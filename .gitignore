@@ -1,0 +1,19 @@
+# Godot
+.godot/
+*.translation
+export_credentials.cfg
+# Build output
+build/
+# Toolchain (fetched by tools/setup_toolchain.sh)
+tools/godot/
+tools/.cache/
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+# Secrets
+*.env
+!*.env.example
+# OS
+.DS_Store

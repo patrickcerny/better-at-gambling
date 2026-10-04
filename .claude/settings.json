@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/tools/setup_toolchain.sh --no-templates >/dev/null 2>&1 || echo 'toolchain setup failed; run tools/setup_toolchain.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}
