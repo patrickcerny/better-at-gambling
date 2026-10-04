@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="MatchPresets" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/defs/match_presets.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+minigames_by_duration = {5: 2, 10: 3, 15: 4, 30: 7}
+default_duration = 10
