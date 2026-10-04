@@ -40,9 +40,8 @@ run_boot_smoke() {
 }
 
 ensure_import() {
-	if [[ ! -d "$ROOT/.godot" ]]; then
-		"$GODOT" --headless --path . --import >/dev/null 2>&1 || true
-	fi
+	# Refreshes the class_name cache (new scripts) and imports changed assets.
+	"$GODOT" --headless --path . --import >/dev/null 2>&1 || true
 }
 
 ensure_import
