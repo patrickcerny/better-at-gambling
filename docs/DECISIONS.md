@@ -75,3 +75,40 @@ Basic strategy (no split) simulation: plain 1:1 → 99.0%, 1.1:1 → 101.4–101
 | Roulette (every bet type) | 101.2% exact; 101.3% red, 102.2% straight over 500k (within 3σ) | generosity 4% |
 | Blackjack (basic strategy, no split) | 101.6% over 400k hands | Dealer Bust Bonus 1.1:1, 3:2, S17 |
 Luck monotonicity (L = −3…+3): slots 70%→132%, blackjack 89%→114%, Plinko and roulette strictly increasing.
+
+## 2026-10-04 — Navmesh: copy the baked polygons into a fresh NavigationMesh
+`NavigationRegion3D.bake_navigation_mesh()` fills the resource in place but the NavigationServer keeps
+the pre-bake upload, so every path query returned nothing (guards stood still). `LuckyLounge` copies the
+baked vertices/polygons into a new `NavigationMesh` on `bake_finished` from the main loop
+(`_on_bake_finished`), then waits a physics + process frame before `navmesh_ready`. Stools are
+obstacles (`agent_max_climb` 0.25, exactly one `cell_height`; 0.3 was floored with a warning) so paths go around furniture.
+
+## 2026-10-04 — Physical hits are impulses, not persistent pushes
+Shoves/door panels add to a horizontal `push_velocity` that decays at 8 m/s²; vertical goes straight
+into `velocity.y` once (`PlayerAvatar.hop/knockback`). The first version re-applied the push every
+physics frame and launched players into the ceiling. `wall_min_slide_angle` is 0 so beans slide along
+posts and tables instead of sticking.
+
+## 2026-10-04 — Plinko chip is a server-steered playback, not simulated physics
+The logic picks the slot (M1). `PlinkoSteering.path_to_slot` builds a constrained random walk in
+half-slot steps that always keeps the target reachable and ends exactly there (1,000 seeded drops in
+`test_plinko_steering.gd`); `PlinkoChip` plays it back with hops and plinks when the `round_result`
+arrives. No RigidBody3D chip: money never depends on physics (§0 rule), and nothing can desync.
+
+## 2026-10-04 — Physical betting (chips on the felt, lever) deferred to M7
+M2 ships the 2D overlays from the art direction (blackjack overlay as specified; roulette layout grid;
+slots bet = pull; Plinko risk + bet). The overlays are the keyboard/gamepad/accessibility path that the
+art direction keeps anyway; the 3D chip placement and lever animation layer on top in M7 polish.
+
+## 2026-10-04 — Sit range is 3.5 m from the station origin
+Seats sit 2.2 m from a blackjack table's centre and players stand ~3 m out, so the prompt's 3.0 m
+`interact_range` rejected legitimate sits. `MapDefinition.interact_range` is 3.5 (server-checked).
+
+## 2026-10-04 — Headless smoke runs take a game-time budget (`--seconds`)
+Headless Godot renders frames as fast as it can, so `--frames` was 15–40 s of game time depending on
+the machine. `--smoke-test --seconds N` ends after N seconds of game time; the 3-minute session uses it.
+
+## 2026-10-04 — Ragdoll wall hits need a real contact with world geometry
+`RagdollBody` reports an impact only when the torso is touching something (`contact_monitor`), and
+flags it as a wall only when that body is on layer 1 (static world). The pin joints jolt the torso
+in the first frames of a throw, and that velocity loss alone used to fire a bogus "wall" knockout.

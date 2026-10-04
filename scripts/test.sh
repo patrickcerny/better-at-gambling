@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the test suites headless. Exits non-zero on any failure.
-# Usage: scripts/test.sh [unit|sim|integration|smoke|lint|all]   (default: unit)
+# Usage: scripts/test.sh [unit|sim|integration|physics|ui|smoke|session|lint|all]   (default: unit)
 set -uo pipefail
 source "$(dirname "$0")/_common.sh"
 cd "$ROOT"
@@ -39,6 +39,18 @@ run_boot_smoke() {
 	fi
 }
 
+run_session() { # scripted 3-minute Practice session must log no errors (M2 acceptance)
+	local log="$LOG_DIR/session.log"
+	echo "== session (autoplay, 185 s game time)"
+	"$GODOT" --headless --path . --audio-driver Dummy -- --autoplay --smoke-test --seconds 185 --bots 3 --seed 7 >"$log" 2>&1
+	local code=$?
+	if [[ $code -ne 0 ]] || grep -qE "$ERROR_PATTERN" "$log"; then
+		echo "   FAILED (exit $code), log: $log"; grep -E "$ERROR_PATTERN" -A2 "$log" | head -40; FAILED=1
+	else
+		echo "   ok ($(grep -c 'autoplay\]' "$log") scripted steps, $(grep -c WARN "$log") warnings)"
+	fi
+}
+
 ensure_import() {
 	# Refreshes the class_name cache (new scripts) and imports changed assets.
 	"$GODOT" --headless --path . --import >/dev/null 2>&1 || true
@@ -49,15 +61,21 @@ case "$SUITE" in
 	unit) run_gut unit res://tests/unit ;;
 	sim) run_gut sim res://tests/sim ;;
 	integration) run_gut integration res://tests/integration ;;
+	physics) run_gut physics res://tests/physics ;;
+	ui) run_gut ui res://tests/ui ;;
 	smoke) run_gut smoke res://tests/smoke; run_boot_smoke ;;
+	session) run_session ;;
 	lint) "$ROOT/scripts/lint.sh" || FAILED=1 ;;
 	all)
 		"$ROOT/scripts/lint.sh" || FAILED=1
 		run_gut unit res://tests/unit
 		run_gut sim res://tests/sim
 		run_gut integration res://tests/integration
+		run_gut physics res://tests/physics
+		run_gut ui res://tests/ui
 		run_gut smoke res://tests/smoke
 		run_boot_smoke
+		run_session
 		;;
 	*) echo "unknown suite: $SUITE" >&2; exit 2 ;;
 esac

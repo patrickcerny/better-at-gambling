@@ -1,12 +1,13 @@
 # Progress
 
-## Current milestone: M2 — Local playable sandbox (single player, in-process server)
-## Next step: build `server/match_server.gd` + `phase_machine.gd` (casino-only) + `station_manager.gd` wired to the M1 logic, then the greybox Lucky Lounge per `docs/ART_DIRECTION.md` (warm luxury look, lobby with fountain/revolving door, VIP balcony).
+## Current milestone: M3 — Networking, dedicated server & lobby
+## Next step: ENet transport in `Net` (client/server modes), replicate positions/events at 20 Hz, `--server` headless entry point, lobby flow with room codes; then the local Practice path and the networked path must share every scene (`match/match_scene.gd` already only talks to `Net`).
 
 ## Status by milestone
 - M0: DONE (evidence: `scripts/test.sh all` green; `godot --headless --path . -- --smoke-test` exit 0; exports built)
 - M1: DONE (evidence: 105 unit tests + 8 sim tests green, RTP table in DECISIONS.md, commits 47210ec…)
-- M2–M11: NOT STARTED
+- M2: DONE (evidence: `scripts/test.sh all` green — unit 109, sim 8, integration 15, physics 10, ui 5, smoke 1, boot, 185 s scripted session with 0 errors; screenshots in `build/screenshots/` via `scripts/screenshots.sh`)
+- M3–M11: NOT STARTED
 
 ## Verified features (IMPLEMENTED+TESTED)
 - Toolchain: Godot 4.7.2 headless, export templates, GUT 9.7.1 (`tools/setup_toolchain.sh`, checksums verified).
@@ -29,11 +30,21 @@
 - `core/` purity (no Node/scene/I/O) — `test_core_purity.gd`.
 - RTP sims: slots 1M spins, roulette 500k per core type, blackjack 400k hands, Plinko 200k per row, all 100.5–102% at L=0, strictly increasing over L∈[−3,3] — `tests/sim/test_rtp.gd` (~100 s).
 
+- M2 server layer: `MatchServer` (20 Hz fixed step, timescale), `PhaseMachine`, `StationManager` (VIP ×3 limits), `IntentValidator` + `RateLimiter`, `WorldQuery`, `PickupSystem`, `InteractionResolver` — `tests/integration/*` (15 tests: full phase sequence, play at every station through intents, VIP gating, rate limit, shove→KO→shake→piles conservation, grab/throw/break-free, guard offences).
+- Greybox Lucky Lounge (`maps/lucky_lounge/`): lobby with fountain, revolving door, reception, ropes, stairs to the VIP mezzanine with bouncer gate and low railing, blackjack lounge, roulette pit, slot rows, Plinko wall, bar; navmesh (baked at load), LOS raycasts, props on Jolt — `tools/scene_probe.gd`, smoke tests.
+- Bean avatar (`player/`): CharacterBody3D with procedural wobble/lean/squash, dot eyes, voice-ready mouth, floppy arms; first/third-person camera, seated camera anchors; 5-body ragdoll with impact/settle signals; held/thrown/seated/stunned/away states; `move` intents at 20 Hz — `tests/physics/test_match_scene.gd`.
+- Match scene (`match/match_scene.gd`): in-process Practice server with bots, HUD, station overlays, guards (navmesh patrol, sight cone, chase, throw-out + respawn), fountain (soak + knockout), revolving door push, VIP bouncer pushback + buzzer, mezzanine fall knockout, chip piles + pickups, Plinko chip playback, emotes, results panel, kill floor — `tests/physics/test_match_scene.gd` (10 tests), `scripts/test.sh session`.
+- HUD (money with ±pops, timer, rank, items, feed, prompt, toast, leaderboard), `BetPanel` (keyboard + joypad), Blackjack/Roulette/Slots/Plinko overlays — `tests/ui/test_bet_panel.gd`, screenshots.
+- `PlinkoSteering` (constrained random walk ending in the server's slot; 1,000 seeded drops) — `tests/unit/test_plinko_steering.gd`.
+- Theme (`ui/theme/main_theme.tres` from `tools/gen_theme.gd`, Barlow Condensed), generated placeholder SFX (`tools/gen_audio.py`), `Audio` director with pooled players and music crossfade.
+
 ## Implemented but unverified
-- (none)
+- Gamepad play end to end (bindings exist and the bet panel is tested with joypad events; nobody has held a real pad yet).
+- Revolving door "stuck" feel and the mezzanine railing shove-off: both work in tests, tuning is by eye in M7.
 
 ## Known bugs
-- (none)
+- Stairs are not on the navmesh (guards never go upstairs; players do, it's physics). Fine for now, revisit when bots roam (M6).
+- The slots camera anchor sits too close to the cabinet screen (M7 station polish).
 
 ## Blockers
 - None for M2–M5. Needed from Patrick later: VPS SSH access/specs and a domain (M6), Steamworks App ID + Web API key (M8).
@@ -44,3 +55,7 @@
 - M1 built: all core logic + the four game logics with unit tests; RTP tuned (slot weights, Plinko weights, roulette generosity 4%) with Monte-Carlo sims; decisions logged.
 - Patrick's art & audio direction adopted as `docs/ART_DIRECTION.md` (+ concept image); master prompt presentation sections now defer to it.
 - Tests: `scripts/test.sh all` → lint ok, unit 105/105, sim 8/8, smoke 1/1, boot ok.
+### 2026-10-04 / session 2 (M2)
+- Server layer + integration tests, greybox casino, avatar/camera/ragdoll, HUD + station overlays, guards/hazards, Plinko chip, autoplay driver, physics + UI suites, screenshots script.
+- Bugs found by the scripted session and fixed: seats faced away from tables (players stood up into the felt), knockback accumulated into vertical velocity (players hit the ceiling), navmesh bake never reached the NavigationServer (guards stood still), stools were "climbable" for the navmesh, the ramp slab had a lip, the porch had no floor.
+- Tests: `scripts/test.sh all` green (see M2 evidence above).

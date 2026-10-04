@@ -70,6 +70,20 @@ extends Resource
 @export var jackpot_feed_rate: float = 0.01
 @export var jackpot_seed: int = 500
 
+@export_group("Movement")
+@export var walk_speed: float = 5.5
+@export var sprint_speed: float = 8.0
+@export var sprint_stamina: float = 4.0
+@export var stamina_regen_per_second: float = 0.5
+@export var jump_height: float = 1.1
+@export var acceleration: float = 30.0
+@export var deceleration: float = 14.0
+@export var held_speed_factor: float = 0.5
+@export var soaked_seconds: float = 3.0
+@export var soaked_speed_factor: float = 0.5
+@export var mezzanine_fall_height: float = 2.5
+@export var throw_out_respawn_seconds: float = 4.0
+
 @export_group("Physical interaction")
 @export var shove_cooldown: float = 1.2
 @export var shove_knockdown_window: float = 1.5

@@ -13,4 +13,4 @@ extends Resource
 ## Spawn points in the entrance hall.
 @export var spawn_points: Array[Vector3] = []
 ## Max distance from a station's interaction point to sit down.
-@export var interact_range: float = 3.0
+@export var interact_range: float = 3.5

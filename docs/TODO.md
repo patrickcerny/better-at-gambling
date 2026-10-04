@@ -70,43 +70,43 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ## M2 — Local playable sandbox (single player, in-process server)
 
 ### Tasks
-- [ ] `MatchServer` + `PhaseMachine` (casino-only for now)
-- [ ] `StationManager`
-- [ ] in-process local session (host = local player, no network peer yet, but go through the same intent/event API)
-- [ ] greybox Lucky Lounge (layout §2.3, navmesh, spawn points, all MVP stations placed via `MapDefinition`)
-- [ ] wobbly bean avatar (walk/sprint/jump, procedural wobble, googly eyes, mouth driven by a test tone until voice exists)
-- [ ] 5-body ragdoll + get-up
-- [ ] **grab/shove/throw/knockout/shake** against dummy bean bots via server-side `InteractionResolver`
-- [ ] props (stools, chip piles) on Jolt physics
-- [ ] fountain hazard
-- [ ] revolving door
-- [ ] 2 security guards with patrol + sight cone + throw-out
-- [ ] VIP mezzanine with bouncer check and railing
-- [ ] first-person camera + third-person toggle + auto third-person when ragdolled
-- [ ] emote wheel
-- [ ] Plinko station with server-steered chip and recorded path playback
-- [ ] interaction prompts
-- [ ] sit/leave
-- [ ] station scenes with placeholder visuals
-- [ ] **betting UI component**
-- [ ] Blackjack/Roulette/Slots UIs wired to logic through intents/events
-- [ ] HUD (money, timer, event feed)
-- [ ] money popups
-- [ ] basic SFX hookup with generated placeholders (run `tools/gen_audio.py`)
-- [ ] toon shader
-- [ ] main menu → "Practice" → casino
+- [x] `MatchServer` + `PhaseMachine` (casino-only for now)
+- [x] `StationManager`
+- [x] in-process local session (host = local player, no network peer yet, but go through the same intent/event API)
+- [x] greybox Lucky Lounge (layout §2.3, navmesh, spawn points, all MVP stations placed via `MapDefinition`)
+- [x] wobbly bean avatar (walk/sprint/jump, procedural wobble, dot eyes; mouth is driven by `AvatarVisuals.mouth_open`, voice hookup in M8)
+- [x] 5-body ragdoll + get-up
+- [x] **grab/shove/throw/knockout/shake** against dummy bean bots via server-side `InteractionResolver`
+- [x] props (stools, chip piles) on Jolt physics
+- [x] fountain hazard
+- [x] revolving door
+- [x] 2 security guards with patrol + sight cone + throw-out
+- [x] VIP mezzanine with bouncer check and railing
+- [x] first-person camera + third-person toggle + auto third-person when ragdolled
+- [x] emote wheel
+- [x] Plinko station with server-steered chip and recorded path playback
+- [x] interaction prompts
+- [x] sit/leave
+- [x] station scenes with placeholder visuals
+- [x] **betting UI component**
+- [x] Blackjack/Roulette/Slots UIs wired to logic through intents/events
+- [x] HUD (money, timer, event feed)
+- [x] money popups
+- [x] basic SFX hookup with generated placeholders (run `tools/gen_audio.py`)
+- [ ] toon shader (file exists in `vfx/shaders/toon.gdshader`; applying it to beans/props is M7 polish per ART_DIRECTION "keep shaders simple")
+- [x] main menu → "Practice" → casino
 
 ### Tests
-- [ ] scene smoke tests for all new scenes
-- [ ] physics integration tests (shove ×3 → knockout; throw into fountain → slow; shake drops exactly the capped amount and chip piles sum to it; seated player immune; guard throws out an attacker in sight but not one out of sight; Plinko chip lands in the server-chosen slot in 1,000 seeded drops)
-- [ ] integration test: scripted local player intents sit at each station type, places bets, plays rounds
-- [ ] money in HUD matches server state
-- [ ] leave mid-round auto-resolves correctly
-- [ ] UI navigation test with keyboard and joypad events on bet panel
+- [x] scene smoke tests for all new scenes
+- [x] physics integration tests (shove ×3 → knockout; throw into fountain → slow; shake drops exactly the capped amount and chip piles sum to it; seated player immune; guard throws out an attacker in sight but not one out of sight; Plinko chip lands in the server-chosen slot in 1,000 seeded drops)
+- [x] integration test: scripted local player intents sit at each station type, places bets, plays rounds
+- [x] money in HUD matches server state
+- [x] leave mid-round auto-resolves correctly
+- [x] UI navigation test with keyboard and joypad events on bet panel
 
 ### Acceptance criteria
-- [ ] you can launch the game, walk around, grab/shove/throw dummy beans and shake chips out of them, get thrown out by a guard, and play all four games with correct payouts using mouse/keyboard and gamepad (verified by automated UI tests + screenshots)
-- [ ] no errors in log during a scripted 3-minute session
+- [x] you can launch the game, walk around, grab/shove/throw dummy beans and shake chips out of them, get thrown out by a guard, and play all four games with correct payouts using mouse/keyboard and gamepad (verified by automated UI tests + screenshots)
+- [x] no errors in log during a scripted 3-minute session
 
 ## M3 — Networking, dedicated server & lobby
 
