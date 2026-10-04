@@ -36,3 +36,42 @@ The viewport is designed at 1920×1080 (`canvas_items` + `expand`), but the defa
 ## 2026-10-04 — Dedicated server export preset from M0
 A `Linux Server` preset (`dedicated_server=true`) exists from the start so server builds can be
 smoke-tested early; the `--server` boot path itself lands in M3.
+
+## 2026-10-04 — Art & audio direction adopted from Patrick's brief (`docs/ART_DIRECTION.md`)
+Patrick supplied a detailed visual/audio direction he likes (warm "luxury vs stupidity" casino,
+palette, Barlow Condensed, bean ragdolls with dot eyes, 3D main-menu scene, physical-first betting,
+lobby podium results). It overrides the master prompt's presentation notes (neon/purple theme, Lilita
+One/Nunito fonts, 2D main menu). Gameplay rules are untouched. Fonts: Barlow Condensed (OFL) will be
+downloaded in M2/M7 for the theme; until then Godot's default font is used.
+
+## 2026-10-04 — Roulette generosity paid as stochastic rounding, 4% not 5%
+The +5% "house generosity" on the gross return yields 36/37 × 1.05 = 102.2%, above the 100.5–102% band,
+so it is 4% (≈101.2%). Payouts are integers; `4% of $20 = $0.80` is paid as $1 with probability 0.8 so
+small bets keep the bonus in expectation (verified in `tests/sim/test_rtp.gd`).
+
+## 2026-10-04 — Slot reel weights retuned
+The prompt's initial weights (9/8/6/5/3/2/1) give RTP 134%. Exact enumeration + search found
+9/11/9/7/3/1/1 (RTP 101.0%, hit rate 30.5%), the closest in-band set to the original.
+
+## 2026-10-04 — Plinko slot weights are Gaussian-ish, not binomial
+Binomial weights give RTP 77%/70%/54% with the prompt's multipliers. Weights are a discretised
+Gaussian over the 13 slots with σ tuned per row to 101% (`balance.tres`), keeping the multipliers.
+
+## 2026-10-04 — Progressive jackpot feed is house money
+The 1% feed on slot/Plinko bets is added to the pot by the house without reducing the stake, so the
+per-game RTP stays as tuned and the jackpot is pure upside (the prompt calls it house money).
+
+## 2026-10-04 — Blackjack Dealer Bust Bonus stays 1.1:1
+Basic strategy (no split) simulation: plain 1:1 → 99.0%, 1.1:1 → 101.4–101.6%. In band, unchanged.
+
+## 2026-10-04 — Luck rerolls only when the reroll chance fires; ties keep the first draw
+`LuckRng.draw` never swaps on equal quality, so a lucky player is never handed a worse result.
+
+## 2026-10-04 — RTP table at neutral luck (final M1 constants, `tests/sim/test_rtp.gd`)
+| Game | Exact / simulated RTP | Notes |
+|---|---|---|
+| Slots | 101.0% exact, 101.1% over 1M spins, hit rate 30.5% | weights 9/11/9/7/3/1/1 |
+| Plinko low / medium / high | 101.0% / 101.0% / 100.9% exact | Gaussian weights σ 2.614 / 2.249 / 2.004 |
+| Roulette (every bet type) | 101.2% exact; 101.3% red, 102.2% straight over 500k (within 3σ) | generosity 4% |
+| Blackjack (basic strategy, no split) | 101.6% over 400k hands | Dealer Bust Bonus 1.1:1, 3:2, S17 |
+Luck monotonicity (L = −3…+3): slots 70%→132%, blackjack 89%→114%, Plinko and roulette strictly increasing.

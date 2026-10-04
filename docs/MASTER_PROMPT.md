@@ -2,6 +2,8 @@
 
 > **Read this whole document before touching anything.** This prompt is addressed to you, the autonomous agent (lead designer, architect and senior developer) who will build this game from an empty folder to a Steam-ready build. It is self-contained: every design decision below has already been made. Where something is still unspecified, pick the sensible default, record it in `docs/DECISIONS.md`, and keep going.
 
+> **Art & audio direction override (2026-10-04):** all visual and audio presentation follows `docs/ART_DIRECTION.md` (warm luxurious-but-chaotic casino, palette `#151414 #24211F #F2E6C9 #C83D3D #275E49 #D6A84B #681F2C #E3B95C #68C26F #E55353`, Barlow Condensed, bean ragdolls with dot eyes and `-/o/O` mouths, 3D main-menu scene, physical-first betting, lobby podium results). Where this section conflicts with it on presentation, ART_DIRECTION.md wins; gameplay rules here stay authoritative.
+
 ---
 
 ## 0. Operating rules for you (read first, obey always)
@@ -303,7 +305,10 @@ Draft is simultaneous; 8 s to pick (default: first option). Cash scales with the
 
 ### 2.14 UI/UX
 
-Godot `Control` UI with a single theme resource `ui/theme/main_theme.tres`: Art-deco gold + neon magenta/teal on deep purple; rounded chunky panels; big readable fonts (UI scale 75–150%). All UI fully navigable with **mouse, keyboard, and gamepad** (focus neighbors set, visible focus outline).
+> **Art & audio direction override (2026-10-04):** all visual and audio presentation follows `docs/ART_DIRECTION.md` (warm luxurious-but-chaotic casino, palette `#151414 #24211F #F2E6C9 #C83D3D #275E49 #D6A84B #681F2C #E3B95C #68C26F #E55353`, Barlow Condensed, bean ragdolls with dot eyes and `-/o/O` mouths, 3D main-menu scene, physical-first betting, lobby podium results). Where this section conflicts with it on presentation, ART_DIRECTION.md wins; gameplay rules here stay authoritative.
+
+
+Godot `Control` UI with a single theme resource `ui/theme/main_theme.tres`: palette and typography from `docs/ART_DIRECTION.md` (cream/gold/black/red/green, casino signage feel, no neon); rounded chunky panels; big readable fonts (UI scale 75–150%). All UI fully navigable with **mouse, keyboard, and gamepad** (focus neighbors set, visible focus outline).
 
 Screens: Splash → Main Menu (Play Online → Create Party / Join by Code / Rejoin Match, Practice vs Bots, Tutorial, Settings, Credits, Quit; dev builds also show Join by IP) → Lobby → Loading → In-game HUD → Minigame UI → Reward Draft → Results → Pause menu (Resume, Settings, How to Play, Invite Friends, Leave Match).
 
@@ -319,6 +324,9 @@ Screens: Splash → Main Menu (Play Online → Create Party / Join by Code / Rej
 
 ### 2.15 Audio
 
+> **Art & audio direction override (2026-10-04):** all visual and audio presentation follows `docs/ART_DIRECTION.md` (warm luxurious-but-chaotic casino, palette `#151414 #24211F #F2E6C9 #C83D3D #275E49 #D6A84B #681F2C #E3B95C #68C26F #E55353`, Barlow Condensed, bean ragdolls with dot eyes and `-/o/O` mouths, 3D main-menu scene, physical-first betting, lobby podium results). Where this section conflicts with it on presentation, ART_DIRECTION.md wins; gameplay rules here stay authoritative.
+
+
 - Buses: Master → Music, SFX, UI, Ambience, Voice. Volume sliders per bus.
 - Music: lobby loop, casino loop (lounge-jazz/funk, ~110 BPM), Last Call variant (faster/intense), quiz game-show loop, results fanfare. Crossfade 1 s between phases.
 - SFX: footsteps, jump, sprint breath, grab/whoosh, shove "oof", throw, ragdoll thuds (soft, comedic), knockout birdies, Spring Glove "BOING", fountain splash, guard whistle + "OUT YOU GO!" bark, cartoon voice gibberish barks for NPCs, Plinko peg plinks (pitch rising with each row), chip clicks (bet), card deal/flip, roulette ball rolling/clatter, slot reel spin/stop/jingles (small/big/jackpot), win/lose stingers, item activation stings (one per item), slip, coin scatter/pickup, quiz tick/correct/wrong, UI hover/click/back, countdown beeps, crowd "ooh/aah" on big wins.
@@ -327,6 +335,9 @@ Screens: Splash → Main Menu (Play Online → Create Party / Join by Code / Rej
 - Placeholder audio: generate with a script (§11.3) — never block on missing audio.
 
 ### 2.16 Visual style & animation
+
+> **Art & audio direction override (2026-10-04):** all visual and audio presentation follows `docs/ART_DIRECTION.md` (warm luxurious-but-chaotic casino, palette `#151414 #24211F #F2E6C9 #C83D3D #275E49 #D6A84B #681F2C #E3B95C #68C26F #E55353`, Barlow Condensed, bean ragdolls with dot eyes and `-/o/O` mouths, 3D main-menu scene, physical-first betting, lobby podium results). Where this section conflicts with it on presentation, ART_DIRECTION.md wins; gameplay rules here stay authoritative.
+
 
 - **Low-fidelity charm on purpose** (friendslop look): simple, slightly goofy low-poly, cheap to produce and endlessly readable, where comedy comes from motion, faces and physics rather than detail. Stylized low-poly, saturated colors, toon/cel shading (a simple `toon.gdshader` with 3-step ramp + rim light), bloom/glow on neon signs, warm spotlights. Readability first: stations have bold silhouettes and colored floor rugs per game type (Blackjack = green, Roulette = red, Slots = gold).
 - Characters: bean/capsule body, 8 player colors, googly eyes, a mouth driven by voice amplitude (and by emotes/reactions for bots and muted players), mitten hands on noodle arms, simple hats (top hat, cowboy, crown (leader only override), visor, beanie, party cone) and unlockable cosmetics (§2.23). **"The mouths move"** is a hard requirement: a talking player's mouth must visibly flap in sync with their voice for everyone nearby.
@@ -434,7 +445,7 @@ Built entirely from existing systems via a `ModeDefinition`, which proves the mo
 | 3D physics | **Jolt Physics** (built into Godot ≥ 4.4; set `physics/3d/physics_engine = "Jolt Physics"`) for stable stacking, ragdolls and props | Godot Physics (default) with tuned solver iterations |
 | Voice | **Steam Voice** via GodotSteam (Steam builds); built-in `AudioEffectCapture` + μ-law codec (ENet/LAN builds) | Voice disabled with a clear UI note; emotes/pings still work |
 | Placeholder 3D/2D assets | Procedural meshes (Godot primitives/CSG), optional **Kenney CC0** packs if downloadable | Primitives only |
-| Fonts | Open-licensed Google Fonts (e.g., "Lilita One" for headings, "Nunito" for body), OFL | Godot default font |
+| Fonts | Barlow Condensed (OFL), see docs/ART_DIRECTION.md | Godot default font |
 | Audio placeholders | Generated by a Python script (sfxr-style synthesis with numpy/wave or pure Python) | Silent placeholder streams; never block |
 
 Every third-party asset/add-on goes into `CREDITS.md` and `THIRD_PARTY_LICENSES.md` with source URL and license.
@@ -721,6 +732,9 @@ Not in MVP: Steam (and therefore Steam Voice), achievements, tutorial (contextua
 - Accessibility and localization groundwork as in §2.17.
 
 ## 11. Assets (required list + placeholder strategy)
+
+> **Art & audio direction override (2026-10-04):** all visual and audio presentation follows `docs/ART_DIRECTION.md` (warm luxurious-but-chaotic casino, palette `#151414 #24211F #F2E6C9 #C83D3D #275E49 #D6A84B #681F2C #E3B95C #68C26F #E55353`, Barlow Condensed, bean ragdolls with dot eyes and `-/o/O` mouths, 3D main-menu scene, physical-first betting, lobby podium results). Where this section conflicts with it on presentation, ART_DIRECTION.md wins; gameplay rules here stay authoritative.
+
 
 Never block on art or audio. Every asset slot below must have a working placeholder by the milestone that needs it; final assets can replace placeholders 1:1 because every visual is referenced through a scene or resource with the same path.
 

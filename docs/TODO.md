@@ -31,41 +31,41 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ## M1 — Core logic library (no visuals)
 
 ### Tasks
-- [ ] `SeededRng`
-- [ ] `LuckRng` (reroll mechanics)
-- [ ] `Card/Shoe/HandEval`
-- [ ] `BlackjackLogic` (state machine: idle → betting → dealing → acting → dealer → payout; simultaneous player actions; timeouts; auto-resolve)
-- [ ] `RouletteLogic` (bet validation, all MVP bet types, payout + generosity bonus, luck neighbor/jinx rules)
-- [ ] `SlotsLogic` (weighted reels, wild, paytable, luck reroll)
-- [ ] `PlinkoLogic` (risk rows, weighted slot outcome, luck reroll) + `ProgressiveJackpot`
-- [ ] `InteractionRules` (pure rules for shove/knockout counting, immunities, shake amounts and caps, guard-sight decision given positions)
-- [ ] `StationLogicBase` interface
-- [ ] `Economy` + ledger
-- [ ] `ModifierStack`
-- [ ] `BalanceConfig` + `balance.tres`
-- [ ] `MatchSchedule` (durations → segment times, Last Call)
-- [ ] `MatchState/PlayerState`
-- [ ] `GameEvents` factory
-- [ ] `Serializer` + protocol constants
-- [ ] `QuizScoring`
-- [ ] `LootTables`
+- [x] `SeededRng`
+- [x] `LuckRng` (reroll mechanics)
+- [x] `Card/Shoe/HandEval`
+- [x] `BlackjackLogic` (state machine: idle → betting → dealing → acting → dealer → payout; simultaneous player actions; timeouts; auto-resolve)
+- [x] `RouletteLogic` (bet validation, all MVP bet types, payout + generosity bonus, luck neighbor/jinx rules)
+- [x] `SlotsLogic` (weighted reels, wild, paytable, luck reroll)
+- [x] `PlinkoLogic` (risk rows, weighted slot outcome, luck reroll) + `ProgressiveJackpot`
+- [x] `InteractionRules` (pure rules for shove/knockout counting, immunities, shake amounts and caps, guard-sight decision given positions)
+- [x] `StationLogicBase` interface
+- [x] `Economy` + ledger
+- [x] `ModifierStack`
+- [x] `BalanceConfig` + `balance.tres`
+- [x] `MatchSchedule` (durations → segment times, Last Call)
+- [x] `MatchState/PlayerState`
+- [x] `GameEvents` factory
+- [x] `Serializer` + protocol constants
+- [x] `QuizScoring`
+- [x] `LootTables`
 
 ### Tests
-- [ ] unit tests for every class: blackjack totals (soft/hard aces, blackjack vs 21, dealer S17, double, bust), shoe reshuffle at penetration, simultaneous actions & timeout auto-stand
-- [ ] roulette color/dozen/column mapping for all 37 numbers, payouts per bet type, limits
-- [ ] slots paytable incl. wild substitution and cherry rules
-- [ ] Plinko multipliers/weights per risk row and jackpot feed/accounting
-- [ ] interaction rules (3 shoves in 4 s → knockout, immunity windows, shake cap 8% / $400 × multiplier, same-attacker 20 s limit, seated players immune)
-- [ ] luck reroll: L=0 never rerolls, L>0 never yields worse quality than the first draw, probability ≈ 0.12·L (statistical)
-- [ ] economy cannot go negative, every change has a reason
-- [ ] schedule table from §2.1 exactly
-- [ ] serializer round-trip for MatchState
-- [ ] quiz scoring boundaries (0 s → 1000, 12 s → 500, wrong → 0, ties). **Sim tests:** RTP within 100.5–102% at L=0 for each game (tune constants until true), monotonic RTP over L∈[−3,3]
+- [x] unit tests for every class: blackjack totals (soft/hard aces, blackjack vs 21, dealer S17, double, bust), shoe reshuffle at penetration, simultaneous actions & timeout auto-stand
+- [x] roulette color/dozen/column mapping for all 37 numbers, payouts per bet type, limits
+- [x] slots paytable incl. wild substitution and cherry rules
+- [x] Plinko multipliers/weights per risk row and jackpot feed/accounting
+- [x] interaction rules (3 shoves in 4 s → knockout, immunity windows, shake cap 8% / $400 × multiplier, same-attacker 20 s limit, seated players immune)
+- [x] luck reroll: L=0 never rerolls, L>0 never yields worse quality than the first draw, probability ≈ 0.12·L (statistical)
+- [x] economy cannot go negative, every change has a reason
+- [x] schedule table from §2.1 exactly
+- [x] serializer round-trip for MatchState
+- [x] quiz scoring boundaries (0 s → 1000, 12 s → 500, wrong → 0, ties). **Sim tests:** RTP within 100.5–102% at L=0 for each game (tune constants until true), monotonic RTP over L∈[−3,3]
 
 ### Acceptance criteria
-- [ ] all tests green
-- [ ] RTP table recorded in `DECISIONS.md` with final tuned constants
-- [ ] no Node references in `core/` (enforce with a grep test)
+- [x] all tests green
+- [x] RTP table recorded in `DECISIONS.md` with final tuned constants
+- [x] no Node references in `core/` (enforce with a grep test)
 
 ## M2 — Local playable sandbox (single player, in-process server)
 
