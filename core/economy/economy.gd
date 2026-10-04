@@ -7,6 +7,8 @@ extends RefCounted
 signal money_changed(event: Dictionary)
 
 var ledger: MoneyLedger = MoneyLedger.new()
+## When false, changes are not logged or emitted (Monte-Carlo sims only; never in a match).
+var record_history: bool = true
 ## Events not yet collected by the match server.
 var pending_events: Array[Dictionary] = []
 
@@ -45,6 +47,8 @@ func apply(player: int, amount: int, reason: StringName, source: StringName = &"
 	if amount == 0:
 		return true
 	_balances[player] = next
+	if not record_history:
+		return true
 	ledger.record(player, amount, reason, source, next)
 	var ev: Dictionary = GameEvents.money_changed(player, amount, reason, next, source)
 	pending_events.append(ev)
