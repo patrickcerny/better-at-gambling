@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/game_definition.gd" id="1"]
+[ext_resource type="Script" path="res://games/blackjack/blackjack_logic.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"blackjack"
+display_name = "Blackjack"
+rules_text = "Get closer to 21 than the dealer without going over. Pays 1:1, Blackjack 3:2. Dealer stands on soft 17. Double on any two cards."
+logic_script = ExtResource("2")
+rug_color = Color(0.153, 0.369, 0.286, 1)

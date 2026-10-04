@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/game_definition.gd" id="1"]
+[ext_resource type="Script" path="res://games/slots/slots_logic.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"slots"
+display_name = "Slots"
+rules_text = "Pick a bet and spin. Three of a kind pays big; the Clover is wild; three Diamonds win the Jackpot."
+logic_script = ExtResource("2")
+rug_color = Color(0.839, 0.659, 0.294, 1)

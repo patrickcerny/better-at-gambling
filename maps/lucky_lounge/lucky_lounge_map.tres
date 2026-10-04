@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MapDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/defs/map_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"lucky_lounge"
+display_name = "The Lucky Lounge"
+stations = {&"slot_1": &"slots", &"slot_2": &"slots", &"slot_3": &"slots", &"slot_4": &"slots", &"slot_5": &"slots", &"slot_6": &"slots", &"slot_7": &"slots", &"slot_8": &"slots", &"slot_9": &"slots", &"slot_10": &"slots", &"slot_11": &"slots", &"slot_12": &"slots", &"roulette_1": &"roulette", &"roulette_2": &"roulette", &"blackjack_1": &"blackjack", &"blackjack_2": &"blackjack", &"blackjack_3": &"blackjack", &"plinko_1": &"plinko", &"plinko_2": &"plinko", &"vip_blackjack_1": &"blackjack", &"vip_roulette_1": &"roulette", &"vip_slot_1": &"slots", &"vip_slot_2": &"slots"}
+hot_table_candidates = Array[StringName]([&"slot_1", &"slot_2", &"slot_3", &"slot_4", &"slot_5", &"slot_6", &"slot_7", &"slot_8", &"slot_9", &"slot_10", &"slot_11", &"slot_12", &"roulette_1", &"roulette_2", &"blackjack_1", &"blackjack_2", &"blackjack_3", &"plinko_1", &"plinko_2"])
+interact_range = 3.0

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/game_definition.gd" id="1"]
+[ext_resource type="Script" path="res://games/roulette/roulette_logic.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"roulette"
+display_name = "Roulette"
+rules_text = "Bet on numbers, colours, odd/even, halves, dozens or columns. Straight number pays 35:1."
+logic_script = ExtResource("2")
+rug_color = Color(0.784, 0.239, 0.239, 1)

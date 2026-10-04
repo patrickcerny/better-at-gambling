@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="RegistryList" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://core/defs/registry_list.gd" id="1"]
+[ext_resource type="Resource" path="res://games/blackjack/blackjack.tres" id="2"]
+[ext_resource type="Resource" path="res://games/roulette/roulette.tres" id="3"]
+[ext_resource type="Resource" path="res://games/slots/slots.tres" id="4"]
+[ext_resource type="Resource" path="res://games/plinko/plinko.tres" id="5"]
+
+[resource]
+script = ExtResource("1")
+entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5")])

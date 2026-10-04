@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/game_definition.gd" id="1"]
+[ext_resource type="Script" path="res://games/plinko/plinko_logic.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"plinko"
+display_name = "Plinko"
+rules_text = "Pick a bet and a risk row, then drop the chip. Edge slots pay the most; the High row can win the Jackpot."
+logic_script = ExtResource("2")
+rug_color = Color(0.408, 0.122, 0.173, 1)
