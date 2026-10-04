@@ -5,7 +5,7 @@
 
 ## Status by milestone
 - M0: DONE (evidence: `scripts/test.sh all` green; `godot --headless --path . -- --smoke-test` exit 0; exports built)
-- M1: DONE (evidence: 113 unit tests + 8 sim tests green, RTP table in DECISIONS.md, commits 47210ec…)
+- M1: DONE (evidence: 105 unit tests + 8 sim tests green, RTP table in DECISIONS.md, commits 47210ec…)
 - M2–M11: NOT STARTED
 
 ## Verified features (IMPLEMENTED+TESTED)
@@ -43,4 +43,4 @@
 - Readiness check passed; M0 built and committed (see git log).
 - M1 built: all core logic + the four game logics with unit tests; RTP tuned (slot weights, Plinko weights, roulette generosity 4%) with Monte-Carlo sims; decisions logged.
 - Patrick's art & audio direction adopted as `docs/ART_DIRECTION.md` (+ concept image); master prompt presentation sections now defer to it.
-- Tests: `scripts/test.sh all` → lint ok, unit 113/113, sim 8/8, smoke 1/1, boot ok.
+- Tests: `scripts/test.sh all` → lint ok, unit 105/105, sim 8/8, smoke 1/1, boot ok.
