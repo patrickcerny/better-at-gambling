@@ -189,35 +189,35 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ## M5 — Items, luck, sabotage, pickups
 
 ### Tasks
-- [ ] `ItemSystem`
-- [ ] inventory (3 slots, discard flow)
-- [ ] `ItemDefinition`/`ItemEffect` for the 11 MVP items (incl. Spring Glove's physical effect and Bouncer NPC hook-up when Bouncer lands in M10)
-- [ ] targeting UI (picker + proximity indicator ring)
-- [ ] activation banners/VFX/SFX placeholders
-- [ ] luck HUD meter
-- [ ] effect timers HUD
-- [ ] protections (Bodyguard/Mirror/spawn protection/away protection)
-- [ ] negative-item grace window
-- [ ] cooldowns
-- [ ] `PickupSystem` (dropped chips, banana peel slip)
-- [ ] reward draft with real items + loot tables + Underdog rule
-- [ ] game-specific luck hooks
-- [ ] peek dealer card for Hot Hands (private event to that player only)
+- [x] `ItemSystem`
+- [x] inventory (3 slots, discard flow)
+- [x] `ItemDefinition`/`ItemEffect` for the 11 MVP items (incl. Spring Glove's physical effect and Bouncer NPC hook-up when Bouncer lands in M10)
+- [x] targeting UI (picker + proximity indicator ring)
+- [x] activation banners/VFX/SFX placeholders
+- [x] luck HUD meter
+- [x] effect timers HUD
+- [x] protections (Bodyguard/Mirror/spawn protection/away protection)
+- [x] negative-item grace window
+- [x] cooldowns
+- [x] `PickupSystem` (dropped chips, banana peel slip)
+- [x] reward draft with real items + loot tables + Underdog rule
+- [x] game-specific luck hooks
+- [x] peek dealer card for Hot Hands (private event to that player only)
 
 ### Tests
-- [ ] unit test per item (activate, effect, expiry, interaction with Bodyguard and Mirror, edge cases: target broke, target away, target protected, self-target invalid, out of range)
-- [ ] Pickpocket min/max/never-negative
-- [ ] Double Trouble × Last Call × Hot Table stacking order
-- [ ] Golden Chip refund exactness
-- [ ] banana drop amount & pickup conservation (money dropped = money picked up + despawned, despawned money is logged as `pickup_expired`)
-- [ ] draft offers follow loot weights (statistical)
-- [ ] Underdog only with ≥ 3 players
-- [ ] integration: bots/autoplay use items during a full match without errors
+- [x] unit test per item (activate, effect, expiry, interaction with Bodyguard and Mirror, edge cases: target broke, target away, target protected, self-target invalid, out of range)
+- [x] Pickpocket min/max/never-negative
+- [x] Double Trouble × Last Call × Hot Table stacking order
+- [x] Golden Chip refund exactness
+- [x] banana drop amount & pickup conservation (money dropped = money picked up + despawned, despawned money is logged as `pickup_expired`)
+- [x] draft offers follow loot weights (statistical)
+- [x] Underdog only with ≥ 3 players
+- [x] integration: bots/autoplay use items during a full match without errors
 
 ### Acceptance criteria
-- [ ] every MVP item is usable in a networked match with visible feedback for all players
-- [ ] money conservation test passes with items enabled
-- [ ] all tests green
+- [x] every MVP item is usable in a networked match with visible feedback for all players
+- [x] money conservation test passes with items enabled
+- [x] all tests green
 
 ## M6 — Bots, reconnects, MVP hardening → **MVP COMPLETE**
 

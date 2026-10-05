@@ -43,7 +43,7 @@ run_boot_smoke() {
 run_session() { # scripted 3-minute Practice session must log no errors (M2 acceptance)
 	local log="$LOG_DIR/session.log"
 	echo "== session (autoplay, 185 s game time)"
-	"$GODOT" --headless --path . --audio-driver Dummy -- --autoplay --smoke-test --seconds 185 --bots 3 --seed 7 >"$log" 2>&1
+	"$GODOT" --headless --path . --audio-driver Dummy -- --autoplay --smoke-test --seconds 185 --bots 3 --seed 7 --give-items lucky_clover,banana_peel,black_cat >"$log" 2>&1
 	local code=$?
 	if [[ $code -ne 0 ]] || grep -qE "$ERROR_PATTERN" "$log"; then
 		echo "   FAILED (exit $code), log: $log"; grep -E "$ERROR_PATTERN" -A2 "$log" | head -40; FAILED=1

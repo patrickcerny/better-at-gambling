@@ -46,6 +46,11 @@ var role: Role = Role.PRACTICE
 var net_world: NetWorld
 var lobby_panel: LobbyPanel
 var connection_label: Label
+## Item keys, target picker, discard choice (M5).
+var items_ctl: ItemController
+## Banana peels on the floor (peel id → mesh) and item effect tags over heads (player → label).
+var peel_nodes: Dictionary[int, Node3D] = {}
+var effect_tags: Dictionary[int, Label3D] = {}
 
 var _ko_until: Dictionary[int, float] = {}
 var _ragdoll_attacker: Dictionary[int, int] = {}
@@ -134,6 +139,10 @@ func _ready() -> void:
 	view.state.station_changed.connect(_on_station_state)
 	view.state.players_changed.connect(_sync_avatars)
 	view.state.lobby_changed.connect(_on_lobby_changed)
+	view.state.peels_changed.connect(_sync_peels)
+	view.state.effects_changed.connect(_refresh_effect_tag)
+	items_ctl = ItemController.new(self)
+	add_child(items_ctl)
 	Net.event_received.connect(_on_event)
 	net_world = NetWorld.new()
 	net_world.name = "NetWorld"
@@ -150,6 +159,10 @@ func _ready() -> void:
 		var skip: float = cmd.get_float("skip-to", 0.0)
 		while skip > 0.0 and server.running and server.phases.casino_time < skip - 0.01:
 			server.advance(MatchServer.TICK)
+		# Dev/tests: `--give-items lucky_clover,banana_peel` starts everyone with these items.
+		for id: String in cmd.get_string("give-items", "").split(",", false):
+			for pid: int in server.state.players:
+				server.items.give(pid, StringName(id), server.match_time)
 	if view.state.phase == Phase.Id.LOBBY and view.state.room_mode:
 		map.set_lobby_open(false)
 		if local != null:
@@ -334,14 +347,13 @@ func _connect_router() -> void:
 		if local != null and local.state == PlayerAvatar.State.SEATED:
 			Net.send_intent(Intents.make(&"leave")))
 	router.grab_pressed.connect(_on_grab)
-	router.grab_released.connect(func() -> void:
-		if _local_holding() >= 0:
-			Net.send_intent(Intents.make(&"release", {"throw": false})))
+	# Grab is a click, not a hold: the next click (LMB, RMB or E) throws where you aim, so
+	# letting go of the button does nothing.
 	router.shove.connect(func() -> void:
 		if local == null:
 			return
 		if _local_holding() >= 0:
-			Net.send_intent(Intents.make(&"release", {"throw": true, "aim": Serializer.vec3(local.aim())}))
+			_throw_held()
 		elif local.is_standing():
 			_predict(&"shove")
 			Net.send_intent(Intents.make(&"shove", {"aim": Serializer.vec3(local.facing())})))
@@ -367,6 +379,7 @@ func _connect_router() -> void:
 		else:
 			hud.show_leaderboard(shown))
 	router.pause.connect(_on_pause)
+	router.item_used.connect(items_ctl.on_slot)
 	router.ping.connect(func() -> void:
 		if local != null:
 			local.say("!", 1.0))
@@ -607,8 +620,8 @@ func _on_event(ev: Dictionary) -> void:
 		&"player_knocked_down":
 			var t: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			if t != null:
-				t.stun(cfg.knockdown_time)
-				t.say("ow", 1.0)
+				t.stun(float(ev.get("seconds", cfg.knockdown_time)))
+				t.say("whoa!" if ev.get("cause", &"") == &"banana" else "ow", 1.0)
 				Audio.play_at(&"oof", t, -8.0)
 		&"player_knocked_out":
 			_knock_out(int(ev["target"]), int(ev["attacker"]), StringName(ev["cause"]))
@@ -661,7 +674,7 @@ func _on_event(ev: Dictionary) -> void:
 				at.visuals.react(&"win")
 				Audio.play_at(&"coin", at, -4.0)
 		&"player_sat":
-			_seat(int(ev["player"]), StringName(ev["station"]))
+			_seat(int(ev["player"]), StringName(ev["station"]), int(ev.get("seat", -1)))
 		&"player_stood":
 			_unseat(int(ev["player"]))
 		&"player_thrown_out":
@@ -679,6 +692,8 @@ func _on_event(ev: Dictionary) -> void:
 				if err == &"vip_denied":
 					Audio.play(&"buzzer", &"SFX", -4.0)
 					hud.toast("VIP ACCESS — $%d+" % _vip_threshold(), 2.0)
+				elif ev.get("intent", &"") == &"use_item" or ev.get("intent", &"") == &"discard_item":
+					hud.toast(ItemController.rejection_text(err), 1.5)
 				elif err != &"rate_limited" and err != &"not_standing":
 					hud.toast(StationUi.rejection_text(err), 1.5)
 		&"round_result":
@@ -733,6 +748,169 @@ func _on_event(ev: Dictionary) -> void:
 			_log_digest()
 		&"match_reset":
 			_on_match_reset()
+		&"item_used":
+			_on_item_used(ev)
+		&"bodyguard_saved":
+			var p: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if p != null:
+				p.say("BODYGUARD!", 1.5)
+				Audio.play_at(&"bonk", p, -4.0, 0.7)
+			if int(ev["player"]) == local_id:
+				hud.banner("Your Bodyguard took the hit!", Palette.MONEY_GREEN)
+		&"banana_slip":
+			var v: PlayerAvatar = avatars.get(int(ev["victim"]), null)
+			if v != null and ev["result"] != &"blocked":
+				v.knockback(Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized(), 3.0)
+				Audio.play_at(&"whoosh", v, -6.0, 1.4)
+			if ev["result"] == &"blocked":
+				var p: PlayerAvatar = avatars.get(int(ev["player"]), null)
+				if p != null:
+					p.say("BODYGUARD!", 1.5)
+			if int(ev["victim"]) == local_id and ev["result"] != &"blocked":
+				hud.banner("SLIPPED! −$%d" % int(ev["amount"]), Palette.LOSS_RED)
+		&"discard_needed":
+			if int(ev["player"]) == local_id:
+				items_ctl.on_discard_needed()
+				Audio.play(&"countdown_beep", &"UI", -8.0, 1.2)
+
+
+## Item activation for everyone: the user calls it out, the target reacts, the local player gets a
+## banner when they used it or were hit.
+func _on_item_used(ev: Dictionary) -> void:
+	var user: int = int(ev["player"])
+	var target: int = int(ev["target"])
+	var result: StringName = StringName(ev["result"])
+	var item: StringName = StringName(ev["item"])
+	var def: ItemDefinition = Registry.items.get(item, null)
+	var name: String = def.display_name if def != null else String(item).capitalize()
+	var u: PlayerAvatar = avatars.get(user, null)
+	var t: PlayerAvatar = avatars.get(target, null) if target != user else null
+	if u != null:
+		u.say(name.to_upper() + "!", 1.5)
+		u.visuals.react(&"win")
+		Audio.play_at(&"whoosh", u, -8.0, 1.2)
+	if user == local_id:
+		items_ctl.on_local_use()
+	var negative: bool = def != null and def.is_negative
+	match result:
+		&"blocked":
+			if t != null:
+				t.say("BODYGUARD!", 1.5)
+				Audio.play_at(&"bonk", t, -4.0, 0.7)
+			if user == local_id:
+				hud.banner("%s blocked by a Bodyguard" % name, Palette.LOSS_RED)
+			elif target == local_id:
+				hud.banner("Your Bodyguard blocked %s!" % name, Palette.MONEY_GREEN)
+			return
+		&"reflected":
+			if t != null:
+				t.say("MIRROR!", 1.5)
+			if user == local_id:
+				hud.banner("MIRRORED! Your %s bounced back" % name, Palette.LOSS_RED)
+			elif target == local_id:
+				hud.banner("Your Mirror bounced %s back!" % name, Palette.MONEY_GREEN)
+			return
+	if item == &"pickpocket":
+		var victim: PlayerAvatar = avatars.get(int(ev.get("victim", target)), null)
+		if victim != null:
+			victim.say("HEY!", 1.6)
+			victim.visuals.react(&"loss")
+			Audio.play_at(&"coin", victim, -4.0, 1.3)
+		if int(ev.get("victim", target)) == local_id:
+			hud.banner("PICKPOCKETED by %s! −$%d" % [view.state.player_name(user), int(ev.get("amount", 0))], Palette.LOSS_RED)
+		elif user == local_id:
+			hud.banner("Pickpocketed $%d!" % int(ev.get("amount", 0)), Palette.MONEY_GREEN)
+		return
+	if t != null and negative:
+		t.visuals.react(&"loss")
+	if user == local_id:
+		hud.banner(name.to_upper() + (" → %s" % view.state.player_name(target) if target != user and target >= 0 else ""))
+		Audio.play(&"chip_clack", &"UI", -4.0, 1.3)
+	elif target == local_id and negative:
+		hud.banner("%s hit you with %s!" % [view.state.player_name(user), name], Palette.LOSS_RED)
+
+
+## Banana peel meshes follow the replicated peel list.
+func _sync_peels() -> void:
+	for id: int in peel_nodes.keys():
+		if not view.state.peels.has(id):
+			peel_nodes[id].queue_free()
+			peel_nodes.erase(id)
+	for id: int in view.state.peels:
+		if peel_nodes.has(id):
+			continue
+		var n: Node3D = _make_peel()
+		world_root.add_child(n)
+		n.global_position = Serializer.to_vec3(view.state.peels[id]["pos"]) + Vector3(0, 0.04, 0)
+		n.rotation.y = randf() * TAU
+		peel_nodes[id] = n
+
+
+static func _make_peel() -> Node3D:
+	var root := Node3D.new()
+	root.name = "BananaPeel"
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#F2D04B")
+	mat.roughness = 0.6
+	for i: int in 3:
+		var leaf := MeshInstance3D.new()
+		var m := CapsuleMesh.new()
+		m.radius = 0.06
+		m.height = 0.42
+		leaf.mesh = m
+		leaf.material_override = mat
+		leaf.rotation = Vector3(PI / 2.0 - 0.25, i * TAU / 3.0, 0)
+		leaf.position = Vector3(sin(i * TAU / 3.0), 0, cos(i * TAU / 3.0)) * 0.14
+		root.add_child(leaf)
+	return root
+
+
+## Short tags over a player's head for their active effects ("LUCKY", "JINXED", "×2"…).
+func _refresh_effect_tag(pid: int) -> void:
+	var a: PlayerAvatar = avatars.get(pid, null)
+	if a == null:
+		return
+	var parts: PackedStringArray = []
+	for id: Variant in view.state.effects.get(pid, []):
+		parts.append(_effect_tag_text(StringName(id)))
+	var tag: Label3D = effect_tags.get(pid, null)
+	if tag == null or not is_instance_valid(tag):
+		if parts.is_empty():
+			return
+		tag = Label3D.new()
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.font_size = 36
+		tag.outline_size = 8
+		tag.pixel_size = 0.004
+		tag.position = Vector3(0, 2.15, 0)
+		tag.modulate = Palette.VIP_GOLD
+		a.add_child(tag)
+		effect_tags[pid] = tag
+	tag.text = " ".join(parts)
+	tag.visible = not parts.is_empty()
+
+
+static func _effect_tag_text(id: StringName) -> String:
+	match id:
+		&"lucky_clover":
+			return "LUCKY"
+		&"black_cat":
+			return "JINXED"
+		&"hot_hands":
+			return "HOT HANDS"
+		&"loaded_reels":
+			return "LOADED"
+		&"double_down":
+			return "×2"
+		&"golden_chip":
+			return "GOLD CHIP"
+		&"bodyguard":
+			return "GUARDED"
+		&"mirror":
+			return "MIRROR"
+		&"boxing_glove":
+			return "GLOVE"
+	return String(id).to_upper()
 
 
 func _knock_out(target: int, attacker: int, cause: StringName) -> void:
@@ -759,13 +937,13 @@ func _knock_out(target: int, attacker: int, cause: StringName) -> void:
 		hud.toast("KNOCKED OUT" if cause != &"fountain" else "SPLASH! Knocked out", 2.0)
 
 
-func _seat(pid: int, sid: StringName) -> void:
+func _seat(pid: int, sid: StringName, seat: int = -1) -> void:
 	var a: PlayerAvatar = avatars.get(pid, null)
 	var st: StationBase = map.stations.get(sid, null)
 	if a == null or st == null:
 		return
 	view.resync()
-	var idx: int = _seat_index(sid, pid)
+	var idx: int = seat if seat >= 0 else _seat_index(sid, pid)
 	a.sit(st.seats[clampi(idx, 0, st.seats.size() - 1)] if not st.seats.is_empty() else st, st.camera_anchor)
 	if pid == local_id:
 		hud.set_prompt("")
@@ -917,6 +1095,9 @@ func _on_match_reset() -> void:
 	_ragdoll_attacker.clear()
 	for id: int in piles.keys():
 		_remove_pile(id)
+	for pid: int in effect_tags.keys():
+		_refresh_effect_tag(pid)
+	items_ctl.cancel()
 	map.set_lobby_open(false)
 	for pid: int in avatars:
 		var a: PlayerAvatar = avatars[pid]
@@ -954,6 +1135,9 @@ func _on_match_reset() -> void:
 # --- Local input -------------------------------------------------------------------------------
 
 func _on_interact() -> void:
+	if local != null and _local_holding() >= 0:
+		_throw_held()
+		return
 	if local == null or not local.is_standing():
 		return
 	var lobby_spot: StringName = _lobby_spot()
@@ -969,7 +1153,14 @@ func _on_interact() -> void:
 	_on_grab()
 
 
+func _throw_held() -> void:
+	Net.send_intent(Intents.make(&"release", {"throw": true, "aim": Serializer.vec3(local.aim())}))
+
+
 func _on_grab() -> void:
+	if local != null and _local_holding() >= 0:
+		_throw_held()
+		return
 	if local == null or not local.is_standing():
 		return
 	var target: int = _nearest_player_in_front(2.0)
@@ -1038,7 +1229,10 @@ func _lobby_spot() -> StringName:
 
 func _update_prompt() -> void:
 	nearest_station = null
-	if local == null or not local.is_standing() or _local_holding() >= 0:
+	if local != null and _local_holding() >= 0:
+		hud.set_prompt("[LMB / RMB / E] THROW %s" % view.state.player_name(_local_holding()))
+		return
+	if local == null or not local.is_standing():
 		hud.set_prompt("")
 		return
 	match _lobby_spot():
@@ -1276,6 +1470,9 @@ func _nearest_player_in_front(range_m: float) -> int:
 
 
 func _seat_index(sid: StringName, pid: int) -> int:
+	var seat: int = int(view.state.players.get(pid, {}).get("seat", -1))
+	if seat >= 0:
+		return seat
 	var st: Dictionary = view.state.stations.get(sid, {})
 	var list: Array = st.get("seats", st.get("players", []))
 	var i: int = list.find(pid)

@@ -532,6 +532,7 @@ func return_to_lobby() -> void:
 		p.quiz_correct_time = 0.0
 		p.biggest_win = 0
 		p.station = &""
+		p.seat = -1
 		p.ready = false
 		lobby.set_on_pad(id, false)
 		lobby.set_panel_ready(id, false)
@@ -586,13 +587,15 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if res["ok"]:
 				rules.status(player).seated = true
 				state.players[player].station = sid
-				_emit(GameEvents.make(&"player_sat", {"player": player, "station": sid}))
+				state.players[player].seat = _free_seat(sid, player)
+				_emit(GameEvents.make(&"player_sat", {"player": player, "station": sid, "seat": state.players[player].seat}))
 			return res
 		&"leave":
 			var res: Dictionary = stations.leave(player)
 			if res["ok"]:
 				rules.status(player).seated = false
 				state.players[player].station = &""
+				state.players[player].seat = -1
 				_emit(GameEvents.make(&"player_stood", {"player": player}))
 			return res
 		&"place_bet", &"clear_bets", &"action":
@@ -887,3 +890,18 @@ func _track_ranks() -> void:
 		var mine: int = economy.balance(id)
 		var rank: int = 1 + money.filter(func(m: int) -> bool: return m > mine).size()
 		stats[id]["lowest_rank"] = maxi(int(stats[id]["lowest_rank"]), rank)
+
+
+## Lowest seat index at `sid` no other seated player holds.
+func _free_seat(sid: StringName, player: int) -> int:
+	var logic: StationLogicBase = stations.logics.get(sid, null)
+	if logic is BlackjackLogic and (logic as BlackjackLogic).seats.has(player):
+		return (logic as BlackjackLogic).seats.find(player)  # the hand's own seat
+	var used: Dictionary = {}
+	for id: int in state.players:
+		if id != player and state.players[id].station == sid:
+			used[state.players[id].seat] = true
+	var i: int = 0
+	while used.has(i):
+		i += 1
+	return i

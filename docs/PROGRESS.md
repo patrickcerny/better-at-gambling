@@ -1,7 +1,7 @@
 # Progress
 
-## Current milestone: M5 — Items, luck, sabotage, pickups (waiting for Patrick's go-ahead)
-## Next step: `ItemSystem` and effects for the 11 MVP items (the draft already hands them out as data).
+## Current milestone: M6 — Bots, reconnects, MVP hardening (waiting for Patrick's go-ahead)
+## Next step: Patrick's playtest fixes (blackjack seats and hands, bets shown on the tables, footsteps, throwing a held player) and his item ideas (docs/ITEM_IDEAS.md), then M6.
 
 ## Status by milestone
 - M0: DONE (evidence: `scripts/test.sh all` green; `godot --headless --path . -- --smoke-test` exit 0; exports built)
@@ -9,7 +9,8 @@
 - M2: DONE (evidence: `scripts/test.sh all` green — unit 109, sim 8, integration 15, physics 10, ui 5, smoke 1, boot, 185 s scripted session with 0 errors; screenshots in `build/screenshots/` via `scripts/screenshots.sh`)
 - M3: DONE (evidence: `scripts/test.sh net` — 3-minute server + 2 clients match with identical balance digests, grab/throw/shove/knockout at 150 ms + 2% loss with ragdoll agreement ≤ 0.03 m, version mismatch refused, orchestrator end to end with join by code and port freed; `scripts/test.sh orchestrator` 62 pytest; unit 120, integration 21, physics 10, session 0 errors; ~4.6 KB/s per client)
 - M4: DONE (evidence: `scripts/test.sh net` — 5-minute match, server + 2 autoplay clients + 2 bots, lobby to results with two quizzes and drafts, identical money+item digests on all three processes; unit 149, integration 29 (`test_match_flow.gd`: quiz schedule 5/30 min, Last Call, Hot Table, comps, closing tables, tiebreakers, secrecy over a full match, play again twice in one room), ui 9 (quiz by key/pad/mouse), session 0 errors; screenshots `quiz_question`, `quiz_end`, `results`)
-- M5–M11: NOT STARTED
+- M5: DONE (evidence: unit 175 (`test_items.gd` 26: every item, Bodyguard/Mirror, protections, grace, cooldown, discard flow, Pickpocket min/max/broke, Double Trouble × Hot × Last Call order, Golden Chip exactness, banana conservation), integration 35 (`test_items_flow.gd`: intents, items off, Spring Glove, Bodyguard KO, draft → inventory → discard, bots use items in a full match with money conservation), physics 17 (`test_items_scene.gd`: keys, target picker, range ring, banners, peels, effect tags, discard keys, Shift while seated), session with items 0 errors, `scripts/test.sh net` with autoplay clients using drafted items online and identical digests; screenshot `items`)
+- M6–M11: NOT STARTED (VPS deploy from M6 already live)
 
 ## Verified features (IMPLEMENTED+TESTED)
 - Toolchain: Godot 4.7.2 headless, export templates, GUT 9.7.1 (`tools/setup_toolchain.sh`, checksums verified).

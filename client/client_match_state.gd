@@ -14,6 +14,10 @@ signal lobby_changed
 signal hot_table_changed(station: StringName)
 ## Results arrived (standings + awards).
 signal results_changed
+## Item effects on a player changed (public: item ids only).
+signal effects_changed(player: int)
+## Banana peels appeared or disappeared.
+signal peels_changed
 
 var phase: Phase.Id = Phase.Id.LOBBY
 var casino_time: float = 0.0
@@ -46,6 +50,10 @@ var rewards: Array = []
 var awards: Array = []
 ## Online results screen: seconds until the room goes back to its lobby (-1 = never).
 var results_return_in: float = -1.0
+## Active item effects per player (item ids, public) and banana peels on the floor (peel id →
+## {peel, owner, pos, seconds}).
+var effects: Dictionary[int, Array] = {}
+var peels: Dictionary[int, Dictionary] = {}
 
 
 ## Replaces everything from a snapshot.
@@ -84,10 +92,19 @@ func apply_snapshot(snap: Dictionary) -> void:
 	standings = snap.get("standings", [])
 	awards = snap.get("awards", [])
 	results_return_in = float(snap.get("results_return_in", -1.0))
+	effects.clear()
+	for id: Variant in snap.get("effects", {}):
+		effects[int(id)] = (snap["effects"][id] as Array).duplicate()
+	peels.clear()
+	for p: Dictionary in snap.get("peels", []):
+		peels[int(p["peel"])] = p
 	if phase == Phase.Id.LOBBY:
 		last_call = false
 	players_changed.emit()
 	hot_table_changed.emit(hot_station)
+	peels_changed.emit()
+	for id: int in players:
+		effects_changed.emit(id)
 	lobby_changed.emit()
 	phase_changed.emit(phase)
 	for sid: Variant in stations:
@@ -120,6 +137,8 @@ func apply_event(ev: Dictionary) -> bool:
 			money_changed.emit(int(ev["player"]), int(ev["amount"]), int(ev["balance"]), StringName(ev["reason"]))
 		&"player_sat":
 			seat_of[int(ev["player"])] = StringName(ev["station"])
+			if players.has(int(ev["player"])):
+				players[int(ev["player"])]["seat"] = int(ev.get("seat", -1))
 			players_changed.emit()
 		&"player_stood":
 			seat_of[int(ev["player"])] = &""
@@ -127,7 +146,7 @@ func apply_event(ev: Dictionary) -> bool:
 		&"round_result":
 			var net: int = int(ev["net"])
 			if net != 0:
-				feed_message.emit("%s %s$%d at %s" % [player_name(int(ev["player"])), "+" if net > 0 else "−", absi(net), ev["station"]], &"win" if net > 0 else &"loss")
+				feed_message.emit("%s %s$%d at %s" % [player_name(int(ev["player"])), "+" if net > 0 else "−", absi(net), station_label(StringName(ev["station"]))], &"win" if net > 0 else &"loss")
 		&"jackpot_won":
 			feed_message.emit("%s hit the JACKPOT for $%d!" % [player_name(int(ev["player"])), int(ev["amount"])], &"jackpot")
 		&"jackpot_changed":
@@ -211,7 +230,39 @@ func apply_event(ev: Dictionary) -> bool:
 			if players.has(pid):
 				players[pid]["inventory"] = ev.get("inventory", [])
 			players_changed.emit()
+		&"inventory_changed":
+			var pid: int = int(ev["player"])
+			if players.has(pid):
+				players[pid]["inventory"] = ev["inventory"]
+			players_changed.emit()
+		&"item_used":
+			_on_item_used(ev)
+		&"effect_ended":
+			var pid: int = int(ev["player"])
+			var list: Array = effects.get(pid, [])
+			list.erase(StringName(ev["item"]))
+			effects_changed.emit(pid)
+		&"bodyguard_saved":
+			feed_message.emit("%s's Bodyguard stepped in!" % player_name(int(ev["player"])), &"chaos")
+		&"banana_placed":
+			peels[int(ev["peel"])] = ev
+			peels_changed.emit()
+		&"banana_removed":
+			peels.erase(int(ev["peel"]))
+			peels_changed.emit()
+		&"banana_slip":
+			var victim: int = int(ev["victim"])
+			match StringName(ev["result"]):
+				&"blocked":
+					feed_message.emit("%s's Bodyguard kicked a banana peel away" % player_name(int(ev["player"])), &"chaos")
+				&"reflected":
+					feed_message.emit("%s's Mirror sent the banana back: %s slipped (−$%d)" % [player_name(int(ev["player"])), player_name(victim), int(ev["amount"])], &"chaos")
+				_:
+					feed_message.emit("%s slipped on a banana (−$%d)" % [player_name(victim), int(ev["amount"])], &"chaos")
 		&"match_reset":
+			effects.clear()
+			peels.clear()
+			peels_changed.emit()
 			phase = Phase.Id.LOBBY
 			last_call = false
 			standings = []
@@ -221,6 +272,35 @@ func apply_event(ev: Dictionary) -> bool:
 	if ev.has("station") and stations.has(ev["station"]):
 		station_changed.emit(StringName(ev["station"]))
 	return not gap
+
+
+func _on_item_used(ev: Dictionary) -> void:
+	var user: int = int(ev["player"])
+	var item: StringName = StringName(ev["item"])
+	var target: int = int(ev["target"])
+	var result: StringName = StringName(ev["result"])
+	var def: ItemDefinition = Registry.items.get(item, null) if Registry.items != null else null
+	var name: String = def.display_name if def != null else String(item).capitalize()
+	if ev.has("affected") and result != &"blocked":
+		var who: int = int(ev.get("affected", target))
+		if not effects.has(who):
+			effects[who] = []
+		if not effects[who].has(item):
+			effects[who].append(item)
+		effects_changed.emit(who)
+	var text: String
+	if target == user or target < 0:
+		text = "%s used %s" % [player_name(user), name]
+	else:
+		text = "%s used %s on %s" % [player_name(user), name, player_name(target)]
+	match result:
+		&"blocked":
+			text += ", but the Bodyguard blocked it"
+		&"reflected":
+			text += ", but the Mirror bounced it back"
+	if ev.has("amount") and int(ev["amount"]) > 0:
+		text += " (−$%d)" % int(ev["amount"])
+	feed_message.emit(text, &"item")
 
 
 ## "Blackjack 2" from "blackjack_2".

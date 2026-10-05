@@ -7,6 +7,10 @@ var hand_label: Label
 var total_label: Label
 var dealer_label: Label
 var others_label: Label
+## One panel per seat at the table (name, cards, total, bet), you highlighted in gold.
+var seats_row: HBoxContainer
+var seat_panels: Array[PanelContainer] = []
+var seat_labels: Array[Label] = []
 var hit: Button
 var stand: Button
 var double_btn: Button
@@ -19,11 +23,26 @@ func _init() -> void:
 
 
 func _panel_height() -> float:
-	return 470.0
+	return 590.0
 
 
 func _build() -> void:
 	dealer_label = _line("DEALER  —", 26, Palette.WARM_GOLD)
+	seats_row = HBoxContainer.new()
+	seats_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	seats_row.add_theme_constant_override(&"separation", 10)
+	body.add_child(seats_row)
+	for i: int in 4:
+		var p := PanelContainer.new()
+		p.custom_minimum_size = Vector2(190, 96)
+		seats_row.add_child(p)
+		var l := Label.new()
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.add_theme_font_size_override(&"font_size", 19)
+		p.add_child(l)
+		seat_panels.append(p)
+		seat_labels.append(l)
 	var your := Label.new()
 	your.theme_type_variation = &"SmallLabel"
 	your.text = "YOUR HAND"
@@ -102,13 +121,48 @@ func _refresh() -> void:
 	actions.visible = acting
 	double_btn.disabled = not acting or (mine.get("cards", []) as Array).size() != 2
 	bet_panel.visible = (st == BlackjackLogic.State.IDLE or st == BlackjackLogic.State.BETTING) and mine.is_empty()
-	var others: Array[String] = []
-	for pid: Variant in hands:
-		if int(pid) == local_id:
+	_refresh_seats(pub.get("seats", []), hands)
+	others_label.text = ""
+
+
+## Every seat: who sits there, their cards and total, their bet, and whether they're done.
+func _refresh_seats(seats: Array, hands: Dictionary) -> void:
+	for i: int in seat_panels.size():
+		var pid: int = int(seats[i]) if i < seats.size() else -1
+		var l: Label = seat_labels[i]
+		var me: bool = pid == local_id and pid >= 0
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(Palette.FELT_GREEN, 0.85) if pid >= 0 else Color(Palette.CASINO_BLACK, 0.5)
+		sb.border_color = Palette.VIP_GOLD if me else Color(Palette.WARM_GOLD, 0.35)
+		sb.set_border_width_all(3 if me else 1)
+		sb.set_corner_radius_all(8)
+		sb.content_margin_left = 8
+		sb.content_margin_right = 8
+		seat_panels[i].add_theme_stylebox_override(&"panel", sb)
+		if pid < 0:
+			l.text = "Seat %d\nempty" % (i + 1)
+			l.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.4))
 			continue
-		var h: Dictionary = hands[pid]
-		others.append("%s: %s (%d)" % [state.player_name(int(pid)) if state != null else str(pid), " ".join(_labels(h.get("cards", []))), int(h.get("total", 0))])
-	others_label.text = "   ".join(others)
+		var name: String = ("YOU" if me else (state.player_name(pid) if state != null else str(pid)))
+		var h: Dictionary = {}
+		for k: Variant in hands:
+			if int(k) == pid:
+				h = hands[k]
+		var lines: PackedStringArray = [name]
+		if h.is_empty():
+			lines.append("no bet")
+		else:
+			var cards: Array = h.get("cards", [])
+			lines.append(" ".join(_labels(cards)) if not cards.is_empty() else "—")
+			var total: int = int(h.get("total", 0))
+			var tail: String = ""
+			if total > 21:
+				tail = "  BUST"
+			elif bool(h.get("done", false)) and not cards.is_empty():
+				tail = "  STAND"
+			lines.append("%s$%d%s" % [("%d  ·  " % total) if total > 0 else "", int(h.get("stake", 0)), tail])
+		l.text = "\n".join(lines)
+		l.add_theme_color_override(&"font_color", Palette.VIP_GOLD if me else Palette.CREAM)
 
 
 func _labels(cards: Array) -> Array[String]:

@@ -106,6 +106,8 @@ func repeat_last() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_visible_in_tree():
 		return
+	if event is InputEventKey and (event as InputEventKey).shift_pressed:
+		return  # Shift+1–3 uses items while seated
 	var handled: bool = true
 	if event.is_action_pressed(&"bet_chip_1"):
 		select_chip(0)

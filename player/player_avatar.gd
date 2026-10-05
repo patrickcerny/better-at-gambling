@@ -101,6 +101,10 @@ func _ready() -> void:
 	nametag.outline_modulate = Palette.CASINO_BLACK
 	nametag.outline_size = 10
 	nametag.position.y = 2.15
+	# Up close the tag would fill the screen: fade it out under ~2.5 m (you can see who it is).
+	nametag.visibility_range_begin = 2.5
+	nametag.visibility_range_begin_margin = 0.8
+	nametag.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	nametag.visible = not is_local
 	add_child(nametag)
 	bubble = Label3D.new()
@@ -520,13 +524,20 @@ func _track_fall() -> void:
 	_was_on_floor = on_floor
 
 
+const FOOTSTEPS: Array[StringName] = [&"footstep", &"footstep_2", &"footstep_3"]
+
+
 func _footsteps(delta: float) -> void:
 	var speed: float = Vector3(velocity.x, 0, velocity.z).length()
 	if (is_on_floor() or (drive == Drive.PUPPET and not puppet_airborne)) and speed > 1.0:
 		_step_timer += delta * speed
 		if _step_timer > 2.6:
 			_step_timer = 0.0
-			Audio.play_at(&"footstep", self, -18.0, randf_range(0.9, 1.1))
+			# Soft carpet steps: three variants, gentle pitch spread, quieter for our own body
+			# (it's right under the camera) and sprinting a touch louder.
+			var clip: StringName = FOOTSTEPS[randi() % FOOTSTEPS.size()]
+			var vol: float = (-26.0 if drive == Drive.INPUT else -22.0) + (2.0 if speed > 5.0 else 0.0)
+			Audio.play_at(clip, self, vol, randf_range(0.92, 1.06))
 
 
 func _holding_someone() -> bool:

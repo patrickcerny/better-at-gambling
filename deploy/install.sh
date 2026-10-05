@@ -16,6 +16,10 @@
 # Re-running is safe. A failed health check rolls back to the previous image.
 set -euo pipefail
 
+# The whole script is one function, read completely before it runs: the --update path checks out
+# new commits (which may change this file) and bash would otherwise keep reading the edited file.
+main() {
+
 REPO_URL="https://github.com/patrickcerny/better-at-gambling.git"
 if [[ $EUID -eq 0 ]]; then
 	DIR=/opt/better-at-gambling
@@ -192,3 +196,7 @@ else
 	url="https://$site"
 fi
 log "done. Clients: --orchestrator $url"
+}
+
+main "$@"
+exit $?

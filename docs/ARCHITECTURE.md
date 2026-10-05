@@ -33,6 +33,7 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
 | `--net-latency MS --net-loss P [--net-seed N]` | wrap the client transport in `DelayedTransport` |
 | `--quit-after-results`, `--quit-on-disconnect` | scripted clients exit instead of returning to the menu |
 | `--capture out.png --capture-at S` | save a screenshot of whatever is on screen after S seconds |
+| `--give-items a,b,c` | Practice only: every player starts with these items (tests, screenshots) |
 | `--skip-to S [--timescale X]` | Practice only: fast-forward to casino time S at start (100 = first quiz of a 5-minute match; screenshots) |
 
 ## Netcode (M3)
@@ -89,6 +90,22 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
   shows the podium, `Awards` and the buttons. In a room the leader's `return_to_lobby` (or the
   60 s timer) resets money, items and stats and rebuilds the match systems; clients take a fresh
   snapshot on `match_reset`.
+
+## Items, luck and sabotage (M5)
+* **Server:** `ItemSystem` (server/items/) owns inventories (3 slots, discard choice), activation
+  (`use` → cooldown, incapacitated, target resolution, protections, Mirror then Bodyguard), banana
+  peels and the private item state. Effects are `ItemEffect` scripts named by each
+  `ItemDefinition` (`items/<id>/<id>.tres`, `effect_script` + `params`); most are
+  `ModifierItemEffect`, which pushes a `Modifier` onto the `ModifierStack` the games already read
+  (luck, payout multiplier, refund, `peek_dealer`, `spring_glove`, `bodyguard`, `mirror`).
+* **Wire:** events `item_used {player, item, target, result: applied|blocked|reflected, …}`,
+  `inventory_changed`, `discard_needed`, `item_discarded`, `effect_ended`, `bodyguard_saved`,
+  `banana_placed`/`banana_slip`/`banana_removed`. Snapshot `effects` (ids per player) and
+  `peels`; private `items {luck, effects[{item, left, uses}], discard?}`.
+* **Client:** `ItemController` (client/) sends `use_item`/`discard_item`, runs the target picker
+  (wheel/shoulders cycle, same key or E confirms, 4 s), the range ring and target marker;
+  `ItemBar` (ui/hud/) shows slots, the luck meter, effect timers and the discard choice;
+  `MatchScene` shows banners, callouts, effect tags over heads and banana peel meshes.
 
 ## Audio buses
 Master → Music, SFX, UI, Ambience, Voice (`audio/default_bus_layout.tres`).

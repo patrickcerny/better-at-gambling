@@ -91,12 +91,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		leave_station.emit()
 	elif event.is_action_pressed(&"ping"):
 		ping.emit()
-	elif event.is_action_pressed(&"item_1"):
-		item_used.emit(0)
-	elif event.is_action_pressed(&"item_2"):
-		item_used.emit(1)
-	elif event.is_action_pressed(&"item_3"):
-		item_used.emit(2)
+	elif _item_slot(event) >= 0:
+		item_used.emit(_item_slot(event))
 	elif event.is_action_pressed(&"emote_wheel"):
 		if mode == Mode.WALK:
 			set_mode(Mode.EMOTE)
@@ -120,6 +116,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			jump.emit()
 		elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and capture_mouse:
 			set_mode(Mode.WALK)  # click to recapture after alt-tab
+
+
+## Item key slot (0–2) for an event, -1 if none. Seated players' plain number keys pick chips,
+## so on the keyboard items need Shift there; the d-pad always works.
+func _item_slot(event: InputEvent) -> int:
+	var slot: int = -1
+	for i: int in 3:
+		if event.is_action_pressed(StringName("item_%d" % (i + 1))):
+			slot = i
+	if slot >= 0 and mode == Mode.SEATED and event is InputEventKey and not (event as InputEventKey).shift_pressed:
+		return -1
+	return slot
 
 
 func _notification(what: int) -> void:

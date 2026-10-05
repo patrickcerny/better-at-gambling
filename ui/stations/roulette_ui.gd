@@ -10,6 +10,10 @@ var outside: HBoxContainer
 var my_bets: Label
 var result_label: Label
 var _buttons: Array[Button] = []
+## Chip badges on the layout: "type:value" → the badge showing your amount there, and the line
+## of coloured dots for other players' chips on that spot.
+var _badges: Dictionary[String, Label] = {}
+var _dots: Dictionary[String, Label] = {}
 
 
 func _init() -> void:
@@ -92,6 +96,27 @@ func _refresh() -> void:
 		result_label.text = ""
 	for b: Button in _buttons:
 		b.disabled = not open_bets or (b.text == "" and b.get_meta(&"type") == &"straight")
+	var on_spot: Dictionary = {}
+	var others_on: Dictionary = {}
+	for b: Dictionary in pub.get("bets", []):
+		var key: String = _key(StringName(b["type"]), int(b["value"]))
+		if int(b["player"]) == local_id:
+			on_spot[key] = int(on_spot.get(key, 0)) + int(b["amount"])
+		else:
+			if not others_on.has(key):
+				others_on[key] = []
+			if not int(b["player"]) in others_on[key]:
+				others_on[key].append(int(b["player"]))
+	for key: String in _badges:
+		var badge: Label = _badges[key]
+		badge.visible = on_spot.has(key)
+		if badge.visible:
+			badge.text = "$%d" % int(on_spot[key])
+		var dots: Label = _dots[key]
+		dots.visible = others_on.has(key)
+		if dots.visible:
+			dots.text = "●".repeat(mini((others_on[key] as Array).size(), 4))
+			dots.add_theme_color_override(&"font_color", Palette.player_color(int(state.players.get(int(others_on[key][0]), {}).get("color", 0))) if state != null else Palette.CREAM)
 	var mine: Array[String] = []
 	var total: int = 0
 	for b: Dictionary in pub.get("bets", []):
@@ -128,4 +153,35 @@ func _spot(text: String, type: StringName, value: int, color: Color, parent: Con
 	b.pressed.connect(func() -> void: send(&"place_bet", {"bet": {"type": type, "value": value, "amount": bet_panel.chip_value()}}))
 	(parent if parent != null else grid).add_child(b)
 	_buttons.append(b)
+	if text != "":
+		var key: String = _key(type, value)
+		var badge := Label.new()
+		badge.add_theme_font_size_override(&"font_size", 15)
+		badge.add_theme_color_override(&"font_color", Palette.CASINO_BLACK)
+		var chip := StyleBoxFlat.new()
+		chip.bg_color = Palette.VIP_GOLD
+		chip.set_corner_radius_all(9)
+		chip.border_color = Palette.CREAM
+		chip.set_border_width_all(2)
+		chip.content_margin_left = 4
+		chip.content_margin_right = 4
+		badge.add_theme_stylebox_override(&"normal", chip)
+		badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		badge.position = Vector2(size.x - 34, -8)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.visible = false
+		badge.z_index = 2
+		b.add_child(badge)
+		_badges[key] = badge
+		var dots := Label.new()
+		dots.add_theme_font_size_override(&"font_size", 12)
+		dots.position = Vector2(2, size.y - 16)
+		dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dots.visible = false
+		b.add_child(dots)
+		_dots[key] = dots
 	return b
+
+
+static func _key(type: StringName, value: int) -> String:
+	return "%s:%d" % [type, value]

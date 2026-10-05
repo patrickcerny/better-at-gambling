@@ -142,7 +142,7 @@ clients need different names; reconnecting with the same name takes over the sam
 identities come from orchestrator-verified join tokens (Steam in M8).
 
 ## 2026-10-05 — `BUILD_ID` must match exactly
-`Protocol.BUILD_ID` (now "0.4.0-m4") is sent in `HELLO` and checked by both the orchestrator (`426
+`Protocol.BUILD_ID` (now "0.5.0-m5") is sent in `HELLO` and checked by both the orchestrator (`426
 version_mismatch`) and the room server (`REJECT version_mismatch`). Bump it with every shipped build.
 
 ## 2026-10-05 — Rooms wait a minute for their first player
@@ -184,3 +184,21 @@ The scripted player's step list pauses while the casino is closed (quiz, rewards
 re-walks an interrupted walk afterwards. It answers quiz questions at random after 1–5 s and
 takes the last draft option, so the network test exercises both intents and checks that every
 process ends with the same money and items.
+
+## 2026-10-05 — Items: one generic modifier effect, server-side targeting
+Nine of the eleven MVP items are one `ModifierItemEffect` driven by the item's `params` (luck,
+game, rounds, payout multiplier, consume on win, refund on loss, flags); only Pickpocket and Banana
+Peel have their own scripts. The server resolves every target: a use without a target picks the
+only valid one and refuses with `need_target` when there are several, so the client's picker is
+convenience, never authority. Mirror is checked before Bodyguard, a blocked item is still used up,
+and Bodyguard also absorbs one knockout from a player who used an item in the last 30 s.
+
+## 2026-10-05 — Item keys while seated
+Number keys 1–4 pick chips at a table, so a seated player uses items with Shift+1–3 (the d-pad
+always uses items; shoulders still cycle chips). The "inventory full" choice takes 1–4 in any
+mode because it only lasts 5 s and blocks nothing else.
+
+## 2026-10-05 — Drafted items go straight into the inventory
+Every drafted item is offered to `ItemSystem.give`; a full inventory opens a 5 s discard choice
+(1–3 swap that slot out, 4 drops the newcomer, the oldest goes on timeout). A choice still open
+when the player uses an item resolves itself into the freed slot.

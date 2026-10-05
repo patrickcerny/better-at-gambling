@@ -18,6 +18,15 @@ const SCHEMA: Dictionary = {
 	&"player_knocked_out": ["target"],
 	&"chips_shaken_out": ["attacker", "target", "amount"],
 	&"phase_changed": ["phase"],
+	&"item_used": ["player", "item", "target", "result"],
+	&"inventory_changed": ["player", "inventory"],
+	&"discard_needed": ["player", "item", "seconds"],
+	&"item_discarded": ["player", "item"],
+	&"effect_ended": ["player", "item", "reason"],
+	&"bodyguard_saved": ["player", "attacker"],
+	&"banana_placed": ["peel", "owner", "pos", "seconds"],
+	&"banana_slip": ["peel", "player", "owner", "result", "victim", "amount"],
+	&"banana_removed": ["peel", "reason"],
 }
 
 

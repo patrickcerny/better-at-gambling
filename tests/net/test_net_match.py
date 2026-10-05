@@ -33,11 +33,12 @@ def test_two_clients_play_a_match_and_agree_on_every_balance(procs):
     # The scripted players actually played (money moved).
     assert any(part.split(":")[1] != "1000" for part in digests["sync-server"].split(",")), digests
     if SYNC_MINUTES >= 2:
-        # Quizzes ran and the rewards draft handed out items (identical on every process).
-        assert any(part.split(":")[2] for part in digests["sync-server"].split(",")), digests
+        # Quizzes ran, the rewards draft handed out items and the players used them online
+        # (inventories in the digest may be empty again by the end).
         for p in (alice, bob):
             played = p.nettest("autoplay")[-1]
             assert "answers=0" not in played and "drafts=0" not in played, (p.name, played)
+            assert "items=0" not in played, ("drafted items get used online", p.name, played)
     for p in (server, alice, bob):
         assert p.errors() == [], (p.name, p.errors()[:5])
     for p in (alice, bob):

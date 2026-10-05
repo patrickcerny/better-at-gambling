@@ -139,8 +139,19 @@ def pickup(t, r):
     return sine(1400 + 800 * t, t) * math.exp(-t * 20)
 
 
-def footstep(t, r):
-    return noise(r) * math.exp(-t * 60) * 0.5 + sine(120, t) * math.exp(-t * 40) * 0.5
+def make_footstep(cutoff, thump):
+    """Soft step on carpet: heavily low-passed noise (no hiss or click) and a quiet low thump,
+    with a short fade-in so it doesn't tick."""
+    state = {"y": 0.0}
+    a = 1.0 - math.exp(-2 * math.pi * cutoff / RATE)
+
+    def fn(t, r):
+        state["y"] += a * (noise(r) - state["y"])
+        fade_in = min(1.0, t / 0.008)
+        body = state["y"] * 3.0 * math.exp(-t * 28)
+        low = sine(thump, t) * math.exp(-t * 35) * 0.35
+        return (body + low) * fade_in
+    return fn
 
 
 def thud(t, r):
@@ -157,7 +168,8 @@ RECIPES = [
     ("boing", 0.5, boing), ("splash", 0.7, splash), ("card_flip", 0.08, card_flip), ("reel_stop", 0.15, reel_stop),
     ("plink", 0.1, plink), ("ui_click", 0.06, ui_click), ("ui_hover", 0.05, ui_hover), ("countdown_beep", 0.12, countdown_beep),
     ("jackpot_siren", 2.0, jackpot_siren), ("slip", 0.4, slip), ("ball_roll", 1.5, ball_roll), ("pickup", 0.2, pickup),
-    ("footstep", 0.1, footstep), ("thud", 0.25, thud), ("jump", 0.2, jump),
+    ("footstep", 0.16, make_footstep(380, 70)), ("footstep_2", 0.16, make_footstep(320, 62)),
+    ("footstep_3", 0.16, make_footstep(440, 78)), ("thud", 0.25, thud), ("jump", 0.2, jump),
 ]
 
 if __name__ == "__main__":

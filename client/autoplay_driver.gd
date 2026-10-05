@@ -30,6 +30,11 @@ var _awaiting: Array = []
 ## Quiz answers given / drafts picked (logged for the network tests).
 var answers_sent: int = 0
 var drafts_picked: int = 0
+## Items: the default script presses an item key every few seconds through the real ItemController
+## (target picker included) and counts the server's confirmations.
+var items_used: int = 0
+var _item_timer: float = 0.0
+const ITEM_EVERY: float = 7.0
 
 const THROW_SPOT: Vector3 = Vector3(5.0, 0.0, 2.0)
 
@@ -83,7 +88,11 @@ func _on_event(ev: Dictionary) -> void:
 		&"rewards_started":
 			_pick_draft()
 		&"match_ended":
-			Log.info(&"nettest", "NETTEST autoplay answers=%d drafts=%d" % [answers_sent, drafts_picked])
+			Log.info(&"nettest", "NETTEST autoplay answers=%d drafts=%d items=%d" % [answers_sent, drafts_picked, items_used])
+		&"item_used":
+			if int(ev["player"]) == scene.local_id:
+				items_used += 1
+				Log.info(&"autoplay", "item used %s" % ev)
 	if not _awaiting.is_empty() and ev["type"] == _awaiting[0] and int(ev.get("player", ev.get("target", -1))) == int(_awaiting[2]):
 		_awaiting.clear()
 
@@ -208,6 +217,22 @@ func _build_steps() -> void:
 	]
 
 
+func _use_items(delta: float) -> void:
+	_item_timer += delta
+	if _item_timer < ITEM_EVERY or not scene.local.is_standing():
+		return
+	_item_timer = 0.0
+	var inv: Array = scene.view.state.players.get(scene.local_id, {}).get("inventory", [])
+	if inv.is_empty():
+		return
+	var slot: int = randi() % inv.size()
+	Log.info(&"autoplay", "item key %d (%s)" % [slot + 1, inv[slot]])
+	scene.items_ctl.on_slot(slot)
+	if scene.items_ctl.picking_slot >= 0:
+		scene.items_ctl.cycle(1)
+		scene.items_ctl.confirm()
+
+
 func _st(id: StringName) -> StringName:
 	return VARIANT_STATIONS.get(id, id) if variant == 1 else id
 
@@ -227,6 +252,8 @@ func _process(delta: float) -> void:
 			scene.local.auto_target = Vector3.INF
 			index = maxi(index - 1, 0)  # walk there again afterwards
 		return
+	if script_name == "":
+		_use_items(delta)
 	if not _awaiting.is_empty():
 		if elapsed > float(_awaiting[1]):
 			Log.warn(&"autoplay", "gave up waiting for %s" % _awaiting[0])

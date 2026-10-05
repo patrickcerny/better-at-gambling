@@ -17,6 +17,9 @@ var quiz_points: int = 0
 var quiz_correct_time: float = 0.0
 var biggest_win: int = 0
 var station: StringName = &""
+## Physical seat at that station (0-based, -1 = none): the server hands out the lowest free one so
+## two players never share a chair.
+var seat: int = -1
 var position: Vector3 = Vector3.ZERO
 
 
@@ -25,7 +28,7 @@ func to_wire() -> Dictionary:
 	return {
 		"id": id, "uid": uid, "name": display_name, "color": color_index, "hat": hat, "bot": is_bot,
 		"bot_difficulty": bot_difficulty, "connected": connected, "ready": ready, "inventory": inventory.duplicate(),
-		"quiz_points": quiz_points, "quiz_time": quiz_correct_time, "biggest_win": biggest_win, "station": station,
+		"quiz_points": quiz_points, "quiz_time": quiz_correct_time, "biggest_win": biggest_win, "station": station, "seat": seat,
 		"pos": Serializer.vec3(position),
 	}
 
@@ -48,5 +51,6 @@ static func from_wire(d: Dictionary) -> PlayerState:
 	p.quiz_correct_time = float(d.get("quiz_time", 0.0))
 	p.biggest_win = int(d.get("biggest_win", 0))
 	p.station = StringName(d.get("station", ""))
+	p.seat = int(d.get("seat", -1))
 	p.position = Serializer.to_vec3(d.get("pos", []))
 	return p

@@ -1,0 +1,305 @@
+class_name ItemController
+extends Node3D
+## Client side of items (M5): turns item keys into `use_item` intents, runs the target picker
+## (cycle with the mouse wheel or shoulder buttons, press the same key or E to confirm, 4 s to
+## decide), draws the proximity ring for NEAR items and a marker over the chosen target, answers the
+## "inventory full" choice (keys 1–4) and feeds the ItemBar from the private snapshot. Never decides
+## anything: the server validates every use.
+
+const PICK_SECONDS: float = 4.0
+const PRIVATE_POLL: float = 0.2
+const DISCARD_INCOMING: int = 3
+
+var scene: MatchScene
+var ring: MeshInstance3D
+var marker: Label3D
+
+## Target picker: the slot being aimed, its definition, ordered candidates, the chosen index.
+var picking_slot: int = -1
+var picking_def: ItemDefinition = null
+var picking_candidates: Array[int] = []
+var picking_index: int = 0
+var _pick_until: float = 0.0
+var _cooldown_until: float = -INF
+var _poll: float = 0.0
+var _clock: float = 0.0
+var _discard_open: bool = false
+var _ring_until: float = -INF
+var _ring_radius: float = 0.0
+
+
+func _init(p_scene: MatchScene) -> void:
+	scene = p_scene
+	name = "ItemController"
+
+
+func _ready() -> void:
+	ring = MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.rings = 48
+	torus.ring_segments = 6
+	ring.mesh = torus
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(Palette.VIP_GOLD, 0.8)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	ring.material_override = mat
+	ring.visible = false
+	add_child(ring)
+	marker = Label3D.new()
+	marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	marker.no_depth_test = true
+	marker.fixed_size = true
+	marker.pixel_size = 0.0012
+	marker.font_size = 40
+	marker.outline_size = 10
+	marker.modulate = Palette.VIP_GOLD
+	marker.visible = false
+	add_child(marker)
+
+
+## Item key `slot` (0–2) was pressed.
+func on_slot(slot: int) -> void:
+	if _discard_open:
+		_discard(slot)
+		return
+	if picking_slot >= 0:
+		if slot == picking_slot:
+			confirm()
+		else:
+			cancel()
+			on_slot(slot)
+		return
+	var inv: Array = _inventory()
+	if slot >= inv.size():
+		return
+	if not _items_allowed():
+		return
+	if _clock < _cooldown_until:
+		scene.hud.toast("Item cooldown", 0.8)
+		return
+	var def: ItemDefinition = Registry.items.get(StringName(inv[slot]), null)
+	if def == null:
+		return
+	if not ItemSystem.targets_player(def):
+		_send(slot, -1)
+		return
+	var cands: Array[int] = candidates(def)
+	if cands.is_empty():
+		scene.hud.toast("Nobody in range" if _near(def) else "No one to target", 1.2)
+		_show_ring(def, 1.5)
+		return
+	if cands.size() == 1:
+		_send(slot, cands[0])
+		return
+	picking_slot = slot
+	picking_def = def
+	picking_candidates = cands
+	picking_index = 0
+	_pick_until = _clock + PICK_SECONDS
+	_update_picker()
+
+
+## Sends the picked target.
+func confirm() -> void:
+	if picking_slot < 0:
+		return
+	var target: int = picking_candidates[picking_index] if picking_index < picking_candidates.size() else -1
+	var slot: int = picking_slot
+	cancel()
+	_send(slot, target)
+
+
+func cancel() -> void:
+	picking_slot = -1
+	picking_def = null
+	picking_candidates.clear()
+	marker.visible = false
+	ring.visible = _clock < _ring_until
+	scene.hud.items.show_target("")
+
+
+func cycle(step: int) -> void:
+	if picking_candidates.is_empty():
+		return
+	picking_index = posmod(picking_index + step, picking_candidates.size())
+	_pick_until = _clock + PICK_SECONDS
+	_update_picker()
+
+
+## Who the local player could aim `def` at: present players other than us; NEAR items only within
+## range (nearest first), others richest first (the usual sabotage pick).
+func candidates(def: ItemDefinition) -> Array[int]:
+	var out: Array[int] = []
+	var me: PlayerAvatar = scene.local
+	for pid: int in scene.avatars:
+		if pid == scene.local_id:
+			continue
+		var a: PlayerAvatar = scene.avatars[pid]
+		if a.state == PlayerAvatar.State.AWAY or not bool(scene.view.state.players.get(pid, {}).get("connected", true)):
+			continue
+		if _near(def) and (me == null or me.global_position.distance_to(a.global_position) > def.range_m):
+			continue
+		out.append(pid)
+	if _near(def) and me != null:
+		var origin: Vector3 = me.global_position
+		out.sort_custom(func(x: int, y: int) -> bool: return origin.distance_to(scene.avatars[x].global_position) < origin.distance_to(scene.avatars[y].global_position))
+	else:
+		var st: ClientMatchState = scene.view.state
+		out.sort_custom(func(x: int, y: int) -> bool: return st.balance(x) > st.balance(y) or (st.balance(x) == st.balance(y) and x < y))
+	return out
+
+
+## The local player used an item (from the server's event): start the cooldown shade.
+func on_local_use() -> void:
+	_cooldown_until = _clock + Registry.balance.item_cooldown
+
+
+## A discard choice opened for the local player.
+func on_discard_needed() -> void:
+	cancel()
+	_discard_open = true
+	_poll = PRIVATE_POLL  # refresh the panel at once
+
+
+static func rejection_text(error: StringName) -> String:
+	match error:
+		&"cooldown":
+			return "Item cooldown"
+		&"need_target", &"no_target":
+			return "No one to target"
+		&"out_of_range":
+			return "Out of range"
+		&"target_protected":
+			return "They're protected right now"
+		&"target_away":
+			return "They're not around"
+		&"grace":
+			return "They just got hit, give them a second"
+		&"target_broke":
+			return "Their pockets are empty"
+		&"incapacitated":
+			return "Can't use items right now"
+		&"seated":
+			return "Stand up first"
+		&"items_off":
+			return "Items are off this match"
+		&"wrong_phase":
+			return "Not now"
+	return StationUi.rejection_text(error)
+
+
+func _process(delta: float) -> void:
+	_clock += delta
+	if scene.local == null or scene.hud == null:
+		return
+	scene.hud.items.set_seated(scene.local.state == PlayerAvatar.State.SEATED)
+	var cd: float = Registry.balance.item_cooldown
+	scene.hud.items.set_cooldown(maxf(_cooldown_until - _clock, 0.0) / cd if cd > 0.0 else 0.0)
+	_poll += delta
+	if _poll >= PRIVATE_POLL:
+		_poll = 0.0
+		var priv: Dictionary = Net.request_private_snapshot().get("items", {})
+		scene.hud.items.set_private(priv)
+		_discard_open = priv.has("discard")
+	if picking_slot >= 0:
+		if _clock > _pick_until or picking_slot >= _inventory().size() or not _items_allowed():
+			cancel()
+		else:
+			# Players move: drop ones that left range, keep the chosen one if still valid.
+			var chosen: int = picking_candidates[picking_index] if picking_index < picking_candidates.size() else -1
+			var fresh: Array[int] = candidates(picking_def)
+			if fresh.is_empty():
+				cancel()
+			elif fresh != picking_candidates:
+				picking_candidates = fresh
+				picking_index = maxi(fresh.find(chosen), 0)
+				_update_picker()
+	if picking_slot >= 0 or _clock < _ring_until:
+		ring.global_position = scene.local.global_position + Vector3(0, 0.05, 0)
+	elif ring.visible:
+		ring.visible = false
+	if marker.visible and picking_index < picking_candidates.size():
+		var t: PlayerAvatar = scene.avatars.get(picking_candidates[picking_index], null)
+		if t != null:
+			marker.global_position = t.global_position + Vector3(0, 2.4, 0)
+
+
+func _input(event: InputEvent) -> void:
+	if _discard_open and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var k: Key = (event as InputEventKey).physical_keycode
+		if k >= KEY_1 and k <= KEY_4:
+			_discard(int(k - KEY_1))
+			get_viewport().set_input_as_handled()
+		return
+	if _discard_open and event.is_action_pressed(&"bet_clear"):
+		_discard(DISCARD_INCOMING)
+		get_viewport().set_input_as_handled()
+		return
+	if picking_slot < 0:
+		return
+	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var b: MouseButton = (event as InputEventMouseButton).button_index
+		if b == MOUSE_BUTTON_WHEEL_UP or b == MOUSE_BUTTON_WHEEL_DOWN:
+			cycle(1 if b == MOUSE_BUTTON_WHEEL_DOWN else -1)
+			get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(&"bet_chip_next"):
+		cycle(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(&"bet_chip_prev"):
+		cycle(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(&"interact"):
+		confirm()
+		get_viewport().set_input_as_handled()
+
+
+func _discard(slot: int) -> void:
+	Net.send_intent(Intents.make(&"discard_item", {"slot": slot}))
+	_discard_open = false
+	_poll = PRIVATE_POLL - 0.05
+
+
+func _send(slot: int, target: int) -> void:
+	var payload: Dictionary = {"slot": slot}
+	if target >= 0:
+		payload["target"] = target
+	var res: Dictionary = Net.send_intent(Intents.make(&"use_item", payload))
+	if not res["ok"] and res["error"] != &"rate_limited":
+		scene.hud.toast(rejection_text(res["error"]), 1.2)
+
+
+func _update_picker() -> void:
+	var tid: int = picking_candidates[picking_index]
+	var name: String = scene.view.state.player_name(tid)
+	marker.text = "▼ %s" % name
+	marker.visible = true
+	var key: String = ("Shift+%d" if scene.local.state == PlayerAvatar.State.SEATED else "%d") % (picking_slot + 1)
+	scene.hud.items.show_target("%s → %s   (wheel: switch, %s or E: use)" % [picking_def.display_name, name, key])
+	if _near(picking_def):
+		_show_ring(picking_def, PICK_SECONDS)
+
+
+func _show_ring(def: ItemDefinition, seconds: float) -> void:
+	if not _near(def) or scene.local == null:
+		return
+	_ring_radius = def.range_m
+	var torus: TorusMesh = ring.mesh as TorusMesh
+	torus.inner_radius = maxf(_ring_radius - 0.06, 0.01)
+	torus.outer_radius = _ring_radius
+	ring.visible = true
+	ring.global_position = scene.local.global_position + Vector3(0, 0.05, 0)
+	_ring_until = _clock + seconds
+
+
+func _near(def: ItemDefinition) -> bool:
+	return def != null and def.target_mode == ItemDefinition.TargetMode.NEAR_PLAYER
+
+
+func _inventory() -> Array:
+	return scene.view.state.players.get(scene.local_id, {}).get("inventory", [])
+
+
+func _items_allowed() -> bool:
+	var ph: Phase.Id = scene.view.state.phase
+	return ph == Phase.Id.CASINO or ph == Phase.Id.PRE_MINIGAME

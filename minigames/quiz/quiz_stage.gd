@@ -48,7 +48,7 @@ func _build(start: Dictionary) -> void:
 		players.append(int(p))
 	_build_set()
 	_build_ui()
-	_show_banner("CASINO QUIZ", "3 questions · answer fast · one answer, no changes")
+	_show_banner("CASINO QUIZ", "3 questions · answer fast · no changing answers")
 	_host_say("Welcome to the show!")
 	_refresh_scoreboard()
 
@@ -395,7 +395,7 @@ func _build_set() -> void:
 	screen.material_override = _mat(Palette.FELT_GREEN.darkened(0.5))
 	add_child(screen)
 	screen_label = Label3D.new()
-	screen_label.text = "CASINO QUIZ"
+	screen_label.text = ""  # the intro banner already says CASINO QUIZ
 	screen_label.font_size = 64
 	screen_label.pixel_size = 0.006
 	screen_label.width = 1300
@@ -712,8 +712,9 @@ func _build_ui() -> void:
 	sub_banner.anchor_right = 0.5
 	sub_banner.anchor_top = 0.5
 	sub_banner.anchor_bottom = 0.5
-	sub_banner.offset_left = -700
-	sub_banner.offset_right = 700
+	sub_banner.offset_left = -480
+	sub_banner.offset_right = 480
 	sub_banner.offset_top = -150
-	sub_banner.offset_bottom = -100
+	sub_banner.offset_bottom = -60
+	sub_banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(sub_banner)

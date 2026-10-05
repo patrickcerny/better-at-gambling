@@ -15,15 +15,19 @@ var timer_label: Label
 var rank_label: Label
 var phase_label: Label
 var jackpot_label: Label
+## "ON TABLES $75 · Roulette 1 $50 · Blackjack 2 $25": money you have riding right now.
+var in_play_label: Label
 var prompt_label: Label
 var toast_label: Label
 var crosshair: Control
 var feed: VBoxContainer
-var items: HBoxContainer
+var items: ItemBar
 var leaderboard: PanelContainer
 var leaderboard_rows: VBoxContainer
 var last_call_banner: Label
 var pops: Control
+## Item activation banner (centre-top).
+var item_banner: Label
 ## Under the timer: "QUIZ IN 1:12".
 var next_quiz_label: Label
 ## Centre warning during the 10 s before a minigame.
@@ -67,6 +71,21 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 func set_prompt(text: String) -> void:
 	prompt_label.text = text
 	prompt_label.visible = text != ""
+
+
+## Big centred banner for item activations aimed at or by the local player.
+func banner(text: String, color: Color = Palette.VIP_GOLD, seconds: float = 2.2) -> void:
+	item_banner.text = text
+	item_banner.add_theme_color_override(&"font_color", color)
+	item_banner.visible = true
+	item_banner.modulate.a = 1.0
+	item_banner.scale = Vector2(1.25, 1.25)
+	item_banner.pivot_offset = item_banner.size / 2.0
+	var t: Tween = create_tween()
+	t.tween_property(item_banner, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_interval(seconds)
+	t.tween_property(item_banner, "modulate:a", 0.0, 0.4)
+	t.tween_callback(func() -> void: item_banner.visible = false)
 
 
 ## Short centred message (rejections, VIP sign).
@@ -121,6 +140,8 @@ func _process(delta: float) -> void:
 	timer_label.text = "%02d:%02d" % [t / 60, t % 60]
 	rank_label.text = "%s / %d" % [_ordinal(state.rank_of(local_id)), maxi(state.balances.size(), 1)]
 	jackpot_label.text = "JACKPOT $%s" % _thousands(state.jackpot)
+	in_play_label.text = in_play_text(state, local_id)
+	in_play_label.visible = in_play_label.text != ""
 	if state.last_call:
 		last_call_banner.visible = true
 		last_call_banner.text = "LAST CALL  ×%.1f PAYOUTS  %02d:%02d" % [Registry.balance.last_call_multiplier, t / 60, t % 60]
@@ -161,14 +182,11 @@ func reset_match() -> void:
 	_refresh_items()
 
 
-## Item slots show what's in the inventory (effects arrive with M5).
+## Item slots show what's in the inventory.
 func _refresh_items() -> void:
 	if state == null or items == null:
 		return
-	var inv: Array = state.players.get(local_id, {}).get("inventory", [])
-	for i: int in items.get_child_count():
-		var l: Label = items.get_child(i) as Label
-		l.text = "[%d] %s" % [i + 1, RewardPanel.item_name(StringName(inv[i])) if i < inv.size() else "—"]
+	items.set_inventory(state.players.get(local_id, {}).get("inventory", []))
 
 
 func _on_money_changed(player: int, amount: int, _balance: int, reason: StringName) -> void:
@@ -195,6 +213,8 @@ func _on_feed(text: String, kind: StringName) -> void:
 			c = Palette.VIP_GOLD
 		&"chaos":
 			c = Color("#F0B27A")
+		&"item":
+			c = Palette.VIP_GOLD
 	l.add_theme_color_override(&"font_color", c)
 	feed.add_child(l)
 	_feed_times.append(_clock)
@@ -209,10 +229,7 @@ func _on_phase(phase: Phase.Id) -> void:
 
 
 func _refresh_static() -> void:
-	for i: int in 3:
-		var slot: Label = items.get_child(i)
-		var inv: Array = state.players.get(local_id, {}).get("inventory", [])
-		slot.text = "[%d] %s" % [i + 1, String(inv[i]).capitalize() if i < inv.size() else "—"]
+	_refresh_items()
 
 
 func _fill_leaderboard() -> void:
@@ -246,6 +263,13 @@ func _build() -> void:
 	jackpot_label.theme_type_variation = &"SmallLabel"
 	jackpot_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
 	tl.add_child(jackpot_label)
+	in_play_label = Label.new()
+	in_play_label.theme_type_variation = &"SmallLabel"
+	in_play_label.add_theme_color_override(&"font_color", Palette.CREAM)
+	in_play_label.add_theme_constant_override(&"outline_size", 6)
+	in_play_label.add_theme_color_override(&"font_outline_color", Palette.CASINO_BLACK)
+	in_play_label.visible = false
+	tl.add_child(in_play_label)
 	pops = Control.new()
 	pops.position = Vector2(300, 10)
 	pops.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -298,25 +322,17 @@ func _build() -> void:
 	rank_label.text = "1st / 1"
 	add_child(rank_label)
 	# Bottom-centre: item slots.
-	items = HBoxContainer.new()
+	items = ItemBar.new()
 	items.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	items.anchor_left = 0.5
 	items.anchor_right = 0.5
 	items.anchor_top = 1.0
 	items.anchor_bottom = 1.0
-	items.offset_left = -300
-	items.offset_right = 300
-	items.offset_top = -70
-	items.offset_bottom = -24
-	items.alignment = BoxContainer.ALIGNMENT_CENTER
-	items.add_theme_constant_override(&"separation", 24)
+	items.offset_left = -340
+	items.offset_right = 340
+	items.offset_top = -420
+	items.offset_bottom = -20
 	add_child(items)
-	for i: int in 3:
-		var s := Label.new()
-		s.theme_type_variation = &"SmallLabel"
-		s.text = "[%d] —" % (i + 1)
-		s.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
-		items.add_child(s)
 	# Left-bottom: feed.
 	feed = VBoxContainer.new()
 	feed.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -354,6 +370,9 @@ func _build() -> void:
 	minigame_warning = _centre_label(-250, 44, Palette.VIP_GOLD)
 	minigame_warning.theme_type_variation = &"TitleLabel"
 	minigame_warning.visible = false
+	item_banner = _centre_label(-200, 48, Palette.VIP_GOLD)
+	item_banner.theme_type_variation = &"TitleLabel"
+	item_banner.visible = false
 	# Leaderboard (hold Tab).
 	leaderboard = PanelContainer.new()
 	leaderboard.set_anchors_preset(Control.PRESET_CENTER)
@@ -395,6 +414,35 @@ func _centre_label(offset_y: float, size: int, color: Color) -> Label:
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(l)
 	return l
+
+
+## Stakes the player has on tables that haven't settled yet (roulette chips, a blackjack hand).
+static func in_play_text(st: ClientMatchState, pid: int) -> String:
+	var parts: PackedStringArray = []
+	var total: int = 0
+	var ids: Array = st.stations.keys()
+	ids.sort()
+	for sid: Variant in ids:
+		var pub: Dictionary = st.stations[sid]
+		var amount: int = 0
+		match StringName(pub.get("game", "")):
+			&"roulette":
+				if int(pub.get("state", 0)) != RouletteLogic.State.RESULT:
+					for b: Dictionary in pub.get("bets", []):
+						if int(b["player"]) == pid:
+							amount += int(b["amount"])
+			&"blackjack":
+				if int(pub.get("state", 0)) != BlackjackLogic.State.PAYOUT:
+					var hands: Dictionary = pub.get("hands", {})
+					for k: Variant in hands:
+						if int(k) == pid:
+							amount += int(hands[k].get("stake", 0))
+		if amount > 0:
+			total += amount
+			parts.append("%s $%d" % [ClientMatchState.station_label(StringName(sid)), amount])
+	if total == 0:
+		return ""
+	return "ON TABLES $%d  ·  %s" % [total, "  ·  ".join(parts)]
 
 
 static func _thousands(n: int) -> String:
