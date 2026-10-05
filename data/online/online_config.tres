@@ -4,4 +4,4 @@
 
 [resource]
 script = ExtResource("1")
-orchestrator_url = "http://127.0.0.1:8080"
+orchestrator_url = "http://152.53.33.53:4300"
