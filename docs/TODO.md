@@ -224,6 +224,9 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 
 ## M6 — Bots, reconnects, MVP hardening → **MVP COMPLETE**
 
+> **Patrick, 2026-10-05 19:23 UTC: "this game does not need bots, just remove them entirely. Rather think about other stuff."**
+> M6 drops every bot task below (BotDirector/BotBrain, lobby bot slots, bot quiz answers/item use/physical behaviour, bot test criteria) and removes bots from the game: lobby bot slots, Practice-with-bots, server bot logic (duels, rewards, items). Scripted test players for the automated tests stay, as test tooling only. Do this when Patrick starts M6.
+
 ### Tasks
 - [x] **VPS deployment** (§4.0, done early on 2026-10-05; see deploy/README.md): `deploy/` Dockerfile + compose + Caddyfile + firewall script + `deploy.sh`/`status.sh`
 - [ ] if the owner has provided SSH access
