@@ -39,7 +39,7 @@ dog_leash, beer_full.
 | File | Model | Source | Author | License |
 |---|---|---|---|---|
 | assets/casino/blackjack_table.dae | Half-moon blackjack table | sent by Patrick (Casino_Free pack) | **check** | **check** |
-| assets/casino/roulette_table.fbx | Roulette wheel ("Rolley") | sent by Patrick | **check** | **check** |
+| assets/casino/roulette_table.fbx | Roulette wheel ("rolley casino", Rolley.fbx) | sent by Patrick | **check** | **check** |
 
 Its camera and lights were stripped from the file. The table's texture files (BrushedIron02_4K, Metal007_4K, Wood067_8K) were not included, so it
 uses flat casino colors. The roulette wheel carries its own textures; its floor plane, camera and
