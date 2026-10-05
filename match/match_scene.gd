@@ -66,6 +66,8 @@ var effect_tags: Dictionary[int, Label3D] = {}
 ## Beer: full-screen wobble/blur under the HUD, and the money we had when we got drunk.
 var drunk_overlay: ColorRect
 var _drunk_money: int = -1
+## Gold crown over the money leader (not on the dedicated server).
+var crown: LeaderCrown = null
 
 var _ko_until: Dictionary[int, float] = {}
 var _ragdoll_attacker: Dictionary[int, int] = {}
@@ -188,6 +190,8 @@ func _ready() -> void:
 		voice.name = "VoiceChannel"
 		voice.setup(view.state, local_id, func(pid: int) -> PlayerAvatar: return avatars.get(pid, null), ui_layer, role == Role.CLIENT)
 		add_child(voice)
+		crown = LeaderCrown.new()
+		world_root.add_child(crown)
 	_connect_router()
 	if _owns_server and role == Role.PRACTICE:
 		server.start_match()
@@ -453,6 +457,8 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_expire_predictions()
 	_point_at_hot_table()
+	if crown != null:
+		crown.track(view.state.balances, avatars)
 	if view.state.jackpot != _shown_jackpot:
 		_shown_jackpot = view.state.jackpot
 		for node: StationBase in map.stations.values():
@@ -783,7 +789,7 @@ func _on_event(ev: Dictionary) -> void:
 			var p: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			var net: int = int(ev["net"])
 			if p != null and net != 0:
-				p.visuals.react(&"win" if net > 0 else &"loss")
+				p.visuals.react(AvatarVisuals.reaction_for_net(net))
 				if int(ev["player"]) != local_id:
 					p.say(("+$%d" if net > 0 else "-$%d") % absi(net), 1.5)
 			var details: Dictionary = ev.get("details", {})
@@ -794,6 +800,8 @@ func _on_event(ev: Dictionary) -> void:
 				_plinko_seen.clear()
 		&"jackpot_won":
 			Audio.play(&"jackpot_siren", &"SFX", -6.0)
+			if avatars.has(int(ev["player"])):
+				avatars[int(ev["player"])].visuals.react(&"big_win")
 		&"last_call":
 			Audio.play(&"countdown_beep", &"SFX", -4.0)
 		&"phase_changed":
@@ -846,6 +854,7 @@ func _on_event(ev: Dictionary) -> void:
 			var v: PlayerAvatar = avatars.get(int(ev["victim"]), null)
 			if v != null and ev["result"] != &"blocked":
 				v.knockback(Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized(), 3.0)
+				v.visuals.react(&"slip")
 				Audio.play_at(&"whoosh", v, -6.0, 1.4)
 			if ev["result"] == &"blocked":
 				var p: PlayerAvatar = avatars.get(int(ev["player"]), null)
@@ -1202,6 +1211,8 @@ func _knock_out(target: int, attacker: int, cause: StringName) -> void:
 	if t.ragdoll != null:
 		t.ragdoll.max_time = cfg.knockout_time + 1.0
 	t.visuals.set_knocked_out(true)
+	if cause == &"fountain":
+		FountainSplash.at_fountain(world_root, t.global_position, true)
 	Audio.play_at(&"bonk", t, -2.0, 0.8)
 	if target == local_id:
 		hud.toast("KNOCKED OUT" if cause != &"fountain" else "SPLASH! Knocked out", 2.0)
@@ -1254,7 +1265,13 @@ func _throw_out(pid: int, guard_name: String) -> void:
 	dir = dir.normalized() if dir.length() > 0.01 else Vector3.BACK
 	_ragdoll_attacker.erase(pid)
 	_ko_until.erase(pid)
-	a.start_ragdoll(dir * 9.0 + Vector3.UP * 4.0, 1.6, not _owns_server)
+	# The guard who caught them carries them toward the door and tosses them (Guard.carry).
+	var carrier: Guard = null
+	for g: Guard in guards:
+		if String(g.guard_id) == guard_name:
+			carrier = g
+	if carrier == null or not carrier.carry(a, LuckyLounge.ENTRANCE_POS):
+		a.start_ragdoll(dir * 9.0 + Vector3.UP * 4.0, 1.6, not _owns_server)
 	if _owns_server:
 		_respawn_at[pid] = _clock + cfg.throw_out_respawn_seconds
 		server.set_server_owned(pid, true)
@@ -1585,6 +1602,7 @@ func _check_fountain() -> void:
 			var a: PlayerAvatar = body
 			if not a.is_soaked():
 				Audio.play_at(&"splash", a, -6.0)
+				FountainSplash.at_fountain(world_root, a.global_position, false)
 			a.soak()
 			if a.is_standing() and a.global_position.y < 0.9 and a.velocity.y < -2.0 and _owns_server:
 				server.report_knockout(a.player_id, _ragdoll_attacker.get(a.player_id, -1), &"fountain")
