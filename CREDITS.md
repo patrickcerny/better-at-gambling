@@ -40,7 +40,7 @@ dog_leash, beer_full.
 |---|---|---|---|---|
 | assets/casino/blackjack_table.dae | Half-moon blackjack table | sent by Patrick (Casino_Free pack) | **check** | **check** |
 
-The table's texture files (BrushedIron02_4K, Metal007_4K, Wood067_8K) were not included, so it
+Its camera and lights were stripped from the file. The table's texture files (BrushedIron02_4K, Metal007_4K, Wood067_8K) were not included, so it
 uses flat casino colors.
 
 ## Sound effects

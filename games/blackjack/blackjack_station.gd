@@ -44,8 +44,6 @@ func _add_table_model() -> void:
 	model.position = Vector3(0, 0, -0.4)
 	add_child(model)
 	for n: Node in model.find_children("*", "", true, false):
-		if n is Camera3D or n is Light3D:
-			n.queue_free()
-		elif n is MeshInstance3D:
+		if n is MeshInstance3D:
 			var c: Color = TABLE_COLORS.get(String(n.name), Palette.WARM_GOLD)
 			(n as MeshInstance3D).material_override = GreyboxKit.gold() if c == Palette.WARM_GOLD else GreyboxKit.material(c, 0.0, 0.7)
