@@ -42,6 +42,8 @@ var items: ItemSystem
 var half_rtt_provider: Callable = func(_p: int) -> float: return 0.0
 ## Per-player match stats for awards and dynamic quiz questions.
 var stats: Dictionary[int, Dictionary] = {}
+## Balance samples over casino time for the results graph (in `match_ended` standings rows).
+var money_history: MoneyHistory = MoneyHistory.new()
 ## Results screen: seconds until an online room goes back to its lobby on its own.
 var results_return_in: float = -1.0
 ## Time acceleration for sims/tests.
@@ -129,6 +131,7 @@ func _build_match_systems(seed_value: int) -> void:
 	rewards = RewardDirector.new()
 	_comped.clear()
 	results_return_in = -1.0
+	money_history = MoneyHistory.new()
 	for id: int in state.players:
 		_reset_stats(id)
 		rules.status(id).away = not state.players[id].connected
@@ -160,6 +163,7 @@ func add_player(uid: String, display_name: String, color_index: int = -1, skin: 
 	state.add_player(p)
 	economy.add_player(p.id, balance.start_money)
 	_reset_stats(p.id)
+	money_history.add_player(p.id, balance.start_money)
 	world.set_transform(p.id, Vector3.ZERO, 0.0)
 	lobby.join(p.id, _uptime + p.id * 0.001)
 	_emit(GameEvents.make(&"player_joined", {"player": p.to_wire()}))
@@ -239,6 +243,7 @@ func start_match() -> void:
 	running = true
 	match_time = 0.0
 	phases.start()
+	money_history.start(schedule.duration_s, _balances())
 	stations.set_limits_multiplier(balance.limits_multiplier(0))
 	for id: int in state.players:
 		rules.protect(id, match_time)
@@ -337,6 +342,7 @@ func _step(delta: float) -> void:
 		stations.tick(delta)
 		hot_tables.tick(delta)
 		_check_comps()
+		money_history.tick(phases.casino_time, _balances())
 	elif phases.phase == Phase.Id.MINIGAME and minigame != null:
 		minigame.tick(delta, match_time)
 		if minigame.is_finished():
@@ -402,6 +408,7 @@ func _finish_match() -> void:
 	running = false
 	hot_tables.stop()
 	stations.set_global_multiplier(1.0)
+	money_history.finish(_balances())
 	var standings: Array[Dictionary] = get_standings()
 	if room_mode:
 		results_return_in = balance.results_return_time
@@ -495,6 +502,13 @@ func get_awards() -> Array[Dictionary]:
 	return Awards.pick(stats, _names(), 4)
 
 
+func _balances() -> Dictionary:
+	var out: Dictionary = {}
+	for id: int in state.players:
+		out[id] = economy.balance(id)
+	return out
+
+
 func _names() -> Dictionary:
 	var out: Dictionary = {}
 	for id: int in state.players:
@@ -532,7 +546,8 @@ func return_to_lobby() -> void:
 
 func _reset_stats(id: int) -> void:
 	stats[id] = {"won_by_game": {}, "biggest_bet": 0, "biggest_win": 0, "biggest_loss": 0, "knockouts_suffered": 0,
-		"thrown_out": 0, "shaken_out": 0, "quiz_points": 0, "comps": 0, "lowest_rank": 1, "final_rank": 1}
+		"thrown_out": 0, "shaken_out": 0, "quiz_points": 0, "comps": 0, "lowest_rank": 1, "final_rank": 1,
+		"jackpot_won": 0, "knockouts_dealt": 0, "times_shoved": 0, "loss_streak": 0, "losing_now": 0}
 
 
 ## Final ranking: money, then quiz points, then biggest win; ties share placement.
@@ -541,6 +556,8 @@ func get_standings() -> Array[Dictionary]:
 	for id: int in state.players:
 		var p: PlayerState = state.players[id]
 		rows.append({"player": id, "name": p.display_name, "money": economy.balance(id), "quiz_points": p.quiz_points, "biggest_win": p.biggest_win})
+		if not running and money_history.samples() > 0:
+			rows[-1]["series"] = money_history.of(id)  # results graph: ~60 ints per player at most
 	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if a["money"] != b["money"]:
 			return a["money"] > b["money"]
@@ -804,6 +821,8 @@ func _track_stats(ev: Dictionary) -> void:
 			var st: Dictionary = stats[p]
 			st["biggest_win"] = maxi(int(st["biggest_win"]), net)
 			st["biggest_loss"] = maxi(int(st["biggest_loss"]), -net)
+			st["losing_now"] = int(st["losing_now"]) + 1 if net < 0 else 0 if net > 0 else int(st["losing_now"])
+			st["loss_streak"] = maxi(int(st["loss_streak"]), int(st["losing_now"]))
 			if net > 0:
 				var game: StringName = stations.game_of.get(StringName(ev["station"]), &"")
 				st["won_by_game"][game] = int(st["won_by_game"].get(game, 0)) + net
@@ -813,6 +832,14 @@ func _track_stats(ev: Dictionary) -> void:
 		&"player_knocked_out":
 			if stats.has(int(ev["target"])):
 				stats[int(ev["target"])]["knockouts_suffered"] += 1
+			if stats.has(int(ev.get("attacker", -1))) and int(ev["attacker"]) != int(ev["target"]):
+				stats[int(ev["attacker"])]["knockouts_dealt"] += 1
+		&"player_shoved":
+			if stats.has(int(ev["target"])):
+				stats[int(ev["target"])]["times_shoved"] += 1
+		&"jackpot_won":
+			if stats.has(int(ev["player"])):
+				stats[int(ev["player"])]["jackpot_won"] += int(ev["amount"])
 		&"player_thrown_out":
 			if stats.has(int(ev["target"])):
 				stats[int(ev["target"])]["thrown_out"] += 1

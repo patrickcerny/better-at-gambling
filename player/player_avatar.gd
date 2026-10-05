@@ -95,7 +95,7 @@ func _ready() -> void:
 	add_child(visuals)
 	visuals.set_color(color)
 	visuals.set_skin(skin)
-	nametag = Label3D.new()
+	nametag = NameTag.new()  # clamps its on-screen size by distance
 	nametag.name = "Nametag"
 	nametag.text = display_name
 	nametag.font_size = 48
@@ -105,10 +105,6 @@ func _ready() -> void:
 	nametag.outline_modulate = Palette.CASINO_BLACK
 	nametag.outline_size = 10
 	nametag.position.y = 2.15
-	# Up close the tag would fill the screen: fade it out under ~2.5 m (you can see who it is).
-	nametag.visibility_range_begin = 2.5
-	nametag.visibility_range_begin_margin = 0.8
-	nametag.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	nametag.visible = not is_local
 	add_child(nametag)
 	bubble = Label3D.new()
