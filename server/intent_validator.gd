@@ -18,6 +18,7 @@ const PHASES: Dictionary = {
 	&"draft_pick": [Phase.Id.REWARDS],
 	&"set_ready": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"lobby_setting": [Phase.Id.LOBBY, Phase.Id.RESULTS],
+	&"set_skin": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"add_bot": [Phase.Id.LOBBY],
 	&"remove_bot": [Phase.Id.LOBBY],
 	&"return_to_lobby": [Phase.Id.RESULTS],

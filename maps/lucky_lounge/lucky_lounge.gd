@@ -174,9 +174,14 @@ func _build_lobby() -> void:
 	for i: int in SPAWNS.size():
 		var pad: Node3D = GreyboxKit.cylinder(self, 0.6, 0.06, SPAWNS[i] + Vector3(0, 0.03, 0), Palette.player_color(i).darkened(0.2), "ReadyPad%d" % i, false)
 		pad.add_to_group(&"ready_pads")
-	# Mirror (decoration; the wardrobe is off while cosmetics are disabled).
+	# Wardrobe mirror: pick a skin in the lobby.
 	GreyboxKit.box(self, Vector3(0.2, 2.4, 1.6), Vector3(-SIZE_X * 0.5 + 0.6, 1.2, 12.0), Color("#9AC4D8"), "Mirror")
 	GreyboxKit.box(self, Vector3(0.3, 2.7, 1.9), Vector3(-SIZE_X * 0.5 + 0.45, 1.3, 12.0), Palette.WARM_GOLD, "MirrorFrame", false)
+	_sign_label(Vector3(-SIZE_X * 0.5 + 0.8, 2.85, 12.0), PI * 0.5, "WARDROBE", 56)
+	# Couches against the back wall of the entrance hall, facing the doors.
+	for x: float in [-16.5, 18.0]:
+		var couch: Node3D = GreyboxKit.box(self, Vector3(2.4, 0.9, 1.0), Vector3(x, 0.45, SIZE_Z * 0.5 - 0.8), Color("#24304A"), "Couch")
+		PropModels.dress(couch, &"couch", 0.45, 0.0, 2.5).rotation.y = PI
 	_build_settings_board()
 	_build_lobby_doors()
 	# Revolving door: rotating 4-panel cylinder in the south wall gap.
@@ -318,7 +323,8 @@ func _build_floor_areas() -> void:
 	# Plants and a few obstacles for lanes.
 	for p: Vector3 in [Vector3(-20, 0, 14), Vector3(20, 0, 14), Vector3(-20, 0, -1), Vector3(20, 0, -1), Vector3(-5, 0, 8.6), Vector3(5, 0, 8.6)]:
 		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, p + Vector3(0, 0.3, 0), Color("#5A3A22"), "Pot")
-		GreyboxKit.sphere(pot, 0.7, Vector3(0, 0.9, 0), Color("#3C7A3A"), "Leaves")
+		var plant: Node3D = PropModels.dress(pot, [&"plant_1", &"plant_2", &"plant_3"][absi(int(p.x + p.z)) % 3], 0.3, 1.7)
+		plant.rotation.y = p.x * 0.7
 
 
 ## Gift Shop kiosk: a counter with a striped awning and a sign, four items on sale each round.
@@ -422,7 +428,11 @@ func _stool(pos: Vector3) -> RigidBody3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = GreyboxKit.material(Palette.CASINO_RED.darkened(0.3))
+	mi.visible = false
 	body.add_child(mi)
+	var model: Node3D = PropModels.shade(PropModels.make(&"seat", 0.6), 0.7)
+	model.position.y = -0.3
+	body.add_child(model)
 	var cs := CollisionShape3D.new()
 	var sh := CylinderShape3D.new()
 	sh.radius = 0.22
@@ -449,7 +459,13 @@ func _chip_stack(pos: Vector3) -> RigidBody3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = GreyboxKit.material(Palette.CASINO_RED)
+	mi.visible = false
 	body.add_child(mi)
+	for i: int in 12:
+		var chip: Node3D = PropModels.make(&"poker_chip", 0.0, 0.24)
+		chip.position = Vector3(randf_range(-0.01, 0.01), -0.15 + i * 0.025, randf_range(-0.01, 0.01))
+		chip.rotation.y = randf() * TAU
+		body.add_child(chip)
 	var cs := CollisionShape3D.new()
 	var sh := CylinderShape3D.new()
 	sh.radius = 0.12

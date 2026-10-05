@@ -97,7 +97,7 @@ func start_local(server: MatchServer, display_name: String) -> int:
 	mode = Mode.LOCAL
 	local_server = server
 	server.event_emitted.connect(_on_local_event)
-	local_player_id = server.add_player("local", display_name)
+	local_player_id = server.add_player("local", display_name, false, -1, StringName(Settings.get_value("profile", "skin", "bean")))
 	connected.emit()
 	return local_player_id
 
@@ -217,7 +217,7 @@ func ping_ms() -> int:
 
 # --- Client ------------------------------------------------------------------------------------
 
-## Connects to a dedicated server. `hello` carries {join_token, name, uid, color, hat};
+## Connects to a dedicated server. `hello` carries {join_token, name, uid, color, skin};
 ## `opts` may add {latency_ms, loss} (tests). Returns OK if the attempt started.
 func join_server(host: String, port: int, hello: Dictionary, opts: Dictionary = {}) -> Error:
 	stop()

@@ -14,7 +14,7 @@ func _sample_state() -> MatchState:
 		p.uid = "uid-%d" % i
 		p.display_name = "P%d" % i
 		p.color_index = i
-		p.hat = &"crown"
+		p.skin = &"king"
 		p.is_bot = i == 3
 		p.inventory = [&"lucky_clover", &"mirror"] as Array[StringName]
 		p.quiz_points = 1500 + i

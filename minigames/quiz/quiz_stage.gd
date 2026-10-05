@@ -443,7 +443,7 @@ func _build_set() -> void:
 		bean.rotation.y = PI  # face the camera
 		root.add_child(bean)
 		bean.set_color(_player_color(pid))
-		bean.set_hat(StringName(state.players.get(pid, {}).get("hat", "none")))
+		bean.set_skin(StringName(state.players.get(pid, {}).get("skin", "bean")))
 		var name_l := Label3D.new()
 		name_l.text = state.player_name(pid)
 		name_l.font_size = 40

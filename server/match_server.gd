@@ -147,18 +147,19 @@ func open_lobby() -> void:
 	room_mode = true
 
 
-## Adds a participant and returns its player id. Colors are unique; `color_index` is a wish.
-func add_player(uid: String, display_name: String, is_bot: bool = false, color_index: int = -1, hat: StringName = &"none") -> int:
+## Adds a participant and returns its player id. Colors are fixed and unique; `skin` is the
+## player's saved character skin.
+func add_player(uid: String, display_name: String, is_bot: bool = false, color_index: int = -1, skin: StringName = &"bean") -> int:
 	var p := PlayerState.new()
 	p.id = _next_player_id
 	_next_player_id += 1
 	p.uid = uid
 	p.display_name = display_name
 	p.is_bot = is_bot
-	# Cosmetics are off (Patrick, 2026-10-05): everyone gets the first free color, no hats; the
-	# client's wishes (`color_index`, `hat`) are ignored.
+	# No color picker (Patrick, 2026-10-05): everyone gets the first free color and the client's
+	# `color_index` wish is ignored. Skins are the only look players choose.
 	p.color_index = lobby.free_color(_taken_colors(), -1)
-	p.hat = &"none"
+	p.skin = skin if Cosmetics.is_valid_skin(skin) else &"bean"
 	p.bot_difficulty = StringName(lobby.settings["bot_difficulty"])
 	state.add_player(p)
 	economy.add_player(p.id, balance.start_money)
@@ -680,6 +681,13 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"set_ready":
 			lobby.set_panel_ready(player, bool(intent["ready"]))
 			_sync_ready(player)
+			return StationLogicBase.OK_RESULT
+		&"set_skin":
+			var skin: StringName = StringName(intent["skin"])
+			if not Cosmetics.is_valid_skin(skin):
+				return StationLogicBase.fail(&"bad_value")
+			(state.players[player] as PlayerState).skin = skin
+			_emit(GameEvents.make(&"player_skin", {"player": player, "skin": skin}))
 			return StationLogicBase.OK_RESULT
 		&"lobby_setting":
 			var err: StringName = lobby.set_setting(player, str(intent["key"]), intent["value"])

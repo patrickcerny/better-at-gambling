@@ -22,6 +22,8 @@ var hand_l: RigidBody3D
 var hand_r: RigidBody3D
 var hips: RigidBody3D
 var color: Color = Palette.CREAM
+## Character skin: when it has a model, that model rides the torso instead of the bean parts.
+var skin: StringName = &"bean"
 var max_time: float = 2.5
 ## Player this ragdoll belongs to.
 var player_id: int = -1
@@ -140,6 +142,25 @@ func _build() -> void:
 		e.material_override = dark
 		e.position = Vector3(x, 0.05, -0.27)
 		head.add_child(e)
+	_wear_skin()
+
+
+## Hides the bean parts and pins the skin model to the torso (it tumbles stiffly, in its idle pose).
+func _wear_skin() -> void:
+	var model: Node3D = SkinLibrary.instantiate(skin)
+	if model == null:
+		return
+	for b: RigidBody3D in [torso, head, hand_l, hand_r, hips]:
+		for mi: Node in b.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).visible = false
+	torso.add_child(model)
+	model.position.y = -0.9
+	SkinLibrary.relax_pose(model)
+	var ap: AnimationPlayer = SkinLibrary.animation_player(model)
+	if ap != null:
+		var hit: StringName = SkinLibrary.clip(ap, &"idle")
+		if hit != &"":
+			ap.play(hit)
 
 
 func _body(name: String, pos: Vector3, mesh: Mesh, mat: Material, mass: float) -> RigidBody3D:

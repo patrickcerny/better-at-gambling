@@ -47,11 +47,11 @@ func profile_name() -> String:
 	return n
 
 
-## Saved look: {color, hat}.
+## Saved look: {color, skin}.
 func profile_cosmetics() -> Dictionary:
 	return {
 		"color": cmdline.get_int("color", int(Settings.get_value("profile", "color", -1))) if cmdline != null else -1,
-		"hat": StringName(cmdline.get_string("hat", str(Settings.get_value("profile", "hat", "none")))) if cmdline != null else &"none",
+		"skin": StringName(cmdline.get_string("skin", str(Settings.get_value("profile", "skin", "bean")))) if cmdline != null else &"bean",
 	}
 
 

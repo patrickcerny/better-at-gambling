@@ -11,18 +11,12 @@ var _label: Label3D
 
 func _ready() -> void:
 	var count: int = clampi(amount / 25, 1, 6)
-	var colours: Array[Color] = [Palette.CASINO_RED, Palette.FELT_GREEN.lightened(0.2), Palette.WARM_GOLD, Palette.CASINO_BLACK]
 	for i: int in count:
-		var mi := MeshInstance3D.new()
-		var cm := CylinderMesh.new()
-		cm.top_radius = 0.16
-		cm.bottom_radius = 0.16
-		cm.height = 0.05
-		mi.mesh = cm
-		mi.material_override = GreyboxKit.material(colours[i % colours.size()])
-		mi.position = Vector3(randf_range(-0.03, 0.03), 0.025 + i * 0.05, randf_range(-0.03, 0.03))
-		mi.rotation.y = randf() * TAU
-		add_child(mi)
+		var chip: Node3D = PropModels.make(&"poker_chip", 0.0, 0.32)
+		chip.position = Vector3(randf_range(-0.03, 0.03), i * 0.05, randf_range(-0.03, 0.03))
+		chip.scale.y = 1.5  # chunky enough to spot on the carpet
+		chip.rotation.y = randf() * TAU
+		add_child(chip)
 	_label = Label3D.new()
 	_label.text = "$%d" % amount
 	_label.font_size = 44

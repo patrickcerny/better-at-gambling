@@ -38,6 +38,7 @@ var nearest_station: StationBase = null
 ## Results podium (also the "no other menu while results show" flag).
 var results_panel: ResultsStage = null
 var settings_panel: SettingsPanel = null
+var _shown_jackpot: int = -1
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
 var reward_panel: RewardPanel
@@ -270,9 +271,13 @@ func _start_local(cmd: Cmdline) -> void:
 	var player_name: String = str(Settings.get_value("profile", "name", "You"))
 	var id: int = Net.start_local(server, player_name)
 	server.set_server_position(id, def.spawn_points[0])
+	if cmd.has("skin"):  # dev/screenshots
+		(server.state.players[id] as PlayerState).skin = StringName(cmd.get_string("skin"))
 	var bots: int = clampi(cmd.get_int("bots", 3), 0, 7)
 	for i: int in bots:
-		var bid: int = server.add_player("bot-%d" % (i + 1), ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bluff", "Royal"][i % 7], true)
+		# Dev/screenshots: `--bot-skins` dresses the bots in the character skins.
+		var skin: StringName = Cosmetics.SKINS[(i + 1) % Cosmetics.SKINS.size()] if cmd.has_flag("bot-skins") else &"bean"
+		var bid: int = server.add_player("bot-%d" % (i + 1), ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bluff", "Royal"][i % 7], true, -1, skin)
 		server.set_server_position(bid, def.spawn_points[(i + 1) % def.spawn_points.size()] + Vector3(0, 0, -3.0))
 
 
@@ -316,7 +321,7 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.ragdoll_impact.connect(func(strength: float, wall: bool) -> void: _on_ragdoll_impact(pid, strength, wall))
 	a.ragdoll_settled.connect(func() -> void: _on_ragdoll_settled(pid))
 	avatars[pid] = a
-	a.visuals.set_hat(StringName(p.get("hat", "none")))
+	a.set_skin(StringName(p.get("skin", "bean")))
 	if not bool(p.get("connected", true)) and not bot:
 		a.set_connection_away(true)
 	# Already at a table when we learn about them (joining late, reconnecting): put them in their
@@ -419,6 +424,11 @@ func _connect_router() -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_expire_predictions()
+	if view.state.jackpot != _shown_jackpot:
+		_shown_jackpot = view.state.jackpot
+		for node: StationBase in map.stations.values():
+			if node is PlinkoStation:
+				(node as PlinkoStation).set_jackpot(_shown_jackpot, cfg.jackpot_seed)
 	if stage != null:
 		stage.on_private(Net.request_private_snapshot())
 	if _owns_server and server != null:
@@ -607,11 +617,10 @@ func _on_event(ev: Dictionary) -> void:
 			if a != null:
 				a.queue_free()
 				avatars.erase(int(ev["player"]))
-		&"player_cosmetics":
+		&"player_skin":
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null:
-				a.set_color(Palette.player_color(int(ev["color"])))
-				a.visuals.set_hat(StringName(ev["hat"]))
+				a.set_skin(StringName(ev["skin"]))
 		&"player_left", &"player_rejoined":
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null and int(ev["player"]) != local_id:
@@ -862,6 +871,21 @@ func _on_event(ev: Dictionary) -> void:
 
 ## Item activation for everyone: the user calls it out, the target reacts, the local player gets a
 ## banner when they used it or were hit.
+## The item's model (when it has one) pops up in front of the user for a moment.
+func _hold_up_prop(u: PlayerAvatar, item: StringName) -> void:
+	var id: StringName = PropModels.ITEM_PROPS.get(item, &"")
+	if id == &"":
+		return
+	var prop: Node3D = PropModels.make(id, 0.3)
+	prop.position = Vector3(0.3, 1.25, -0.45)
+	u.add_child(prop)
+	var t: Tween = prop.create_tween()
+	t.tween_property(prop, ^"position:y", 1.6, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_interval(1.0)
+	t.tween_property(prop, ^"scale", Vector3.ONE * 0.01, 0.25)
+	t.tween_callback(prop.queue_free)
+
+
 func _on_item_used(ev: Dictionary) -> void:
 	var user: int = int(ev["player"])
 	var target: int = int(ev["target"])
@@ -874,6 +898,7 @@ func _on_item_used(ev: Dictionary) -> void:
 	if u != null:
 		u.say(name.to_upper() + "!", 1.5)
 		u.visuals.react(&"win")
+		_hold_up_prop(u, item)
 		Audio.play_at(&"whoosh", u, -8.0, 1.2)
 	if user == local_id:
 		items_ctl.on_local_use()
@@ -1404,11 +1429,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 # --- World checks ------------------------------------------------------------------------------
 
-## &"settings" when the local player stands at the settings board in the lobby.
+## &"wardrobe"/&"settings" when the local player stands at the mirror/settings board in the lobby.
 func _lobby_spot() -> StringName:
 	if local == null or not view.state.room_mode or view.state.phase != Phase.Id.LOBBY:
 		return &""
 	var p: Vector3 = local.global_position
+	if Vector2(p.x - LuckyLounge.MIRROR_POS.x, p.z - LuckyLounge.MIRROR_POS.z).length() < 2.6:
+		return &"wardrobe"
 	if Vector2(p.x - LuckyLounge.SETTINGS_BOARD_POS.x, p.z - LuckyLounge.SETTINGS_BOARD_POS.z).length() < 2.6:
 		return &"settings"
 	return &""
@@ -1423,6 +1450,9 @@ func _update_prompt() -> void:
 		hud.set_prompt("")
 		return
 	match _lobby_spot():
+		&"wardrobe":
+			hud.set_prompt("[E] Wardrobe: pick your skin")
+			return
 		&"settings":
 			hud.set_prompt("[E] Party settings" if view.state.leader == local_id else "[E] Party settings (only the leader ★ can change them)")
 			return

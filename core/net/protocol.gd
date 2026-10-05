@@ -4,7 +4,7 @@ extends RefCounted
 
 const PROTOCOL_VERSION: int = 2
 ## Build string clients and servers must share exactly (the orchestrator checks it too).
-const BUILD_ID: String = "0.5.2-fixes"
+const BUILD_ID: String = "0.5.3-skins"
 const DEFAULT_PORT: int = 24680
 const MAX_PLAYERS: int = 8
 const SERVER_TICK_HZ: int = 20
@@ -19,7 +19,7 @@ const CHANNEL_VOICE: int = 3
 
 ## Message types: every packet is `[type, payload]` (see `Wire`).
 enum Msg {
-	HELLO = 1,  ## C→S {protocol, build, join_token, name, uid, color, hat}
+	HELLO = 1,  ## C→S {protocol, build, join_token, name, uid, color, skin}
 	WELCOME,  ## S→C {player, snapshot, private, server_time}
 	REJECT,  ## S→C {code, message}
 	EVENT,  ## S→C one game event (reliable, ordered)

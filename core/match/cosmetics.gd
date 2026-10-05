@@ -1,18 +1,19 @@
 class_name Cosmetics
 extends RefCounted
-## Lobby cosmetics (§2.2): 8 colorblind-safe player colors (see `Palette.player_color`) and
-## 6 placeholder hats. Purely visual; validated by the server.
+## Player looks (§2.2): 8 fixed, colorblind-safe player colors (see `Palette.player_color`;
+## assigned by the server, no picker) and character skins. Purely visual; validated by the server.
+## The skin models themselves live client-side in `SkinLibrary`.
 
 const COLOR_COUNT: int = 8
-const HATS: Array[StringName] = [&"none", &"top_hat", &"cowboy", &"party", &"beanie", &"bowler"]
-const HAT_NAMES: Dictionary = {
-	&"none": "No hat", &"top_hat": "Top hat", &"cowboy": "Cowboy", &"party": "Party cone",
-	&"beanie": "Beanie", &"bowler": "Bowler",
+const SKINS: Array[StringName] = [&"bean", &"wizard", &"business", &"warrior", &"king", &"regular", &"swat"]
+const SKIN_NAMES: Dictionary = {
+	&"bean": "Bean", &"wizard": "Wizard", &"business": "Businessman", &"warrior": "Warrior",
+	&"king": "King", &"regular": "Regular Guy", &"swat": "SWAT",
 }
 
 
-static func is_valid_hat(hat: StringName) -> bool:
-	return hat in HATS
+static func is_valid_skin(skin: StringName) -> bool:
+	return skin in SKINS
 
 
 static func is_valid_color(index: int) -> bool:

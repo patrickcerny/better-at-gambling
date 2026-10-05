@@ -3,3 +3,41 @@
 - Design and production: Patrick Cerny
 - Engine: [Godot Engine](https://godotengine.org) (MIT)
 - Testing: [GUT](https://github.com/bitwes/Gut) by Butch Wesley (MIT)
+
+## 3D models (poly.pizza)
+
+Picked by Patrick, downloaded from poly.pizza (`https://poly.pizza/m/<id>`), stored in
+`assets/polypizza/`. The poly.pizza API and pages are not reachable from the build sandbox, so
+the license column is what the model's own data shows (creator naming and export pipeline).
+Rows marked **check** need the author and license copied from the model page; CC-BY models must
+name their author here before release.
+
+| File | Model | id | Author | License |
+|---|---|---|---|---|
+| skin_01.glb | Wizardus Maximus | 6oDxK0wqyL | **check** | **check** |
+| skin_02.glb | Business Man | JFrLIKqvCH | Quaternius | CC0 (Quaternius rig and clips) |
+| skin_03.glb | Warrior | RaWl2GJ0NZ | **check** | **check** |
+| skin_04.glb | King | I1gTjmuK2m | Quaternius | CC0 (Quaternius rig and clips) |
+| skin_05.glb | Man | HMnuH5geEG | Quaternius | CC0 (Quaternius rig and clips) |
+| skin_06.glb | SWAT | Btfn3G5Xv4 | Quaternius | CC0 (Quaternius rig and clips) |
+| poker_chip.glb | Poker chip | 2T3RWLeAudL | **check** | **check** |
+| money_pile.glb | Money pile | dZPTS7VMmqP | **check** | **check** |
+| beer_empty.glb | Beer Mug | Zkyui3QLc9 | **check** | **check** |
+| cone.glb | Cone | WoXpAJT0oD | **check** | **check** |
+| seat.glb | Bar Stool | 2do92chR2k | Kenney | CC0 (Kenney Furniture Kit) |
+| rug_blackjack.glb | Rug Round | jeDDiN69Ze | Kenney | CC0 (Kenney Furniture Kit) |
+| couch.glb | Couch Medium | mWgQ94zhDZ | Quaternius | CC0 |
+| flowers_01.glb | Flower Pot | Kgt363WkKd | Quaternius | CC0 |
+| flowers_02.glb | Houseplant | bfLOqIV5uP | Quaternius | CC0 |
+| flowers_03.glb | Houseplant | VtJh4Irl4w | Quaternius | CC0 |
+
+Still to come (see docs/MODELS.md): atm_shop, revolver, scratch_ticket, coin_placeholder, bat,
+dog_leash, beer_full.
+
+## Sound effects
+
+Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KENNEY_LICENSE.txt`).
+
+## Fonts
+
+Barlow Condensed, SIL Open Font License.

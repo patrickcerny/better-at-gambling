@@ -171,10 +171,9 @@ func apply_event(ev: Dictionary) -> bool:
 			if players.has(int(ev["player"])):
 				players[int(ev["player"])]["ready"] = bool(ev["ready"])
 			lobby_changed.emit()
-		&"player_cosmetics":
+		&"player_skin":
 			if players.has(int(ev["player"])):
-				players[int(ev["player"])]["color"] = int(ev["color"])
-				players[int(ev["player"])]["hat"] = StringName(ev["hat"])
+				players[int(ev["player"])]["skin"] = StringName(ev["skin"])
 			players_changed.emit()
 			lobby_changed.emit()
 		&"leader_changed":

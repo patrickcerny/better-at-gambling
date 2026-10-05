@@ -13,6 +13,9 @@ var slot_xs: Array[float] = []
 ## Local y of the top of the board where chips are released.
 var drop_y: float = 0.0
 var pegs_parent: Node3D
+## Money piles beside the board, shown once the jackpot has grown (Patrick: "next to plinko when
+## jackpot big"). Left pile from 3x the seed, right one from 6x; both grow up to 10x.
+var _money_piles: Array[Node3D] = []
 
 
 func _build_visuals() -> void:
@@ -47,11 +50,29 @@ func _build_visuals() -> void:
 	# Floor of the board (chips rest here) and a lip at the front.
 	GreyboxKit.box(self, Vector3(BOARD_W + 0.2, 0.1, 0.4), Vector3(0, 0.55, 0.0), Color("#3A2A1E"), "Tray")
 	GreyboxKit.box(self, Vector3(BOARD_W + 0.2, BOARD_H + 0.2, 0.02), Vector3(0, BOARD_H * 0.5 + 0.6, 0.16), Color(1, 1, 1, 0.0), "Glass")
-	_add_seat(Vector3(-0.8, 0, 2.2), 0.0)
-	_add_seat(Vector3(0.8, 0, 2.2), 0.0)
+	for x: float in [-0.8, 0.8]:
+		_stool(Vector3(x, 0, 2.2), "Stool%d" % seats.size())
+		_add_seat(Vector3(x, 0.5, 2.2), 0.0)
 	camera_anchor = Node3D.new()
 	camera_anchor.name = "CameraAnchor"
 	camera_anchor.position = Vector3(0, 2.4, 3.2)
 	camera_anchor.rotation.x = deg_to_rad(-5.0)
 	add_child(camera_anchor)
 	(get_node("Glass/Mesh") as MeshInstance3D).visible = false
+
+
+## Grows the money piles with the jackpot (`seed` = the jackpot's starting value).
+func set_jackpot(amount: int, seed: int) -> void:
+	if _money_piles.is_empty():
+		for side: float in [-1.0, 1.0]:
+			var pile: Node3D = PropModels.make(&"money_pile", 0.0, 1.0)
+			pile.position = Vector3(side * (BOARD_W * 0.5 + 0.8), 0.0, 0.5)
+			pile.rotation.y = side * 0.4
+			pile.visible = false
+			add_child(pile)
+			_money_piles.append(pile)
+	var ratio: float = float(amount) / float(maxi(seed, 1))
+	for i: int in _money_piles.size():
+		var from: float = 3.0 if i == 0 else 6.0
+		_money_piles[i].visible = ratio >= from
+		_money_piles[i].scale = Vector3.ONE * lerpf(0.8, 1.6, clampf((ratio - from) / (10.0 - from), 0.0, 1.0))

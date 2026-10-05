@@ -17,6 +17,7 @@ const SCHEMA: Dictionary = {
 	&"draft_pick": ["choice"],
 	&"set_ready": ["ready"],
 	&"lobby_setting": ["key", "value"],
+	&"set_skin": ["skin"],
 	&"add_bot": [],
 	&"remove_bot": ["player"],
 	&"return_to_lobby": [],

@@ -125,7 +125,7 @@ func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> 
 		if server.occupied_slots() >= Protocol.MAX_PLAYERS:
 			_reject(peer, &"room_full")
 			return
-		pid = server.add_player(uid, display_name, false, int(hello.get("color", -1)), StringName(hello.get("hat", "none")))
+		pid = server.add_player(uid, display_name, false, int(hello.get("color", -1)), StringName(hello.get("skin", "bean")))
 		_players[peer] = pid
 		Log.info(&"room", "%s joined as player %d (peer %d)" % [display_name, pid, peer])
 	Net.forget_private(pid)

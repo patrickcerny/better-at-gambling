@@ -26,6 +26,7 @@ const HELD_OFFSET: Vector3 = Vector3(0.0, 1.0, -0.9)
 var player_id: int = -1
 var display_name: String = "Player"
 var color: Color = Palette.CREAM
+var skin: StringName = &"bean"
 var is_local: bool = false
 var state: State = State.STANDING
 var drive: Drive = Drive.SIM
@@ -93,6 +94,7 @@ func _ready() -> void:
 	visuals.name = "Visuals"
 	add_child(visuals)
 	visuals.set_color(color)
+	visuals.set_skin(skin)
 	nametag = Label3D.new()
 	nametag.name = "Nametag"
 	nametag.text = display_name
@@ -127,6 +129,13 @@ func _ready() -> void:
 		cam.yaw = yaw
 	target_position = global_position
 	target_yaw = yaw
+
+
+## Puts on a character skin (`Cosmetics.SKINS`).
+func set_skin(id: StringName) -> void:
+	skin = id
+	if visuals != null:
+		visuals.set_skin(id)
 
 
 ## Sets the player colour on the bean.
@@ -213,6 +222,7 @@ func start_ragdoll(velocity: Vector3, max_time: float = 2.5, puppet: bool = fals
 	ragdoll = RagdollBody.new()
 	ragdoll.name = "Ragdoll%d" % player_id
 	ragdoll.color = color
+	ragdoll.skin = skin
 	ragdoll.player_id = player_id
 	ragdoll.max_time = max_time
 	ragdoll.puppet = puppet
@@ -287,6 +297,7 @@ func release_held() -> void:
 func sit(p_seat: Node3D, anchor: Node3D) -> void:
 	seat = p_seat
 	state = State.SEATED
+	visuals.sitting = true
 	velocity = Vector3.ZERO
 	push_velocity = Vector3.ZERO
 	_applied_push = Vector3.ZERO
@@ -563,6 +574,7 @@ func _leave_seat() -> void:
 		global_position = out
 		target_position = out
 	seat = null
+	visuals.sitting = false
 	if cam != null:
 		cam.set_anchor(null)
 	if router != null:

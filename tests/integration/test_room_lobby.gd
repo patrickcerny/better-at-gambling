@@ -33,13 +33,18 @@ func _tick(seconds: float) -> void:
 		t += 0.05
 
 
-func test_colors_are_fixed_and_unique_and_cosmetics_are_off() -> void:
+func test_colors_are_fixed_and_unique_and_skins_are_picked() -> void:
 	var a: int = server.add_player("dev:a", "A", false, 3, &"cowboy")
-	var b: int = server.add_player("dev:b", "B", false, 3)
+	var b: int = server.add_player("dev:b", "B", false, 3, &"king")
 	assert_eq(server.state.players[a].color_index, 0, "wishes ignored: first free color")
 	assert_eq(server.state.players[b].color_index, 1)
-	assert_eq(server.state.players[a].hat, &"none")
-	assert_false(_intent(b, &"set_cosmetics", {"color": 6, "hat": &"cowboy"})["ok"], "no cosmetics intent any more")
+	assert_eq(server.state.players[a].skin, &"bean", "unknown skins fall back to the bean")
+	assert_eq(server.state.players[b].skin, &"king", "saved skin is kept")
+	assert_false(_intent(b, &"set_cosmetics", {"color": 6, "hat": &"cowboy"})["ok"], "no color picker any more")
+	assert_true(_intent(a, &"set_skin", {"skin": &"swat"})["ok"])
+	assert_eq(server.state.players[a].skin, &"swat")
+	assert_false(_intent(a, &"set_skin", {"skin": &"dragon"})["ok"])
+	assert_eq(server.state.players[a].skin, &"swat")
 
 
 func test_not_ready_wins_over_the_pad_and_reconnect_starts_not_ready() -> void:

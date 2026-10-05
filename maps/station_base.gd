@@ -17,6 +17,8 @@ var interaction_area: Area3D
 var hot_light: OmniLight3D
 ## "OUT OF ORDER" sign (item) hung over the station; built on first use.
 var out_of_order_sign: Label3D
+## Traffic cones on the seats while the station is out of order.
+var out_of_order_cones: Node3D
 ## Seconds left on the sign (0 = open).
 var out_of_order_left: float = 0.0
 
@@ -67,6 +69,7 @@ func set_out_of_order(seconds: float) -> void:
 	if seconds <= 0.0:
 		if out_of_order_sign != null:
 			out_of_order_sign.visible = false
+			out_of_order_cones.visible = false
 		return
 	if out_of_order_sign == null:
 		out_of_order_sign = Label3D.new()
@@ -79,6 +82,14 @@ func set_out_of_order(seconds: float) -> void:
 		out_of_order_sign.outline_modulate = Palette.CASINO_BLACK
 		out_of_order_sign.position = Vector3(0, 2.3, 0)
 		add_child(out_of_order_sign)
+		out_of_order_cones = Node3D.new()
+		out_of_order_cones.name = "Cones"
+		add_child(out_of_order_cones)
+		for s: Node3D in seats:
+			var cone: Node3D = PropModels.make(&"cone", 0.75)
+			cone.position = Vector3(s.position.x, 0.0, s.position.z) + s.transform.basis.z * 0.5
+			out_of_order_cones.add_child(cone)
+	out_of_order_cones.visible = true
 	out_of_order_sign.text = "OUT OF ORDER\n%ds" % ceili(seconds)
 	out_of_order_sign.visible = true
 
@@ -103,6 +114,19 @@ func _add_seat(local_pos: Vector3, yaw: float = 0.0) -> Node3D:
 	add_child(s)
 	seats.append(s)
 	return s
+
+
+## A bar stool (Patrick's model, collision kept from the greybox cylinder) with its seat on top.
+func _stool(local_pos: Vector3, name: String = "Stool") -> void:
+	var solid: Node3D = GreyboxKit.cylinder(self, 0.22, 0.5, local_pos + Vector3(0, 0.25, 0), Palette.CASINO_RED.darkened(0.3), name)
+	PropModels.shade(PropModels.dress(solid, &"seat", 0.25, 0.5), 0.7)
+
+
+## Patrick's round rug, `width` across.
+func _round_rug(width: float) -> void:
+	var rug: Node3D = PropModels.shade(PropModels.make(&"rug", 0.0, width), 0.45)
+	rug.position.y = 0.015
+	add_child(rug)
 
 
 func _rug(size: Vector2, color: Color) -> void:

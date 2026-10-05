@@ -125,7 +125,7 @@ func _build_set() -> void:
 		bean.position = base
 		add_child(bean)
 		bean.set_color(Palette.player_color(int(state.players.get(pid, {}).get("color", pid - 1))))
-		bean.set_hat(StringName(state.players.get(pid, {}).get("hat", "none")))
+		bean.set_skin(StringName(state.players.get(pid, {}).get("skin", "bean")))
 		bean.rotation.y = PI  # face the camera
 		beans[pid] = bean
 		bean_y[pid] = base.y

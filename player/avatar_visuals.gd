@@ -1,7 +1,7 @@
 class_name AvatarVisuals
 extends Node3D
 ## The bean: capsule body in the player colour, dot eyes, a `-`/`o`/`O` mouth driven by voice,
-## long floppy arms with oversized hands, a hat slot. Procedural wobble: spring lean on
+## long floppy arms with oversized hands, or a character skin. Procedural wobble: spring lean on
 ## acceleration, squash/stretch on landing, idle bob. (docs/ART_DIRECTION.md)
 
 const BODY_RADIUS: float = 0.42
@@ -16,9 +16,16 @@ var arm_l: Node3D
 var arm_r: Node3D
 var hand_l: MeshInstance3D
 var hand_r: MeshInstance3D
+## Top of the head (guards wear their cap here).
 var hat_slot: Node3D
 var stars: Node3D
 var color: Color = Palette.CREAM
+## Character skin (`Cosmetics.SKINS`); &"bean" shows the procedural bean.
+var skin_id: StringName = &"bean"
+## The skin model while one is worn (bean parts are hidden then).
+var skin_root: Node3D
+## Set while the player sits at a station (skins with a sitting clip use it).
+var sitting: bool = false
 
 ## 0 = closed `-`, ~0.5 = `o`, 1 = `O`.
 var mouth_open: float = 0.0
@@ -36,10 +43,20 @@ var _eye_scale: float = 1.0
 var _eye_target: float = 1.0
 var _mouth_smoothed: float = 0.0
 var _body_mat: StandardMaterial3D
+var _legs: Array[MeshInstance3D] = []
+var _anim: AnimationPlayer
+var _motion: StringName = &""
+## Player-colored ring at the feet: skins hide the bean, so this keeps who-is-who readable.
+var _ring: MeshInstance3D
+var _ring_mat: StandardMaterial3D
 
 
 func _ready() -> void:
 	_build()
+	if skin_id != &"bean":
+		var id: StringName = skin_id
+		skin_id = &"bean"
+		set_skin(id)
 
 
 ## Applies the player colour.
@@ -47,6 +64,48 @@ func set_color(c: Color) -> void:
 	color = c
 	if _body_mat != null:
 		_body_mat.albedo_color = c
+	if _ring_mat != null:
+		_ring_mat.albedo_color = c
+
+
+## Swaps between the bean and a character skin (see `SkinLibrary`).
+func set_skin(id: StringName) -> void:
+	if id == skin_id:
+		return
+	skin_id = id
+	if body == null:
+		return  # applied in _ready
+	if skin_root != null:
+		skin_root.queue_free()
+		skin_root = null
+	_anim = null
+	_motion = &""
+	var model: Node3D = SkinLibrary.instantiate(id)
+	if model != null:
+		add_child(model)
+		skin_root = model
+		SkinLibrary.relax_pose(model)
+		_anim = SkinLibrary.animation_player(model)
+		_play(&"idle")
+	var bean: bool = skin_root == null
+	body.visible = bean
+	arm_l.visible = bean
+	arm_r.visible = bean
+	for leg: MeshInstance3D in _legs:
+		leg.visible = bean
+	_ring.visible = not bean
+
+
+func _play(motion: StringName) -> void:
+	if _anim == null or motion == _motion:
+		return
+	var a: StringName = SkinLibrary.clip(_anim, motion)
+	if a == &"" and motion == &"sit":
+		a = SkinLibrary.clip(_anim, &"idle")
+	if a == &"":
+		return
+	_motion = motion
+	_anim.play(a, 0.2)
 
 
 ## Half-transparent "away" look for disconnected players.
@@ -55,42 +114,6 @@ func set_ghost(on: bool) -> void:
 		(n as GeometryInstance3D).transparency = 0.55 if on else 0.0
 
 
-## Puts one of the placeholder lobby hats on (see `Cosmetics.HATS`).
-func set_hat(hat: StringName) -> void:
-	if hat_slot == null:
-		return
-	for c: Node in hat_slot.get_children():
-		c.queue_free()
-	var black: Color = Palette.CASINO_BLACK
-	match hat:
-		&"top_hat":
-			GreyboxKit.cylinder(hat_slot, 0.34, 0.04, Vector3(0, 0.02, 0), black, "Brim", false)
-			GreyboxKit.cylinder(hat_slot, 0.22, 0.42, Vector3(0, 0.23, 0), black, "Crown", false)
-			GreyboxKit.cylinder(hat_slot, 0.225, 0.07, Vector3(0, 0.08, 0), Palette.CASINO_RED, "Band", false)
-		&"cowboy":
-			GreyboxKit.cylinder(hat_slot, 0.48, 0.04, Vector3(0, 0.02, 0), Color("#8A5A32"), "Brim", false)
-			GreyboxKit.cylinder(hat_slot, 0.24, 0.24, Vector3(0, 0.14, 0), Color("#8A5A32"), "Crown", false)
-		&"party":
-			var cone := MeshInstance3D.new()
-			var cm := CylinderMesh.new()
-			cm.top_radius = 0.0
-			cm.bottom_radius = 0.2
-			cm.height = 0.45
-			cone.mesh = cm
-			cone.material_override = GreyboxKit.material(Palette.VIP_GOLD)
-			cone.position.y = 0.22
-			cone.name = "Cone"
-			hat_slot.add_child(cone)
-			GreyboxKit.sphere(hat_slot, 0.06, Vector3(0, 0.46, 0), Palette.CASINO_RED, "Pom")
-		&"beanie":
-			GreyboxKit.sphere(hat_slot, 0.33, Vector3(0, -0.02, 0), Palette.FELT_GREEN, "Knit")
-			GreyboxKit.sphere(hat_slot, 0.08, Vector3(0, 0.3, 0), Palette.CREAM, "Pom")
-		&"bowler":
-			GreyboxKit.cylinder(hat_slot, 0.3, 0.03, Vector3(0, 0.02, 0), Color("#3A2A1E"), "Brim", false)
-			GreyboxKit.sphere(hat_slot, 0.22, Vector3(0, 0.1, 0), Color("#3A2A1E"), "Dome")
-
-
-## Call every frame with the body's velocity and grounded state.
 func update_motion(velocity: Vector3, on_floor: bool, delta: float) -> void:
 	_time += delta
 	var accel: Vector3 = (velocity - _prev_velocity) / maxf(delta, 0.0001)
@@ -112,6 +135,17 @@ func update_motion(velocity: Vector3, on_floor: bool, delta: float) -> void:
 	_squash += _squash_vel * delta
 	var bob: float = 1.0 + sin(_time * 2.2) * 0.012
 	body.scale = Vector3(1.0 / sqrt(_squash), _squash * bob, 1.0 / sqrt(_squash))
+	if skin_root != null:
+		skin_root.rotation = Vector3(_lean.x * 0.6, 0.0, -_lean.y * 0.6)
+		skin_root.scale = Vector3(1.0 / sqrt(_squash), _squash, 1.0 / sqrt(_squash))
+		if sitting:
+			_play(&"sit")
+		elif speed > 4.2:
+			_play(&"run")
+		elif speed > 0.4:
+			_play(&"walk")
+		else:
+			_play(&"idle")
 	# Face.
 	_eye_scale = lerpf(_eye_scale, _eye_target, 10.0 * delta)
 	eye_l.scale = Vector3.ONE * _eye_scale
@@ -190,6 +224,24 @@ func _build() -> void:
 		leg.material_override = dark
 		leg.position = Vector3(x, 0.12, 0.0)
 		add_child(leg)
+		_legs.append(leg)
+	_ring_mat = StandardMaterial3D.new()
+	_ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ring_mat.albedo_color = color
+	_ring = MeshInstance3D.new()
+	_ring.name = "ColorRing"
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.36
+	torus.outer_radius = 0.44
+	torus.rings = 24
+	torus.ring_segments = 6
+	_ring.mesh = torus
+	_ring.material_override = _ring_mat
+	_ring.scale = Vector3(1.0, 0.15, 1.0)
+	_ring.position.y = 0.02
+	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ring.visible = false
+	add_child(_ring)
 	hat_slot = Node3D.new()
 	hat_slot.name = "HatSlot"
 	hat_slot.position.y = BODY_HEIGHT * 0.5 + BODY_RADIUS - 0.05

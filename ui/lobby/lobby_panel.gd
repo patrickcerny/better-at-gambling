@@ -1,8 +1,8 @@
 class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
-## accessibility: the 8 slots (name, color, ready, leader), the ready
-## toggle and — for the party leader — duration, items, bot difficulty and bot slots. Every
+## accessibility: the 8 slots (name, color, skin, ready, leader), the ready toggle, your skin
+## and — for the party leader — duration, items, bot difficulty and bot slots. Every
 ## button sends an intent; the panel only redraws from the ClientMatchState mirror.
 
 signal closed
@@ -20,6 +20,8 @@ var _countdown_label: Label
 var _duration_buttons: Dictionary[int, Button] = {}
 var _items_button: Button
 var _difficulty_buttons: Dictionary[StringName, Button] = {}
+var _skin_label: Label
+var _skin_next: Button
 
 
 func _ready() -> void:
@@ -45,7 +47,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	_refresh()
 
 
-## Shows the panel; `focus` is &"settings" or &"" (general).
+## Shows the panel; `focus` is &"settings", &"wardrobe" or &"" (general).
 func open(focus: StringName = &"") -> void:
 	visible = true
 	_refresh()
@@ -53,6 +55,8 @@ func open(focus: StringName = &"") -> void:
 		&"settings":
 			if not _duration_buttons.is_empty():
 				_duration_buttons.values()[0].grab_focus()
+		&"wardrobe":
+			_skin_next.grab_focus()
 		_:
 			_ready_button.grab_focus()
 
@@ -98,6 +102,25 @@ func _build() -> void:
 	_ready_button.pressed.connect(func() -> void:
 		Net.send_intent(Intents.make(&"set_ready", {"ready": not _my_ready()})))
 	right.add_child(_ready_button)
+	right.add_child(_heading("YOUR SKIN"))
+	var skin_row := HBoxContainer.new()
+	skin_row.add_theme_constant_override(&"separation", 8)
+	right.add_child(skin_row)
+	var prev := Button.new()
+	prev.text = "◀"
+	prev.custom_minimum_size = Vector2(54, 44)
+	prev.pressed.connect(_cycle_skin.bind(-1))
+	skin_row.add_child(prev)
+	_skin_label = Label.new()
+	_skin_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_skin_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	skin_row.add_child(_skin_label)
+	_skin_next = Button.new()
+	var next: Button = _skin_next
+	next.text = "▶"
+	next.custom_minimum_size = Vector2(54, 44)
+	next.pressed.connect(_cycle_skin.bind(1))
+	skin_row.add_child(next)
 	right.add_child(_heading("PARTY SETTINGS"))
 	_settings_note = Label.new()
 	_settings_note.theme_type_variation = &"SmallLabel"
@@ -203,6 +226,7 @@ func _refresh() -> void:
 			rm.pressed.connect(func() -> void: Net.send_intent(Intents.make(&"remove_bot", {"player": pid})))
 			row.add_child(rm)
 	_ready_button.text = "NOT READY" if _my_ready() else "READY"
+	_skin_label.text = str(Cosmetics.SKIN_NAMES.get(_my_skin(), "Bean"))
 	var leader: bool = local_id == state.leader
 	_settings_note.text = "You lead this party." if leader else "Only the party leader (★) can change these."
 	for d: int in _duration_buttons:
@@ -215,6 +239,21 @@ func _refresh() -> void:
 		_difficulty_buttons[dname].button_pressed = StringName(state.lobby_settings.get("bot_difficulty", &"normal")) == dname
 		_difficulty_buttons[dname].disabled = not leader
 	_settings_box.get_child(_settings_box.get_child_count() - 1).set(&"disabled", not leader)
+
+
+func _my_skin() -> StringName:
+	return StringName(state.players.get(local_id, {}).get("skin", "bean"))
+
+
+## Steps through the skins; the choice is remembered for the next party.
+func _cycle_skin(step: int) -> void:
+	if state == null:
+		return
+	var i: int = maxi(Cosmetics.SKINS.find(_my_skin()), 0)
+	var skin: StringName = Cosmetics.SKINS[posmod(i + step, Cosmetics.SKINS.size())]
+	Settings.set_value("profile", "skin", String(skin))
+	Settings.save()
+	Net.send_intent(Intents.make(&"set_skin", {"skin": skin}))
 
 
 func _my_ready() -> bool:
