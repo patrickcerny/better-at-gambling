@@ -58,6 +58,8 @@ var shop_panel: ShopPanel
 var connection_label: Label
 ## Proximity voice (clients only; the dedicated server just relays in `Net`).
 var voice: VoiceChannel = null
+## Table animations, win/lose VFX, screen shake / hit-stop, Last Call lighting (clients only).
+var table_fx: TableFx = null
 ## Item keys, target picker, discard choice (M5).
 var items_ctl: ItemController
 ## Banana peels on the floor (peel id → mesh) and item effect tags over heads (player → label).
@@ -188,6 +190,7 @@ func _ready() -> void:
 		voice.name = "VoiceChannel"
 		voice.setup(view.state, local_id, func(pid: int) -> PlayerAvatar: return avatars.get(pid, null), ui_layer, role == Role.CLIENT)
 		add_child(voice)
+		_add_table_fx()
 	_connect_router()
 	if _owns_server and role == Role.PRACTICE:
 		server.start_match()
@@ -461,7 +464,7 @@ func _process(delta: float) -> void:
 	if stage != null:
 		stage.on_private(Net.request_private_snapshot())
 	if _owns_server and server != null:
-		server.advance(delta)
+		server.advance(ScreenJuice.unscaled(delta))  # a hit-stop slows the client, not the server
 	# Simulated bodies (dummies) follow the server's last known position.
 	for pid: int in avatars:
 		if pid == local_id:
@@ -648,6 +651,8 @@ func _on_event(ev: Dictionary) -> void:
 	var type: StringName = ev["type"]
 	if stage != null:
 		stage.on_event(ev)
+	if table_fx != null:
+		table_fx.on_event(ev)
 	match type:
 		&"player_joined":
 			_spawn_avatar(int(ev["player"]["id"]), ev["player"])
@@ -780,8 +785,6 @@ func _on_event(ev: Dictionary) -> void:
 			var net: int = int(ev["net"])
 			if p != null and net != 0:
 				p.visuals.react(&"win" if net > 0 else &"loss")
-				if int(ev["player"]) != local_id:
-					p.say(("+$%d" if net > 0 else "-$%d") % absi(net), 1.5)
 			var details: Dictionary = ev.get("details", {})
 			if details.has("drop_id") and details.has("slot"):
 				_drop_plinko_chip(StringName(ev["station"]), int(ev["player"]), int(details["slot"]), int(details["drop_id"]))
@@ -1684,6 +1687,20 @@ func _on_ragdoll_settled(pid: int) -> void:
 
 
 # --- Stations ----------------------------------------------------------------------------------
+
+func _add_table_fx() -> void:
+	var juice := ScreenJuice.new()
+	juice.name = "ScreenJuice"
+	add_child(juice)
+	table_fx = TableFx.new()
+	table_fx.name = "TableFx"
+	add_child(table_fx)
+	table_fx.setup(map.stations, func(pid: int) -> PlayerAvatar: return avatars.get(pid, null), local_id, juice, world_root)
+	var lc := LastCallLighting.new()
+	lc.name = "LastCallLighting"
+	lc.setup(view.state, map, map.stations)
+	add_child(lc)
+
 
 func _on_station_state(sid: StringName) -> void:
 	var st: Dictionary = view.state.stations.get(sid, {})

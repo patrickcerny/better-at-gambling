@@ -17,6 +17,8 @@ var _music_a: AudioStreamPlayer
 var _music_b: AudioStreamPlayer
 var _music_current: AudioStreamPlayer
 var _current_track: StringName = &""
+## Current music mood (`&"last_call"` while Last Call runs, `&""` otherwise).
+var mood: StringName = &""
 
 
 func _ready() -> void:
@@ -98,6 +100,12 @@ func play_music(name: StringName) -> void:
 		next.play()
 		tween.tween_property(next, "volume_db", 0.0, CROSSFADE)
 	_music_current = next
+
+
+## Mood cue from the game (`&"last_call"`, `&""` = normal). Hook for the music: for now it only
+## remembers the mood.
+func set_mood(p_mood: StringName) -> void:
+	mood = p_mood
 
 
 ## Sets a bus volume in linear 0..1 units. Unknown buses are ignored with a warning.

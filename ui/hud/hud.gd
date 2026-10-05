@@ -43,6 +43,8 @@ var money_hidden: bool = false
 var _toast_until: float = -INF
 var _clock: float = 0.0
 var _displayed_money: float = 0.0
+## Counts the money readout up/down to the balance and flashes it green/red.
+var money_counter := MoneyCounter.new()
 var _feed_times: Array[float] = []
 
 
@@ -68,6 +70,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	if not state.players_changed.is_connected(_refresh_items):
 		state.players_changed.connect(_refresh_items)
 	_displayed_money = float(state.balance(local_id))
+	money_counter.snap(state.balance(local_id))
 	_refresh_static()
 
 
@@ -156,11 +159,10 @@ func _process(delta: float) -> void:
 			_feed_times.remove_at(i)
 	if state == null:
 		return
-	var target: float = float(state.balance(local_id))
-	_displayed_money = lerpf(_displayed_money, target, minf(1.0, 12.0 * delta))
-	if absf(_displayed_money - target) < 1.0:
-		_displayed_money = target
+	money_counter.set_target(state.balance(local_id))
+	_displayed_money = money_counter.step(delta)
 	money_label.text = "$???" if money_hidden else "$%s" % _thousands(int(round(_displayed_money)))
+	_flash_money()
 	var t: int = int(ceil(maxf(state.time_left, 0.0)))
 	timer_label.text = "%02d:%02d" % [t / 60, t % 60]
 	rank_label.text = "%s / %d" % [_ordinal(state.rank_of(local_id)), maxi(state.balances.size(), 1)]
@@ -198,12 +200,24 @@ func _update_countdowns() -> void:
 		hot_label.text = "HOT: %s ×%.2f  0:%02d" % [ClientMatchState.station_label(state.hot_station), Registry.balance.hot_table_multiplier, h]
 
 
+## Green/red flash and a small punch on the money readout while it counts.
+func _flash_money() -> void:
+	var c: Color = money_counter.tint(Palette.CREAM) if not money_hidden else Palette.CREAM
+	if c == Palette.CREAM:
+		money_label.remove_theme_color_override(&"font_color")
+	else:
+		money_label.add_theme_color_override(&"font_color", c)
+	money_label.pivot_offset = Vector2(0.0, money_label.size.y * 0.5)
+	money_label.scale = Vector2.ONE * (money_counter.punch() if not money_hidden else 1.0)
+
+
 ## A new match in the same room: clear Last Call colours and banners.
 func reset_match() -> void:
 	last_call_banner.visible = false
 	timer_label.remove_theme_color_override(&"font_color")
 	_last_warning_second = -1
 	_displayed_money = float(state.balance(local_id)) if state != null else 0.0
+	money_counter.snap(int(_displayed_money))
 	_refresh_items()
 
 
