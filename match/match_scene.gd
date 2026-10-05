@@ -543,7 +543,7 @@ func _hint(id: StringName, text: String, delay: float) -> void:
 	Settings.set_value("hints", String(id), true)
 	Settings.save()
 	# A bound method (not await) so nothing fires once the scene is gone.
-	get_tree().create_timer(delay).timeout.connect(hud.toast.bind(text, 5.0))
+	get_tree().create_timer(delay).timeout.connect(hud.toast.bind(InputGlyphs.fill(text), 5.0))
 
 
 ## Lobby: standing on your own colored pad means ready (§2.2).
@@ -685,7 +685,7 @@ func _on_event(ev: Dictionary) -> void:
 				net_world.reset_player(pid)
 		&"match_started":
 			map.set_lobby_open(true)
-			_hint(&"sit", "Walk up to a table and press E to sit.  LMB grabs, RMB shoves.", 5.0)
+			_hint(&"sit", "Walk up to a table and press {interact} to sit.  {grab} grabs, {shove} shoves.", 5.0)
 		&"player_shoved":
 			if int(ev["attacker"]) == local_id:
 				_predicted[&"shove"] = minf(_predicted.get(&"shove", 0.0), _clock + 0.15)  # confirmed: finish the push
@@ -707,7 +707,7 @@ func _on_event(ev: Dictionary) -> void:
 			_knock_out(int(ev["target"]), int(ev["attacker"]), StringName(ev["cause"]))
 			var ko: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			if local != null and ko != null and ko != local and ko.global_position.distance_to(local.global_position) < 8.0:
-				_hint(&"shake", "Knocked out! Stand next to them and press E to shake out their chips.", 0.5)
+				_hint(&"shake", "Knocked out! Stand next to them and press {shake} to shake out their chips.", 0.5)
 		&"player_grabbed":
 			if int(ev["attacker"]) == local_id:
 				_predicted.erase(&"grab")  # confirmed: the hold keeps the arms out
@@ -763,11 +763,7 @@ func _on_event(ev: Dictionary) -> void:
 		&"player_thrown_out":
 			_throw_out(int(ev["target"]), String(ev.get("guard", "guard")))
 		&"emote":
-			var p: PlayerAvatar = avatars.get(int(ev["player"]), null)
-			if p != null:
-				p.say(_emote_text(StringName(ev["id"])), 2.0)
-				if p.is_standing():
-					p.hop(Vector3(0, 3.5, 0))
+			EmoteWheel.present(avatars.get(int(ev["player"]), null), StringName(ev["id"]))
 		&"intent_rejected":
 			if int(ev["player"]) == local_id:
 				_end_prediction(StringName(ev.get("intent", &"")), true)
@@ -819,7 +815,7 @@ func _on_event(ev: Dictionary) -> void:
 			if int(ev["player"]) == local_id:
 				reward_panel.show_result(ev.get("items", []), ev.get("kept", []))
 				if not (ev.get("items", []) as Array).is_empty():
-					_hint(&"items", "New item! Press 1, 2 or 3 to use it.", 3.0)
+					_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it.", 3.0)
 		&"hot_table":
 			Audio.play(&"jackpot_siren", &"SFX", -10.0)
 			hud.banner("%s IS HOT!  Winnings ×%.2f  (follow the arrow)" % [ClientMatchState.station_label(StringName(ev["station"])).to_upper(), float(ev["multiplier"])], Color(1.0, 0.55, 0.1), 4.0)
@@ -1518,20 +1514,20 @@ func _lobby_spot() -> StringName:
 func _update_prompt() -> void:
 	nearest_station = null
 	if local != null and _local_holding() >= 0:
-		hud.set_prompt("[LMB / RMB / E] THROW %s" % view.state.player_name(_local_holding()))
+		hud.set_prompt(InputGlyphs.fill("[{grab} / {shove} / {interact}] THROW %s") % view.state.player_name(_local_holding()))
 		return
 	if local == null or not local.is_standing():
 		hud.set_prompt("")
 		return
 	match _lobby_spot():
 		&"wardrobe":
-			hud.set_prompt("[E] Wardrobe: pick your skin")
+			hud.set_prompt(InputGlyphs.fill("[{interact}] Wardrobe: pick your skin"))
 			return
 		&"settings":
-			hud.set_prompt("[E] Party settings" if view.state.leader == local_id else "[E] Party settings (only the leader ★ can change them)")
+			hud.set_prompt(InputGlyphs.fill("[{interact}] Party settings" if view.state.leader == local_id else "[{interact}] Party settings (only the leader ★ can change them)"))
 			return
 	if _near_shop():
-		hud.set_prompt("[E] Gift Shop: one item per round")
+		hud.set_prompt(InputGlyphs.fill("[{interact}] Gift Shop: one item per round"))
 		return
 	var best_d: float = INF
 	for sid: StringName in map.stations:
@@ -1550,7 +1546,7 @@ func _update_prompt() -> void:
 		hud.set_prompt(text)
 	else:
 		var target: int = _nearest_player_in_front(2.0)
-		hud.set_prompt("[E / LMB] Grab %s   [RMB] Shove" % view.state.player_name(target) if target >= 0 else "")
+		hud.set_prompt(InputGlyphs.fill("[{interact} / {grab}] Grab %s   [{shove}] Shove") % view.state.player_name(target) if target >= 0 else "")
 
 
 ## True when the local player stands at the Gift Shop counter while the casino is open.
@@ -1806,10 +1802,3 @@ func _vip_threshold() -> int:
 ## Dev summary for tools/scene_probe.gd.
 func probe() -> String:
 	return "players=%d guards=%d hud=%s viewport=%s timer_at=%s local_pos=%s errors=%d" % [avatars.size(), guards.size(), hud.size, get_viewport().get_visible_rect().size, hud.timer_label.global_position, local.global_position if local != null else Vector3.INF, Log.error_count]
-
-
-static func _emote_text(id: StringName) -> String:
-	for e: Array in EmoteWheel.EMOTES:
-		if e[0] == id:
-			return String(e[1]).split(" ")[0]
-	return "…"

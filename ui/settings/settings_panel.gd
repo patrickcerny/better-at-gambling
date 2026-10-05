@@ -10,6 +10,7 @@ signal leave_requested
 var in_game: bool = false
 var _resume: Button
 var _leave: Button
+var _back: Button
 var _first: Control
 var _mutes: VoiceMuteList
 
@@ -75,7 +76,7 @@ func _ready() -> void:
 	_leave = _button(bottom, "Leave to menu", func() -> void:
 		close()
 		leave_requested.emit())
-	_button(bottom, "Back [Esc]", close)
+	_back = _button(bottom, "Back [Esc]", close)
 
 
 ## Shows the panel; `p_in_game` adds Resume and Leave.
@@ -84,6 +85,7 @@ func open(p_in_game: bool = false) -> void:
 	_resume.visible = in_game
 	_leave.visible = in_game
 	_mutes.refresh()
+	_back.text = "Back %s" % InputGlyphs.hint(&"ui_cancel")
 	visible = true
 	(_resume if in_game else _first).grab_focus()
 

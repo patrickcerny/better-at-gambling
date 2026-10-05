@@ -134,7 +134,7 @@ func test_roulette_luck_monotonic() -> void:
 
 func test_blackjack_rtp_basic_strategy_400k_hands() -> void:
 	var r: Dictionary = SimHelpers.blackjack(400_000, 0, 11)
-	gut.p("blackjack: sim %.4f over 400k hands (basic strategy, no split)" % r["rtp"])
+	gut.p("blackjack: sim %.4f over 400k hands (basic strategy with splits)" % r["rtp"])
 	assert_between(float(r["rtp"]), LOW, HIGH)
 
 

@@ -117,8 +117,8 @@ func test_bust_loses_even_if_dealer_busts() -> void:
 	bj.player_action(1, &"hit")
 	bj.player_action(2, &"stand")
 	assert_eq(fx.economy.balance(1), 900)
-	# p2 wins with the Dealer Bust Bonus 1.1:1 -> 100 + 110
-	assert_eq(fx.economy.balance(2), 1110)
+	# p2 wins with the Dealer Bust Bonus (1.07:1) -> 100 + 107
+	assert_eq(fx.economy.balance(2), 1107)
 
 
 func test_action_timeout_auto_stands() -> void:
@@ -184,3 +184,195 @@ func test_basic_strategy_samples() -> void:
 	assert_eq(BlackjackLogic.basic_strategy(_c([1, 7]), Card.make(9)), &"hit")
 	assert_eq(BlackjackLogic.basic_strategy(_c([1, 7]), Card.make(2)), &"stand")
 	assert_eq(BlackjackLogic.basic_strategy(_c([10, 2]), Card.make(4)), &"stand")
+
+
+# --- Split (M7) ---
+
+
+func _results() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for ev: Dictionary in bj.drain_events():
+		if ev["type"] == &"round_result":
+			out.append(ev)
+	return out
+
+
+func test_split_takes_equal_stake_and_settles_each_hand() -> void:
+	bj.place_bet(1, {"amount": 100})
+	# p1 8,8 ; dealer 10,7 ; split cards 3 (hand 1) and 10 (hand 2) ; double card 10
+	_stack([8, 10, 8, 7, 3, 10, 10])
+	bj.tick(8.0)
+	assert_true(bj.get_public_state()["hands"][1]["can_split"])
+	assert_true(bj.player_action(1, &"split")["ok"])
+	assert_eq(fx.economy.balance(1), 800)
+	assert_eq(HandEval.total(bj.hands[1]["cards"]), 11)
+	assert_eq(HandEval.total(bj.hands[1]["split"]["cards"]), 18)
+	assert_eq(bj.player_action(1, &"split")["error"], &"cannot_split", "one split per round")
+	# Double after split on the first hand (11 + 10 = 21), then the second hand stands on 18.
+	assert_true(bj.player_action(1, &"double")["ok"])
+	assert_eq(fx.economy.balance(1), 700)
+	assert_eq(int(bj.hands[1]["active"]), 1)
+	assert_eq(bj.state, BlackjackLogic.State.ACTING)
+	bj.player_action(1, &"stand")
+	assert_eq(bj.state, BlackjackLogic.State.PAYOUT)
+	var res: Array[Dictionary] = _results()
+	assert_eq(res.size(), 2, "one result per hand")
+	assert_eq(int(res[0]["stake"]), 200)
+	assert_eq(int(res[0]["returned"]), 400)
+	assert_eq(int(res[1]["stake"]), 100)
+	assert_eq(int(res[1]["returned"]), 200)
+	assert_eq(fx.economy.balance(1), 1300)
+
+
+func test_split_hands_can_win_and_lose_separately() -> void:
+	bj.place_bet(1, {"amount": 100})
+	# p1 9,9 ; dealer 10,8 ; split cards 10 (19, wins) and 5 (14) ; hand 2 hits 10 -> bust
+	_stack([9, 10, 9, 8, 10, 5, 10])
+	bj.tick(8.0)
+	bj.player_action(1, &"split")
+	bj.player_action(1, &"stand")
+	bj.player_action(1, &"hit")
+	assert_eq(bj.state, BlackjackLogic.State.PAYOUT)
+	var res: Array[Dictionary] = _results()
+	assert_eq(res.size(), 2)
+	assert_eq(StringName(res[0]["details"]["outcome"]), &"win")
+	assert_eq(StringName(res[1]["details"]["outcome"]), &"bust")
+	assert_eq(fx.economy.balance(1), 1000)  # +100 -100
+
+
+func test_split_only_first_two_card_pairs() -> void:
+	bj.place_bet(1, {"amount": 100})
+	_stack([8, 10, 9, 7, 2])
+	bj.tick(8.0)
+	assert_false(bj.get_public_state()["hands"][1]["can_split"])
+	assert_eq(bj.player_action(1, &"split")["error"], &"cannot_split")
+	assert_eq(fx.economy.balance(1), 900)
+	assert_false(bj.hands[1].has("split"))
+
+
+func test_split_tens_of_equal_value() -> void:
+	bj.place_bet(1, {"amount": 100})
+	_stack([13, 9, 10, 8, 5, 6])  # K,10 count as a pair
+	bj.tick(8.0)
+	assert_true(bj.player_action(1, &"split")["ok"])
+
+
+func test_no_split_after_hit() -> void:
+	bj.place_bet(1, {"amount": 100})
+	_stack([2, 10, 2, 7, 3])
+	bj.tick(8.0)
+	bj.player_action(1, &"hit")
+	assert_eq(bj.player_action(1, &"split")["error"], &"cannot_split")
+
+
+func test_split_aces_get_one_card_each_and_no_blackjack_bonus() -> void:
+	bj.place_bet(1, {"amount": 100})
+	# p1 A,A ; dealer 10,8 = 18 ; split cards K (21, not a blackjack) and 5 (16)
+	_stack([1, 10, 1, 8, 13, 5])
+	bj.tick(8.0)
+	assert_true(bj.player_action(1, &"split")["ok"])
+	assert_true(bj.hands[1]["done"], "split aces stop after one card")
+	assert_eq(bj.state, BlackjackLogic.State.PAYOUT)
+	var res: Array[Dictionary] = _results()
+	assert_eq(int(res[0]["returned"]), 200, "21 on a split ace pays 1:1")
+	assert_eq(int(res[1]["returned"]), 0)
+	assert_eq(fx.economy.balance(1), 1000)
+
+
+func test_split_refused_without_money_for_the_second_stake() -> void:
+	bj.place_bet(1, {"amount": 100})
+	fx.economy.apply(1, -850, &"test")
+	_stack([8, 10, 8, 7])
+	bj.tick(8.0)
+	assert_eq(bj.player_action(1, &"split")["error"], &"insufficient_funds")
+	assert_eq(fx.economy.balance(1), 50)
+	assert_false(bj.hands[1].has("split"))
+	assert_eq((bj.hands[1]["cards"] as Array).size(), 2)
+
+
+func test_split_public_state_shows_both_hands() -> void:
+	bj.place_bet(1, {"amount": 100})
+	_stack([7, 10, 7, 8, 4, 10])
+	bj.tick(8.0)
+	bj.player_action(1, &"split")
+	var h: Dictionary = bj.get_public_state()["hands"][1]
+	assert_eq(int(h["active"]), 0)
+	assert_eq(h["cards"], [Card.make(7), Card.make(4)])
+	assert_eq(h["split"]["cards"], [Card.make(7), Card.make(10)])
+	assert_eq(int(h["split"]["total"]), 17)
+	assert_eq(int(h["split"]["stake"]), 100)
+
+
+func test_leaving_after_split_stands_both_hands() -> void:
+	bj.place_bet(1, {"amount": 100})
+	_stack([8, 10, 8, 9, 10, 10])  # 18 and 18 vs 19
+	bj.tick(8.0)
+	bj.player_action(1, &"split")
+	bj.leave(1)
+	assert_eq(bj.state, BlackjackLogic.State.PAYOUT)
+	assert_eq(_results().size(), 2)
+	assert_eq(fx.economy.balance(1), 800)
+
+
+func test_split_basic_strategy_chart() -> void:
+	assert_eq(BlackjackLogic.basic_strategy(_c([1, 1]), Card.make(10), true), &"split")
+	assert_eq(BlackjackLogic.basic_strategy(_c([8, 8]), Card.make(1), true), &"split")
+	assert_eq(BlackjackLogic.basic_strategy(_c([10, 13]), Card.make(6), true), &"stand")
+	assert_eq(BlackjackLogic.basic_strategy(_c([5, 5]), Card.make(6), true), &"double")
+	assert_eq(BlackjackLogic.basic_strategy(_c([9, 9]), Card.make(7), true), &"stand")
+	assert_eq(BlackjackLogic.basic_strategy(_c([9, 9]), Card.make(8), true), &"split")
+	assert_eq(BlackjackLogic.basic_strategy(_c([8, 8]), Card.make(1), false), &"hit")
+
+
+## Many random rounds with splits: every round's balance change equals the sum of its results'
+## nets, and the results' stakes equal everything that was taken.
+func test_split_money_conservation_over_many_rounds() -> void:
+	fx.economy.apply(1, 1_000_000, &"test")
+	var splits: int = 0
+	for i: int in 3000:
+		var before: int = fx.economy.balance(1)
+		fx.economy.drain_events()
+		bj.place_bet(1, {"amount": 100})
+		bj.tick(100.0)
+		while bj.state == BlackjackLogic.State.ACTING and not bj.hands[1]["done"]:
+			var h: Dictionary = bj.hands[1]
+			var cur: Dictionary = BlackjackLogic.active_hand(h)
+			var a: StringName = BlackjackLogic.basic_strategy(cur["cards"], bj.dealer[0], bj.can_split(h))
+			bj.player_action(1, a)
+			if a == &"split":
+				splits += 1
+		bj.auto_resolve()
+		var taken: int = 0
+		for m: Dictionary in fx.economy.drain_events():
+			if m["reason"] == &"bet_blackjack":
+				taken -= int(m["amount"])
+		var staked: int = 0
+		var net: int = 0
+		for r: Dictionary in _results():
+			staked += int(r["stake"])
+			net += int(r["net"])
+		if staked != taken or fx.economy.balance(1) - before != net:
+			fail_test("round %d: staked %d taken %d net %d change %d" % [i, staked, taken, net, fx.economy.balance(1) - before])
+			return
+	assert_gt(splits, 20, "basic strategy split some pairs")
+
+
+## Luck still rerolls each card dealt to a split hand.
+func test_luck_rerolls_cards_dealt_to_split_hands() -> void:
+	fx.give_luck(1, 3, &"blackjack")
+	fx.economy.apply(1, 1_000_000, &"test")
+	var flourishes_on_split: int = 0
+	for i: int in 400:
+		bj.place_bet(1, {"amount": 100})
+		# Force a pair of 8s against a 10 so every round splits.
+		_stack([8, 10, 8, 7])
+		bj.tick(100.0)
+		bj.drain_events()
+		if bj.state == BlackjackLogic.State.ACTING:
+			bj.player_action(1, &"split")
+			for ev: Dictionary in bj.drain_events():
+				if ev["type"] == &"luck_flourish":
+					flourishes_on_split += 1
+		bj.auto_resolve()
+		bj.drain_events()
+	assert_gt(flourishes_on_split, 0)

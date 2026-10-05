@@ -2,7 +2,8 @@ class_name BlackjackUi
 extends StationUi
 ## Blackjack strip (docs/ART_DIRECTION.md). The cards are dealt on the 3D table and you look
 ## around with the mouse, so this only carries the round status, your total and the keys:
-## 1-4 chip, Space bet, R repeat, Backspace clear, H hit, S stand, D double, C cut.
+## 1-4 chip, Space bet, R repeat, Backspace clear, H hit, S stand, D double, P split, C cut
+## (gamepad: A hit, X stand, Y double, RB split). Key names follow the device in use (InputGlyphs).
 
 var hand_label: Label
 var total_label: Label
@@ -15,6 +16,7 @@ var seat_labels: Array[Label] = []
 var hit: Button
 var stand: Button
 var double_btn: Button
+var split_btn: Button
 ## Scissors item: snip the last card (shown only while you hold them).
 var cut_btn: Button
 var bet_panel: BetPanel
@@ -59,9 +61,10 @@ func _build() -> void:
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	actions.add_theme_constant_override(&"separation", 14)
 	body.add_child(actions)
-	hit = _action("HIT  [H]", func() -> void: send(&"action", {"action": &"hit"}))
-	stand = _action("STAND  [S]", func() -> void: send(&"action", {"action": &"stand"}))
-	double_btn = _action("DOUBLE  [D]", func() -> void: send(&"action", {"action": &"double"}))
+	hit = _action("HIT", func() -> void: send(&"action", {"action": &"hit"}))
+	stand = _action("STAND", func() -> void: send(&"action", {"action": &"stand"}))
+	double_btn = _action("DOUBLE", func() -> void: send(&"action", {"action": &"double"}))
+	split_btn = _action("SPLIT", func() -> void: send(&"action", {"action": &"split"}))
 	cut_btn = _action("CUT  [C]", func() -> void: send(&"action", {"action": &"cut"}))
 	cut_btn.visible = false
 	bet_panel = BetPanel.new()
@@ -70,11 +73,23 @@ func _build() -> void:
 
 
 func _on_open() -> void:
-	hint.text = "Mouse: look around\n[1-4] chip  [Space] bet  [R] repeat\n[Esc / Q] stand up"
 	var lo: int = scaled(Registry.balance.bj_min_bet)
 	var hi: int = scaled(Registry.balance.bj_max_bet)
 	bet_panel.setup([lo, lo * 2 + lo / 2, lo * 5, lo * 10], lo, hi, "BET")
 	bet_panel.set_amount(lo * 2 + lo / 2)
+
+
+func _hint_text() -> String:
+	if InputGlyphs.gamepad:
+		return InputGlyphs.fill("{look_left}: look around\n[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_confirm}] bet  [{bet_repeat}] repeat\n[{leave_station}] stand up")
+	return InputGlyphs.fill("Mouse: look around\n[1-4] chip  [{bet_confirm}] bet  [{bet_repeat}] repeat\n[{leave_station}] stand up")
+
+
+func _relabel() -> void:
+	hit.text = "HIT  %s" % InputGlyphs.hint(&"bj_hit")
+	stand.text = "STAND  %s" % InputGlyphs.hint(&"bj_stand")
+	double_btn.text = "DOUBLE  %s" % InputGlyphs.hint(&"bj_double")
+	split_btn.text = "SPLIT  %s" % InputGlyphs.hint(&"bj_split")
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -86,6 +101,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		stand.pressed.emit()
 	elif event.is_action_pressed(&"bj_double"):
 		double_btn.pressed.emit()
+	elif event.is_action_pressed(&"bj_split") and split_btn.visible and not split_btn.disabled:
+		split_btn.pressed.emit()
 	elif event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).physical_keycode == KEY_C and cut_btn.visible:
 		cut_btn.pressed.emit()
 	else:
@@ -114,23 +131,32 @@ func _refresh() -> void:
 	dealer_label.text = "DEALER  %s" % (dealer_txt if not dealer.is_empty() else "—")
 	if priv.has("hole_card"):
 		dealer_label.text += "   (peek: %s)" % Card.label(int(priv["hole_card"]))
+	var split: bool = mine.has("split")
+	var active_hand: Dictionary = (mine["split"] as Dictionary) if split and int(mine.get("active", 0)) == 1 else mine
+	if st == BlackjackLogic.State.ACTING and split and not bool(mine.get("done", true)):
+		status_label.text = "Your move: hand %d of 2  (%d s)" % [int(mine.get("active", 0)) + 1, int(ceil(timer))]
 	if mine.is_empty():
 		hand_label.text = "—"
 		total_label.text = ""
+	elif split:
+		# Both hands, the one you are playing marked; the totals ride along on each line.
+		var lines: PackedStringArray = []
+		for i: int in 2:
+			var h: Dictionary = mine if i == 0 else mine["split"]
+			var playing: bool = not bool(mine.get("done", true)) and int(mine.get("active", 0)) == i
+			lines.append("%s%s   %s" % ["» " if playing else "", " ".join(_labels(h.get("cards", []))), _total_text(h, false)])
+		hand_label.text = "\n".join(lines)
+		total_label.text = "SPLIT  $%d + $%d" % [int(mine.get("stake", 0)), int((mine["split"] as Dictionary).get("stake", 0))]
 	else:
 		var cards: Array = mine.get("cards", [])
 		hand_label.text = " ".join(_labels(cards)) if not cards.is_empty() else "bet $%d" % int(mine.get("stake", 0))
-		var total: int = int(mine.get("total", 0))
-		total_label.text = ("%d" % total) if total > 0 else ""
-		if total > 21:
-			total_label.text += "  BUST"
-		elif total == 21 and cards.size() == 2:
-			total_label.text += "  BLACKJACK!"
+		total_label.text = _total_text(mine, true)
 	var acting: bool = st == BlackjackLogic.State.ACTING and not mine.is_empty() and not bool(mine.get("done", true))
 	actions.visible = acting
-	double_btn.disabled = not acting or (mine.get("cards", []) as Array).size() != 2
+	double_btn.disabled = not acting or (active_hand.get("cards", []) as Array).size() != 2
+	split_btn.visible = acting and bool(mine.get("can_split", false))
 	cut_btn.visible = acting and bool(priv.get("scissors", false))
-	cut_btn.disabled = (mine.get("cards", []) as Array).size() < 3
+	cut_btn.disabled = (active_hand.get("cards", []) as Array).size() < 3
 	bet_panel.visible = (st == BlackjackLogic.State.IDLE or st == BlackjackLogic.State.BETTING) and mine.is_empty()
 	_refresh_seats(pub.get("seats", []), hands)
 	others_label.text = ""
@@ -174,6 +200,17 @@ func _refresh_seats(seats: Array, hands: Dictionary) -> void:
 			lines.append("%s$%d%s" % [("%d  ·  " % total) if total > 0 else "", int(h.get("stake", 0)), tail])
 		l.text = "\n".join(lines)
 		l.add_theme_color_override(&"font_color", Palette.VIP_GOLD if me else Palette.CREAM)
+
+
+## "18", "23  BUST", "21  BLACKJACK!" (a natural only counts on an unsplit hand).
+static func _total_text(h: Dictionary, natural: bool) -> String:
+	var total: int = int(h.get("total", 0))
+	var out: String = ("%d" % total) if total > 0 else ""
+	if total > 21:
+		out += "  BUST"
+	elif natural and total == 21 and (h.get("cards", []) as Array).size() == 2:
+		out += "  BLACKJACK!"
+	return out
 
 
 func _labels(cards: Array) -> Array[String]:

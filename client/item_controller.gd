@@ -305,9 +305,12 @@ func _update_picker() -> void:
 	var name: String = scene.view.state.player_name(tid)
 	marker.text = "▼ %s" % name
 	marker.visible = true
-	var key: String = ("Shift+%d" if scene.local.state == PlayerAvatar.State.SEATED else "%d") % (picking_slot + 1)
-	var extra: String = ("\n[R] %s" % _option_texts(picking_def)[option]) if _has_options(picking_def) else ""
-	scene.hud.items.show_target("%s → %s   (wheel: switch, %s or E: use)%s" % [picking_def.display_name, name, key, extra])
+	var key: String = InputGlyphs.key(StringName("item_%d" % (picking_slot + 1)))
+	if not InputGlyphs.gamepad and scene.local.state == PlayerAvatar.State.SEATED:
+		key = "Shift+" + key
+	var switch: String = InputGlyphs.fill("{bet_chip_prev} / {bet_chip_next}" if InputGlyphs.gamepad else "wheel")
+	var extra: String = ("\n%s %s" % [InputGlyphs.hint(&"bet_repeat"), _option_texts(picking_def)[option]]) if _has_options(picking_def) else ""
+	scene.hud.items.show_target("%s → %s   (%s: switch, %s or %s: use)%s" % [picking_def.display_name, name, switch, key, InputGlyphs.key(&"interact"), extra])
 	if _near(picking_def):
 		_show_ring(picking_def, PICK_SECONDS)
 

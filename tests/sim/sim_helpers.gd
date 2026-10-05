@@ -47,8 +47,8 @@ static func plinko(drops: int, risk: StringName, luck: int, seed_value: int, bet
 	return {"wagered": wagered, "returned": returned, "rtp": returned / float(wagered)}
 
 
-## Blackjack hands with basic strategy (no split).
-static func blackjack(hands: int, luck: int, seed_value: int, bet: int = 100) -> Dictionary:
+## Blackjack hands with basic strategy (with pair splitting unless `split` is false).
+static func blackjack(hands: int, luck: int, seed_value: int, bet: int = 100, split: bool = true) -> Dictionary:
 	var fx := fixture(seed_value, luck, &"blackjack")
 	var bj: BlackjackLogic = fx.make(BlackjackLogic.new()) as BlackjackLogic
 	bj.join(1)
@@ -58,9 +58,14 @@ static func blackjack(hands: int, luck: int, seed_value: int, bet: int = 100) ->
 		bj.place_bet(1, {"amount": bet})
 		bj.tick(100.0)  # close the betting window -> deal
 		while bj.state == BlackjackLogic.State.ACTING and not bj.hands[1]["done"]:
-			var action: StringName = BlackjackLogic.basic_strategy(bj.hands[1]["cards"], bj.dealer[0])
+			var h: Dictionary = bj.hands[1]
+			var cur: Dictionary = BlackjackLogic.active_hand(h)
+			var action: StringName = BlackjackLogic.basic_strategy(cur["cards"], bj.dealer[0], split and bj.can_split(h))
 			bj.player_action(1, action)
-		wagered += int(bj.hands[1]["stake"]) if bj.hands.has(1) else bet
+		if bj.hands.has(1):
+			wagered += int(bj.hands[1]["stake"]) + int(bj.hands[1].get("split", {}).get("stake", 0))
+		else:
+			wagered += bet
 		bj.auto_resolve()
 		bj.events.clear()
 		if before < 0:

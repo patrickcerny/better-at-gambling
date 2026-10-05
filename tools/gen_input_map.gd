@@ -40,6 +40,7 @@ const ACTIONS: Array = [
 	["bj_hit", 0.5, ["key:H", "joy:0"]],
 	["bj_stand", 0.5, ["key:S", "joy:2"]],
 	["bj_double", 0.5, ["key:D", "joy:3"]],
+	["bj_split", 0.5, ["key:P", "joy:10"]],
 	["break_free", 0.5, ["key:Space", "joy:0"]],
 	["shake", 0.5, ["key:E", "joy:2"]],
 ]
