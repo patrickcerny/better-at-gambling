@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 [audio]
 
 buses/default_bus_layout="res://audio/default_bus_layout.tres"
+driver/enable_input=true
 
 [autoload]
 

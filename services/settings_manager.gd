@@ -9,7 +9,9 @@ const PATH: String = "user://settings.cfg"
 ## Base mouse look in radians per pixel at sensitivity 1.0.
 const BASE_MOUSE: float = 0.0025
 const DEFAULTS: Dictionary = {
-	"audio": {"master": 0.8, "music": 0.6, "sfx": 0.8, "ui": 0.7},
+	"audio": {"master": 0.8, "music": 0.6, "sfx": 0.8, "ui": 0.7, "voice": 0.9},
+	## Voice chat: "push_to_talk", "open_mic" or "off" (see `VoiceChannel.MODE_KEYS`).
+	"voice": {"mode": "push_to_talk"},
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false},
 	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
 }
@@ -59,7 +61,7 @@ func mouse_look() -> float:
 
 ## Pushes engine-owned settings: bus volumes, window mode, vsync, frame cap.
 func apply() -> void:
-	for pair: Array in [["Master", "master"], ["Music", "music"], ["SFX", "sfx"], ["UI", "ui"]]:
+	for pair: Array in [["Master", "master"], ["Music", "music"], ["SFX", "sfx"], ["UI", "ui"], ["Voice", "voice"]]:
 		var idx: int = AudioServer.get_bus_index(pair[0])
 		if idx >= 0:
 			var v: float = clampf(float(get_value("audio", pair[1])), 0.0, 1.0)
