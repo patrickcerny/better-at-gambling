@@ -1,11 +1,21 @@
 extends Node
-## `Audio` autoload: one-shot SFX by name on the right bus, 3D SFX at a position, music crossfades.
-## Recorded clips (CC0) where we have them, generated placeholders (`tools/gen_audio.py`) for the
-## rest; missing clips log once and never block.
+## `Audio` autoload: one-shot SFX by name on the right bus, 3D SFX at a position, music by mood
+## with smooth crossfades. Recorded clips (CC0 Kenney) where we have them, synthesized ones
+## (`tools/audio/gen_sfx.py`) for the rest; music loops from `tools/audio/gen_music.py`. Missing
+## clips log once and never block.
 
 const SFX_DIR: String = "res://audio/sfx/"
 const POOL_SIZE: int = 12
 const CROSSFADE: float = 1.0
+## Mood changes fade slower than a hard track switch: lounge music never cuts.
+const MOOD_CROSSFADE: float = 2.5
+## Music sits under the SFX; the Music bus (settings) scales this.
+const MUSIC_DB: float = -6.0
+## Moods (`set_mood`) and their loops in res://audio/music/.
+const MOODS: Dictionary[StringName, StringName] = {
+	&"menu": &"menu", &"casino": &"casino", &"quiz": &"quiz", &"minigame": &"quiz",
+	&"last_call": &"last_call", &"results": &"results",
+}
 const MAX_VARIANTS: int = 8
 
 var _clips: Dictionary[StringName, Array] = {}
@@ -17,6 +27,8 @@ var _music_a: AudioStreamPlayer
 var _music_b: AudioStreamPlayer
 var _music_current: AudioStreamPlayer
 var _current_track: StringName = &""
+var _mood: StringName = &""
+var _fade: Tween = null
 
 
 func _ready() -> void:
@@ -78,8 +90,32 @@ func play_at(name: StringName, parent: Node3D, volume_db: float = 0.0, pitch: fl
 	p.play()
 
 
-## Crossfades to a music track (`res://audio/music/<name>.ogg|wav`); &"" stops music.
+## The music for a moment of the game: &"menu", &"casino", &"quiz" (or &"minigame"),
+## &"last_call", &"results"; &"" fades the music out. Calling it again with the same mood does
+## nothing, so callers may set it every frame.
+func set_mood(mood: StringName) -> void:
+	if mood == _mood:
+		return
+	_mood = mood
+	_crossfade(MOODS.get(mood, mood) if mood != &"" else &"", MOOD_CROSSFADE)
+
+
+## Current mood (&"" when none was set).
+func current_mood() -> StringName:
+	return _mood
+
+
+## Crossfades to a music track (`res://audio/music/<name>.ogg|wav`); &"" stops music. Old track
+## names (`casino_loop`) map to their mood.
 func play_music(name: StringName) -> void:
+	if name == &"casino_loop":
+		set_mood(&"casino")
+		return
+	_mood = name
+	_crossfade(name, CROSSFADE)
+
+
+func _crossfade(name: StringName, seconds: float) -> void:
 	if _silent or name == _current_track:
 		return
 	_current_track = name
@@ -90,13 +126,25 @@ func play_music(name: StringName) -> void:
 		if name != &"" and ResourceLoader.exists(path):
 			stream = load(path)
 			break
-	var tween: Tween = create_tween().set_parallel(true)
-	tween.tween_property(_music_current, "volume_db", -80.0, CROSSFADE)
+	if name != &"" and stream == null:
+		Log.warn(&"audio", "missing music %s" % name)
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
+	if _fade != null and _fade.is_valid():
+		_fade.kill()
+	# Equal-power fade in the linear domain (a dB ramp sounds like a dip in the middle).
+	var prev: AudioStreamPlayer = _music_current
+	var start: float = minf(db_to_linear(prev.volume_db - MUSIC_DB), 1.0) if prev.playing else 0.0
+	_fade = create_tween().set_parallel(true)
+	_fade.tween_method(func(v: float) -> void: prev.volume_db = linear_to_db(maxf(start * cos(v * PI * 0.5), 0.0001)) + MUSIC_DB, 0.0, 1.0, seconds)
 	if stream != null:
 		next.stream = stream
 		next.volume_db = -80.0
 		next.play()
-		tween.tween_property(next, "volume_db", 0.0, CROSSFADE)
+		_fade.tween_method(func(v: float) -> void: next.volume_db = linear_to_db(maxf(sin(v * PI * 0.5), 0.0001)) + MUSIC_DB, 0.0, 1.0, seconds)
+	_fade.chain().tween_callback(func() -> void:
+		if prev != _music_current:
+			prev.stop())
 	_music_current = next
 
 

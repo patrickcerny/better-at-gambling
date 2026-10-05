@@ -4,7 +4,8 @@ extends RefCounted
 ## - within `HEARING_RADIUS` metres: heard, positioned in 3D (full volume within `FULL_VOLUME_RADIUS`,
 ##   fading to silence at the edge);
 ## - seated at the same table: heard at full volume regardless of distance;
-## - quiz, rewards and results: everyone hears everyone (game-show stage, podium gloating).
+## - quiz, rewards and results: everyone hears everyone (game-show stage, podium gloating);
+## - whoever holds the Megaphone (M7, `MegaphoneLogic`) is heard by everyone at full volume.
 
 enum Reach { NONE, NEAR, TABLE, GLOBAL }
 
@@ -19,8 +20,8 @@ static func is_global_phase(phase: Phase.Id) -> bool:
 
 
 ## How a listener hears a speaker. Stations are &"" when not seated.
-static func reach(phase: Phase.Id, speaker_pos: Vector3, listener_pos: Vector3, speaker_station: StringName = &"", listener_station: StringName = &"") -> Reach:
-	if is_global_phase(phase):
+static func reach(phase: Phase.Id, speaker_pos: Vector3, listener_pos: Vector3, speaker_station: StringName = &"", listener_station: StringName = &"", megaphone: bool = false) -> Reach:
+	if is_global_phase(phase) or megaphone:
 		return Reach.GLOBAL
 	if speaker_station != &"" and speaker_station == listener_station:
 		return Reach.TABLE

@@ -102,6 +102,22 @@ func test_same_table_hears_at_full_volume_regardless_of_distance() -> void:
 	assert_eq(VoicePacket.parse_down(out[near])["flags"], 0, "the bystander still hears positional voice")
 
 
+func test_megaphone_holder_is_heard_by_everyone_for_ten_seconds() -> void:
+	fx.server.world.set_transform(speaker, MegaphoneLogic.STAND_POS, 0.0)
+	fx.server.world.set_transform(near, MegaphoneLogic.STAND_POS + Vector3(3, 0, 0), 0.0)
+	fx.server.world.set_transform(far, MegaphoneLogic.STAND_POS + Vector3(0, 0, -40), 0.0)
+	assert_false(_route().has(far), "without the megaphone: 40 m is out of reach")
+	assert_true(fx.intent(speaker, &"megaphone")["ok"], "picked up at the stand")
+	var out: Dictionary[int, PackedByteArray] = _route(1.0)
+	assert_true(out.has(far) and out.has(near), "megaphone: everyone hears the holder")
+	assert_eq(VoicePacket.parse_down(out[far])["flags"], VoicePacket.FLAG_GLOBAL, "full volume, not positional")
+	assert_eq(VoicePacket.parse_down(out[near])["flags"], VoicePacket.FLAG_GLOBAL)
+	assert_false(relay.route(fx.server, far, _frame(), 1.5, fx.player_ids).has(speaker), "only the holder is global")
+	fx.run(MegaphoneLogic.SECONDS + 0.1)
+	assert_false(_route(20.0).has(far), "after 10 s the megaphone is back on its stand")
+	assert_eq(VoicePacket.parse_down(_route(21.0)[near])["flags"], 0, "positional again")
+
+
 func test_end_flag_survives_and_client_flags_are_not_trusted() -> void:
 	var out: Dictionary[int, PackedByteArray] = _route(0.0, _frame(5, VoicePacket.FLAG_END | VoicePacket.FLAG_GLOBAL))
 	var d: Dictionary = VoicePacket.parse_down(out[near])

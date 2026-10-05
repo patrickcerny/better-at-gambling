@@ -38,6 +38,9 @@ var rewards: RewardDirector = RewardDirector.new()
 var hot_tables: HotTableDirector
 var loot: LootTables
 var items: ItemSystem
+## The waiter NPC's trips and drink puddles, and the Megaphone prop by the bar (M7, npc/).
+var waiter: WaiterLogic
+var megaphone: MegaphoneLogic
 ## Smoothed half round-trip time of a player in seconds (set by the network layer; 0 offline).
 var half_rtt_provider: Callable = func(_p: int) -> float: return 0.0
 ## Per-player match stats for awards and dynamic quiz questions.
@@ -124,6 +127,8 @@ func _build_match_systems(seed_value: int) -> void:
 	items.jackpot = jackpot
 	items.find_station = _nearest_station
 	items.close_station = func(sid: StringName, seconds: float) -> void: stations.out_of_order[sid] = seconds
+	waiter = WaiterLogic.new(state.players, rules, world, SeededRng.new(seed_value ^ 0x3A11E5))
+	megaphone = MegaphoneLogic.new(state.players, rules, world)
 	minigames.reset()
 	minigame = null
 	rewards = RewardDirector.new()
@@ -273,6 +278,7 @@ func get_snapshot() -> Dictionary:
 	snap["room"] = room_mode
 	snap["effects"] = items.public_effects()
 	snap["peels"] = items.peels_wire()
+	snap["floor"] = {"puddles": waiter.wire(), "megaphone": megaphone.wire()}
 	snap["shop"] = items.shop.wire() if items.shop != null else {}
 	snap["hot_table"] = {"station": hot_tables.current, "time_left": snappedf(hot_tables.time_left, 0.01)} if hot_tables.current != &"" else {}
 	if minigame != null:
@@ -347,6 +353,8 @@ func _step(delta: float) -> void:
 			phases.rewards_finished()
 	modifiers.expire(match_time)
 	items.tick(match_time, casino_open)
+	waiter.tick(match_time, casino_open)
+	megaphone.tick(match_time)
 	interactions.tick(match_time)
 	pickups.tick(match_time)
 
@@ -606,6 +614,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				modifiers.consume_round(player, &"spring_glove")
 			if shoved["ok"]:
 				items.pass_monkey(player, int(shoved["target"]), match_time)
+			elif shoved["error"] == &"no_target" and waiter.shove(player, Serializer.to_vec3(intent["aim"]), match_time):
+				return StationLogicBase.OK_RESULT  # nobody to push, but the waiter goes flying
 			return shoved
 		&"shake":
 			if stations.is_seated(player) or rules.is_knocked_down(player, match_time):
@@ -613,6 +623,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			return interactions.shake(player, match_time)
 		&"break_free":
 			return interactions.break_free(player, match_time)
+		&"megaphone":
+			return megaphone.take(player, match_time)
 		&"emote":
 			_emit(GameEvents.make(&"emote", {"player": player, "id": StringName(intent["id"])}))
 			return StationLogicBase.OK_RESULT
@@ -778,6 +790,8 @@ func _flush() -> void:
 		batch.append_array(minigame.drain_events())
 	batch.append_array(rewards.drain_events())
 	batch.append_array(items.drain_events())
+	batch.append_array(waiter.drain_events())
+	batch.append_array(megaphone.drain_events())
 	var caught: Array[Dictionary] = []
 	for ev: Dictionary in batch:
 		_track_stats(ev)

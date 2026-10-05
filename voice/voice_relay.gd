@@ -42,11 +42,12 @@ func route(server: MatchServer, speaker: int, data: PackedByteArray, now: float,
 	var phase: Phase.Id = server.phases.phase if server.phases != null else Phase.Id.LOBBY
 	var spos: Vector3 = server.world.get_position(speaker)
 	var sstation: StringName = server.stations.station_of(speaker)
+	var megaphone: bool = server.megaphone != null and server.megaphone.is_holder(speaker)
 	var by_flags: Dictionary[int, PackedByteArray] = {}
 	for l: int in listeners:
 		if l == speaker:
 			continue
-		var r: VoiceProximity.Reach = VoiceProximity.reach(phase, spos, server.world.get_position(l), sstation, server.stations.station_of(l))
+		var r: VoiceProximity.Reach = VoiceProximity.reach(phase, spos, server.world.get_position(l), sstation, server.stations.station_of(l), megaphone)
 		if r == VoiceProximity.Reach.NONE:
 			continue
 		var flags: int = (int(up["flags"]) & VoicePacket.FLAG_END) | VoiceProximity.flags_for(r)

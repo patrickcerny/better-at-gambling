@@ -20,6 +20,7 @@ const PHASES: Dictionary = {
 	&"lobby_setting": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"set_skin": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"return_to_lobby": [Phase.Id.RESULTS],
+	&"megaphone": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 }
 
 var limiter: RateLimiter

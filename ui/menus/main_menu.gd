@@ -36,6 +36,7 @@ func _ready() -> void:
 	_settings_button.pressed.connect(func() -> void: _settings.open(false))
 	_build_online()
 	_practice.grab_focus()
+	Audio.set_mood(&"menu")
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if Net.last_error != "":

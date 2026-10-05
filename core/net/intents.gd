@@ -26,6 +26,7 @@ const SCHEMA: Dictionary = {
 	&"shove": ["aim"],
 	&"shake": [],
 	&"break_free": [],
+	&"megaphone": [],
 }
 
 

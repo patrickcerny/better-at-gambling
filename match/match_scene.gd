@@ -39,6 +39,9 @@ var avatars: Dictionary[int, PlayerAvatar] = {}
 var dummies: Dictionary[int, bool] = {}
 var piles: Dictionary[int, ChipPile] = {}
 var guards: Array[Guard] = []
+## Waiter NPC, puddles and the Megaphone (M7, npc/) and the event sounds (audio/event_sfx.gd).
+var casino_floor: CasinoFloor = null
+var event_sfx: EventSfx = null
 var station_uis: Dictionary[StringName, StationUi] = {}
 var current_ui: StationUi = null
 var nearest_station: StationBase = null
@@ -204,13 +207,21 @@ func _ready() -> void:
 		if local != null:
 			hud.toast("Welcome! Stand on your READY pad. TAB: lobby panel", 4.0)
 	_spawn_guards()
+	casino_floor = CasinoFloor.new()
+	casino_floor.name = "CasinoFloor"
+	add_child(casino_floor)
+	casino_floor.setup(self)
+	event_sfx = EventSfx.new(self)
 	Loading.finish()
 	if cmd.has_flag("autoplay"):
 		var driver: Script = load("res://client/autoplay_driver.gd")
 		autoplay = driver.new()
 		autoplay.name = "Autoplay"
 		add_child(autoplay)
-	Audio.play_music(&"casino_loop")
+	var music := MusicMood.new()
+	music.name = "MusicMood"
+	add_child(music)
+	music.setup(view.state)
 	if cmd.has_flag("third-person") and local != null:
 		local.cam.toggle_mode()
 	if cmd.has("autosit"):
@@ -648,6 +659,10 @@ func _on_event(ev: Dictionary) -> void:
 	var type: StringName = ev["type"]
 	if stage != null:
 		stage.on_event(ev)
+	if casino_floor != null:
+		casino_floor.on_event(ev)
+	if event_sfx != null:
+		event_sfx.on_event(ev)
 	match type:
 		&"player_joined":
 			_spawn_avatar(int(ev["player"]["id"]), ev["player"])
@@ -701,7 +716,7 @@ func _on_event(ev: Dictionary) -> void:
 			var t: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			if t != null:
 				t.stun(float(ev.get("seconds", cfg.knockdown_time)))
-				t.say("whoa!" if ev.get("cause", &"") == &"banana" else "ow", 1.0)
+				t.say("whoa!" if ev.get("cause", &"") in [&"banana", &"puddle"] else "ow", 1.0)
 				Audio.play_at(&"oof", t, -8.0)
 		&"player_knocked_out":
 			_knock_out(int(ev["target"]), int(ev["attacker"]), StringName(ev["cause"]))
@@ -793,9 +808,9 @@ func _on_event(ev: Dictionary) -> void:
 			if ev.get("details", {}).get("game", "") == "plinko":
 				_plinko_seen.clear()
 		&"jackpot_won":
-			Audio.play(&"jackpot_siren", &"SFX", -6.0)
+			Audio.play(&"jackpot_siren", &"SFX", -4.0)
 		&"last_call":
-			Audio.play(&"countdown_beep", &"SFX", -4.0)
+			Audio.play(&"last_call_bell", &"SFX", -4.0)
 		&"phase_changed":
 			var phase: Phase.Id = int(ev["phase"]) as Phase.Id
 			if phase != Phase.Id.LOBBY:
@@ -821,12 +836,12 @@ func _on_event(ev: Dictionary) -> void:
 				if not (ev.get("items", []) as Array).is_empty():
 					_hint(&"items", "New item! Press 1, 2 or 3 to use it.", 3.0)
 		&"hot_table":
-			Audio.play(&"jackpot_siren", &"SFX", -10.0)
+			Audio.play(&"hot_table", &"SFX", -6.0)
 			hud.banner("%s IS HOT!  Winnings ×%.2f  (follow the arrow)" % [ClientMatchState.station_label(StringName(ev["station"])).to_upper(), float(ev["multiplier"])], Color(1.0, 0.55, 0.1), 4.0)
 		&"house_comp":
 			if int(ev["player"]) == local_id:
 				hud.toast("The house feels sorry for you: +$%d" % int(ev["amount"]), 3.0)
-				Audio.play(&"coin", &"SFX", -2.0)
+				Audio.play(&"cash_register", &"SFX", -4.0)
 		&"match_ended":
 			_match_over = true
 			_show_results(ev["standings"])
@@ -846,7 +861,7 @@ func _on_event(ev: Dictionary) -> void:
 			var v: PlayerAvatar = avatars.get(int(ev["victim"]), null)
 			if v != null and ev["result"] != &"blocked":
 				v.knockback(Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized(), 3.0)
-				Audio.play_at(&"whoosh", v, -6.0, 1.4)
+				Audio.play_at(&"slip", v, -4.0)
 			if ev["result"] == &"blocked":
 				var p: PlayerAvatar = avatars.get(int(ev["player"]), null)
 				if p != null:
@@ -1417,6 +1432,8 @@ func _on_interact() -> void:
 	if lobby_spot != &"":
 		_open_lobby_panel(lobby_spot)
 		return
+	if casino_floor != null and casino_floor.interact():
+		return
 	if _near_shop():
 		router.set_mode(InputRouter.Mode.MENU)
 		shop_panel.open()
@@ -1530,6 +1547,10 @@ func _update_prompt() -> void:
 		&"settings":
 			hud.set_prompt("[E] Party settings" if view.state.leader == local_id else "[E] Party settings (only the leader ★ can change them)")
 			return
+	var floor_prompt: String = casino_floor.prompt() if casino_floor != null else ""
+	if floor_prompt != "":
+		hud.set_prompt(floor_prompt)
+		return
 	if _near_shop():
 		hud.set_prompt("[E] Gift Shop: one item per round")
 		return
