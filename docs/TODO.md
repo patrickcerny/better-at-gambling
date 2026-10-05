@@ -423,4 +423,11 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 
 ## Bugs
 
-- (none yet)
+### Patrick's playtest, 2026-10-05 19:01 UTC (next fix round, wait for his word)
+- [ ] Party host leaves: nobody is host anymore. Hand host to another player in the room.
+- [ ] Empty room (everyone left): shut it down right away.
+- [ ] Roulette bet display is one spot off, so it's unclear where the bet sits.
+- [ ] Text overlaps on many screens (HUD, panels, quiz, results; audit every screen).
+- [ ] Plinko: the UI covers the board, so you can't see where the chip drops in.
+- [ ] Sounds are still bad (replace the generated placeholders with better ones).
+- [ ] Gift Shop doesn't work in his game (reproduce online first: kiosk prompt, panel, buy).
