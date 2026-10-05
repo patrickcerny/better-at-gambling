@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+[ext_resource type="Script" path="res://items/scratch_ticket/scratch_ticket_effect.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"scratch_ticket"
+display_name = "Scratch Ticket"
+description = "Scratch it: a random item, or cash (up to $500)."
+rarity = 0
+target_mode = 0
+requires_proximity = false
+range_m = 0.0
+is_negative = false
+duration = 0.0
+params = {"common": 0.6, "rare": 0.25, "small_cash": 0.1, "small_min": 50, "small_max": 200, "top": 500}
+effect_script = ExtResource("2")
+in_loot = true

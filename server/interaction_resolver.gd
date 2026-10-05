@@ -117,7 +117,7 @@ func shove(attacker: int, aim: Vector3, now: float, spring_glove: bool = false) 
 		_knocked_out(target, attacker, now, &"shoves")
 	elif res["knockdown"]:
 		events.append(GameEvents.make(&"player_knocked_down", {"target": target, "attacker": attacker}))
-	return StationLogicBase.OK_RESULT
+	return {"ok": true, "error": &"", "target": target}
 
 
 ## The world reports a hard landing / wall hit / fall / stool hit that knocks a player out.

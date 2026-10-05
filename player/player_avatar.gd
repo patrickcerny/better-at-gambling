@@ -34,6 +34,8 @@ var puppet_airborne: bool = false
 ## Disconnected (§2.12): stays where it was, "zzz", intangible.
 var connection_away: bool = false
 var cfg: BalanceConfig
+## Walking/sprinting speed factor from items (Energy Drink).
+var speed_multiplier: float = 1.0
 var router: InputRouter
 var visuals: AvatarVisuals
 var cam: PlayerCamera
@@ -427,6 +429,7 @@ func _local_move(delta: float) -> void:
 		stamina = maxf(stamina - delta, 0.0)
 	else:
 		stamina = minf(stamina + cfg.stamina_regen_per_second * delta, cfg.sprint_stamina)
+	speed *= speed_multiplier
 	if is_soaked():
 		speed *= cfg.soaked_speed_factor
 	if holder == null and state == State.STANDING and _holding_someone():

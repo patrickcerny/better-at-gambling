@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+[ext_resource type="Script" path="res://items/credit_card/credit_card_effect.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"credit_card"
+display_name = "Credit Card"
+description = "Borrow $300 now. In 90 s the bank wants $360 back (or all you have)."
+rarity = 0
+target_mode = 0
+requires_proximity = false
+range_m = 0.0
+is_negative = false
+duration = 90.0
+params = {"amount": 300, "repay": 360}
+effect_script = ExtResource("2")
+in_loot = true

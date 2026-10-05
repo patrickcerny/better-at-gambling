@@ -84,7 +84,8 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	minigames = MinigameDirector.new(defs, Registry.quiz_bank)
 	var rarities: Dictionary[StringName, int] = {}
 	for id: StringName in Registry.items:
-		rarities[id] = Registry.items[id].rarity
+		if Registry.items[id].in_loot:
+			rarities[id] = Registry.items[id].rarity
 	loot = LootTables.new(Registry.loot, rarities)
 	lobby.settings["duration"] = state.duration_minutes
 	lobby.settings["items_enabled"] = bool(settings.get("items_enabled", true))
@@ -117,6 +118,11 @@ func _build_match_systems(seed_value: int) -> void:
 	_logic_rng = rng.fork()
 	items = ItemSystem.new(Registry.items, balance, state.players, economy, modifiers, rules, world, pickups, rng.fork())
 	interactions.ko_shield = items.shield_knockout
+	items.interactions = interactions
+	items.limits = func() -> float: return stations._limits_multiplier
+	items.on_vip_lost = _on_vip_pass_ended
+	items.loot = loot
+	items.jackpot = jackpot
 	minigames.reset()
 	minigame = null
 	rewards = RewardDirector.new()
@@ -581,7 +587,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			var spos: Variant = map_def.station_positions.get(sid, null)
 			if spos != null and (Vector3(spos) - pos).length() > map_def.interact_range:
 				return StationLogicBase.fail(&"too_far")
-			if stations.vip.get(sid, false) and economy.balance(player) < int(floor(balance.vip_entry_money * stations._limits_multiplier)):
+			if stations.vip.get(sid, false) and economy.balance(player) < vip_threshold() and not modifiers.has_flag(player, &"vip_pass"):
 				return StationLogicBase.fail(&"vip_denied")
 			var res: Dictionary = stations.sit(player, sid)
 			if res["ok"]:
@@ -619,6 +625,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			var shoved: Dictionary = interactions.shove(player, Serializer.to_vec3(intent["aim"]), match_time, glove)
 			if glove and shoved["ok"]:
 				modifiers.consume_round(player, &"spring_glove")
+			if shoved["ok"]:
+				items.pass_monkey(player, int(shoved["target"]), match_time)
 			return shoved
 		&"shake":
 			if stations.is_seated(player) or rules.is_knocked_down(player, match_time):
@@ -638,7 +646,10 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"use_item":
 			if not bool(settings.get("items_enabled", true)):
 				return StationLogicBase.fail(&"items_off")
-			return items.use(player, int(intent["slot"]), int(intent.get("target", -1)), match_time)
+			var opts: Dictionary = {}
+			if intent.has("option"):
+				opts["option"] = int(intent["option"])
+			return items.use(player, int(intent["slot"]), int(intent.get("target", -1)), match_time, opts)
 		&"discard_item":
 			return items.discard(player, int(intent["slot"]), match_time)
 		&"return_to_lobby":
@@ -827,9 +838,16 @@ func _flush() -> void:
 		batch.append_array(minigame.drain_events())
 	batch.append_array(rewards.drain_events())
 	batch.append_array(items.drain_events())
+	var caught: Array[Dictionary] = []
 	for ev: Dictionary in batch:
 		_track_stats(ev)
 		_emit(ev)
+		if ev["type"] == &"fake_cash_used" and bool(ev["caught"]):
+			caught.append(ev)
+	for ev: Dictionary in caught:
+		_fake_cash_caught(int(ev["player"]), int(ev["amount"]))
+	if not caught.is_empty():
+		_flush()
 
 
 func _track_stats(ev: Dictionary) -> void:
@@ -905,3 +923,34 @@ func _free_seat(sid: StringName, player: int) -> int:
 	while used.has(i):
 		i += 1
 	return i
+
+
+## The bouncer spotted Fake Cash: the player pays the same amount as a fine (as far as they can)
+## and gets thrown out (the bet stays in and settles normally).
+func _fake_cash_caught(player: int, amount: int) -> void:
+	var fine: int = economy.take_up_to(player, amount, &"fake_cash_fine")
+	_emit(GameEvents.make(&"fake_cash_caught", {"player": player, "fine": fine}))
+	if stations.is_seated(player):
+		stations.leave(player)
+		rules.status(player).seated = false
+		state.players[player].station = &""
+		state.players[player].seat = -1
+		_emit(GameEvents.make(&"player_stood", {"player": player, "reason": &"thrown_out"}))
+	interactions.report_thrown_out(player, &"bouncer", match_time)
+
+
+## Money needed to sit at a VIP table right now.
+func vip_threshold() -> int:
+	return int(floor(balance.vip_entry_money * stations._limits_multiplier))
+
+
+## An Early VIP Pass ran out: a player at a VIP table who couldn't afford it is walked out.
+func _on_vip_pass_ended(player: int) -> void:
+	var sid: StringName = stations.station_of(player)
+	if sid == &"" or not stations.vip.get(sid, false) or economy.balance(player) >= vip_threshold():
+		return
+	stations.leave(player)
+	rules.status(player).seated = false
+	state.players[player].station = &""
+	state.players[player].seat = -1
+	_emit(GameEvents.make(&"player_stood", {"player": player, "reason": &"vip_pass_ended"}))

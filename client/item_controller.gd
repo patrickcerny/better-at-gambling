@@ -19,6 +19,9 @@ var picking_slot: int = -1
 var picking_def: ItemDefinition = null
 var picking_candidates: Array[int] = []
 var picking_index: int = 0
+## Pickpocket greed tier (0 safe 12%, 1 greedy 20% at 65%, 2 very greedy 30% at 40%); R cycles it.
+var option: int = 0
+const GREED_TEXT: Array[String] = ["safe 12%", "greedy 20% (65% odds)", "very greedy 30% (40% odds)"]
 var _pick_until: float = 0.0
 var _cooldown_until: float = -INF
 var _poll: float = 0.0
@@ -89,13 +92,14 @@ func on_slot(slot: int) -> void:
 		scene.hud.toast("Nobody in range" if _near(def) else "No one to target", 1.2)
 		_show_ring(def, 1.5)
 		return
-	if cands.size() == 1:
+	if cands.size() == 1 and not _has_options(def):
 		_send(slot, cands[0])
 		return
 	picking_slot = slot
 	picking_def = def
 	picking_candidates = cands
 	picking_index = 0
+	option = 0
 	_pick_until = _clock + PICK_SECONDS
 	_update_picker()
 
@@ -106,8 +110,9 @@ func confirm() -> void:
 		return
 	var target: int = picking_candidates[picking_index] if picking_index < picking_candidates.size() else -1
 	var slot: int = picking_slot
+	var opt: int = option if _has_options(picking_def) else -1
 	cancel()
-	_send(slot, target)
+	_send(slot, target, opt)
 
 
 func cancel() -> void:
@@ -252,6 +257,11 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"interact"):
 		confirm()
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(&"bet_repeat") and _has_options(picking_def):
+		option = (option + 1) % GREED_TEXT.size()
+		_pick_until = _clock + PICK_SECONDS
+		_update_picker()
+		get_viewport().set_input_as_handled()
 
 
 func _discard(slot: int) -> void:
@@ -260,10 +270,12 @@ func _discard(slot: int) -> void:
 	_poll = PRIVATE_POLL - 0.05
 
 
-func _send(slot: int, target: int) -> void:
+func _send(slot: int, target: int, opt: int = -1) -> void:
 	var payload: Dictionary = {"slot": slot}
 	if target >= 0:
 		payload["target"] = target
+	if opt >= 0:
+		payload["option"] = opt
 	var res: Dictionary = Net.send_intent(Intents.make(&"use_item", payload))
 	if not res["ok"] and res["error"] != &"rate_limited":
 		scene.hud.toast(rejection_text(res["error"]), 1.2)
@@ -275,7 +287,8 @@ func _update_picker() -> void:
 	marker.text = "▼ %s" % name
 	marker.visible = true
 	var key: String = ("Shift+%d" if scene.local.state == PlayerAvatar.State.SEATED else "%d") % (picking_slot + 1)
-	scene.hud.items.show_target("%s → %s   (wheel: switch, %s or E: use)" % [picking_def.display_name, name, key])
+	var extra: String = ("\n[R] %s" % GREED_TEXT[option]) if _has_options(picking_def) else ""
+	scene.hud.items.show_target("%s → %s   (wheel: switch, %s or E: use)%s" % [picking_def.display_name, name, key, extra])
 	if _near(picking_def):
 		_show_ring(picking_def, PICK_SECONDS)
 
@@ -290,6 +303,11 @@ func _show_ring(def: ItemDefinition, seconds: float) -> void:
 	ring.visible = true
 	ring.global_position = scene.local.global_position + Vector3(0, 0.05, 0)
 	_ring_until = _clock + seconds
+
+
+## Items with a choice made in the picker (Pickpocket's greed).
+func _has_options(def: ItemDefinition) -> bool:
+	return def != null and def.id == &"pickpocket"
 
 
 func _near(def: ItemDefinition) -> bool:

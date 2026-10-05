@@ -22,6 +22,9 @@ func activate(ctx: ItemContext) -> Dictionary:
 		m.expires_at = ctx.now + ctx.def.duration
 	for f: Variant in ctx.param("flags", []):
 		m.flags[StringName(f)] = true
+	var values: Dictionary = ctx.param("flag_values", {})
+	for k: Variant in values:
+		m.flags[StringName(k)] = values[k]
 	if bool(ctx.param("segment_end", false)):
 		m.flags[&"segment_end"] = true
 	ctx.system.modifiers.add(ctx.target, m)

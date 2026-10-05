@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+[ext_resource type="Script" path="res://items/effects/modifier_effect.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"energy_drink"
+display_name = "Energy Drink"
+description = "30 s of +40% speed. Alone at a blackjack or roulette table, the dealer hurries up too."
+rarity = 0
+target_mode = 0
+requires_proximity = false
+range_m = 0.0
+is_negative = false
+duration = 30.0
+params = {"flags": ["speed", "fast_tables"]}
+effect_script = ExtResource("2")
+in_loot = true

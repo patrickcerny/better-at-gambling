@@ -242,6 +242,20 @@ func apply_event(ev: Dictionary) -> bool:
 			var list: Array = effects.get(pid, [])
 			list.erase(StringName(ev["item"]))
 			effects_changed.emit(pid)
+		&"monkey_passed":
+			var from: int = int(ev["from"])
+			var to: int = int(ev["to"])
+			(effects.get(from, []) as Array).erase(StringName(ev["item"]))
+			if not effects.has(to):
+				effects[to] = []
+			effects[to].append(StringName(ev["item"]))
+			effects_changed.emit(from)
+			effects_changed.emit(to)
+			feed_message.emit("%s passed the Bad Luck Monkey to %s" % [player_name(from), player_name(to)], &"chaos")
+		&"fake_cash_caught":
+			feed_message.emit("The bouncer caught %s with fake cash (−$%d)" % [player_name(int(ev["player"])), int(ev["fine"])], &"chaos")
+		&"credit_repaid":
+			feed_message.emit("The bank collected $%d from %s" % [int(ev["amount"]), player_name(int(ev["player"]))], &"loss")
 		&"bodyguard_saved":
 			feed_message.emit("%s's Bodyguard stepped in!" % player_name(int(ev["player"])), &"chaos")
 		&"banana_placed":
@@ -298,8 +312,18 @@ func _on_item_used(ev: Dictionary) -> void:
 			text += ", but the Bodyguard blocked it"
 		&"reflected":
 			text += ", but the Mirror bounced it back"
-	if ev.has("amount") and int(ev["amount"]) > 0:
-		text += " (−$%d)" % int(ev["amount"])
+	match item:
+		&"scratch_ticket":
+			text += ": $%d!" % int(ev.get("amount", 0)) if ev.get("prize", &"") == &"cash" else ": %s" % RewardPanel.item_name(StringName(ev.get("won_item", "")))
+		&"russian_roulette":
+			text += ": BANG! (−$%d)" % int(ev.get("amount", 0)) if bool(ev.get("bang", false)) else ": *click* (+$%d)" % int(ev.get("amount", 0))
+		&"credit_card":
+			text += " (+$%d)" % int(ev.get("loan", 0))
+		_:
+			if bool(ev.get("caught", false)):
+				text += ", but got caught and paid $%d" % int(ev.get("paid", 0))
+			elif ev.has("amount") and int(ev["amount"]) > 0:
+				text += " (−$%d)" % int(ev["amount"])
 	feed_message.emit(text, &"item")
 
 

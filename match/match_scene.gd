@@ -51,6 +51,9 @@ var items_ctl: ItemController
 ## Banana peels on the floor (peel id → mesh) and item effect tags over heads (player → label).
 var peel_nodes: Dictionary[int, Node3D] = {}
 var effect_tags: Dictionary[int, Label3D] = {}
+## Beer: full-screen wobble/blur under the HUD, and the money we had when we got drunk.
+var drunk_overlay: ColorRect
+var _drunk_money: int = -1
 
 var _ko_until: Dictionary[int, float] = {}
 var _ragdoll_attacker: Dictionary[int, int] = {}
@@ -86,6 +89,15 @@ func _ready() -> void:
 	ui_layer = CanvasLayer.new()
 	ui_layer.name = "UI"
 	add_child(ui_layer)
+	drunk_overlay = ColorRect.new()
+	drunk_overlay.name = "DrunkOverlay"
+	drunk_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	drunk_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var drunk_mat := ShaderMaterial.new()
+	drunk_mat.shader = load("res://ui/effects/drunk.gdshader")
+	drunk_overlay.material = drunk_mat
+	drunk_overlay.visible = false
+	ui_layer.add_child(drunk_overlay)
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
@@ -768,6 +780,29 @@ func _on_event(ev: Dictionary) -> void:
 					p.say("BODYGUARD!", 1.5)
 			if int(ev["victim"]) == local_id and ev["result"] != &"blocked":
 				hud.banner("SLIPPED! −$%d" % int(ev["amount"]), Palette.LOSS_RED)
+		&"monkey_passed":
+			var to: PlayerAvatar = avatars.get(int(ev["to"]), null)
+			if to != null:
+				to.say("MONKEY!", 1.5)
+			if int(ev["to"]) == local_id:
+				hud.banner("%s passed you the Bad Luck Monkey!" % view.state.player_name(int(ev["from"])), Palette.LOSS_RED)
+			elif int(ev["from"]) == local_id:
+				hud.banner("Monkey passed to %s!" % view.state.player_name(int(ev["to"])), Palette.MONEY_GREEN)
+		&"credit_repaid":
+			if int(ev["player"]) == local_id:
+				hud.banner("The bank collected $%d" % int(ev["amount"]), Palette.LOSS_RED)
+		&"collar_cut":
+			if int(ev["owner"]) == local_id:
+				hud.toast("Collar cut from %s: +$%d" % [view.state.player_name(int(ev["player"])), int(ev["amount"])], 1.5)
+		&"fake_cash_used":
+			if int(ev["player"]) == local_id and not bool(ev["caught"]):
+				hud.toast("The bouncer didn't notice the fake cash ($%d)" % int(ev["amount"]), 2.0)
+		&"fake_cash_caught":
+			var p: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if p != null:
+				p.say("FAKE?!", 1.5)
+			if int(ev["player"]) == local_id:
+				hud.banner("FAKE CASH! Fined $%d" % int(ev["fine"]), Palette.LOSS_RED, 3.0)
 		&"discard_needed":
 			if int(ev["player"]) == local_id:
 				items_ctl.on_discard_needed()
@@ -810,6 +845,50 @@ func _on_item_used(ev: Dictionary) -> void:
 			elif target == local_id:
 				hud.banner("Your Mirror bounced %s back!" % name, Palette.MONEY_GREEN)
 			return
+	match item:
+		&"scratch_ticket":
+			if user == local_id:
+				if ev.get("prize", &"") == &"cash":
+					hud.banner("SCRATCH! You won $%d" % int(ev.get("amount", 0)), Palette.MONEY_GREEN)
+				else:
+					hud.banner("SCRATCH! You got %s" % RewardPanel.item_name(StringName(ev.get("won_item", ""))))
+				Audio.play(&"coin", &"SFX", -2.0)
+			return
+		&"russian_roulette":
+			if bool(ev.get("bang", false)):
+				if u != null:
+					u.say("BANG!", 2.0)
+					u.visuals.react(&"loss")
+					Audio.play_at(&"bonk", u, 0.0, 0.6)
+				if user == local_id:
+					hud.banner("BANG! −$%d into the jackpot" % int(ev.get("amount", 0)), Palette.LOSS_RED, 3.0)
+			else:
+				if u != null:
+					u.say("*click*", 1.5)
+				if user == local_id:
+					hud.banner("*click*  +$%d   (next: %d%% bang)" % [int(ev.get("amount", 0)), roundi(float(ev.get("next_odds", 0.0)) * 100.0)], Palette.MONEY_GREEN)
+			return
+		&"credit_card":
+			if user == local_id:
+				hud.banner("+$%d on credit. Pay back $%d in %ds" % [int(ev.get("loan", 0)), int(ev.get("debt", 0)), int(ev.get("seconds", 0))], Palette.VIP_GOLD, 3.0)
+			return
+		&"baseball_bat", &"empty_bottle":
+			if t != null:
+				Audio.play_at(&"bonk", t, 0.0, 0.7 if item == &"baseball_bat" else 1.2)
+			if target == local_id:
+				hud.banner("%s got you with a %s! −$%d" % [view.state.player_name(user), name, int(ev.get("amount", 0))], Palette.LOSS_RED)
+			elif user == local_id:
+				hud.banner("BONK! %s dropped $%d" % [view.state.player_name(target), int(ev.get("amount", 0))], Palette.MONEY_GREEN)
+			return
+	if item == &"pickpocket" and bool(ev.get("caught", false)):
+		var thief: PlayerAvatar = avatars.get(user, null)
+		if thief != null:
+			thief.say("oops", 1.5)
+		if user == local_id:
+			hud.banner("CAUGHT! You paid %s $%d" % [view.state.player_name(target), int(ev.get("paid", 0))], Palette.LOSS_RED)
+		elif target == local_id:
+			hud.banner("You caught %s's hand in your pocket: +$%d" % [view.state.player_name(user), int(ev.get("paid", 0))], Palette.MONEY_GREEN)
+		return
 	if item == &"pickpocket":
 		var victim: PlayerAvatar = avatars.get(int(ev.get("victim", target)), null)
 		if victim != null:
@@ -873,8 +952,13 @@ func _refresh_effect_tag(pid: int) -> void:
 	var parts: PackedStringArray = []
 	for id: Variant in view.state.effects.get(pid, []):
 		parts.append(_effect_tag_text(StringName(id)))
-	var tag: Label3D = effect_tags.get(pid, null)
-	if tag == null or not is_instance_valid(tag):
+	var fx: Array = view.state.effects.get(pid, [])
+	a.speed_multiplier = 1.4 if fx.has(&"energy_drink") else 1.0
+	if pid == local_id:
+		_set_drunk(fx.has(&"beer"))
+	var held: Variant = effect_tags.get(pid, null)
+	var tag: Label3D = held as Label3D if is_instance_valid(held) and (held as Node).get_parent() == a else null
+	if tag == null:
 		if parts.is_empty():
 			return
 		tag = Label3D.new()
@@ -890,8 +974,47 @@ func _refresh_effect_tag(pid: int) -> void:
 	tag.visible = not parts.is_empty()
 
 
+## Beer on the local player: blurry screen, inverted look, hidden money; sobering up shows what
+## happened to your money meanwhile.
+func _set_drunk(on: bool) -> void:
+	if on == drunk_overlay.visible:
+		return
+	drunk_overlay.visible = on
+	router.drunk = on
+	hud.money_hidden = on
+	var mat: ShaderMaterial = drunk_overlay.material as ShaderMaterial
+	if on:
+		_drunk_money = view.state.balance(local_id)
+		var t: Tween = create_tween()
+		t.tween_method(func(v: float) -> void: mat.set_shader_parameter(&"strength", v), 0.0, 1.0, 1.5)
+	else:
+		mat.set_shader_parameter(&"strength", 0.0)
+		if _drunk_money >= 0:
+			var diff: int = view.state.balance(local_id) - _drunk_money
+			hud.banner("Sobered up: %s$%d" % ["+" if diff >= 0 else "−", absi(diff)], Palette.MONEY_GREEN if diff >= 0 else Palette.LOSS_RED, 3.0)
+		_drunk_money = -1
+
+
 static func _effect_tag_text(id: StringName) -> String:
 	match id:
+		&"bad_luck_monkey":
+			return "MONKEY"
+		&"vip_pass":
+			return "VIP PASS"
+		&"energy_drink":
+			return "WIRED"
+		&"credit_card":
+			return "IN DEBT"
+		&"dog_collar":
+			return "COLLARED"
+		&"fake_cash":
+			return "FAKE $"
+		&"scissors":
+			return "SCISSORS"
+		&"beer":
+			return "TIPSY"
+		&"sunglasses":
+			return "SHADES"
 		&"lucky_clover":
 			return "LUCKY"
 		&"black_cat":
@@ -1300,7 +1423,7 @@ func _check_vip_gate() -> void:
 	for body: Node3D in map.vip_gate_area.get_overlapping_bodies():
 		if body is PlayerAvatar and (body as PlayerAvatar).is_standing() and _simulates(body):
 			var a: PlayerAvatar = body
-			if view.state.balance(a.player_id) >= threshold:
+			if view.state.balance(a.player_id) >= threshold or (view.state.effects.get(a.player_id, []) as Array).has(&"vip_pass"):
 				continue
 			# Bouncer pushes them back toward the stairs (+x) with a buzzer.
 			a.knockback(Vector3(1.0, 0.0, 0.0), 7.0)

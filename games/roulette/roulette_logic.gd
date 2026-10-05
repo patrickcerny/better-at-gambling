@@ -101,6 +101,8 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 
 
 func tick(delta: float) -> void:
+	if _fast_for(players):
+		delta *= 2.0  # Energy Drink, alone at the table
 	match state:
 		State.IDLE:
 			if not players.is_empty():

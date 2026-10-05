@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+[ext_resource type="Script" path="res://items/russian_roulette/russian_roulette_effect.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"russian_roulette"
+display_name = "Russian Roulette"
+description = "Multi-use. Each pull: +20% of your money, but the bang (1 in 6, then worse) leaves you 20%."
+rarity = 2
+target_mode = 0
+requires_proximity = false
+range_m = 0.0
+is_negative = false
+duration = 0.0
+params = {"gain": 0.2, "keep": 0.2}
+effect_script = ExtResource("2")
+in_loot = true

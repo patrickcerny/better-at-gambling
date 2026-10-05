@@ -17,3 +17,6 @@ enum TargetMode { SELF, ANY_PLAYER, NEAR_PLAYER, SEATED_PLAYER, LEADER, PLACED, 
 @export var duration: float = 0.0
 @export var params: Dictionary = {}
 @export var effect_script: Script
+## False for items that only come from other items (Empty Bottle): never offered in drafts,
+## scratch tickets or the shop.
+@export var in_loot: bool = true

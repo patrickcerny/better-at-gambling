@@ -219,6 +219,9 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 - [x] money conservation test passes with items enabled
 - [x] all tests green
 
+## Later (Patrick's ideas, not scheduled)
+- [ ] Jail when caught by security: growing timeout (8 s / 15 s / 25 s) and a Get Out of Jail Free item that also resets the caught counter (details in docs/ITEM_IDEAS.md). Patrick, 2026-10-05: not now, keep as a todo.
+
 ## M6 — Bots, reconnects, MVP hardening → **MVP COMPLETE**
 
 ### Tasks

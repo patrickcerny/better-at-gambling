@@ -29,6 +29,8 @@ var capture_mouse: bool = true
 ## Mouse look sensitivity (radians per pixel).
 var mouse_sensitivity: float = 0.0025
 var invert_y: bool = false
+## Beer: look is inverted on both axes and walking drifts a little.
+var drunk: bool = false
 
 
 func _ready() -> void:
@@ -53,7 +55,11 @@ func move_vector() -> Vector2:
 	if mode != Mode.WALK:
 		return Vector2.ZERO
 	var v: Vector2 = Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
-	return Vector2(v.x, -v.y)
+	var out := Vector2(v.x, -v.y)
+	if drunk and out.length() > 0.1:
+		var t: float = Time.get_ticks_msec() / 1000.0
+		out.x += sin(t * 1.3) * 0.35
+	return out
 
 
 ## Right stick look, radians per second.
@@ -61,7 +67,7 @@ func stick_look() -> Vector2:
 	if mode == Mode.MENU:
 		return Vector2.ZERO
 	var v: Vector2 = Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
-	return v * STICK_LOOK_SPEED
+	return v * STICK_LOOK_SPEED * (-1.0 if drunk else 1.0)
 
 
 func sprint_held() -> bool:
@@ -73,6 +79,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var rel: Vector2 = (event as InputEventMouseMotion).relative * mouse_sensitivity
 		if invert_y:
 			rel.y = -rel.y
+		if drunk:
+			rel = -rel
 		look.emit(rel)
 		return
 	if event.is_action_pressed(&"pause"):

@@ -14,6 +14,8 @@ var seat_labels: Array[Label] = []
 var hit: Button
 var stand: Button
 var double_btn: Button
+## Scissors item: snip the last card (shown only while you hold them).
+var cut_btn: Button
 var bet_panel: BetPanel
 var actions: HBoxContainer
 
@@ -58,6 +60,8 @@ func _build() -> void:
 	hit = _action("HIT  [H]", func() -> void: send(&"action", {"action": &"hit"}))
 	stand = _action("STAND  [S]", func() -> void: send(&"action", {"action": &"stand"}))
 	double_btn = _action("DOUBLE  [D]", func() -> void: send(&"action", {"action": &"double"}))
+	cut_btn = _action("CUT  [C]", func() -> void: send(&"action", {"action": &"cut"}))
+	cut_btn.visible = false
 	bet_panel = BetPanel.new()
 	bet_panel.confirmed.connect(func(a: int) -> void: send(&"place_bet", {"bet": {"amount": a}}))
 	body.add_child(bet_panel)
@@ -79,6 +83,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		stand.pressed.emit()
 	elif event.is_action_pressed(&"bj_double"):
 		double_btn.pressed.emit()
+	elif event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).physical_keycode == KEY_C and cut_btn.visible:
+		cut_btn.pressed.emit()
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -120,6 +126,8 @@ func _refresh() -> void:
 	var acting: bool = st == BlackjackLogic.State.ACTING and not mine.is_empty() and not bool(mine.get("done", true))
 	actions.visible = acting
 	double_btn.disabled = not acting or (mine.get("cards", []) as Array).size() != 2
+	cut_btn.visible = acting and bool(priv.get("scissors", false))
+	cut_btn.disabled = (mine.get("cards", []) as Array).size() < 3
 	bet_panel.visible = (st == BlackjackLogic.State.IDLE or st == BlackjackLogic.State.BETTING) and mine.is_empty()
 	_refresh_seats(pub.get("seats", []), hands)
 	others_label.text = ""

@@ -18,6 +18,13 @@ var rules: InteractionRules
 var world: WorldQuery
 var pickups: PickupSystem
 var rng: SeededRng
+## Set by the MatchServer: knockouts (Baseball Bat), the current limits multiplier, standing a
+## player up from a VIP table when their pass runs out, and the loot pool (Scratch Ticket).
+var interactions: InteractionResolver = null
+var limits: Callable = func() -> float: return 1.0
+var on_vip_lost: Callable = Callable()
+var loot: LootTables = null
+var jackpot: ProgressiveJackpot = null
 var events: Array[Dictionary] = []
 ## When each player last used an item, and when each was last hit by a negative one.
 var last_use: Dictionary[int, float] = {}
@@ -133,7 +140,7 @@ func _inventory_changed(player: int) -> void:
 # --- Activation --------------------------------------------------------------------------------
 
 ## A player uses the item in `slot` (on `target`, -1 = automatic). Returns {ok, error}.
-func use(player: int, slot: int, target: int, now: float) -> Dictionary:
+func use(player: int, slot: int, target: int, now: float, options: Dictionary = {}) -> Dictionary:
 	_now = now
 	if not players.has(player):
 		return StationLogicBase.fail(&"unknown_player")
@@ -153,6 +160,7 @@ func use(player: int, slot: int, target: int, now: float) -> Dictionary:
 		return StationLogicBase.fail(resolved["error"])
 	var tgt: int = resolved["target"]
 	var ctx := ItemContext.new(self, def, player, tgt, now)
+	ctx.options = options
 	var effect: ItemEffect = _effect(def)
 	var why: StringName = effect.can_activate(ctx)
 	if why != &"":
@@ -172,9 +180,11 @@ func use(player: int, slot: int, target: int, now: float) -> Dictionary:
 	var ev: Dictionary = {"player": player, "item": id, "target": tgt, "result": result}
 	if result != &"blocked":
 		ev.merge(effect.activate(ctx), true)
+	if bool(ev.get("keep", false)) and inv.size() < SLOTS:
+		inv.insert(mini(slot, inv.size()), id)  # multi-use items stay in their slot
 	events.append(GameEvents.make(&"item_used", ev))
 	_inventory_changed(player)
-	if not (pending.get(player, []) as Array).is_empty():
+	if not (pending.get(player, []) as Array).is_empty() and inv.size() < SLOTS:
 		_resolve_choice(player, 0, now)  # a slot just freed up: the waiting item moves in
 	return StationLogicBase.OK_RESULT
 
@@ -283,7 +293,47 @@ func _on_modifier_removed(player: int, mod: Modifier, reason: StringName) -> voi
 	if not defs.has(mod.id):
 		return
 	events.append(GameEvents.make(&"effect_ended", {"player": player, "item": mod.id, "reason": reason}))
-	_effect(defs[mod.id]).on_expire(ItemContext.new(self, defs[mod.id], mod.source_player, player, _now), reason)
+	var ctx := ItemContext.new(self, defs[mod.id], mod.source_player, player, _now)
+	ctx.options["modifier"] = mod
+	_effect(defs[mod.id]).on_expire(ctx, reason)
+
+
+# --- Helpers for effects ----------------------------------------------------------------------
+
+## Bad Luck Monkey is a hot potato: shoving someone hands it to them.
+func pass_monkey(from: int, to: int, now: float) -> void:
+	if to < 0 or to == from or not players.has(to) or rules.status(to).away:
+		return
+	var m: Modifier = modifiers.move_flag(from, to, &"monkey")
+	if m != null:
+		last_hit[to] = now
+		events.append(GameEvents.make(&"monkey_passed", {"from": from, "to": to, "item": m.id, "left": snappedf(m.expires_at - now, 0.1) if m.expires_at != INF else -1.0}))
+
+
+## Knocks a player down for `seconds` (they drop to the floor and can't act).
+func knock_down(player: int, seconds: float, attacker: int, cause: StringName, now: float) -> void:
+	rules.status(player).knocked_down_until = maxf(rules.status(player).knocked_down_until, now + seconds)
+	events.append(GameEvents.make(&"player_knocked_down", {"target": player, "attacker": attacker, "seconds": seconds, "cause": cause}))
+
+
+## Spills `pct` of a player's money (min/max, never more than they have) as chip piles around them.
+## Returns {amount, piles}.
+func spill(player: int, pct: float, min_amount: int, max_amount: int, reason: StringName, now: float) -> Dictionary:
+	var amount: int = slip_amount(economy.balance(player), pct, min_amount, max_amount)
+	var ids: Array[int] = []
+	if amount > 0:
+		ids = pickups.drop_from(player, amount, world.get_position(player), 4, rng, reason, now, 3.0)
+	return {"amount": amount, "piles": ids}
+
+
+## Hands out a random item from the loot pool of `rarity` (Scratch Ticket). Returns its id.
+func random_item(rarity: int) -> StringName:
+	if loot == null:
+		return &""
+	var pool: Array[StringName] = loot.ids_of(rarity)
+	if pool.is_empty():
+		return &""
+	return pool[rng.range_int(0, pool.size() - 1)]
 
 
 # --- Banana peels ------------------------------------------------------------------------------

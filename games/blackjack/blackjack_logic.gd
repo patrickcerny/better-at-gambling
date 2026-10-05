@@ -102,6 +102,13 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 			h["doubled"] = true
 			_deal_to_player(p)
 			h["done"] = true
+		&"cut":
+			# Scissors: snip off your last card (not after doubling, at least 3 cards in hand).
+			if h["doubled"] or (h["cards"] as Array).size() < 3 or not modifiers.has_flag(p, &"scissors", game_id):
+				return fail(&"cannot_cut")
+			modifiers.consume_flag(p, &"scissors")
+			var cut: int = (h["cards"] as Array).pop_back()
+			shoe.return_card(cut)
 		_:
 			return fail(&"unknown_action")
 	events.append(GameEvents.make(&"bj_action", {"station": station_id, "player": p, "action": action, "cards": (h["cards"] as Array).duplicate()}))
@@ -110,6 +117,8 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 
 
 func tick(delta: float) -> void:
+	if _fast_for(seats.filter(func(x: int) -> bool: return x >= 0)):
+		delta *= 2.0  # Energy Drink, alone at the table
 	match state:
 		State.BETTING:
 			timer -= delta
@@ -159,9 +168,12 @@ func get_public_state() -> Dictionary:
 
 
 func get_private_state(p: int) -> Dictionary:
+	var out: Dictionary = {}
 	if not dealer_revealed and dealer.size() >= 2 and modifiers.has_flag(p, &"peek_dealer", game_id):
-		return {"hole_card": dealer[1]}
-	return {}
+		out["hole_card"] = dealer[1]
+	if modifiers.has_flag(p, &"scissors", game_id):
+		out["scissors"] = true
+	return out
 
 
 func _deal() -> void:

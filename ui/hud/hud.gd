@@ -36,6 +36,9 @@ var minigame_warning: Label
 var hot_label: Label
 var _last_warning_second: int = -1
 
+## Beer: the money counter shows "$???" and no +/- pops until you sober up.
+var money_hidden: bool = false
+
 var _toast_until: float = -INF
 var _clock: float = 0.0
 var _displayed_money: float = 0.0
@@ -135,7 +138,7 @@ func _process(delta: float) -> void:
 	_displayed_money = lerpf(_displayed_money, target, minf(1.0, 12.0 * delta))
 	if absf(_displayed_money - target) < 1.0:
 		_displayed_money = target
-	money_label.text = "$%s" % _thousands(int(round(_displayed_money)))
+	money_label.text = "$???" if money_hidden else "$%s" % _thousands(int(round(_displayed_money)))
 	var t: int = int(ceil(maxf(state.time_left, 0.0)))
 	timer_label.text = "%02d:%02d" % [t / 60, t % 60]
 	rank_label.text = "%s / %d" % [_ordinal(state.rank_of(local_id)), maxi(state.balances.size(), 1)]
@@ -192,7 +195,8 @@ func _refresh_items() -> void:
 func _on_money_changed(player: int, amount: int, _balance: int, reason: StringName) -> void:
 	if player != local_id or amount == 0:
 		return
-	money_pop(amount)
+	if not money_hidden:
+		money_pop(amount)
 	if reason == &"stake":
 		Audio.play(&"chip_clack", &"SFX", -8.0)
 	elif amount > 0:

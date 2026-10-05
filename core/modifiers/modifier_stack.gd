@@ -105,6 +105,18 @@ func expire_flag(flag: StringName) -> void:
 				_remove(player, m, &"expired")
 
 
+## Hands the first modifier of `from` carrying `flag` over to `to` (Bad Luck Monkey). Returns it,
+## or null if `from` had none.
+func move_flag(from: int, to: int, flag: StringName) -> Modifier:
+	for m: Modifier in get_mods(from):
+		if m.flags.get(flag, false):
+			_remove(from, m, &"passed")
+			m.source_player = from
+			add(to, m)
+			return m
+	return null
+
+
 ## Removes all modifiers with id `id` from a player.
 func remove_by_id(player: int, id: StringName) -> void:
 	for m: Modifier in get_mods(player):

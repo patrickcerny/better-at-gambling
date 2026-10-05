@@ -25,7 +25,7 @@ effects only stun, drop chips or move players.
 | 15 | **Pickpocket**: steal money, bouncer doesn't notice, bigger amount = worse odds | Current Pickpocket stays (12%, $50–$500). Add a **Greedy** choice: pick 10/20/30% with 90/65/40% success; a failure costs you the same amount to the victim | Patrick's twist on the existing item. |
 | 16 | **Russian Roulette**: multi-use, 1 in 6; each use +20%, lose and you drop to 20% of your money | Each pull: +20% of current money (paid by the house); chance of losing starts at 1/6 and rises by 1/6 per pull; losing leaves you 20% of your money (the rest goes to the jackpot, not deleted) | Expected value per pull is negative from the second pull on; money "lost" feeds the jackpot so the ledger balances. |
 
-## Jail (Patrick, 2026-10-05, idea only)
+## Jail (Patrick, 2026-10-05): TODO only, not part of the item build (docs/TODO.md "Later")
 Getting caught by security (guards, a failed Fake Cash, a botched Greedy Pickpocket) sends you to
 a **jail cell** instead of straight back to the entrance: a timeout that grows each time you're
 caught this match. Proposed: 8 s, then 15 s, then 25 s (cap), shown as a countdown over the cell;
@@ -39,5 +39,5 @@ knockouts and falls keep the plain respawn.
    Early VIP Pass, Scratch Ticket, Energy Drink.
 2. New small mechanics: Baseball Bat + Empty Bottle (melee item hit), Credit Card (delayed
    repayment), Dog Collar (win split), Fake Cash, Scissors, Greedy Pickpocket.
-3. Bigger features: Jail + Get Out of Jail Free, Shop, Beer (screen effects + hidden money), Rock Paper Scissors (consent UI),
+3. Bigger features: Shop, Beer (screen effects + hidden money), Rock Paper Scissors (consent UI),
    Russian Roulette, Game Disabler.

@@ -108,6 +108,24 @@ func drain_events() -> Array[Dictionary]:
 	return out
 
 
+## Dog Collar: part of the wearer's winnings goes to whoever collared them.
+func _collar_cut(player: int, profit: int) -> void:
+	for m: Modifier in modifiers.get_mods(player):
+		if not m.flags.get(&"collar", false) or m.source_player < 0 or m.source_player == player:
+			continue
+		var cut: int = mini(int(floor(profit * COLLAR_SHARE)), economy.balance(player))
+		if cut <= 0:
+			continue
+		economy.apply(player, -cut, &"item_collar", station_id)
+		economy.apply(m.source_player, cut, &"item_collar", station_id)
+		events.append(GameEvents.make(&"collar_cut", {"player": player, "owner": m.source_player, "station": station_id, "amount": cut}))
+
+
+## True when `player` sits here alone with an Energy Drink: table timers run twice as fast.
+func _fast_for(players_here: Array) -> bool:
+	return players_here.size() == 1 and modifiers.has_flag(int(players_here[0]), &"fast_tables")
+
+
 ## Integer limit scaled by the limits multiplier.
 func scaled(amount: int) -> int:
 	return int(floor(amount * limits_multiplier))
@@ -118,8 +136,24 @@ static func fail(error: StringName) -> Dictionary:
 	return {"ok": false, "error": error}
 
 
-## Takes a stake from the player; false if they can't afford it.
+## Most of a bet Fake Cash pays for (× limits), and the chance the bouncer spots it.
+const FAKE_CASH_CAP: int = 200
+const FAKE_CASH_CAUGHT: float = 0.5
+## Share of a Dog Collar wearer's winnings that goes to whoever put it on them.
+const COLLAR_SHARE: float = 0.15
+
+
+## Takes a stake from the player; false if they can't afford it. Fake Cash pays (part of) the
+## next stake; whether the bouncer noticed is in the `fake_cash_used` event (the MatchServer fines
+## and throws out a caught player).
 func _take_stake(player: int, amount: int) -> bool:
+	if modifiers.has_flag(player, &"fake_cash"):
+		var covered: int = mini(amount, scaled(FAKE_CASH_CAP))
+		if economy.balance(player) < amount - covered:
+			return false
+		modifiers.consume_flag(player, &"fake_cash")
+		economy.apply(player, covered, &"item_fake_cash", station_id)
+		events.append(GameEvents.make(&"fake_cash_used", {"player": player, "station": station_id, "amount": covered, "caught": rng.chance(FAKE_CASH_CAUGHT)}))
 	return economy.apply(player, -amount, StringName("bet_" + game_id), station_id)
 
 
@@ -139,4 +173,6 @@ func _settle(player: int, stake: int, base_return: int, details: Dictionary = {}
 	if returned > 0:
 		economy.apply(player, returned, StringName("win_" + game_id) if returned > stake else StringName("return_" + game_id), station_id)
 	events.append(GameEvents.round_result(station_id, player, stake, returned, details))
+	if returned > stake:
+		_collar_cut(player, returned - stake)
 	return returned

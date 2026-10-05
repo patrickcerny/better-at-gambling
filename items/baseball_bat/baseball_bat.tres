@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+[ext_resource type="Script" path="res://items/baseball_bat/baseball_bat_effect.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"baseball_bat"
+display_name = "Baseball Bat"
+description = "One swing at a standing player within 2 m: knocked out on the spot, chips everywhere."
+rarity = 1
+target_mode = 2
+requires_proximity = true
+range_m = 2.0
+is_negative = true
+duration = 0.0
+params = {"pct": 0.08, "min": 30, "max": 400}
+effect_script = ExtResource("2")
+in_loot = true

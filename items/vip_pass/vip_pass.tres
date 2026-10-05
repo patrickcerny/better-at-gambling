@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+[ext_resource type="Script" path="res://items/vip_pass/vip_pass_effect.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"vip_pass"
+display_name = "Early VIP Pass"
+description = "The bouncer lets you into the VIP lounge for 2 minutes, whatever your money."
+rarity = 1
+target_mode = 0
+requires_proximity = false
+range_m = 0.0
+is_negative = false
+duration = 120.0
+params = {"flags": ["vip_pass"]}
+effect_script = ExtResource("2")
+in_loot = true
