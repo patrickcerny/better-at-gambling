@@ -22,4 +22,5 @@ shot vip_blackjack 420 --bots 3 --seed 3 --autosit vip_blackjack_1
 shot quiz_question 200 --bots 3 --seed 3 --skip-to 100 --duration 5
 shot results 240 --bots 3 --seed 3 --skip-to 300 --duration 5
 shot quiz_end 400 --bots 3 --seed 3 --skip-to 100 --duration 5
+shot pause_menu 90 --bots 3 --seed 3 --pause-menu
 shot items 760 --bots 3 --seed 3 --third-person --autoplay --give-items lucky_clover,black_cat,banana_peel

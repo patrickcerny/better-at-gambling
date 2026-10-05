@@ -174,10 +174,9 @@ func _build_lobby() -> void:
 	for i: int in SPAWNS.size():
 		var pad: Node3D = GreyboxKit.cylinder(self, 0.6, 0.06, SPAWNS[i] + Vector3(0, 0.03, 0), Palette.player_color(i).darkened(0.2), "ReadyPad%d" % i, false)
 		pad.add_to_group(&"ready_pads")
-	# Wardrobe mirror.
+	# Mirror (decoration; the wardrobe is off while cosmetics are disabled).
 	GreyboxKit.box(self, Vector3(0.2, 2.4, 1.6), Vector3(-SIZE_X * 0.5 + 0.6, 1.2, 12.0), Color("#9AC4D8"), "Mirror")
 	GreyboxKit.box(self, Vector3(0.3, 2.7, 1.9), Vector3(-SIZE_X * 0.5 + 0.45, 1.3, 12.0), Palette.WARM_GOLD, "MirrorFrame", false)
-	_sign_label(Vector3(-SIZE_X * 0.5 + 0.8, 2.85, 12.0), PI * 0.5, "WARDROBE", 56)
 	_build_settings_board()
 	_build_lobby_doors()
 	# Revolving door: rotating 4-panel cylinder in the south wall gap.

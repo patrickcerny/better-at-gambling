@@ -36,6 +36,13 @@ var drunk: bool = false
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_mode(Mode.WALK)
+	_apply_settings()
+	Settings.changed.connect(_apply_settings)
+
+
+func _apply_settings() -> void:
+	mouse_sensitivity = Settings.mouse_look()
+	invert_y = bool(Settings.get_value("controls", "invert_y"))
 
 
 ## Switches input mode and the mouse capture that goes with it.

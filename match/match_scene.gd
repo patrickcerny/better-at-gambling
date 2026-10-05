@@ -37,6 +37,7 @@ var current_ui: StationUi = null
 var nearest_station: StationBase = null
 ## Results podium (also the "no other menu while results show" flag).
 var results_panel: ResultsStage = null
+var settings_panel: SettingsPanel = null
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
 var reward_panel: RewardPanel
@@ -198,6 +199,8 @@ func _ready() -> void:
 		local.cam.toggle_mode()
 	if cmd.has("autosit"):
 		_autosit(StringName(cmd.get_string("autosit")))
+	if cmd.has_flag("pause-menu"):
+		_on_pause.call_deferred()
 	_catch_up_phase()
 	Log.info(&"match", "match scene ready: %d players, local=%d" % [avatars.size(), local_id])
 
@@ -316,6 +319,12 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.visuals.set_hat(StringName(p.get("hat", "none")))
 	if not bool(p.get("connected", true)) and not bot:
 		a.set_connection_away(true)
+	# Already at a table when we learn about them (joining late, reconnecting): put them in their
+	# own chair. They used to stand where they last walked, which is the same spot in front of the
+	# table for everyone, so they piled up on top of each other.
+	var sid: StringName = StringName(p.get("station", ""))
+	if sid != &"" and map.stations.has(sid):
+		_seat.call_deferred(pid, sid, int(p.get("seat", -1)))
 	return a
 
 
@@ -1369,12 +1378,23 @@ func _expire_predictions() -> void:
 func _on_pause() -> void:
 	if results_panel != null:
 		return
-	if router.mode == InputRouter.Mode.MENU:
-		router.set_mode(InputRouter.Mode.SEATED if local != null and local.state == PlayerAvatar.State.SEATED else InputRouter.Mode.WALK)
-		hud.toast("", 0.0)
+	if settings_panel != null and settings_panel.visible:
+		settings_panel.close()
+	elif router.mode == InputRouter.Mode.MENU:
+		_resume_play()
 	else:
+		if settings_panel == null:
+			settings_panel = SettingsPanel.new()
+			settings_panel.closed.connect(_resume_play)
+			settings_panel.leave_requested.connect(_leave_to_menu)
+			hud.add_child(settings_panel)
 		router.set_mode(InputRouter.Mode.MENU)
-		hud.toast("PAUSED — Esc to resume, F10 to quit to menu", 60.0)
+		settings_panel.open(true)
+
+
+func _resume_play() -> void:
+	router.set_mode(InputRouter.Mode.SEATED if local != null and local.state == PlayerAvatar.State.SEATED else InputRouter.Mode.WALK)
+	hud.toast("", 0.0)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -1384,13 +1404,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 # --- World checks ------------------------------------------------------------------------------
 
-## &"wardrobe"/&"settings" when the local player stands at the mirror/settings board in the lobby.
+## &"settings" when the local player stands at the settings board in the lobby.
 func _lobby_spot() -> StringName:
 	if local == null or not view.state.room_mode or view.state.phase != Phase.Id.LOBBY:
 		return &""
 	var p: Vector3 = local.global_position
-	if Vector2(p.x - LuckyLounge.MIRROR_POS.x, p.z - LuckyLounge.MIRROR_POS.z).length() < 2.6:
-		return &"wardrobe"
 	if Vector2(p.x - LuckyLounge.SETTINGS_BOARD_POS.x, p.z - LuckyLounge.SETTINGS_BOARD_POS.z).length() < 2.6:
 		return &"settings"
 	return &""
@@ -1405,9 +1423,6 @@ func _update_prompt() -> void:
 		hud.set_prompt("")
 		return
 	match _lobby_spot():
-		&"wardrobe":
-			hud.set_prompt("[E] Wardrobe: change your color and hat")
-			return
 		&"settings":
 			hud.set_prompt("[E] Party settings" if view.state.leader == local_id else "[E] Party settings (only the leader ★ can change them)")
 			return

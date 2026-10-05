@@ -155,8 +155,10 @@ func add_player(uid: String, display_name: String, is_bot: bool = false, color_i
 	p.uid = uid
 	p.display_name = display_name
 	p.is_bot = is_bot
-	p.color_index = lobby.free_color(_taken_colors(), color_index if color_index >= 0 else (p.id - 1) % Cosmetics.COLOR_COUNT)
-	p.hat = hat if Cosmetics.is_valid_hat(hat) else &"none"
+	# Cosmetics are off (Patrick, 2026-10-05): everyone gets the first free color, no hats; the
+	# client's wishes (`color_index`, `hat`) are ignored.
+	p.color_index = lobby.free_color(_taken_colors(), -1)
+	p.hat = &"none"
 	p.bot_difficulty = StringName(lobby.settings["bot_difficulty"])
 	state.add_player(p)
 	economy.add_player(p.id, balance.start_money)
@@ -678,18 +680,6 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"set_ready":
 			lobby.set_panel_ready(player, bool(intent["ready"]))
 			_sync_ready(player)
-			return StationLogicBase.OK_RESULT
-		&"set_cosmetics":
-			var p: PlayerState = state.players[player]
-			var color: int = int(intent["color"])
-			var hat: StringName = StringName(intent["hat"])
-			if not Cosmetics.is_valid_color(color) or not Cosmetics.is_valid_hat(hat):
-				return StationLogicBase.fail(&"bad_value")
-			if color != p.color_index and color in _taken_colors():
-				return StationLogicBase.fail(&"color_taken")
-			p.color_index = color
-			p.hat = hat
-			_emit(GameEvents.make(&"player_cosmetics", {"player": player, "color": color, "hat": hat}))
 			return StationLogicBase.OK_RESULT
 		&"lobby_setting":
 			var err: StringName = lobby.set_setting(player, str(intent["key"]), intent["value"])

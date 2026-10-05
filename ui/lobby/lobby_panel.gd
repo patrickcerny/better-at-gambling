@@ -1,7 +1,7 @@
 class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
-## accessibility: the 8 slots (name, color, hat, ready, leader), your look (wardrobe), the ready
+## accessibility: the 8 slots (name, color, ready, leader), the ready
 ## toggle and — for the party leader — duration, items, bot difficulty and bot slots. Every
 ## button sends an intent; the panel only redraws from the ClientMatchState mirror.
 
@@ -14,8 +14,6 @@ var local_id: int = -1
 var _title: Label
 var _slots: VBoxContainer
 var _ready_button: Button
-var _color_row: HBoxContainer
-var _hat_row: HBoxContainer
 var _settings_box: VBoxContainer
 var _settings_note: Label
 var _countdown_label: Label
@@ -47,7 +45,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	_refresh()
 
 
-## Shows the panel; `focus` is &"wardrobe", &"settings" or &"" (general).
+## Shows the panel; `focus` is &"settings" or &"" (general).
 func open(focus: StringName = &"") -> void:
 	visible = true
 	_refresh()
@@ -55,9 +53,6 @@ func open(focus: StringName = &"") -> void:
 		&"settings":
 			if not _duration_buttons.is_empty():
 				_duration_buttons.values()[0].grab_focus()
-		&"wardrobe":
-			if _color_row.get_child_count() > 0:
-				(_color_row.get_child(0) as Control).grab_focus()
 		_:
 			_ready_button.grab_focus()
 
@@ -98,31 +93,6 @@ func _build() -> void:
 	right.add_theme_constant_override(&"separation", 8)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cols.add_child(right)
-	right.add_child(_heading("YOUR LOOK"))
-	_color_row = HBoxContainer.new()
-	right.add_child(_color_row)
-	for i: int in Cosmetics.COLOR_COUNT:
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(40, 40)
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Palette.player_color(i)
-		sb.set_corner_radius_all(20)
-		b.add_theme_stylebox_override(&"normal", sb)
-		var sbf: StyleBoxFlat = sb.duplicate()
-		sbf.border_color = Palette.CREAM
-		sbf.set_border_width_all(3)
-		b.add_theme_stylebox_override(&"hover", sbf)
-		b.add_theme_stylebox_override(&"focus", sbf)
-		b.pressed.connect(func() -> void: _send_look(i, _my_hat()))
-		_color_row.add_child(b)
-	_hat_row = HBoxContainer.new()
-	right.add_child(_hat_row)
-	for hat: StringName in Cosmetics.HATS:
-		var b := Button.new()
-		b.text = Cosmetics.HAT_NAMES[hat]
-		b.add_theme_font_size_override(&"font_size", 18)
-		b.pressed.connect(func() -> void: _send_look(_my_color(), hat))
-		_hat_row.add_child(b)
 	_ready_button = Button.new()
 	_ready_button.custom_minimum_size = Vector2(0, 54)
 	_ready_button.pressed.connect(func() -> void:
@@ -222,10 +192,6 @@ func _refresh() -> void:
 		if pid == local_id:
 			label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 		row.add_child(label)
-		var hat := Label.new()
-		hat.text = Cosmetics.HAT_NAMES.get(StringName(p.get("hat", "none")), "")
-		hat.theme_type_variation = &"SmallLabel"
-		row.add_child(hat)
 		var ready := Label.new()
 		var is_ready: bool = bool(p.get("ready", false)) or bool(p.get("bot", false))
 		ready.text = "READY" if is_ready else "…"
@@ -254,14 +220,3 @@ func _refresh() -> void:
 func _my_ready() -> bool:
 	return bool(state.players.get(local_id, {}).get("ready", false))
 
-
-func _my_color() -> int:
-	return int(state.players.get(local_id, {}).get("color", 0))
-
-
-func _my_hat() -> StringName:
-	return StringName(state.players.get(local_id, {}).get("hat", "none"))
-
-
-func _send_look(color: int, hat: StringName) -> void:
-	Net.send_intent(Intents.make(&"set_cosmetics", {"color": color, "hat": hat}))

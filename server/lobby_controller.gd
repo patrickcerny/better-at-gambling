@@ -21,7 +21,7 @@ var _leader: int = -1
 
 ## Registers a participant. `at` orders leadership (earliest connected human leads).
 func join(player: int, human: bool, at: float) -> void:
-	_members[player] = {"human": human, "connected": true, "joined_at": at, "pad": false, "panel": false}
+	_members[player] = {"human": human, "connected": true, "joined_at": at, "pad": false, "panel": false, "pad_ignored": false}
 	_elect()
 
 
@@ -35,6 +35,7 @@ func set_connected(player: int, connected: bool, at: float) -> void:
 	else:
 		_members[player]["pad"] = false
 		_members[player]["panel"] = false
+		_members[player]["pad_ignored"] = false
 	_elect()
 
 
@@ -68,6 +69,8 @@ func set_on_pad(player: int, on: bool) -> bool:
 	if not _members.has(player) or _members[player]["pad"] == on:
 		return false
 	_members[player]["pad"] = on
+	if not on:
+		_members[player]["pad_ignored"] = false  # stepping off and back on readies again
 	return true
 
 
@@ -75,13 +78,16 @@ func set_on_pad(player: int, on: bool) -> bool:
 func set_panel_ready(player: int, on: bool) -> void:
 	if _members.has(player):
 		_members[player]["panel"] = on
+		# NOT READY wins over standing on the pad (it used to do nothing while you stood there,
+		# e.g. right after a reconnect put you back on your pad).
+		_members[player]["pad_ignored"] = not on and _members[player]["pad"]
 
 
 func is_ready(player: int) -> bool:
 	if not _members.has(player):
 		return false
 	var m: Dictionary = _members[player]
-	return not m["human"] or m["pad"] or m["panel"]
+	return not m["human"] or m["panel"] or (m["pad"] and not m.get("pad_ignored", false))
 
 
 ## True when every connected human is ready and there are enough participants.

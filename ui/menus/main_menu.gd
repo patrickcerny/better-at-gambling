@@ -5,6 +5,7 @@ extends Control
 @onready var _play_online: Button = %PlayOnline
 @onready var _practice: Button = $Center/VBox/Practice
 @onready var _quit: Button = %Quit
+@onready var _settings_button: Button = $Center/VBox/Settings
 @onready var _main_box: VBoxContainer = $Center/VBox
 
 var _online_box: VBoxContainer
@@ -14,12 +15,17 @@ var _ip_edit: LineEdit
 var _rejoin: Button
 var _status: Label
 var _busy: bool = false
+var _settings: SettingsPanel
 
 
 func _ready() -> void:
 	_quit.pressed.connect(_on_quit_pressed)
 	_practice.pressed.connect(func() -> void: SceneRouter.goto(SceneRouter.MATCH))
 	_play_online.pressed.connect(_show_online)
+	_settings = SettingsPanel.new()
+	add_child(_settings)
+	_settings.closed.connect(func() -> void: _settings_button.grab_focus())
+	_settings_button.pressed.connect(func() -> void: _settings.open(false))
 	_build_online()
 	_practice.grab_focus()
 	if DisplayServer.get_name() != "headless":

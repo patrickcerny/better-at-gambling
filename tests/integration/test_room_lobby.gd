@@ -33,17 +33,33 @@ func _tick(seconds: float) -> void:
 		t += 0.05
 
 
-func test_colors_are_unique_and_cosmetics_validated() -> void:
-	var a: int = server.add_player("dev:a", "A", false, 3)
+func test_colors_are_fixed_and_unique_and_cosmetics_are_off() -> void:
+	var a: int = server.add_player("dev:a", "A", false, 3, &"cowboy")
 	var b: int = server.add_player("dev:b", "B", false, 3)
-	assert_eq(server.state.players[a].color_index, 3)
-	assert_ne(server.state.players[b].color_index, 3, "wish taken: another color")
-	assert_eq(_intent(b, &"set_cosmetics", {"color": 3, "hat": &"cowboy"})["error"], &"color_taken")
-	assert_eq(_intent(b, &"set_cosmetics", {"color": 99, "hat": &"cowboy"})["error"], &"bad_value")
-	assert_eq(_intent(b, &"set_cosmetics", {"color": 6, "hat": &"crown_of_lies"})["error"], &"bad_value")
-	assert_true(_intent(b, &"set_cosmetics", {"color": 6, "hat": &"cowboy"})["ok"])
-	assert_eq(server.state.players[b].hat, &"cowboy")
-	assert_eq(_of(&"player_cosmetics").size(), 1)
+	assert_eq(server.state.players[a].color_index, 0, "wishes ignored: first free color")
+	assert_eq(server.state.players[b].color_index, 1)
+	assert_eq(server.state.players[a].hat, &"none")
+	assert_false(_intent(b, &"set_cosmetics", {"color": 6, "hat": &"cowboy"})["ok"], "no cosmetics intent any more")
+
+
+func test_not_ready_wins_over_the_pad_and_reconnect_starts_not_ready() -> void:
+	var a: int = server.add_player("dev:a", "A")
+	server.add_player("dev:b", "B")
+	server.report_on_pad(a, true)
+	assert_true(server.state.players[a].ready, "pad readies")
+	assert_true(_intent(a, &"set_ready", {"ready": false})["ok"])
+	assert_false(server.state.players[a].ready, "NOT READY works while standing on the pad")
+	server.report_on_pad(a, false)
+	server.report_on_pad(a, true)
+	assert_true(server.state.players[a].ready, "stepping back on readies again")
+	server.player_disconnected(a)
+	assert_false(server.state.players[a].ready)
+	server.player_reconnected(a)
+	assert_false(server.state.players[a].ready, "back as not ready")
+	assert_true(_intent(a, &"set_ready", {"ready": true})["ok"])
+	assert_true(server.state.players[a].ready, "READY works after a reconnect")
+	assert_true(_intent(a, &"set_ready", {"ready": false})["ok"])
+	assert_false(server.state.players[a].ready)
 
 
 func test_leader_settings_bots_ready_countdown_and_start() -> void:

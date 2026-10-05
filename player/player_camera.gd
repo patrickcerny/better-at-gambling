@@ -37,9 +37,11 @@ func _ready() -> void:
 	add_child(spring)
 	camera = Camera3D.new()
 	camera.name = "Camera"
+	fov = float(Settings.get_value("video", "fov"))
 	camera.fov = fov
 	camera.near = 0.05
 	add_child(camera)
+	Settings.changed.connect(_apply_fov)
 	camera.position = Vector3(0.0, EYE_HEIGHT, 0.0)
 
 
@@ -107,3 +109,8 @@ func update_camera(speed: float, on_floor: bool, ragdolled: bool, delta: float) 
 	var bob: Vector3 = Vector3(0, sin(_bob_time * 1.6) * 0.03, 0) if head_bob and on_floor and speed > 0.5 else Vector3.ZERO
 	camera.global_position = global_position + Vector3(0, EYE_HEIGHT, 0) + bob
 	camera.global_rotation = Vector3(pitch, yaw, 0.0)
+
+
+func _apply_fov() -> void:
+	fov = float(Settings.get_value("video", "fov"))
+	camera.fov = fov
