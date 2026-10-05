@@ -24,6 +24,16 @@ func _ready() -> void:
 	var floor_node := CasinoFloor.new()
 	add_child(floor_node)
 	floor_node._build_stand()
+	# A player bean shouting through the megaphone (as `CasinoFloor` holds it).
+	var shouter := AvatarVisuals.new()
+	add_child(shouter)
+	shouter.set_color(Palette.player_color(1))
+	shouter.global_position = Vector3(14.6, 0, -1.4)
+	shouter.rotation.y = deg_to_rad(10.0)
+	shouter.mouth_open = 1.0
+	var mega: Node3D = CasinoFloor.make_megaphone()
+	add_child(mega)
+	mega.global_transform = shouter.global_transform * Transform3D(Basis.from_euler(Vector3(CasinoFloor.HELD_TILT, 0.0, 0.0)), CasinoFloor.HELD_POS)
 	var cam := Camera3D.new()
 	add_child(cam)
 	var far: bool = Cmdline.parse(OS.get_cmdline_user_args()).get_string("cam", "") == "far"
