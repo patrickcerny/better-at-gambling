@@ -11,6 +11,7 @@ var in_game: bool = false
 var _resume: Button
 var _leave: Button
 var _first: Control
+var _mutes: VoiceMuteList
 
 
 func _ready() -> void:
@@ -21,8 +22,8 @@ func _ready() -> void:
 	anchor_bottom = 0.5
 	offset_left = -380
 	offset_right = 380
-	offset_top = -330
-	offset_bottom = 330
+	offset_top = -420
+	offset_bottom = 420
 	grow_horizontal = Control.GROW_DIRECTION_BOTH
 	grow_vertical = Control.GROW_DIRECTION_BOTH
 	visible = false
@@ -40,6 +41,18 @@ func _ready() -> void:
 	_slider(v, "Music", "audio", "music", 0.0, 1.0, 0.05, true)
 	_slider(v, "Effects", "audio", "sfx", 0.0, 1.0, 0.05, true)
 	_slider(v, "Menus", "audio", "ui", 0.0, 1.0, 0.05, true)
+	v.add_child(_heading("VOICE CHAT"))
+	_slider(v, "Voice volume", "audio", "voice", 0.0, 1.0, 0.05, true)
+	var voice_row := _row(v, "Microphone")
+	var voice_mode := OptionButton.new()
+	for label: String in VoiceChannel.MODE_LABELS:
+		voice_mode.add_item(label)
+	voice_mode.selected = maxi(VoiceChannel.MODE_KEYS.find(str(Settings.get_value("voice", "mode"))), 0)
+	voice_mode.item_selected.connect(func(i: int) -> void: Settings.change("voice", "mode", VoiceChannel.MODE_KEYS[i]))
+	voice_mode.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	voice_row.add_child(voice_mode)
+	_mutes = VoiceMuteList.new()
+	v.add_child(_mutes)
 	v.add_child(_heading("CONTROLS"))
 	_slider(v, "Mouse sensitivity", "controls", "mouse_sensitivity", 0.2, 3.0, 0.05, false)
 	_check(v, "Invert mouse Y", "controls", "invert_y")
@@ -70,6 +83,7 @@ func open(p_in_game: bool = false) -> void:
 	in_game = p_in_game
 	_resume.visible = in_game
 	_leave.visible = in_game
+	_mutes.refresh()
 	visible = true
 	(_resume if in_game else _first).grab_focus()
 

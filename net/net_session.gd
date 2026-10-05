@@ -23,6 +23,8 @@ signal snapshot_received(snapshot: Dictionary)
 signal position_forced(pos: Vector3, yaw: float)
 ## SERVER: an accepted movement report from a client's own avatar.
 signal move_received(player: int, pos: Vector3, yaw: float, airborne: bool)
+## CLIENT: a relayed voice frame (`VoicePacket` down packet) on the voice channel.
+signal voice_received(data: PackedByteArray)
 
 enum Mode { NONE, LOCAL, CLIENT, SERVER }
 
@@ -48,6 +50,8 @@ var transport: NetTransport = null
 var clock: NetClock = NetClock.new()
 ## SERVER: room lifecycle (handshake, orchestrator, empty shutdown).
 var room_host: RoomHost = null
+## SERVER: proximity voice relay (created on the first voice packet).
+var voice_relay: VoiceRelay = null
 ## SERVER: returns the world dictionary to stream (set by the match scene).
 var world_provider: Callable
 ## Last refusal/disconnect (code + player-facing text), for the menu's error panel.
@@ -119,6 +123,7 @@ func stop() -> void:
 		room_host.queue_free()
 		room_host = null
 	local_server = null
+	voice_relay = null
 	local_player_id = -1
 	_welcomed = false
 	_snapshot = {}
@@ -143,6 +148,13 @@ func send_intent(intent: Dictionary) -> Dictionary:
 				_send(NetTransport.SERVER_PEER, Protocol.CHANNEL_EVENTS, true, Protocol.Msg.INTENT, intent)
 			return {"ok": true, "error": &"", "pending": true}
 	return StationLogicBase.fail(&"not_connected")
+
+
+## CLIENT: sends one captured voice frame (`VoicePacket` up packet) to the server for relaying.
+## No-op otherwise (Practice has nobody to talk to).
+func send_voice(packet: PackedByteArray) -> void:
+	if mode == Mode.CLIENT and _welcomed and transport != null:
+		transport.send(NetTransport.SERVER_PEER, Protocol.CHANNEL_VOICE, false, packet)
 
 
 ## Latest full snapshot (immediate in LOCAL mode; the cached, status-refreshed copy in CLIENT mode).
@@ -458,6 +470,9 @@ func _process(delta: float) -> void:
 	if transport == null:
 		return
 	for p: Dictionary in transport.poll():
+		if int(p["channel"]) == Protocol.CHANNEL_VOICE:
+			_voice_packet(int(p["peer"]), p["data"])
+			continue
 		var msg: Array = Wire.decode(p["data"])
 		if msg.is_empty():
 			continue
@@ -480,6 +495,27 @@ func _process(delta: float) -> void:
 					_send(NetTransport.SERVER_PEER, Protocol.CHANNEL_STATE, true, Protocol.Msg.PING, {"t": _now()})
 		Mode.SERVER:
 			_server_tick(delta)
+
+
+## Voice frames bypass `Wire`: clients play them, the server relays them to listeners in reach.
+func _voice_packet(peer: int, data: PackedByteArray) -> void:
+	if mode == Mode.CLIENT:
+		if _welcomed:
+			voice_received.emit(data)
+	elif mode == Mode.SERVER and local_server != null and room_host != null:
+		var speaker: int = room_host.player_of(peer)
+		if speaker < 0:
+			return
+		if voice_relay == null:
+			voice_relay = VoiceRelay.new()
+		var peers: Dictionary[int, int] = {}
+		for pr: int in room_host.welcomed_peers():
+			peers[room_host.player_of(pr)] = pr
+		var listeners: Array[int] = []
+		listeners.assign(peers.keys())
+		var out: Dictionary[int, PackedByteArray] = voice_relay.route(local_server, speaker, data, _now(), listeners)
+		for pid: int in out:
+			transport.send(peers[pid], Protocol.CHANNEL_VOICE, false, out[pid])
 
 
 func _send(peer: int, channel: int, reliable: bool, type: int, payload: Variant) -> void:

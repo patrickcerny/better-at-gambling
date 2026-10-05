@@ -56,6 +56,8 @@ var net_world: NetWorld
 var lobby_panel: LobbyPanel
 var shop_panel: ShopPanel
 var connection_label: Label
+## Proximity voice (clients only; the dedicated server just relays in `Net`).
+var voice: VoiceChannel = null
 ## Item keys, target picker, discard choice (M5).
 var items_ctl: ItemController
 ## Banana peels on the floor (peel id → mesh) and item effect tags over heads (player → label).
@@ -181,6 +183,11 @@ func _ready() -> void:
 		Net.world_provider = net_world.build
 		Net.move_received.connect(_on_move_received)
 	_spawn_avatars()
+	if role != Role.SERVER:
+		voice = VoiceChannel.new()
+		voice.name = "VoiceChannel"
+		voice.setup(view.state, local_id, func(pid: int) -> PlayerAvatar: return avatars.get(pid, null), ui_layer, role == Role.CLIENT)
+		add_child(voice)
 	_connect_router()
 	if _owns_server and role == Role.PRACTICE:
 		server.start_match()

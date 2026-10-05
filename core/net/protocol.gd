@@ -15,6 +15,8 @@ const MAX_INTENTS_PER_SECOND: int = 20
 const CHANNEL_EVENTS: int = 0
 const CHANNEL_STATE: int = 1
 const CHANNEL_PHYSICS: int = 2
+## Voice frames are raw `VoicePacket` bytes, not `Wire` messages: client → server → listeners in
+## reach (`VoiceRelay`).
 const CHANNEL_VOICE: int = 3
 
 ## Message types: every packet is `[type, payload]` (see `Wire`).
