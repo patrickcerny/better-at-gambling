@@ -240,6 +240,10 @@ func test_sit_bet_and_leave_mid_round_through_the_scene() -> void:
 	var bet: Dictionary = Net.send_intent(Intents.make(&"place_bet", {"station": sid, "bet": {"amount": 50}}))
 	assert_true(bet["ok"], "bet: %s" % bet)
 	await wait_seconds(Registry.balance.bj_betting_window + 0.5)  # cards are dealt, we're acting
+	if int(scene.view.state.stations[sid]["state"]) == BlackjackLogic.State.PAYOUT:
+		# A natural blackjack on either side (random seed) ends the round before we can leave mid-hand.
+		assert_eq(_of(&"round_result").size(), 1, "the natural settled the hand")
+		return
 	assert_eq(int(scene.view.state.stations[sid]["state"]), BlackjackLogic.State.ACTING, "mid-round")
 	var leave: Dictionary = Net.send_intent(Intents.make(&"leave"))
 	assert_true(leave["ok"])
