@@ -527,7 +527,7 @@ func _track_fall() -> void:
 	_was_on_floor = on_floor
 
 
-const FOOTSTEPS: Array[StringName] = [&"footstep", &"footstep_2", &"footstep_3"]
+const FOOTSTEPS: Array[StringName] = [&"footstep"]  # recorded carpet steps, variants picked by Audio
 
 
 func _footsteps(delta: float) -> void:
@@ -536,7 +536,7 @@ func _footsteps(delta: float) -> void:
 		_step_timer += delta * speed
 		if _step_timer > 2.6:
 			_step_timer = 0.0
-			# Soft carpet steps: three variants, gentle pitch spread, quieter for our own body
+			# Soft carpet steps (recorded variants), gentle pitch spread, quieter for our own body
 			# (it's right under the camera) and sprinting a touch louder.
 			var clip: StringName = FOOTSTEPS[randi() % FOOTSTEPS.size()]
 			var vol: float = (-26.0 if drive == Drive.INPUT else -22.0) + (2.0 if speed > 5.0 else 0.0)

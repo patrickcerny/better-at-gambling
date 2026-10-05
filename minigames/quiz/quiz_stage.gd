@@ -158,7 +158,9 @@ func _show_question(q: Dictionary) -> void:
 	_last_tick = -1
 	header.text = "QUESTION %d / %d  ·  %s%s" % [index + 1, count, CATEGORY_NAMES.get(str(q.get("category", "")), "Quiz").to_upper(), "  ·  LIVE" if bool(q.get("dynamic", false)) else ""]
 	question_label.text = str(q["question"])
-	screen_label.text = str(q["question"])
+	# The question itself is on the card at the top; the big screen only shows the number, so
+	# the same sentence isn't printed twice.
+	screen_label.text = "QUESTION %d" % (index + 1)
 	var answers: Array = q["answers"]
 	for i: int in answer_buttons.size():
 		answer_texts[i].text = str(answers[i]) if i < answers.size() else ""
@@ -250,6 +252,8 @@ func _finish(ranking: Array) -> void:
 		b.visible = false
 	explanation.visible = false
 	timer_bar.visible = false
+	for c: Node in answered_row.get_children():
+		c.queue_free()
 	if ranking.is_empty():
 		return
 	var top: Dictionary = ranking[0]
@@ -396,7 +400,7 @@ func _build_set() -> void:
 	add_child(screen)
 	screen_label = Label3D.new()
 	screen_label.text = ""  # the intro banner already says CASINO QUIZ
-	screen_label.font_size = 64
+	screen_label.font_size = 96
 	screen_label.pixel_size = 0.006
 	screen_label.width = 1300
 	screen_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

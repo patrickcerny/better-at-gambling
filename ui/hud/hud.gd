@@ -399,6 +399,18 @@ func _build() -> void:
 	lb.add_child(title)
 	leaderboard_rows = VBoxContainer.new()
 	lb.add_child(leaderboard_rows)
+	_outline_labels(self)
+
+
+## Every HUD label floats over the 3D scene, so each gets a dark outline to stay readable on
+## bright walls and signs (Patrick: text running into the background).
+func _outline_labels(node: Node) -> void:
+	for c: Node in node.get_children():
+		if c is Label and not (c as Label).has_theme_constant_override(&"outline_size"):
+			(c as Label).add_theme_constant_override(&"outline_size", 4)
+			(c as Label).add_theme_color_override(&"font_outline_color", Palette.CASINO_BLACK)
+		if not c is PanelContainer:
+			_outline_labels(c)
 
 
 func _centre_label(offset_y: float, size: int, color: Color) -> Label:

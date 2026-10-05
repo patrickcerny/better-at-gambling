@@ -4,7 +4,7 @@ extends RefCounted
 
 const PROTOCOL_VERSION: int = 2
 ## Build string clients and servers must share exactly (the orchestrator checks it too).
-const BUILD_ID: String = "0.5.1-items"
+const BUILD_ID: String = "0.5.2-fixes"
 const DEFAULT_PORT: int = 24680
 const MAX_PLAYERS: int = 8
 const SERVER_TICK_HZ: int = 20

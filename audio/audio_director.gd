@@ -1,12 +1,14 @@
 extends Node
 ## `Audio` autoload: one-shot SFX by name on the right bus, 3D SFX at a position, music crossfades.
-## Placeholder clips come from `tools/gen_audio.py`; missing clips log once and never block.
+## Recorded clips (CC0) where we have them, generated placeholders (`tools/gen_audio.py`) for the
+## rest; missing clips log once and never block.
 
 const SFX_DIR: String = "res://audio/sfx/"
 const POOL_SIZE: int = 12
 const CROSSFADE: float = 1.0
+const MAX_VARIANTS: int = 8
 
-var _clips: Dictionary[StringName, AudioStream] = {}
+var _clips: Dictionary[StringName, Array] = {}
 var _missing: Dictionary[StringName, bool] = {}
 var _pool: Array[AudioStreamPlayer] = []
 var _music_a: AudioStreamPlayer
@@ -28,6 +30,10 @@ func _ready() -> void:
 		m.volume_db = -80.0
 		add_child(m)
 	_music_current = _music_a
+
+
+func _exit_tree() -> void:
+	_clips.clear()  # release the streams before the engine's resource check at exit
 
 
 ## Plays a 2D one-shot (UI and local-player feedback).
@@ -93,15 +99,31 @@ func set_bus_volume(bus_name: StringName, linear: float) -> void:
 
 
 func _clip(name: StringName) -> AudioStream:
-	if _clips.has(name):
-		return _clips[name]
-	if _missing.has(name):
+	if not _clips.has(name) and not _missing.has(name):
+		_load(name)
+	var list: Array = _clips.get(name, [])
+	if list.is_empty():
 		return null
-	var path: String = SFX_DIR + String(name) + ".wav"
-	if not ResourceLoader.exists(path):
+	return list[randi() % list.size()]
+
+
+## Recorded variants `<name>-v1.ogg`, `-v2.ogg`… (CC0 Kenney packs, see audio/sfx/KENNEY_LICENSE.txt)
+## win over the generated `<name>.wav` placeholder; one is picked at random per play.
+func _load(name: StringName) -> void:
+	var list: Array = []
+	for i: int in range(1, MAX_VARIANTS + 1):
+		var vpath: String = "%s%s-v%d.ogg" % [SFX_DIR, name, i]
+		if not ResourceLoader.exists(vpath):
+			break
+		list.append(load(vpath))
+	if list.is_empty():
+		for ext: String in ["ogg", "wav"]:
+			var path: String = "%s%s.%s" % [SFX_DIR, name, ext]
+			if ResourceLoader.exists(path):
+				list.append(load(path))
+				break
+	if list.is_empty():
 		_missing[name] = true
 		Log.warn(&"audio", "missing sfx %s" % name)
-		return null
-	var clip: AudioStream = load(path)
-	_clips[name] = clip
-	return clip
+		return
+	_clips[name] = list

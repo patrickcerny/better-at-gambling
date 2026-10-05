@@ -33,9 +33,21 @@ func _ready() -> void:
 	panel.anchor_bottom = 1.0
 	panel.offset_left = -400
 	panel.offset_right = 400
-	panel.offset_top = -(_panel_height() + 30)
-	panel.offset_bottom = -30
+	panel.offset_top = -(_panel_height() + 118)
+	panel.offset_bottom = -118  # clear of the item bar
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN  # taller content pushes the panel up, never off-screen
+	if _dock_right():
+		# Games you watch (Plinko's falling chip) keep the middle of the screen clear.
+		panel.anchor_left = 1.0
+		panel.anchor_right = 1.0
+		panel.anchor_top = 0.5
+		panel.anchor_bottom = 0.5
+		panel.offset_left = -440
+		panel.offset_right = -24
+		panel.offset_top = -_panel_height() * 0.5
+		panel.offset_bottom = _panel_height() * 0.5
+		panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	add_child(panel)
 	body = VBoxContainer.new()
 	body.add_theme_constant_override(&"separation", 10)
@@ -102,6 +114,11 @@ func scaled(amount: int) -> int:
 
 func _panel_height() -> float:
 	return 360.0
+
+
+## True for overlays that sit at the right edge instead of over the middle of the screen.
+func _dock_right() -> bool:
+	return false
 
 
 func _build() -> void:

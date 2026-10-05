@@ -13,7 +13,11 @@ func _init() -> void:
 
 
 func _panel_height() -> float:
-	return 360.0
+	return 300.0
+
+
+func _dock_right() -> bool:
+	return true
 
 
 func _build() -> void:
@@ -25,7 +29,7 @@ func _build() -> void:
 		var b := Button.new()
 		b.text = String(r).to_upper()
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(130, 48)
+		b.custom_minimum_size = Vector2(118, 48)
 		var rr: StringName = r
 		b.pressed.connect(func() -> void: _set_risk(rr))
 		row.add_child(b)
@@ -33,6 +37,7 @@ func _build() -> void:
 	mults_label = Label.new()
 	mults_label.theme_type_variation = &"SmallLabel"
 	mults_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mults_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mults_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
 	body.add_child(mults_label)
 	bet_panel = BetPanel.new()

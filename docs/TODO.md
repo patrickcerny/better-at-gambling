@@ -424,10 +424,10 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ## Bugs
 
 ### Patrick's playtest, 2026-10-05 19:01 UTC (next fix round, wait for his word)
-- [ ] Party host leaves: nobody is host anymore. Hand host to another player in the room.
-- [ ] Empty room (everyone left): shut it down right away.
-- [ ] Roulette bet display is one spot off, so it's unclear where the bet sits.
-- [ ] Text overlaps on many screens (HUD, panels, quiz, results; audit every screen).
-- [ ] Plinko: the UI covers the board, so you can't see where the chip drops in.
-- [ ] Sounds are still bad (replace the generated placeholders with better ones).
-- [ ] Gift Shop doesn't work in his game (reproduce online first: kiosk prompt, panel, buy).
+- [x] Party host leaves: nobody is host anymore. Hand host to another player in the room. (Leaving now frees the slot on the server at once instead of waiting for ENet's timeout, so leadership moves immediately; `test_leader_handoff.gd`.)
+- [x] Empty room (everyone left): shut it down right away. (5 s after the last player leaves, `RoomHost.LEFT_EMPTY_CLOSE`.)
+- [x] Roulette bet display is one spot off, so it's unclear where the bet sits. (Badge was anchored before layout; now centred on its own spot.)
+- [x] Text overlaps on many screens. (Station panels sit above the item bar, HUD labels outlined, quiz question no longer printed twice, quiz answer dots cleared at the end.)
+- [x] Plinko: the UI covers the board, so you can't see where the chip drops in. (Panel docked at the right edge.)
+- [x] Sounds are still bad. (Recorded CC0 Kenney sounds for footsteps, chips, cards, hits, UI; generated placeholders remain for splash, whistle, jackpot, big win.)
+- [x] Gift Shop doesn't work in his game. (Online clients overwrote the stock with their stale join snapshot every refresh, so the kiosk never offered anything.)

@@ -120,3 +120,32 @@ func test_out_of_order_sign_shows_on_the_table() -> void:
 	assert_not_null(node.out_of_order_sign)
 	assert_true(node.out_of_order_sign.visible)
 	assert_string_contains(scene.hud.prompt_label.text, "OUT OF ORDER")
+
+
+func test_roulette_chip_badge_sits_on_its_own_spot() -> void:
+	var sid: StringName = &"roulette_1"
+	scene._autosit(sid)
+	await wait_seconds(4.0)
+	assert_eq(scene.local.state, PlayerAvatar.State.SEATED)
+	var ui: RouletteUi = scene.current_ui as RouletteUi
+	assert_not_null(ui)
+	var res: Dictionary = Net.send_intent(Intents.make(&"place_bet", {"station": sid, "bet": {"type": &"straight", "value": 17, "amount": 10}}))
+	assert_true(res["ok"], str(res))
+	await wait_seconds(1.0)
+	var badge: Label = ui._badges["straight:17"]
+	assert_true(badge.visible)
+	var spot: Button = badge.get_parent() as Button
+	assert_eq(spot.text, "17")
+	var centre: Vector2 = badge.get_global_rect().get_center()
+	assert_true(centre.x > spot.get_global_rect().position.x and centre.x < spot.get_global_rect().end.x, "badge centred over 17, not the neighbour")
+	# The overlay stays clear of the item bar.
+	assert_true(ui.panel.get_global_rect().end.y <= scene.hud.items.slots[0].get_global_rect().position.y + 1.0, "station panel above the item slots")
+
+
+func test_plinko_panel_leaves_the_board_visible() -> void:
+	scene._autosit(&"plinko_1")
+	await wait_seconds(4.0)
+	var ui: StationUi = scene.current_ui
+	assert_not_null(ui)
+	var view: Vector2 = scene.get_viewport().get_visible_rect().size
+	assert_gt(ui.panel.get_global_rect().position.x, view.x * 0.7, "panel docked at the right edge")
