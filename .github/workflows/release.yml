@@ -1,0 +1,73 @@
+# Builds the Windows and Linux clients on every push to main and publishes them as a GitHub Release.
+# Shareable links that always point at the newest build:
+#   https://github.com/patrickcerny/better-at-gambling/releases/latest
+#   https://github.com/patrickcerny/better-at-gambling/releases/latest/download/BetterAtGambling-windows.zip
+# The VPS deploys the same commit on its own (deploy/install.sh cron, waits for empty rooms).
+name: Build & release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**/*.md", "deploy/**", "services/orchestrator/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot + export templates
+        uses: actions/cache@v4
+        with:
+          path: |
+            tools/godot
+            ~/.local/share/godot/export_templates/4.7.2.stable
+          key: godot-4.7.2-stable-v1
+
+      - name: Toolchain
+        run: tools/setup_toolchain.sh
+
+      - name: Import project
+        run: tools/godot/godot --headless --path . --import > import.log 2>&1 || (tail -50 import.log; exit 1)
+
+      - name: Unit tests + boot smoke
+        run: scripts/test.sh unit && scripts/test.sh smoke
+
+      - name: Export
+        run: |
+          mkdir -p build/windows build/linux dist
+          tools/godot/godot --headless --path . --export-release "Windows" "$PWD/build/windows/BetterAtGambling.exe"
+          tools/godot/godot --headless --path . --export-release "Linux" "$PWD/build/linux/BetterAtGambling.x86_64"
+          test -s build/windows/BetterAtGambling.exe && test -s build/linux/BetterAtGambling.x86_64
+          build/linux/BetterAtGambling.x86_64 --headless -- --smoke-test --frames 60
+          (cd build/windows && zip -q -9 ../../dist/BetterAtGambling-windows.zip BetterAtGambling.exe)
+          (cd build/linux && zip -q -9 ../../dist/BetterAtGambling-linux.zip BetterAtGambling.x86_64)
+          ls -la dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          build_id=$(sed -n 's/^const BUILD_ID: String = "\(.*\)"/\1/p' core/net/protocol.gd)
+          tag="build-${GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Game version **${build_id}**, commit ${GITHUB_SHA::7}.
+
+          **Windows:** download \`BetterAtGambling-windows.zip\`, unzip, run \`BetterAtGambling.exe\`
+          (SmartScreen: "More info" → "Run anyway"). Then Play Online → Create Party and share the code.
+          Online parties run on the game server automatically, no setup needed.
+          EOF
+          gh release create "$tag" dist/*.zip --target "$GITHUB_SHA" \
+            --title "Better at Gambling ${build_id} (build ${GITHUB_RUN_NUMBER})" --notes-file notes.md --latest
+          # Keep the 5 newest builds so the release list stays short.
+          gh release list --limit 100 --json tagName,createdAt -q 'sort_by(.createdAt) | reverse | .[5:] | .[].tagName' \
+            | grep '^build-' | xargs -r -n1 gh release delete --cleanup-tag -y
