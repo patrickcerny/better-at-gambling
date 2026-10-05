@@ -12,6 +12,11 @@ var stop_btn: Button
 var pay_label: Label
 var _spin_anim: float = 0.0
 var _last_line: Array = []
+## Reels stop one after another on a new result: seconds left per reel (< 0 = stopped).
+const STOP_STAGGER: float = 0.35
+var _stop_in: Array[float] = [-1.0, -1.0, -1.0]
+var _result_pending: bool = false
+var _saw_spin: bool = false
 
 
 func _init() -> void:
@@ -70,10 +75,38 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
-	if visible and bool(pub.get("spinning", false)):
-		_spin_anim += delta * 18.0
-		for i: int in 3:
+	if not visible:
+		return
+	var spinning: bool = bool(pub.get("spinning", false))
+	_spin_anim += delta * 18.0
+	for i: int in 3:
+		if _stop_in[i] >= 0.0:
+			_stop_in[i] -= delta
+			if _stop_in[i] < 0.0:
+				_land_reel(i)
+				continue
+		if spinning or _stop_in[i] >= 0.0:
 			reels[i].text = SYMBOL_GLYPHS[SlotsLogic.SYMBOL_NAMES[(int(_spin_anim) + i * 2) % SlotsLogic.SYMBOL_NAMES.size()]]
+	if _result_pending and _stop_in[2] < 0.0:
+		_result_pending = false
+		_show_result()
+
+
+func _land_reel(i: int) -> void:
+	if i < _last_line.size():
+		reels[i].text = SYMBOL_GLYPHS[SlotsLogic.SYMBOL_NAMES[int(_last_line[i])]]
+	var p: Control = reels[i].get_parent() as Control
+	p.pivot_offset = p.size * 0.5
+	p.scale = Vector2(1.0, 0.9)
+	var t: Tween = p.create_tween()
+	t.tween_property(p, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	Audio.play(&"reel_stop", &"UI", -10.0, 1.0 + i * 0.08)
+
+
+func _show_result() -> void:
+	var mult: int = SlotsLogic.payout_multiplier(_ints(_last_line), Registry.balance)
+	status_label.text = ("WIN ×%d" % mult) if mult > 0 else "No luck — pull again"
+	status_label.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if mult > 0 else Palette.CREAM)
 
 
 func _refresh() -> void:
@@ -83,17 +116,22 @@ func _refresh() -> void:
 	bet_panel.visible = not spinning
 	if spinning:
 		status_label.text = "Spinning… ($%d)" % int(pub.get("stake", 0))
+		status_label.remove_theme_color_override(&"font_color")
+		_saw_spin = true
 	elif line.is_empty():
 		status_label.text = "Pick a bet to pull the lever"
-	else:
+	elif _saw_spin:
+		# A new result: the reels stop left to right, then the payout shows.
+		_saw_spin = false
+		_last_line = line.duplicate()
+		for i: int in 3:
+			_stop_in[i] = 0.1 + STOP_STAGGER * i
+		_result_pending = true
+	elif not _result_pending:
+		_last_line = line.duplicate()
 		for i: int in mini(3, line.size()):
 			reels[i].text = SYMBOL_GLYPHS[SlotsLogic.SYMBOL_NAMES[int(line[i])]]
-		var mult: int = SlotsLogic.payout_multiplier(_ints(line), Registry.balance)
-		status_label.text = ("WIN ×%d" % mult) if mult > 0 else "No luck — pull again"
-		status_label.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if mult > 0 else Palette.CREAM)
-		if line != _last_line:
-			_last_line = line.duplicate()
-			Audio.play(&"reel_stop", &"UI", -10.0)
+		_show_result()
 
 
 func _ints(a: Array) -> Array[int]:

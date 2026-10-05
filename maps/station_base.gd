@@ -22,6 +22,10 @@ var hot_light: OmniLight3D
 ## Big bouncing arrow over the hot table, drawn on top of everything so it reads across the floor.
 var hot_marker: Node3D
 const HOT_MARKER_Y: float = 4.2
+## Spotlight cone, embers and sparks while hot (client only, built on first use).
+var hot_fx: HotTableFx
+## Middle of the table's footprint (local) for the hot spotlight and fire ring.
+var hot_center: Vector3 = Vector3.ZERO
 var _hot_time: float = 0.0
 ## "OUT OF ORDER" sign (item) hung over the station; built on first use.
 var out_of_order_sign: Label3D
@@ -62,6 +66,13 @@ func _ready() -> void:
 ## Marks the station hot (spotlight and bouncing arrow) or not.
 func set_hot(hot: bool) -> void:
 	hot_light.light_energy = 6.0 if hot else 0.0
+	if hot and hot_fx == null and Vfx.enabled():
+		hot_fx = HotTableFx.new()
+		hot_fx.radius = interact_radius * 0.8
+		hot_fx.position = hot_center
+		add_child(hot_fx)
+	if hot_fx != null:
+		hot_fx.set_on(hot)
 	if hot and hot_marker == null:
 		_build_hot_marker()
 	if hot_marker != null:
