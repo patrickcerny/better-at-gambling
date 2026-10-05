@@ -2,6 +2,9 @@ class_name RagdollBody
 extends Node3D
 ## "Active ragdoll lite" (§2.4): 5 rigid bodies (torso, head, two hands, hips) on pin joints.
 ## Spawned when a player is knocked down, thrown or slips; reports hard impacts and settling.
+## The bodies are the physics (simulated on the server, streamed to clients); on top of them sits a
+## purely visual layer (M7) that never touches the simulation: floppy arms from the shoulders to the
+## hands, little kicking legs, hands that flail while the body flies, and X eyes when knocked out.
 
 ## Emitted on a hard hit: `strength` is the speed lost in the collision (m/s), `wall` if the
 ## contact normal was mostly horizontal.
@@ -38,6 +41,18 @@ var _elapsed: float = 0.0
 var _still: float = 0.0
 var _done: bool = false
 var _prev_vel: Vector3 = Vector3.ZERO
+
+## Visual-only flail layer (built only with a display, and only for the bean).
+var _arm_meshes: Array[MeshInstance3D] = []
+var _hand_meshes: Array[MeshInstance3D] = []
+var _leg_pivots: Array[Node3D] = []
+var _eyes: Array[MeshInstance3D] = []
+var _x_eyes: Array[Node3D] = []
+var _dazed: bool = false
+var _skinned: bool = false
+var _vis_t: float = 0.0
+var _vis_prev: Vector3 = Vector3.INF
+var _vis_speed: float = 0.0
 
 
 func _ready() -> void:
@@ -142,14 +157,106 @@ func _build() -> void:
 		e.material_override = dark
 		e.position = Vector3(x, 0.05, -0.27)
 		head.add_child(e)
-	_wear_skin()
+		_eyes.append(e)
+	_skinned = _wear_skin()
+	if not _skinned and DisplayServer.get_name() != "headless":
+		_build_flail(mat, dark)
+	set_dazed(_dazed)
+
+
+## Knocked out: the dot eyes turn into little crosses.
+func set_dazed(on: bool) -> void:
+	_dazed = on
+	for e: MeshInstance3D in _eyes:
+		e.visible = not on and not _skinned
+	for x: Node3D in _x_eyes:
+		x.visible = on
+
+
+## Visual arms (shoulder to hand), legs on the hips and X eyes. Children of the bodies or of this
+## node; no collision, no mass.
+func _build_flail(mat: Material, dark: Material) -> void:
+	for i: int in 2:
+		var arm := MeshInstance3D.new()
+		arm.name = "ArmVis%d" % i
+		var cm := CapsuleMesh.new()
+		cm.radius = 0.07
+		cm.height = 1.0
+		arm.mesh = cm
+		arm.material_override = mat
+		add_child(arm)
+		_arm_meshes.append(arm)
+	for hb: RigidBody3D in [hand_l, hand_r]:
+		for c: Node in hb.get_children():
+			if c is MeshInstance3D:
+				_hand_meshes.append(c)
+	for x: float in [-0.14, 0.14]:
+		var pivot := Node3D.new()
+		pivot.name = "LegVis"
+		pivot.position = Vector3(x, -0.12, 0.0)
+		hips.add_child(pivot)
+		var leg := MeshInstance3D.new()
+		var lm := CapsuleMesh.new()
+		lm.radius = 0.09
+		lm.height = 0.34
+		leg.mesh = lm
+		leg.material_override = dark
+		leg.position = Vector3(0.0, -0.12, 0.0)
+		pivot.add_child(leg)
+		_leg_pivots.append(pivot)
+	for x: float in [-0.1, 0.1]:
+		var cross := Node3D.new()
+		cross.name = "XEye"
+		cross.position = Vector3(x, 0.05, -0.27)
+		cross.visible = false
+		head.add_child(cross)
+		for a: float in [PI * 0.25, -PI * 0.25]:
+			var bar := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.11, 0.025, 0.025)
+			bar.mesh = bm
+			bar.material_override = dark
+			bar.rotation.z = a
+			cross.add_child(bar)
+		_x_eyes.append(cross)
+
+
+func _process(delta: float) -> void:
+	if _arm_meshes.is_empty() or torso == null:
+		return
+	_vis_t += delta
+	var tp: Vector3 = torso.global_position
+	if _vis_prev != Vector3.INF and delta > 0.0:
+		_vis_speed = lerpf(_vis_speed, (tp - _vis_prev).length() / delta, 0.2)
+	_vis_prev = tp
+	# Flail while the body flies; limp once it lies still.
+	var flail: float = clampf((_vis_speed - 0.6) / 5.0, 0.0, 1.0)
+	var tb: Basis = torso.global_basis
+	var hands: Array[RigidBody3D] = [hand_l, hand_r]
+	for i: int in 2:
+		var side: float = -1.0 if i == 0 else 1.0
+		var shoulder: Vector3 = torso.global_transform * Vector3(side * 0.38, 0.3, 0.0)
+		var wiggle: Vector3 = tb * Vector3(side * sin(_vis_t * 19.0 + i) * 0.25, cos(_vis_t * 23.0 + i * 2.0) * 0.3, sin(_vis_t * 15.0 + i) * 0.25) * flail
+		var hand_pos: Vector3 = hands[i].global_position + wiggle
+		if i < _hand_meshes.size():
+			_hand_meshes[i].global_position = hand_pos
+		var arm: MeshInstance3D = _arm_meshes[i]
+		var span: Vector3 = hand_pos - shoulder
+		var length: float = maxf(span.length(), 0.05)
+		var up: Vector3 = span / length
+		var side_axis: Vector3 = up.cross(Vector3.FORWARD if absf(up.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT).normalized()
+		var fwd: Vector3 = side_axis.cross(up).normalized()
+		arm.global_transform = Transform3D(Basis(side_axis, up * length, fwd), shoulder + span * 0.5)
+	for i: int in _leg_pivots.size():
+		_leg_pivots[i].rotation.x = sin(_vis_t * 21.0 + i * PI) * 0.9 * flail
 
 
 ## Hides the bean parts and pins the skin model to the torso (it tumbles stiffly, in its idle pose).
-func _wear_skin() -> void:
+## Returns whether a skin model is worn.
+func _wear_skin() -> bool:
 	var model: Node3D = SkinLibrary.instantiate(skin)
 	if model == null:
-		return
+		return false
 	for b: RigidBody3D in [torso, head, hand_l, hand_r, hips]:
 		for mi: Node in b.find_children("*", "MeshInstance3D", true, false):
 			(mi as MeshInstance3D).visible = false
@@ -161,6 +268,7 @@ func _wear_skin() -> void:
 		var hit: StringName = SkinLibrary.clip(ap, &"idle")
 		if hit != &"":
 			ap.play(hit)
+	return true
 
 
 func _body(name: String, pos: Vector3, mesh: Mesh, mat: Material, mass: float) -> RigidBody3D:

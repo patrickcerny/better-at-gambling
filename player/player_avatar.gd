@@ -22,6 +22,8 @@ const GRAVITY: float = 18.0
 const REMOTE_LERP: float = 10.0
 const PUPPET_LERP: float = 18.0
 const HELD_OFFSET: Vector3 = Vector3(0.0, 1.0, -0.9)
+## Height of a carried bean's feet line above the guard's feet (lying across the guard's head).
+const CARRIED_HEIGHT: float = 1.62
 
 var player_id: int = -1
 var display_name: String = "Player"
@@ -56,6 +58,8 @@ var soaked_until: float = -INF
 var stunned_until: float = -INF
 var ragdoll: RagdollBody = null
 var holder: PlayerAvatar = null
+## A guard carrying us out over their head (HELD state; see `set_carried`).
+var carrier: Node3D = null
 var seat: Node3D = null
 ## Last player that hurt us (for fountain/fall credit).
 var last_attacker: int = -1
@@ -228,7 +232,7 @@ func start_ragdoll(velocity: Vector3, max_time: float = 2.5, puppet: bool = fals
 	ragdoll.launch(velocity)
 	ragdoll.impact.connect(func(s: float, w: bool) -> void: ragdoll_impact.emit(s, w))
 	ragdoll.settled.connect(_on_ragdoll_settled)
-	visuals.visible = false
+	visuals.set_ragdoll(ragdoll)
 	nametag.visible = false
 	_collision.disabled = true
 	velocity = Vector3.ZERO
@@ -245,6 +249,8 @@ func end_ragdoll(at: Vector3 = Vector3.INF) -> void:
 	if ragdoll != null:
 		if pos == Vector3.INF:
 			pos = ragdoll.body_position()
+		visuals.set_ragdoll(null)
+		visuals.get_up(ragdoll.torso.global_basis.y)
 		ragdoll.queue_free()
 		ragdoll = null
 	if pos == Vector3.INF:
@@ -276,11 +282,28 @@ func set_held(by: PlayerAvatar) -> void:
 	visuals.react(&"loss")
 
 
+## Carried out by a guard (`by`): we lie across their head, flailing, until they toss us.
+func set_carried(by: Node3D) -> void:
+	if state == State.SEATED:
+		_leave_seat()
+	holder = null
+	carrier = by
+	state = State.HELD
+	_collision.disabled = true
+	velocity = Vector3.ZERO
+	push_velocity = Vector3.ZERO
+	_applied_push = Vector3.ZERO
+	visuals.set_carried(true)
+
+
 ## Dropped (not thrown): back on our feet where we are.
 func release_held() -> void:
 	if state != State.HELD:
 		return
 	holder = null
+	if carrier != null:
+		carrier = null
+		visuals.set_carried(false)
 	_collision.disabled = false
 	var p: Vector3 = global_position
 	p.y = maxf(p.y, 0.0)
@@ -348,6 +371,9 @@ func set_connection_away(away: bool) -> void:
 
 ## Hides the player while they're outside (thrown out).
 func set_away(away: bool) -> void:
+	if carrier != null:
+		carrier = null
+		visuals.set_carried(false)
 	if away:
 		if ragdoll != null:
 			end_ragdoll(global_position)
@@ -506,6 +532,9 @@ func _puppet_move(delta: float) -> void:
 
 
 func _follow_holder(delta: float) -> void:
+	if carrier != null:
+		_follow_carrier(delta)
+		return
 	if holder == null or not is_instance_valid(holder):
 		release_held()
 		return
@@ -514,6 +543,20 @@ func _follow_holder(delta: float) -> void:
 	global_position = global_position.lerp(want, 15.0 * delta)
 	yaw = holder.yaw
 	rotation.y = yaw + sin(_clock * 9.0) * 0.3
+	visuals.update_motion(Vector3.ZERO, false, delta)
+	if cam != null:
+		cam.update_camera(0.0, false, false, delta)
+
+
+## Lies across the guard's head, bouncing with their steps.
+func _follow_carrier(delta: float) -> void:
+	if not is_instance_valid(carrier):
+		release_held()
+		return
+	var want: Vector3 = carrier.global_position + Vector3(0.0, CARRIED_HEIGHT + absf(sin(_clock * 9.0)) * 0.07, 0.0)
+	global_position = global_position.lerp(want, minf(1.0, 12.0 * delta))
+	yaw = carrier.global_rotation.y
+	rotation.y = yaw
 	visuals.update_motion(Vector3.ZERO, false, delta)
 	if cam != null:
 		cam.update_camera(0.0, false, false, delta)
@@ -558,6 +601,9 @@ func _holding_someone() -> bool:
 
 
 func _detach_from_holder() -> void:
+	if carrier != null:
+		carrier = null
+		visuals.set_carried(false)
 	if holder != null:
 		holder = null
 		_collision.disabled = false
