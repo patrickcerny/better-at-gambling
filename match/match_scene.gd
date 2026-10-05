@@ -197,6 +197,7 @@ func _ready() -> void:
 		if local != null:
 			hud.toast("Welcome! Stand on your READY pad. TAB: lobby panel", 4.0)
 	_spawn_guards()
+	Loading.finish()
 	if cmd.has_flag("autoplay"):
 		var driver: Script = load("res://client/autoplay_driver.gd")
 		autoplay = driver.new()

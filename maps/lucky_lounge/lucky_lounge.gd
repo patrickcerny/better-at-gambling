@@ -59,6 +59,8 @@ var navmesh_ready: bool = false
 ## Wall between the entrance hall and the casino while the online lobby waits (§2.2).
 var lobby_doors: StaticBody3D
 var lobby_open: bool = true
+## False for decorative copies (the menu and loading panorama): no navmesh bake.
+var bake_navmesh: bool = true
 
 
 func _ready() -> void:
@@ -69,7 +71,8 @@ func _ready() -> void:
 	_build_stations()
 	_build_props()
 	_build_lights()
-	_build_navmesh()
+	if bake_navmesh:
+		_build_navmesh()
 
 
 ## Station id → world position of the station origin.

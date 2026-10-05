@@ -19,6 +19,14 @@ var _settings: SettingsPanel
 
 
 func _ready() -> void:
+	# Live casino behind the menu (art direction: the menu is the casino, slightly blurred).
+	var pano := CasinoPanorama.new()
+	pano.name = "Panorama"
+	pano.blur_px = 1.5
+	pano.darken = 0.45
+	pano.start_leg = randf() * CasinoPanorama.PATH.size()
+	add_child(pano)
+	move_child(pano, 1)  # above the plain background, below the buttons
 	_quit.pressed.connect(_on_quit_pressed)
 	_practice.pressed.connect(func() -> void: SceneRouter.goto(SceneRouter.MATCH))
 	_play_online.pressed.connect(_show_online)

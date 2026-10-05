@@ -159,8 +159,14 @@ func _process(delta: float) -> void:
 		get_tree().quit(code)
 
 
-## Replaces the current scene, logging failures.
+## Replaces the current scene, logging failures. Going into a match shows the loading screen
+## first (the match scene takes it down when its world is built).
 func goto(path: String) -> void:
+	if path == MATCH and DisplayServer.get_name() != "headless" and not cmdline.has("capture"):
+		Loading.begin()
+		# Let the loading screen draw before the match scene blocks the main thread.
+		await get_tree().process_frame
+		await get_tree().process_frame
 	var err: Error = get_tree().change_scene_to_file(path)
 	if err != OK:
 		Log.error(&"router", "could not change scene to %s (error %d)" % [path, err])
