@@ -1,13 +1,22 @@
 class_name MatchScene
 extends Node3D
 ## The casino match as the player sees it: the Lucky Lounge, one avatar per player, HUD, station
-## overlays, guards, hazards and loose chips. In Practice it also hosts the in-process
-## MatchServer (through `Net`, so nothing here knows whether the server is local). Every money or
-## knockout decision comes from server events; this scene only shows them and reports what the
-## physics world did (`report_knockout`, `report_pickup`, `report_thrown_out`).
+## overlays, guards, hazards and loose chips. Every money or knockout decision comes from server
+## events; this scene only shows them and reports what the physics world did
+## (`report_knockout`, `report_pickup`, `report_thrown_out`, `report_got_up`).
+##
+## One scene, three roles (§3.5 "one code path"):
+## - PRACTICE: hosts the MatchServer in-process; the local avatar is driven by input, bots by
+##   local simulation.
+## - SERVER: the dedicated room server (headless). Humans are puppets fed by their clients'
+##   movement; the server simulates ragdolls, guards, props and bots and streams them.
+## - CLIENT: online player. Own avatar from input while standing; everything else follows the
+##   server's world stream (`NetWorld`).
 
 const MATCH_SCENE_PATH: String = "res://match/match_scene.tscn"
 const RESULTS_PATH: String = "res://ui/menus/main_menu.tscn"
+
+enum Role { PRACTICE, SERVER, CLIENT }
 
 var map: LuckyLounge
 var server: MatchServer = null
@@ -29,6 +38,10 @@ var nearest_station: StationBase = null
 var results_panel: PanelContainer = null
 ## Scripted driver (--autoplay); null in normal play.
 var autoplay: Node = null
+var role: Role = Role.PRACTICE
+var net_world: NetWorld
+var lobby_panel: LobbyPanel
+var connection_label: Label
 
 var _ko_until: Dictionary[int, float] = {}
 var _ragdoll_attacker: Dictionary[int, int] = {}
@@ -38,11 +51,20 @@ var _vip_toast_at: float = -INF
 var _door_angle: float = 0.0
 var _owns_server: bool = false
 var _plinko_seen: Dictionary[int, bool] = {}
+var _pad_timer: float = 0.0
+var _countdown_shown: int = -1
+var _match_over: bool = false
+## Predicted local actions awaiting the server: intent type → give-up time.
+var _predicted: Dictionary[StringName, float] = {}
+const PREDICTION_TIMEOUT: float = 0.6
+## `--quit-after-results`: scripted clients exit once the digest is logged (network tests).
+var cmd_quit_after_results: bool = false
 
 
 func _ready() -> void:
 	cfg = Registry.balance
 	var cmd: Cmdline = SceneRouter.cmdline if SceneRouter.cmdline != null else Cmdline.from_os()
+	cmd_quit_after_results = cmd.has_flag("quit-after-results")
 	map = LuckyLounge.new()
 	map.name = "LuckyLounge"
 	add_child(map)
@@ -69,21 +91,57 @@ func _ready() -> void:
 	emote_wheel.name = "EmoteWheel"
 	emote_wheel.picked.connect(func(id: StringName) -> void: Net.send_intent(Intents.make(&"emote", {"id": id})))
 	ui_layer.add_child(emote_wheel)
-	if Net.mode == Net.Mode.NONE:
-		_start_local(cmd)
-	else:
-		server = Net.local_server
+	lobby_panel = LobbyPanel.new()
+	lobby_panel.name = "LobbyPanel"
+	lobby_panel.closed.connect(func() -> void:
+		if router.mode == InputRouter.Mode.MENU and results_panel == null:
+			router.set_mode(InputRouter.Mode.WALK))
+	lobby_panel.leave_requested.connect(_leave_to_menu)
+	ui_layer.add_child(lobby_panel)
+	connection_label = Label.new()
+	connection_label.name = "ConnectionLost"
+	connection_label.theme_type_variation = &"HeadingLabel"
+	connection_label.text = "Connection lost — reconnecting…"
+	connection_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	connection_label.offset_top = 90
+	connection_label.visible = false
+	ui_layer.add_child(connection_label)
+	match Net.mode:
+		Net.Mode.NONE:
+			_start_local(cmd)
+		Net.Mode.SERVER:
+			_start_room_server(cmd)
+		Net.Mode.CLIENT:
+			role = Role.CLIENT
+			Net.position_forced.connect(_on_position_forced)
+			Net.disconnected.connect(_on_disconnected)
+		_:
+			server = Net.local_server
 	local_id = Net.local_player_id
 	view = ClientMatchView.new()
 	view.name = "ClientView"
 	add_child(view)
 	hud.bind(view.state, local_id)
+	lobby_panel.bind(view.state, local_id)
 	view.state.station_changed.connect(_on_station_state)
+	view.state.players_changed.connect(_sync_avatars)
+	view.state.lobby_changed.connect(_on_lobby_changed)
 	Net.event_received.connect(_on_event)
+	net_world = NetWorld.new()
+	net_world.name = "NetWorld"
+	add_child(net_world)
+	net_world.setup(self)
+	if role == Role.SERVER:
+		Net.world_provider = net_world.build
+		Net.move_received.connect(_on_move_received)
 	_spawn_avatars()
 	_connect_router()
-	if _owns_server:
+	if _owns_server and role == Role.PRACTICE:
 		server.start_match()
+	if view.state.phase == Phase.Id.LOBBY and view.state.room_mode:
+		map.set_lobby_open(false)
+		if local != null:
+			hud.toast("Welcome! Stand on your READY pad. TAB: lobby panel", 4.0)
 	_spawn_guards()
 	if cmd.has_flag("autoplay"):
 		var driver: Script = load("res://client/autoplay_driver.gd")
@@ -101,7 +159,13 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if Net.event_received.is_connected(_on_event):
 		Net.event_received.disconnect(_on_event)
-	if _owns_server:
+	if Net.position_forced.is_connected(_on_position_forced):
+		Net.position_forced.disconnect(_on_position_forced)
+	if Net.disconnected.is_connected(_on_disconnected):
+		Net.disconnected.disconnect(_on_disconnected)
+	if Net.move_received.is_connected(_on_move_received):
+		Net.move_received.disconnect(_on_move_received)
+	if role == Role.PRACTICE and _owns_server:
 		Net.stop()
 
 
@@ -118,6 +182,27 @@ func _autosit(sid: StringName) -> void:
 	_report_position(local_id)
 	await get_tree().physics_frame
 	Net.send_intent(Intents.make(&"sit", {"station": sid}))
+
+
+## Dedicated server: the authoritative MatchServer for this room, waiting in the lobby.
+func _start_room_server(cmd: Cmdline) -> void:
+	role = Role.SERVER
+	server = MatchServer.new()
+	server.name = "MatchServer"
+	add_child(server)
+	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
+	def.station_positions = map.station_positions()
+	def.spawn_points = map.spawn_points()
+	var settings: Dictionary = {"duration": cmd.get_int("duration", 10), "seed": cmd.get_int("seed", 0), "items_enabled": true}
+	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
+	server.timescale = cmd.get_float("timescale", 1.0)
+	server.lobby.min_participants = cmd.get_int("min-players", 2)
+	server.lobby.settings["duration"] = cmd.get_int("duration", 10)  # dev/tests may go below the menu's 5
+	server.open_lobby()
+	_owns_server = true
+	Net.attach_server(server)
+	for i: int in clampi(cmd.get_int("bots", 0), 0, 7):
+		server.add_player("bot-%d" % (i + 1), MatchServer.BOT_NAMES[i % MatchServer.BOT_NAMES.size()], true)
 
 
 ## Practice: host the server in-process with bots standing around.
@@ -161,9 +246,16 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.is_local = pid == local_id
 	a.cfg = cfg
 	a.router = router if a.is_local else null
+	# Bots are simulated wherever the server runs; humans other than us are network puppets.
+	var bot: bool = bool(p.get("bot", false))
+	if not a.is_local:
+		a.drive = PlayerAvatar.Drive.SIM if (bot and _owns_server) or role == Role.PRACTICE else PlayerAvatar.Drive.PUPPET
 	var pos: Vector3 = Serializer.to_vec3(p.get("pos", [0, 0, 0]))
 	if pos == Vector3.ZERO:
-		pos = map.spawn_points()[(pid - 1) % map.spawn_points().size()]
+		var room: bool = server.room_mode if _owns_server else view.state.room_mode
+		pos = map.lobby_spawn(pid) if room else map.spawn_points()[(pid - 1) % map.spawn_points().size()]
+		if _owns_server:
+			server.set_server_position(pid, pos)
 	a.position = pos
 	a.yaw = 0.0  # yaw 0 looks down −z: into the casino from the entrance
 	a.target_yaw = 0.0
@@ -173,7 +265,30 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.ragdoll_impact.connect(func(strength: float, wall: bool) -> void: _on_ragdoll_impact(pid, strength, wall))
 	a.ragdoll_settled.connect(func() -> void: _on_ragdoll_settled(pid))
 	avatars[pid] = a
+	a.visuals.set_hat(StringName(p.get("hat", "none")))
+	if not bool(p.get("connected", true)) and not bot:
+		a.set_connection_away(true)
 	return a
+
+
+## Spawns avatars for players we only learned about from a snapshot.
+func _sync_avatars() -> void:
+	for pid: int in view.state.players:
+		if not avatars.has(pid):
+			_spawn_avatar(pid, view.state.players[pid])
+	for pid: int in avatars.keys():
+		if not view.state.players.has(pid):
+			avatars[pid].queue_free()
+			avatars.erase(pid)
+
+
+func _on_lobby_changed() -> void:
+	var cd: int = ceili(view.state.countdown) if view.state.countdown > 0.0 else -1
+	if cd != _countdown_shown:
+		_countdown_shown = cd
+		if cd > 0 and local != null:
+			hud.toast("Everyone's ready! Doors open in %d…" % cd, 3.2)
+			Audio.play(&"countdown_beep", &"SFX", -6.0)
 
 
 func _spawn_guards() -> void:
@@ -192,6 +307,7 @@ func _spawn_guards() -> void:
 			route.append(p)
 		g.route = route
 		g.caught.connect(func(pid: int) -> void: _on_guard_caught(g, pid))
+		g.puppet = role == Role.CLIENT
 		world_root.add_child(g)
 		guards.append(g)
 
@@ -213,7 +329,8 @@ func _connect_router() -> void:
 			return
 		if _local_holding() >= 0:
 			Net.send_intent(Intents.make(&"release", {"throw": true, "aim": Serializer.vec3(local.aim())}))
-		else:
+		elif local.is_standing():
+			_predict(&"shove")
 			Net.send_intent(Intents.make(&"shove", {"aim": Serializer.vec3(local.facing())})))
 	router.shake.connect(func() -> void:
 		var res: Dictionary = Net.send_intent(Intents.make(&"shake"))
@@ -230,7 +347,12 @@ func _connect_router() -> void:
 			emote_wheel.open()
 		else:
 			emote_wheel.close_and_pick())
-	router.leaderboard_toggled.connect(hud.show_leaderboard)
+	router.leaderboard_toggled.connect(func(shown: bool) -> void:
+		if view.state.phase == Phase.Id.LOBBY and view.state.room_mode:
+			if shown:
+				_open_lobby_panel(&"")
+		else:
+			hud.show_leaderboard(shown))
 	router.pause.connect(_on_pause)
 	router.ping.connect(func() -> void:
 		if local != null:
@@ -239,20 +361,23 @@ func _connect_router() -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	_expire_predictions()
 	if _owns_server and server != null:
 		server.advance(delta)
-	# Remote avatars follow the server's last known position.
+	# Simulated bots follow the server's last known position.
 	for pid: int in avatars:
 		if pid == local_id:
 			continue
 		var a: PlayerAvatar = avatars[pid]
 		var p: Dictionary = view.state.players.get(pid, {})
-		if p.has("pos") and a.is_standing():
+		if p.has("pos") and a.is_standing() and a.drive == PlayerAvatar.Drive.SIM:
 			a.target_position = Serializer.to_vec3(p["pos"])
-	# Kill floor: anything that falls out of the world comes back at the entrance.
+	if role == Role.CLIENT:
+		connection_label.visible = Net.silence() > Net.SILENCE_WARNING
+	# Kill floor: anything we simulate that falls out of the world comes back at the entrance.
 	for pid: int in avatars:
 		var a: PlayerAvatar = avatars[pid]
-		if a.global_position.y < -5.0 and a.state != PlayerAvatar.State.AWAY:
+		if a.global_position.y < -5.0 and a.state != PlayerAvatar.State.AWAY and _simulates(a):
 			Log.warn(&"match", "player %d fell out of the world at %s, respawning" % [pid, a.global_position])
 			if a.state == PlayerAvatar.State.RAGDOLL:
 				a.end_ragdoll(LuckyLounge.RESPAWN_POS)
@@ -266,7 +391,7 @@ func _process(delta: float) -> void:
 			var a: PlayerAvatar = avatars.get(pid, null)
 			if a != null and a.state == PlayerAvatar.State.RAGDOLL:
 				a.end_ragdoll()
-				_report_position(pid)
+				_got_up(pid)
 	for pid: int in _respawn_at.keys():
 		if _clock >= _respawn_at[pid]:
 			_respawn_at.erase(pid)
@@ -274,7 +399,8 @@ func _process(delta: float) -> void:
 			if a != null:
 				a.set_away(false)
 				a.teleport(LuckyLounge.RESPAWN_POS, 0.0)
-				_report_position(pid)
+				if _owns_server:
+					server.report_respawned(pid, LuckyLounge.RESPAWN_POS)
 				if pid == local_id:
 					hud.toast("Back inside. Behave.", 2.0)
 	_update_prompt()
@@ -286,6 +412,125 @@ func _physics_process(delta: float) -> void:
 	_check_vip_gate()
 	_check_pickups()
 	_update_guards()
+	if _owns_server:
+		_report_simulated_positions()
+		_pad_timer += delta
+		if _pad_timer >= 0.1 and server.room_mode and server.phases.phase == Phase.Id.LOBBY:
+			_pad_timer = 0.0
+			_check_ready_pads()
+
+
+## True if this process moves `a`'s body (so local hazards and pushes apply to it here).
+func _simulates(a: PlayerAvatar) -> bool:
+	if a.state == PlayerAvatar.State.RAGDOLL:
+		return a.ragdoll != null and not a.ragdoll.puppet
+	return a.drive != PlayerAvatar.Drive.PUPPET
+
+
+## The server keeps its world query in step with the ragdolls it simulates. Standing bots need
+## nothing: their avatars follow the server's position, never the other way round.
+func _report_simulated_positions() -> void:
+	for pid: int in avatars:
+		var a: PlayerAvatar = avatars[pid]
+		if a.state == PlayerAvatar.State.RAGDOLL and a.ragdoll != null and not a.ragdoll.puppet:
+			if server.state.players.has(pid):
+				server.world.set_transform(pid, a.global_position, a.yaw)
+				server.state.players[pid].position = a.global_position
+
+
+## Lobby: standing on your own colored pad means ready (§2.2).
+func _check_ready_pads() -> void:
+	for pid: int in avatars:
+		var p: PlayerState = server.state.players.get(pid, null)
+		if p == null or p.is_bot:
+			continue
+		var a: PlayerAvatar = avatars[pid]
+		var pad: Vector3 = map.ready_pad(p.color_index)
+		var flat: float = Vector2(a.global_position.x - pad.x, a.global_position.z - pad.z).length()
+		server.report_on_pad(pid, a.is_standing() and p.connected and flat <= LuckyLounge.PAD_RADIUS)
+
+
+## SERVER: a client's own avatar moved.
+func _on_move_received(pid: int, pos: Vector3, yaw: float, airborne: bool) -> void:
+	var a: PlayerAvatar = avatars.get(pid, null)
+	if a == null or a.drive != PlayerAvatar.Drive.PUPPET:
+		return
+	if pos.y < -2.5:
+		# Fell out of the world: the server puts them back at the entrance.
+		server.set_server_position(pid, LuckyLounge.RESPAWN_POS)
+		a.teleport(LuckyLounge.RESPAWN_POS)
+		Net.send_to(Net.room_host.peer_of(pid), Protocol.CHANNEL_STATE, true, Protocol.Msg.FORCE_POSITION, {"pos": Serializer.vec3(LuckyLounge.RESPAWN_POS), "yaw": 0.0})
+		return
+	a.target_position = pos
+	a.target_yaw = yaw
+	a.puppet_airborne = airborne
+
+
+## CLIENT: the server refused our movement and put us somewhere else.
+func _on_position_forced(pos: Vector3, yaw: float) -> void:
+	if local != null and local.is_standing():
+		local.teleport(pos, yaw)
+
+
+## CLIENT: lost the server (or got refused): back to the menu, which shows the reason.
+func _on_disconnected(_reason: String) -> void:
+	if not is_inside_tree():
+		return
+	if SceneRouter.quit_on_disconnect():
+		get_tree().quit(0 if _match_over else 4)
+	else:
+		SceneRouter.goto.call_deferred(RESULTS_PATH)
+
+
+## Money per player, as this process knows it (authoritative on servers, the mirror on clients).
+## Network tests compare these digests across processes.
+func state_digest() -> String:
+	var ids: Array = view.state.players.keys()
+	ids.sort()
+	var parts: PackedStringArray = []
+	for pid: int in ids:
+		var money: int = server.economy.balance(pid) if _owns_server else view.state.balance(pid)
+		parts.append("%d:%d" % [pid, money])
+	return ",".join(parts)
+
+
+func _log_digest() -> void:
+	# Late events (the last payouts) are still in flight to clients for one RTT; wait a little.
+	await get_tree().create_timer(1.5).timeout
+	if not is_inside_tree():
+		return
+	var d: String = state_digest()
+	Log.info(&"nettest", "NETTEST digest %s hash=%d role=%d" % [d, d.hash(), role])
+	if role == Role.CLIENT:
+		Log.info(&"nettest", "NETTEST bandwidth down=%.0f B/s ping=%d ms" % [Net.download_rate(), Net.ping_ms()])
+	if cmd_quit_after_results and role != Role.SERVER:
+		await get_tree().create_timer(0.5).timeout
+		if role == Role.CLIENT:
+			Net.stop()
+		get_tree().quit(0)
+
+
+func _leave_to_menu() -> void:
+	if role == Role.CLIENT:
+		Net.last_error = ""
+		Net.stop()
+	SceneRouter.goto(RESULTS_PATH)
+
+
+func _open_lobby_panel(focus: StringName) -> void:
+	if local == null:
+		return
+	router.set_mode(InputRouter.Mode.MENU)
+	lobby_panel.open(focus)
+
+
+## Ragdoll over: the server records it and hands the body back to its owner.
+func _got_up(pid: int) -> void:
+	var a: PlayerAvatar = avatars.get(pid, null)
+	if a == null:
+		return
+	if _owns_server:
+		server.report_got_up(pid, a.global_position)
 
 
 # --- Server events -----------------------------------------------------------------------------
@@ -295,7 +540,44 @@ func _on_event(ev: Dictionary) -> void:
 	match type:
 		&"player_joined":
 			_spawn_avatar(int(ev["player"]["id"]), ev["player"])
+		&"player_removed":
+			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if a != null:
+				a.queue_free()
+				avatars.erase(int(ev["player"]))
+		&"player_cosmetics":
+			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if a != null:
+				a.set_color(Palette.player_color(int(ev["color"])))
+				a.visuals.set_hat(StringName(ev["hat"]))
+		&"player_left", &"player_rejoined":
+			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if a != null and int(ev["player"]) != local_id:
+				a.set_connection_away(type == &"player_left")
+		&"player_got_up":
+			var pid: int = int(ev["player"])
+			var a: PlayerAvatar = avatars.get(pid, null)
+			_ko_until.erase(pid)
+			if a != null and a.state == PlayerAvatar.State.RAGDOLL:
+				a.end_ragdoll(Serializer.to_vec3(ev["pos"]) + Vector3(0, 0.5, 0))
+			if net_world != null:
+				net_world.reset_player(pid)
+		&"player_respawned":
+			var pid: int = int(ev["player"])
+			var a: PlayerAvatar = avatars.get(pid, null)
+			_respawn_at.erase(pid)
+			if a != null and (a.state == PlayerAvatar.State.AWAY or a.state == PlayerAvatar.State.RAGDOLL):
+				a.set_away(false)
+				a.teleport(Serializer.to_vec3(ev["pos"]), 0.0)
+				if pid == local_id:
+					hud.toast("Back inside. Behave.", 2.0)
+			if net_world != null:
+				net_world.reset_player(pid)
+		&"match_started":
+			map.set_lobby_open(true)
 		&"player_shoved":
+			if int(ev["attacker"]) == local_id:
+				_predicted[&"shove"] = minf(_predicted.get(&"shove", 0.0), _clock + 0.15)  # confirmed: finish the push
 			var t: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			if t != null:
 				var dir: Vector3 = Serializer.to_vec3(ev["dir"])
@@ -313,6 +595,8 @@ func _on_event(ev: Dictionary) -> void:
 		&"player_knocked_out":
 			_knock_out(int(ev["target"]), int(ev["attacker"]), StringName(ev["cause"]))
 		&"player_grabbed":
+			if int(ev["attacker"]) == local_id:
+				_predicted.erase(&"grab")  # confirmed: the hold keeps the arms out
 			var t: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			var h: PlayerAvatar = avatars.get(int(ev["attacker"]), null)
 			if t != null and h != null:
@@ -338,7 +622,9 @@ func _on_event(ev: Dictionary) -> void:
 				h.visuals.reaching = false
 			if t != null:
 				_ragdoll_attacker[int(ev["target"])] = int(ev["attacker"])
-				t.start_ragdoll(Serializer.to_vec3(ev["velocity"]), 3.0)
+				t.start_ragdoll(Serializer.to_vec3(ev["velocity"]), 3.0, not _owns_server)
+				if _owns_server:
+					server.set_server_owned(int(ev["target"]), true)
 				Audio.play_at(&"whoosh", t, -8.0)
 		&"chips_dropped":
 			_spawn_pile(int(ev["pile"]), int(ev["amount"]), Serializer.to_vec3(ev["pos"]))
@@ -370,6 +656,7 @@ func _on_event(ev: Dictionary) -> void:
 					p.hop(Vector3(0, 3.5, 0))
 		&"intent_rejected":
 			if int(ev["player"]) == local_id:
+				_end_prediction(StringName(ev.get("intent", &"")), true)
 				var err: StringName = StringName(ev["error"])
 				if err == &"vip_denied":
 					Audio.play(&"buzzer", &"SFX", -4.0)
@@ -395,19 +682,27 @@ func _on_event(ev: Dictionary) -> void:
 			Audio.play(&"countdown_beep", &"SFX", -4.0)
 		&"phase_changed":
 			var phase: Phase.Id = int(ev["phase"]) as Phase.Id
+			if phase != Phase.Id.LOBBY:
+				map.set_lobby_open(true)
+				if lobby_panel.visible:
+					lobby_panel.close()
 			if phase == Phase.Id.INTRO:
 				hud.toast("WELCOME TO THE LUCKY LOUNGE", 3.0)
 			elif phase == Phase.Id.CASINO and int(ev.get("from", -1)) == Phase.Id.INTRO:
 				hud.toast("Gamble. Shove. Don't get caught.", 3.0)
 		&"match_ended":
+			_match_over = true
 			_show_results(ev["standings"])
+			_log_digest()
 
 
 func _knock_out(target: int, attacker: int, cause: StringName) -> void:
 	var t: PlayerAvatar = avatars.get(target, null)
 	if t == null:
 		return
-	_ko_until[target] = _clock + cfg.knockout_time
+	if _owns_server:
+		_ko_until[target] = _clock + cfg.knockout_time
+		server.set_server_owned(target, true)
 	_ragdoll_attacker[target] = attacker
 	if t.state != PlayerAvatar.State.RAGDOLL:
 		var dir: Vector3 = -t.facing()
@@ -416,7 +711,7 @@ func _knock_out(target: int, attacker: int, cause: StringName) -> void:
 			dir = (t.global_position - at.global_position)
 			dir.y = 0.0
 			dir = dir.normalized() if dir.length() > 0.01 else -t.facing()
-		t.start_ragdoll(dir * 3.0 + Vector3.UP * 2.5, cfg.knockout_time + 1.0)
+		t.start_ragdoll(dir * 3.0 + Vector3.UP * 2.5, cfg.knockout_time + 1.0, not _owns_server)
 	if t.ragdoll != null:
 		t.ragdoll.max_time = cfg.knockout_time + 1.0
 	t.visuals.set_knocked_out(true)
@@ -469,8 +764,10 @@ func _throw_out(pid: int, guard_name: String) -> void:
 	dir = dir.normalized() if dir.length() > 0.01 else Vector3.BACK
 	_ragdoll_attacker.erase(pid)
 	_ko_until.erase(pid)
-	a.start_ragdoll(dir * 9.0 + Vector3.UP * 4.0, 1.6)
-	_respawn_at[pid] = _clock + cfg.throw_out_respawn_seconds
+	a.start_ragdoll(dir * 9.0 + Vector3.UP * 4.0, 1.6, not _owns_server)
+	if _owns_server:
+		_respawn_at[pid] = _clock + cfg.throw_out_respawn_seconds
+		server.set_server_owned(pid, true)
 	Audio.play_at(&"whistle", a, -4.0)
 	if pid == local_id:
 		hud.toast("Security threw you out!", 3.0)
@@ -509,7 +806,7 @@ func _show_results(standings: Array) -> void:
 		v.add_child(l)
 	var b := Button.new()
 	b.text = "BACK TO MENU"
-	b.pressed.connect(func() -> void: SceneRouter.goto(RESULTS_PATH))
+	b.pressed.connect(_leave_to_menu)
 	v.add_child(b)
 	b.grab_focus()
 	Audio.play(&"big_win", &"SFX", -4.0)
@@ -519,6 +816,10 @@ func _show_results(standings: Array) -> void:
 
 func _on_interact() -> void:
 	if local == null or not local.is_standing():
+		return
+	var lobby_spot: StringName = _lobby_spot()
+	if lobby_spot != &"":
+		_open_lobby_panel(lobby_spot)
 		return
 	if nearest_station != null:
 		var res: Dictionary = Net.send_intent(Intents.make(&"sit", {"station": nearest_station.station_id}))
@@ -534,7 +835,36 @@ func _on_grab() -> void:
 		return
 	var target: int = _nearest_player_in_front(2.0)
 	if target >= 0:
+		_predict(&"grab")
 		Net.send_intent(Intents.make(&"grab", {"target": target}))
+
+
+## Client-side prediction (§4.1): the arms go out the moment you press, before the server answers.
+## A confirming event keeps (grab) or finishes (shove) the pose; a rejection or silence drops it.
+func _predict(kind: StringName) -> void:
+	if local == null:
+		return
+	local.visuals.reaching = true
+	local.visuals.reach_target = PlayerAvatar.HELD_OFFSET
+	_predicted[kind] = _clock + PREDICTION_TIMEOUT
+	if kind == &"shove":
+		Audio.play_at(&"whoosh", local, -14.0, randf_range(1.1, 1.3))
+
+
+func _end_prediction(kind: StringName, denied: bool) -> void:
+	if not _predicted.has(kind):
+		return
+	_predicted.erase(kind)
+	if local != null and _local_holding() < 0:
+		local.visuals.reaching = false
+		if denied:
+			local.visuals.react(&"loss")
+
+
+func _expire_predictions() -> void:
+	for kind: StringName in _predicted.keys():
+		if _clock >= _predicted[kind]:
+			_end_prediction(kind, false)
 
 
 func _on_pause() -> void:
@@ -550,16 +880,35 @@ func _on_pause() -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_F10:
-		SceneRouter.goto(RESULTS_PATH)
+		_leave_to_menu()
 
 
 # --- World checks ------------------------------------------------------------------------------
+
+## &"wardrobe"/&"settings" when the local player stands at the mirror/settings board in the lobby.
+func _lobby_spot() -> StringName:
+	if local == null or not view.state.room_mode or view.state.phase != Phase.Id.LOBBY:
+		return &""
+	var p: Vector3 = local.global_position
+	if Vector2(p.x - LuckyLounge.MIRROR_POS.x, p.z - LuckyLounge.MIRROR_POS.z).length() < 2.6:
+		return &"wardrobe"
+	if Vector2(p.x - LuckyLounge.SETTINGS_BOARD_POS.x, p.z - LuckyLounge.SETTINGS_BOARD_POS.z).length() < 2.6:
+		return &"settings"
+	return &""
+
 
 func _update_prompt() -> void:
 	nearest_station = null
 	if local == null or not local.is_standing() or _local_holding() >= 0:
 		hud.set_prompt("")
 		return
+	match _lobby_spot():
+		&"wardrobe":
+			hud.set_prompt("[E] Wardrobe: change your color and hat")
+			return
+		&"settings":
+			hud.set_prompt("[E] Party settings" if view.state.leader == local_id else "[E] Party settings (only the leader ★ can change them)")
+			return
 	var best_d: float = INF
 	for sid: StringName in map.stations:
 		var st: StationBase = map.stations[sid]
@@ -589,7 +938,7 @@ func _spin_door(delta: float) -> void:
 	if area == null:
 		return
 	for body: Node3D in area.get_overlapping_bodies():
-		if body is PlayerAvatar and (body as PlayerAvatar).is_standing():
+		if body is PlayerAvatar and (body as PlayerAvatar).is_standing() and _simulates(body):
 			var rel: Vector3 = body.global_position - map.revolving_door.global_position
 			var tangent: Vector3 = Vector3(-rel.z, 0.0, rel.x).normalized()
 			(body as PlayerAvatar).push_velocity += tangent * 4.0 * delta
@@ -616,7 +965,7 @@ func _check_fountain() -> void:
 func _check_vip_gate() -> void:
 	var threshold: int = _vip_threshold()
 	for body: Node3D in map.vip_gate_area.get_overlapping_bodies():
-		if body is PlayerAvatar and (body as PlayerAvatar).is_standing():
+		if body is PlayerAvatar and (body as PlayerAvatar).is_standing() and _simulates(body):
 			var a: PlayerAvatar = body
 			if view.state.balance(a.player_id) >= threshold:
 				continue
@@ -697,8 +1046,10 @@ func _on_ragdoll_settled(pid: int) -> void:
 		return
 	if _ko_until.has(pid):
 		return  # still out cold; _process gets them up on the server's clock
+	if not _owns_server:
+		return  # online clients wait for the server's player_got_up
 	a.end_ragdoll()
-	_report_position(pid)
+	_got_up(pid)
 
 
 # --- Stations ----------------------------------------------------------------------------------
@@ -772,7 +1123,7 @@ func _nearest_player_in_front(range_m: float) -> int:
 		if pid == local_id:
 			continue
 		var a: PlayerAvatar = avatars[pid]
-		if a.state == PlayerAvatar.State.AWAY:
+		if a.state == PlayerAvatar.State.AWAY or a.connection_away:
 			continue
 		var to: Vector3 = a.global_position - local.global_position
 		to.y = 0.0

@@ -12,12 +12,15 @@ signal ragdoll_impact(strength: float, wall: bool)
 signal ragdoll_settled
 
 enum State { STANDING, SEATED, HELD, RAGDOLL, STUNNED, AWAY }
+## Who moves this body: local input, local simulation (bots, Practice), or a network stream.
+enum Drive { INPUT, SIM, PUPPET }
 
 const LAYER_PLAYERS: int = 2
 const MASK: int = 1 | 2 | 8
 const MOVE_SEND_INTERVAL: float = 1.0 / 20.0
 const GRAVITY: float = 18.0
 const REMOTE_LERP: float = 10.0
+const PUPPET_LERP: float = 18.0
 const HELD_OFFSET: Vector3 = Vector3(0.0, 1.0, -0.9)
 
 var player_id: int = -1
@@ -25,6 +28,11 @@ var display_name: String = "Player"
 var color: Color = Palette.CREAM
 var is_local: bool = false
 var state: State = State.STANDING
+var drive: Drive = Drive.SIM
+## PUPPET: the stream says we're in the air (for fall detection on the server).
+var puppet_airborne: bool = false
+## Disconnected (§2.12): stays where it was, "zzz", intangible.
+var connection_away: bool = false
 var cfg: BalanceConfig
 var router: InputRouter
 var visuals: AvatarVisuals
@@ -38,6 +46,8 @@ var target_position: Vector3 = Vector3.ZERO
 var target_yaw: float = 0.0
 ## Extra horizontal velocity from shoves/door panels; decays on its own.
 var push_velocity: Vector3 = Vector3.ZERO
+## Horizontal push folded into `velocity` on the last INPUT frame.
+var _applied_push: Vector3 = Vector3.ZERO
 var stamina: float = 4.0
 var soaked_until: float = -INF
 var stunned_until: float = -INF
@@ -65,6 +75,8 @@ func _ready() -> void:
 	wall_min_slide_angle = 0.0  # always slide along posts/tables instead of sticking
 	add_to_group(&"players")
 	set_meta(&"player_id", player_id)
+	if is_local:
+		drive = Drive.INPUT
 	if cfg == null:
 		cfg = BalanceConfig.new()
 	stamina = cfg.sprint_stamina
@@ -140,10 +152,14 @@ func is_soaked() -> bool:
 	return _clock < soaked_until
 
 
-## Applies a knockback impulse (shove, door panel).
+## Applies a knockback impulse (shove, door panel). Puppets only flinch: their owner moves them.
 func knockback(dir: Vector3, strength: float) -> void:
 	var d: Vector3 = Vector3(dir.x, 0.0, dir.z)
 	if d.length() < 0.01:
+		return
+	if drive == Drive.PUPPET:
+		if visuals != null:
+			visuals.react(&"loss")
 		return
 	push_velocity += d.normalized() * strength
 	velocity.y = maxf(velocity.y, strength * 0.3)
@@ -153,6 +169,8 @@ func knockback(dir: Vector3, strength: float) -> void:
 
 ## One-off impulse: vertical goes straight into the body, horizontal into the push buffer.
 func hop(impulse: Vector3) -> void:
+	if drive == Drive.PUPPET:
+		return
 	velocity.y = maxf(velocity.y, impulse.y)
 	push_velocity += Vector3(impulse.x, 0.0, impulse.z)
 
@@ -177,7 +195,8 @@ func say(text: String, seconds: float = 2.0) -> void:
 
 
 ## Swaps the body for a ragdoll launched with `velocity`. Returns the ragdoll (parented to our parent).
-func start_ragdoll(velocity: Vector3, max_time: float = 2.5) -> RagdollBody:
+## `puppet`: the server simulates the body and streams its pose (online clients).
+func start_ragdoll(velocity: Vector3, max_time: float = 2.5, puppet: bool = false) -> RagdollBody:
 	if state == State.RAGDOLL and ragdoll != null:
 		ragdoll.launch(velocity)
 		return ragdoll
@@ -190,6 +209,7 @@ func start_ragdoll(velocity: Vector3, max_time: float = 2.5) -> RagdollBody:
 	ragdoll.color = color
 	ragdoll.player_id = player_id
 	ragdoll.max_time = max_time
+	ragdoll.puppet = puppet
 	ragdoll.position = global_position
 	ragdoll.rotation.y = yaw
 	get_parent().add_child(ragdoll)
@@ -201,6 +221,7 @@ func start_ragdoll(velocity: Vector3, max_time: float = 2.5) -> RagdollBody:
 	_collision.disabled = true
 	velocity = Vector3.ZERO
 	push_velocity = Vector3.ZERO
+	_applied_push = Vector3.ZERO
 	if cam != null:
 		cam.follow = ragdoll.torso
 	return ragdoll
@@ -221,6 +242,7 @@ func end_ragdoll(at: Vector3 = Vector3.INF) -> void:
 	target_position = pos
 	velocity = Vector3.ZERO
 	push_velocity = Vector3.ZERO
+	_applied_push = Vector3.ZERO
 	_collision.disabled = false
 	visuals.visible = true
 	nametag.visible = not is_local
@@ -261,6 +283,7 @@ func sit(p_seat: Node3D, anchor: Node3D) -> void:
 	state = State.SEATED
 	velocity = Vector3.ZERO
 	push_velocity = Vector3.ZERO
+	_applied_push = Vector3.ZERO
 	global_position = p_seat.global_position
 	yaw = p_seat.global_rotation.y
 	rotation.y = yaw
@@ -285,12 +308,29 @@ func teleport(pos: Vector3, p_yaw: float = NAN) -> void:
 	target_position = pos
 	velocity = Vector3.ZERO
 	push_velocity = Vector3.ZERO
+	_applied_push = Vector3.ZERO
 	if not is_nan(p_yaw):
 		yaw = p_yaw
 		target_yaw = p_yaw
 		rotation.y = p_yaw
 		if cam != null:
 			cam.yaw = p_yaw
+
+
+## Disconnected players (§2.12): a "zzz" statue nobody can grab or shove.
+func set_connection_away(away: bool) -> void:
+	connection_away = away
+	if away:
+		bubble.text = "zzz"
+		bubble.visible = true
+		_bubble_until = INF
+		_collision.disabled = true
+		visuals.set_ghost(true)
+	else:
+		bubble.visible = false
+		_bubble_until = -INF
+		_collision.disabled = state == State.RAGDOLL or state == State.HELD or state == State.AWAY
+		visuals.set_ghost(false)
 
 
 ## Hides the player while they're outside (thrown out).
@@ -329,12 +369,16 @@ func _physics_process(delta: float) -> void:
 			return
 	if state == State.STUNNED and _clock >= stunned_until:
 		state = State.STANDING
-	if is_local:
-		_local_move(delta)
-	else:
-		_remote_move(delta)
-	_track_fall()
-	visuals.update_motion(velocity, is_on_floor(), delta)
+	match drive:
+		Drive.INPUT:
+			_local_move(delta)
+			_track_fall()
+		Drive.SIM:
+			_remote_move(delta)
+			_track_fall()
+		Drive.PUPPET:
+			_puppet_move(delta)
+	visuals.update_motion(velocity, is_on_floor() if drive != Drive.PUPPET else not puppet_airborne, delta)
 	_footsteps(delta)
 	if cam != null:
 		cam.update_camera(Vector3(velocity.x, 0, velocity.z).length(), is_on_floor(), false, delta)
@@ -383,12 +427,15 @@ func _local_move(delta: float) -> void:
 		speed *= cfg.soaked_speed_factor
 	if holder == null and state == State.STANDING and _holding_someone():
 		speed *= cfg.held_speed_factor
-	var horizontal: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
+	# Last frame's push is part of `velocity`; take it out so it isn't added again (it compounded
+	# into a 30 m/s slide whenever the local player was shoved).
+	var horizontal: Vector3 = Vector3(velocity.x - _applied_push.x, 0.0, velocity.z - _applied_push.z)
 	var target: Vector3 = wish * speed
 	var rate: float = cfg.acceleration if wish.length() > 0.1 else cfg.deceleration
 	horizontal = horizontal.move_toward(target, rate * delta)
 	velocity.x = horizontal.x + push_velocity.x
 	velocity.z = horizontal.z + push_velocity.z
+	_applied_push = Vector3(push_velocity.x, 0.0, push_velocity.z)
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	else:
@@ -425,6 +472,25 @@ func _remote_move(delta: float) -> void:
 	rotation.y = yaw
 
 
+func _puppet_move(delta: float) -> void:
+	var prev: Vector3 = global_position
+	if global_position.distance_to(target_position) > 3.0:
+		global_position = target_position
+	else:
+		global_position = global_position.lerp(target_position, minf(1.0, PUPPET_LERP * delta))
+	velocity = (global_position - prev) / maxf(delta, 0.0001)
+	yaw = lerp_angle(yaw, target_yaw, minf(1.0, 15.0 * delta))
+	rotation.y = yaw
+	# Falls are detected from the stream's airborne flag (no floor contact on a puppet).
+	if puppet_airborne:
+		_fall_start_y = global_position.y if _was_on_floor else maxf(_fall_start_y, global_position.y)
+	elif not _was_on_floor:
+		var drop: float = _fall_start_y - global_position.y if _fall_start_y != INF else 0.0
+		_fall_start_y = INF
+		landed.emit(drop)
+	_was_on_floor = not puppet_airborne
+
+
 func _follow_holder(delta: float) -> void:
 	if holder == null or not is_instance_valid(holder):
 		release_held()
@@ -456,7 +522,7 @@ func _track_fall() -> void:
 
 func _footsteps(delta: float) -> void:
 	var speed: float = Vector3(velocity.x, 0, velocity.z).length()
-	if is_on_floor() and speed > 1.0:
+	if (is_on_floor() or (drive == Drive.PUPPET and not puppet_airborne)) and speed > 1.0:
 		_step_timer += delta * speed
 		if _step_timer > 2.6:
 			_step_timer = 0.0

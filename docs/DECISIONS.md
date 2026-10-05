@@ -112,3 +112,44 @@ the machine. `--smoke-test --seconds N` ends after N seconds of game time; the 3
 `RagdollBody` reports an impact only when the torso is touching something (`contact_monitor`), and
 flags it as a wall only when that body is on layer 1 (static world). The pin joints jolt the torso
 in the first frames of a throw, and that velocity loss alone used to fire a bogus "wall" knockout.
+
+## 2026-10-05 — Own packet framing over ENet instead of `@rpc` / MultiplayerSynchronizer
+`Net` polls an `ENetMultiplayerPeer` directly and frames every message as `[type, payload]`
+(`Wire`). It keeps the protocol in one place (`Protocol.Msg`), lets tests count bytes per peer and wrap
+the pipe in `DelayedTransport`, and avoids node-path coupling between the server and client scene
+trees (the dedicated server has no local player, so the trees differ). The master prompt's
+`MultiplayerSynchronizer` suggestion is replaced by `NetWorld` + `WorldCodec`.
+
+## 2026-10-05 — Body authority: client while standing, server otherwise
+A standing player's client is authoritative for its own body (20 Hz `MOVE`, server sanity-checked:
+speed, teleports, map bounds). The server takes the body while the player is held, ragdolled, knocked
+out or thrown out, simulates the real ragdoll and streams its pose; clients show a kinematic puppet
+ragdoll. Positions the money rules depend on (range, seats) are always server-side, so a cheating client
+can at worst walk fast, and sanity snaps that back.
+
+## 2026-10-05 — Snapshots travel on the events channel
+ENet orders packets per channel only. A snapshot sent on the state channel could arrive after events
+that are newer than it and roll the client mirror back (seen as event gaps in the first two-client run).
+Snapshots now go on channel 0 with the events they summarise.
+
+## 2026-10-05 — Rematch after results moves to M4
+The results screen online returns to the menu for now; "play again in the same room" belongs with the
+full match flow (M4). Dedicated servers stay in their room after results and close when empty.
+
+## 2026-10-05 — Dev identity is the display name
+Without the orchestrator (`--server` alone) the server trusts `dev:<name>` as the uid, so two dev
+clients need different names; reconnecting with the same name takes over the same player. Production
+identities come from orchestrator-verified join tokens (Steam in M8).
+
+## 2026-10-05 — `BUILD_ID` must match exactly
+`Protocol.BUILD_ID` ("0.3.0-m3") is sent in `HELLO` and checked by both the orchestrator (`426
+version_mismatch`) and the room server (`REJECT version_mismatch`). Bump it with every shipped build.
+
+## 2026-10-05 — Rooms wait a minute for their first player
+A dedicated room closes after `--empty-timeout` seconds without players (orchestrator default 120 s),
+but only after someone has joined; before that it waits at least 60 s so the creator can finish loading.
+
+## 2026-10-05 — Shove push no longer compounds
+`PlayerAvatar._local_move` read `velocity` (which already contained last frame's push) and added the
+push again, so a shoved local player slid ~8 m at 30 m/s. Found by the networked physics test (the
+server rejected the slide as implausible). The push is now subtracted before re-adding.

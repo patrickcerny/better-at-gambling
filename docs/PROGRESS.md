@@ -1,13 +1,14 @@
 # Progress
 
-## Current milestone: M3 — Networking, dedicated server & lobby
-## Next step: ENet transport in `Net` (client/server modes), replicate positions/events at 20 Hz, `--server` headless entry point, lobby flow with room codes; then the local Practice path and the networked path must share every scene (`match/match_scene.gd` already only talks to `Net`).
+## Current milestone: M4 — Match flow, timer, Quiz minigame, rewards (waiting for Patrick's go-ahead)
+## Next step: full PhaseMachine flow with the Quiz minigame and cash rewards, rematch in the same room (deferred from M3).
 
 ## Status by milestone
 - M0: DONE (evidence: `scripts/test.sh all` green; `godot --headless --path . -- --smoke-test` exit 0; exports built)
 - M1: DONE (evidence: 105 unit tests + 8 sim tests green, RTP table in DECISIONS.md, commits 47210ec…)
 - M2: DONE (evidence: `scripts/test.sh all` green — unit 109, sim 8, integration 15, physics 10, ui 5, smoke 1, boot, 185 s scripted session with 0 errors; screenshots in `build/screenshots/` via `scripts/screenshots.sh`)
-- M3–M11: NOT STARTED
+- M3: DONE (evidence: `scripts/test.sh net` — 3-minute server + 2 clients match with identical balance digests, grab/throw/shove/knockout at 150 ms + 2% loss with ragdoll agreement ≤ 0.03 m, version mismatch refused, orchestrator end to end with join by code and port freed; `scripts/test.sh orchestrator` 62 pytest; unit 120, integration 21, physics 10, session 0 errors; ~4.6 KB/s per client)
+- M4–M11: NOT STARTED
 
 ## Verified features (IMPLEMENTED+TESTED)
 - Toolchain: Godot 4.7.2 headless, export templates, GUT 9.7.1 (`tools/setup_toolchain.sh`, checksums verified).
@@ -38,16 +39,25 @@
 - `PlinkoSteering` (constrained random walk ending in the server's slot; 1,000 seeded drops) — `tests/unit/test_plinko_steering.gd`.
 - Theme (`ui/theme/main_theme.tres` from `tools/gen_theme.gd`, Barlow Condensed), generated placeholder SFX (`tools/gen_audio.py`), `Audio` director with pooled players and music crossfade.
 
+- M3 networking (`net/`, `core/net/`): ENet transport + `DelayedTransport`, `Wire` framing, handshake with version check and token verification, event seq + gap recovery + backlog replay, 4 Hz station status, binary 20 Hz world stream (`WorldCodec`), `InterpBuffer` (100 ms), `NetClock`, `MoveSanity` with force-position — `tests/unit/test_net_codec.gd`, `tests/integration/test_delayed_transport.gd`, `tests/net/`.
+- Dedicated room server (`--server`, `RoomHost`): orchestrator verify/heartbeat/closing, reconnect by uid, room full / in progress refusals, closes when empty — `tests/net/test_orchestrator_e2e.py`; exported `Linux Server` binary boots and hosts a match.
+- Room orchestrator (`services/orchestrator/`, FastAPI): rooms, codes, port pool, join tokens, spawn/heartbeat/reap, rate limits, dev/Steam auth — 62 pytest.
+- Entrance-hall lobby: ready pads, wardrobe mirror and settings board prompts, closed doors until the match starts, `LobbyPanel` (slots, colors, hats, ready, leader settings, add/remove bots), `LobbyController` — `tests/unit/test_lobby_controller.gd`, `tests/integration/test_room_lobby.gd`, screenshot `build/screenshots/online_lobby.png`.
+- Body authority handoff (client while standing, server while held/ragdolled/thrown), puppet ragdolls and guards, prop sync, grab/shove prediction — `tests/net/test_net_match.py`.
+- Main menu Play Online: create party, join by code, join by address, rejoin last party, connection errors.
+
 ## Implemented but unverified
+- Lobby panel and the wardrobe mirror / settings board prompts by hand (they send the same intents the integration tests cover, but nobody has clicked through them yet), and the Play Online menu with a real mouse.
 - Gamepad play end to end (bindings exist and the bet panel is tested with joypad events; nobody has held a real pad yet).
 - Revolving door "stuck" feel and the mezzanine railing shove-off: both work in tests, tuning is by eye in M7.
 
 ## Known bugs
+- The lobby doors' sign is partly hidden behind the fountain from some spawn points (greybox layout; M7 art pass).
 - Stairs are not on the navmesh (guards never go upstairs; players do, it's physics). Fine for now, revisit when bots roam (M6).
 - The slots camera anchor sits too close to the cabinet screen (M7 station polish).
 
 ## Blockers
-- None for M2–M5. Needed from Patrick later: VPS SSH access/specs and a domain (M6), Steamworks App ID + Web API key (M8).
+- None for M4–M5. Needed from Patrick later: VPS SSH access/specs and a domain (M6), Steamworks App ID + Web API key (M8).
 
 ## Session log
 ### 2026-10-04 / session 1
@@ -59,3 +69,6 @@
 - Server layer + integration tests, greybox casino, avatar/camera/ragdoll, HUD + station overlays, guards/hazards, Plinko chip, autoplay driver, physics + UI suites, screenshots script.
 - Bugs found by the scripted session and fixed: seats faced away from tables (players stood up into the felt), knockback accumulated into vertical velocity (players hit the ceiling), navmesh bake never reached the NavigationServer (guards stood still), stools were "climbable" for the navmesh, the ramp slab had a lip, the porch had no floor.
 - Tests: `scripts/test.sh all` green (see M2 evidence above).
+### 2026-10-05 / session 3 (M3)
+- Orchestrator service, transport/protocol/world stream, room host, lobby, authority handoff, online menus, network test harness (`tests/net`, pytest driving real Godot processes).
+- Bugs found by the network tests and fixed: events that arrived before the match scene loaded were lost (backlog replay), snapshots overtook events on another channel (moved to the events channel), bots blocked the lobby exit (they now start on the casino floor), transports leaked through signal cycles, a shoved local player slid ~8 m (push compounding, also in practice).

@@ -12,12 +12,19 @@ var _since_refresh: float = 0.0
 
 func _ready() -> void:
 	Net.event_received.connect(_on_event)
+	Net.snapshot_received.connect(_on_snapshot)
 	resync()
 
 
 func _exit_tree() -> void:
 	if Net.event_received.is_connected(_on_event):
 		Net.event_received.disconnect(_on_event)
+	if Net.snapshot_received.is_connected(_on_snapshot):
+		Net.snapshot_received.disconnect(_on_snapshot)
+
+
+func _on_snapshot(snap: Dictionary) -> void:
+	state.apply_snapshot(snap)
 
 
 ## Pulls a full snapshot.
@@ -25,6 +32,8 @@ func resync() -> void:
 	var snap: Dictionary = Net.request_snapshot()
 	if not snap.is_empty():
 		state.apply_snapshot(snap)
+		for ev: Dictionary in Net.events_since_snapshot():
+			state.apply_event(ev)
 
 
 func _process(delta: float) -> void:
@@ -42,7 +51,9 @@ func _process(delta: float) -> void:
 		for sid: Variant in st:
 			state.stations[sid] = st[sid]
 			state.station_changed.emit(StringName(sid))
-		# Positions of the other players (full replication arrives in M3; this keeps bots in place).
+		# Positions of bots simulated in-process (online, positions come from the world stream).
+		if Net.is_client():
+			return
 		var players: Dictionary = snap.get("players", {})
 		for id: Variant in players:
 			if state.players.has(int(id)):
@@ -52,4 +63,7 @@ func _process(delta: float) -> void:
 func _on_event(ev: Dictionary) -> void:
 	if not state.apply_event(ev):
 		Log.warn(&"client", "event gap at seq %d, resyncing" % int(ev.get("seq", -1)))
-		resync()
+		if Net.is_client():
+			Net.request_fresh_snapshot()
+		else:
+			resync()

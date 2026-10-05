@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs the test suites headless. Exits non-zero on any failure.
-# Usage: scripts/test.sh [unit|sim|integration|physics|ui|smoke|session|lint|all]   (default: unit)
+# Usage: scripts/test.sh [unit|sim|integration|physics|ui|smoke|session|lint|orchestrator|net|all]   (default: unit)
+# `net` runs real server/client processes (~7 min; NET_SYNC_MINUTES shortens the long match).
 set -uo pipefail
 source "$(dirname "$0")/_common.sh"
 cd "$ROOT"
@@ -51,6 +52,17 @@ run_session() { # scripted 3-minute Practice session must log no errors (M2 acce
 	fi
 }
 
+run_pytest() { # suite-name dir
+	local name="$1" dir="$2" log="$LOG_DIR/$1.log"
+	echo "== $name"
+	(cd "$ROOT/$dir" && python3 -m pytest -q -p no:cacheprovider) >"$log" 2>&1
+	local code=$?
+	tail -n 1 "$log" | sed 's/^/   /'
+	if [[ $code -ne 0 ]]; then
+		echo "   FAILED (exit $code), log: $log"; grep -E '^(FAILED|ERROR|E )' "$log" | head -30; FAILED=1
+	fi
+}
+
 ensure_import() {
 	# Refreshes the class_name cache (new scripts) and imports changed assets.
 	"$GODOT" --headless --path . --import >/dev/null 2>&1 || true
@@ -66,6 +78,8 @@ case "$SUITE" in
 	smoke) run_gut smoke res://tests/smoke; run_boot_smoke ;;
 	session) run_session ;;
 	lint) "$ROOT/scripts/lint.sh" || FAILED=1 ;;
+	orchestrator) run_pytest orchestrator services/orchestrator ;;
+	net) run_pytest net tests/net ;;
 	all)
 		"$ROOT/scripts/lint.sh" || FAILED=1
 		run_gut unit res://tests/unit
@@ -76,6 +90,8 @@ case "$SUITE" in
 		run_gut smoke res://tests/smoke
 		run_boot_smoke
 		run_session
+		run_pytest orchestrator services/orchestrator
+		run_pytest net tests/net
 		;;
 	*) echo "unknown suite: $SUITE" >&2; exit 2 ;;
 esac

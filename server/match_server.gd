@@ -8,6 +8,7 @@ extends Node
 signal event_emitted(event: Dictionary)
 
 const TICK: float = 1.0 / Protocol.SERVER_TICK_HZ
+const BOT_NAMES: Array[String] = ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bluff", "Royal"]
 
 var balance: BalanceConfig
 var presets: MatchPresets
@@ -23,6 +24,12 @@ var world: WorldQuery = WorldQuery.new()
 var pickups: PickupSystem
 var interactions: InteractionResolver
 var validator: IntentValidator = IntentValidator.new()
+## Entrance-hall lobby rules (online rooms only; Practice starts the match straight away).
+var lobby: LobbyController = LobbyController.new()
+## Server-side checks on client-reported movement (online).
+var sanity: MoveSanity = MoveSanity.new()
+## True for an online room: the match waits in LOBBY until everyone is ready.
+var room_mode: bool = false
 var schedule: MatchSchedule
 var phases: PhaseMachine
 ## Optional minigame director (M4). Without one, minigames are skipped with equal scores.
@@ -41,6 +48,11 @@ var map_def: MapDefinition
 var _accumulator: float = 0.0
 var _next_player_id: int = 1
 var _logic_scripts: Dictionary = {}
+## Players whose body the server simulates right now (ragdolled, thrown): their moves are ignored.
+var _server_owned: Dictionary[int, bool] = {}
+## Real seconds since the server started (lobby ordering, network clock).
+var _uptime: float = 0.0
+var _leader: int = -1
 
 
 ## Wires balance/presets/registry data. Call before `add_player`/`start_match`.
@@ -63,9 +75,9 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	rules = InteractionRules.new(balance)
 	pickups = PickupSystem.new(economy)
 	interactions = InteractionResolver.new(rules, world, economy, pickups, rng.fork())
-	schedule = MatchSchedule.new(state.duration_minutes, presets, balance.last_call_seconds)
-	phases = PhaseMachine.new(schedule)
-	phases.phase_changed.connect(_on_phase_changed)
+	lobby.settings["duration"] = state.duration_minutes
+	lobby.settings["items_enabled"] = bool(settings.get("items_enabled", true))
+	_build_schedule()
 	var vip_ids: Array = []
 	for sid: Variant in map_def.stations:
 		if str(sid).begins_with("vip_"):
@@ -74,20 +86,94 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	Log.info(&"server", "configured: duration %d min, seed %d, %d stations" % [state.duration_minutes, seed_value, stations.logics.size()])
 
 
-## Adds a participant and returns its player id.
-func add_player(uid: String, display_name: String, is_bot: bool = false, color_index: int = -1) -> int:
+func _build_schedule() -> void:
+	schedule = MatchSchedule.new(state.duration_minutes, presets, balance.last_call_seconds)
+	phases = PhaseMachine.new(schedule)
+	phases.phase_changed.connect(_on_phase_changed)
+
+
+## Online room: wait in the entrance-hall lobby until everyone is ready (§2.2).
+func open_lobby() -> void:
+	room_mode = true
+
+
+## Adds a participant and returns its player id. Colors are unique; `color_index` is a wish.
+func add_player(uid: String, display_name: String, is_bot: bool = false, color_index: int = -1, hat: StringName = &"none") -> int:
 	var p := PlayerState.new()
 	p.id = _next_player_id
 	_next_player_id += 1
 	p.uid = uid
 	p.display_name = display_name
 	p.is_bot = is_bot
-	p.color_index = color_index if color_index >= 0 else (p.id - 1) % 8
+	p.color_index = lobby.free_color(_taken_colors(), color_index if color_index >= 0 else (p.id - 1) % Cosmetics.COLOR_COUNT)
+	p.hat = hat if Cosmetics.is_valid_hat(hat) else &"none"
+	p.bot_difficulty = StringName(lobby.settings["bot_difficulty"])
 	state.add_player(p)
 	economy.add_player(p.id, balance.start_money)
 	world.set_transform(p.id, Vector3.ZERO, 0.0)
+	lobby.join(p.id, not is_bot, _uptime + p.id * 0.001)
 	_emit(GameEvents.make(&"player_joined", {"player": p.to_wire()}))
+	_check_leader()
 	return p.id
+
+
+## Number of seats taken (connected humans + bots), for "room full".
+func occupied_slots() -> int:
+	var n: int = 0
+	for id: int in state.players:
+		if state.players[id].is_bot or state.players[id].connected:
+			n += 1
+	return n
+
+
+## A client dropped: the avatar stays as "away" (§2.12), money and seat are kept.
+func player_disconnected(player: int) -> void:
+	if not state.players.has(player):
+		return
+	state.players[player].connected = false
+	state.players[player].ready = false
+	lobby.set_connected(player, false, _uptime)
+	_emit(GameEvents.make(&"player_left", {"player": player}))
+	_check_leader()
+	_flush()
+
+
+## The same identity came back.
+func player_reconnected(player: int) -> void:
+	if not state.players.has(player):
+		return
+	state.players[player].connected = true
+	lobby.set_connected(player, true, _uptime)
+	_emit(GameEvents.make(&"player_rejoined", {"player": player}))
+	_check_leader()
+	_flush()
+
+
+## Removes a bot slot from the lobby (humans are never removed, only marked away).
+func remove_bot(player: int) -> bool:
+	if not state.players.has(player) or not state.players[player].is_bot or phases.phase != Phase.Id.LOBBY:
+		return false
+	state.players.erase(player)
+	economy.remove_player(player)
+	lobby.remove(player)
+	_emit(GameEvents.make(&"player_removed", {"player": player}))
+	_flush()
+	return true
+
+
+func _taken_colors() -> Array[int]:
+	var out: Array[int] = []
+	for id: int in state.players:
+		if state.players[id].is_bot or state.players[id].connected:
+			out.append(state.players[id].color_index)
+	return out
+
+
+func _check_leader() -> void:
+	var now: int = lobby.leader()
+	if now != _leader:
+		_leader = now
+		_emit(GameEvents.make(&"leader_changed", {"player": now}))
 
 
 ## Player id for a uid, or -1.
@@ -102,6 +188,17 @@ func player_by_uid(uid: String) -> int:
 func start_match() -> void:
 	if running:
 		return
+	if room_mode:
+		# Lobby settings apply now: duration rebuilds the schedule.
+		settings["items_enabled"] = bool(lobby.settings["items_enabled"])
+		if int(lobby.settings["duration"]) != state.duration_minutes:
+			state.duration_minutes = int(lobby.settings["duration"])
+			_build_schedule()
+		# Bots don't walk out of the entrance hall on their own; they start on the casino floor.
+		if not map_def.spawn_points.is_empty():
+			for id: int in state.players:
+				if state.players[id].is_bot:
+					set_server_position(id, map_def.spawn_points[(id - 1) % map_def.spawn_points.size()])
 	running = true
 	match_time = 0.0
 	phases.start()
@@ -135,6 +232,8 @@ func get_snapshot() -> Dictionary:
 	snap["next_minigame_in"] = snappedf(phases.next_minigame_in(), 0.001) if phases.next_minigame_in() != INF else -1.0
 	snap["last_call"] = phases.last_call_announced
 	snap["piles"] = _piles_wire()
+	snap["lobby"] = lobby.to_wire()
+	snap["room"] = room_mode
 	return snap
 
 
@@ -145,7 +244,10 @@ func get_private_snapshot(player: int) -> Dictionary:
 
 ## Advances the simulation by real seconds (scaled by `timescale`), in fixed 20 Hz steps.
 func advance(real_delta: float) -> void:
+	_uptime += real_delta
 	if not running:
+		if room_mode and phases.phase == Phase.Id.LOBBY:
+			_tick_lobby(real_delta)
 		return
 	_accumulator += real_delta * timescale
 	var steps: int = 0
@@ -177,6 +279,21 @@ func _step(delta: float) -> void:
 	interactions.tick(match_time)
 	pickups.tick(match_time)
 	_tick_bots()
+
+
+func _tick_lobby(delta: float) -> void:
+	match lobby.tick(delta):
+		&"countdown_started":
+			_emit(GameEvents.make(&"lobby_countdown", {"seconds": LobbyController.COUNTDOWN_SECONDS}))
+		&"countdown_cancelled":
+			_emit(GameEvents.make(&"lobby_countdown_cancelled", {}))
+		&"start":
+			start_match()
+
+
+## Server time in seconds (real time since start; the network clock).
+func uptime() -> float:
+	return _uptime
 
 
 func _on_phase_note(note: StringName) -> void:
@@ -267,7 +384,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"place_bet", &"clear_bets", &"action":
 			return stations.route(player, intent)
 		&"move":
-			if stations.is_seated(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player):
+			if not can_move(player):
 				return StationLogicBase.fail(&"not_standing")
 			world.set_transform(player, Serializer.to_vec3(intent["pos"]), float(intent["yaw"]), bool(intent.get("airborne", false)))
 			state.players[player].position = world.get_position(player)
@@ -292,10 +409,99 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			_emit(GameEvents.make(&"emote", {"player": player, "id": StringName(intent["id"])}))
 			return StationLogicBase.OK_RESULT
 		&"set_ready":
-			state.players[player].ready = bool(intent["ready"])
-			_emit(GameEvents.make(&"player_ready", {"player": player, "ready": bool(intent["ready"])}))
+			lobby.set_panel_ready(player, bool(intent["ready"]))
+			_sync_ready(player)
 			return StationLogicBase.OK_RESULT
+		&"set_cosmetics":
+			var p: PlayerState = state.players[player]
+			var color: int = int(intent["color"])
+			var hat: StringName = StringName(intent["hat"])
+			if not Cosmetics.is_valid_color(color) or not Cosmetics.is_valid_hat(hat):
+				return StationLogicBase.fail(&"bad_value")
+			if color != p.color_index and color in _taken_colors():
+				return StationLogicBase.fail(&"color_taken")
+			p.color_index = color
+			p.hat = hat
+			_emit(GameEvents.make(&"player_cosmetics", {"player": player, "color": color, "hat": hat}))
+			return StationLogicBase.OK_RESULT
+		&"lobby_setting":
+			var err: StringName = lobby.set_setting(player, str(intent["key"]), intent["value"])
+			if err != &"":
+				return StationLogicBase.fail(err)
+			_emit(GameEvents.make(&"lobby_settings", {"settings": lobby.settings.duplicate()}))
+			return StationLogicBase.OK_RESULT
+		&"add_bot":
+			if player != lobby.leader():
+				return StationLogicBase.fail(&"not_leader")
+			if occupied_slots() >= Protocol.MAX_PLAYERS:
+				return StationLogicBase.fail(&"room_full")
+			var n: int = 0
+			for id: int in state.players:
+				n += 1 if state.players[id].is_bot else 0
+			add_player("bot-%d" % _next_player_id, BOT_NAMES[n % BOT_NAMES.size()], true)
+			return StationLogicBase.OK_RESULT
+		&"remove_bot":
+			if player != lobby.leader():
+				return StationLogicBase.fail(&"not_leader")
+			return StationLogicBase.OK_RESULT if remove_bot(int(intent["player"])) else StationLogicBase.fail(&"bad_value")
 	return StationLogicBase.fail(&"not_implemented")
+
+
+## True while the player's own client drives their body (standing, not held or ragdolled).
+func can_move(player: int) -> bool:
+	return not (stations.is_seated(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player) or _server_owned.get(player, false))
+
+
+## Online movement report (unreliable stream, not rate-limited like intents). Returns false when
+## the move was refused and the client must be snapped back to `sanity.last_good(player)`.
+func apply_move(player: int, pos: Vector3, yaw: float, airborne: bool) -> bool:
+	if not state.players.has(player) or not can_move(player):
+		return true  # ignored, not a cheat: the server owns the body right now
+	if not sanity.check(player, pos, _uptime):
+		return false
+	world.set_transform(player, pos, yaw, airborne)
+	state.players[player].position = pos
+	return true
+
+
+## The server simulates this player's body (ragdoll/thrown) or hands it back to the client.
+func set_server_owned(player: int, owned: bool) -> void:
+	_server_owned[player] = owned
+
+
+func is_server_owned(player: int) -> bool:
+	return _server_owned.get(player, false)
+
+
+## The scene got a ragdolled player back on their feet at `pos`: authority returns to the client.
+func report_got_up(player: int, pos: Vector3) -> void:
+	if not state.players.has(player):
+		return
+	_server_owned.erase(player)
+	set_server_position(player, pos)
+	_emit(GameEvents.make(&"player_got_up", {"player": player, "pos": Serializer.vec3(pos)}))
+
+
+## A thrown-out player walks back in at `pos`.
+func report_respawned(player: int, pos: Vector3) -> void:
+	if not state.players.has(player):
+		return
+	_server_owned.erase(player)
+	set_server_position(player, pos)
+	_emit(GameEvents.make(&"player_respawned", {"player": player, "pos": Serializer.vec3(pos)}))
+
+
+## Lobby: a player stepped on or off their ready pad.
+func report_on_pad(player: int, on: bool) -> void:
+	if lobby.set_on_pad(player, on):
+		_sync_ready(player)
+
+
+func _sync_ready(player: int) -> void:
+	var ready: bool = lobby.is_ready(player)
+	if state.players[player].ready != ready:
+		state.players[player].ready = ready
+		_emit(GameEvents.make(&"player_ready", {"player": player, "ready": ready}))
 
 
 ## World callbacks (the scene reports physical outcomes the server can't see itself).
@@ -320,6 +526,7 @@ func report_thrown_out(attacker: int, guard: StringName) -> void:
 func set_server_position(player: int, pos: Vector3) -> void:
 	world.set_transform(player, pos, world.get_yaw(player))
 	state.players[player].position = pos
+	sanity.allow_teleport(player, pos, _uptime)
 
 
 func _tick_bots() -> void:

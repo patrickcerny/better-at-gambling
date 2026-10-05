@@ -25,6 +25,12 @@ var color: Color = Palette.CREAM
 var max_time: float = 2.5
 ## Player this ragdoll belongs to.
 var player_id: int = -1
+## Online clients: the server simulates the body; we only show its streamed pose (§4.1).
+var puppet: bool = false
+
+var _pose_pos: Vector3 = Vector3.INF
+var _pose_rot: Quaternion = Quaternion.IDENTITY
+var _pose_parts: Array[Vector3] = []
 
 var _elapsed: float = 0.0
 var _still: float = 0.0
@@ -38,6 +44,8 @@ func _ready() -> void:
 
 ## Launches the whole body with a velocity.
 func launch(velocity: Vector3) -> void:
+	if puppet:
+		return
 	for b: RigidBody3D in [torso, head, hand_l, hand_r, hips]:
 		b.linear_velocity = velocity
 	_prev_vel = velocity
@@ -48,7 +56,35 @@ func body_position() -> Vector3:
 	return torso.global_position
 
 
+## Current pose for the world stream: torso position/rotation and head, hands, hips positions.
+func pose() -> Dictionary:
+	return {"pos": torso.global_position, "rot": torso.global_basis.get_rotation_quaternion(), "parts": [head.global_position, hand_l.global_position, hand_r.global_position, hips.global_position]}
+
+
+## Puppet: the server's pose to ease toward.
+func apply_pose(pos: Vector3, rot: Quaternion, parts: Array) -> void:
+	var first: bool = _pose_pos == Vector3.INF
+	_pose_pos = pos
+	_pose_rot = rot
+	_pose_parts.assign(parts)
+	if first:
+		_snap_to_pose(1.0)
+
+
+func _snap_to_pose(w: float) -> void:
+	if _pose_pos == Vector3.INF:
+		return
+	torso.global_position = torso.global_position.lerp(_pose_pos, w)
+	torso.quaternion = torso.quaternion.slerp(_pose_rot, w)
+	var bodies: Array[RigidBody3D] = [head, hand_l, hand_r, hips]
+	for i: int in mini(bodies.size(), _pose_parts.size()):
+		bodies[i].global_position = bodies[i].global_position.lerp(_pose_parts[i], w)
+
+
 func _physics_process(delta: float) -> void:
+	if puppet:
+		_snap_to_pose(minf(1.0, 20.0 * delta))
+		return
 	if _done:
 		return
 	_elapsed += delta
@@ -85,10 +121,17 @@ func _build() -> void:
 	hand_l = _body("HandL", Vector3(-0.75, 0.9, 0), _sphere(0.14), GreyboxKit.material(Palette.CREAM), 0.5)
 	hand_r = _body("HandR", Vector3(0.75, 0.9, 0), _sphere(0.14), GreyboxKit.material(Palette.CREAM), 0.5)
 	hips = _body("Hips", Vector3(0, 0.25, 0), _box(Vector3(0.5, 0.3, 0.4)), GreyboxKit.material(Palette.CASINO_BLACK), 2.0)
-	_pin(torso, head, Vector3(0, 1.5, 0))
-	_pin(torso, hand_l, Vector3(-0.45, 1.1, 0))
-	_pin(torso, hand_r, Vector3(0.45, 1.1, 0))
-	_pin(torso, hips, Vector3(0, 0.4, 0))
+	if puppet:
+		for b: RigidBody3D in [torso, head, hand_l, hand_r, hips]:
+			b.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+			b.freeze = true
+			b.collision_layer = 0
+			b.contact_monitor = false
+	else:
+		_pin(torso, head, Vector3(0, 1.5, 0))
+		_pin(torso, hand_l, Vector3(-0.45, 1.1, 0))
+		_pin(torso, hand_r, Vector3(0.45, 1.1, 0))
+		_pin(torso, hips, Vector3(0, 0.4, 0))
 	# Dot eyes on the head so it still reads as a face while flopping.
 	var dark: StandardMaterial3D = GreyboxKit.material(Palette.CASINO_BLACK)
 	for x: float in [-0.1, 0.1]:

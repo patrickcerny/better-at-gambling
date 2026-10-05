@@ -16,53 +16,136 @@ var _stuck_time: float = 0.0
 var _final_leg: bool = false
 
 
+## `--autoplay-variant 1` swaps the single-seat slot machine (and the last table) so two scripted
+## clients share the blackjack table, roulette and Plinko but never queue for one seat.
+var variant: int = 0
+## `--autoplay-script thrower|victim`: the networked physics scenario (two clients, no bots):
+## the victim waits at THROW_SPOT, the thrower grabs and throws them; both check the ragdoll's
+## resting place against the server's and the victim checks it gets its body back.
+var script_name: String = ""
+## Last client-side position of every ragdolled avatar (compared on `player_got_up`).
+var _last_rag: Dictionary[int, Vector3] = {}
+## "wait_event" step: [type, deadline].
+var _awaiting: Array = []
+
+const THROW_SPOT: Vector3 = Vector3(5.0, 0.0, 2.0)
+
+const VARIANT_STATIONS: Dictionary[StringName, StringName] = {
+	&"blackjack_2": &"blackjack_1", &"slot_8": &"slot_9",
+}
+
+
 func _ready() -> void:
 	scene = get_parent() as MatchScene
-	await get_tree().create_timer(3.5).timeout  # intro
+	variant = SceneRouter.cmdline.get_int("autoplay-variant", 0) if SceneRouter.cmdline != null else 0
+	script_name = SceneRouter.cmdline.get_string("autoplay-script", "") if SceneRouter.cmdline != null else ""
+	if scene.view.state.room_mode:
+		await _lobby()
+	else:
+		await get_tree().create_timer(3.5).timeout  # intro
 	if not is_inside_tree():
 		return
 	_build_steps()
-	Net.event_received.connect(func(ev: Dictionary) -> void:
-		if ev["type"] in [&"player_knocked_out", &"player_thrown_out", &"player_thrown", &"chips_shaken_out", &"jackpot_won", &"intent_rejected"]:
-			Log.info(&"autoplay", "event %s" % ev))
+	Net.event_received.connect(_on_event)
 	Log.info(&"autoplay", "starting %d steps" % steps.size())
+
+
+## Online: get ready in the lobby (pad or panel) and wait for the intro to finish.
+func _lobby() -> void:
+	await get_tree().create_timer(1.0).timeout
+	if not is_inside_tree():
+		return
+	if scene.view.state.phase == Phase.Id.LOBBY:
+		Log.info(&"autoplay", "lobby: ready")
+		Net.send_intent(Intents.make(&"set_ready", {"ready": true}))
+	while is_inside_tree() and scene.view.state.phase != Phase.Id.CASINO:
+		await get_tree().create_timer(0.2).timeout
+	Log.info(&"autoplay", "match is on")
+
+
+func _on_event(ev: Dictionary) -> void:
+	if ev["type"] in [&"player_knocked_out", &"player_thrown_out", &"player_thrown", &"chips_shaken_out", &"jackpot_won", &"intent_rejected", &"player_grabbed", &"player_shoved"]:
+		Log.info(&"autoplay", "event %s" % ev)
+	if ev["type"] == &"player_got_up" and Net.is_client():
+		var pid: int = int(ev["player"])
+		if _last_rag.has(pid):
+			# Ground-plane distance: getting up drops the torso height (`end_ragdoll`).
+			var at: Vector3 = Serializer.to_vec3(ev["pos"])
+			var d: float = Vector2(_last_rag[pid].x - at.x, _last_rag[pid].z - at.z).length()
+			Log.info(&"nettest", "NETTEST got_up player=%d agreement=%.3f" % [pid, d])
+			_last_rag.erase(pid)
+	if not _awaiting.is_empty() and ev["type"] == _awaiting[0] and int(ev.get("player", ev.get("target", -1))) == int(_awaiting[2]):
+		_awaiting.clear()
 
 
 func _build_steps() -> void:
 	var sp: Dictionary = scene.map.station_positions()
+	# Prefer a bot as the shove/grab partner; online, another player will do.
 	var bot: int = -1
 	for pid: int in scene.avatars:
-		if pid != scene.local_id:
+		if pid != scene.local_id and (bot < 0 or bool(scene.view.state.players.get(pid, {}).get("bot", false))):
 			bot = pid
-			break
+	match script_name:
+		"thrower":
+			steps = [
+				["walk", THROW_SPOT + Vector3(0, 0, 1.4)],
+				["wait_near", bot, 1.0], ["wait", 1.0],
+				["face_bot", bot], ["wait", 0.2],
+				["intent", &"shove", {"aim": [0, 0, 0]}],
+				["wait_event", &"player_shoved", 30.0], ["wait", 0.5],  # the victim shoves back
+				["wait_near", bot, 1.0], ["wait", 0.5],
+				["approach_bot", bot], ["wait", 0.3],
+				["face_bot", bot], ["wait", 0.2],
+				["intent", &"grab", {"target": bot}], ["wait", 0.8],
+				["intent", &"release", {"throw": true, "aim": [1, 0, -0.4]}],
+				["wait_event", &"player_got_up", 30.0, bot], ["wait", 5.0],  # victim checks its body
+				# Three quick shoves knock the victim out.
+				["approach_if_far", bot], ["face_bot", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.25],
+				["approach_if_far", bot], ["face_bot", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.25],
+				["approach_if_far", bot], ["face_bot", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 8.0],
+				["done", null],
+			]
+			return
+		"victim":
+			steps = [
+				["walk", THROW_SPOT], ["wait", 0.5],
+				["wait_event", &"player_shoved", 45.0], ["wait", 0.6],
+				["walk", THROW_SPOT], ["wait", 0.3],
+				["face_bot", bot], ["wait", 0.2], ["intent", &"shove", {"aim": [0, 0, 0]}],
+				["wait_event", &"player_got_up", 45.0], ["wait", 1.0],
+				["walk_by", Vector3(0, 0, 3.0)], ["wait", 1.5],
+				["check_authority"],
+				["done", null],
+			]
+			return
 	steps = [
-		["walk", Vector3(sp[&"blackjack_3"]) + Vector3(0, 0, 2.6)],
-		["sit", &"blackjack_3"], ["wait", 0.5],
-		["intent", &"place_bet", {"station": &"blackjack_3", "bet": {"amount": 25}}], ["wait", 9.0],
-		["intent", &"action", {"station": &"blackjack_3", "action": &"stand"}], ["wait", 3.0],
-		["intent", &"place_bet", {"station": &"blackjack_3", "bet": {"amount": 50}}], ["wait", 9.0],
-		["intent", &"action", {"station": &"blackjack_3", "action": &"hit"}], ["wait", 0.5],
-		["intent", &"action", {"station": &"blackjack_3", "action": &"stand"}], ["wait", 3.5],
+		["walk", Vector3(sp[_st(&"blackjack_3")]) + Vector3(0, 0, 2.6)],
+		["sit", _st(&"blackjack_3")], ["wait", 0.5],
+		["intent", &"place_bet", {"station": _st(&"blackjack_3"), "bet": {"amount": 25}}], ["wait", 9.0],
+		["intent", &"action", {"station": _st(&"blackjack_3"), "action": &"stand"}], ["wait", 3.0],
+		["intent", &"place_bet", {"station": _st(&"blackjack_3"), "bet": {"amount": 50}}], ["wait", 9.0],
+		["intent", &"action", {"station": _st(&"blackjack_3"), "action": &"hit"}], ["wait", 0.5],
+		["intent", &"action", {"station": _st(&"blackjack_3"), "action": &"stand"}], ["wait", 3.5],
 		["intent", &"leave", {}], ["wait", 0.5],
-		["walk", Vector3(sp[&"roulette_1"]) + Vector3(1.0, 0, 2.0)],
-		["sit", &"roulette_1"], ["wait", 1.0],
-		["intent", &"place_bet", {"station": &"roulette_1", "bet": {"type": &"red", "value": 0, "amount": 25}}],
-		["intent", &"place_bet", {"station": &"roulette_1", "bet": {"type": &"straight", "value": 17, "amount": 10}}],
+		["walk", Vector3(sp[_st(&"roulette_1")]) + Vector3(1.0, 0, 2.0)],
+		["sit", _st(&"roulette_1")], ["wait", 1.0],
+		["intent", &"place_bet", {"station": _st(&"roulette_1"), "bet": {"type": &"red", "value": 0, "amount": 25}}],
+		["intent", &"place_bet", {"station": _st(&"roulette_1"), "bet": {"type": &"straight", "value": 17, "amount": 10}}],
 		["wait", 23.0],
-		["intent", &"place_bet", {"station": &"roulette_1", "bet": {"type": &"dozen", "value": 2, "amount": 25}}],
+		["intent", &"place_bet", {"station": _st(&"roulette_1"), "bet": {"type": &"dozen", "value": 2, "amount": 25}}],
 		["wait", 22.0],
 		["intent", &"leave", {}], ["wait", 0.5],
-		["walk", Vector3(sp[&"slot_8"]) + Vector3(0, 0, 1.2)],
-		["sit", &"slot_8"], ["wait", 0.5],
-		["intent", &"place_bet", {"station": &"slot_8", "bet": {"amount": 10}}], ["wait", 2.2],
-		["intent", &"place_bet", {"station": &"slot_8", "bet": {"amount": 25}}], ["wait", 0.8],
-		["intent", &"action", {"station": &"slot_8", "action": &"stop"}], ["wait", 1.0],
-		["intent", &"place_bet", {"station": &"slot_8", "bet": {"amount": 50}}], ["wait", 2.2],
+		["walk", Vector3(sp[_st(&"slot_8")]) + Vector3(0, 0, 1.2)],
+		["sit", _st(&"slot_8")], ["wait", 0.5],
+		["intent", &"place_bet", {"station": _st(&"slot_8"), "bet": {"amount": 10}}], ["wait", 2.2],
+		["intent", &"place_bet", {"station": _st(&"slot_8"), "bet": {"amount": 25}}], ["wait", 0.8],
+		["intent", &"action", {"station": _st(&"slot_8"), "action": &"stop"}], ["wait", 1.0],
+		["intent", &"place_bet", {"station": _st(&"slot_8"), "bet": {"amount": 50}}], ["wait", 2.2],
 		["intent", &"leave", {}], ["wait", 0.5],
-		["walk", Vector3(sp[&"plinko_1"]) + Vector3(-0.8, 0, 2.4)],
-		["sit", &"plinko_1"], ["wait", 0.5],
-		["intent", &"place_bet", {"station": &"plinko_1", "bet": {"amount": 25, "risk": &"medium"}}], ["wait", 3.5],
-		["intent", &"place_bet", {"station": &"plinko_1", "bet": {"amount": 10, "risk": &"high"}}], ["wait", 3.5],
+		["walk", Vector3(sp[_st(&"plinko_1")]) + Vector3(-0.8, 0, 2.4)],
+		["sit", _st(&"plinko_1")], ["wait", 0.5],
+		["intent", &"place_bet", {"station": _st(&"plinko_1"), "bet": {"amount": 25, "risk": &"medium"}}], ["wait", 3.5],
+		["intent", &"place_bet", {"station": _st(&"plinko_1"), "bet": {"amount": 10, "risk": &"high"}}], ["wait", 3.5],
 		["intent", &"leave", {}], ["wait", 0.5],
 		["walk", LuckyLounge.SPAWNS[1] + Vector3(0, 0, -1.5)],
 		["face_bot", bot], ["wait", 0.3],
@@ -81,18 +164,30 @@ func _build_steps() -> void:
 		["walk", Vector3(12.0, LuckyLounge.MEZZ_Y, -1.5)],
 		["walk", Vector3(-1.0, LuckyLounge.MEZZ_Y, -0.6)], ["wait", 0.5],
 		["jump_to", Vector3(-1.0, LuckyLounge.MEZZ_Y, 2.0)], ["wait", 5.0],
-		["walk", Vector3(sp[&"blackjack_2"]) + Vector3(0, 0, 2.6)],
-		["sit", &"blackjack_2"], ["wait", 0.5],
-		["intent", &"place_bet", {"station": &"blackjack_2", "bet": {"amount": 100}}], ["wait", 9.0],
-		["intent", &"action", {"station": &"blackjack_2", "action": &"double"}], ["wait", 4.0],
+		["walk", Vector3(sp[_st(&"blackjack_2")]) + Vector3(0, 0, 2.6)],
+		["sit", _st(&"blackjack_2")], ["wait", 0.5],
+		["intent", &"place_bet", {"station": _st(&"blackjack_2"), "bet": {"amount": 100}}], ["wait", 9.0],
+		["intent", &"action", {"station": _st(&"blackjack_2"), "action": &"double"}], ["wait", 4.0],
 		["intent", &"leave", {}],
 		["done", null],
 	]
 
 
+func _st(id: StringName) -> StringName:
+	return VARIANT_STATIONS.get(id, id) if variant == 1 else id
+
+
 func _process(delta: float) -> void:
 	elapsed += delta
+	for pid: int in scene.avatars:
+		if scene.avatars[pid].state == PlayerAvatar.State.RAGDOLL:
+			_last_rag[pid] = scene.avatars[pid].global_position
 	if steps.is_empty() or scene.local == null:
+		return
+	if not _awaiting.is_empty():
+		if elapsed > float(_awaiting[1]):
+			Log.warn(&"autoplay", "gave up waiting for %s" % _awaiting[0])
+			_awaiting.clear()
 		return
 	if walking_to != Vector3.INF:
 		var flat: float = Vector3(walking_to.x - scene.local.global_position.x, 0, walking_to.z - scene.local.global_position.z).length()
@@ -176,12 +271,29 @@ func _process(delta: float) -> void:
 				to.y = 0.0
 				var goal: Vector3 = bot.global_position + (to.normalized() if to.length() > 0.1 else Vector3.BACK) * 1.3
 				steps.insert(index, ["walk", goal])
+		"approach_if_far":
+			var other: PlayerAvatar = scene.avatars.get(int(step[1]), null)
+			if other != null and other.global_position.distance_to(scene.local.global_position) > 1.7:
+				steps.insert(index, ["approach_bot", step[1]])
 		"face_bot":
 			var bot: PlayerAvatar = scene.avatars.get(int(step[1]), null)
 			if bot != null and scene.local.cam != null:
 				var to: Vector3 = bot.global_position - scene.local.global_position
 				scene.local.cam.yaw = atan2(-to.x, -to.z)
 				scene.local.yaw = scene.local.cam.yaw
+		"walk_by":
+			steps.insert(index, ["walk", scene.local.global_position + Vector3(step[1])])
+		"wait_near":
+			var other: PlayerAvatar = scene.avatars.get(int(step[1]), null)
+			if other == null or other.global_position.distance_to(THROW_SPOT) > float(step[2]):
+				index -= 1
+				wait_left = 0.3
+		"wait_event":
+			_awaiting = [step[1], elapsed + float(step[2]), step[3] if step.size() > 3 else scene.local_id]
+		"check_authority":
+			var srv: Vector3 = scene.net_world.server_position(scene.local_id)
+			var d: float = srv.distance_to(scene.local.global_position)
+			Log.info(&"nettest", "NETTEST authority player=%d state=%d drift=%.3f" % [scene.local_id, scene.local.state, d])
 		"emote":
 			Net.send_intent(Intents.make(&"emote", {"id": step[1]}))
 		"wait":

@@ -21,6 +21,15 @@ func add_player(player: int, start_money: int) -> void:
 	apply(player, start_money, &"start")
 
 
+## Forgets a lobby participant before the match starts (an emptied bot slot). The start money
+## goes back with reason `removed` so the ledger still sums to the balances.
+func remove_player(player: int) -> void:
+	if not _balances.has(player):
+		return
+	apply(player, -_balances[player], &"removed")
+	_balances.erase(player)
+
+
 ## True if the player is known.
 func has_player(player: int) -> bool:
 	return _balances.has(player)

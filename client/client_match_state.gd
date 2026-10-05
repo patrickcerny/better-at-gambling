@@ -8,6 +8,8 @@ signal phase_changed(phase: Phase.Id)
 signal station_changed(station_id: StringName)
 signal players_changed
 signal feed_message(text: String, kind: StringName)
+## Lobby data changed (leader, settings, countdown, ready, cosmetics).
+signal lobby_changed
 
 var phase: Phase.Id = Phase.Id.LOBBY
 var casino_time: float = 0.0
@@ -25,6 +27,11 @@ var piles: Dictionary[int, Dictionary] = {}
 var standings: Array = []
 ## Seated station of each player.
 var seat_of: Dictionary[int, StringName] = {}
+## Online lobby: party leader, host settings, start countdown (-1 = none), room or Practice.
+var leader: int = -1
+var lobby_settings: Dictionary = {}
+var countdown: float = -1.0
+var room_mode: bool = false
 
 
 ## Replaces everything from a snapshot.
@@ -50,7 +57,13 @@ func apply_snapshot(snap: Dictionary) -> void:
 	piles.clear()
 	for p: Dictionary in snap.get("piles", []):
 		piles[int(p["pile"])] = p
+	var lobby: Dictionary = snap.get("lobby", {})
+	leader = int(lobby.get("leader", -1))
+	lobby_settings = lobby.get("settings", {})
+	countdown = float(lobby.get("countdown", -1.0))
+	room_mode = bool(snap.get("room", false))
 	players_changed.emit()
+	lobby_changed.emit()
 	phase_changed.emit(phase)
 	for sid: Variant in stations:
 		station_changed.emit(StringName(sid))
@@ -58,7 +71,9 @@ func apply_snapshot(snap: Dictionary) -> void:
 
 ## Applies one event. Returns false if a sequence gap was detected (caller should resnapshot).
 func apply_event(ev: Dictionary) -> bool:
-	var seq: int = int(ev.get("seq", last_seq + 1))
+	if ev.has("seq") and int(ev["seq"]) <= last_seq:
+		return true  # already in the snapshot we applied
+	var seq: int = int(ev.get("seq", last_seq))
 	var gap: bool = seq > last_seq + 1 and last_seq > 0
 	last_seq = maxi(last_seq, seq)
 	var type: StringName = ev["type"]
@@ -67,8 +82,6 @@ func apply_event(ev: Dictionary) -> bool:
 			var p: Dictionary = ev["player"]
 			players[int(p["id"])] = p
 			players_changed.emit()
-		&"match_started":
-			duration_minutes = int(ev["duration"])
 		&"phase_changed":
 			phase = int(ev["phase"]) as Phase.Id
 			casino_time = float(ev.get("casino_time", casino_time))
@@ -104,6 +117,44 @@ func apply_event(ev: Dictionary) -> bool:
 			feed_message.emit("%s shook $%d out of %s" % [player_name(int(ev["attacker"])), int(ev["amount"]), player_name(int(ev["target"]))], &"chaos")
 		&"player_thrown_out":
 			feed_message.emit("Security threw %s out!" % player_name(int(ev["target"])), &"chaos")
+		&"player_ready":
+			if players.has(int(ev["player"])):
+				players[int(ev["player"])]["ready"] = bool(ev["ready"])
+			lobby_changed.emit()
+		&"player_cosmetics":
+			if players.has(int(ev["player"])):
+				players[int(ev["player"])]["color"] = int(ev["color"])
+				players[int(ev["player"])]["hat"] = StringName(ev["hat"])
+			players_changed.emit()
+			lobby_changed.emit()
+		&"leader_changed":
+			leader = int(ev["player"])
+			lobby_changed.emit()
+		&"lobby_settings":
+			lobby_settings = ev["settings"]
+			lobby_changed.emit()
+		&"lobby_countdown":
+			countdown = float(ev["seconds"])
+			lobby_changed.emit()
+		&"lobby_countdown_cancelled":
+			countdown = -1.0
+			lobby_changed.emit()
+		&"player_left", &"player_rejoined":
+			if players.has(int(ev["player"])):
+				players[int(ev["player"])]["connected"] = ev["type"] == &"player_rejoined"
+				if ev["type"] == &"player_left":
+					players[int(ev["player"])]["ready"] = false
+			feed_message.emit("%s %s" % [player_name(int(ev["player"])), "lost connection" if ev["type"] == &"player_left" else "is back"], &"info")
+			players_changed.emit()
+			lobby_changed.emit()
+		&"player_removed":
+			players.erase(int(ev["player"]))
+			balances.erase(int(ev["player"]))
+			players_changed.emit()
+			lobby_changed.emit()
+		&"match_started":
+			duration_minutes = int(ev["duration"])
+			countdown = -1.0
 		&"match_ended":
 			standings = ev["standings"]
 			phase = Phase.Id.RESULTS

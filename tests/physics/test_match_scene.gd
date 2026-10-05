@@ -76,6 +76,11 @@ func test_shake_drops_exactly_the_capped_amount_as_piles_and_pickup_pays_it() ->
 	assert_eq(_of(&"player_knocked_out").size(), 1)
 	var before: int = scene.server.economy.balance(bot)
 	var mine_before: int = scene.server.economy.balance(scene.local_id)
+	# The knockout launched the ragdoll (the server tracks where it lies); walk up to it.
+	var lie: Vector3 = scene.server.world.get_position(bot)
+	scene.local.teleport(Vector3(lie.x, 0.0, lie.z + 1.0), 0.0)
+	scene.server.set_server_position(scene.local_id, scene.local.global_position)
+	await wait_physics_frames(2)
 	var shaken: int = 0
 	for i: int in 3:
 		var res: Dictionary = Net.send_intent(Intents.make(&"shake"))

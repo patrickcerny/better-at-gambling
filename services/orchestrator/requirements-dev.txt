@@ -1,0 +1,3 @@
+# Test dependencies (runtime deps + pytest).
+-r requirements.txt
+pytest==9.1.1

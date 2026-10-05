@@ -29,6 +29,10 @@ var _chase_time: float = 0.0
 var _since_seen: float = 0.0
 var _target_pos: Vector3 = Vector3.ZERO
 var _wait: float = 0.0
+## Online clients: the server runs the guard; we follow its streamed position.
+var puppet: bool = false
+var _net_pos: Vector3 = Vector3.INF
+var _net_yaw: float = 0.0
 
 
 func _ready() -> void:
@@ -92,7 +96,27 @@ func stop_chase() -> void:
 	target_id = -1
 
 
+## Puppet: the server's latest position/yaw/state.
+func apply_net(pos: Vector3, p_yaw: float, p_state: int) -> void:
+	if _net_pos == Vector3.INF:
+		global_position = pos
+	_net_pos = pos
+	_net_yaw = p_yaw
+	if p_state == State.CHASE and state != State.CHASE:
+		visuals.react(&"win")
+		Audio.play_at(&"whistle", self, -6.0)
+	state = p_state as State
+
+
 func _physics_process(delta: float) -> void:
+	if puppet:
+		if _net_pos != Vector3.INF:
+			var prev: Vector3 = global_position
+			global_position = global_position.lerp(_net_pos, minf(1.0, 15.0 * delta))
+			yaw = lerp_angle(yaw, _net_yaw, minf(1.0, 12.0 * delta))
+			rotation.y = yaw
+			visuals.update_motion((global_position - prev) / maxf(delta, 0.0001), true, delta)
+		return
 	var speed: float = PATROL_SPEED
 	var goal: Vector3
 	match state:

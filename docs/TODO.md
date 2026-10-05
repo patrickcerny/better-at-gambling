@@ -111,47 +111,47 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ## M3 — Networking, dedicated server & lobby
 
 ### Tasks
-- [ ] `Dedicated Server` export preset and `--server` boot path
-- [ ] **Room Orchestrator** (§4.0) with `AUTH_MODE=dev`
-- [ ] port pool
-- [ ] spawn/heartbeat/reap
-- [ ] room codes
-- [ ] join tokens and `/internal/verify`
-- [ ] client `OnlineService` (create party, join by code, rejoin) and `RoomSession`
-- [ ] `NetSession`
-- [ ] `TransportFactory`
-- [ ] ENet transport
-- [ ] handshake/versioning
-- [ ] `NetIntents` & `NetEvents`
-- [ ] `IntentValidator` + `RateLimiter`
-- [ ] `ClientMatchView`/`ClientMatchState`
-- [ ] snapshot + delta with seq/gap recovery
-- [ ] `NetClock`
-- [ ] player avatar replication with interpolation and server sanity checks
-- [ ] **physical entrance-hall lobby** (ready pads, wardrobe mirror, host settings board) plus the mirrored 2D lobby panel (slots, colors, hats, ready, host settings, bot slots placeholder)
-- [ ] physics/ragdoll replication with **authority handoff** (client-owned while standing, server-owned while ragdolled/grabbed/thrown) and prop sync
-- [ ] client-side prediction of grab/shove animations with server confirm/deny
-- [ ] host/join by IP menus
-- [ ] connection error UI
-- [ ] `DelayedPeer` for tests
-- [ ] command-line `--server/--connect/--autoplay`
+- [x] `Dedicated Server` export preset and `--server` boot path
+- [x] **Room Orchestrator** (§4.0) with `AUTH_MODE=dev`
+- [x] port pool
+- [x] spawn/heartbeat/reap
+- [x] room codes
+- [x] join tokens and `/internal/verify`
+- [x] client `OnlineService` (create party, join by code, rejoin); the room side is `RoomHost` (server) + `Net` (client)
+- [x] `NetSession`
+- [x] `TransportFactory`
+- [x] ENet transport
+- [x] handshake/versioning
+- [x] `NetIntents` & `NetEvents`
+- [x] `IntentValidator` + `RateLimiter`
+- [x] `ClientMatchView`/`ClientMatchState`
+- [x] snapshot + delta with seq/gap recovery
+- [x] `NetClock`
+- [x] player avatar replication with interpolation and server sanity checks
+- [x] **physical entrance-hall lobby** (ready pads, wardrobe mirror, host settings board) plus the mirrored 2D lobby panel (slots, colors, hats, ready, host settings, bot slots placeholder)
+- [x] physics/ragdoll replication with **authority handoff** (client-owned while standing, server-owned while ragdolled/grabbed/thrown) and prop sync
+- [x] client-side prediction of grab/shove animations with server confirm/deny
+- [x] host/join by IP menus
+- [x] connection error UI
+- [x] `DelayedTransport` for tests (the `DelayedPeer` of the spec)
+- [x] command-line `--server/--connect/--autoplay`
 
 ### Tests
-- [ ] orchestrator **pytest** suite (room create/join/full/closed, port allocation and release, heartbeat timeout reaping, empty-room shutdown, one-room-per-owner, rate limits, version mismatch, dev auth refused when `ENV=production`, join token single-use)
-- [ ] end-to-end local test: start orchestrator → create room via API → orchestrator spawns a headless server → 2 autoplay clients join by room code → match runs → room shuts down when empty and the port is freed
-- [ ] serializer/protocol tests
-- [ ] validator tests (bet over money, wrong phase, not seated, foreign station, spam > 20/s)
-- [ ] multi-process integration: headless server + 2 headless autoplay clients play 3 minutes of casino
-- [ ] assert client mirrors equal server (state hash) at end
-- [ ] version-mismatch rejection
-- [ ] networked physics test (client A grabs and throws client B; both clients and server agree on B's final position within 0.3 m and on the knockout event; authority returns to B after get-up)
-- [ ] latency test 150 ms/2% loss (including a shove exchange)
-- [ ] bandwidth measured < 30 KB/s/client
+- [x] orchestrator **pytest** suite (room create/join/full/closed, port allocation and release, heartbeat timeout reaping, empty-room shutdown, one-room-per-owner, rate limits, version mismatch, dev auth refused when `ENV=production`, join token single-use)
+- [x] end-to-end local test: start orchestrator → create room via API → orchestrator spawns a headless server → 2 autoplay clients join by room code → match runs → room shuts down when empty and the port is freed
+- [x] serializer/protocol tests
+- [x] validator tests (bet over money, wrong phase, not seated, foreign station, spam > 20/s)
+- [x] multi-process integration: headless server + 2 headless autoplay clients play 3 minutes of casino
+- [x] assert client mirrors equal server (state hash) at end
+- [x] version-mismatch rejection
+- [x] networked physics test (client A grabs and throws client B; both clients and server agree on B's final position within 0.3 m and on the knockout event; authority returns to B after get-up)
+- [x] latency test 150 ms/2% loss (including a shove exchange)
+- [x] bandwidth measured < 30 KB/s/client
 
 ### Acceptance criteria
-- [ ] with the orchestrator running locally, one client creates a party, a second client joins by room code
-- [ ] both ready up, enter the casino, see each other move and wobble, shove and throw each other, play at the same roulette/blackjack table and Plinko board together, and money stays consistent
-- [ ] all tests green
+- [x] with the orchestrator running locally, one client creates a party, a second client joins by room code (`tests/net/test_orchestrator_e2e.py`)
+- [x] both ready up, enter the casino, see each other move and wobble, shove and throw each other, play at the same roulette/blackjack table and Plinko board together, and money stays consistent (`tests/net/test_net_match.py`: shared blackjack_3/roulette_1/plinko_1, identical balance digests on server and both clients)
+- [x] all tests green
 
 ## M4 — Match flow, timer, Quiz minigame, rewards (cash only for now)
 

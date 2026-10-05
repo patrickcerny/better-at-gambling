@@ -49,6 +49,47 @@ func set_color(c: Color) -> void:
 		_body_mat.albedo_color = c
 
 
+## Half-transparent "away" look for disconnected players.
+func set_ghost(on: bool) -> void:
+	for n: Node in find_children("*", "GeometryInstance3D", true, false):
+		(n as GeometryInstance3D).transparency = 0.55 if on else 0.0
+
+
+## Puts one of the placeholder lobby hats on (see `Cosmetics.HATS`).
+func set_hat(hat: StringName) -> void:
+	if hat_slot == null:
+		return
+	for c: Node in hat_slot.get_children():
+		c.queue_free()
+	var black: Color = Palette.CASINO_BLACK
+	match hat:
+		&"top_hat":
+			GreyboxKit.cylinder(hat_slot, 0.34, 0.04, Vector3(0, 0.02, 0), black, "Brim", false)
+			GreyboxKit.cylinder(hat_slot, 0.22, 0.42, Vector3(0, 0.23, 0), black, "Crown", false)
+			GreyboxKit.cylinder(hat_slot, 0.225, 0.07, Vector3(0, 0.08, 0), Palette.CASINO_RED, "Band", false)
+		&"cowboy":
+			GreyboxKit.cylinder(hat_slot, 0.48, 0.04, Vector3(0, 0.02, 0), Color("#8A5A32"), "Brim", false)
+			GreyboxKit.cylinder(hat_slot, 0.24, 0.24, Vector3(0, 0.14, 0), Color("#8A5A32"), "Crown", false)
+		&"party":
+			var cone := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.0
+			cm.bottom_radius = 0.2
+			cm.height = 0.45
+			cone.mesh = cm
+			cone.material_override = GreyboxKit.material(Palette.VIP_GOLD)
+			cone.position.y = 0.22
+			cone.name = "Cone"
+			hat_slot.add_child(cone)
+			GreyboxKit.sphere(hat_slot, 0.06, Vector3(0, 0.46, 0), Palette.CASINO_RED, "Pom")
+		&"beanie":
+			GreyboxKit.sphere(hat_slot, 0.33, Vector3(0, -0.02, 0), Palette.FELT_GREEN, "Knit")
+			GreyboxKit.sphere(hat_slot, 0.08, Vector3(0, 0.3, 0), Palette.CREAM, "Pom")
+		&"bowler":
+			GreyboxKit.cylinder(hat_slot, 0.3, 0.03, Vector3(0, 0.02, 0), Color("#3A2A1E"), "Brim", false)
+			GreyboxKit.sphere(hat_slot, 0.22, Vector3(0, 0.1, 0), Color("#3A2A1E"), "Dome")
+
+
 ## Call every frame with the body's velocity and grounded state.
 func update_motion(velocity: Vector3, on_floor: bool, delta: float) -> void:
 	_time += delta

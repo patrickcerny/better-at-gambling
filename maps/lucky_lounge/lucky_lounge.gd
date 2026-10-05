@@ -36,6 +36,16 @@ const VIP_GATE_POS: Vector3 = Vector3(9.0, MEZZ_Y, -0.5)
 const ENTRANCE_POS: Vector3 = Vector3(0, 0, 15.0)
 const RESPAWN_POS: Vector3 = Vector3(0, 0, 13.0)
 const FOUNTAIN_POS: Vector3 = Vector3(0, 0, 10.0)
+## Where online players appear in the entrance hall (off the ready pads, clear of the fountain).
+const LOBBY_SPAWNS: Array[Vector3] = [
+	Vector3(-7, 0, 10.0), Vector3(7, 0, 10.0), Vector3(-5, 0, 10.8), Vector3(5, 0, 10.8),
+	Vector3(-9, 0, 11.0), Vector3(9, 0, 11.0), Vector3(-7, 0, 11.6), Vector3(7, 0, 11.6),
+]
+const MIRROR_POS: Vector3 = Vector3(-21.3, 0, 12.0)
+const SETTINGS_BOARD_POS: Vector3 = Vector3(12.5, 0, 14.6)
+## Radius around a ready pad's centre that counts as standing on it.
+const PAD_RADIUS: float = 0.75
+const LOBBY_DOORS_Z: float = 8.2
 
 var stations: Dictionary[StringName, StationBase] = {}
 var fountain_area: Area3D
@@ -44,6 +54,9 @@ var revolving_door: Node3D
 var nav_region: NavigationRegion3D
 var props_parent: Node3D
 var navmesh_ready: bool = false
+## Wall between the entrance hall and the casino while the online lobby waits (§2.2).
+var lobby_doors: StaticBody3D
+var lobby_open: bool = true
 
 
 func _ready() -> void:
@@ -68,6 +81,32 @@ func station_positions() -> Dictionary:
 ## Spawn points (world).
 func spawn_points() -> Array[Vector3]:
 	return SPAWNS.duplicate()
+
+
+## Lobby spawn for a player (online rooms).
+func lobby_spawn(player_id: int) -> Vector3:
+	return LOBBY_SPAWNS[(player_id - 1) % LOBBY_SPAWNS.size()]
+
+
+## Centre of the ready pad in a player colour.
+func ready_pad(color_index: int) -> Vector3:
+	return SPAWNS[clampi(color_index, 0, SPAWNS.size() - 1)]
+
+
+## Opens (casino reachable) or closes the lobby doors. Opening slides them into the floor.
+func set_lobby_open(open: bool) -> void:
+	if lobby_doors == null or open == lobby_open:
+		return
+	lobby_open = open
+	var shape: CollisionShape3D = lobby_doors.get_node("Shape")
+	shape.set_deferred(&"disabled", open)
+	if open and is_inside_tree():
+		var tw: Tween = create_tween()
+		tw.tween_property(lobby_doors, "position:y", -4.2, 1.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_callback(func() -> void: lobby_doors.visible = false)
+	else:
+		lobby_doors.position.y = 0.0
+		lobby_doors.visible = not open
 
 
 func _build_floor_and_walls() -> void:
@@ -135,6 +174,10 @@ func _build_lobby() -> void:
 		pad.add_to_group(&"ready_pads")
 	# Wardrobe mirror.
 	GreyboxKit.box(self, Vector3(0.2, 2.4, 1.6), Vector3(-SIZE_X * 0.5 + 0.6, 1.2, 12.0), Color("#9AC4D8"), "Mirror")
+	GreyboxKit.box(self, Vector3(0.3, 2.7, 1.9), Vector3(-SIZE_X * 0.5 + 0.45, 1.3, 12.0), Palette.WARM_GOLD, "MirrorFrame", false)
+	_sign_label(Vector3(-SIZE_X * 0.5 + 0.8, 2.85, 12.0), PI * 0.5, "WARDROBE", 56)
+	_build_settings_board()
+	_build_lobby_doors()
 	# Revolving door: rotating 4-panel cylinder in the south wall gap.
 	revolving_door = Node3D.new()
 	revolving_door.name = "RevolvingDoor"
@@ -182,6 +225,80 @@ func _build_lobby() -> void:
 	GreyboxKit.ramp(self, Vector3(12.0, MEZZ_Y * 0.5, 1.5), Vector3(12.0, MEZZ_Y, -1.5), 2.4, Palette.CASINO_RED.darkened(0.2), "Stairs2")
 	for side: float in [-1.3, 1.3]:
 		GreyboxKit.box(self, Vector3(0.1, 1.0, 11.0), Vector3(12.0 + side, MEZZ_Y * 0.5 + 0.5, 3.75), Palette.WARM_GOLD, "StairRail", true)
+
+
+func _build_settings_board() -> void:
+	var p: Vector3 = SETTINGS_BOARD_POS
+	for x: float in [-1.0, 1.0]:
+		GreyboxKit.cylinder(self, 0.07, 1.6, p + Vector3(x, 0.8, 0), Palette.WARM_GOLD, "BoardPost", true, 0.8)
+	GreyboxKit.box(self, Vector3(2.4, 1.5, 0.12), p + Vector3(0, 2.2, 0), Palette.FELT_GREEN.darkened(0.3), "SettingsBoard")
+	GreyboxKit.box(self, Vector3(2.6, 0.1, 0.16), p + Vector3(0, 3.0, 0), Palette.WARM_GOLD, "BoardTrim", false)
+	_sign_label(p + Vector3(0, 2.55, -0.08), PI, "PARTY SETTINGS", 52)
+	_sign_label(p + Vector3(0, 2.05, -0.08), PI, "leader: press E", 34)
+
+
+func _build_lobby_doors() -> void:
+	# Built by hand (not GreyboxKit) so it never enters the navmesh: the casino floor stays
+	# walkable for guards and bots once the doors sink away.
+	lobby_doors = StaticBody3D.new()
+	lobby_doors.name = "LobbyDoors"
+	lobby_doors.collision_layer = 1
+	var cs := CollisionShape3D.new()
+	cs.name = "Shape"
+	var sh := BoxShape3D.new()
+	sh.size = Vector3(SIZE_X, 4.0, 0.4)
+	cs.shape = sh
+	cs.position = Vector3(0, 2.0, LOBBY_DOORS_Z)
+	lobby_doors.add_child(cs)
+	for x: float in [-14.0, 14.0]:
+		var curtain := MeshInstance3D.new()
+		var cm := BoxMesh.new()
+		cm.size = Vector3(16.0, 4.0, 0.2)
+		curtain.mesh = cm
+		curtain.material_override = GreyboxKit.material(Palette.CASINO_RED.darkened(0.35))
+		curtain.position = Vector3(x, 2.0, LOBBY_DOORS_Z)
+		lobby_doors.add_child(curtain)
+	for x: float in [-3.0, 3.0]:
+		var door := MeshInstance3D.new()
+		var dm := BoxMesh.new()
+		dm.size = Vector3(6.0, 4.0, 0.3)
+		door.mesh = dm
+		door.material_override = GreyboxKit.material(Color("#3A2A1E"))
+		door.position = Vector3(x, 2.0, LOBBY_DOORS_Z)
+		lobby_doors.add_child(door)
+		var trim := MeshInstance3D.new()
+		var tm := BoxMesh.new()
+		tm.size = Vector3(5.4, 3.4, 0.05)
+		trim.mesh = tm
+		trim.material_override = GreyboxKit.material(Palette.WARM_GOLD)
+		trim.position = Vector3(x, 2.0, LOBBY_DOORS_Z + 0.17)
+		lobby_doors.add_child(trim)
+	var label := Label3D.new()
+	label.text = "THE CASINO OPENS WHEN EVERYONE IS ON A READY PAD"
+	label.font_size = 64
+	label.pixel_size = 0.006
+	label.modulate = Palette.CREAM
+	label.outline_modulate = Palette.CASINO_BLACK
+	label.outline_size = 12
+	label.position = Vector3(0, 3.3, LOBBY_DOORS_Z + 0.25)
+	lobby_doors.add_child(label)
+	lobby_doors.visible = false
+	cs.disabled = true
+	add_child(lobby_doors)
+
+
+func _sign_label(pos: Vector3, yaw: float, text: String, size: int) -> Label3D:
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = size
+	l.pixel_size = 0.005
+	l.modulate = Palette.CREAM
+	l.outline_modulate = Palette.CASINO_BLACK
+	l.outline_size = 10
+	l.position = pos
+	l.rotation.y = yaw
+	add_child(l)
+	return l
 
 
 func _build_floor_areas() -> void:
