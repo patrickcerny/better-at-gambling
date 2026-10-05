@@ -27,6 +27,13 @@ const SCHEMA: Dictionary = {
 	&"banana_placed": ["peel", "owner", "pos", "seconds"],
 	&"banana_slip": ["peel", "player", "owner", "result", "victim", "amount"],
 	&"banana_removed": ["peel", "reason"],
+	&"rps_invite": ["duel", "from", "to", "stake", "seconds"],
+	&"rps_start": ["duel", "a", "b", "stake", "seconds", "replay"],
+	&"rps_picked": ["duel", "player"],
+	&"rps_result": ["duel", "a", "b", "pick_a", "pick_b", "winner", "amount", "replay"],
+	&"rps_cancelled": ["duel", "a", "b", "reason"],
+	&"shop_restocked": ["offers"],
+	&"shop_bought": ["player", "item", "price"],
 }
 
 

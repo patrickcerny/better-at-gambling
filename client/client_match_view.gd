@@ -51,6 +51,10 @@ func _process(delta: float) -> void:
 		state.next_minigame_in = float(snap.get("next_minigame_in", -1.0))
 		state.casino_time = float(snap.get("casino_time", state.casino_time))
 		state.jackpot = int(snap.get("jackpot", state.jackpot))
+		var offers: Array = (snap.get("shop", {}) as Dictionary).get("offers", [])
+		if offers != state.shop_offers:
+			state.shop_offers = offers.duplicate(true)
+			state.shop_changed.emit()
 		var st: Dictionary = snap.get("stations", {})
 		for sid: Variant in st:
 			state.stations[sid] = st[sid]

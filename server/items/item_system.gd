@@ -25,6 +25,12 @@ var limits: Callable = func() -> float: return 1.0
 var on_vip_lost: Callable = Callable()
 var loot: LootTables = null
 var jackpot: ProgressiveJackpot = null
+## Out of Order: nearest station to a player within a range (&"" = none), and closing one.
+var find_station: Callable = Callable()
+## Rock Paper Scissors wagers and the Gift Shop (built in `setup_extras`).
+var duels: RpsDuels
+var shop: GiftShop
+var close_station: Callable = Callable()
 var events: Array[Dictionary] = []
 ## When each player last used an item, and when each was last hit by a negative one.
 var last_use: Dictionary[int, float] = {}
@@ -50,6 +56,28 @@ func _init(p_defs: Dictionary[StringName, ItemDefinition], p_balance: BalanceCon
 	pickups = p_pickups
 	rng = p_rng
 	modifiers.modifier_removed.connect(_on_modifier_removed)
+	duels = RpsDuels.new(economy, rng.fork())
+
+
+## Builds what needs the loot pool (call after setting `loot`).
+func setup_extras() -> void:
+	shop = GiftShop.new(loot, rng.fork())
+
+
+## Buys Gift Shop offer `index` for `player`. Returns {ok, error}.
+func buy(player: int, index: int, now: float) -> Dictionary:
+	if shop == null or index < 0 or index >= shop.offers.size():
+		return StationLogicBase.fail(&"bad_value")
+	if shop.bought.has(player):
+		return StationLogicBase.fail(&"already_bought")
+	var offer: Dictionary = shop.offers[index]
+	if economy.balance(player) < int(offer["price"]):
+		return StationLogicBase.fail(&"insufficient_funds")
+	economy.apply(player, -int(offer["price"]), &"shop", StringName(offer["item"]))
+	shop.bought[player] = true
+	events.append(GameEvents.make(&"shop_bought", {"player": player, "item": offer["item"], "price": offer["price"]}))
+	give(player, StringName(offer["item"]), now)
+	return StationLogicBase.OK_RESULT
 
 
 # --- Inventory ---------------------------------------------------------------------------------
@@ -276,6 +304,7 @@ func shield_knockout(target: int, attacker: int, now: float) -> bool:
 ## The casino segment ended: segment-long items (Hot Hands, Loaded Reels) run out.
 func end_segment() -> void:
 	modifiers.expire_flag(&"segment_end")
+	duels.cancel_all()
 
 
 ## Discard deadlines always; banana peels only while the casino is open.
@@ -287,6 +316,11 @@ func tick(now: float, casino_open: bool) -> void:
 			_resolve_choice(player, 0, now)  # default: the oldest item goes
 	if casino_open:
 		_tick_peels(now)
+		var bots: Dictionary = {}
+		for id: int in players:
+			if players[id].is_bot:
+				bots[id] = true
+		duels.tick(now, bots)
 
 
 func _on_modifier_removed(player: int, mod: Modifier, reason: StringName) -> void:
@@ -443,6 +477,11 @@ func private_state(player: int, now: float) -> Dictionary:
 			continue
 		effects.append({"item": m.id, "luck": m.luck, "game": m.game_id, "left": snappedf(m.expires_at - now, 0.1) if m.expires_at != INF else -1.0, "uses": m.rounds_left})
 	var out: Dictionary = {"luck": modifiers.get_luck(player), "effects": effects}
+	if shop != null and shop.bought.has(player):
+		out["shop_bought"] = true
+	for d: Dictionary in duels.duels.values():
+		if int(d["a"]) == player or int(d["b"]) == player:
+			out["duel"] = {"duel": d["duel"], "a": d["a"], "b": d["b"], "stake": d["stake"], "state": d["state"], "left": snappedf(maxf(float(d["deadline"]) - now, 0.0), 0.1), "picked": (d["picks"] as Dictionary).has(player)}
 	var queue: Array = pending.get(player, [])
 	if not queue.is_empty() and float(queue[0]["deadline"]) != INF:
 		out["discard"] = {"item": queue[0]["item"], "left": snappedf(maxf(float(queue[0]["deadline"]) - now, 0.0), 0.1)}
@@ -452,4 +491,5 @@ func private_state(player: int, now: float) -> Dictionary:
 func drain_events() -> Array[Dictionary]:
 	var out: Array[Dictionary] = events
 	events = []
+	out.append_array(duels.drain_events())
 	return out

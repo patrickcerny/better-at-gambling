@@ -41,6 +41,8 @@ const LOBBY_SPAWNS: Array[Vector3] = [
 	Vector3(-7, 0, 10.0), Vector3(7, 0, 10.0), Vector3(-5, 0, 10.8), Vector3(5, 0, 10.8),
 	Vector3(-9, 0, 11.0), Vector3(9, 0, 11.0), Vector3(-7, 0, 11.6), Vector3(7, 0, 11.6),
 ]
+## Where players stand to shop at the Gift Shop kiosk (east wall, next to the bar).
+const SHOP_POS: Vector3 = Vector3(19.6, 0, 1.5)
 const MIRROR_POS: Vector3 = Vector3(-21.3, 0, 12.0)
 const SETTINGS_BOARD_POS: Vector3 = Vector3(12.5, 0, 14.6)
 ## Radius around a ready pad's centre that counts as standing on it.
@@ -313,10 +315,25 @@ func _build_floor_areas() -> void:
 	GreyboxKit.box(self, Vector3(8.0, 2.5, 0.4), Vector3(16.0, 1.25, 7.0), Color("#2A1E18"), "BackBar")
 	for i: int in 6:
 		GreyboxKit.box(self, Vector3(0.25, 0.4, 0.25), Vector3(12.5 + i * 1.4, 1.6, 6.9), [Palette.CASINO_RED, Palette.WARM_GOLD, Palette.FELT_GREEN][i % 3], "Bottle", false)
+	_build_gift_shop()
 	# Plants and a few obstacles for lanes.
 	for p: Vector3 in [Vector3(-20, 0, 14), Vector3(20, 0, 14), Vector3(-20, 0, -1), Vector3(20, 0, -1), Vector3(-5, 0, 8.6), Vector3(5, 0, 8.6)]:
 		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, p + Vector3(0, 0.3, 0), Color("#5A3A22"), "Pot")
 		GreyboxKit.sphere(pot, 0.7, Vector3(0, 0.9, 0), Color("#3C7A3A"), "Leaves")
+
+
+## Gift Shop kiosk: a counter with a striped awning and a sign, four items on sale each round.
+func _build_gift_shop() -> void:
+	var c: Vector3 = SHOP_POS + Vector3(1.3, 0, 0)
+	GreyboxKit.box(self, Vector3(1.0, 1.1, 2.2), c + Vector3(0, 0.55, 0), Palette.VIP_BURGUNDY, "ShopCounter")
+	GreyboxKit.box(self, Vector3(1.1, 0.08, 2.3), c + Vector3(0, 1.14, 0), Palette.WARM_GOLD, "ShopCounterTop", false)
+	for z: float in [-1.0, 1.0]:
+		GreyboxKit.box(self, Vector3(0.1, 2.6, 0.1), c + Vector3(-0.5, 1.3, z), Palette.WARM_GOLD, "ShopPost")
+	for i: int in 4:
+		GreyboxKit.box(self, Vector3(1.4, 0.12, 0.58), c + Vector3(-0.2, 2.65, -0.87 + i * 0.58), Palette.CASINO_RED if i % 2 == 0 else Palette.CREAM, "ShopAwning", false)
+	for i: int in 4:
+		GreyboxKit.box(self, Vector3(0.3, 0.3, 0.3), c + Vector3(0.1, 1.33, -0.75 + i * 0.5), [Palette.FELT_GREEN, Palette.WARM_GOLD, Palette.CASINO_RED, Palette.CREAM][i], "ShopGoods", false)
+	_sign_label(c + Vector3(-0.56, 2.15, 0), -PI / 2.0, "GIFT SHOP", 64)
 
 
 func _build_mezzanine() -> void:

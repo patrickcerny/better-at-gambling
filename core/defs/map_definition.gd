@@ -12,5 +12,7 @@ extends Resource
 @export var station_positions: Dictionary = {}
 ## Spawn points in the entrance hall.
 @export var spawn_points: Array[Vector3] = []
+## Gift Shop counter (filled by the map scene; INF = no distance check, e.g. in tests).
+@export var shop_position: Vector3 = Vector3.INF
 ## Max distance from a station's interaction point to sit down.
 @export var interact_range: float = 3.5

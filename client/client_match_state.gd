@@ -18,6 +18,8 @@ signal results_changed
 signal effects_changed(player: int)
 ## Banana peels appeared or disappeared.
 signal peels_changed
+## The Gift Shop got new stock.
+signal shop_changed
 
 var phase: Phase.Id = Phase.Id.LOBBY
 var casino_time: float = 0.0
@@ -54,6 +56,8 @@ var results_return_in: float = -1.0
 ## {peel, owner, pos, seconds}).
 var effects: Dictionary[int, Array] = {}
 var peels: Dictionary[int, Dictionary] = {}
+## Gift Shop offers this segment [{item, price, rarity}].
+var shop_offers: Array = []
 
 
 ## Replaces everything from a snapshot.
@@ -95,6 +99,8 @@ func apply_snapshot(snap: Dictionary) -> void:
 	effects.clear()
 	for id: Variant in snap.get("effects", {}):
 		effects[int(id)] = (snap["effects"][id] as Array).duplicate()
+	shop_offers = (snap.get("shop", {}) as Dictionary).get("offers", []).duplicate(true)
+	shop_changed.emit()
 	peels.clear()
 	for p: Dictionary in snap.get("peels", []):
 		peels[int(p["peel"])] = p
@@ -273,6 +279,19 @@ func apply_event(ev: Dictionary) -> bool:
 					feed_message.emit("%s's Mirror sent the banana back: %s slipped (−$%d)" % [player_name(int(ev["player"])), player_name(victim), int(ev["amount"])], &"chaos")
 				_:
 					feed_message.emit("%s slipped on a banana (−$%d)" % [player_name(victim), int(ev["amount"])], &"chaos")
+		&"shop_restocked":
+			shop_offers = (ev["offers"] as Array).duplicate(true)
+			shop_changed.emit()
+		&"shop_bought":
+			feed_message.emit("%s bought %s at the Gift Shop" % [player_name(int(ev["player"])), RewardPanel.item_name(StringName(ev["item"]))], &"item")
+		&"rps_result":
+			if not bool(ev["replay"]):
+				var w: int = int(ev["winner"])
+				if w < 0:
+					feed_message.emit("%s and %s tied at Rock Paper Scissors twice: no money changed hands" % [player_name(int(ev["a"])), player_name(int(ev["b"]))], &"item")
+				else:
+					var l: int = int(ev["b"]) if w == int(ev["a"]) else int(ev["a"])
+					feed_message.emit("%s beat %s at Rock Paper Scissors (+$%d)" % [player_name(w), player_name(l), int(ev["amount"])], &"chaos")
 		&"match_reset":
 			effects.clear()
 			peels.clear()
@@ -319,6 +338,10 @@ func _on_item_used(ev: Dictionary) -> void:
 			text += ": BANG! (−$%d)" % int(ev.get("amount", 0)) if bool(ev.get("bang", false)) else ": *click* (+$%d)" % int(ev.get("amount", 0))
 		&"credit_card":
 			text += " (+$%d)" % int(ev.get("loan", 0))
+		&"out_of_order":
+			text += " on %s" % station_label(StringName(ev.get("station", "")))
+		&"rock_paper_scissors":
+			text += " for $%d" % int(ev.get("stake", 0))
 		_:
 			if bool(ev.get("caught", false)):
 				text += ", but got caught and paid $%d" % int(ev.get("paid", 0))

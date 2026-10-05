@@ -15,6 +15,10 @@ var seats: Array[Node3D] = []
 var camera_anchor: Node3D
 var interaction_area: Area3D
 var hot_light: OmniLight3D
+## "OUT OF ORDER" sign (item) hung over the station; built on first use.
+var out_of_order_sign: Label3D
+## Seconds left on the sign (0 = open).
+var out_of_order_left: float = 0.0
 
 
 func _ready() -> void:
@@ -57,8 +61,32 @@ func seat_position(index: int = 0) -> Vector3:
 	return seats[clampi(index, 0, seats.size() - 1)].global_position
 
 
+## Shows or hides the Out of Order sign (`seconds` left, 0 = open).
+func set_out_of_order(seconds: float) -> void:
+	out_of_order_left = seconds
+	if seconds <= 0.0:
+		if out_of_order_sign != null:
+			out_of_order_sign.visible = false
+		return
+	if out_of_order_sign == null:
+		out_of_order_sign = Label3D.new()
+		out_of_order_sign.name = "OutOfOrder"
+		out_of_order_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		out_of_order_sign.font_size = 72
+		out_of_order_sign.pixel_size = 0.006
+		out_of_order_sign.outline_size = 14
+		out_of_order_sign.modulate = Palette.LOSS_RED
+		out_of_order_sign.outline_modulate = Palette.CASINO_BLACK
+		out_of_order_sign.position = Vector3(0, 2.3, 0)
+		add_child(out_of_order_sign)
+	out_of_order_sign.text = "OUT OF ORDER\n%ds" % ceili(seconds)
+	out_of_order_sign.visible = true
+
+
 ## Interaction prompt text.
 func prompt_text(min_bet: int) -> String:
+	if out_of_order_left > 0.0:
+		return "OUT OF ORDER (%ds)" % ceili(out_of_order_left)
 	return "[E] Play %s — Min $%d" % [game_id.capitalize(), min_bet]
 
 

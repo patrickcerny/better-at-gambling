@@ -14,6 +14,9 @@ var hot: Dictionary[StringName, bool] = {}
 ## Station ids that are VIP (limits ×3, entry check).
 var vip: Dictionary[StringName, bool] = {}
 
+## Station id → seconds left on its "Out of Order" sign (item). Nobody new sits, no new bets;
+## rounds already running finish normally.
+var out_of_order: Dictionary[StringName, float] = {}
 ## Seconds until the casino closes (pre-minigame warning, end of match); INF while open.
 var closing_in: float = INF
 var _balance: BalanceConfig
@@ -83,6 +86,8 @@ func sit(player: int, station_id: StringName) -> Dictionary:
 	if current != &"":
 		return StationLogicBase.fail(&"already_seated")
 	var logic: StationLogicBase = logics[station_id]
+	if out_of_order.has(station_id):
+		return StationLogicBase.fail(&"out_of_order")
 	if not logic.can_join(player):
 		return StationLogicBase.fail(&"seat_taken")
 	var res: Dictionary = logic.join(player)
@@ -111,6 +116,8 @@ func route(player: int, intent: Dictionary) -> Dictionary:
 	var logic: StationLogicBase = logics[station_id]
 	match intent["type"]:
 		&"place_bet":
+			if out_of_order.has(station_id):
+				return StationLogicBase.fail(&"out_of_order")
 			var bet: Variant = intent.get("bet", {})
 			if typeof(bet) != TYPE_DICTIONARY:
 				return StationLogicBase.fail(&"bad_bet")
@@ -129,6 +136,10 @@ func route(player: int, intent: Dictionary) -> Dictionary:
 func tick(delta: float) -> void:
 	for sid: StringName in logics:
 		logics[sid].tick(delta)
+	for sid: StringName in out_of_order.keys():
+		out_of_order[sid] -= delta
+		if out_of_order[sid] <= 0.0:
+			out_of_order.erase(sid)
 
 
 ## True while the player has money in play anywhere (an open hand, bet, spin or Plinko chip).
@@ -160,6 +171,8 @@ func public_states() -> Dictionary:
 		var st: Dictionary = logics[sid].get_public_state()
 		st["hot"] = hot.get(sid, false)
 		st["vip"] = vip.get(sid, false)
+		if out_of_order.has(sid):
+			st["out_of_order"] = snappedf(out_of_order[sid], 0.1)
 		out[sid] = st
 	return out
 

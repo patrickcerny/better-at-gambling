@@ -1,10 +1,9 @@
 # Item ideas from Patrick (2026-10-05)
 
-Status: **noted, not implemented.** Patrick: "Just note these and rework if unbalanced. Don't
-implement yet, implement with the other fixes later." They get built together with the playtest
-fixes after M5. Each idea has a proposed balanced version below; numbers are first guesses for
-tuning in `BalanceConfig`/item `params`. Money never depends on physics (§ master prompt), so physical
-effects only stun, drop chips or move players.
+Status: **built in 0.5.1** (Patrick, 2026-10-05: "implement the new items"; jail stays a todo).
+All 15 items and the Gift Shop follow the "Proposed version" column below, with the changes listed
+under "As built". Money never depends on physics (§ master prompt), so physical effects only stun,
+drop chips or move players.
 
 | # | Idea (Patrick's words, short) | Proposed version | Notes |
 |---|---|---|---|
@@ -34,7 +33,20 @@ Jail Free** (rare): leave jail at once *and* reset your caught counter to zero; 
 pre-emptively only to reset the counter. Replaces the current "thrown out + respawn" for offences;
 knockouts and falls keep the plain respawn.
 
-## Order to build (proposal)
+## As built (0.5.1)
+- **Controls:** Pickpocket and Rock Paper Scissors open the target picker; **R** cycles the greed
+  tier / the stake (5, 10 or 15% of the poorer player's money, minimum $10). A challenged player
+  answers with **Y / N** (6 s, silence declines), then both pick with **1 / 2 / 3** (6 s, no pick =
+  random). One tie replays, a second tie calls it off. Bots accept 70% of challenges.
+- **Out of Order:** hangs on the nearest table or machine within 4 m for 30 s; nobody can sit or
+  bet there, rounds already running finish. A red sign and the prompt show the countdown.
+- **Gift Shop:** a kiosk on the east wall next to the bar, open in the casino. Four offers per
+  segment (two common, one rare, one rare or legendary), the same for everyone, $150 / $400 / $900
+  × table limits; one buy per player per segment. Restocks when each casino segment starts.
+- **Scissors** is a CUT button [C] at blackjack; **Beer** wobbles the camera only (movement stays
+  normal) and leaves an Empty Bottle (4 s stun, never in drafts or the shop).
+
+## Order to build (proposal, done)
 1. Cheap, data-only on existing systems: Sunglasses, Bad Luck Monkey (without hot potato first),
    Early VIP Pass, Scratch Ticket, Energy Drink.
 2. New small mechanics: Baseball Bat + Empty Bottle (melee item hit), Credit Card (delayed

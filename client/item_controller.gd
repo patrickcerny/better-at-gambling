@@ -19,9 +19,13 @@ var picking_slot: int = -1
 var picking_def: ItemDefinition = null
 var picking_candidates: Array[int] = []
 var picking_index: int = 0
-## Pickpocket greed tier (0 safe 12%, 1 greedy 20% at 65%, 2 very greedy 30% at 40%); R cycles it.
+## Picker option, R cycles it: Pickpocket greed (0 safe 12%, 1 greedy 20% at 65%, 2 very greedy
+## 30% at 40%) or the Rock Paper Scissors stake (5/10/15% of the poorer player's money).
 var option: int = 0
 const GREED_TEXT: Array[String] = ["safe 12%", "greedy 20% (65% odds)", "very greedy 30% (40% odds)"]
+const STAKE_TEXT: Array[String] = ["stake 5%", "stake 10%", "stake 15%"]
+## The local player's Rock Paper Scissors duel from the private snapshot ({} = none).
+var duel: Dictionary = {}
 var _pick_until: float = 0.0
 var _cooldown_until: float = -INF
 var _poll: float = 0.0
@@ -99,7 +103,7 @@ func on_slot(slot: int) -> void:
 	picking_def = def
 	picking_candidates = cands
 	picking_index = 0
-	option = 0
+	option = 1 if def.id == &"rock_paper_scissors" else 0
 	_pick_until = _clock + PICK_SECONDS
 	_update_picker()
 
@@ -191,6 +195,16 @@ static func rejection_text(error: StringName) -> String:
 			return "Items are off this match"
 		&"wrong_phase":
 			return "Not now"
+		&"busy":
+			return "They're already in a duel"
+		&"no_station":
+			return "Stand next to a table or machine"
+		&"already_bought":
+			return "One gift shop buy per round"
+		&"too_far":
+			return "Walk up to the gift shop"
+		&"no_duel":
+			return "That duel is over"
 	return StationUi.rejection_text(error)
 
 
@@ -207,6 +221,8 @@ func _process(delta: float) -> void:
 		var priv: Dictionary = Net.request_private_snapshot().get("items", {})
 		scene.hud.items.set_private(priv)
 		_discard_open = priv.has("discard")
+		duel = priv.get("duel", {})
+		scene.hud.items.show_duel(duel_text())
 	if picking_slot >= 0:
 		if _clock > _pick_until or picking_slot >= _inventory().size() or not _items_allowed():
 			cancel()
@@ -231,6 +247,9 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _duel_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if _discard_open and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var k: Key = (event as InputEventKey).physical_keycode
 		if k >= KEY_1 and k <= KEY_4:
@@ -258,7 +277,7 @@ func _input(event: InputEvent) -> void:
 		confirm()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(&"bet_repeat") and _has_options(picking_def):
-		option = (option + 1) % GREED_TEXT.size()
+		option = (option + 1) % _option_texts(picking_def).size()
 		_pick_until = _clock + PICK_SECONDS
 		_update_picker()
 		get_viewport().set_input_as_handled()
@@ -287,7 +306,7 @@ func _update_picker() -> void:
 	marker.text = "▼ %s" % name
 	marker.visible = true
 	var key: String = ("Shift+%d" if scene.local.state == PlayerAvatar.State.SEATED else "%d") % (picking_slot + 1)
-	var extra: String = ("\n[R] %s" % GREED_TEXT[option]) if _has_options(picking_def) else ""
+	var extra: String = ("\n[R] %s" % _option_texts(picking_def)[option]) if _has_options(picking_def) else ""
 	scene.hud.items.show_target("%s → %s   (wheel: switch, %s or E: use)%s" % [picking_def.display_name, name, key, extra])
 	if _near(picking_def):
 		_show_ring(picking_def, PICK_SECONDS)
@@ -305,9 +324,51 @@ func _show_ring(def: ItemDefinition, seconds: float) -> void:
 	_ring_until = _clock + seconds
 
 
-## Items with a choice made in the picker (Pickpocket's greed).
+## Items with a choice made in the picker (Pickpocket's greed, the duel stake).
 func _has_options(def: ItemDefinition) -> bool:
-	return def != null and def.id == &"pickpocket"
+	return def != null and (def.id == &"pickpocket" or def.id == &"rock_paper_scissors")
+
+
+func _option_texts(def: ItemDefinition) -> Array[String]:
+	return STAKE_TEXT if def != null and def.id == &"rock_paper_scissors" else GREED_TEXT
+
+
+## The duel prompt for the local player ("" = nothing to show).
+func duel_text() -> String:
+	if duel.is_empty():
+		return ""
+	var me: int = scene.local_id
+	var other: int = int(duel["b"]) if int(duel["a"]) == me else int(duel["a"])
+	var who: String = scene.view.state.player_name(other)
+	var left: int = ceili(float(duel.get("left", 0.0)))
+	if str(duel["state"]) == "invite":
+		if int(duel["b"]) == me:
+			return "%s challenges you to Rock Paper Scissors for $%d\n[Y] Accept   [N] Decline   (%ds)" % [who, int(duel["stake"]), left]
+		return "Waiting for %s to accept your challenge… (%ds)" % [who, left]
+	if bool(duel.get("picked", false)):
+		return "Waiting for %s to pick… (%ds)" % [who, left]
+	return "ROCK PAPER SCISSORS vs %s for $%d\n[1] Rock   [2] Paper   [3] Scissors   (%ds)" % [who, int(duel["stake"]), left]
+
+
+## Y/N to answer a challenge, 1–3 to pick. True if the event was used.
+func _duel_input(event: InputEvent) -> bool:
+	if duel.is_empty() or not (event is InputEventKey) or not (event as InputEventKey).pressed or (event as InputEventKey).echo:
+		return false
+	var k: Key = (event as InputEventKey).physical_keycode
+	var id: int = int(duel["duel"])
+	if str(duel["state"]) == "invite":
+		if int(duel["b"]) != scene.local_id or not (k == KEY_Y or k == KEY_N):
+			return false
+		Net.send_intent(Intents.make(&"rps_answer", {"duel": id, "accept": k == KEY_Y}))
+		duel = {}
+		scene.hud.items.show_duel("")
+		return true
+	if bool(duel.get("picked", false)) or k < KEY_1 or k > KEY_3 or (event as InputEventKey).shift_pressed:
+		return false
+	Net.send_intent(Intents.make(&"rps_pick", {"duel": id, "pick": int(k - KEY_1)}))
+	duel["picked"] = true
+	scene.hud.items.show_duel(duel_text())
+	return true
 
 
 func _near(def: ItemDefinition) -> bool:

@@ -16,6 +16,8 @@ var effects_label: Label
 var target_label: Label
 var discard_panel: PanelContainer
 var discard_label: Label
+var duel_panel: PanelContainer
+var duel_label: Label
 
 var inventory: Array = []
 var luck: int = 0
@@ -92,6 +94,12 @@ static func effect_text(e: Dictionary) -> String:
 	return name
 
 
+## The Rock Paper Scissors prompt ("" hides it).
+func show_duel(text: String) -> void:
+	duel_label.text = text
+	duel_panel.visible = text != ""
+
+
 ## The target picker line ("" hides it).
 func show_target(text: String) -> void:
 	target_label.text = text
@@ -144,6 +152,15 @@ func _build() -> void:
 	discard_label.theme_type_variation = &"SmallLabel"
 	discard_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	discard_panel.add_child(discard_label)
+	duel_panel = PanelContainer.new()
+	duel_panel.add_theme_stylebox_override(&"panel", _slot_style(Palette.VIP_GOLD))
+	duel_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	duel_panel.visible = false
+	col.add_child(duel_panel)
+	duel_label = Label.new()
+	duel_label.theme_type_variation = &"HeadingLabel"
+	duel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	duel_panel.add_child(duel_label)
 	target_label = Label.new()
 	target_label.theme_type_variation = &"HeadingLabel"
 	target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -197,7 +214,7 @@ func _build() -> void:
 		slots.append(p)
 		slot_keys.append(k)
 		slot_names.append(n)
-	for l: Label in [discard_label, target_label, effects_label, luck_label]:
+	for l: Label in [discard_label, duel_label, target_label, effects_label, luck_label]:
 		_outline(l)
 	set_private({})
 

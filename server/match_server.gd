@@ -122,7 +122,10 @@ func _build_match_systems(seed_value: int) -> void:
 	items.limits = func() -> float: return stations._limits_multiplier
 	items.on_vip_lost = _on_vip_pass_ended
 	items.loot = loot
+	items.setup_extras()
 	items.jackpot = jackpot
+	items.find_station = _nearest_station
+	items.close_station = func(sid: StringName, seconds: float) -> void: stations.out_of_order[sid] = seconds
 	minigames.reset()
 	minigame = null
 	rewards = RewardDirector.new()
@@ -288,6 +291,7 @@ func get_snapshot() -> Dictionary:
 	snap["room"] = room_mode
 	snap["effects"] = items.public_effects()
 	snap["peels"] = items.peels_wire()
+	snap["shop"] = items.shop.wire() if items.shop != null else {}
 	snap["hot_table"] = {"station": hot_tables.current, "time_left": snappedf(hot_tables.time_left, 0.01)} if hot_tables.current != &"" else {}
 	if minigame != null:
 		snap["minigame"] = minigame.get_public_state()
@@ -404,6 +408,9 @@ func _on_phase_changed(from: Phase.Id, to: Phase.Id) -> void:
 		state.segment_index = seg
 		stations.set_limits_multiplier(balance.limits_multiplier(seg))
 		interactions.limits_multiplier = balance.limits_multiplier(seg)
+		if from == Phase.Id.INTRO or from == Phase.Id.REWARDS:
+			items.shop.restock(balance.limits_multiplier(seg))
+			_emit(GameEvents.make(&"shop_restocked", items.shop.wire()))
 		if from == Phase.Id.REWARDS:
 			for id: int in state.players:
 				rules.protect(id, match_time)
@@ -652,6 +659,15 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			return items.use(player, int(intent["slot"]), int(intent.get("target", -1)), match_time, opts)
 		&"discard_item":
 			return items.discard(player, int(intent["slot"]), match_time)
+		&"rps_answer":
+			return items.duels.answer(player, int(intent["duel"]), bool(intent["accept"]), match_time)
+		&"rps_pick":
+			return items.duels.pick(player, int(intent["duel"]), int(intent["pick"]), match_time)
+		&"shop_buy":
+			var shop_pos: Vector3 = map_def.shop_position
+			if shop_pos.is_finite() and world.get_position(player).distance_to(shop_pos) > map_def.interact_range:
+				return StationLogicBase.fail(&"too_far")
+			return items.buy(player, int(intent["index"]), match_time)
 		&"return_to_lobby":
 			if player != lobby.leader():
 				return StationLogicBase.fail(&"not_leader")
@@ -806,7 +822,10 @@ func _bot_use_item(bot: int) -> void:
 		if cands.is_empty():
 			return
 		target = cands[_logic_rng.range_int(0, cands.size() - 1)]
-	items.use(bot, 0, target, match_time)
+	var opts: Dictionary = {}
+	if def.id == &"pickpocket" or def.id == &"rock_paper_scissors":
+		opts["option"] = _logic_rng.range_int(0, 2)
+	items.use(bot, 0, target, match_time, opts)
 
 
 func _sync_state() -> void:
@@ -937,6 +956,19 @@ func _fake_cash_caught(player: int, amount: int) -> void:
 		state.players[player].seat = -1
 		_emit(GameEvents.make(&"player_stood", {"player": player, "reason": &"thrown_out"}))
 	interactions.report_thrown_out(player, &"bouncer", match_time)
+
+
+## Nearest station whose interaction point is within `range_m` of the player (&"" = none).
+func _nearest_station(player: int, range_m: float) -> StringName:
+	var pos: Vector3 = world.get_position(player)
+	var best: StringName = &""
+	var best_d: float = range_m
+	for sid: Variant in map_def.station_positions:
+		var d: float = (Vector3(map_def.station_positions[sid]) - pos).length()
+		if d <= best_d and stations.logics.has(StringName(sid)):
+			best_d = d
+			best = StringName(sid)
+	return best
 
 
 ## Money needed to sit at a VIP table right now.

@@ -45,6 +45,7 @@ var autoplay: Node = null
 var role: Role = Role.PRACTICE
 var net_world: NetWorld
 var lobby_panel: LobbyPanel
+var shop_panel: ShopPanel
 var connection_label: Label
 ## Item keys, target picker, discard choice (M5).
 var items_ctl: ItemController
@@ -119,6 +120,12 @@ func _ready() -> void:
 			router.set_mode(InputRouter.Mode.WALK))
 	lobby_panel.leave_requested.connect(_leave_to_menu)
 	ui_layer.add_child(lobby_panel)
+	shop_panel = ShopPanel.new()
+	shop_panel.name = "ShopPanel"
+	shop_panel.closed.connect(func() -> void:
+		if router.mode == InputRouter.Mode.MENU and results_panel == null:
+			router.set_mode(InputRouter.Mode.WALK))
+	ui_layer.add_child(shop_panel)
 	reward_panel = RewardPanel.new()
 	reward_panel.name = "RewardPanel"
 	ui_layer.add_child(reward_panel)
@@ -147,6 +154,7 @@ func _ready() -> void:
 	add_child(view)
 	hud.bind(view.state, local_id)
 	lobby_panel.bind(view.state, local_id)
+	shop_panel.bind(view.state, local_id)
 	reward_panel.bind(view.state, local_id)
 	view.state.station_changed.connect(_on_station_state)
 	view.state.players_changed.connect(_sync_avatars)
@@ -231,6 +239,7 @@ func _start_room_server(cmd: Cmdline) -> void:
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
 	def.spawn_points = map.spawn_points()
+	def.shop_position = LuckyLounge.SHOP_POS
 	var settings: Dictionary = {"duration": cmd.get_int("duration", 10), "seed": cmd.get_int("seed", 0), "items_enabled": true}
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
 	server.timescale = cmd.get_float("timescale", 1.0)
@@ -251,6 +260,7 @@ func _start_local(cmd: Cmdline) -> void:
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
 	def.spawn_points = map.spawn_points()
+	def.shop_position = LuckyLounge.SHOP_POS
 	var settings: Dictionary = {"duration": cmd.get_int("duration", 10), "seed": cmd.get_int("seed", randi() % 1000000), "items_enabled": true}
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
 	_owns_server = true
@@ -803,6 +813,38 @@ func _on_event(ev: Dictionary) -> void:
 				p.say("FAKE?!", 1.5)
 			if int(ev["player"]) == local_id:
 				hud.banner("FAKE CASH! Fined $%d" % int(ev["fine"]), Palette.LOSS_RED, 3.0)
+		&"rps_invite":
+			if int(ev["to"]) == local_id:
+				hud.banner("%s challenges you to Rock Paper Scissors!" % view.state.player_name(int(ev["from"])), Palette.VIP_GOLD)
+				Audio.play(&"countdown_beep", &"UI", -6.0, 1.0)
+		&"rps_start":
+			if int(ev["a"]) == local_id or int(ev["b"]) == local_id:
+				hud.banner("TIE! Go again" if bool(ev["replay"]) else "ROCK… PAPER… SCISSORS!", Palette.VIP_GOLD, 1.5)
+		&"rps_result":
+			for k: String in ["a", "b"]:
+				var p: PlayerAvatar = avatars.get(int(ev[k]), null)
+				if p != null:
+					p.say(String(ev["pick_" + k]).to_upper() + "!", 2.0)
+			if not bool(ev["replay"]) and (int(ev["a"]) == local_id or int(ev["b"]) == local_id):
+				var w: int = int(ev["winner"])
+				if w < 0:
+					hud.banner("Tied twice: nobody pays", Palette.CREAM)
+				elif w == local_id:
+					hud.banner("YOU WIN! +$%d" % int(ev["amount"]), Palette.MONEY_GREEN)
+				else:
+					hud.banner("You lost the duel: −$%d" % int(ev["amount"]), Palette.LOSS_RED)
+		&"rps_cancelled":
+			if int(ev["a"]) == local_id:
+				match StringName(ev["reason"]):
+					&"declined":
+						hud.toast("%s turned down your challenge" % view.state.player_name(int(ev["b"])), 2.0)
+					&"no_answer":
+						hud.toast("%s didn't answer your challenge" % view.state.player_name(int(ev["b"])), 2.0)
+		&"shop_bought":
+			if int(ev["player"]) == local_id:
+				hud.banner("Bought %s" % RewardPanel.item_name(StringName(ev["item"])), Palette.MONEY_GREEN)
+		&"shop_restocked":
+			shop_panel.close_panel()
 		&"discard_needed":
 			if int(ev["player"]) == local_id:
 				items_ctl.on_discard_needed()
@@ -1267,6 +1309,10 @@ func _on_interact() -> void:
 	if lobby_spot != &"":
 		_open_lobby_panel(lobby_spot)
 		return
+	if _near_shop():
+		router.set_mode(InputRouter.Mode.MENU)
+		shop_panel.open()
+		return
 	if nearest_station != null:
 		var res: Dictionary = Net.send_intent(Intents.make(&"sit", {"station": nearest_station.station_id}))
 		if not res["ok"] and res["error"] != &"vip_denied":
@@ -1365,6 +1411,9 @@ func _update_prompt() -> void:
 		&"settings":
 			hud.set_prompt("[E] Party settings" if view.state.leader == local_id else "[E] Party settings (only the leader ★ can change them)")
 			return
+	if _near_shop():
+		hud.set_prompt("[E] Gift Shop: one item per round")
+		return
 	var best_d: float = INF
 	for sid: StringName in map.stations:
 		var st: StationBase = map.stations[sid]
@@ -1383,6 +1432,17 @@ func _update_prompt() -> void:
 	else:
 		var target: int = _nearest_player_in_front(2.0)
 		hud.set_prompt("[E / LMB] Grab %s   [RMB] Shove" % view.state.player_name(target) if target >= 0 else "")
+
+
+## True when the local player stands at the Gift Shop counter while the casino is open.
+func _near_shop() -> bool:
+	if local == null or view.state.shop_offers.is_empty():
+		return false
+	var ph: Phase.Id = view.state.phase
+	if ph != Phase.Id.CASINO and ph != Phase.Id.PRE_MINIGAME:
+		return false
+	var p: Vector3 = local.global_position
+	return Vector2(p.x - LuckyLounge.SHOP_POS.x, p.z - LuckyLounge.SHOP_POS.z).length() < 2.2 and absf(p.y - LuckyLounge.SHOP_POS.y) < 1.5
 
 
 func _spin_door(delta: float) -> void:
@@ -1515,6 +1575,7 @@ func _on_station_state(sid: StringName) -> void:
 	var node: StationBase = map.stations.get(sid, null)
 	if node != null:
 		node.set_hot(bool(st.get("hot", false)))
+		node.set_out_of_order(float(st.get("out_of_order", 0.0)))
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 

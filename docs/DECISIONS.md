@@ -202,3 +202,10 @@ mode because it only lasts 5 s and blocks nothing else.
 Every drafted item is offered to `ItemSystem.give`; a full inventory opens a 5 s discard choice
 (1–3 swap that slot out, 4 drops the newcomer, the oldest goes on timeout). A choice still open
 when the player uses an item resolves itself into the freed slot.
+
+## 2026-10-05 — Rock Paper Scissors needs consent; the Gift Shop is a kiosk
+A wager on someone else's money only starts when the target accepts (Y/N, 6 s, silence declines),
+the stake is capped at 15% of the poorer player's money and only moves between the two players.
+The Gift Shop is a casino kiosk rather than a REWARDS screen so buying costs walking time; one buy
+per player per segment, prices above an item's usual value so money can't be farmed. Out of Order
+closes one station for 30 s instead of a whole game type for a segment.
