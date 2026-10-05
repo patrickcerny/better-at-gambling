@@ -23,8 +23,8 @@ draft → Casino … → Last Call (final 60 s, winnings ×1.5) → Results.
 Timer counts casino time only. House comp $150 when broke (once per segment).
 
 ## Casino games (MVP)
-- **Blackjack:** 6-deck shoe, S17, 3:2, double any two, no split (M7), simultaneous play, Dealer
-  Bust Bonus 1.1:1. Limits $10–$200.
+- **Blackjack:** 6-deck shoe, S17, 3:2, double any two (also after a split), split one pair once
+  (aces get one card each), simultaneous play, Dealer Bust Bonus 1.07:1. Limits $10–$200.
 - **Roulette:** European, straight/colour/odd-even/low-high/dozens/columns, +5% generosity. $10
   min per bet, $300 per spin.
 - **Slots:** 3 reels, 1 line, wild clover, weighted symbols, target RTP ~101%.

@@ -29,6 +29,8 @@ func _build_visuals() -> void:
 		# Your cards land on the felt in front of you; your camera sits at your own stool.
 		var to_seat: Vector3 = (pos - ARC_CENTRE).normalized()
 		cards.spots[i] = [ARC_CENTRE + to_seat * 1.3 + Vector3(0, TABLE_TOP, 0), angle]
+		# A split's second hand: one row closer to the dealer, nudged right, so both stay readable.
+		cards.spots[i + SPLIT_KEY] = [ARC_CENTRE + to_seat * 1.3 + Basis(Vector3.UP, angle) * SPLIT_OFFSET + Vector3(0, TABLE_TOP, 0), angle]
 		var eye := Node3D.new()
 		eye.name = "SeatCamera%d" % i
 		eye.position = pos - to_seat * 0.2 + Vector3(0, 1.45, 0)
@@ -46,6 +48,10 @@ func _build_visuals() -> void:
 ## Card height on the felt and the centre of the half-moon's arc.
 const TABLE_TOP: float = 0.935
 const ARC_CENTRE: Vector3 = Vector3(0, 0, -0.4)
+## Card-spot key offset for a seat's second (split) hand, and where that hand lies relative to
+## the first one (seat-local: -z is towards the dealer).
+const SPLIT_KEY: int = 10
+const SPLIT_OFFSET: Vector3 = Vector3(0.14, 0.0, -0.4)
 
 var cards: TableCards
 
@@ -61,7 +67,10 @@ func show_round(pub: Dictionary) -> void:
 			continue
 		for k: Variant in hands:
 			if int(k) == pid:
-				by_seat[i] = (hands[k] as Dictionary).get("cards", [])
+				var h: Dictionary = hands[k]
+				by_seat[i] = h.get("cards", [])
+				if h.has("split"):
+					by_seat[i + SPLIT_KEY] = (h["split"] as Dictionary).get("cards", [])
 	var dealer: Array = (pub.get("dealer", []) as Array).duplicate()
 	if not bool(pub.get("dealer_revealed", false)) and dealer.size() == 1 and int(pub.get("state", 0)) == BlackjackLogic.State.ACTING:
 		dealer.append(TableCards.FACE_DOWN)

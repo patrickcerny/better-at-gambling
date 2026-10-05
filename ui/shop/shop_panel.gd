@@ -11,6 +11,7 @@ var local_id: int = -1
 
 var _rows: VBoxContainer
 var _note: Label
+var _close: Button
 var _bought: bool = false
 
 
@@ -41,10 +42,10 @@ func _ready() -> void:
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override(&"separation", 6)
 	v.add_child(_rows)
-	var close := Button.new()
-	close.text = "Close [Esc]"
-	close.pressed.connect(close_panel)
-	v.add_child(close)
+	_close = Button.new()
+	_close.text = "Close [Esc]"
+	_close.pressed.connect(close_panel)
+	v.add_child(_close)
 
 
 func bind(p_state: ClientMatchState, p_local_id: int) -> void:
@@ -58,6 +59,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 
 func open() -> void:
 	visible = true
+	_close.text = "Close %s" % InputGlyphs.hint(&"ui_cancel")
 	_refresh()
 	if _rows.get_child_count() > 0:
 		(_rows.get_child(0) as Control).grab_focus()

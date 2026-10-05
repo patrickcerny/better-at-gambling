@@ -118,6 +118,8 @@ func test_malformed_unknown_and_rate_limited() -> void:
 	assert_eq(rejected, 20)
 	fx.run(1.0)
 	assert_true(fx.intent(p, &"emote", {"id": &"wave"})["ok"])
+	assert_eq(fx.intent(p, &"emote", {"id": &"moon"})["error"], &"unknown_emote")
+	assert_eq(fx.intent(p, &"emote", {"id": 7})["error"], &"unknown_emote")
 
 
 func test_snapshot_round_trips_into_client_state() -> void:

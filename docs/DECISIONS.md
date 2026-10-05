@@ -209,3 +209,33 @@ the stake is capped at 15% of the poorer player's money and only moves between t
 The Gift Shop is a casino kiosk rather than a REWARDS screen so buying costs walking time; one buy
 per player per segment, prices above an item's usual value so money can't be farmed. Out of Order
 closes one station for 30 s instead of a whole game type for a segment.
+
+## 2026-10-05 — Blackjack split rules (M7) and Dealer Bust Bonus 1.07:1
+Standard casino split: a first-two-card pair of equal blackjack value (so K+10 counts), once per
+round (no re-split), for a second stake equal to the first. The two hands are played in order
+(hand 1, then hand 2) inside the same simultaneous action window; a timeout or leaving stands both.
+Split aces get exactly one card each. A two-card 21 after a split is not a blackjack (pays 1:1, and
+a dealer blackjack beats it). Double after split is allowed (the common DAS rule). Each hand settles
+on its own (`round_result` per hand with `details.hand` 0/1), so a one-win multiplier or a loss
+refund item is used by the first hand it applies to. Luck rerolls still judge every card against
+the hand it lands in. Splitting raised basic-strategy RTP from 101.6% to 102.3% (over the 102% cap),
+so the Dealer Bust Bonus goes from 1.1:1 to 1.07:1: 101.5% over 400k hands with the split chart
+(S17/DAS: always A-A and 8-8, never 10s or 5s, 9s vs 2–9 except 7, 7s/2s/3s vs 2–7, 6s vs 2–6,
+4s vs 5–6). Rejected: no double after split (one more rule to explain at the table).
+Controls: P / RB (RB only picks chips while the bet panel is open, which it isn't mid-hand).
+The second hand lies one row closer to the dealer on the felt, nudged right.
+
+## 2026-10-05 — Key hints follow the last device (InputGlyphs)
+`InputGlyphs` names an action's binding from the live InputMap for keyboard + mouse or for the
+gamepad, whichever sent the last meaningful input (stick drift under 0.5 and mouse moves under 6 px
+don't count). The InputRouter feeds it from `_input`; prompts are rebuilt every frame and station
+panels redraw when `InputGlyphs.epoch` changes. Hint strings use `{action}` tokens
+(`InputGlyphs.fill`). Pad names are Xbox-style (A/B/X/Y, LB/RB, LT/RT, View/Menu). Raw-key prompts
+with no pad binding (Rock Paper Scissors Y/N/1–3, the discard choice 1–4, Scissors' C, shop 1–4)
+stay keyboard text. The seated hint now says Q / B stands up: Esc opens settings, it never stood
+you up.
+
+## 2026-10-05 — Emotes are validated and also work seated
+The server rejects emote ids that aren't in `Emotes.LIST` (`unknown_emote`). The wheel opens while
+walking or seated (and returns to that mode). Each emote shows "emoji WORD" over the character, a
+hop when standing, and plays `emote_<id>` from audio/sfx when such a clip exists, else a stock clip.

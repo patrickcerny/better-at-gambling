@@ -2,7 +2,9 @@ class_name BlackjackLogic
 extends StationLogicBase
 ## Blackjack table with simultaneous play (§2.5): IDLE → BETTING (window opens on the first bet)
 ## → deal → ACTING (everyone at once, timeout = stand) → dealer (stands on soft 17) → PAYOUT → IDLE.
-## 3:2 blackjack, double on any first two cards, no split (M7), Dealer Bust Bonus on wins.
+## 3:2 blackjack, double on any first two cards (also after a split), one split per round of a
+## first-two-card pair of equal value (split aces get one card each; 21 after a split is not a
+## blackjack), Dealer Bust Bonus on wins.
 
 enum State { IDLE, BETTING, ACTING, PAYOUT }
 
@@ -10,7 +12,9 @@ var seat_count: int = 4
 var seats: Array[int] = []
 var state: State = State.IDLE
 var timer: float = 0.0
-## player → {stake, cards: Array[int], done, doubled, blackjack, settled}
+## player → {stake, cards: Array[int], done, doubled, blackjack, settled}; after a split also
+## "split": {stake, cards, doubled} (the second hand) and "active": 0 / 1 (the hand being played).
+## `done` means the player is finished with every hand.
 var hands: Dictionary[int, Dictionary] = {}
 var dealer: Array[int] = []
 var dealer_revealed: bool = false
@@ -85,35 +89,79 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 	if not hands.has(p) or hands[p]["done"]:
 		return fail(&"no_active_hand")
 	var h: Dictionary = hands[p]
+	var idx: int = int(h.get("active", 0))
+	var cur: Dictionary = active_hand(h)
 	match action:
 		&"hit":
-			_deal_to_player(p)
-			var t: int = HandEval.total(h["cards"])
-			if t >= 21:
-				h["done"] = true
+			_deal_card(p, cur["cards"])
+			if HandEval.total(cur["cards"]) >= 21:
+				_finish_active(h)
 		&"stand":
-			h["done"] = true
+			_finish_active(h)
 		&"double":
-			if (h["cards"] as Array).size() != 2:
+			if (cur["cards"] as Array).size() != 2:
 				return fail(&"cannot_double")
+			if not _take_stake(p, int(cur["stake"])):
+				return fail(&"insufficient_funds")
+			cur["stake"] = int(cur["stake"]) * 2
+			cur["doubled"] = true
+			_deal_card(p, cur["cards"])
+			_finish_active(h)
+		&"split":
+			if not can_split(h):
+				return fail(&"cannot_split")
 			if not _take_stake(p, int(h["stake"])):
 				return fail(&"insufficient_funds")
-			h["stake"] = int(h["stake"]) * 2
-			h["doubled"] = true
-			_deal_to_player(p)
-			h["done"] = true
+			var first: Array[int] = h["cards"]
+			var second: Array[int] = [first.pop_back()]
+			h["split"] = {"stake": int(h["stake"]), "cards": second, "doubled": false}
+			h["active"] = 0
+			var aces: bool = Card.bj_value(first[0]) == 1
+			_deal_card(p, first)
+			_deal_card(p, second)
+			if aces:
+				h["done"] = true  # one card on each ace, no more
+			elif HandEval.total(first) >= 21:
+				_finish_active(h)
 		&"cut":
 			# Scissors: snip off your last card (not after doubling, at least 3 cards in hand).
-			if h["doubled"] or (h["cards"] as Array).size() < 3 or not modifiers.has_flag(p, &"scissors", game_id):
+			if cur["doubled"] or (cur["cards"] as Array).size() < 3 or not modifiers.has_flag(p, &"scissors", game_id):
 				return fail(&"cannot_cut")
 			modifiers.consume_flag(p, &"scissors")
-			var cut: int = (h["cards"] as Array).pop_back()
+			var cut: int = (cur["cards"] as Array).pop_back()
 			shoe.return_card(cut)
 		_:
 			return fail(&"unknown_action")
-	events.append(GameEvents.make(&"bj_action", {"station": station_id, "player": p, "action": action, "cards": (h["cards"] as Array).duplicate()}))
+	var ev: Dictionary = {"station": station_id, "player": p, "action": action, "cards": (cur["cards"] as Array).duplicate()}
+	if h.has("split"):
+		ev["hand"] = idx
+		ev["split_cards"] = (h["split"]["cards"] as Array).duplicate()
+	events.append(GameEvents.make(&"bj_action", ev))
 	_check_all_done()
 	return OK_RESULT
+
+
+## True when the player's hand is a first-two-card pair of equal value and has not been split.
+func can_split(h: Dictionary) -> bool:
+	if h.has("split") or h["done"]:
+		return false
+	var cards: Array = h["cards"]
+	return cards.size() == 2 and Card.bj_value(int(cards[0])) == Card.bj_value(int(cards[1]))
+
+
+## The hand the player is acting on: the main one, or the second after a split.
+static func active_hand(h: Dictionary) -> Dictionary:
+	return h["split"] if h.has("split") and int(h.get("active", 0)) == 1 else h
+
+
+## The active hand is finished: move on to the split hand, or the player is done.
+static func _finish_active(h: Dictionary) -> void:
+	if h.has("split") and int(h.get("active", 0)) == 0:
+		h["active"] = 1
+		if HandEval.total(h["split"]["cards"]) >= 21:
+			h["done"] = true
+	else:
+		h["done"] = true
 
 
 func tick(delta: float) -> void:
@@ -161,6 +209,13 @@ func get_public_state() -> Dictionary:
 	for p: int in hands.keys():
 		var h: Dictionary = hands[p]
 		hs[p] = {"stake": h["stake"], "cards": (h["cards"] as Array).duplicate(), "done": h["done"], "total": HandEval.total(h["cards"])}
+		if h.has("split"):
+			var sh: Dictionary = h["split"]
+			hs[p]["active"] = int(h["active"])
+			hs[p]["first_done"] = bool(h["done"]) or int(h["active"]) == 1
+			hs[p]["split"] = {"stake": sh["stake"], "cards": (sh["cards"] as Array).duplicate(), "done": h["done"], "total": HandEval.total(sh["cards"])}
+		else:
+			hs[p]["can_split"] = state == State.ACTING and can_split(h)
 	var shown: Array[int] = dealer.duplicate()
 	if not dealer_revealed and shown.size() >= 2:
 		shown = [dealer[0]]
@@ -183,10 +238,10 @@ func _deal() -> void:
 	dealer.clear()
 	dealer_revealed = false
 	for p: int in hands.keys():
-		_deal_to_player(p)
+		_deal_card(p, hands[p]["cards"])
 	dealer.append(shoe.draw())
 	for p: int in hands.keys():
-		_deal_to_player(p)
+		_deal_card(p, hands[p]["cards"])
 	dealer.append(shoe.draw())
 	events.append(GameEvents.make(&"cards_dealt", {"station": station_id, "dealer_up": dealer[0]}))
 	if HandEval.is_blackjack(dealer):
@@ -207,8 +262,8 @@ func _deal() -> void:
 	_check_all_done()
 
 
-func _deal_to_player(p: int) -> void:
-	var cards: Array[int] = hands[p]["cards"]
+## Deals one card to one of the player's hands; luck rerolls judge it against that hand.
+func _deal_card(p: int, cards: Array[int]) -> void:
 	var lk: int = modifiers.get_luck(p, game_id)
 	var d: LuckRng.Draw = luck.draw(lk, shoe.draw, func(c: int) -> float:
 		var trial: Array[int] = cards.duplicate()
@@ -235,43 +290,55 @@ func _dealer_and_settle() -> void:
 	var need_dealer: bool = false
 	for p: int in hands.keys():
 		var h: Dictionary = hands[p]
-		if not h["settled"] and not HandEval.is_bust(h["cards"]):
+		if h["settled"]:
+			continue
+		if not HandEval.is_bust(h["cards"]) or (h.has("split") and not HandEval.is_bust(h["split"]["cards"])):
 			need_dealer = true
 	if need_dealer and not HandEval.is_blackjack(dealer):
 		while HandEval.total(dealer) < 17:
 			dealer.append(shoe.draw())
 	var dt: int = HandEval.total(dealer)
-	var dealer_bj: bool = HandEval.is_blackjack(dealer)
 	events.append(GameEvents.make(&"bj_dealer", {"station": station_id, "cards": dealer.duplicate(), "total": dt}))
 	for p: int in hands.keys():
 		var h: Dictionary = hands[p]
 		if h["settled"]:
 			continue
 		h["settled"] = true
-		var stake: int = h["stake"]
-		var cards: Array[int] = h["cards"]
-		var pt: int = HandEval.total(cards)
-		var outcome: StringName
-		var ret: int = 0
-		if pt > 21:
-			outcome = &"bust"
-		elif dealer_bj:
-			outcome = &"push" if HandEval.is_blackjack(cards) else &"dealer_blackjack"
-			ret = stake if outcome == &"push" else 0
-		elif dt > 21:
-			outcome = &"dealer_bust"
-			ret = stake + int(floor(stake * balance.bj_dealer_bust_bonus + 0.000001))
-		elif pt > dt:
-			outcome = &"win"
-			ret = stake * 2
-		elif pt == dt:
-			outcome = &"push"
-			ret = stake
-		else:
-			outcome = &"lose"
-		_settle(p, stake, ret, {"outcome": outcome, "cards": cards.duplicate(), "dealer": dealer.duplicate()})
+		if not h.has("split"):
+			_settle_hand(p, int(h["stake"]), h["cards"], true, {})
+			continue
+		# Each split hand settles on its own (two results, its own multipliers and refunds).
+		_settle_hand(p, int(h["stake"]), h["cards"], false, {"hand": 0, "split": true})
+		_settle_hand(p, int(h["split"]["stake"]), h["split"]["cards"], false, {"hand": 1, "split": true})
 	state = State.PAYOUT
 	timer = balance.bj_result_time
+
+
+## Pays one hand against the dealer. `natural_counts`: a two-card 21 is a blackjack (not after a split).
+func _settle_hand(p: int, stake: int, cards: Array[int], natural_counts: bool, extra: Dictionary) -> void:
+	var dt: int = HandEval.total(dealer)
+	var pt: int = HandEval.total(cards)
+	var outcome: StringName
+	var ret: int = 0
+	if pt > 21:
+		outcome = &"bust"
+	elif HandEval.is_blackjack(dealer):
+		outcome = &"push" if natural_counts and HandEval.is_blackjack(cards) else &"dealer_blackjack"
+		ret = stake if outcome == &"push" else 0
+	elif dt > 21:
+		outcome = &"dealer_bust"
+		ret = stake + int(floor(stake * balance.bj_dealer_bust_bonus + 0.000001))
+	elif pt > dt:
+		outcome = &"win"
+		ret = stake * 2
+	elif pt == dt:
+		outcome = &"push"
+		ret = stake
+	else:
+		outcome = &"lose"
+	var details: Dictionary = {"outcome": outcome, "cards": cards.duplicate(), "dealer": dealer.duplicate()}
+	details.merge(extra)
+	_settle(p, stake, ret, details)
 
 
 func _end_round() -> void:
@@ -287,14 +354,17 @@ func _end_round() -> void:
 	state = State.IDLE
 
 
-## Basic strategy without splitting (S17, double any two): returns &"hit", &"stand" or &"double".
-static func basic_strategy(cards: Array[int], dealer_up: int) -> StringName:
+## Basic strategy (S17, double any two, double after split): returns &"hit", &"stand", &"double"
+## or, when `splittable`, &"split".
+static func basic_strategy(cards: Array[int], dealer_up: int, splittable: bool = false) -> StringName:
 	var t: int = HandEval.total(cards)
 	var soft: bool = HandEval.is_soft(cards)
 	var two: bool = cards.size() == 2
 	var up: int = Card.bj_value(dealer_up)
 	if up == 1:
 		up = 11
+	if splittable and two and Card.bj_value(cards[0]) == Card.bj_value(cards[1]) and _should_split(Card.bj_value(cards[0]), up):
+		return &"split"
 	if soft:
 		if t >= 20:
 			return &"stand"
@@ -322,3 +392,19 @@ static func basic_strategy(cards: Array[int], dealer_up: int) -> StringName:
 	if t == 9:
 		return &"double" if two and up >= 3 and up <= 6 else &"hit"
 	return &"hit"
+
+
+## Pair splitting chart (S17, DAS): pair card value 1–10 against dealer up 2–11.
+static func _should_split(v: int, up: int) -> bool:
+	match v:
+		1, 8:
+			return true
+		9:
+			return up <= 9 and up != 7
+		7, 2, 3:
+			return up <= 7
+		6:
+			return up <= 6
+		4:
+			return up == 5 or up == 6
+	return false  # tens and fives play as 20 and 10

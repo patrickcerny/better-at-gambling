@@ -614,6 +614,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"break_free":
 			return interactions.break_free(player, match_time)
 		&"emote":
+			if not Emotes.has(StringName(str(intent["id"]))):
+				return StationLogicBase.fail(&"unknown_emote")
 			_emit(GameEvents.make(&"emote", {"player": player, "id": StringName(intent["id"])}))
 			return StationLogicBase.OK_RESULT
 		&"submit_answer":

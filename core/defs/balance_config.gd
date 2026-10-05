@@ -29,7 +29,7 @@ extends Resource
 @export var bj_action_time: float = 10.0
 @export var bj_result_time: float = 2.0
 ## Profit ratio paid on winning hands when the dealer busts (1.0 = plain 1:1).
-@export var bj_dealer_bust_bonus: float = 1.1
+@export var bj_dealer_bust_bonus: float = 1.07
 @export var bj_blackjack_ratio: float = 1.5
 
 @export_group("Roulette")

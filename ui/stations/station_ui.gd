@@ -19,6 +19,8 @@ var hint: Label
 var limits_mult: float = 1.0
 ## Display name shown in the header.
 var game_title: String = "GAME"
+## InputGlyphs.epoch the key hints were last written for.
+var _glyph_epoch: int = -1
 
 
 func _ready() -> void:
@@ -64,7 +66,7 @@ func _ready() -> void:
 	_build()
 	hint = Label.new()
 	hint.theme_type_variation = &"SmallLabel"
-	hint.text = "[Esc / Q] Stand up"
+	hint.text = _hint_text()
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_color_override(&"font_color", Color("#9A8F7A"))
 	body.add_child(hint)
@@ -80,6 +82,7 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 	var vip: bool = bool(pub.get("vip", false))
 	limits_mult = Registry.balance.limits_multiplier(state.segment_index if state != null else 0) * (3.0 if vip else 1.0)
 	_on_open()
+	_update_glyphs()
 	_refresh()
 
 
@@ -92,7 +95,16 @@ func update_state(p_pub: Dictionary, p_priv: Dictionary) -> void:
 	pub = p_pub
 	priv = p_priv
 	if visible:
+		if _glyph_epoch != InputGlyphs.epoch:
+			_update_glyphs()
 		_refresh()
+
+
+## Rewrites every key hint for the device in use (keyboard + mouse or gamepad).
+func _update_glyphs() -> void:
+	_glyph_epoch = InputGlyphs.epoch
+	hint.text = _hint_text()
+	_relabel()
 
 
 ## Sends an intent for this station; shows the rejection if any.
@@ -126,6 +138,16 @@ func _build() -> void:
 
 
 func _on_open() -> void:
+	pass
+
+
+## The small key hint line at the bottom of the panel.
+func _hint_text() -> String:
+	return "%s Stand up" % InputGlyphs.hint(&"leave_station")
+
+
+## Override: put the current device's keys on buttons.
+func _relabel() -> void:
 	pass
 
 

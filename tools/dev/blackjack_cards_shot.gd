@@ -22,4 +22,4 @@ func _ready() -> void:
 	cam.global_transform = st.camera_for_seat(1).global_transform
 	cam.current = true
 	st.show_round({"state": BlackjackLogic.State.ACTING, "seats": [3, 1, 2, -1], "dealer_revealed": false, "dealer": [Card.make(10, 1)],
-		"hands": {1: {"cards": [Card.make(1, 0), Card.make(9, 2)]}, 2: {"cards": [Card.make(13, 3), Card.make(5, 1), Card.make(4, 0)]}, 3: {"cards": [Card.make(7, 1), Card.make(7, 2)]}}})
+		"hands": {1: {"cards": [Card.make(8, 0), Card.make(3, 2), Card.make(9, 1)], "split": {"cards": [Card.make(8, 2), Card.make(13, 3)]}}, 2: {"cards": [Card.make(13, 3), Card.make(5, 1), Card.make(4, 0)]}, 3: {"cards": [Card.make(7, 1), Card.make(4, 2), Card.make(6, 3)], "split": {"cards": [Card.make(7, 2), Card.make(10, 0)]}}}})

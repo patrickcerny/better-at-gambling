@@ -15,10 +15,10 @@ const TIPS: Array[String] = [
 	"The jackpot grows with every Slots and Plinko bet. Three Diamonds take it all.",
 	"The Casino Quiz pays the fastest correct answers best.",
 	"Out of Order signs close the nearest table for 30 seconds.",
-	"Press E at the Gift Shop next to the bar: one purchase per round.",
+	"Press {interact} at the Gift Shop next to the bar: one purchase per round.",
 	"Spend items before the next draft. You can only carry three.",
-	"At blackjack, H hits, S stands and D doubles. Look around while you wait.",
-	"Settings live under Esc, in game and in the menu.",
+	"At blackjack, {bj_hit} hits, {bj_stand} stands, {bj_double} doubles and {bj_split} splits a pair.",
+	"Settings live under {pause}, in game and in the menu.",
 	"Last Call: in the final minute every table pays ×1.5.",
 ]
 
@@ -79,7 +79,7 @@ func begin() -> void:
 	loading.add_theme_color_override(&"font_color", Palette.CREAM)
 	box.add_child(loading)
 	var tip := Label.new()
-	tip.text = TIPS[randi() % TIPS.size()]
+	tip.text = InputGlyphs.fill(TIPS[randi() % TIPS.size()])
 	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tip.custom_minimum_size = Vector2(900, 0)

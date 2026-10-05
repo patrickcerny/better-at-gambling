@@ -33,6 +33,8 @@ var invert_y: bool = false
 var seated_capture: bool = false
 ## Beer: look is inverted on both axes and walking drifts a little.
 var drunk: bool = false
+## Mode to return to when the emote wheel closes (you can emote while seated too).
+var _mode_before_emote: Mode = Mode.WALK
 
 
 func _ready() -> void:
@@ -85,6 +87,11 @@ func sprint_held() -> bool:
 	return mode == Mode.WALK and Input.is_action_pressed(&"sprint")
 
 
+## Sees every event first (even ones a UI consumes) so key hints follow the device in use.
+func _input(event: InputEvent) -> void:
+	InputGlyphs.observe(event)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and (mode == Mode.WALK or mode == Mode.SEATED) and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var rel: Vector2 = (event as InputEventMouseMotion).relative * mouse_sensitivity
@@ -113,12 +120,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _item_slot(event) >= 0:
 		item_used.emit(_item_slot(event))
 	elif event.is_action_pressed(&"emote_wheel"):
-		if mode == Mode.WALK:
+		if mode == Mode.WALK or mode == Mode.SEATED:
+			_mode_before_emote = mode
 			set_mode(Mode.EMOTE)
 			emote_wheel_toggled.emit(true)
 	elif event.is_action_released(&"emote_wheel"):
 		if mode == Mode.EMOTE:
-			set_mode(Mode.WALK)
+			set_mode(_mode_before_emote)
 			emote_wheel_toggled.emit(false)
 	elif mode == Mode.WALK:
 		if event.is_action_pressed(&"interact"):

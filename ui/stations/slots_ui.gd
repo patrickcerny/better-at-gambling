@@ -63,6 +63,10 @@ func _on_open() -> void:
 	bet_panel.setup(sizes, sizes[0], sizes[sizes.size() - 1], "PULL", true)
 
 
+func _relabel() -> void:
+	stop_btn.text = "STOP  [%s]" % InputGlyphs.keys(&"bet_confirm")
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if is_visible_in_tree() and event.is_action_pressed(&"bet_confirm") and stop_btn.visible:
 		stop_btn.pressed.emit()

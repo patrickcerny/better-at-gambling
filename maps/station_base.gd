@@ -169,7 +169,7 @@ func set_out_of_order(seconds: float) -> void:
 func prompt_text(min_bet: int) -> String:
 	if out_of_order_left > 0.0:
 		return "OUT OF ORDER (%ds)" % ceili(out_of_order_left)
-	return "[E] Play %s — Min $%d" % [game_id.capitalize(), min_bet]
+	return "%s Play %s — Min $%d" % [InputGlyphs.hint(&"interact"), game_id.capitalize(), min_bet]
 
 
 ## Override: build meshes, `seats`, and `camera_anchor`.

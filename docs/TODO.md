@@ -297,14 +297,14 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 - [ ] results podium animations + fun awards + money-over-time graph
 - [ ] music crossfades
 - [ ] all SFX hooked
-- [ ] emotes wheel
-- [ ] blackjack **split**
-- [ ] input glyph switching (keyboard ↔ gamepad)
+- [x] emotes wheel
+- [x] blackjack **split**
+- [x] input glyph switching (keyboard ↔ gamepad)
 - [ ] improved placeholder art (better procedural props, lighting, glow)
 
 ### Tests
 - [ ] smoke tests for all scenes
-- [ ] split logic unit tests
+- [x] split logic unit tests
 - [ ] awards computation tests
 - [ ] no FPS regression in a scripted benchmark scene (record FPS in PROGRESS.md if a renderer is available)
 
