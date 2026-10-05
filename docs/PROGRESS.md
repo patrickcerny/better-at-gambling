@@ -1,7 +1,7 @@
 # Progress
 
-## Current milestone: M6 — Bots, reconnects, MVP hardening (waiting for Patrick's go-ahead)
-## Next step: Patrick's playtest fixes (blackjack seats and hands, bets shown on the tables, footsteps, throwing a held player) and his item ideas (docs/ITEM_IDEAS.md), then M6.
+## Current milestone: M6 done (0.6.0-m6). M7 waits for Patrick's word.
+## Next step: Patrick says go for M7. Still owed by Patrick: 7 poly.pizza models, 6 licence lines, the roulette wheel texture; "update the server" so the VPS auto-update runs again.
 
 ## Status by milestone
 - M0: DONE (evidence: `scripts/test.sh all` green; `godot --headless --path . -- --smoke-test` exit 0; exports built)
@@ -11,7 +11,16 @@
 - M4: DONE (evidence: `scripts/test.sh net` — 5-minute match, server + 2 autoplay clients + 2 bots, lobby to results with two quizzes and drafts, identical money+item digests on all three processes; unit 149, integration 29 (`test_match_flow.gd`: quiz schedule 5/30 min, Last Call, Hot Table, comps, closing tables, tiebreakers, secrecy over a full match, play again twice in one room), ui 9 (quiz by key/pad/mouse), session 0 errors; screenshots `quiz_question`, `quiz_end`, `results`)
 - M5: DONE (evidence: unit 175 (`test_items.gd` 26: every item, Bodyguard/Mirror, protections, grace, cooldown, discard flow, Pickpocket min/max/broke, Double Trouble × Hot × Last Call order, Golden Chip exactness, banana conservation), integration 35 (`test_items_flow.gd`: intents, items off, Spring Glove, Bodyguard KO, draft → inventory → discard, bots use items in a full match with money conservation), physics 17 (`test_items_scene.gd`: keys, target picker, range ring, banners, peels, effect tags, discard keys, Shift while seated), session with items 0 errors, `scripts/test.sh net` with autoplay clients using drafted items online and identical digests; screenshot `items`)
 - Patrick's item batch (0.5.1): DONE. 15 new items plus the Gift Shop from docs/ITEM_IDEAS.md (jail is a todo). Evidence: unit 200 (`test_items_extra.gd`, `test_items_duels_shop.gd`: every item, duel outcomes, decline/timeout/tie replay, bots, conservation, shop stock/prices/one buy per segment), integration 40 (`test_items_stations.gd`: Out of Order blocks sitting and expires, shop through intents), physics 21 (`test_items_extras_scene.gd`: kiosk prompt + panel + buy with keys, duel Y/N and 1–3 prompts, Out of Order sign).
-- M6–M11: NOT STARTED (VPS deploy from M6 already live)
+- Pre-M6 batch (0.5.3, on main): settings (Esc + main menu), fixed colours, skins and props, 3D dealt blackjack cards with free look and keys, hot-table arrow, blackjack table and roulette wheel models.
+- M6: DONE, with Patrick's changes: **no bots** (removed from the game; tests use `--dummies N` standing players and scripted intents), loading screen added. Evidence:
+  - Bots gone: lobby slots, difficulty, add/remove intents, quiz/draft/duel/item bot logic; Practice is solo (`test_room_lobby.gd`, `test_lobby_controller.gd`).
+  - Proximity voice (μ-law 8 kHz, 40 ms frames, ~65 kbit/s per speaker, 20 m hearing radius, global in quiz/rewards/results, same table at any distance, push-to-talk T / open mic / off, per-player mute in the Esc panel, mouth flap, talking icons): 39 tests in `test_voice_*.gd` and `test_voice_relay.gd`. No real microphone has been tried yet.
+  - Reconnect: `tests/net` crash-and-rejoin (client killed mid-match, rejoins by uid, identical digests). Host leaving: `test_leader_handoff.gd`.
+  - Hardening: `tests/sim/test_many_matches.gd`, 50 scripted matches (seeds 1–50, 2–8 players, 5–30 min) reach results with no errors, valid events and money conserved (~47 s).
+  - Loading screen + menu backdrop: `CasinoPanorama` (live casino, slow drifting camera, gentle roll, blur), tips; video `/mnt/project-files/better-at-gambling/screenshots/loading_screen.mp4`.
+  - Pause menu with settings (since 0.5.3), first-time tips (sit, items, shake), settings persisted.
+  - Load: one room with 4 players ≈ 9% of one core, 320 MB RAM peak (`tools/stress/room_load.py`); RAM bounds the VPS (cap 8 rooms). A live stress run on the VPS needs Patrick's PC session.
+- M7–M11: NOT STARTED
 
 ## Verified features (IMPLEMENTED+TESTED)
 - Toolchain: Godot 4.7.2 headless, export templates, GUT 9.7.1 (`tools/setup_toolchain.sh`, checksums verified).

@@ -233,29 +233,29 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 - [x] deploy to the VPS (dev auth mode, or production mode only once a Steam App ID and Web API key exist) and run the internet test below
 - [ ] if not
 - [x] run the same stack locally in Docker and log VPS deployment as waiting on the owner
-- [ ] `BotDirector`/`BotBrain` with personalities and difficulties (§2.19)
-- [ ] lobby bot slots
-- [ ] bot quiz answers
-- [ ] bot item use
-- [ ] bot physical behavior (§2.19)
-- [ ] **proximity voice**: `VoiceChannel`
-- [ ] `VoiceCapture` (mic bus + `AudioEffectCapture`)
-- [ ] μ-law `VoiceCodec`
-- [ ] server relay with distance filtering
-- [ ] `VoicePlayback` (3D `AudioStreamPlayer3D` + `AudioStreamGenerator` + jitter buffer)
-- [ ] global-voice exceptions (quiz, rewards, results, same table)
-- [ ] push-to-talk/open-mic
-- [ ] per-player mute
-- [ ] mouth-flap from decoded RMS
-- [ ] talking indicator
-- [ ] disconnect → away state
-- [ ] reconnect by `player_uid` with snapshot
-- [ ] host-left flow
-- [ ] pause menu (Resume/Leave/basic settings: volumes, fullscreen)
-- [ ] contextual hints
-- [ ] loading tips
+- [~] (dropped: no bots) `BotDirector`/`BotBrain` with personalities and difficulties (§2.19)
+- [~] (dropped: no bots) lobby bot slots
+- [~] (dropped: no bots) bot quiz answers
+- [~] (dropped: no bots) bot item use
+- [~] (dropped: no bots) bot physical behavior (§2.19)
+- [x] **proximity voice**: `VoiceChannel`
+- [x] `VoiceCapture` (mic bus + `AudioEffectCapture`)
+- [x] μ-law `VoiceCodec`
+- [x] server relay with distance filtering
+- [x] `VoicePlayback` (3D `AudioStreamPlayer3D` + `AudioStreamGenerator` + jitter buffer)
+- [x] global-voice exceptions (quiz, rewards, results, same table)
+- [x] push-to-talk/open-mic
+- [x] per-player mute
+- [x] mouth-flap from decoded RMS
+- [x] talking indicator
+- [x] disconnect → away state
+- [x] reconnect by `player_uid` with snapshot
+- [x] host-left flow
+- [x] pause menu (Resume/Leave/basic settings: volumes, fullscreen)
+- [x] contextual hints
+- [x] loading tips
 - [ ] fix all known bugs
-- [ ] basic settings persistence
+- [x] basic settings persistence
 
 ### Tests
 - [ ] internet test: 2–4 headless autoplay clients connect to the deployed VPS orchestrator, create/join a room by code and finish a 5-minute match with zero errors (or the same against the local Docker stack if no VPS access)
