@@ -72,7 +72,7 @@ func test_decline_and_silence_cost_nothing() -> void:
 	assert_false(sys.duels.answer(3, a, true, now)["ok"], "only the challenged player answers")
 	assert_true(sys.duels.answer(2, a, false, now)["ok"])
 	var b: int = sys.duels.challenge(1, 3, 0, now)
-	sys.duels.tick(now + RpsDuels.ANSWER_TIME + 0.1, {})
+	sys.duels.tick(now + RpsDuels.ANSWER_TIME + 0.1)
 	var cancelled: Array = _of(&"rps_cancelled")
 	assert_eq(cancelled.map(func(e: Dictionary) -> StringName: return e["reason"]), [&"declined", &"no_answer"])
 	assert_eq(int(cancelled[1]["duel"]), b)
@@ -100,25 +100,16 @@ func test_missed_pick_is_random_and_money_is_conserved() -> void:
 	var d: int = sys.duels.challenge(1, 2, 2, now)
 	sys.duels.answer(2, d, true, now)
 	sys.duels.pick(1, d, 0, now)
-	sys.duels.tick(now + RpsDuels.PICK_TIME + 0.1, {})
-	sys.duels.tick(now + 2 * RpsDuels.PICK_TIME + 0.2, {})  # a tie replays once
+	sys.duels.tick(now + RpsDuels.PICK_TIME + 0.1)
+	sys.duels.tick(now + 2 * RpsDuels.PICK_TIME + 0.2)  # a tie replays once
 	assert_false(sys.duels.duels.has(d))
 	assert_eq(_total(), 3000)
 
 
-func test_bots_answer_and_pick_on_their_own() -> void:
-	players[2].is_bot = true
-	var resolved: int = 0
-	for i: int in 20:
-		var d: int = sys.duels.challenge(1, 2, 0, now)
-		sys.duels.tick(now, {2: true})
-		if sys.duels.duels.has(d):
-			sys.duels.pick(1, d, i % 3, now)
-			sys.duels.tick(now, {2: true})
-			sys.duels.tick(now + RpsDuels.PICK_TIME + 1.0, {2: true})
-		assert_false(sys.duels.duels.has(d))
-		resolved += 1
-	assert_eq(resolved, 20)
+func test_unanswered_invites_lapse_and_missing_picks_are_random() -> void:
+	var lapsed: int = sys.duels.challenge(1, 2, 0, now)
+	sys.duels.tick(now + 60.0)
+	assert_false(sys.duels.duels.has(lapsed), "nobody accepted")
 	assert_eq(_total(), 3000)
 
 

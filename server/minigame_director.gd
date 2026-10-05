@@ -35,15 +35,15 @@ func pick(rng: SeededRng) -> MinigameDefinition:
 	return pool[maxi(i, 0)]
 
 
-## Starts a minigame for `players` (bots: id → difficulty). Returns the running logic.
-func begin(players: Array[int], bots: Dictionary[int, StringName], rng: SeededRng, balance: BalanceConfig, stats: Dictionary, half_rtt: Callable) -> MinigameLogicBase:
+## Starts a minigame for `players`. Returns the running logic.
+func begin(players: Array[int], rng: SeededRng, balance: BalanceConfig, stats: Dictionary, half_rtt: Callable) -> MinigameLogicBase:
 	current_def = pick(rng)
 	if current_def == null or current_def.logic_script == null:
 		return null
 	_last_id = current_def.id
 	current = current_def.logic_script.new() as MinigameLogicBase
 	current.half_rtt = half_rtt
-	current.setup(players, bots, rng, balance, current_def.params, {"bank": bank, "used": used_questions, "stats": stats})
+	current.setup(players, rng, balance, current_def.params, {"bank": bank, "used": used_questions, "stats": stats})
 	return current
 
 

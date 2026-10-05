@@ -55,7 +55,7 @@ func _process(delta: float) -> void:
 		for sid: Variant in st:
 			state.stations[sid] = st[sid]
 			state.station_changed.emit(StringName(sid))
-		# Positions of bots simulated in-process (online, positions come from the world stream).
+		# Positions of dummies simulated in-process (online, positions come from the world stream).
 		if Net.is_client():
 			return
 		var players: Dictionary = snap.get("players", {})

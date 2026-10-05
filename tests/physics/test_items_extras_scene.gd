@@ -149,3 +149,11 @@ func test_plinko_panel_leaves_the_board_visible() -> void:
 	assert_not_null(ui)
 	var view: Vector2 = scene.get_viewport().get_visible_rect().size
 	assert_gt(ui.panel.get_global_rect().position.x, view.x * 0.7, "panel docked at the right edge")
+
+
+func before_all() -> void:
+	MatchScene.test_dummies = 3  # standing dummies to shove, grab and target
+
+
+func after_all() -> void:
+	MatchScene.test_dummies = 0

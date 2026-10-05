@@ -4,10 +4,8 @@ extends RefCounted
 ## `scores()`. Pure logic like the casino games: no nodes, no I/O; events go out via
 ## `drain_events`, per-player secrets via `private_state`.
 
-## Participants (connected players and bots) and everyone's display data.
+## Participants (connected players) and everyone's display data.
 var players: Array[int] = []
-## Bot player id → difficulty (&"easy"/&"normal"/&"hard"); bots are driven by the logic itself.
-var bots: Dictionary[int, StringName] = {}
 var rng: SeededRng
 var balance: BalanceConfig
 var params: Dictionary = {}
@@ -19,9 +17,8 @@ var half_rtt: Callable = func(_p: int) -> float: return 0.0
 
 ## Wires the minigame. `context` carries match data some minigames need (the quiz's question bank
 ## and match stats).
-func setup(p_players: Array[int], p_bots: Dictionary[int, StringName], p_rng: SeededRng, p_balance: BalanceConfig, p_params: Dictionary, context: Dictionary) -> void:
+func setup(p_players: Array[int], p_rng: SeededRng, p_balance: BalanceConfig, p_params: Dictionary, context: Dictionary) -> void:
 	players = p_players.duplicate()
-	bots = p_bots.duplicate()
 	rng = p_rng
 	balance = p_balance
 	params = p_params

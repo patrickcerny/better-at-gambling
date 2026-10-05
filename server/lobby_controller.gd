@@ -1,31 +1,30 @@
 class_name LobbyController
 extends RefCounted
 ## The entrance-hall lobby's rules (§2.2), server side: unique colors, hats, ready state (pad or
-## panel), the party leader (longest-connected human), leader-only settings, bot slots and the
-## 3-second start countdown. Pure logic: the MatchServer feeds it and turns its notes into events.
+## panel), the party leader (longest-connected player), leader-only settings and the 3-second
+## start countdown. Pure logic: the MatchServer feeds it and turns its notes into events.
 
 const COUNTDOWN_SECONDS: float = 3.0
 const DURATIONS: Array[int] = [5, 10, 15, 30]
-const BOT_DIFFICULTIES: Array[StringName] = [&"easy", &"normal", &"hard"]
 
 ## Host settings shown on the board and the 2D panel.
-var settings: Dictionary = {"duration": 10, "items_enabled": true, "bot_difficulty": &"normal", "quiz_category": &"all"}
+var settings: Dictionary = {"duration": 10, "items_enabled": true, "quiz_category": &"all"}
 ## Seconds left on the start countdown (-1 when not counting).
 var countdown: float = -1.0
 var min_participants: int = 2
 
-## player id → {human: bool, connected: bool, joined_at: float, pad: bool, panel: bool}
+## player id → {connected: bool, joined_at: float, pad: bool, panel: bool}
 var _members: Dictionary[int, Dictionary] = {}
 var _leader: int = -1
 
 
-## Registers a participant. `at` orders leadership (earliest connected human leads).
-func join(player: int, human: bool, at: float) -> void:
-	_members[player] = {"human": human, "connected": true, "joined_at": at, "pad": false, "panel": false, "pad_ignored": false}
+## Registers a participant. `at` orders leadership (earliest connected player leads).
+func join(player: int, at: float) -> void:
+	_members[player] = {"connected": true, "joined_at": at, "pad": false, "panel": false, "pad_ignored": false}
 	_elect()
 
 
-## Marks a player connected or not (a disconnected human never blocks the start).
+## Marks a player connected or not (a disconnected player never blocks the start).
 func set_connected(player: int, connected: bool, at: float) -> void:
 	if not _members.has(player):
 		return
@@ -39,7 +38,7 @@ func set_connected(player: int, connected: bool, at: float) -> void:
 	_elect()
 
 
-## Removes a participant (bot slot cleared).
+## Removes a participant.
 func remove(player: int) -> void:
 	_members.erase(player)
 	_elect()
@@ -49,7 +48,7 @@ func has(player: int) -> bool:
 	return _members.has(player)
 
 
-## Current party leader (-1 if no human is connected).
+## Current party leader (-1 if nobody is connected).
 func leader() -> int:
 	return _leader
 
@@ -87,25 +86,19 @@ func is_ready(player: int) -> bool:
 	if not _members.has(player):
 		return false
 	var m: Dictionary = _members[player]
-	return not m["human"] or m["panel"] or (m["pad"] and not m.get("pad_ignored", false))
+	return m["panel"] or (m["pad"] and not m.get("pad_ignored", false))
 
 
-## True when every connected human is ready and there are enough participants.
+## True when every connected player is ready and there are enough of them.
 func all_ready() -> bool:
 	var participants: int = 0
-	var humans: int = 0
 	for id: int in _members:
-		var m: Dictionary = _members[id]
-		if not m["human"]:
-			participants += 1
+		if not _members[id]["connected"]:
 			continue
-		if not m["connected"]:
-			continue
-		humans += 1
 		participants += 1
 		if not is_ready(id):
 			return false
-	return humans >= 1 and participants >= min_participants
+	return participants >= maxi(min_participants, 1)
 
 
 ## Validates and applies a leader setting. Returns &"" or an error.
@@ -119,10 +112,6 @@ func set_setting(player: int, key: String, value: Variant) -> StringName:
 			settings["duration"] = int(value)
 		"items_enabled":
 			settings["items_enabled"] = bool(value)
-		"bot_difficulty":
-			if not StringName(value) in BOT_DIFFICULTIES:
-				return &"bad_value"
-			settings["bot_difficulty"] = StringName(value)
 		"quiz_category":
 			settings["quiz_category"] = StringName(value)
 		_:
@@ -148,11 +137,11 @@ func tick(delta: float) -> StringName:
 	return &""
 
 
-## Number of participants (humans connected + bots).
+## Number of connected participants.
 func participant_count() -> int:
 	var n: int = 0
 	for id: int in _members:
-		if not _members[id]["human"] or _members[id]["connected"]:
+		if _members[id]["connected"]:
 			n += 1
 	return n
 
@@ -164,11 +153,11 @@ func to_wire() -> Dictionary:
 func _elect() -> void:
 	var best: int = -1
 	var best_at: float = INF
-	if _members.has(_leader) and _members[_leader]["human"] and _members[_leader]["connected"]:
+	if _members.has(_leader) and _members[_leader]["connected"]:
 		return  # leadership sticks until the leader leaves
 	for id: int in _members:
 		var m: Dictionary = _members[id]
-		if m["human"] and m["connected"] and m["joined_at"] < best_at:
+		if m["connected"] and m["joined_at"] < best_at:
 			best_at = m["joined_at"]
 			best = id
 	_leader = best

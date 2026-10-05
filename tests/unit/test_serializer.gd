@@ -15,7 +15,6 @@ func _sample_state() -> MatchState:
 		p.display_name = "P%d" % i
 		p.color_index = i
 		p.skin = &"king"
-		p.is_bot = i == 3
 		p.inventory = [&"lucky_clover", &"mirror"] as Array[StringName]
 		p.quiz_points = 1500 + i
 		p.position = Vector3(1.25, 0, -3.5 * i)
@@ -36,7 +35,7 @@ func test_match_state_round_trip() -> void:
 	assert_eq(back.to_wire(), wire)
 	assert_eq(Serializer.state_hash(back.to_wire()), Serializer.state_hash(wire))
 	assert_eq(back.players[2].display_name, "P2")
-	assert_eq(back.players[3].is_bot, true)
+	assert_eq(back.players[3].skin, &"king")
 	assert_eq(back.players[1].inventory, [&"lucky_clover", &"mirror"] as Array[StringName])
 	assert_almost_eq(back.players[2].position.z, -7.0, 0.001)
 	assert_eq(back.balances[3], 3000)

@@ -2,11 +2,11 @@ extends GutTest
 
 
 func test_flags_and_values() -> void:
-	var c: Cmdline = Cmdline.parse(PackedStringArray(["--server", "--port", "24680", "--bots=3", "--autostart"]))
+	var c: Cmdline = Cmdline.parse(PackedStringArray(["--server", "--port", "24680", "--dummies=3", "--autostart"]))
 	assert_true(c.has_flag("server"))
 	assert_true(c.has_flag("autostart"))
 	assert_eq(c.get_int("port"), 24680)
-	assert_eq(c.get_int("bots"), 3)
+	assert_eq(c.get_int("dummies"), 3)
 	assert_false(c.has("connect"))
 
 

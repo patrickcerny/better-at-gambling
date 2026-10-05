@@ -7,7 +7,7 @@ var stage: QuizStage
 
 func before_each() -> void:
 	var st := ClientMatchState.new()
-	st.players = {1: {"id": 1, "name": "Me", "color": 0}, 2: {"id": 2, "name": "Bot", "color": 1, "bot": true}}
+	st.players = {1: {"id": 1, "name": "Me", "color": 0}, 2: {"id": 2, "name": "Other", "color": 1}}
 	stage = QuizStage.new()
 	add_child_autofree(stage)
 	stage.begin(st, 1, {"minigame": &"quiz", "players": [1, 2]}, {})

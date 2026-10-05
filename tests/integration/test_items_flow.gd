@@ -1,6 +1,6 @@
 extends GutTest
-## Items inside a whole match (M5): intents, the reward draft feeding inventories, bots using
-## items, Spring Glove and Bodyguard in physical play, and money conservation with items on.
+## Items inside a whole match (M5): intents, the reward draft feeding inventories, scripted
+## players using items, Spring Glove and Bodyguard in physical play, and money conservation with items on.
 
 var fx: ServerFixture
 
@@ -95,19 +95,26 @@ func test_reward_draft_fills_inventories_and_asks_when_full() -> void:
 	assert_eq(fx.server.state.players[a].inventory.size(), 3)
 
 
-func test_bots_use_items_in_a_full_match_and_money_is_conserved() -> void:
+func test_scripted_players_use_items_in_a_full_match_and_money_is_conserved() -> void:
 	for i: int in 3:
-		fx.server.add_player("bot-%d" % i, "Bot%d" % i, true)
+		fx.player_ids.append(fx.server.add_player("uid-extra-%d" % i, "X%d" % i))
 	_start()
-	var bots: Array[int] = []
-	for id: int in fx.server.state.players:
-		if fx.server.state.players[id].is_bot:
-			bots.append(id)
-			_give(id, [&"banana_peel", &"black_cat", &"pickpocket"])
-	fx.server.run_to_end()
+	for id: int in fx.player_ids:
+		_give(id, [&"banana_peel", &"black_cat", &"pickpocket"])
+	# Scripted players (the game has no bots): now and then each one uses its first item on
+	# someone at random, through the same intent a client sends.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	while fx.server.running and fx.server.phases.phase != Phase.Id.RESULTS:
+		fx.server.run_to_end(1.0)
+		for id: int in fx.player_ids:
+			if fx.server.state.players[id].inventory.is_empty() or rng.randf() > 0.1:
+				continue
+			var target: int = fx.player_ids[rng.randi_range(0, fx.player_ids.size() - 1)]
+			fx.intent(id, &"use_item", {"slot": 0, "target": target, "option": rng.randi_range(0, 2)})
 	assert_eq(fx.server.phases.phase, Phase.Id.RESULTS)
 	var used: Array[Dictionary] = fx.of_type(&"item_used")
-	assert_gt(used.size(), 5, "bots used their items")
+	assert_gt(used.size(), 5, "players used their items")
 	var kinds: Dictionary = {}
 	for e: Dictionary in used:
 		kinds[e["item"]] = true

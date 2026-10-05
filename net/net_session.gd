@@ -97,7 +97,7 @@ func start_local(server: MatchServer, display_name: String) -> int:
 	mode = Mode.LOCAL
 	local_server = server
 	server.event_emitted.connect(_on_local_event)
-	local_player_id = server.add_player("local", display_name, false, -1, StringName(Settings.get_value("profile", "skin", "bean")))
+	local_player_id = server.add_player("local", display_name, -1, StringName(Settings.get_value("profile", "skin", "bean")))
 	connected.emit()
 	return local_player_id
 

@@ -6,10 +6,10 @@ extends Node3D
 ## (`report_knockout`, `report_pickup`, `report_thrown_out`, `report_got_up`).
 ##
 ## One scene, three roles (§3.5 "one code path"):
-## - PRACTICE: hosts the MatchServer in-process; the local avatar is driven by input, bots by
-##   local simulation.
+## - PRACTICE: hosts the MatchServer in-process; the local avatar is driven by input, everyone
+##   else (only test dummies; the game has no bots) by local simulation.
 ## - SERVER: the dedicated room server (headless). Humans are puppets fed by their clients'
-##   movement; the server simulates ragdolls, guards, props and bots and streams them.
+##   movement; the server simulates ragdolls, guards, props and test dummies and streams them.
 ## - CLIENT: online player. Own avatar from input while standing; everything else follows the
 ##   server's world stream (`NetWorld`).
 
@@ -17,6 +17,11 @@ const MATCH_SCENE_PATH: String = "res://match/match_scene.tscn"
 const RESULTS_PATH: String = "res://ui/menus/main_menu.tscn"
 
 enum Role { PRACTICE, SERVER, CLIENT }
+
+const DUMMY_NAMES: Array[String] = ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bluff", "Royal"]
+
+## Practice dummies when no `--dummies` flag is given (scene tests set this; the game keeps 0).
+static var test_dummies: int = 0
 
 var map: LuckyLounge
 var server: MatchServer = null
@@ -30,6 +35,8 @@ var local: PlayerAvatar = null
 var local_id: int = -1
 var cfg: BalanceConfig
 var avatars: Dictionary[int, PlayerAvatar] = {}
+## Player ids of test dummies this process simulates (server side only).
+var dummies: Dictionary[int, bool] = {}
 var piles: Dictionary[int, ChipPile] = {}
 var guards: Array[Guard] = []
 var station_uis: Dictionary[StringName, StationUi] = {}
@@ -256,11 +263,12 @@ func _start_room_server(cmd: Cmdline) -> void:
 	server.open_lobby()
 	_owns_server = true
 	Net.attach_server(server)
-	for i: int in clampi(cmd.get_int("bots", 0), 0, 7):
-		server.add_player("bot-%d" % (i + 1), MatchServer.BOT_NAMES[i % MatchServer.BOT_NAMES.size()], true)
+	for i: int in clampi(cmd.get_int("dummies", 0), 0, 7):
+		_add_dummy(i)
 
 
-## Practice: host the server in-process with bots standing around.
+## Practice: host the server in-process. Just you in the casino (Patrick: no bots); tests and
+## screenshots add standing dummies with `--dummies N`.
 func _start_local(cmd: Cmdline) -> void:
 	server = MatchServer.new()
 	server.name = "MatchServer"
@@ -277,12 +285,20 @@ func _start_local(cmd: Cmdline) -> void:
 	server.set_server_position(id, def.spawn_points[0])
 	if cmd.has("skin"):  # dev/screenshots
 		(server.state.players[id] as PlayerState).skin = StringName(cmd.get_string("skin"))
-	var bots: int = clampi(cmd.get_int("bots", 3), 0, 7)
-	for i: int in bots:
-		# Dev/screenshots: `--bot-skins` dresses the bots in the character skins.
-		var skin: StringName = Cosmetics.SKINS[(i + 1) % Cosmetics.SKINS.size()] if cmd.has_flag("bot-skins") else &"bean"
-		var bid: int = server.add_player("bot-%d" % (i + 1), ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bluff", "Royal"][i % 7], true, -1, skin)
-		server.set_server_position(bid, def.spawn_points[(i + 1) % def.spawn_points.size()] + Vector3(0, 0, -3.0))
+	for i: int in clampi(cmd.get_int("dummies", test_dummies), 0, 7):
+		# Dev/screenshots: `--dummy-skins` dresses the dummies in the character skins.
+		var skin: StringName = Cosmetics.SKINS[(i + 1) % Cosmetics.SKINS.size()] if cmd.has_flag("dummy-skins") else &"bean"
+		var did: int = _add_dummy(i, skin)
+		server.set_server_position(did, def.spawn_points[(i + 1) % def.spawn_points.size()] + Vector3(0, 0, -3.0))
+
+
+## Test/screenshot dummy: a ready player with no client that only stands where it is put (or
+## where physics throws it). Simulated by whoever hosts the server.
+func _add_dummy(i: int, skin: StringName = &"bean") -> int:
+	var did: int = server.add_player("dummy-%d" % (i + 1), DUMMY_NAMES[i % DUMMY_NAMES.size()], -1, skin)
+	server.lobby.set_panel_ready(did, true)
+	dummies[did] = true
+	return did
 
 
 func _spawn_avatars() -> void:
@@ -306,10 +322,10 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.is_local = pid == local_id
 	a.cfg = cfg
 	a.router = router if a.is_local else null
-	# Bots are simulated wherever the server runs; humans other than us are network puppets.
-	var bot: bool = bool(p.get("bot", false))
+	# Dummies are simulated wherever the server runs; other players are network puppets.
+	var dummy: bool = _owns_server and dummies.has(pid)
 	if not a.is_local:
-		a.drive = PlayerAvatar.Drive.SIM if (bot and _owns_server) or role == Role.PRACTICE else PlayerAvatar.Drive.PUPPET
+		a.drive = PlayerAvatar.Drive.SIM if dummy or role == Role.PRACTICE else PlayerAvatar.Drive.PUPPET
 	var pos: Vector3 = Serializer.to_vec3(p.get("pos", [0, 0, 0]))
 	if pos == Vector3.ZERO:
 		var room: bool = server.room_mode if _owns_server else view.state.room_mode
@@ -326,7 +342,7 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.ragdoll_settled.connect(func() -> void: _on_ragdoll_settled(pid))
 	avatars[pid] = a
 	a.set_skin(StringName(p.get("skin", "bean")))
-	if not bool(p.get("connected", true)) and not bot:
+	if not bool(p.get("connected", true)):
 		a.set_connection_away(true)
 	# Already at a table when we learn about them (joining late, reconnecting): put them in their
 	# own chair. They used to stand where they last walked, which is the same spot in front of the
@@ -438,7 +454,7 @@ func _process(delta: float) -> void:
 		stage.on_private(Net.request_private_snapshot())
 	if _owns_server and server != null:
 		server.advance(delta)
-	# Simulated bots follow the server's last known position.
+	# Simulated bodies (dummies) follow the server's last known position.
 	for pid: int in avatars:
 		if pid == local_id:
 			continue
@@ -501,7 +517,7 @@ func _simulates(a: PlayerAvatar) -> bool:
 	return a.drive != PlayerAvatar.Drive.PUPPET
 
 
-## The server keeps its world query in step with the ragdolls it simulates. Standing bots need
+## The server keeps its world query in step with the ragdolls it simulates. Standing dummies need
 ## nothing: their avatars follow the server's position, never the other way round.
 func _report_simulated_positions() -> void:
 	for pid: int in avatars:
@@ -516,7 +532,7 @@ func _report_simulated_positions() -> void:
 func _check_ready_pads() -> void:
 	for pid: int in avatars:
 		var p: PlayerState = server.state.players.get(pid, null)
-		if p == null or p.is_bot:
+		if p == null or dummies.has(pid):
 			continue
 		var a: PlayerAvatar = avatars[pid]
 		var pad: Vector3 = map.ready_pad(p.color_index)

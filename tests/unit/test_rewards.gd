@@ -44,7 +44,7 @@ func test_start_pays_cash_and_announces_without_offers() -> void:
 	var s: Array = _setup(4)
 	var eco: Economy = s[0]
 	var rd := RewardDirector.new()
-	rd.start(_ranking(4), {}, eco, loot, true, 1.0, cfg, SeededRng.new(3))
+	rd.start(_ranking(4), eco, loot, true, 1.0, cfg, SeededRng.new(3))
 	assert_eq(eco.balance(1), 1150)
 	assert_eq(eco.balance(2), 1100)
 	assert_eq(eco.balance(3), 1050)
@@ -63,7 +63,7 @@ func test_default_pick_is_first_option_on_timeout() -> void:
 	var s: Array = _setup(2)
 	var players: Dictionary[int, PlayerState] = s[1]
 	var rd := RewardDirector.new()
-	rd.start(_ranking(2), {}, s[0], loot, true, 1.0, cfg, SeededRng.new(7))
+	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(7))
 	var first: StringName = StringName(rd.private_state(1)["draft"]["choices"][0])
 	var t: float = 0.0
 	while not rd.is_done() and t < 30.0:
@@ -79,7 +79,7 @@ func test_pick_validation_and_early_close() -> void:
 	var s: Array = _setup(2)
 	var players: Dictionary[int, PlayerState] = s[1]
 	var rd := RewardDirector.new()
-	rd.start(_ranking(2), {}, s[0], loot, true, 1.0, cfg, SeededRng.new(9))
+	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(9))
 	var n1: int = (rd.private_state(1)["draft"]["choices"] as Array).size()
 	assert_eq(rd.pick(1, n1)["error"], &"bad_value")
 	assert_eq(rd.pick(1, -1)["error"], &"bad_value")
@@ -94,20 +94,12 @@ func test_pick_validation_and_early_close() -> void:
 	assert_eq(rd.pick(2, 0)["error"], &"too_late")
 
 
-func test_bots_pick_automatically() -> void:
-	var s: Array = _setup(2)
-	var rd := RewardDirector.new()
-	var bots: Dictionary[int, StringName] = {2: &"normal"}
-	rd.start(_ranking(2), bots, s[0], loot, true, 1.0, cfg, SeededRng.new(1))
-	assert_true(int(rd.rewards[2]["pick"]) >= 0)
-
-
 func test_inventory_capped_at_three() -> void:
 	var s: Array = _setup(2)
 	var players: Dictionary[int, PlayerState] = s[1]
 	players[1].inventory.assign([&"black_cat", &"bodyguard", &"mirror"])
 	var rd := RewardDirector.new()
-	rd.start(_ranking(2), {}, s[0], loot, true, 1.0, cfg, SeededRng.new(2))
+	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(2))
 	rd.pick(1, 0)
 	rd.pick(2, 0)
 	rd.tick(0.05, players)
@@ -122,7 +114,7 @@ func test_items_off_means_cash_only_and_no_draft() -> void:
 	var eco: Economy = s[0]
 	var players: Dictionary[int, PlayerState] = s[1]
 	var rd := RewardDirector.new()
-	rd.start(_ranking(3), {}, eco, loot, false, 1.0, cfg, SeededRng.new(4))
+	rd.start(_ranking(3), eco, loot, false, 1.0, cfg, SeededRng.new(4))
 	assert_eq(eco.balance(1), 1300)
 	assert_true(rd.private_state(1).is_empty())
 	var t: float = 0.0

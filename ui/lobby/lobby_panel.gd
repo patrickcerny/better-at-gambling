@@ -2,7 +2,7 @@ class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
 ## accessibility: the 8 slots (name, color, skin, ready, leader), the ready toggle, your skin
-## and — for the party leader — duration, items, bot difficulty and bot slots. Every
+## and — for the party leader — duration and items. Every
 ## button sends an intent; the panel only redraws from the ClientMatchState mirror.
 
 signal closed
@@ -19,7 +19,6 @@ var _settings_note: Label
 var _countdown_label: Label
 var _duration_buttons: Dictionary[int, Button] = {}
 var _items_button: Button
-var _difficulty_buttons: Dictionary[StringName, Button] = {}
 var _skin_label: Label
 var _skin_next: Button
 
@@ -141,20 +140,6 @@ func _build() -> void:
 	_items_button.pressed.connect(func() -> void:
 		Net.send_intent(Intents.make(&"lobby_setting", {"key": "items_enabled", "value": not bool(state.lobby_settings.get("items_enabled", true))})))
 	_settings_box.add_child(_items_button)
-	var diff := HBoxContainer.new()
-	_settings_box.add_child(diff)
-	for dname: StringName in LobbyController.BOT_DIFFICULTIES:
-		var b := Button.new()
-		b.text = "BOTS: %s" % String(dname).to_upper()
-		b.toggle_mode = true
-		b.add_theme_font_size_override(&"font_size", 18)
-		b.pressed.connect(func() -> void: Net.send_intent(Intents.make(&"lobby_setting", {"key": "bot_difficulty", "value": dname})))
-		diff.add_child(b)
-		_difficulty_buttons[dname] = b
-	var add_bot := Button.new()
-	add_bot.text = "ADD BOT"
-	add_bot.pressed.connect(func() -> void: Net.send_intent(Intents.make(&"add_bot")))
-	_settings_box.add_child(add_bot)
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override(&"separation", 20)
@@ -206,8 +191,6 @@ func _refresh() -> void:
 		var tags: PackedStringArray = []
 		if pid == state.leader:
 			tags.append("★")
-		if bool(p.get("bot", false)):
-			tags.append("BOT")
 		if not bool(p.get("connected", true)):
 			tags.append("away")
 		label.text = "%s %s" % [str(p.get("name", "?")), " ".join(tags)]
@@ -216,15 +199,10 @@ func _refresh() -> void:
 			label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 		row.add_child(label)
 		var ready := Label.new()
-		var is_ready: bool = bool(p.get("ready", false)) or bool(p.get("bot", false))
+		var is_ready: bool = bool(p.get("ready", false))
 		ready.text = "READY" if is_ready else "…"
 		ready.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if is_ready else Color("#9A8F7A"))
 		row.add_child(ready)
-		if bool(p.get("bot", false)) and local_id == state.leader:
-			var rm := Button.new()
-			rm.text = "✕"
-			rm.pressed.connect(func() -> void: Net.send_intent(Intents.make(&"remove_bot", {"player": pid})))
-			row.add_child(rm)
 	_ready_button.text = "NOT READY" if _my_ready() else "READY"
 	_skin_label.text = str(Cosmetics.SKIN_NAMES.get(_my_skin(), "Bean"))
 	var leader: bool = local_id == state.leader
@@ -235,10 +213,6 @@ func _refresh() -> void:
 	_items_button.text = "ITEMS: %s" % ("ON" if bool(state.lobby_settings.get("items_enabled", true)) else "OFF")
 	_items_button.button_pressed = bool(state.lobby_settings.get("items_enabled", true))
 	_items_button.disabled = not leader
-	for dname: StringName in _difficulty_buttons:
-		_difficulty_buttons[dname].button_pressed = StringName(state.lobby_settings.get("bot_difficulty", &"normal")) == dname
-		_difficulty_buttons[dname].disabled = not leader
-	_settings_box.get_child(_settings_box.get_child_count() - 1).set(&"disabled", not leader)
 
 
 func _my_skin() -> StringName:

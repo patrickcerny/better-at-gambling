@@ -51,7 +51,7 @@ text = "Play Online"
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
-text = "Practice vs Bots"
+text = "Practice (solo)"
 
 [node name="Settings" type="Button" parent="Center/VBox"]
 custom_minimum_size = Vector2(0, 56)

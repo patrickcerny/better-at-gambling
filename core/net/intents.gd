@@ -18,8 +18,6 @@ const SCHEMA: Dictionary = {
 	&"set_ready": ["ready"],
 	&"lobby_setting": ["key", "value"],
 	&"set_skin": ["skin"],
-	&"add_bot": [],
-	&"remove_bot": ["player"],
 	&"return_to_lobby": [],
 	&"emote": ["id"],
 	&"move": ["pos", "yaw"],

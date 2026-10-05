@@ -1,5 +1,5 @@
 extends GutTest
-## Online room flow on the authoritative server (§2.2, §4.1): lobby, leader, cosmetics, bots,
+## Online room flow on the authoritative server (§2.2, §4.1): lobby, leader, cosmetics,
 ## ready → countdown → match, and the validator rules every client intent goes through.
 
 var server: MatchServer
@@ -34,8 +34,8 @@ func _tick(seconds: float) -> void:
 
 
 func test_colors_are_fixed_and_unique_and_skins_are_picked() -> void:
-	var a: int = server.add_player("dev:a", "A", false, 3, &"cowboy")
-	var b: int = server.add_player("dev:b", "B", false, 3, &"king")
+	var a: int = server.add_player("dev:a", "A", 3, &"cowboy")
+	var b: int = server.add_player("dev:b", "B", 3, &"king")
 	assert_eq(server.state.players[a].color_index, 0, "wishes ignored: first free color")
 	assert_eq(server.state.players[b].color_index, 1)
 	assert_eq(server.state.players[a].skin, &"bean", "unknown skins fall back to the bean")
@@ -67,22 +67,13 @@ func test_not_ready_wins_over_the_pad_and_reconnect_starts_not_ready() -> void:
 	assert_false(server.state.players[a].ready)
 
 
-func test_leader_settings_bots_ready_countdown_and_start() -> void:
+func test_leader_settings_ready_countdown_and_start() -> void:
 	var a: int = server.add_player("dev:a", "A")
 	var b: int = server.add_player("dev:b", "B")
 	assert_eq(server.lobby.leader(), a)
 	assert_eq(_intent(b, &"lobby_setting", {"key": "duration", "value": 15})["error"], &"not_leader")
 	assert_true(_intent(a, &"lobby_setting", {"key": "duration", "value": 15})["ok"])
-	assert_eq(_intent(b, &"add_bot")["error"], &"not_leader")
-	assert_true(_intent(a, &"add_bot")["ok"])
-	var bot: int = -1
-	for id: int in server.state.players:
-		if server.state.players[id].is_bot:
-			bot = id
-	assert_gt(bot, 0)
-	assert_true(_intent(a, &"remove_bot", {"player": bot})["ok"])
-	assert_false(server.state.players.has(bot))
-	assert_eq(_intent(a, &"remove_bot", {"player": b})["error"], &"bad_value", "humans can't be removed")
+	assert_eq(server.submit_intent(a, {"type": &"add_bot"})["error"], &"malformed", "the game has no bots")
 	assert_eq(_intent(a, &"place_bet", {"station": &"slot_1", "bet": {"amount": 10}})["error"], &"wrong_phase", "no gambling in the lobby")
 	_intent(a, &"set_ready", {"ready": true})
 	_tick(5.0)
@@ -128,7 +119,6 @@ func test_validator_rules() -> void:
 	assert_eq(server.economy.balance(a), before)
 	assert_eq(server.submit_intent(a, {"type": &"place_bet", "station": &"slot_1"})["error"], &"malformed")
 	assert_eq(server.submit_intent(a, {"type": &"hack_money", "amount": 1e9})["error"], &"malformed")
-	assert_eq(_intent(a, &"add_bot")["error"], &"wrong_phase")
 	_tick(1.1)  # fresh rate-limit window
 	var limited: int = 0
 	for i: int in 30:

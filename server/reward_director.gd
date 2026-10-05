@@ -23,7 +23,7 @@ var _balance: BalanceConfig
 
 ## Starts the reward phase from a minigame ranking ([{player, rank, ...}]). Pays the cash through
 ## `economy`, builds draft offers with `loot` (null or items off = cash only).
-func start(ranking: Array[Dictionary], bots: Dictionary[int, StringName], economy: Economy, loot: LootTables, items_enabled: bool, limits_multiplier: float, balance: BalanceConfig, rng: SeededRng) -> void:
+func start(ranking: Array[Dictionary], economy: Economy, loot: LootTables, items_enabled: bool, limits_multiplier: float, balance: BalanceConfig, rng: SeededRng) -> void:
 	_balance = balance
 	rewards.clear()
 	var worst: int = 0
@@ -39,8 +39,6 @@ func start(ranking: Array[Dictionary], bots: Dictionary[int, StringName], econom
 			var d: Dictionary = loot.draft(placement, placement == worst and ranking.size() > 1, ranking.size(), rng)
 			r["choices"] = d["choices"]
 			r["bonus"] = d["bonus"]
-		if bots.has(p) and not (r["choices"] as Array).is_empty():
-			r["pick"] = rng.range_int(0, (r["choices"] as Array).size() - 1)
 		rewards[p] = r
 		if cash > 0:
 			economy.apply(p, cash, &"minigame_prize", &"rewards")

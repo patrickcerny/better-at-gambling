@@ -22,8 +22,6 @@ var elapsed: Dictionary[int, float] = {}
 ## Totals over the quiz.
 var points: Dictionary[int, int] = {}
 var correct_time: Dictionary[int, float] = {}
-## Bots' planned answers for the current question: player → [delay, choice].
-var _bot_plan: Dictionary[int, Array] = {}
 var _ranking: Array[Dictionary] = []
 var _last_reveal: Dictionary = {}
 
@@ -55,10 +53,6 @@ func tick(delta: float, now: float) -> void:
 		return
 	timer -= delta
 	if state == State.ANSWER:
-		for p: int in _bot_plan.keys():
-			if now - sent_at >= float(_bot_plan[p][0]):
-				_record(p, int(_bot_plan[p][1]), now - sent_at)
-				_bot_plan.erase(p)
 		if _everyone_answered():
 			timer = minf(timer, 0.0)
 	if timer > 0.0:
@@ -80,7 +74,7 @@ func tick(delta: float, now: float) -> void:
 
 ## `intent` = {question: index, index: chosen answer}.
 func submit(player: int, intent: Dictionary, now: float) -> Dictionary:
-	if not player in players or bots.has(player):
+	if not player in players:
 		return StationLogicBase.fail(&"not_in_minigame")
 	if state != State.ANSWER or int(intent.get("question", -1)) != index:
 		return StationLogicBase.fail(&"too_late")
@@ -91,11 +85,6 @@ func submit(player: int, intent: Dictionary, now: float) -> Dictionary:
 		return StationLogicBase.fail(&"bad_value")
 	_record(player, choice, QuizScoring.compensated_elapsed(sent_at, now, float(half_rtt.call(player))))
 	return StationLogicBase.OK_RESULT
-
-
-func remove_player(player: int) -> void:
-	super.remove_player(player)
-	_bot_plan.erase(player)
 
 
 func ranking() -> Array[Dictionary]:
@@ -133,16 +122,6 @@ func _ask(now: float) -> void:
 	state = State.ANSWER
 	timer = balance.quiz_answer_time
 	sent_at = now
-	_bot_plan.clear()
-	var correct: int = int(questions[index]["correct_index"])
-	for p: int in players:
-		if not bots.has(p):
-			continue
-		var acc: float = float(balance.quiz_bot_accuracy.get(bots[p], 0.6))
-		var choice: int = correct
-		if not rng.chance(acc):
-			choice = (correct + 1 + rng.range_int(0, QuestionBank.ANSWER_COUNT - 2)) % QuestionBank.ANSWER_COUNT
-		_bot_plan[p] = [rng.range_float(balance.quiz_bot_min_delay, balance.quiz_bot_max_delay), choice]
 	var ev: Dictionary = _public_question(index)
 	ev["seconds"] = balance.quiz_answer_time
 	events.append(GameEvents.make(&"quiz_question", ev))

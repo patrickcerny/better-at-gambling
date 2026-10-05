@@ -9,8 +9,6 @@ var display_name: String = ""
 var color_index: int = 0
 ## Character skin (see `Cosmetics.SKINS`); purely visual.
 var skin: StringName = &"bean"
-var is_bot: bool = false
-var bot_difficulty: StringName = &"normal"
 var connected: bool = true
 var ready: bool = false
 var inventory: Array[StringName] = []
@@ -27,8 +25,8 @@ var position: Vector3 = Vector3.ZERO
 ## Wire dictionary.
 func to_wire() -> Dictionary:
 	return {
-		"id": id, "uid": uid, "name": display_name, "color": color_index, "skin": skin, "bot": is_bot,
-		"bot_difficulty": bot_difficulty, "connected": connected, "ready": ready, "inventory": inventory.duplicate(),
+		"id": id, "uid": uid, "name": display_name, "color": color_index, "skin": skin,
+		"connected": connected, "ready": ready, "inventory": inventory.duplicate(),
 		"quiz_points": quiz_points, "quiz_time": quiz_correct_time, "biggest_win": biggest_win, "station": station, "seat": seat,
 		"pos": Serializer.vec3(position),
 	}
@@ -42,8 +40,6 @@ static func from_wire(d: Dictionary) -> PlayerState:
 	p.display_name = str(d.get("name", ""))
 	p.color_index = int(d.get("color", 0))
 	p.skin = StringName(d.get("skin", "bean"))
-	p.is_bot = bool(d.get("bot", false))
-	p.bot_difficulty = StringName(d.get("bot_difficulty", "normal"))
 	p.connected = bool(d.get("connected", true))
 	p.ready = bool(d.get("ready", false))
 	for item: Variant in d.get("inventory", []):

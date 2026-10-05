@@ -75,25 +75,17 @@ func pick(player: int, duel: int, choice: int, now: float) -> Dictionary:
 	return StationLogicBase.OK_RESULT
 
 
-## Timeouts; `bots` pick (and accept) on their own.
-func tick(now: float, bots: Dictionary) -> void:
+## Timeouts: an unanswered invite lapses, a missing pick is made at random.
+func tick(now: float) -> void:
 	for id: int in duels.keys():
 		var d: Dictionary = duels.get(id, {})
 		if d.is_empty():
 			continue
 		if d["state"] == &"invite":
-			if bots.has(int(d["b"])):
-				if rng.chance(0.7):
-					_start_round(d, now)
-				else:
-					_cancel(id, &"declined")
-			elif now >= float(d["deadline"]):
+			if now >= float(d["deadline"]):
 				_cancel(id, &"no_answer")
 			continue
-		for p: int in [int(d["a"]), int(d["b"])]:
-			if bots.has(p) and not (d["picks"] as Dictionary).has(p):
-				pick(p, id, rng.range_int(0, 2), now)
-		if duels.has(id) and now >= float(d["deadline"]):
+		if now >= float(d["deadline"]):
 			for p: int in [int(d["a"]), int(d["b"])]:
 				if not (d["picks"] as Dictionary).has(p):
 					d["picks"][p] = rng.range_int(0, 2)

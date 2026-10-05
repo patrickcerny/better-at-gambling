@@ -12,7 +12,7 @@ signal ragdoll_impact(strength: float, wall: bool)
 signal ragdoll_settled
 
 enum State { STANDING, SEATED, HELD, RAGDOLL, STUNNED, AWAY }
-## Who moves this body: local input, local simulation (bots, Practice), or a network stream.
+## Who moves this body: local input, local simulation (test dummies, Practice), or a network stream.
 enum Drive { INPUT, SIM, PUPPET }
 
 const LAYER_PLAYERS: int = 2
@@ -59,7 +59,7 @@ var holder: PlayerAvatar = null
 var seat: Node3D = null
 ## Last player that hurt us (for fountain/fall credit).
 var last_attacker: int = -1
-## Scripted drive target for bots/autoplay: when set, walks there instead of reading input.
+## Scripted drive target for autoplay: when set, walks there instead of reading input.
 var auto_target: Vector3 = Vector3.INF
 
 var _send_timer: float = 0.0

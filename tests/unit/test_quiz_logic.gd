@@ -1,5 +1,5 @@
 extends GutTest
-## Casino Quiz rules (§2.9): three questions, server timing with RTT compensation, ties, bots,
+## Casino Quiz rules (§2.9): three questions, server timing with RTT compensation, ties,
 ## and the correct answer never leaving the server before the reveal.
 
 var cfg: BalanceConfig = BalanceConfig.new()
@@ -13,10 +13,10 @@ func before_each() -> void:
 	now = 0.0
 
 
-func _quiz(players: Array[int], bots: Dictionary[int, StringName] = {}, used: Dictionary = {}, rtt: Dictionary = {}) -> QuizLogic:
+func _quiz(players: Array[int], used: Dictionary = {}, rtt: Dictionary = {}) -> QuizLogic:
 	var q := QuizLogic.new()
 	q.half_rtt = func(p: int) -> float: return float(rtt.get(p, 0.0))
-	q.setup(players, bots, SeededRng.new(5), cfg, {}, {"bank": bank, "used": used, "stats": {}})
+	q.setup(players, SeededRng.new(5), cfg, {}, {"bank": bank, "used": used, "stats": {}})
 	return q
 
 
@@ -55,7 +55,7 @@ func test_no_repeats_across_quizzes_of_a_match() -> void:
 	var used: Dictionary = {}
 	var ids: Dictionary = {}
 	for i: int in 7:  # a 30-minute match
-		var q: QuizLogic = _quiz([1, 2], {}, used)
+		var q: QuizLogic = _quiz([1, 2], used)
 		for question: Dictionary in q.questions:
 			assert_false(ids.has(question["id"]), "repeat %s" % question["id"])
 			ids[question["id"]] = true
@@ -64,7 +64,7 @@ func test_no_repeats_across_quizzes_of_a_match() -> void:
 
 func test_correct_index_never_sent_before_reveal() -> void:
 	var events: Array[Dictionary] = []
-	var q: QuizLogic = _quiz([1, 2], {3: &"hard"})
+	var q: QuizLogic = _quiz([1, 2])
 	events.append_array(q.drain_events())
 	_to_answer(q, events)
 	q.submit(1, {"question": 0, "index": 2}, now)
@@ -102,7 +102,7 @@ func test_scoring_compensates_latency() -> void:
 	# Player 1 has 300 ms RTT (150 ms each way), player 2 none. Both press at the same moment
 	# 2 s after the question appeared on their screens: same score.
 	var events: Array[Dictionary] = []
-	var q: QuizLogic = _quiz([1, 2], {}, {}, {1: 0.15, 2: 0.0})
+	var q: QuizLogic = _quiz([1, 2], {}, {1: 0.15, 2: 0.0})
 	_to_answer(q, events)
 	var correct: int = int(q.questions[0]["correct_index"])
 	var sent: float = q.sent_at
@@ -168,20 +168,6 @@ func test_exact_ties_share_the_rank() -> void:
 		_run(q, 0.1, events)
 	_run(q, 30.0, events)
 	assert_eq(q.ranking().map(func(r: Dictionary) -> int: return r["rank"]), [1, 1])
-
-
-func test_bots_answer_inside_the_window_with_their_accuracy() -> void:
-	cfg.quiz_bot_accuracy = {&"hard": 1.0, &"easy": 0.0}
-	var events: Array[Dictionary] = []
-	var q: QuizLogic = _quiz([1, 2], {1: &"hard", 2: &"easy"})
-	_run(q, 200.0, events)
-	var reveals: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == &"quiz_reveal")
-	assert_eq(reveals.size(), 3)
-	for r: Dictionary in reveals:
-		assert_eq(r["answers"][1], r["correct_index"])
-		assert_ne(r["answers"][2], r["correct_index"])
-		assert_between(int(r["points"][1]), 500 + roundi(500.0 * 3.0 / 12.0), 500 + roundi(500.0 * 10.0 / 12.0), "answered 2-9 s in")
-	assert_eq(q.ranking()[0]["player"], 1)
 
 
 func test_player_who_drops_scores_zero_and_leaves_the_ranking() -> void:

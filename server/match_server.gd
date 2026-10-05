@@ -8,7 +8,6 @@ extends Node
 signal event_emitted(event: Dictionary)
 
 const TICK: float = 1.0 / Protocol.SERVER_TICK_HZ
-const BOT_NAMES: Array[String] = ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bluff", "Royal"]
 
 var balance: BalanceConfig
 var presets: MatchPresets
@@ -49,7 +48,7 @@ var results_return_in: float = -1.0
 var timescale: float = 1.0
 ## Match seconds elapsed (all phases), the server clock.
 var match_time: float = 0.0
-## Settings: duration, seed, items_enabled, bots.
+## Settings: duration, seed, items_enabled.
 var settings: Dictionary = {"duration": 10, "seed": 0, "items_enabled": true}
 ## Recent events kept for gap recovery.
 var event_log: Array[Dictionary] = []
@@ -66,7 +65,6 @@ var _uptime: float = 0.0
 var _leader: int = -1
 ## player → casino segment in which they got the House Comp (once per segment).
 var _comped: Dictionary[int, int] = {}
-var _bot_item_timer: float = 1.0
 var _logic_rng: SeededRng
 
 
@@ -133,7 +131,7 @@ func _build_match_systems(seed_value: int) -> void:
 	results_return_in = -1.0
 	for id: int in state.players:
 		_reset_stats(id)
-		rules.status(id).away = not (state.players[id].connected or state.players[id].is_bot)
+		rules.status(id).away = not state.players[id].connected
 
 
 func _build_schedule() -> void:
@@ -149,33 +147,31 @@ func open_lobby() -> void:
 
 ## Adds a participant and returns its player id. Colors are fixed and unique; `skin` is the
 ## player's saved character skin.
-func add_player(uid: String, display_name: String, is_bot: bool = false, color_index: int = -1, skin: StringName = &"bean") -> int:
+func add_player(uid: String, display_name: String, color_index: int = -1, skin: StringName = &"bean") -> int:
 	var p := PlayerState.new()
 	p.id = _next_player_id
 	_next_player_id += 1
 	p.uid = uid
 	p.display_name = display_name
-	p.is_bot = is_bot
 	# No color picker (Patrick, 2026-10-05): everyone gets the first free color and the client's
 	# `color_index` wish is ignored. Skins are the only look players choose.
 	p.color_index = lobby.free_color(_taken_colors(), -1)
 	p.skin = skin if Cosmetics.is_valid_skin(skin) else &"bean"
-	p.bot_difficulty = StringName(lobby.settings["bot_difficulty"])
 	state.add_player(p)
 	economy.add_player(p.id, balance.start_money)
 	_reset_stats(p.id)
 	world.set_transform(p.id, Vector3.ZERO, 0.0)
-	lobby.join(p.id, not is_bot, _uptime + p.id * 0.001)
+	lobby.join(p.id, _uptime + p.id * 0.001)
 	_emit(GameEvents.make(&"player_joined", {"player": p.to_wire()}))
 	_check_leader()
 	return p.id
 
 
-## Number of seats taken (connected humans + bots), for "room full".
+## Number of seats taken (connected players), for "room full".
 func occupied_slots() -> int:
 	var n: int = 0
 	for id: int in state.players:
-		if state.players[id].is_bot or state.players[id].connected:
+		if state.players[id].connected:
 			n += 1
 	return n
 
@@ -207,22 +203,10 @@ func player_reconnected(player: int) -> void:
 	_flush()
 
 
-## Removes a bot slot from the lobby (humans are never removed, only marked away).
-func remove_bot(player: int) -> bool:
-	if not state.players.has(player) or not state.players[player].is_bot or phases.phase != Phase.Id.LOBBY:
-		return false
-	state.players.erase(player)
-	economy.remove_player(player)
-	lobby.remove(player)
-	_emit(GameEvents.make(&"player_removed", {"player": player}))
-	_flush()
-	return true
-
-
 func _taken_colors() -> Array[int]:
 	var out: Array[int] = []
 	for id: int in state.players:
-		if state.players[id].is_bot or state.players[id].connected:
+		if state.players[id].connected:
 			out.append(state.players[id].color_index)
 	return out
 
@@ -252,11 +236,6 @@ func start_match() -> void:
 		if int(lobby.settings["duration"]) != state.duration_minutes:
 			state.duration_minutes = int(lobby.settings["duration"])
 			_build_schedule()
-		# Bots don't walk out of the entrance hall on their own; they start on the casino floor.
-		if not map_def.spawn_points.is_empty():
-			for id: int in state.players:
-				if state.players[id].is_bot:
-					set_server_position(id, map_def.spawn_points[(id - 1) % map_def.spawn_points.size()])
 	running = true
 	match_time = 0.0
 	phases.start()
@@ -370,7 +349,6 @@ func _step(delta: float) -> void:
 	items.tick(match_time, casino_open)
 	interactions.tick(match_time)
 	pickups.tick(match_time)
-	_tick_bots()
 
 
 func _tick_lobby(delta: float) -> void:
@@ -434,15 +412,10 @@ func _finish_match() -> void:
 
 func _start_minigame() -> void:
 	var players: Array[int] = []
-	var bots: Dictionary[int, StringName] = {}
 	for id: int in state.players:
-		var p: PlayerState = state.players[id]
-		if p.is_bot:
+		if state.players[id].connected:
 			players.append(id)
-			bots[id] = p.bot_difficulty
-		elif p.connected:
-			players.append(id)
-	minigame = minigames.begin(players, bots, _logic_rng.fork(), balance, _quiz_stats(), half_rtt_provider) if minigames.has_minigames() and not players.is_empty() else null
+	minigame = minigames.begin(players, _logic_rng.fork(), balance, _quiz_stats(), half_rtt_provider) if minigames.has_minigames() and not players.is_empty() else null
 	if minigame == null:
 		_emit(GameEvents.make(&"minigame_skipped", {}))
 		phases.minigame_finished()
@@ -464,14 +437,10 @@ func _finish_minigame() -> void:
 	minigames.end()
 	_emit(GameEvents.make(&"minigame_finished", {"ranking": ranking}))
 	phases.minigame_finished()
-	var bots: Dictionary[int, StringName] = {}
-	for id: int in state.players:
-		if state.players[id].is_bot:
-			bots[id] = state.players[id].bot_difficulty
 	var played_segment: int = maxi(phases.segment_index() - 1, 0)
 	rewards = RewardDirector.new()
 	rewards.grant = func(p: int, item: StringName) -> void: items.give(p, item, match_time)
-	rewards.start(ranking, bots, economy, loot, bool(settings.get("items_enabled", true)), balance.limits_multiplier(played_segment), balance, _logic_rng.fork())
+	rewards.start(ranking, economy, loot, bool(settings.get("items_enabled", true)), balance.limits_multiplier(played_segment), balance, _logic_rng.fork())
 	_flush()
 
 
@@ -507,7 +476,7 @@ func _check_comps() -> void:
 	var threshold: int = int(floor(balance.comp_threshold * balance.limits_multiplier(seg)))
 	for id: int in state.players:
 		var p: PlayerState = state.players[id]
-		if not (p.connected or p.is_bot) or _comped.get(id, -1) == seg:
+		if not p.connected or _comped.get(id, -1) == seg:
 			continue
 		if economy.balance(id) >= threshold or stations.has_stake(id) or interactions.is_held(id):
 			continue
@@ -695,20 +664,6 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				return StationLogicBase.fail(err)
 			_emit(GameEvents.make(&"lobby_settings", {"settings": lobby.settings.duplicate()}))
 			return StationLogicBase.OK_RESULT
-		&"add_bot":
-			if player != lobby.leader():
-				return StationLogicBase.fail(&"not_leader")
-			if occupied_slots() >= Protocol.MAX_PLAYERS:
-				return StationLogicBase.fail(&"room_full")
-			var n: int = 0
-			for id: int in state.players:
-				n += 1 if state.players[id].is_bot else 0
-			add_player("bot-%d" % _next_player_id, BOT_NAMES[n % BOT_NAMES.size()], true)
-			return StationLogicBase.OK_RESULT
-		&"remove_bot":
-			if player != lobby.leader():
-				return StationLogicBase.fail(&"not_leader")
-			return StationLogicBase.OK_RESULT if remove_bot(int(intent["player"])) else StationLogicBase.fail(&"bad_value")
 	return StationLogicBase.fail(&"not_implemented")
 
 
@@ -792,38 +747,6 @@ func set_server_position(player: int, pos: Vector3) -> void:
 	world.set_transform(player, pos, world.get_yaw(player))
 	state.players[player].position = pos
 	sanity.allow_teleport(player, pos, _uptime)
-
-
-func _tick_bots() -> void:
-	# BotDirector (M6) takes over; for now bots only use their items now and then.
-	var casino_open: bool = phases.phase == Phase.Id.CASINO or phases.phase == Phase.Id.PRE_MINIGAME
-	if not casino_open or not bool(settings.get("items_enabled", true)):
-		return
-	_bot_item_timer -= TICK
-	if _bot_item_timer > 0.0:
-		return
-	_bot_item_timer = 1.0
-	for id: int in state.players:
-		var p: PlayerState = state.players[id]
-		if p.is_bot and not p.inventory.is_empty() and _logic_rng.chance(0.08):
-			_bot_use_item(id)
-
-
-## A bot uses its first item: self items as they come, targeted ones on a random valid player.
-func _bot_use_item(bot: int) -> void:
-	var def: ItemDefinition = Registry.items.get(state.players[bot].inventory[0], null)
-	if def == null:
-		return
-	var target: int = -1
-	if ItemSystem.targets_player(def):
-		var cands: Array = items.candidates(bot, def).filter(func(c: int) -> bool: return items.protection(c, match_time) == &"")
-		if cands.is_empty():
-			return
-		target = cands[_logic_rng.range_int(0, cands.size() - 1)]
-	var opts: Dictionary = {}
-	if def.id == &"pickpocket" or def.id == &"rock_paper_scissors":
-		opts["option"] = _logic_rng.range_int(0, 2)
-	items.use(bot, 0, target, match_time, opts)
 
 
 func _sync_state() -> void:

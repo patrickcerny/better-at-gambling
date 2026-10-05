@@ -74,7 +74,7 @@ func test_self_item_from_the_key_updates_hud_and_tag() -> void:
 
 func test_target_picker_cycles_and_confirms() -> void:
 	var others: Array[int] = _others()
-	assert_gt(others.size(), 1, "needs two bots to pick between")
+	assert_gt(others.size(), 1, "needs two dummies to pick between")
 	_give([&"black_cat"])
 	await wait_process_frames(2)
 	scene.items_ctl.on_slot(0)
@@ -134,11 +134,11 @@ func test_banana_peel_mesh_and_slip() -> void:
 	await wait_seconds(0.4)
 	var slips: Array[Dictionary] = _of(&"banana_slip")
 	if slips.is_empty():
-		# The bot may have wandered off before the server saw it on the peel: place it again.
+		# The dummy may have wandered off before the server saw it on the peel: place it again.
 		scene.server.set_server_position(victim, Vector3(6, 0, 6))
 		await wait_seconds(0.3)
 		slips = _of(&"banana_slip")
-	assert_eq(slips.size(), 1, "the bot slipped")
+	assert_eq(slips.size(), 1, "the dummy slipped")
 	assert_eq(scene.peel_nodes.size(), 0, "peel gone")
 
 
@@ -166,3 +166,11 @@ func test_seated_number_keys_pick_chips_shift_uses_items() -> void:
 	scene.router.set_mode(InputRouter.Mode.WALK)
 	plain.shift_pressed = false
 	assert_eq(scene.router._item_slot(plain), 0)
+
+
+func before_all() -> void:
+	MatchScene.test_dummies = 3  # standing dummies to shove, grab and target
+
+
+func after_all() -> void:
+	MatchScene.test_dummies = 0

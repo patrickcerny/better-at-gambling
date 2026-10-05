@@ -117,10 +117,6 @@ extends Resource
 @export var quiz_intro_time: float = 3.0
 @export var quiz_outro_time: float = 4.0
 @export var quiz_dynamic_chance: float = 0.4
-## Bot accuracy by difficulty and their answer delay range (seconds).
-@export var quiz_bot_accuracy: Dictionary = {&"easy": 0.4, &"normal": 0.6, &"hard": 0.8}
-@export var quiz_bot_min_delay: float = 2.0
-@export var quiz_bot_max_delay: float = 9.0
 
 @export_group("Rewards")
 ## Seconds to pick from the draft (default: first option).

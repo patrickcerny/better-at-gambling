@@ -8,13 +8,12 @@ func before_each() -> void:
 	lobby = LobbyController.new()
 
 
-func test_leader_is_the_longest_connected_human_and_sticks() -> void:
-	lobby.join(1, false, 0.0)  # bot
-	lobby.join(2, true, 1.0)
-	lobby.join(3, true, 2.0)
+func test_leader_is_the_longest_connected_player_and_sticks() -> void:
+	lobby.join(2, 1.0)
+	lobby.join(3, 2.0)
 	assert_eq(lobby.leader(), 2)
 	lobby.set_connected(2, false, 3.0)
-	assert_eq(lobby.leader(), 3, "leader left: next longest-connected human")
+	assert_eq(lobby.leader(), 3, "leader left: next longest-connected player")
 	lobby.set_connected(2, true, 4.0)
 	assert_eq(lobby.leader(), 3, "leadership doesn't bounce back")
 	lobby.remove(3)
@@ -22,9 +21,11 @@ func test_leader_is_the_longest_connected_human_and_sticks() -> void:
 
 
 func test_ready_countdown_start_and_cancel() -> void:
-	lobby.join(1, true, 0.0)
+	lobby.join(1, 0.0)
+	lobby.min_participants = 2
 	assert_eq(lobby.tick(0.1), &"", "one player is not enough")
-	lobby.join(2, false, 0.5)  # a bot is always ready
+	lobby.join(2, 0.5)
+	lobby.set_panel_ready(2, true)
 	assert_false(lobby.all_ready())
 	assert_true(lobby.set_on_pad(1, true))
 	assert_false(lobby.set_on_pad(1, true), "no change")
@@ -41,10 +42,10 @@ func test_ready_countdown_start_and_cancel() -> void:
 	assert_eq(result, &"start")
 
 
-func test_disconnected_humans_never_block() -> void:
-	lobby.join(1, true, 0.0)
-	lobby.join(2, true, 1.0)
-	lobby.join(3, true, 2.0)
+func test_disconnected_players_never_block() -> void:
+	lobby.join(1, 0.0)
+	lobby.join(2, 1.0)
+	lobby.join(3, 2.0)
 	lobby.set_panel_ready(1, true)
 	lobby.set_panel_ready(2, true)
 	assert_false(lobby.all_ready())
@@ -54,14 +55,13 @@ func test_disconnected_humans_never_block() -> void:
 
 
 func test_settings_are_leader_only_and_validated() -> void:
-	lobby.join(1, true, 0.0)
-	lobby.join(2, true, 1.0)
+	lobby.join(1, 0.0)
+	lobby.join(2, 1.0)
 	assert_eq(lobby.set_setting(2, "duration", 5), &"not_leader")
 	assert_eq(lobby.set_setting(1, "duration", 7), &"bad_value")
 	assert_eq(lobby.set_setting(1, "duration", 15), &"")
 	assert_eq(lobby.settings["duration"], 15)
-	assert_eq(lobby.set_setting(1, "bot_difficulty", &"hard"), &"")
-	assert_eq(lobby.set_setting(1, "bot_difficulty", &"godlike"), &"bad_value")
+	assert_eq(lobby.set_setting(1, "bot_difficulty", &"hard"), &"bad_key", "the game has no bots")
 	assert_eq(lobby.set_setting(1, "money", 1e9), &"bad_key")
 	assert_eq(lobby.set_setting(1, "items_enabled", false), &"")
 	assert_false(lobby.settings["items_enabled"])

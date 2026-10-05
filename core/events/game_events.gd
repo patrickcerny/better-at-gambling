@@ -1,7 +1,7 @@
 class_name GameEvents
 extends RefCounted
 ## Factory + validation for typed game events: `{type: StringName, ...payload}`.
-## Events are applied server-side (stats, bots) and broadcast to clients (presentation).
+## Events are applied server-side (stats) and broadcast to clients (presentation).
 
 ## Required payload keys per event type. Types not listed only need `type`.
 const SCHEMA: Dictionary = {

@@ -1,6 +1,6 @@
 extends GutTest
 ## Physics/world integration (M2 acceptance): the real match scene with an in-process server and
-## bots. Everything goes through intents and server events; the scene reports world outcomes.
+## standing test dummies. Everything goes through intents and server events; the scene reports world outcomes.
 
 var scene: MatchScene
 var events: Array[Dictionary] = []
@@ -36,7 +36,7 @@ func _of(type: StringName) -> Array[Dictionary]:
 	return events.filter(func(e: Dictionary) -> bool: return e["type"] == type)
 
 
-## Puts the local player at `pos` looking along `yaw` with the bot standing `dist` metres ahead.
+## Puts the local player at `pos` looking along `yaw` with the dummy standing `dist` metres ahead.
 func _face_off(pos: Vector3, dist: float = 1.5, yaw: float = 0.0) -> void:
 	scene.local.teleport(pos, yaw)
 	var bpos: Vector3 = pos + Vector3(-sin(yaw), 0.0, -cos(yaw)) * dist
@@ -59,7 +59,7 @@ func test_three_shoves_knock_out_then_get_up() -> void:
 	assert_eq(_of(&"player_shoved").size(), 3)
 	assert_eq(_of(&"player_knocked_out").size(), 1, "third shove inside the window knocks out")
 	var b: PlayerAvatar = scene.avatars[bot]
-	assert_eq(b.state, PlayerAvatar.State.RAGDOLL, "the bot ragdolls")
+	assert_eq(b.state, PlayerAvatar.State.RAGDOLL, "the dummy ragdolls")
 	assert_true(b.visuals.stars.visible, "dizzy stars")
 	await wait_seconds(Registry.balance.knockout_time + 1.0)
 	assert_eq(b.state, PlayerAvatar.State.STANDING, "gets back up after the knockout time")
@@ -114,7 +114,7 @@ func test_seated_player_is_immune() -> void:
 	var spos: Vector3 = scene.map.stations[sid].global_position
 	scene.server.set_server_position(bot, spos + Vector3(0, 0, 2.0))
 	var res: Dictionary = scene.server.submit_intent(bot, Intents.make(&"sit", {"station": sid}))
-	assert_true(res["ok"], "bot sits: %s" % res)
+	assert_true(res["ok"], "dummy sits: %s" % res)
 	await wait_physics_frames(2)
 	var b: PlayerAvatar = scene.avatars[bot]
 	assert_eq(b.state, PlayerAvatar.State.SEATED)
@@ -178,7 +178,7 @@ func test_guard_chases_an_attacker_in_sight_but_not_behind_a_wall() -> void:
 	g2.global_position = Vector3(-8, 0, -1)
 	g2.yaw = PI * 0.5  # forward = −x
 	g2.state = Guard.State.PATROL
-	_face_off(Vector3(-12, 0, -1), 1.5, PI)  # we look +z at the bot; the pillar at (−11, −1) is just east
+	_face_off(Vector3(-12, 0, -1), 1.5, PI)  # we look +z at the dummy; the pillar at (−11, −1) is just east
 	assert_true(scene.map.has_line_of_sight(g.global_position, scene.local.global_position), "guard 1 sees the spot")
 	assert_false(scene.map.has_line_of_sight(g2.global_position, scene.local.global_position), "pillar blocks guard 2")
 	assert_true(scene.server.rules.guard_sees(g2.global_position, g2.forward(), scene.local.global_position, true), "guard 2 would see it if not for the pillar")
@@ -263,3 +263,11 @@ func test_mezzanine_fall_knocks_out() -> void:
 	assert_eq(kos.size(), 1, "falling off the balcony knocks out")
 	if not kos.is_empty():
 		assert_eq(kos[0]["cause"], &"fall")
+
+
+func before_all() -> void:
+	MatchScene.test_dummies = 3  # standing dummies to shove, grab and target
+
+
+func after_all() -> void:
+	MatchScene.test_dummies = 0

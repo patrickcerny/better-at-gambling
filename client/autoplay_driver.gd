@@ -1,6 +1,6 @@
 extends Node
 ## Scripted local player for `--autoplay`: walks to each station type, plays a few rounds,
-## shoves/grabs/throws a bot, shakes chips, visits the fountain and the VIP gate, then idles.
+## shoves/grabs/throws another player (a test dummy), shakes chips, visits the fountain and the VIP gate, then idles.
 ## Used by the 3-minute no-errors session (M2 acceptance) and handy for screenshots.
 ## Every step is an intent or a walk target; nothing bypasses the server.
 
@@ -19,7 +19,7 @@ var _final_leg: bool = false
 ## `--autoplay-variant 1` swaps the single-seat slot machine (and the last table) so two scripted
 ## clients share the blackjack table, roulette and Plinko but never queue for one seat.
 var variant: int = 0
-## `--autoplay-script thrower|victim`: the networked physics scenario (two clients, no bots):
+## `--autoplay-script thrower|victim`: the networked physics scenario (two clients, no dummies):
 ## the victim waits at THROW_SPOT, the thrower grabs and throws them; both check the ragdoll's
 ## resting place against the server's and the victim checks it gets its body back.
 var script_name: String = ""
@@ -124,29 +124,29 @@ func _pick_draft() -> void:
 
 func _build_steps() -> void:
 	var sp: Dictionary = scene.map.station_positions()
-	# Prefer a bot as the shove/grab partner; online, another player will do.
+	# Any other player (a test dummy in Practice) is the shove/grab partner.
 	var bot: int = -1
 	for pid: int in scene.avatars:
-		if pid != scene.local_id and (bot < 0 or bool(scene.view.state.players.get(pid, {}).get("bot", false))):
+		if pid != scene.local_id and bot < 0:
 			bot = pid
 	match script_name:
 		"thrower":
 			steps = [
 				["walk", THROW_SPOT + Vector3(0, 0, 1.4)],
 				["wait_near", bot, 1.0], ["wait", 1.0],
-				["face_bot", bot], ["wait", 0.2],
+				["face_partner", bot], ["wait", 0.2],
 				["intent", &"shove", {"aim": [0, 0, 0]}],
 				["wait_event", &"player_shoved", 30.0], ["wait", 0.5],  # the victim shoves back
 				["wait_near", bot, 1.0], ["wait", 0.5],
-				["approach_bot", bot], ["wait", 0.3],
-				["face_bot", bot], ["wait", 0.2],
+				["approach_partner", bot], ["wait", 0.3],
+				["face_partner", bot], ["wait", 0.2],
 				["intent", &"grab", {"target": bot}], ["wait", 0.8],
 				["intent", &"release", {"throw": true, "aim": [1, 0, -0.4]}],
 				["wait_event", &"player_got_up", 30.0, bot], ["wait", 5.0],  # victim checks its body
 				# Three quick shoves knock the victim out.
-				["approach_if_far", bot], ["face_bot", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.25],
-				["approach_if_far", bot], ["face_bot", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.25],
-				["approach_if_far", bot], ["face_bot", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 8.0],
+				["approach_if_far", bot], ["face_partner", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.25],
+				["approach_if_far", bot], ["face_partner", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.25],
+				["approach_if_far", bot], ["face_partner", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 8.0],
 				["done", null],
 			]
 			return
@@ -155,7 +155,7 @@ func _build_steps() -> void:
 				["walk", THROW_SPOT], ["wait", 0.5],
 				["wait_event", &"player_shoved", 45.0], ["wait", 0.6],
 				["walk", THROW_SPOT], ["wait", 0.3],
-				["face_bot", bot], ["wait", 0.2], ["intent", &"shove", {"aim": [0, 0, 0]}],
+				["face_partner", bot], ["wait", 0.2], ["intent", &"shove", {"aim": [0, 0, 0]}],
 				["wait_event", &"player_got_up", 45.0], ["wait", 1.0],
 				["walk_by", Vector3(0, 0, 3.0)], ["wait", 1.5],
 				["check_authority"],
@@ -192,13 +192,13 @@ func _build_steps() -> void:
 		["intent", &"place_bet", {"station": _st(&"plinko_1"), "bet": {"amount": 10, "risk": &"high"}}], ["wait", 3.5],
 		["intent", &"leave", {}], ["wait", 0.5],
 		["walk", LuckyLounge.SPAWNS[1] + Vector3(0, 0, -1.5)],
-		["face_bot", bot], ["wait", 0.3],
+		["face_partner", bot], ["wait", 0.3],
 		["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.4],
 		["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.4],
 		["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.0],
 		["intent", &"shake", {}], ["wait", 0.7], ["intent", &"shake", {}], ["wait", 0.7], ["intent", &"shake", {}], ["wait", 4.0],
-		["approach_bot", bot], ["wait", 0.5],
-		["face_bot", bot], ["intent", &"grab", {"target": bot}], ["wait", 1.0],
+		["approach_partner", bot], ["wait", 0.5],
+		["face_partner", bot], ["intent", &"grab", {"target": bot}], ["wait", 1.0],
 		["intent", &"release", {"throw": true, "aim": [0, 0, -1]}], ["wait", 4.0],
 		["emote", &"laugh"], ["wait", 2.0],
 		["walk", LuckyLounge.FOUNTAIN_POS + Vector3(2.6, 0, 0)], ["wait", 0.5],
@@ -334,21 +334,21 @@ func _process(delta: float) -> void:
 		"intent":
 			var res: Dictionary = Net.send_intent(Intents.make(step[1], step[2]))
 			Log.info(&"autoplay", "%s %s -> %s" % [step[1], step[2], res])
-		"approach_bot":
-			var bot: PlayerAvatar = scene.avatars.get(int(step[1]), null)
-			if bot != null:
-				var to: Vector3 = scene.local.global_position - bot.global_position
+		"approach_partner":
+			var partner: PlayerAvatar = scene.avatars.get(int(step[1]), null)
+			if partner != null:
+				var to: Vector3 = scene.local.global_position - partner.global_position
 				to.y = 0.0
-				var goal: Vector3 = bot.global_position + (to.normalized() if to.length() > 0.1 else Vector3.BACK) * 1.3
+				var goal: Vector3 = partner.global_position + (to.normalized() if to.length() > 0.1 else Vector3.BACK) * 1.3
 				steps.insert(index, ["walk", goal])
 		"approach_if_far":
 			var other: PlayerAvatar = scene.avatars.get(int(step[1]), null)
 			if other != null and other.global_position.distance_to(scene.local.global_position) > 1.7:
-				steps.insert(index, ["approach_bot", step[1]])
-		"face_bot":
-			var bot: PlayerAvatar = scene.avatars.get(int(step[1]), null)
-			if bot != null and scene.local.cam != null:
-				var to: Vector3 = bot.global_position - scene.local.global_position
+				steps.insert(index, ["approach_partner", step[1]])
+		"face_partner":
+			var partner: PlayerAvatar = scene.avatars.get(int(step[1]), null)
+			if partner != null and scene.local.cam != null:
+				var to: Vector3 = partner.global_position - scene.local.global_position
 				scene.local.cam.yaw = atan2(-to.x, -to.z)
 				scene.local.yaw = scene.local.cam.yaw
 		"walk_by":

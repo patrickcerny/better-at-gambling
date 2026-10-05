@@ -3,7 +3,7 @@ extends RefCounted
 ## Items on the server (§2.8): inventories (3 slots with a discard choice when full), activation
 ## with cooldowns and target checks, protections (Bodyguard, Mirror, spawn and away protection,
 ## the negative-item grace window), effect expiry, and banana peels lying on the floor.
-## Player intents and bots both go through `use`.
+## Player intents go through `use`.
 
 const SLOTS: int = 3
 ## `discard_item` slot meaning "throw away the incoming item" while a discard choice is open.
@@ -278,7 +278,7 @@ func in_range(a: int, b: int, range_m: float) -> bool:
 
 
 func _present(id: int) -> bool:
-	return players.has(id) and (players[id].connected or players[id].is_bot)
+	return players.has(id) and players[id].connected
 
 
 func _effect(def: ItemDefinition) -> ItemEffect:
@@ -316,11 +316,7 @@ func tick(now: float, casino_open: bool) -> void:
 			_resolve_choice(player, 0, now)  # default: the oldest item goes
 	if casino_open:
 		_tick_peels(now)
-		var bots: Dictionary = {}
-		for id: int in players:
-			if players[id].is_bot:
-				bots[id] = true
-		duels.tick(now, bots)
+		duels.tick(now)
 
 
 func _on_modifier_removed(player: int, mod: Modifier, reason: StringName) -> void:

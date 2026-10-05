@@ -245,7 +245,7 @@ func _build_settings_board() -> void:
 
 func _build_lobby_doors() -> void:
 	# Built by hand (not GreyboxKit) so it never enters the navmesh: the casino floor stays
-	# walkable for guards and bots once the doors sink away.
+	# walkable for guards once the doors sink away.
 	lobby_doors = StaticBody3D.new()
 	lobby_doors.name = "LobbyDoors"
 	lobby_doors.collision_layer = 1
