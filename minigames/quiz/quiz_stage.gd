@@ -505,15 +505,16 @@ func _place_bubble() -> void:
 	var p: Vector2 = camera.unproject_position(host.bubble_anchor())
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	bubble.reset_size()
-	bubble.pivot_offset = Vector2(0.0, bubble.size.y)
-	bubble.position = Vector2(clampf(p.x - 40.0, 16.0, vp.x - bubble.size.x - 16.0), clampf(p.y - bubble.size.y, 16.0, vp.y - bubble.size.y - 260.0))
+	# The bubble grows up and to the left of Lucky's head, away from the contestants' podiums.
+	bubble.pivot_offset = Vector2(bubble.size.x, bubble.size.y)
+	bubble.position = Vector2(clampf(p.x - bubble.size.x + 90.0, 16.0, vp.x - bubble.size.x - 16.0), clampf(p.y - bubble.size.y, 16.0, vp.y - bubble.size.y - 260.0))
 
 
 ## A little scale "pop" on a control.
 func _pop(c: Control, to: float = 1.0, from: float = 0.85) -> void:
 	if c == null or _headless:
 		return
-	c.pivot_offset = c.size * 0.5 if c != bubble else Vector2(0.0, c.size.y)
+	c.pivot_offset = c.size * 0.5 if c != bubble else c.size
 	c.scale = Vector2(from, from)
 	var t: Tween = c.create_tween()
 	t.tween_property(c, "scale", Vector2(to, to), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -936,7 +937,7 @@ func _build_ui() -> void:
 	var bsb := StyleBoxFlat.new()
 	bsb.bg_color = Palette.CREAM
 	bsb.set_corner_radius_all(18)
-	bsb.corner_radius_bottom_left = 2
+	bsb.corner_radius_bottom_right = 2
 	bsb.set_border_width_all(3)
 	bsb.border_color = Palette.WARM_GOLD
 	bsb.content_margin_left = 18
@@ -953,5 +954,5 @@ func _build_ui() -> void:
 	bubble_label.add_theme_font_size_override(&"font_size", 28)
 	bubble_label.add_theme_color_override(&"font_color", Palette.CASINO_BLACK)
 	bubble_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	bubble_label.custom_minimum_size = Vector2(300, 0)
+	bubble_label.custom_minimum_size = Vector2(290, 0)
 	bubble.add_child(bubble_label)

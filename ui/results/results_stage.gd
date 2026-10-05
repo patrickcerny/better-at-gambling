@@ -114,7 +114,7 @@ func _build_set() -> void:
 	cm.size = Vector3(3.2, 0.02, 16)
 	carpet.mesh = cm
 	carpet.position = Vector3(0, 0.01, 2)
-	carpet.material_override = _mat(Palette.CASINO_RED.darkened(0.15))
+	carpet.material_override = _mat(Palette.CASINO_RED.darkened(0.3))
 	add_child(carpet)
 	var wall := MeshInstance3D.new()
 	var wm := BoxMesh.new()

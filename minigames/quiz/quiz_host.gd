@@ -47,7 +47,7 @@ func line() -> String:
 
 ## World position just above the head (where the speech bubble points).
 func bubble_anchor() -> Vector3:
-	return to_global(Vector3(0.0, 2.55, 0.0))
+	return to_global(Vector3(0.0, 2.3, 0.0))
 
 
 func _process(delta: float) -> void:
