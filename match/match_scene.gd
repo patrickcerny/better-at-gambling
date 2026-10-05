@@ -529,6 +529,16 @@ func _report_simulated_positions() -> void:
 				server.state.players[pid].position = a.global_position
 
 
+## First-time tips (M6 contextual hints): each one shows once per profile, after `delay` s.
+func _hint(id: StringName, text: String, delay: float) -> void:
+	if role == Role.SERVER or local == null or bool(Settings.get_value("hints", String(id), false)):
+		return
+	Settings.set_value("hints", String(id), true)
+	Settings.save()
+	# A bound method (not await) so nothing fires once the scene is gone.
+	get_tree().create_timer(delay).timeout.connect(hud.toast.bind(text, 5.0))
+
+
 ## Lobby: standing on your own colored pad means ready (§2.2).
 func _check_ready_pads() -> void:
 	for pid: int in avatars:
@@ -668,6 +678,7 @@ func _on_event(ev: Dictionary) -> void:
 				net_world.reset_player(pid)
 		&"match_started":
 			map.set_lobby_open(true)
+			_hint(&"sit", "Walk up to a table and press E to sit.  LMB grabs, RMB shoves.", 5.0)
 		&"player_shoved":
 			if int(ev["attacker"]) == local_id:
 				_predicted[&"shove"] = minf(_predicted.get(&"shove", 0.0), _clock + 0.15)  # confirmed: finish the push
@@ -687,6 +698,9 @@ func _on_event(ev: Dictionary) -> void:
 				Audio.play_at(&"oof", t, -8.0)
 		&"player_knocked_out":
 			_knock_out(int(ev["target"]), int(ev["attacker"]), StringName(ev["cause"]))
+			var ko: PlayerAvatar = avatars.get(int(ev["target"]), null)
+			if local != null and ko != null and ko != local and ko.global_position.distance_to(local.global_position) < 8.0:
+				_hint(&"shake", "Knocked out! Stand next to them and press E to shake out their chips.", 0.5)
 		&"player_grabbed":
 			if int(ev["attacker"]) == local_id:
 				_predicted.erase(&"grab")  # confirmed: the hold keeps the arms out
@@ -797,6 +811,8 @@ func _on_event(ev: Dictionary) -> void:
 		&"draft_result":
 			if int(ev["player"]) == local_id:
 				reward_panel.show_result(ev.get("items", []), ev.get("kept", []))
+				if not (ev.get("items", []) as Array).is_empty():
+					_hint(&"items", "New item! Press 1, 2 or 3 to use it.", 3.0)
 		&"hot_table":
 			Audio.play(&"jackpot_siren", &"SFX", -10.0)
 			hud.banner("%s IS HOT!  Winnings ×%.2f  (follow the arrow)" % [ClientMatchState.station_label(StringName(ev["station"])).to_upper(), float(ev["multiplier"])], Color(1.0, 0.55, 0.1), 4.0)

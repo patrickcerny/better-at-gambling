@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 from conftest import free_port
 
@@ -84,3 +85,26 @@ def test_version_mismatch_is_refused_with_a_reason(procs):
     assert "could not join" in client.log() and "update" in client.log().lower()
     assert "rejected: version" in server.log()
     server.kill()
+
+
+def test_a_client_killed_mid_match_rejoins_with_its_state_and_the_match_finishes(procs):
+    """M6 reconnect: kill a client process mid-match, start it again with the same uid; it gets its
+    player back (money, items) from the snapshot and the match ends with everyone in agreement."""
+    port = free_port()
+    server = _server(procs, "rejoin-server", port, "--duration", "2", "--seed", "13")
+    server.wait_for(r"server listening", 30)
+    first = _client(procs, "rejoin-alice", port, "--uid", "dev:alice")
+    bob = _client(procs, "rejoin-bob", port, "--autoplay-variant", "1")
+    first.wait_for(r"match is on", 90)
+    time.sleep(20)  # play a little, then crash
+    first.kill()
+    server.wait_for(r"player \d+ disconnected", 30)
+    again = _client(procs, "rejoin-alice2", port, "--uid", "dev:alice")
+    server.wait_for(r"rejoin-alice2 rejoined as player", 60)
+    assert again.wait(2 * 60 + 240) == 0, again.log_path
+    assert bob.wait(60) == 0, bob.log_path
+    assert server.wait(60) == 0, server.log_path
+    digests = {p.name: p.digest() for p in (server, again, bob)}
+    assert len(set(digests.values())) == 1, digests
+    for p in (server, again, bob):
+        assert p.errors() == [], (p.name, p.errors()[:5])
