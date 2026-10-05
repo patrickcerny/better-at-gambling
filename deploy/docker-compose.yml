@@ -1,0 +1,38 @@
+# Orchestrator + Caddy, both on the host network: game servers bind UDP 24700-24799 directly
+# and Caddy terminates HTTP(S) in front of the orchestrator on loopback (BIND_PORT).
+# BAG_ENV_FILE comes from deploy/.env, which install.sh writes.
+name: better-at-gambling
+
+services:
+  orchestrator:
+    image: better-at-gambling:current
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    network_mode: host
+    env_file: ${BAG_ENV_FILE:-/etc/better-at-gambling/orchestrator.env}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    volumes:
+      - room-logs:/var/log/bag-rooms
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+
+  caddy:
+    image: public.ecr.aws/docker/library/caddy:2
+    network_mode: host
+    env_file: ${BAG_ENV_FILE:-/etc/better-at-gambling/orchestrator.env}
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+volumes:
+  room-logs:
+  caddy-data:
+  caddy-config:

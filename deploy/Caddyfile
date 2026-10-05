@@ -1,0 +1,8 @@
+# BAG_SITE is a domain (automatic HTTPS via Let's Encrypt) or ":PORT" (plain HTTP on the IP, dev only).
+{$BAG_SITE::80} {
+	encode gzip
+	# Game servers talk to the orchestrator on loopback; never expose the internal API.
+	@internal path /v1/internal/*
+	respond @internal 404
+	reverse_proxy 127.0.0.1:{$BIND_PORT:8080}
+}
