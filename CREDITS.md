@@ -34,6 +34,15 @@ name their author here before release.
 Still to come (see docs/MODELS.md): atm_shop, revolver, scratch_ticket, coin_placeholder, bat,
 dog_leash, beer_full.
 
+## Other models
+
+| File | Model | Source | Author | License |
+|---|---|---|---|---|
+| assets/casino/blackjack_table.dae | Half-moon blackjack table | sent by Patrick (Casino_Free pack) | **check** | **check** |
+
+The table's texture files (BrushedIron02_4K, Metal007_4K, Wood067_8K) were not included, so it
+uses flat casino colors.
+
 ## Sound effects
 
 Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KENNEY_LICENSE.txt`).
