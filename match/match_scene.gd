@@ -424,6 +424,7 @@ func _connect_router() -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_expire_predictions()
+	_point_at_hot_table()
 	if view.state.jackpot != _shown_jackpot:
 		_shown_jackpot = view.state.jackpot
 		for node: StationBase in map.stations.values():
@@ -776,8 +777,8 @@ func _on_event(ev: Dictionary) -> void:
 			if int(ev["player"]) == local_id:
 				reward_panel.show_result(ev.get("items", []), ev.get("kept", []))
 		&"hot_table":
-			Audio.play(&"whoosh", &"SFX", -6.0, 0.7)
-			hud.toast("%s is HOT! ×%.2f" % [ClientMatchState.station_label(StringName(ev["station"])), float(ev["multiplier"])], 2.5)
+			Audio.play(&"jackpot_siren", &"SFX", -10.0)
+			hud.banner("%s IS HOT!  Winnings ×%.2f  (follow the arrow)" % [ClientMatchState.station_label(StringName(ev["station"])).to_upper(), float(ev["multiplier"])], Color(1.0, 0.55, 0.1), 4.0)
 		&"house_comp":
 			if int(ev["player"]) == local_id:
 				hud.toast("The house feels sorry for you: +$%d" % int(ev["amount"]), 3.0)
@@ -871,6 +872,32 @@ func _on_event(ev: Dictionary) -> void:
 
 ## Item activation for everyone: the user calls it out, the target reacts, the local player gets a
 ## banner when they used it or were hit.
+## While a table is hot and off screen, an arrow on the screen edge points the way to it.
+func _point_at_hot_table() -> void:
+	var node: StationBase = map.stations.get(view.state.hot_station, null) if view.state.hot_station != &"" else null
+	if node == null or local == null or local.cam == null or results_panel != null:
+		hud.set_hot_pointer(false)
+		return
+	var cam: Camera3D = local.cam.camera
+	var target: Vector3 = node.global_position + Vector3(0, 2.0, 0)
+	var size: Vector2 = get_viewport().get_visible_rect().size
+	var on_screen: bool = not cam.is_position_behind(target)
+	var p: Vector2 = cam.unproject_position(target)
+	if on_screen and Rect2(Vector2.ZERO, size).grow(-40.0).has_point(p):
+		hud.set_hot_pointer(false)
+		return
+	var centre: Vector2 = size * 0.5
+	var dir: Vector2 = (p - centre)
+	if not on_screen:
+		dir = -dir  # unproject mirrors points behind the camera
+	if dir.length() < 1.0:
+		dir = Vector2.DOWN
+	dir = dir.normalized()
+	var half: Vector2 = centre - Vector2(70, 90)
+	var t: float = minf(absf(half.x / dir.x) if dir.x != 0.0 else INF, absf(half.y / dir.y) if dir.y != 0.0 else INF)
+	hud.set_hot_pointer(true, centre + dir * t, dir.angle())
+
+
 ## The item's model (when it has one) pops up in front of the user for a moment.
 func _hold_up_prop(u: PlayerAvatar, item: StringName) -> void:
 	var id: StringName = PropModels.ITEM_PROPS.get(item, &"")

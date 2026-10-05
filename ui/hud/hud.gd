@@ -34,6 +34,7 @@ var next_quiz_label: Label
 var minigame_warning: Label
 ## Hot Table line under the timer ("HOT: Roulette 1 ×1.25 0:24").
 var hot_label: Label
+var hot_pointer: Polygon2D
 var _last_warning_second: int = -1
 
 ## Beer: the money counter shows "$???" and no +/- pops until you sober up.
@@ -77,6 +78,27 @@ func set_prompt(text: String) -> void:
 
 
 ## Big centred banner for item activations aimed at or by the local player.
+## Screen-edge arrow towards the hot table (`angle` in radians, 0 = pointing right).
+func set_hot_pointer(on: bool, pos: Vector2 = Vector2.ZERO, angle: float = 0.0) -> void:
+	if hot_pointer == null:
+		hot_pointer = Polygon2D.new()
+		hot_pointer.name = "HotPointer"
+		hot_pointer.polygon = PackedVector2Array([Vector2(44, 0), Vector2(-10, -34), Vector2(-10, -14), Vector2(-40, -14), Vector2(-40, 14), Vector2(-10, 14), Vector2(-10, 34)])
+		hot_pointer.color = Color(1.0, 0.55, 0.1)
+		var outline := Line2D.new()
+		outline.points = hot_pointer.polygon
+		outline.closed = true
+		outline.width = 5.0
+		outline.default_color = Palette.CASINO_BLACK
+		hot_pointer.add_child(outline)
+		add_child(hot_pointer)
+	hot_pointer.visible = on
+	if on:
+		hot_pointer.position = pos
+		hot_pointer.rotation = angle
+		hot_pointer.scale = Vector2.ONE * (1.0 + absf(sin(Time.get_ticks_msec() / 160.0)) * 0.2)
+
+
 func banner(text: String, color: Color = Palette.VIP_GOLD, seconds: float = 2.2) -> void:
 	item_banner.text = text
 	item_banner.add_theme_color_override(&"font_color", color)

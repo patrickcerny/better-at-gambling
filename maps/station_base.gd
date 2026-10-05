@@ -15,6 +15,10 @@ var seats: Array[Node3D] = []
 var camera_anchor: Node3D
 var interaction_area: Area3D
 var hot_light: OmniLight3D
+## Big bouncing arrow over the hot table, drawn on top of everything so it reads across the floor.
+var hot_marker: Node3D
+const HOT_MARKER_Y: float = 4.2
+var _hot_time: float = 0.0
 ## "OUT OF ORDER" sign (item) hung over the station; built on first use.
 var out_of_order_sign: Label3D
 ## Traffic cones on the seats while the station is out of order.
@@ -51,9 +55,67 @@ func _ready() -> void:
 	add_child(hot_light)
 
 
-## Marks the station hot (spotlight) or not.
+## Marks the station hot (spotlight and bouncing arrow) or not.
 func set_hot(hot: bool) -> void:
 	hot_light.light_energy = 6.0 if hot else 0.0
+	if hot and hot_marker == null:
+		_build_hot_marker()
+	if hot_marker != null:
+		hot_marker.visible = hot
+	set_process(hot)
+
+
+func _process(delta: float) -> void:
+	if hot_marker != null and hot_marker.visible:
+		_hot_time += delta
+		hot_marker.position.y = HOT_MARKER_Y + absf(sin(_hot_time * 4.0)) * 1.0
+		hot_marker.rotation.y += delta * 1.5
+		# Grows with distance so it reads from across the floor.
+		var cam: Camera3D = get_viewport().get_camera_3d()
+		if cam != null:
+			var d: float = cam.global_position.distance_to(hot_marker.global_position)
+			hot_marker.scale = Vector3.ONE * clampf(d / 6.0, 1.0, 5.0)
+
+
+func _build_hot_marker() -> void:
+	hot_marker = Node3D.new()
+	hot_marker.name = "HotMarker"
+	hot_marker.position.y = HOT_MARKER_Y
+	add_child(hot_marker)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.55, 0.1)
+	mat.no_depth_test = true
+	mat.render_priority = 10
+	var head := MeshInstance3D.new()
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.0
+	cone.bottom_radius = 0.55
+	cone.height = 0.7
+	head.mesh = cone
+	head.material_override = mat
+	head.rotation.x = PI  # point down at the table
+	head.position.y = 0.35
+	hot_marker.add_child(head)
+	var shaft := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.32, 0.8, 0.32)
+	shaft.mesh = box
+	shaft.material_override = mat
+	shaft.position.y = 1.1
+	hot_marker.add_child(shaft)
+	var label := Label3D.new()
+	label.text = "HOT ×%.2f" % Registry.balance.hot_table_multiplier
+	label.font_size = 64
+	label.pixel_size = 0.00045
+	label.fixed_size = true  # same size on screen from anywhere on the floor
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.modulate = Palette.VIP_GOLD
+	label.outline_modulate = Palette.CASINO_BLACK
+	label.outline_size = 18
+	label.position.y = 2.1
+	hot_marker.add_child(label)
 
 
 ## World position of a seat (first seat by default).
