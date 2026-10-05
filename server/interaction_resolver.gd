@@ -24,6 +24,8 @@ var held_by: Dictionary[int, Dictionary] = {}
 var offences: Array[Dictionary] = []
 var events: Array[Dictionary] = []
 var limits_multiplier: float = 1.0
+## Callable(target: int, attacker: int, now: float) -> bool: true cancels a knockout (Bodyguard).
+var ko_shield: Callable
 
 
 func _init(p_rules: InteractionRules, p_world: WorldQuery, p_economy: Economy, p_pickups: PickupSystem, p_rng: SeededRng) -> void:
@@ -101,6 +103,10 @@ func shove(attacker: int, aim: Vector3, now: float, spring_glove: bool = false) 
 	var res: Dictionary = rules.shove(attacker, target, now, world.is_airborne(target), spring_glove)
 	if not res["ok"]:
 		return StationLogicBase.fail(res["error"])
+	if res["knockout"] and ko_shield.is_valid() and ko_shield.call(target, attacker, now):
+		rules.cancel_knockout(target, now)
+		res["knockout"] = false
+		res["knockdown"] = true
 	var dir: Vector3 = (world.get_position(target) - world.get_position(attacker))
 	dir.y = 0.0
 	dir = dir.normalized() if dir.length() > 0.01 else world.get_facing(attacker)
@@ -117,6 +123,10 @@ func shove(attacker: int, aim: Vector3, now: float, spring_glove: bool = false) 
 ## The world reports a hard landing / wall hit / fall / stool hit that knocks a player out.
 func report_knockout(target: int, attacker: int, now: float, cause: StringName) -> bool:
 	if rules.status(target).away:
+		return false
+	if rules.is_knocked_out(target, now) or now < rules.status(target).ko_immune_until:
+		return false
+	if ko_shield.is_valid() and ko_shield.call(target, attacker, now):
 		return false
 	var money: int = economy.balance(target)
 	if not rules.knock_out(target, now, money, limits_multiplier):

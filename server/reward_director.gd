@@ -15,6 +15,9 @@ var timer: float = 0.0
 ## player → {placement, cash, choices: Array[StringName], bonus: Array[StringName], pick: int}
 var rewards: Dictionary[int, Dictionary] = {}
 var events: Array[Dictionary] = []
+## Hands an item to a player: Callable(player: int, item: StringName) (the ItemSystem, which runs
+## the discard choice when the inventory is full). Unset: items that don't fit are lost.
+var grant: Callable
 var _balance: BalanceConfig
 
 
@@ -140,7 +143,11 @@ func _grant(players: Dictionary[int, PlayerState]) -> void:
 		for b: Variant in r["bonus"]:
 			got.append(StringName(b))
 		var kept: Array[StringName] = []
-		if players.has(p):
+		if grant.is_valid():
+			for item: StringName in got:
+				grant.call(p, item)
+				kept.append(item)
+		elif players.has(p):
 			for item: StringName in got:
 				if players[p].inventory.size() < INVENTORY_SLOTS:
 					players[p].inventory.append(item)

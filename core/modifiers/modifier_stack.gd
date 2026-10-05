@@ -88,6 +88,23 @@ func expire(now: float) -> void:
 				_remove(player, m, &"expired")
 
 
+## Uses up the first modifier of a player carrying `flag` (Bodyguard, Mirror). True if one was found.
+func consume_flag(player: int, flag: StringName) -> bool:
+	for m: Modifier in get_mods(player):
+		if m.flags.get(flag, false):
+			_remove(player, m, &"consumed")
+			return true
+	return false
+
+
+## Ends every modifier (all players) carrying `flag`, e.g. &"segment_end" when a casino segment closes.
+func expire_flag(flag: StringName) -> void:
+	for player: int in _mods.keys():
+		for m: Modifier in get_mods(player):
+			if m.flags.get(flag, false):
+				_remove(player, m, &"expired")
+
+
 ## Removes all modifiers with id `id` from a player.
 func remove_by_id(player: int, id: StringName) -> void:
 	for m: Modifier in get_mods(player):

@@ -116,6 +116,14 @@ func knock_out(target: int, now: float, money: int = -1, limits_multiplier: floa
 	return true
 
 
+## Turns a knockout that was just decided back into a knockdown (Bodyguard absorbed it).
+func cancel_knockout(target: int, now: float) -> void:
+	var t: Status = status(target)
+	t.knocked_out_until = -INF
+	t.ko_immune_until = -INF
+	t.knocked_down_until = now + cfg.knockdown_time
+
+
 ## Maximum total that can be shaken out of one knockout.
 func shake_cap(money: int, limits_multiplier: float) -> int:
 	var cap_amount: int = int(floor(cfg.shake_cap_amount * limits_multiplier))

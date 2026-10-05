@@ -130,6 +130,19 @@ extends Resource
 ## Cash rewards are multiplied by this when items are disabled in the lobby (§2.10).
 @export var cash_only_factor: float = 2.0
 
+@export_group("Items")
+## Seconds between any two item activations by one player (§2.8).
+@export var item_cooldown: float = 3.0
+## A player can be hit by at most one negative item per this many seconds.
+@export var item_grace: float = 5.0
+## Seconds to choose what to discard when an item arrives with a full inventory (default: oldest).
+@export var discard_time: float = 5.0
+## Bodyguard also absorbs a knockout from an attacker who used an item this recently.
+@export var bodyguard_ko_window: float = 30.0
+## Banana peel: trigger radius and how long the slip stuns.
+@export var banana_radius: float = 0.9
+@export var banana_stun: float = 1.2
+
 @export_group("Results")
 ## Seconds the results screen stays up before an online room returns to its lobby on its own.
 @export var results_return_time: float = 60.0

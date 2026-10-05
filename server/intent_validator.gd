@@ -10,6 +10,7 @@ const PHASES: Dictionary = {
 	&"clear_bets": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 	&"action": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 	&"use_item": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
+	&"discard_item": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME, Phase.Id.MINIGAME, Phase.Id.REWARDS],
 	&"submit_answer": [Phase.Id.MINIGAME],
 	&"draft_pick": [Phase.Id.REWARDS],
 	&"set_ready": [Phase.Id.LOBBY, Phase.Id.RESULTS],

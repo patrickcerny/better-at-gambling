@@ -38,6 +38,7 @@ var minigame: MinigameLogicBase = null
 var rewards: RewardDirector = RewardDirector.new()
 var hot_tables: HotTableDirector
 var loot: LootTables
+var items: ItemSystem
 ## Smoothed half round-trip time of a player in seconds (set by the network layer; 0 offline).
 var half_rtt_provider: Callable = func(_p: int) -> float: return 0.0
 ## Per-player match stats for awards and dynamic quiz questions.
@@ -65,6 +66,7 @@ var _uptime: float = 0.0
 var _leader: int = -1
 ## player → casino segment in which they got the House Comp (once per segment).
 var _comped: Dictionary[int, int] = {}
+var _bot_item_timer: float = 1.0
 var _logic_rng: SeededRng
 
 
@@ -113,6 +115,8 @@ func _build_match_systems(seed_value: int) -> void:
 	stations.setup(map_def.stations, _logic_scripts, balance, economy, modifiers, rng.fork(), jackpot, vip_ids)
 	hot_tables = HotTableDirector.new(stations, balance, rng.fork())
 	_logic_rng = rng.fork()
+	items = ItemSystem.new(Registry.items, balance, state.players, economy, modifiers, rules, world, pickups, rng.fork())
+	interactions.ko_shield = items.shield_knockout
 	minigames.reset()
 	minigame = null
 	rewards = RewardDirector.new()
@@ -120,6 +124,7 @@ func _build_match_systems(seed_value: int) -> void:
 	results_return_in = -1.0
 	for id: int in state.players:
 		_reset_stats(id)
+		rules.status(id).away = not (state.players[id].connected or state.players[id].is_bot)
 
 
 func _build_schedule() -> void:
@@ -169,6 +174,7 @@ func player_disconnected(player: int) -> void:
 		return
 	state.players[player].connected = false
 	state.players[player].ready = false
+	rules.status(player).away = true  # untouchable while away (§2.12)
 	lobby.set_connected(player, false, _uptime)
 	if minigame != null:
 		minigame.remove_player(player)  # away players score 0 and get no minigame reward (§2.12)
@@ -182,6 +188,7 @@ func player_reconnected(player: int) -> void:
 	if not state.players.has(player):
 		return
 	state.players[player].connected = true
+	rules.status(player).away = false
 	lobby.set_connected(player, true, _uptime)
 	_emit(GameEvents.make(&"player_rejoined", {"player": player}))
 	_check_leader()
@@ -273,6 +280,8 @@ func get_snapshot() -> Dictionary:
 	snap["piles"] = _piles_wire()
 	snap["lobby"] = lobby.to_wire()
 	snap["room"] = room_mode
+	snap["effects"] = items.public_effects()
+	snap["peels"] = items.peels_wire()
 	snap["hot_table"] = {"station": hot_tables.current, "time_left": snappedf(hot_tables.time_left, 0.01)} if hot_tables.current != &"" else {}
 	if minigame != null:
 		snap["minigame"] = minigame.get_public_state()
@@ -291,6 +300,7 @@ func get_private_snapshot(player: int) -> Dictionary:
 	if minigame != null:
 		out["minigame"] = minigame.private_state(player)
 	out.merge(rewards.private_state(player))
+	out["items"] = items.private_state(player, match_time)
 	return out
 
 
@@ -344,6 +354,7 @@ func _step(delta: float) -> void:
 		if rewards.is_done():
 			phases.rewards_finished()
 	modifiers.expire(match_time)
+	items.tick(match_time, casino_open)
 	interactions.tick(match_time)
 	pickups.tick(match_time)
 	_tick_bots()
@@ -373,6 +384,7 @@ func _on_phase_note(note: StringName) -> void:
 			_emit(GameEvents.make(&"minigame_warning", {"seconds": PhaseMachine.PRE_MINIGAME_SECONDS}))
 		&"segment_ended":
 			stations.auto_resolve_all()
+			items.end_segment()
 			_emit(GameEvents.make(&"segment_ended", {"segment": phases.segment_index()}))
 		&"minigame_started":
 			_start_minigame()
@@ -442,6 +454,7 @@ func _finish_minigame() -> void:
 			bots[id] = state.players[id].bot_difficulty
 	var played_segment: int = maxi(phases.segment_index() - 1, 0)
 	rewards = RewardDirector.new()
+	rewards.grant = func(p: int, item: StringName) -> void: items.give(p, item, match_time)
 	rewards.start(ranking, bots, economy, loot, bool(settings.get("items_enabled", true)), balance.limits_multiplier(played_segment), balance, _logic_rng.fork())
 	_flush()
 
@@ -599,7 +612,11 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"shove":
 			if stations.is_seated(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player):
 				return StationLogicBase.fail(&"not_standing")
-			return interactions.shove(player, Serializer.to_vec3(intent["aim"]), match_time, modifiers.has_flag(player, &"spring_glove"))
+			var glove: bool = modifiers.has_flag(player, &"spring_glove", &"spring_glove")
+			var shoved: Dictionary = interactions.shove(player, Serializer.to_vec3(intent["aim"]), match_time, glove)
+			if glove and shoved["ok"]:
+				modifiers.consume_round(player, &"spring_glove")
+			return shoved
 		&"shake":
 			if stations.is_seated(player) or rules.is_knocked_down(player, match_time):
 				return StationLogicBase.fail(&"not_standing")
@@ -615,6 +632,12 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			return minigame.submit(player, intent, match_time)
 		&"draft_pick":
 			return rewards.pick(player, int(intent["choice"]))
+		&"use_item":
+			if not bool(settings.get("items_enabled", true)):
+				return StationLogicBase.fail(&"items_off")
+			return items.use(player, int(intent["slot"]), int(intent.get("target", -1)), match_time)
+		&"discard_item":
+			return items.discard(player, int(intent["slot"]), match_time)
 		&"return_to_lobby":
 			if player != lobby.leader():
 				return StationLogicBase.fail(&"not_leader")
@@ -744,7 +767,32 @@ func set_server_position(player: int, pos: Vector3) -> void:
 
 
 func _tick_bots() -> void:
-	pass  # BotDirector (M6) hooks in here.
+	# BotDirector (M6) takes over; for now bots only use their items now and then.
+	var casino_open: bool = phases.phase == Phase.Id.CASINO or phases.phase == Phase.Id.PRE_MINIGAME
+	if not casino_open or not bool(settings.get("items_enabled", true)):
+		return
+	_bot_item_timer -= TICK
+	if _bot_item_timer > 0.0:
+		return
+	_bot_item_timer = 1.0
+	for id: int in state.players:
+		var p: PlayerState = state.players[id]
+		if p.is_bot and not p.inventory.is_empty() and _logic_rng.chance(0.08):
+			_bot_use_item(id)
+
+
+## A bot uses its first item: self items as they come, targeted ones on a random valid player.
+func _bot_use_item(bot: int) -> void:
+	var def: ItemDefinition = Registry.items.get(state.players[bot].inventory[0], null)
+	if def == null:
+		return
+	var target: int = -1
+	if ItemSystem.targets_player(def):
+		var cands: Array = items.candidates(bot, def).filter(func(c: int) -> bool: return items.protection(c, match_time) == &"")
+		if cands.is_empty():
+			return
+		target = cands[_logic_rng.range_int(0, cands.size() - 1)]
+	items.use(bot, 0, target, match_time)
 
 
 func _sync_state() -> void:
@@ -775,6 +823,7 @@ func _flush() -> void:
 	if minigame != null:
 		batch.append_array(minigame.drain_events())
 	batch.append_array(rewards.drain_events())
+	batch.append_array(items.drain_events())
 	for ev: Dictionary in batch:
 		_track_stats(ev)
 		_emit(ev)
