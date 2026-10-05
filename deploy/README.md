@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/patrickcerny/better-at-gambling/mai
 Options: `--http-port P` (plain HTTP on P, default 80), `--domain D` (HTTPS via Let's Encrypt,
 needs 80/443), `--max-rooms N`, `--public-host H`, `--branch B`, `--firewall` (root, enables ufw),
 `--no-auto-update`. The auto-updater re-runs the script with `--update` every 10 minutes and
-redeploys when the branch moved. A failed health check rolls back to the previous image.
+redeploys when the branch moved, but only while no party is running (a redeploy restarts every room). A failed health check rolls back to the previous image.
 
 Clients need TCP to the HTTP port and UDP 24700–24799 (`PORT_RANGE`). The internal API
 (`/v1/internal/*`) only answers game servers on loopback and is 404 through Caddy.

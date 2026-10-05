@@ -75,6 +75,15 @@ if [[ -d "$DIR/.git" ]]; then
 	if [[ $UPDATE_ONLY -eq 1 && "$(git -C "$DIR" rev-parse HEAD)" == "$(git -C "$DIR" rev-parse "origin/$BRANCH")" ]]; then
 		exit 0  # nothing new
 	fi
+	if [[ $UPDATE_ONLY -eq 1 && -f "$ETC/orchestrator.env" ]]; then
+		# A redeploy restarts every room, so wait until no party is running (next tick retries).
+		port=$(sed -n 's/^BIND_PORT=//p' "$ETC/orchestrator.env")
+		rooms=$(curl -fsS --max-time 3 "http://127.0.0.1:${port:-8080}/v1/status" 2>/dev/null | sed -n 's/.*"rooms": *\([0-9]*\).*/\1/p')
+		if [[ -n "$rooms" && "$rooms" != "0" ]]; then
+			log "update waiting: $rooms room(s) in progress"
+			exit 0
+		fi
+	fi
 	git -C "$DIR" checkout -q -B "$BRANCH" "origin/$BRANCH"
 else
 	log "cloning $REPO_URL ($BRANCH)"
