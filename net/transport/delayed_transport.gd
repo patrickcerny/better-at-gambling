@@ -51,6 +51,10 @@ func kick(id: int) -> void:
 	inner.kick(id)
 
 
+func flush() -> void:
+	inner.flush()
+
+
 func close() -> void:
 	inner.close()
 	for sig: StringName in [&"peer_connected", &"peer_disconnected", &"connection_failed"]:

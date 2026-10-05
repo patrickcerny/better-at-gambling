@@ -156,7 +156,6 @@ func _spot(text: String, type: StringName, value: int, color: Color, parent: Con
 	if text != "":
 		var key: String = _key(type, value)
 		var badge := Label.new()
-		badge.add_theme_font_size_override(&"font_size", 15)
 		badge.add_theme_color_override(&"font_color", Palette.CASINO_BLACK)
 		var chip := StyleBoxFlat.new()
 		chip.bg_color = Palette.VIP_GOLD
@@ -166,8 +165,20 @@ func _spot(text: String, type: StringName, value: int, color: Color, parent: Con
 		chip.content_margin_left = 4
 		chip.content_margin_right = 4
 		badge.add_theme_stylebox_override(&"normal", chip)
-		badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-		badge.position = Vector2(size.x - 34, -8)
+		# Sits on the spot's own bottom edge, centred. (It used to be anchored top-right with a
+		# position computed before layout, which pushed it onto the neighbouring number.)
+		badge.add_theme_font_size_override(&"font_size", 13)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.anchor_left = 0.5
+		badge.anchor_right = 0.5
+		badge.anchor_top = 1.0
+		badge.anchor_bottom = 1.0
+		badge.offset_left = -22
+		badge.offset_right = 22
+		badge.offset_top = -12
+		badge.offset_bottom = 8
+		badge.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		badge.clip_text = false
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		badge.visible = false
 		badge.z_index = 2
@@ -175,7 +186,7 @@ func _spot(text: String, type: StringName, value: int, color: Color, parent: Con
 		_badges[key] = badge
 		var dots := Label.new()
 		dots.add_theme_font_size_override(&"font_size", 12)
-		dots.position = Vector2(2, size.y - 16)
+		dots.position = Vector2(3, -3)
 		dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		dots.visible = false
 		b.add_child(dots)

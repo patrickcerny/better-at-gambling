@@ -32,6 +32,11 @@ func kick(_peer: int) -> void:
 	pass
 
 
+## Sends anything still queued right away.
+func flush() -> void:
+	pass
+
+
 ## Closes the connection/host.
 func close() -> void:
 	pass

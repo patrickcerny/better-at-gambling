@@ -8,6 +8,9 @@ extends Node
 const HEARTBEAT_INTERVAL: float = 5.0
 ## Seconds a fresh room waits for its first player before the empty timeout applies.
 const FIRST_JOIN_GRACE: float = 60.0
+## Once someone has played here, an empty room closes after this many seconds (Patrick: "if a room
+## is empty, just kill it"); a few seconds so a crash-and-rejoin still finds the room.
+const LEFT_EMPTY_CLOSE: float = 5.0
 
 var orchestrator: String = ""
 var room_id: String = ""
@@ -164,7 +167,7 @@ func _process(delta: float) -> void:
 	if empty_timeout > 0.0:
 		_empty_for = _empty_for + delta if _players.is_empty() and _verifying.is_empty() else 0.0
 		# Before anyone arrived, give the creator time to load in (at least a minute).
-		if _empty_for >= (empty_timeout if _ever_joined else maxf(empty_timeout, FIRST_JOIN_GRACE)):
+		if _empty_for >= (minf(empty_timeout, LEFT_EMPTY_CLOSE) if _ever_joined else maxf(empty_timeout, FIRST_JOIN_GRACE)):
 			_close("empty")
 
 

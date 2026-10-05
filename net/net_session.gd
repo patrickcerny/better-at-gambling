@@ -107,6 +107,7 @@ func stop() -> void:
 	if mode == Mode.CLIENT and transport != null and _welcomed:
 		_send(NetTransport.SERVER_PEER, Protocol.CHANNEL_EVENTS, true, Protocol.Msg.BYE, {})
 		transport.poll()
+		transport.flush()
 	if local_server != null and local_server.event_emitted.is_connected(_on_local_event):
 		local_server.event_emitted.disconnect(_on_local_event)
 	if local_server != null and local_server.event_emitted.is_connected(_on_server_event):
@@ -280,6 +281,9 @@ func _client_packet(type: int, payload: Variant) -> void:
 		Protocol.Msg.EVENT:
 			if _backlog.size() < BACKLOG_MAX:
 				_backlog.append(payload)
+			# Keep the cached snapshot's Gift Shop current (STATUS doesn't carry it).
+			if (payload as Dictionary).get("type", &"") == &"shop_restocked":
+				_snapshot["shop"] = {"offers": (payload as Dictionary)["offers"]}
 			event_received.emit(payload)
 		Protocol.Msg.WORLD:
 			var w: Dictionary = WorldCodec.decode(payload)
@@ -393,6 +397,9 @@ func _server_packet(peer: int, type: int, payload: Variant) -> void:
 		Protocol.Msg.PING:
 			_send(peer, Protocol.CHANNEL_STATE, true, Protocol.Msg.PONG, {"t": payload.get("t", 0.0), "server_time": server_time()})
 		Protocol.Msg.BYE:
+			# Leaving on purpose: free the slot (and hand over leadership) now, not after ENet notices.
+			if room_host != null:
+				room_host.on_peer_disconnected(peer)
 			transport.kick(peer)
 
 

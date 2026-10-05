@@ -76,6 +76,11 @@ func kick(id: int) -> void:
 		peer.disconnect_peer(id, false)
 
 
+func flush() -> void:
+	if peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED and peer.host != null:
+		peer.host.flush()
+
+
 func close() -> void:
 	if peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED:
 		peer.close()
