@@ -57,7 +57,7 @@
 - The slots camera anchor sits too close to the cabinet screen (M7 station polish).
 
 ## Blockers
-- None for M4–M5. Needed from Patrick later: VPS SSH access/specs and a domain (M6), Steamworks App ID + Web API key (M8).
+- None for M4–M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
 ### 2026-10-04 / session 1
@@ -72,3 +72,8 @@
 ### 2026-10-05 / session 3 (M3)
 - Orchestrator service, transport/protocol/world stream, room host, lobby, authority handoff, online menus, network test harness (`tests/net`, pytest driving real Godot processes).
 - Bugs found by the network tests and fixed: events that arrived before the match scene loaded were lost (backlog replay), snapshots overtook events on another channel (moved to the events channel), bots blocked the lobby exit (they now start on the casino floor), transports leaked through signal cycles, a shoved local player slid ~8 m (push compounding, also in practice).
+### 2026-10-05 / session 3b (VPS deploy, pulled forward from M6)
+- Deploy kit (`deploy/`): Docker image with Godot + orchestrator, Caddy, install.sh (root or rootless), rollback, auto-update, status.sh.
+- Deployed to the VPS at http://152.53.33.53:4300 (rootless, max 8 rooms); the client defaults to it.
+- Verified: local Docker stack create/join/match; two clients on Patrick's PC created and joined a party on the VPS with no flags.
+- Bug fixed: install.sh exited after the health check for a user without a crontab (pipefail).

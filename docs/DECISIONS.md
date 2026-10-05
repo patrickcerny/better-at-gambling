@@ -153,3 +153,12 @@ but only after someone has joined; before that it waits at least 60 s so the cre
 `PlayerAvatar._local_move` read `velocity` (which already contained last frame's push) and added the
 push again, so a shoved local player slid ~8 m at 30 m/s. Found by the networked physics test (the
 server rejected the slide as implausible). The push is now subtracted before re-adding.
+
+## 2026-10-05 — VPS deploy pulled forward, rootless next to an existing web server
+Patrick asked for the VPS deployment right after M3. His box already serves other sites from a
+host nginx on 80/443 and admin's sudo needs a password, so `deploy/install.sh` also runs as a
+docker-group user without sudo and serves plain HTTP on its own port (4300) with the room UDP range
+24700–24799. TLS on a domain stays for the production config (M8). The image runs the Godot editor
+binary headless with `--path` on an imported project instead of an exported server (no export
+templates in the image, one binary for import and serving). An auto-updater redeploys main every
+10 minutes so finished milestones go live without a manual step.

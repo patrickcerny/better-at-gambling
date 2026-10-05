@@ -222,11 +222,11 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ## M6 — Bots, reconnects, MVP hardening → **MVP COMPLETE**
 
 ### Tasks
-- [ ] **VPS deployment** (§4.0): `deploy/` Dockerfile + compose + Caddyfile + firewall script + `deploy.sh`/`status.sh`
+- [x] **VPS deployment** (§4.0, done early on 2026-10-05; see deploy/README.md): `deploy/` Dockerfile + compose + Caddyfile + firewall script + `deploy.sh`/`status.sh`
 - [ ] if the owner has provided SSH access
-- [ ] deploy to the VPS (dev auth mode, or production mode only once a Steam App ID and Web API key exist) and run the internet test below
+- [x] deploy to the VPS (dev auth mode, or production mode only once a Steam App ID and Web API key exist) and run the internet test below
 - [ ] if not
-- [ ] run the same stack locally in Docker and log VPS deployment as waiting on the owner
+- [x] run the same stack locally in Docker and log VPS deployment as waiting on the owner
 - [ ] `BotDirector`/`BotBrain` with personalities and difficulties (§2.19)
 - [ ] lobby bot slots
 - [ ] bot quiz answers

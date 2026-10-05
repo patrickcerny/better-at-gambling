@@ -150,7 +150,8 @@ log "healthy: $(curl -fsS $API/v1/status)"
 # 6. Auto-update: redeploy when the branch moves (milestones land on main when they're green).
 if [[ $AUTO_UPDATE -eq 1 && $EUID -ne 0 ]]; then
 	line="*/10 * * * * $DIR/deploy/install.sh --update --branch $BRANCH >>$ETC/update.log 2>&1"
-	(crontab -l 2>/dev/null | grep -v 'better-at-gambling/deploy/install.sh'; echo "$line") | crontab -
+	# crontab -l fails and grep -v matches nothing for a user without a crontab; neither is an error.
+	{ { crontab -l 2>/dev/null || true; } | { grep -v 'better-at-gambling/deploy/install.sh' || true; }; echo "$line"; } | crontab -
 	log "auto-update cron job active (every 10 min from $BRANCH)"
 elif [[ $AUTO_UPDATE -eq 1 ]]; then
 	install -m 755 "$DIR/deploy/install.sh" /usr/local/sbin/bag-install
