@@ -24,6 +24,13 @@ var leaderboard: PanelContainer
 var leaderboard_rows: VBoxContainer
 var last_call_banner: Label
 var pops: Control
+## Under the timer: "QUIZ IN 1:12".
+var next_quiz_label: Label
+## Centre warning during the 10 s before a minigame.
+var minigame_warning: Label
+## Hot Table line under the timer ("HOT: Roulette 1 ×1.25 0:24").
+var hot_label: Label
+var _last_warning_second: int = -1
 
 var _toast_until: float = -INF
 var _clock: float = 0.0
@@ -50,6 +57,8 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	state.money_changed.connect(_on_money_changed)
 	state.feed_message.connect(_on_feed)
 	state.phase_changed.connect(_on_phase)
+	if not state.players_changed.is_connected(_refresh_items):
+		state.players_changed.connect(_refresh_items)
 	_displayed_money = float(state.balance(local_id))
 	_refresh_static()
 
@@ -118,6 +127,48 @@ func _process(delta: float) -> void:
 		timer_label.add_theme_color_override(&"font_color", Palette.LOSS_RED)
 	if leaderboard.visible:
 		_fill_leaderboard()
+	_update_countdowns()
+
+
+## Next-quiz countdown, the pre-minigame warning and the Hot Table line.
+func _update_countdowns() -> void:
+	var nm: float = state.next_minigame_in
+	var casino: bool = state.phase == Phase.Id.CASINO or state.phase == Phase.Id.PRE_MINIGAME
+	next_quiz_label.visible = casino and nm >= 0.0
+	if next_quiz_label.visible:
+		var n: int = ceili(nm)
+		next_quiz_label.text = "QUIZ IN %d:%02d" % [n / 60, n % 60]
+	var warn: bool = state.phase == Phase.Id.PRE_MINIGAME
+	minigame_warning.visible = warn
+	if warn:
+		var sec: int = ceili(maxf(nm, 0.0))
+		minigame_warning.text = "QUIZ TIME in %d…  Tables closing!" % sec
+		if sec != _last_warning_second and sec > 0:
+			_last_warning_second = sec
+			Audio.play(&"countdown_beep", &"UI", -12.0, 1.0 + (10 - sec) * 0.03)
+	hot_label.visible = casino and state.hot_station != &""
+	if hot_label.visible:
+		var h: int = ceili(state.hot_left)
+		hot_label.text = "HOT: %s ×%.2f  0:%02d" % [ClientMatchState.station_label(state.hot_station), Registry.balance.hot_table_multiplier, h]
+
+
+## A new match in the same room: clear Last Call colours and banners.
+func reset_match() -> void:
+	last_call_banner.visible = false
+	timer_label.remove_theme_color_override(&"font_color")
+	_last_warning_second = -1
+	_displayed_money = float(state.balance(local_id)) if state != null else 0.0
+	_refresh_items()
+
+
+## Item slots show what's in the inventory (effects arrive with M5).
+func _refresh_items() -> void:
+	if state == null or items == null:
+		return
+	var inv: Array = state.players.get(local_id, {}).get("inventory", [])
+	for i: int in items.get_child_count():
+		var l: Label = items.get_child(i) as Label
+		l.text = "[%d] %s" % [i + 1, RewardPanel.item_name(StringName(inv[i])) if i < inv.size() else "—"]
 
 
 func _on_money_changed(player: int, amount: int, _balance: int, reason: StringName) -> void:
@@ -153,7 +204,7 @@ func _on_feed(text: String, kind: StringName) -> void:
 
 
 func _on_phase(phase: Phase.Id) -> void:
-	phase_label.text = String(Phase.name_of(phase)).to_upper() if phase != Phase.Id.CASINO else ""
+	phase_label.text = "LOBBY" if phase == Phase.Id.LOBBY else ""
 	phase_label.visible = phase_label.text != ""
 
 
@@ -220,6 +271,18 @@ func _build() -> void:
 	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	phase_label.visible = false
 	tr.add_child(phase_label)
+	next_quiz_label = Label.new()
+	next_quiz_label.theme_type_variation = &"SmallLabel"
+	next_quiz_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	next_quiz_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	next_quiz_label.visible = false
+	tr.add_child(next_quiz_label)
+	hot_label = Label.new()
+	hot_label.theme_type_variation = &"SmallLabel"
+	hot_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hot_label.add_theme_color_override(&"font_color", Palette.LOSS_RED)
+	hot_label.visible = false
+	tr.add_child(hot_label)
 	# Bottom-right: rank.
 	rank_label = Label.new()
 	rank_label.theme_type_variation = &"MoneyLabel"
@@ -288,6 +351,9 @@ func _build() -> void:
 	last_call_banner = _centre_label(-320, 56, Palette.LOSS_RED)
 	last_call_banner.theme_type_variation = &"TitleLabel"
 	last_call_banner.visible = false
+	minigame_warning = _centre_label(-250, 44, Palette.VIP_GOLD)
+	minigame_warning.theme_type_variation = &"TitleLabel"
+	minigame_warning.visible = false
 	# Leaderboard (hold Tab).
 	leaderboard = PanelContainer.new()
 	leaderboard.set_anchors_preset(Control.PRESET_CENTER)

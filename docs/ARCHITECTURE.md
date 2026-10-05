@@ -33,6 +33,7 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
 | `--net-latency MS --net-loss P [--net-seed N]` | wrap the client transport in `DelayedTransport` |
 | `--quit-after-results`, `--quit-on-disconnect` | scripted clients exit instead of returning to the menu |
 | `--capture out.png --capture-at S` | save a screenshot of whatever is on screen after S seconds |
+| `--skip-to S [--timescale X]` | Practice only: fast-forward to casino time S at start (100 = first quiz of a 5-minute match; screenshots) |
 
 ## Netcode (M3)
 * **Transport:** `ENetTransport` (4 channels, range-coder compression) behind `NetTransport`;
@@ -61,6 +62,33 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
   `intent_rejected` (or 0.6 s of silence) drops it.
 * **Lobby:** `LobbyController` on the server: leader = longest-connected human, ready = own pad or
   the panel toggle, everyone ready and ≥ 2 participants → 3 s countdown → `start_match`.
+
+## Match flow, minigames and rewards (M4)
+* **Phases:** `PhaseMachine` (LOBBY → INTRO → CASINO ⇄ PRE_MINIGAME → MINIGAME → REWARDS → … →
+  RESULTS). Casino time only advances in CASINO and PRE_MINIGAME, so quizzes land exactly on the
+  `MatchSchedule` (5 min: 1:40 and 3:20). Last Call ×1.5 is the stations' global multiplier for the
+  final 60 s.
+* **Casino rules on the server:** `HotTableDirector` (a random station ×1.25 for 30 s every 45–60 s
+  of casino time), House Comp in `MatchServer._check_comps` (once per segment, nothing in play),
+  and "Table closing": `StationManager.closing_in` refuses a bet whose round (`round_seconds()`)
+  would outlast the pre-minigame warning or the match.
+* **Minigames:** a `MinigameDefinition` (`minigames/<id>/<id>.tres`, registered in
+  `data/registry/minigames.tres`) names a pure-logic `MinigameLogicBase` (server) and a
+  `MinigameStage` (client set at z = 400 with its own camera and UI layer). `MinigameDirector`
+  picks one (weighted, no immediate repeat) and keeps the used-question set for the match. The
+  logic gets `submit_*` intents, emits events, and exposes public and private state; the stage only
+  reads events and snapshots and sends intents.
+* **Casino Quiz:** `QuizLogic` (3 questions from `QuestionBank`, at most one `DynamicQuestions`
+  template, server timing with half-RTT credit from `NetSession.half_rtt_of`, capped at 250 ms),
+  `QuizStage` (podiums, big screen, 2×2 answers on keys 1–4 / A B X Y / mouse). The correct index
+  leaves the server only in `quiz_reveal`.
+* **Rewards:** `RewardDirector` pays placement cash (× the played segment's limits, ×2 with items
+  off) and runs the private item draft (offers only in `PRIVATE`, default = first option, bots
+  pick at once). Items are data-only until M5.
+* **Results and play again:** `match_ended {standings, awards, return_in}`; `ResultsStage` (z = −400)
+  shows the podium, `Awards` and the buttons. In a room the leader's `return_to_lobby` (or the
+  60 s timer) resets money, items and stats and rebuilds the match systems; clients take a fresh
+  snapshot on `match_reset`.
 
 ## Audio buses
 Master → Music, SFX, UI, Ambience, Voice (`audio/default_bus_layout.tres`).

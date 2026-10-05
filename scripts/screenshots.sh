@@ -19,3 +19,6 @@ shot roulette 420 --bots 3 --seed 3 --autosit roulette_1
 shot slots 420 --bots 3 --seed 3 --autosit slot_8
 shot plinko 420 --bots 3 --seed 3 --autosit plinko_1
 shot vip_blackjack 420 --bots 3 --seed 3 --autosit vip_blackjack_1
+shot quiz_question 200 --bots 3 --seed 3 --skip-to 100 --duration 5
+shot results 240 --bots 3 --seed 3 --skip-to 300 --duration 5
+shot quiz_end 400 --bots 3 --seed 3 --skip-to 100 --duration 5

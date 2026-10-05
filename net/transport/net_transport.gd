@@ -47,6 +47,11 @@ func local_id() -> int:
 	return 0
 
 
+## Smoothed round-trip time to a peer in milliseconds (0 = unknown).
+func peer_rtt_ms(_peer: int) -> float:
+	return 0.0
+
+
 func _count_out(peer: int, n: int) -> void:
 	bytes_out += n
 	bytes_out_by_peer[peer] = bytes_out_by_peer.get(peer, 0) + n

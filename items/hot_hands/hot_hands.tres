@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"hot_hands"
+display_name = "Hot Hands"
+description = "Blackjack luck +3 and you peek the dealer's hole card for your next 3 hands."
+rarity = 0
+target_mode = 0
+requires_proximity = false
+range_m = 0.0
+is_negative = false
+duration = 0.0

@@ -93,6 +93,13 @@ func local_id() -> int:
 	return peer.get_unique_id() if peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED else 0
 
 
+func peer_rtt_ms(id: int) -> float:
+	if peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return 0.0
+	var pp: ENetPacketPeer = peer.get_peer(id)
+	return pp.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME) if pp != null else 0.0
+
+
 func _on_peer_connected(id: int) -> void:
 	var p: ENetPacketPeer = peer.get_peer(id)
 	if p != null:

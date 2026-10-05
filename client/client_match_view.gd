@@ -37,6 +37,10 @@ func resync() -> void:
 
 
 func _process(delta: float) -> void:
+	if state.hot_station != &"" and (state.phase == Phase.Id.CASINO or state.phase == Phase.Id.PRE_MINIGAME):
+		state.hot_left = maxf(state.hot_left - delta, 0.0)
+	if state.results_return_in > 0.0:
+		state.results_return_in = maxf(state.results_return_in - delta, 0.0)
 	_since_refresh += delta
 	if _since_refresh >= station_refresh_interval:
 		_since_refresh = 0.0
@@ -61,7 +65,15 @@ func _process(delta: float) -> void:
 
 
 func _on_event(ev: Dictionary) -> void:
-	if not state.apply_event(ev):
+	var ok: bool = state.apply_event(ev)
+	if ev["type"] == &"match_reset":
+		# Money, inventories and stations were rebuilt without events: start from a fresh snapshot.
+		if Net.is_client():
+			Net.request_fresh_snapshot()
+		else:
+			resync()
+		return
+	if not ok:
 		Log.warn(&"client", "event gap at seq %d, resyncing" % int(ev.get("seq", -1)))
 		if Net.is_client():
 			Net.request_fresh_snapshot()

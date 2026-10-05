@@ -30,6 +30,8 @@ const PING_INTERVAL: float = 1.0
 const STATUS_INTERVAL: float = 0.25
 const WORLD_INTERVAL: float = 1.0 / Protocol.SERVER_TICK_HZ
 const CONNECT_TIMEOUT: float = 10.0
+## Most latency credited to a quiz answer (half a 500 ms round trip).
+const MAX_HALF_RTT: float = 0.25
 ## Silence after which the UI shows "Connection lost — reconnecting…" (§2.12).
 const SILENCE_WARNING: float = 3.0
 ## Events kept for late-joining views (a long match without snapshots just falls back to a resync).
@@ -334,7 +336,17 @@ func start_server(port: int, opts: Dictionary = {}) -> Error:
 func attach_server(server: MatchServer) -> void:
 	local_server = server
 	server.event_emitted.connect(_on_server_event)
+	server.half_rtt_provider = half_rtt_of
 	room_host.on_server_attached(server)
+
+
+## SERVER: half the round trip to a player's client in seconds (quiz answer timing, §2.9).
+## Capped so a laggy connection can't buy extra answer time.
+func half_rtt_of(player: int) -> float:
+	if transport == null or room_host == null:
+		return 0.0
+	var peer: int = room_host.peer_of(player)
+	return clampf(transport.peer_rtt_ms(peer) / 2000.0, 0.0, MAX_HALF_RTT) if peer > 0 else 0.0
 
 
 ## SERVER: sends one message to a peer.

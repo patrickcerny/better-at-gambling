@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the test suites headless. Exits non-zero on any failure.
 # Usage: scripts/test.sh [unit|sim|integration|physics|ui|smoke|session|lint|orchestrator|net|all]   (default: unit)
-# `net` runs real server/client processes (~7 min; NET_SYNC_MINUTES shortens the long match).
+# `net` runs real server/client processes (~9 min; NET_SYNC_MINUTES shortens the long match).
 set -uo pipefail
 source "$(dirname "$0")/_common.sh"
 cd "$ROOT"

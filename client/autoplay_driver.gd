@@ -27,6 +27,9 @@ var script_name: String = ""
 var _last_rag: Dictionary[int, Vector3] = {}
 ## "wait_event" step: [type, deadline].
 var _awaiting: Array = []
+## Quiz answers given / drafts picked (logged for the network tests).
+var answers_sent: int = 0
+var drafts_picked: int = 0
 
 const THROW_SPOT: Vector3 = Vector3(5.0, 0.0, 2.0)
 
@@ -74,8 +77,40 @@ func _on_event(ev: Dictionary) -> void:
 			var d: float = Vector2(_last_rag[pid].x - at.x, _last_rag[pid].z - at.z).length()
 			Log.info(&"nettest", "NETTEST got_up player=%d agreement=%.3f" % [pid, d])
 			_last_rag.erase(pid)
+	match ev["type"]:
+		&"quiz_question":
+			_answer(int(ev["index"]), (ev["answers"] as Array).size())
+		&"rewards_started":
+			_pick_draft()
+		&"match_ended":
+			Log.info(&"nettest", "NETTEST autoplay answers=%d drafts=%d" % [answers_sent, drafts_picked])
 	if not _awaiting.is_empty() and ev["type"] == _awaiting[0] and int(ev.get("player", ev.get("target", -1))) == int(_awaiting[2]):
 		_awaiting.clear()
+
+
+## Casino Quiz: a random answer after a human-ish pause (keys/buttons go through the same intent).
+func _answer(question: int, count: int) -> void:
+	await get_tree().create_timer(randf_range(1.0, 5.0)).timeout
+	if not is_inside_tree() or count <= 0:
+		return
+	var res: Dictionary = Net.send_intent(Intents.make(&"submit_answer", {"question": question, "index": randi() % count}))
+	answers_sent += 1
+	Log.info(&"autoplay", "quiz answer %d -> %s" % [question, res])
+
+
+## Reward draft: wait for the private offer, then take the last option (the default is the first).
+func _pick_draft() -> void:
+	for i: int in 20:
+		await get_tree().create_timer(0.25).timeout
+		if not is_inside_tree():
+			return
+		var draft: Dictionary = Net.request_private_snapshot().get("draft", {})
+		var choices: Array = draft.get("choices", [])
+		if not choices.is_empty():
+			var res: Dictionary = Net.send_intent(Intents.make(&"draft_pick", {"choice": choices.size() - 1}))
+			drafts_picked += 1
+			Log.info(&"autoplay", "draft pick %s -> %s" % [choices[-1], res])
+			return
 
 
 func _build_steps() -> void:
@@ -183,6 +218,14 @@ func _process(delta: float) -> void:
 		if scene.avatars[pid].state == PlayerAvatar.State.RAGDOLL:
 			_last_rag[pid] = scene.avatars[pid].global_position
 	if steps.is_empty() or scene.local == null:
+		return
+	# The script pauses while the casino is closed (quiz, rewards, results).
+	var phase: Phase.Id = scene.view.state.phase
+	if phase != Phase.Id.CASINO and phase != Phase.Id.PRE_MINIGAME:
+		if walking_to != Vector3.INF:
+			walking_to = Vector3.INF
+			scene.local.auto_target = Vector3.INF
+			index = maxi(index - 1, 0)  # walk there again afterwards
 		return
 	if not _awaiting.is_empty():
 		if elapsed > float(_awaiting[1]):

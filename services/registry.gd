@@ -9,6 +9,10 @@ var maps: Dictionary[StringName, MapDefinition] = {}
 var balance: BalanceConfig
 var presets: MatchPresets
 var loot: LootTableConfig
+## Quiz questions (validated; invalid entries are logged and dropped).
+var quiz_bank: QuestionBank
+
+const QUESTIONS_PATH: String = "res://data/quiz/questions_en.json"
 
 
 func _ready() -> void:
@@ -28,7 +32,16 @@ func reload() -> void:
 	balance = load("res://data/balance/balance.tres") as BalanceConfig
 	presets = load("res://data/balance/match_presets.tres") as MatchPresets
 	loot = load("res://data/items/loot_tables.tres") as LootTableConfig
-	Log.info(&"registry", "%d games, %d items, %d minigames, %d maps" % [games.size(), items.size(), minigames.size(), maps.size()])
+	quiz_bank = load_question_bank(QUESTIONS_PATH)
+	Log.info(&"registry", "%d games, %d items, %d minigames, %d maps, %d quiz questions" % [games.size(), items.size(), minigames.size(), maps.size(), quiz_bank.size()])
+
+
+## Reads and validates a question file. A broken file logs every problem and yields what's valid.
+static func load_question_bank(path: String) -> QuestionBank:
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+	for e: String in QuestionBank.validate(data):
+		Log.error(&"registry", "%s: %s" % [path, e])
+	return QuestionBank.from_data(data)
 
 
 ## Game id → logic Script, for the StationManager.

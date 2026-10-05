@@ -14,6 +14,8 @@ var hot: Dictionary[StringName, bool] = {}
 ## Station ids that are VIP (limits ×3, entry check).
 var vip: Dictionary[StringName, bool] = {}
 
+## Seconds until the casino closes (pre-minigame warning, end of match); INF while open.
+var closing_in: float = INF
 var _balance: BalanceConfig
 var _limits_multiplier: float = 1.0
 
@@ -112,6 +114,8 @@ func route(player: int, intent: Dictionary) -> Dictionary:
 			var bet: Variant = intent.get("bet", {})
 			if typeof(bet) != TYPE_DICTIONARY:
 				return StationLogicBase.fail(&"bad_bet")
+			if logic.round_seconds() > closing_in:
+				return StationLogicBase.fail(&"table_closing")
 			return logic.place_bet(player, bet)
 		&"clear_bets":
 			return logic.player_action(player, &"clear_bets")
@@ -125,6 +129,14 @@ func route(player: int, intent: Dictionary) -> Dictionary:
 func tick(delta: float) -> void:
 	for sid: StringName in logics:
 		logics[sid].tick(delta)
+
+
+## True while the player has money in play anywhere (an open hand, bet, spin or Plinko chip).
+func has_stake(player: int) -> bool:
+	for sid: StringName in logics:
+		if logics[sid].has_stake(player):
+			return true
+	return false
 
 
 ## Resolves every open round (phase end).

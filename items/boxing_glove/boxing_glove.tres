@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"boxing_glove"
+display_name = "Spring Glove"
+description = "Your next 3 shoves knock players over instantly (45 s)."
+rarity = 0
+target_mode = 0
+requires_proximity = false
+range_m = 0.0
+is_negative = false
+duration = 45.0

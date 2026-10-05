@@ -75,6 +75,17 @@ func tick(_delta: float) -> void:
 	pass
 
 
+## Seconds a bet placed now needs until it settles; bets that would outlast the casino closing
+## are refused ("Table closing!").
+func round_seconds() -> float:
+	return 0.0
+
+
+## True while the player has money in play here (unsettled bet).
+func has_stake(_player: int) -> bool:
+	return false
+
+
 ## Resolves everything open right now (phase end).
 func auto_resolve() -> void:
 	pass

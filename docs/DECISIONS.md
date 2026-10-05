@@ -142,7 +142,7 @@ clients need different names; reconnecting with the same name takes over the sam
 identities come from orchestrator-verified join tokens (Steam in M8).
 
 ## 2026-10-05 — `BUILD_ID` must match exactly
-`Protocol.BUILD_ID` ("0.3.0-m3") is sent in `HELLO` and checked by both the orchestrator (`426
+`Protocol.BUILD_ID` (now "0.4.0-m4") is sent in `HELLO` and checked by both the orchestrator (`426
 version_mismatch`) and the room server (`REJECT version_mismatch`). Bump it with every shipped build.
 
 ## 2026-10-05 — Rooms wait a minute for their first player
@@ -162,3 +162,25 @@ docker-group user without sudo and serves plain HTTP on its own port (4300) with
 binary headless with `--path` on an imported project instead of an exported server (no export
 templates in the image, one binary for import and serving). An auto-updater redeploys main every
 10 minutes so finished milestones go live without a manual step.
+
+## 2026-10-05 — Quiz answer timing trusts ENet's RTT, capped
+The quiz credits each answer with half the peer's round trip as ENet measures it on the server
+(`ENetPacketPeer.PEER_ROUND_TRIP_TIME`), capped at 250 ms so a slow connection can't buy extra
+time. The client never reports its own timing.
+
+## 2026-10-05 — Rewards draft defaults and reward cash
+Draft offers are private (`PRIVATE` channel only); the public `rewards_started` event lists cash,
+placement and whether someone has a draft, never the items. A player who doesn't pick within 8 s
+gets the first option; the draft closes early when everyone has picked. Cash uses the limits
+multiplier of the segment just played, doubled when items are switched off.
+
+## 2026-10-05 — Clients resnapshot after "play again"
+`return_to_lobby` rebuilds the economy and stations without a money event per player, so
+`match_reset` makes every client request a fresh snapshot (host and practice views resync locally)
+instead of replaying a burst of synthetic events.
+
+## 2026-10-05 — Autoplay pauses outside the casino
+The scripted player's step list pauses while the casino is closed (quiz, rewards, results) and
+re-walks an interrupted walk afterwards. It answers quiz questions at random after 1–5 s and
+takes the last draft option, so the network test exercises both intents and checks that every
+process ends with the same money and items.

@@ -17,6 +17,7 @@ const SCHEMA: Dictionary = {
 	&"set_cosmetics": ["color", "hat"],
 	&"add_bot": [],
 	&"remove_bot": ["player"],
+	&"return_to_lobby": [],
 	&"emote": ["id"],
 	&"move": ["pos", "yaw"],
 	&"grab": ["target"],

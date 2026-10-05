@@ -1,7 +1,18 @@
-[gd_resource type="Resource" script_class="RegistryList" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="RegistryList" load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://core/defs/registry_list.gd" id="1"]
+[ext_resource type="Resource" path="res://items/lucky_clover/lucky_clover.tres" id="2"]
+[ext_resource type="Resource" path="res://items/black_cat/black_cat.tres" id="3"]
+[ext_resource type="Resource" path="res://items/hot_hands/hot_hands.tres" id="4"]
+[ext_resource type="Resource" path="res://items/loaded_reels/loaded_reels.tres" id="5"]
+[ext_resource type="Resource" path="res://items/double_down/double_down.tres" id="6"]
+[ext_resource type="Resource" path="res://items/golden_chip/golden_chip.tres" id="7"]
+[ext_resource type="Resource" path="res://items/pickpocket/pickpocket.tres" id="8"]
+[ext_resource type="Resource" path="res://items/banana_peel/banana_peel.tres" id="9"]
+[ext_resource type="Resource" path="res://items/bodyguard/bodyguard.tres" id="10"]
+[ext_resource type="Resource" path="res://items/mirror/mirror.tres" id="11"]
+[ext_resource type="Resource" path="res://items/boxing_glove/boxing_glove.tres" id="12"]
 
 [resource]
 script = ExtResource("1")
-entries = Array[Resource]([])
+entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("9"), ExtResource("10"), ExtResource("11"), ExtResource("12")])

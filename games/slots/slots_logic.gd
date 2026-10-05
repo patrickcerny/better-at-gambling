@@ -89,6 +89,14 @@ func tick(delta: float) -> void:
 			_finish_spin()
 
 
+func round_seconds() -> float:
+	return balance.slots_spin_time
+
+
+func has_stake(p: int) -> bool:
+	return spinning and player == p
+
+
 func auto_resolve() -> void:
 	if spinning:
 		_finish_spin()

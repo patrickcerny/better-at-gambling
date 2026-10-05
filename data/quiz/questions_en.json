@@ -1,0 +1,1268 @@
+{
+ "version": 1,
+ "questions": [
+  {
+   "id": "ct_001",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many pockets does a European roulette wheel have?",
+   "answers": [
+    "37",
+    "36",
+    "38",
+    "40"
+   ],
+   "correct_index": 0,
+   "explanation": "Numbers 1-36 plus a single zero."
+  },
+  {
+   "id": "ct_002",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "What extra pocket does an American roulette wheel have?",
+   "answers": [
+    "Double zero (00)",
+    "Thirty-seven",
+    "Thirteen",
+    "A gold star"
+   ],
+   "correct_index": 0,
+   "explanation": "That extra pocket raises the house edge."
+  },
+  {
+   "id": "ct_003",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the highest number on a roulette wheel?",
+   "answers": [
+    "36",
+    "32",
+    "38",
+    "50"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_004",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What colour is the 0 pocket on a roulette wheel?",
+   "answers": [
+    "Green",
+    "Red",
+    "Black",
+    "Gold"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_005",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "A roulette bet on a single number is called…",
+   "answers": [
+    "Straight up",
+    "Split",
+    "Corner",
+    "Street"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_006",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "What does a straight-up roulette bet pay?",
+   "answers": [
+    "35 to 1",
+    "17 to 1",
+    "10 to 1",
+    "100 to 1"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_007",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which city is nicknamed \"Sin City\"?",
+   "answers": [
+    "Las Vegas",
+    "Monte Carlo",
+    "Macau",
+    "Atlantic City"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_008",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Monte Carlo is in which country?",
+   "answers": [
+    "Monaco",
+    "France",
+    "Italy",
+    "Spain"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_009",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What do you play with at casino tables instead of cash?",
+   "answers": [
+    "Chips",
+    "Coupons",
+    "Tokens of gratitude",
+    "Seashells"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_010",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "In casino slang, a \"whale\" is…",
+   "answers": [
+    "A gambler who bets huge sums",
+    "A broken slot machine",
+    "A losing streak",
+    "The head of security"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_011",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "\"One-armed bandit\" is a nickname for…",
+   "answers": [
+    "A slot machine",
+    "A pickpocket",
+    "A blackjack dealer",
+    "A roulette ball"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_012",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "A croupier is…",
+   "answers": [
+    "The person who runs a casino table",
+    "A French pastry",
+    "A losing bet",
+    "A type of poker chip"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_013",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "In a casino, a \"comp\" is…",
+   "answers": [
+    "A free gift from the house",
+    "A computer that counts cards",
+    "A forced bet",
+    "A cheating player"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_014",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Plinko became famous on which TV game show?",
+   "answers": [
+    "The Price Is Right",
+    "Jeopardy!",
+    "Wheel of Fortune",
+    "Family Feud"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_015",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "A \"high roller\" is someone who…",
+   "answers": [
+    "Bets very big",
+    "Rolls dice very high",
+    "Works on the roof",
+    "Never gambles"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_016",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "Which casino game deals cards from a \"shoe\"?",
+   "answers": [
+    "Blackjack",
+    "Roulette",
+    "Slots",
+    "Bingo"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_017",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Betting on \"red or black\" is part of which game?",
+   "answers": [
+    "Roulette",
+    "Blackjack",
+    "Plinko",
+    "Bingo"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_018",
+   "category": "casino_trivia",
+   "difficulty": 3,
+   "question": "\"Roulette\" means \"little wheel\" in which language?",
+   "answers": [
+    "French",
+    "Italian",
+    "Spanish",
+    "German"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_019",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "Which Las Vegas resort has a half-size Eiffel Tower?",
+   "answers": [
+    "Paris Las Vegas",
+    "Caesars Palace",
+    "The Venetian",
+    "Luxor"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_020",
+   "category": "casino_trivia",
+   "difficulty": 2,
+   "question": "What is the house edge?",
+   "answers": [
+    "The casino's built-in advantage",
+    "The outside of a roulette table",
+    "The VIP room's door",
+    "A bonus for regulars"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_001",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "How many cards are in a standard deck (no jokers)?",
+   "answers": [
+    "52",
+    "54",
+    "48",
+    "50"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_002",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "How many suits are in a standard deck?",
+   "answers": [
+    "4",
+    "3",
+    "5",
+    "6"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_003",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "In blackjack, how much is an Ace worth?",
+   "answers": [
+    "1 or 11",
+    "Always 11",
+    "Always 1",
+    "10"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_004",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "In blackjack, how much is a King worth?",
+   "answers": [
+    "10",
+    "13",
+    "11",
+    "12"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_005",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "Going over 21 in blackjack is called…",
+   "answers": [
+    "Busting",
+    "Folding",
+    "Doubling",
+    "Pushing"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_006",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "Asking for another card in blackjack is called…",
+   "answers": [
+    "Hit",
+    "Stand",
+    "Fold",
+    "Raise"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_007",
+   "category": "cards_and_dice",
+   "difficulty": 2,
+   "question": "Doubling your bet for exactly one more card is called…",
+   "answers": [
+    "Double down",
+    "Split",
+    "Surrender",
+    "All in"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_008",
+   "category": "cards_and_dice",
+   "difficulty": 2,
+   "question": "A tie with the dealer in blackjack is called a…",
+   "answers": [
+    "Push",
+    "Draw",
+    "Split",
+    "Bust"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_009",
+   "category": "cards_and_dice",
+   "difficulty": 2,
+   "question": "Opposite faces of a standard die always add up to…",
+   "answers": [
+    "7",
+    "6",
+    "8",
+    "12"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_010",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "Rolling two ones is called…",
+   "answers": [
+    "Snake eyes",
+    "Boxcars",
+    "Double trouble",
+    "Pig eyes"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_011",
+   "category": "cards_and_dice",
+   "difficulty": 2,
+   "question": "Which total is most likely when rolling two dice?",
+   "answers": [
+    "7",
+    "6",
+    "8",
+    "12"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_012",
+   "category": "cards_and_dice",
+   "difficulty": 3,
+   "question": "How many dots are on a standard six-sided die in total?",
+   "answers": [
+    "21",
+    "18",
+    "24",
+    "36"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_013",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "Which of these is NOT a suit in a standard deck?",
+   "answers": [
+    "Stars",
+    "Hearts",
+    "Spades",
+    "Clubs"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_014",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "What is the best hand in poker?",
+   "answers": [
+    "Royal flush",
+    "Four of a kind",
+    "Full house",
+    "Straight"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_015",
+   "category": "cards_and_dice",
+   "difficulty": 2,
+   "question": "In poker, three of a kind plus a pair is a…",
+   "answers": [
+    "Full house",
+    "Flush",
+    "Straight",
+    "Two pair"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_016",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "How many cards make a natural blackjack?",
+   "answers": [
+    "2",
+    "3",
+    "1",
+    "21"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_017",
+   "category": "cards_and_dice",
+   "difficulty": 2,
+   "question": "In standard blackjack, the dealer keeps drawing until reaching at least…",
+   "answers": [
+    "17",
+    "16",
+    "18",
+    "21"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_018",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "How many Kings are in a standard deck?",
+   "answers": [
+    "4",
+    "2",
+    "1",
+    "8"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_019",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "Craps is played with how many dice?",
+   "answers": [
+    "2",
+    "1",
+    "3",
+    "5"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_020",
+   "category": "cards_and_dice",
+   "difficulty": 2,
+   "question": "What are the odds of drawing an Ace from a full deck?",
+   "answers": [
+    "1 in 13",
+    "1 in 4",
+    "1 in 52",
+    "1 in 26"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_021",
+   "category": "cards_and_dice",
+   "difficulty": 1,
+   "question": "Which number is opposite the 6 on a standard die?",
+   "answers": [
+    "1",
+    "2",
+    "3",
+    "5"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "cd_022",
+   "category": "cards_and_dice",
+   "difficulty": 2,
+   "question": "Rolling two sixes is called…",
+   "answers": [
+    "Boxcars",
+    "Snake eyes",
+    "Hard eight",
+    "Little Joe"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_001",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "Which number is unlucky in many Western countries?",
+   "answers": [
+    "13",
+    "7",
+    "8",
+    "3"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_002",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "A four-leaf clover is said to bring…",
+   "answers": [
+    "Good luck",
+    "Rain",
+    "Bad luck",
+    "Money from the sky"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_003",
+   "category": "luck_and_superstition",
+   "difficulty": 2,
+   "question": "Which number is considered very lucky in China?",
+   "answers": [
+    "8",
+    "4",
+    "13",
+    "6"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_004",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "Breaking a mirror supposedly brings how many years of bad luck?",
+   "answers": [
+    "7",
+    "3",
+    "13",
+    "100"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_005",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "Which animal crossing your path is said to be unlucky?",
+   "answers": [
+    "A black cat",
+    "A white rabbit",
+    "A golden retriever",
+    "A goldfish"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_006",
+   "category": "luck_and_superstition",
+   "difficulty": 3,
+   "question": "Fear of the number 13 is called…",
+   "answers": [
+    "Triskaidekaphobia",
+    "Arachnophobia",
+    "Claustrophobia",
+    "Numerophobia"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_007",
+   "category": "luck_and_superstition",
+   "difficulty": 2,
+   "question": "Which number is avoided in Japan and China because it sounds like \"death\"?",
+   "answers": [
+    "4",
+    "9",
+    "13",
+    "1"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_008",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "What do superstitious gamblers blow on for luck?",
+   "answers": [
+    "Dice",
+    "Chips",
+    "The dealer",
+    "Their shoes"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_009",
+   "category": "luck_and_superstition",
+   "difficulty": 2,
+   "question": "To keep its luck in, a horseshoe is often hung with its ends…",
+   "answers": [
+    "Pointing up",
+    "Pointing down",
+    "Pointing sideways",
+    "Nailed shut"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_010",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "\"Beginner's luck\" is the idea that…",
+   "answers": [
+    "New players often win",
+    "Experts always win",
+    "The house never wins",
+    "Luck runs out at midnight"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_011",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "Which day of the month is unlucky when it falls on a Friday?",
+   "answers": [
+    "The 13th",
+    "The 7th",
+    "The 1st",
+    "The 31st"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_012",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "Which of these is a traditional lucky charm?",
+   "answers": [
+    "A rabbit's foot",
+    "A broken umbrella",
+    "A black cat",
+    "An open ladder"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_013",
+   "category": "luck_and_superstition",
+   "difficulty": 3,
+   "question": "The gambler's fallacy is believing that…",
+   "answers": [
+    "Past results change the odds of independent events",
+    "Casinos always lose money",
+    "Dice are always fair",
+    "Luck can be counted"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_014",
+   "category": "luck_and_superstition",
+   "difficulty": 1,
+   "question": "In the Lucky Lounge, what does the clover meter next to your money show?",
+   "answers": [
+    "Your luck",
+    "Your health",
+    "Your ping",
+    "The time left"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_015",
+   "category": "luck_and_superstition",
+   "difficulty": 2,
+   "question": "Walking under a ladder is supposed to bring…",
+   "answers": [
+    "Bad luck",
+    "Good luck",
+    "Extra chips",
+    "A free drink"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_016",
+   "category": "luck_and_superstition",
+   "difficulty": 2,
+   "question": "Which of these is said to be lucky to find on the ground?",
+   "answers": [
+    "A penny",
+    "A banana peel",
+    "A losing ticket",
+    "A black cat"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ls_017",
+   "category": "luck_and_superstition",
+   "difficulty": 2,
+   "question": "Crossing your fingers is supposed to…",
+   "answers": [
+    "Bring good luck",
+    "Ward off the dealer",
+    "Double your bet",
+    "Cancel a jinx on others"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_001",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "How much money does everyone start a match with?",
+   "answers": [
+    "$1,000",
+    "$500",
+    "$100",
+    "$10,000"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_002",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "How many questions does each Casino Quiz have?",
+   "answers": [
+    "3",
+    "5",
+    "1",
+    "10"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_003",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "What happens to winnings during LAST CALL?",
+   "answers": [
+    "They're multiplied by 1.5",
+    "They're halved",
+    "They go to the house",
+    "Nothing"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_004",
+   "category": "game_rules",
+   "difficulty": 2,
+   "question": "How long does LAST CALL last?",
+   "answers": [
+    "The final 60 seconds",
+    "The final 10 seconds",
+    "The whole last segment",
+    "5 minutes"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_005",
+   "category": "game_rules",
+   "difficulty": 2,
+   "question": "How much more does a HOT table pay on winnings?",
+   "answers": [
+    "×1.25",
+    "×2",
+    "×10",
+    "Nothing extra"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_006",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "What does the house do when you're completely broke?",
+   "answers": [
+    "Gives you a $150 comp",
+    "Throws you out",
+    "Ends the match",
+    "Takes your hat"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_007",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "What does security do if they catch you causing trouble?",
+   "answers": [
+    "Throw you out",
+    "Give you chips",
+    "Make you dealer",
+    "Ignore it"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_008",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "What happens when you shake a player you're holding?",
+   "answers": [
+    "Chips fall out of them",
+    "They get richer",
+    "They teleport",
+    "Nothing at all"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_009",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "Who wins the match?",
+   "answers": [
+    "Whoever has the most money at the end",
+    "Whoever answers fastest",
+    "Whoever shoves most",
+    "The dealer cat"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_010",
+   "category": "game_rules",
+   "difficulty": 2,
+   "question": "What's the cash prize for winning a quiz (before limits grow)?",
+   "answers": [
+    "$150",
+    "$1,000",
+    "$50",
+    "$15"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_011",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "In the quiz, answering faster gives you…",
+   "answers": [
+    "More points",
+    "Fewer points",
+    "A free drink",
+    "Nothing"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_012",
+   "category": "game_rules",
+   "difficulty": 2,
+   "question": "What's the most points one quiz question can give?",
+   "answers": [
+    "1,000",
+    "500",
+    "100",
+    "10,000"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_013",
+   "category": "game_rules",
+   "difficulty": 3,
+   "question": "In the Lucky Lounge, when the dealer busts, winning blackjack hands are paid…",
+   "answers": [
+    "1.1 to 1",
+    "2 to 1",
+    "1 to 2",
+    "3 to 2"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_014",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "Which of these is NOT played on the Lucky Lounge floor?",
+   "answers": [
+    "Poker",
+    "Blackjack",
+    "Roulette",
+    "Plinko"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_015",
+   "category": "game_rules",
+   "difficulty": 3,
+   "question": "If two players finish with the same money, what decides the winner first?",
+   "answers": [
+    "Total quiz points",
+    "Who joined first",
+    "A coin flip",
+    "Hat colour"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_016",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "Who can change the match length in the lobby?",
+   "answers": [
+    "The party leader",
+    "Anyone",
+    "The dealer cat",
+    "Nobody"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_017",
+   "category": "game_rules",
+   "difficulty": 2,
+   "question": "Your luck can range from…",
+   "answers": [
+    "-3 to +3",
+    "0 to 100",
+    "-10 to +10",
+    "1 to 6"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_018",
+   "category": "game_rules",
+   "difficulty": 2,
+   "question": "How many quick shoves knock a player out?",
+   "answers": [
+    "3",
+    "1",
+    "5",
+    "10"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_019",
+   "category": "game_rules",
+   "difficulty": 2,
+   "question": "What do you need to get into the VIP room?",
+   "answers": [
+    "Enough money",
+    "A golden hat",
+    "A secret password",
+    "Nothing"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "gr_020",
+   "category": "game_rules",
+   "difficulty": 1,
+   "question": "What happens if you fall into the fountain?",
+   "answers": [
+    "You get soaked and slow",
+    "You win the jackpot",
+    "You get a free item",
+    "Nothing"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_001",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "Why don't they play poker in the jungle?",
+   "answers": [
+    "Too many cheetahs",
+    "The trees fold",
+    "Lions eat the chips",
+    "Monkeys bluff"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_002",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "Why did the scarecrow win an award?",
+   "answers": [
+    "He was outstanding in his field",
+    "He scared the judges",
+    "He bribed the crows",
+    "He had straw power"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_003",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "What do you call a fake noodle?",
+   "answers": [
+    "An impasta",
+    "A fauxghetti",
+    "A noodle't",
+    "A spaghettn't"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_004",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "What do you call cheese that isn't yours?",
+   "answers": [
+    "Nacho cheese",
+    "Swiss miss",
+    "Brie-gone",
+    "Feta-nother"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_005",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "Why can't a bicycle stand up by itself?",
+   "answers": [
+    "It's two tired",
+    "It's lazy",
+    "It lost its balance bet",
+    "It's on a break"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_006",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "How many lives does a cat traditionally have?",
+   "answers": [
+    "9",
+    "7",
+    "3",
+    "13"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_007",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "What's the name of the quiz host?",
+   "answers": [
+    "Lucky the dealer cat",
+    "Chippy the croupier",
+    "Mr. Jackpot",
+    "The Bouncer"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_008",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "Which is heavier: a kilo of chips or a kilo of feathers?",
+   "answers": [
+    "They weigh the same",
+    "The chips",
+    "The feathers",
+    "Depends on the luck"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_009",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "You have $10 and lose $10. How much do you have?",
+   "answers": [
+    "$0",
+    "$20",
+    "$10",
+    "$-10"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_010",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "What colour is the felt on most casino tables?",
+   "answers": [
+    "Green",
+    "Purple",
+    "Orange",
+    "Plaid"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_011",
+   "category": "silly",
+   "difficulty": 2,
+   "question": "Which of these is a real casino game?",
+   "answers": [
+    "Baccarat",
+    "Spoonball",
+    "Wigglechips",
+    "Beanjack"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_012",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "Why was the maths book sad?",
+   "answers": [
+    "It had too many problems",
+    "It lost at roulette",
+    "Nobody opened it",
+    "Its pages were blank"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_013",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "What do you call a sleeping bull?",
+   "answers": [
+    "A bulldozer",
+    "A snore-horn",
+    "A cow-nap",
+    "A beef-rest"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_014",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "Why did the cookie go to the doctor?",
+   "answers": [
+    "It felt crummy",
+    "It was half-baked",
+    "It lost its chips",
+    "It had a sugar rush"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_015",
+   "category": "silly",
+   "difficulty": 2,
+   "question": "What did the zero say to the eight?",
+   "answers": [
+    "Nice belt!",
+    "You look tired",
+    "Go away",
+    "Let's split"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_016",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "Why did the golfer wear two pairs of trousers?",
+   "answers": [
+    "In case he got a hole in one",
+    "For extra pockets",
+    "It was cold",
+    "To confuse security"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_017",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "What kind of tree fits in your hand?",
+   "answers": [
+    "A palm tree",
+    "An oak",
+    "A birch",
+    "A pine"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "si_018",
+   "category": "silly",
+   "difficulty": 1,
+   "question": "Why are ghosts bad at lying?",
+   "answers": [
+    "You can see right through them",
+    "They're too scary",
+    "They forget the story",
+    "They mumble"
+   ],
+   "correct_index": 0
+  }
+ ]
+}

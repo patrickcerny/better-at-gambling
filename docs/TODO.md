@@ -156,35 +156,35 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ## M4 — Match flow, timer, Quiz minigame, rewards (cash only for now)
 
 ### Tasks
-- [ ] full `PhaseMachine` (intro, casino segments, pre-minigame warning, minigame, rewards, Last Call, results)
-- [ ] match timer & HUD countdowns
-- [ ] durations from lobby
-- [ ] `MinigameDirector` + `MinigameBase`
-- [ ] quiz stage scene
-- [ ] `QuizMinigame` (question flow, server timing with RTT compensation, reveal, scoreboard, ranking with tiebreaks)
-- [ ] `questions_en.json` with ≥ 60 questions (aim 150 by M10) + JSON schema validation
-- [ ] 2 dynamic question templates
-- [ ] reward phase with cash prizes (item draft UI built but items stubbed)
-- [ ] Hot Table director
-- [ ] bankruptcy comp
-- [ ] results screen (podium, final money, rematch/leave)
-- [ ] auto-resolve all stations at phase end
+- [x] full `PhaseMachine` (intro, casino segments, pre-minigame warning, minigame, rewards, Last Call, results)
+- [x] match timer & HUD countdowns
+- [x] durations from lobby
+- [x] `MinigameDirector` + `MinigameBase`
+- [x] quiz stage scene
+- [x] `QuizMinigame` (question flow, server timing with RTT compensation, reveal, scoreboard, ranking with tiebreaks)
+- [x] `questions_en.json` with ≥ 60 questions (aim 150 by M10) + JSON schema validation
+- [x] 2 dynamic question templates
+- [x] reward phase with cash prizes (item draft UI built but items stubbed)
+- [x] Hot Table director
+- [x] bankruptcy comp
+- [x] results screen (podium, final money, rematch/leave)
+- [x] auto-resolve all stations at phase end
 
 ### Tests
-- [ ] schedule integration (5-minute match at timescale → exactly 2 quizzes at 1:40/3:20 casino time; 30-minute → 7)
-- [ ] each quiz exactly 3 questions, no repeats within a match
-- [ ] correct index never present in any client-bound event before reveal (assert on serialized traffic)
-- [ ] scoring with simulated latencies
-- [ ] ties
-- [ ] question JSON validation (4 answers, valid index, unique ids, non-empty)
-- [ ] Last Call multiplier applied only in final 60 s
-- [ ] comp rules
-- [ ] results tiebreakers
+- [x] schedule integration (5-minute match at timescale → exactly 2 quizzes at 1:40/3:20 casino time; 30-minute → 7)
+- [x] each quiz exactly 3 questions, no repeats within a match
+- [x] correct index never present in any client-bound event before reveal (assert on serialized traffic)
+- [x] scoring with simulated latencies
+- [x] ties
+- [x] question JSON validation (4 answers, valid index, unique ids, non-empty)
+- [x] Last Call multiplier applied only in final 60 s
+- [x] comp rules
+- [x] results tiebreakers
 
 ### Acceptance criteria
-- [ ] full multi-process match (server + 2 autoplay clients + 2 bots stubs or scripted players) completes from lobby to results for 5-minute duration
-- [ ] quiz playable with keyboard/mouse/gamepad
-- [ ] screenshots of quiz and results look correct
+- [x] full multi-process match (server + 2 autoplay clients + 2 bots stubs or scripted players) completes from lobby to results for 5-minute duration
+- [x] quiz playable with keyboard/mouse/gamepad
+- [x] screenshots of quiz and results look correct
 
 ## M5 — Items, luck, sabotage, pickups
 

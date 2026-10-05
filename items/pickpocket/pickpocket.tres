@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"pickpocket"
+display_name = "Pickpocket"
+description = "Steal 12% of the money of a player within 4 m (min $50, max $500)."
+rarity = 1
+target_mode = 2
+requires_proximity = true
+range_m = 4.0
+is_negative = true
+duration = 0.0

@@ -66,6 +66,10 @@ func local_id() -> int:
 	return inner.local_id()
 
 
+func peer_rtt_ms(peer: int) -> float:
+	return rtt_ms + inner.peer_rtt_ms(peer)
+
+
 func _queue(q: Array[Dictionary], peer: int, channel: int, reliable: bool, data: PackedByteArray, dir: String) -> void:
 	var delay: float = rtt_ms / 2000.0
 	if rng.randf() < loss:

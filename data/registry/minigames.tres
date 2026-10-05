@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="RegistryList" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="RegistryList" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/defs/registry_list.gd" id="1"]
+[ext_resource type="Resource" path="res://minigames/quiz/quiz.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
-entries = Array[Resource]([])
+entries = Array[Resource]([ExtResource("2")])

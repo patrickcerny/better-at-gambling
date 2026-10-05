@@ -85,6 +85,14 @@ func tick(delta: float) -> void:
 			_land(drop)
 
 
+func round_seconds() -> float:
+	return balance.plinko_flight_time
+
+
+func has_stake(p: int) -> bool:
+	return drops.any(func(d: Dictionary) -> bool: return int(d.get("player", -1)) == p)
+
+
 func auto_resolve() -> void:
 	for drop: Dictionary in drops.duplicate():
 		_land(drop)

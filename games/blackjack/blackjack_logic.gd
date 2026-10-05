@@ -127,6 +127,15 @@ func tick(delta: float) -> void:
 				_end_round()
 
 
+func round_seconds() -> float:
+	# Remaining betting window, then at least a few seconds of play and the dealer.
+	return (timer if state == State.BETTING else balance.bj_betting_window) + 4.0
+
+
+func has_stake(p: int) -> bool:
+	return hands.has(p) and not bool(hands[p].get("settled", false))
+
+
 func auto_resolve() -> void:
 	if state == State.BETTING:
 		_deal()

@@ -17,6 +17,7 @@ const PHASES: Dictionary = {
 	&"set_cosmetics": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"add_bot": [Phase.Id.LOBBY],
 	&"remove_bot": [Phase.Id.LOBBY],
+	&"return_to_lobby": [Phase.Id.RESULTS],
 }
 
 var limiter: RateLimiter

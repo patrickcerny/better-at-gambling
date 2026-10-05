@@ -10,6 +10,10 @@ signal players_changed
 signal feed_message(text: String, kind: StringName)
 ## Lobby data changed (leader, settings, countdown, ready, cosmetics).
 signal lobby_changed
+## The Hot Table moved ("" = none).
+signal hot_table_changed(station: StringName)
+## Results arrived (standings + awards).
+signal results_changed
 
 var phase: Phase.Id = Phase.Id.LOBBY
 var casino_time: float = 0.0
@@ -32,6 +36,16 @@ var leader: int = -1
 var lobby_settings: Dictionary = {}
 var countdown: float = -1.0
 var room_mode: bool = false
+## Hot Table: station id ("" = none) and seconds left (counted down locally between snapshots).
+var hot_station: StringName = &""
+var hot_left: float = 0.0
+## Minigame public state from the last snapshot (a view joining mid-minigame starts from it).
+var minigame: Dictionary = {}
+## Reward phase summary [{player, placement, cash, draft, bonus_count}].
+var rewards: Array = []
+var awards: Array = []
+## Online results screen: seconds until the room goes back to its lobby (-1 = never).
+var results_return_in: float = -1.0
 
 
 ## Replaces everything from a snapshot.
@@ -62,7 +76,18 @@ func apply_snapshot(snap: Dictionary) -> void:
 	lobby_settings = lobby.get("settings", {})
 	countdown = float(lobby.get("countdown", -1.0))
 	room_mode = bool(snap.get("room", false))
+	var hot: Dictionary = snap.get("hot_table", {})
+	hot_station = StringName(hot.get("station", ""))
+	hot_left = float(hot.get("time_left", 0.0))
+	minigame = snap.get("minigame", {})
+	rewards = (snap.get("rewards", {}) as Dictionary).get("rewards", [])
+	standings = snap.get("standings", [])
+	awards = snap.get("awards", [])
+	results_return_in = float(snap.get("results_return_in", -1.0))
+	if phase == Phase.Id.LOBBY:
+		last_call = false
 	players_changed.emit()
+	hot_table_changed.emit(hot_station)
 	lobby_changed.emit()
 	phase_changed.emit(phase)
 	for sid: Variant in stations:
@@ -157,11 +182,53 @@ func apply_event(ev: Dictionary) -> bool:
 			countdown = -1.0
 		&"match_ended":
 			standings = ev["standings"]
+			awards = ev.get("awards", [])
+			results_return_in = float(ev.get("return_in", -1.0))
 			phase = Phase.Id.RESULTS
+			hot_station = &""
+			hot_table_changed.emit(hot_station)
+			phase_changed.emit(phase)
+			results_changed.emit()
+		&"hot_table":
+			hot_station = StringName(ev["station"])
+			hot_left = float(ev["seconds"])
+			feed_message.emit("%s is HOT! Winnings ×%.2f for %ds" % [station_label(hot_station), float(ev["multiplier"]), int(ev["seconds"])], &"hot")
+			hot_table_changed.emit(hot_station)
+		&"hot_table_ended":
+			if hot_station == StringName(ev["station"]):
+				hot_station = &""
+				hot_table_changed.emit(hot_station)
+		&"house_comp":
+			feed_message.emit("The house feels sorry for %s: +$%d" % [player_name(int(ev["player"])), int(ev["amount"])], &"comp")
+		&"minigame_started":
+			minigame = {"minigame": ev["minigame"], "state": 0}
+		&"minigame_finished":
+			minigame = {}
+		&"rewards_started":
+			rewards = ev["rewards"]
+		&"draft_result":
+			var pid: int = int(ev["player"])
+			if players.has(pid):
+				players[pid]["inventory"] = ev.get("inventory", [])
+			players_changed.emit()
+		&"match_reset":
+			phase = Phase.Id.LOBBY
+			last_call = false
+			standings = []
+			awards = []
+			results_return_in = -1.0
 			phase_changed.emit(phase)
 	if ev.has("station") and stations.has(ev["station"]):
 		station_changed.emit(StringName(ev["station"]))
 	return not gap
+
+
+## "Blackjack 2" from "blackjack_2".
+static func station_label(sid: StringName) -> String:
+	var parts: PackedStringArray = String(sid).split("_")
+	if parts.size() >= 2 and parts[-1].is_valid_int():
+		return "%s %s" % [" ".join(parts.slice(0, parts.size() - 1)).capitalize(), parts[-1]]
+	return String(sid).capitalize()
 
 
 ## Display name of a player.

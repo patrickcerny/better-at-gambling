@@ -1,14 +1,15 @@
 # Progress
 
-## Current milestone: M4 — Match flow, timer, Quiz minigame, rewards (waiting for Patrick's go-ahead)
-## Next step: full PhaseMachine flow with the Quiz minigame and cash rewards, rematch in the same room (deferred from M3).
+## Current milestone: M5 — Items, luck, sabotage, pickups (waiting for Patrick's go-ahead)
+## Next step: `ItemSystem` and effects for the 11 MVP items (the draft already hands them out as data).
 
 ## Status by milestone
 - M0: DONE (evidence: `scripts/test.sh all` green; `godot --headless --path . -- --smoke-test` exit 0; exports built)
 - M1: DONE (evidence: 105 unit tests + 8 sim tests green, RTP table in DECISIONS.md, commits 47210ec…)
 - M2: DONE (evidence: `scripts/test.sh all` green — unit 109, sim 8, integration 15, physics 10, ui 5, smoke 1, boot, 185 s scripted session with 0 errors; screenshots in `build/screenshots/` via `scripts/screenshots.sh`)
 - M3: DONE (evidence: `scripts/test.sh net` — 3-minute server + 2 clients match with identical balance digests, grab/throw/shove/knockout at 150 ms + 2% loss with ragdoll agreement ≤ 0.03 m, version mismatch refused, orchestrator end to end with join by code and port freed; `scripts/test.sh orchestrator` 62 pytest; unit 120, integration 21, physics 10, session 0 errors; ~4.6 KB/s per client)
-- M4–M11: NOT STARTED
+- M4: DONE (evidence: `scripts/test.sh net` — 5-minute match, server + 2 autoplay clients + 2 bots, lobby to results with two quizzes and drafts, identical money+item digests on all three processes; unit 149, integration 29 (`test_match_flow.gd`: quiz schedule 5/30 min, Last Call, Hot Table, comps, closing tables, tiebreakers, secrecy over a full match, play again twice in one room), ui 9 (quiz by key/pad/mouse), session 0 errors; screenshots `quiz_question`, `quiz_end`, `results`)
+- M5–M11: NOT STARTED
 
 ## Verified features (IMPLEMENTED+TESTED)
 - Toolchain: Godot 4.7.2 headless, export templates, GUT 9.7.1 (`tools/setup_toolchain.sh`, checksums verified).
@@ -46,9 +47,15 @@
 - Body authority handoff (client while standing, server while held/ragdolled/thrown), puppet ragdolls and guards, prop sync, grab/shove prediction — `tests/net/test_net_match.py`.
 - Main menu Play Online: create party, join by code, join by address, rejoin last party, connection errors.
 
+- M4 match flow: Casino Quiz (`QuizLogic`, `QuestionBank` with 97 questions in `data/quiz/questions_en.json`, 2 dynamic templates, RTT-credited timing, ties) — `test_quiz_logic.gd`, `test_question_bank.gd`, `test_dynamic_questions.gd`; `QuizStage` — `tests/ui/test_quiz_input.gd`, screenshots.
+- Rewards (`RewardDirector`: placement cash, private draft, defaults, bots, 3-slot cap, cash-only mode) — `test_rewards.gd`; `RewardPanel` draft UI.
+- Hot Table, House Comp, "Table closing", Last Call — `tests/integration/test_match_flow.gd`.
+- Results podium + `Awards`, play again in the same room (leader or 60 s timer) — `test_awards.gd`, `test_match_flow.gd`, screenshot `results.png`.
+
 ## Implemented but unverified
 - Lobby panel and the wardrobe mirror / settings board prompts by hand (they send the same intents the integration tests cover, but nobody has clicked through them yet), and the Play Online menu with a real mouse.
 - Gamepad play end to end (bindings exist and the bet panel is tested with joypad events; nobody has held a real pad yet).
+- The reward draft panel and the results buttons by hand (the intents they send are tested; the draft panel has no screenshot yet because the screenshot tool's frame timing skips past the 8 s draft).
 - Revolving door "stuck" feel and the mezzanine railing shove-off: both work in tests, tuning is by eye in M7.
 
 ## Known bugs
@@ -57,7 +64,7 @@
 - The slots camera anchor sits too close to the cabinet screen (M7 station polish).
 
 ## Blockers
-- None for M4–M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
+- None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
 ### 2026-10-04 / session 1
@@ -77,3 +84,7 @@
 - Deployed to the VPS at http://152.53.33.53:4300 (rootless, max 8 rooms); the client defaults to it.
 - Verified: local Docker stack create/join/match; two clients on Patrick's PC created and joined a party on the VPS with no flags.
 - Bug fixed: install.sh exited after the health check for a user without a crontab (pipefail).
+### 2026-10-05 / session 4 (M4)
+- Quiz (logic, questions, dynamic templates, stage), minigame framework, reward director + draft panel, Hot Table, House Comp, closing tables, awards, results podium, play again in the same room, half-RTT from ENet, autoplay answers and drafts, `--skip-to` for screenshots.
+- Bugs found and fixed: the quiz scoreboard and reveal read typed int-keyed dictionaries with string keys (engine errors in the full-match session), opening the quiz called a missing `EmoteWheel.close()`, results beans stood on the floor inside the podiums and faced away, quiz beans faced away, the old question stayed on the big screen under the winner banner, a hot table could repeat the same station.
+- Patrick's PC set up `.github/workflows/release.yml`: every push to main publishes a GitHub Release (`releases/latest`).

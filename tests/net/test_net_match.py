@@ -6,8 +6,8 @@ import os
 
 from conftest import free_port
 
-# Match length in minutes for the long sync test (spec: 3).
-SYNC_MINUTES = int(os.environ.get("NET_SYNC_MINUTES", "3"))
+# Match length in minutes for the long sync test (M4 spec: a 5-minute match with two quizzes).
+SYNC_MINUTES = int(os.environ.get("NET_SYNC_MINUTES", "5"))
 
 
 def _server(procs, name, port, *extra):
@@ -20,18 +20,24 @@ def _client(procs, name, port, *extra):
 
 def test_two_clients_play_a_match_and_agree_on_every_balance(procs):
     port = free_port()
-    server = _server(procs, "sync-server", port, "--duration", str(SYNC_MINUTES), "--seed", "11", "--bots", "1")
+    server = _server(procs, "sync-server", port, "--duration", str(SYNC_MINUTES), "--seed", "11", "--bots", "2")
     server.wait_for(r"server listening", 30)
     alice = _client(procs, "sync-alice", port)
     bob = _client(procs, "sync-bob", port, "--autoplay-variant", "1")
-    budget = SYNC_MINUTES * 60 + 90
+    budget = SYNC_MINUTES * 60 + 90 + 75 * max(SYNC_MINUTES // 2, 0)  # each quiz + draft adds ~1 min
     assert alice.wait(budget) == 0, alice.log_path
     assert bob.wait(60) == 0, bob.log_path
     assert server.wait(60) == 0, server.log_path  # empty room closes itself
     digests = {p.name: p.digest() for p in (server, alice, bob)}
     assert len(set(digests.values())) == 1, digests
     # The scripted players actually played (money moved).
-    assert any(not part.endswith(":1000") for part in digests["sync-server"].split(",")), digests
+    assert any(part.split(":")[1] != "1000" for part in digests["sync-server"].split(",")), digests
+    if SYNC_MINUTES >= 2:
+        # Quizzes ran and the rewards draft handed out items (identical on every process).
+        assert any(part.split(":")[2] for part in digests["sync-server"].split(",")), digests
+        for p in (alice, bob):
+            played = p.nettest("autoplay")[-1]
+            assert "answers=0" not in played and "drafts=0" not in played, (p.name, played)
     for p in (server, alice, bob):
         assert p.errors() == [], (p.name, p.errors()[:5])
     for p in (alice, bob):

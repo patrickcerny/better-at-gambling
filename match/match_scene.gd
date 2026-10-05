@@ -35,7 +35,11 @@ var guards: Array[Guard] = []
 var station_uis: Dictionary[StringName, StationUi] = {}
 var current_ui: StationUi = null
 var nearest_station: StationBase = null
-var results_panel: PanelContainer = null
+## Results podium (also the "no other menu while results show" flag).
+var results_panel: ResultsStage = null
+## The running minigame's stage and the reward screen after it.
+var stage: MinigameStage = null
+var reward_panel: RewardPanel
 ## Scripted driver (--autoplay); null in normal play.
 var autoplay: Node = null
 var role: Role = Role.PRACTICE
@@ -98,6 +102,9 @@ func _ready() -> void:
 			router.set_mode(InputRouter.Mode.WALK))
 	lobby_panel.leave_requested.connect(_leave_to_menu)
 	ui_layer.add_child(lobby_panel)
+	reward_panel = RewardPanel.new()
+	reward_panel.name = "RewardPanel"
+	ui_layer.add_child(reward_panel)
 	connection_label = Label.new()
 	connection_label.name = "ConnectionLost"
 	connection_label.theme_type_variation = &"HeadingLabel"
@@ -123,6 +130,7 @@ func _ready() -> void:
 	add_child(view)
 	hud.bind(view.state, local_id)
 	lobby_panel.bind(view.state, local_id)
+	reward_panel.bind(view.state, local_id)
 	view.state.station_changed.connect(_on_station_state)
 	view.state.players_changed.connect(_sync_avatars)
 	view.state.lobby_changed.connect(_on_lobby_changed)
@@ -138,6 +146,10 @@ func _ready() -> void:
 	_connect_router()
 	if _owns_server and role == Role.PRACTICE:
 		server.start_match()
+		# Dev/screenshots: `--skip-to 100` fast-forwards to that casino time (100 = first quiz).
+		var skip: float = cmd.get_float("skip-to", 0.0)
+		while skip > 0.0 and server.running and server.phases.casino_time < skip - 0.01:
+			server.advance(MatchServer.TICK)
 	if view.state.phase == Phase.Id.LOBBY and view.state.room_mode:
 		map.set_lobby_open(false)
 		if local != null:
@@ -153,6 +165,7 @@ func _ready() -> void:
 		local.cam.toggle_mode()
 	if cmd.has("autosit"):
 		_autosit(StringName(cmd.get_string("autosit")))
+	_catch_up_phase()
 	Log.info(&"match", "match scene ready: %d players, local=%d" % [avatars.size(), local_id])
 
 
@@ -362,6 +375,8 @@ func _connect_router() -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_expire_predictions()
+	if stage != null:
+		stage.on_private(Net.request_private_snapshot())
 	if _owns_server and server != null:
 		server.advance(delta)
 	# Simulated bots follow the server's last known position.
@@ -482,15 +497,16 @@ func _on_disconnected(_reason: String) -> void:
 		SceneRouter.goto.call_deferred(RESULTS_PATH)
 
 
-## Money per player, as this process knows it (authoritative on servers, the mirror on clients).
-## Network tests compare these digests across processes.
+## Money and items per player ("id:money:item+item"), as this process knows them (authoritative
+## on servers, the mirror on clients). Network tests compare these digests across processes.
 func state_digest() -> String:
 	var ids: Array = view.state.players.keys()
 	ids.sort()
 	var parts: PackedStringArray = []
 	for pid: int in ids:
 		var money: int = server.economy.balance(pid) if _owns_server else view.state.balance(pid)
-		parts.append("%d:%d" % [pid, money])
+		var items: Array = server.state.players[pid].inventory if _owns_server else view.state.players[pid].get("inventory", [])
+		parts.append("%d:%d:%s" % [pid, money, "+".join(PackedStringArray(items.map(func(i: Variant) -> String: return str(i))))])
 	return ",".join(parts)
 
 
@@ -537,6 +553,8 @@ func _got_up(pid: int) -> void:
 
 func _on_event(ev: Dictionary) -> void:
 	var type: StringName = ev["type"]
+	if stage != null:
+		stage.on_event(ev)
 	match type:
 		&"player_joined":
 			_spawn_avatar(int(ev["player"]["id"]), ev["player"])
@@ -690,10 +708,31 @@ func _on_event(ev: Dictionary) -> void:
 				hud.toast("WELCOME TO THE LUCKY LOUNGE", 3.0)
 			elif phase == Phase.Id.CASINO and int(ev.get("from", -1)) == Phase.Id.INTRO:
 				hud.toast("Gamble. Shove. Don't get caught.", 3.0)
+			elif phase == Phase.Id.CASINO and int(ev.get("from", -1)) == Phase.Id.REWARDS:
+				_back_to_casino()
+			elif phase == Phase.Id.PRE_MINIGAME:
+				Audio.play(&"countdown_beep", &"SFX", -4.0, 0.8)
+		&"minigame_started":
+			_open_stage(ev, {})
+		&"rewards_started":
+			if role != Role.SERVER:
+				reward_panel.open(ev["rewards"], float(ev["seconds"]))
+		&"draft_result":
+			if int(ev["player"]) == local_id:
+				reward_panel.show_result(ev.get("items", []), ev.get("kept", []))
+		&"hot_table":
+			Audio.play(&"whoosh", &"SFX", -6.0, 0.7)
+			hud.toast("%s is HOT! ×%.2f" % [ClientMatchState.station_label(StringName(ev["station"])), float(ev["multiplier"])], 2.5)
+		&"house_comp":
+			if int(ev["player"]) == local_id:
+				hud.toast("The house feels sorry for you: +$%d" % int(ev["amount"]), 3.0)
+				Audio.play(&"coin", &"SFX", -2.0)
 		&"match_ended":
 			_match_over = true
 			_show_results(ev["standings"])
 			_log_digest()
+		&"match_reset":
+			_on_match_reset()
 
 
 func _knock_out(target: int, attacker: int, cause: StringName) -> void:
@@ -773,43 +812,143 @@ func _throw_out(pid: int, guard_name: String) -> void:
 		hud.toast("Security threw you out!", 3.0)
 
 
-func _show_results(standings: Array) -> void:
-	if results_panel != null:
+func _show_results(_standings: Array) -> void:
+	if results_panel != null or role == Role.SERVER:
 		return
+	_close_stage()
+	reward_panel.close()
 	router.set_mode(InputRouter.Mode.MENU)
-	results_panel = PanelContainer.new()
-	results_panel.set_anchors_preset(Control.PRESET_CENTER)
-	results_panel.anchor_left = 0.5
-	results_panel.anchor_right = 0.5
-	results_panel.anchor_top = 0.5
-	results_panel.anchor_bottom = 0.5
-	results_panel.offset_left = -320
-	results_panel.offset_right = 320
-	results_panel.offset_top = -260
-	results_panel.offset_bottom = 260
-	ui_layer.add_child(results_panel)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override(&"separation", 10)
-	results_panel.add_child(v)
-	var t := Label.new()
-	t.theme_type_variation = &"TitleLabel"
-	t.text = "RESULTS"
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(t)
-	for row: Dictionary in standings:
-		var l := Label.new()
-		l.text = "%s   %s   $%s" % [Hud._ordinal(int(row["rank"])), str(row["name"]), Hud._thousands(int(row["money"]))]
-		l.add_theme_font_size_override(&"font_size", 30)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		if int(row["player"]) == local_id:
-			l.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-		v.add_child(l)
-	var b := Button.new()
-	b.text = "BACK TO MENU"
-	b.pressed.connect(_leave_to_menu)
-	v.add_child(b)
-	b.grab_focus()
-	Audio.play(&"big_win", &"SFX", -4.0)
+	hud.visible = false
+	results_panel = ResultsStage.new()
+	results_panel.name = "Results"
+	add_child(results_panel)
+	results_panel.setup(view.state, local_id, view.state.room_mode)
+	results_panel.play_again_pressed.connect(func() -> void:
+		if view.state.room_mode:
+			Net.send_intent(Intents.make(&"return_to_lobby"))
+		else:
+			SceneRouter.goto(SceneRouter.MATCH))
+	results_panel.leave_pressed.connect(_leave_to_menu)
+
+
+# --- Minigames ---------------------------------------------------------------------------------
+
+## Opens the stage for a minigame (`minigame_started`, or the snapshot when joining mid-game).
+func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
+	if role == Role.SERVER:
+		return
+	_close_stage()
+	var def: MinigameDefinition = Registry.minigames.get(StringName(start.get("minigame", "")), null)
+	if def == null or def.stage_script == null:
+		Log.warn(&"match", "no stage for minigame %s" % start.get("minigame", "?"))
+		return
+	stage = def.stage_script.new() as MinigameStage
+	stage.name = "MinigameStage"
+	add_child(stage)
+	stage.begin(view.state, local_id, start, snapshot_state)
+	if current_ui != null:
+		current_ui.close()
+		current_ui = null
+	emote_wheel.visible = false
+	lobby_panel.close()
+	hud.visible = false
+	router.set_mode(InputRouter.Mode.MENU)
+	if local != null:
+		local.auto_target = Vector3.INF
+	Audio.play(&"whoosh", &"SFX", -4.0)
+
+
+func _close_stage() -> void:
+	if stage != null:
+		stage.queue_free()
+		stage = null
+
+
+## Rewards over: back on the casino floor with spawn protection.
+func _back_to_casino() -> void:
+	_close_stage()
+	reward_panel.close()
+	if role == Role.SERVER:
+		return
+	hud.visible = true
+	if local != null:
+		local.cam.activate()
+		var seated: bool = local.state == PlayerAvatar.State.SEATED
+		router.set_mode(InputRouter.Mode.SEATED if seated else InputRouter.Mode.WALK)
+		if seated and current_ui == null:
+			var sid: StringName = view.state.seat_of.get(local_id, &"")
+			var st: StationBase = map.stations.get(sid, null)
+			var ui: StationUi = station_uis.get(st.game_id, null) if st != null else null
+			if ui != null:
+				current_ui = ui
+				ui.open(sid, local_id, view.state)
+				_on_station_state(sid)
+	hud.toast("Back to the tables! (%ds spawn protection)" % int(cfg.spawn_protection), 2.5)
+
+
+## A view created mid-match (late join, reconnect) catches up with a minigame, rewards or results.
+func _catch_up_phase() -> void:
+	var st: ClientMatchState = view.state
+	match st.phase:
+		Phase.Id.MINIGAME:
+			if not st.minigame.is_empty():
+				_open_stage({"minigame": st.minigame.get("minigame", &"quiz"), "players": st.minigame.get("players", [])}, st.minigame)
+		Phase.Id.REWARDS:
+			if role != Role.SERVER:
+				reward_panel.open(st.rewards, Registry.balance.draft_time)
+				hud.visible = false
+				router.set_mode(InputRouter.Mode.MENU)
+		Phase.Id.RESULTS:
+			_match_over = true
+			_show_results(st.standings)
+
+
+## Online room went back to its lobby for another match ("play again in the same room").
+func _on_match_reset() -> void:
+	if results_panel != null:
+		results_panel.queue_free()
+		results_panel = null
+	_close_stage()
+	reward_panel.close()
+	_match_over = false
+	_countdown_shown = -1
+	_ko_until.clear()
+	_respawn_at.clear()
+	_ragdoll_attacker.clear()
+	for id: int in piles.keys():
+		_remove_pile(id)
+	map.set_lobby_open(false)
+	for pid: int in avatars:
+		var a: PlayerAvatar = avatars[pid]
+		if a.state == PlayerAvatar.State.RAGDOLL:
+			a.end_ragdoll(map.lobby_spawn(pid))
+		elif a.state == PlayerAvatar.State.SEATED:
+			a.stand()
+		elif a.state == PlayerAvatar.State.HELD:
+			a.release_held()
+		if a.state == PlayerAvatar.State.AWAY:
+			a.set_away(false)
+		a.visuals.set_knocked_out(false)
+		if _owns_server or pid == local_id:
+			a.teleport(map.lobby_spawn(pid), 0.0)
+			if _owns_server:
+				server.set_server_position(pid, map.lobby_spawn(pid))
+			else:
+				_report_position(pid)
+		if net_world != null:
+			net_world.reset_player(pid)
+	if current_ui != null:
+		current_ui.close()
+		current_ui = null
+	if role == Role.SERVER:
+		return
+	hud.visible = true
+	hud.reset_match()
+	if local != null:
+		local.cam.activate()
+	router.set_mode(InputRouter.Mode.WALK)
+	hud.toast("Back in the lobby! Stand on your READY pad for another round.", 4.0)
+	Audio.play_music(&"casino_loop")
 
 
 # --- Local input -------------------------------------------------------------------------------

@@ -110,6 +110,29 @@ extends Resource
 @export var quiz_base_points: int = 500
 @export var quiz_speed_points: int = 500
 @export var quiz_cash_prizes: PackedInt32Array = PackedInt32Array([150, 100, 50])
+## Phase timings inside one question: get ready, then answer window, then reveal.
+@export var quiz_ready_time: float = 2.0
+@export var quiz_reveal_time: float = 2.5
+## Title card before the first question and final ranking after the last.
+@export var quiz_intro_time: float = 3.0
+@export var quiz_outro_time: float = 4.0
+@export var quiz_dynamic_chance: float = 0.4
+## Bot accuracy by difficulty and their answer delay range (seconds).
+@export var quiz_bot_accuracy: Dictionary = {&"easy": 0.4, &"normal": 0.6, &"hard": 0.8}
+@export var quiz_bot_min_delay: float = 2.0
+@export var quiz_bot_max_delay: float = 9.0
+
+@export_group("Rewards")
+## Seconds to pick from the draft (default: first option).
+@export var draft_time: float = 8.0
+## Extra seconds for the reward screen after the draft closes.
+@export var reward_outro_time: float = 2.0
+## Cash rewards are multiplied by this when items are disabled in the lobby (§2.10).
+@export var cash_only_factor: float = 2.0
+
+@export_group("Results")
+## Seconds the results screen stays up before an online room returns to its lobby on its own.
+@export var results_return_time: float = 60.0
 
 
 ## Limits multiplier for a casino segment index (0-based): 1 + step × index, capped.

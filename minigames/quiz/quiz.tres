@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/quiz/quiz_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/quiz/quiz_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"quiz"
+display_name = "Casino Quiz"
+rules_text = "Three questions. Answer fast: a right answer is worth 500 to 1,000 points. One answer per question, no changes."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")

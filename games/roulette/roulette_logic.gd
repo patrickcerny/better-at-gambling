@@ -122,6 +122,14 @@ func tick(delta: float) -> void:
 					_start_betting()
 
 
+func round_seconds() -> float:
+	return (timer if state == State.BETTING else balance.roulette_betting_time) + balance.roulette_spin_time
+
+
+func has_stake(p: int) -> bool:
+	return state != State.RESULT and player_total(p) > 0
+
+
 func auto_resolve() -> void:
 	if state == State.BETTING and not bets.is_empty():
 		_start_spin()
