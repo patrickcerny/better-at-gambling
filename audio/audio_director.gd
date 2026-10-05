@@ -9,6 +9,8 @@ const CROSSFADE: float = 1.0
 const MAX_VARIANTS: int = 8
 
 var _clips: Dictionary[StringName, Array] = {}
+## Headless (dedicated servers, tests): nothing can be heard, so nothing is loaded or played.
+var _silent: bool = false
 var _missing: Dictionary[StringName, bool] = {}
 var _pool: Array[AudioStreamPlayer] = []
 var _music_a: AudioStreamPlayer
@@ -18,6 +20,7 @@ var _current_track: StringName = &""
 
 
 func _ready() -> void:
+	_silent = DisplayServer.get_name() == "headless"
 	for i: int in POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.bus = &"SFX"
@@ -33,11 +36,17 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	_clips.clear()  # release the streams before the engine's resource check at exit
+	# Release the streams before the engine's resource check at exit.
+	_clips.clear()
+	for p: AudioStreamPlayer in _pool + [_music_a, _music_b]:
+		p.stop()
+		p.stream = null
 
 
 ## Plays a 2D one-shot (UI and local-player feedback).
 func play(name: StringName, bus: StringName = &"SFX", volume_db: float = 0.0, pitch: float = 1.0) -> void:
+	if _silent:
+		return
 	var clip: AudioStream = _clip(name)
 	if clip == null:
 		return
@@ -53,6 +62,8 @@ func play(name: StringName, bus: StringName = &"SFX", volume_db: float = 0.0, pi
 
 ## Plays a positional one-shot under `parent` (freed when done).
 func play_at(name: StringName, parent: Node3D, volume_db: float = 0.0, pitch: float = 1.0) -> void:
+	if _silent:
+		return
 	var clip: AudioStream = _clip(name)
 	if clip == null or parent == null or not parent.is_inside_tree():
 		return
@@ -69,7 +80,7 @@ func play_at(name: StringName, parent: Node3D, volume_db: float = 0.0, pitch: fl
 
 ## Crossfades to a music track (`res://audio/music/<name>.ogg|wav`); &"" stops music.
 func play_music(name: StringName) -> void:
-	if name == _current_track:
+	if _silent or name == _current_track:
 		return
 	_current_track = name
 	var next: AudioStreamPlayer = _music_b if _music_current == _music_a else _music_a
