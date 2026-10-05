@@ -1,7 +1,8 @@
 class_name BlackjackUi
 extends StationUi
-## Blackjack overlay (docs/ART_DIRECTION.md): YOUR HAND, total, dealer, HIT / STAND / DOUBLE,
-## bet stepper. Keys: H hit, S stand, D double.
+## Blackjack strip (docs/ART_DIRECTION.md). The cards are dealt on the 3D table and you look
+## around with the mouse, so this only carries the round status, your total and the keys:
+## 1-4 chip, Space bet, R repeat, Backspace clear, H hit, S stand, D double, C cut.
 
 var hand_label: Label
 var total_label: Label
@@ -25,12 +26,18 @@ func _init() -> void:
 
 
 func _panel_height() -> float:
-	return 590.0
+	return 420.0
+
+
+func _dock_right() -> bool:
+	return true  # the cards are on the table in the middle of the screen
 
 
 func _build() -> void:
-	dealer_label = _line("DEALER  —", 26, Palette.WARM_GOLD)
+	dealer_label = _line("DEALER  —", 22, Palette.WARM_GOLD)
+	dealer_label.visible = false  # the dealer's cards are on the felt
 	seats_row = HBoxContainer.new()
+	seats_row.visible = false  # everyone's cards are on the felt now
 	seats_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	seats_row.add_theme_constant_override(&"separation", 10)
 	body.add_child(seats_row)
@@ -45,12 +52,7 @@ func _build() -> void:
 		p.add_child(l)
 		seat_panels.append(p)
 		seat_labels.append(l)
-	var your := Label.new()
-	your.theme_type_variation = &"SmallLabel"
-	your.text = "YOUR HAND"
-	your.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	body.add_child(your)
-	hand_label = _line("—", 44, Palette.CREAM)
+	hand_label = _line("—", 30, Palette.CREAM)
 	total_label = _line("", 30, Palette.VIP_GOLD)
 	others_label = _line("", 20, Color("#9A8F7A"))
 	actions = HBoxContainer.new()
@@ -68,6 +70,7 @@ func _build() -> void:
 
 
 func _on_open() -> void:
+	hint.text = "Mouse: look around\n[1-4] chip  [Space] bet  [R] repeat\n[Esc / Q] stand up"
 	var lo: int = scaled(Registry.balance.bj_min_bet)
 	var hi: int = scaled(Registry.balance.bj_max_bet)
 	bet_panel.setup([lo, lo * 2 + lo / 2, lo * 5, lo * 10], lo, hi, "BET")

@@ -6,6 +6,7 @@ extends StationBase
 
 func _build_visuals() -> void:
 	game_id = &"blackjack"
+	free_look = true
 	seat_count = 4
 	_round_rug(4.8)
 	# Collision stays a simple cylinder; Patrick's half-moon table model is what you see.
@@ -13,17 +14,58 @@ func _build_visuals() -> void:
 	(rim.get_node(^"Mesh") as Node3D).visible = false
 	_add_table_model()
 	# Dealer spot (north side, the straight edge), chip rack.
-	GreyboxKit.box(self, Vector3(0.9, 0.08, 0.25), Vector3(0, 0.96, -0.2), Color("#1E1B19"), "ChipRack", false)
+	GreyboxKit.box(self, Vector3(0.7, 0.08, 0.22), Vector3(0.75, 0.96, -0.22), Color("#1E1B19"), "ChipRack", false)
+	GreyboxKit.box(self, Vector3(0.2, 0.12, 0.3), Vector3(-0.8, 0.98, -0.2), Color("#1E1B19"), "Shoe", false)
+	cards = TableCards.new()
+	cards.name = "Cards"
+	cards.shoe = Vector3(-0.8, 1.06, -0.2)
+	cards.spots[-1] = [Vector3(-0.1, TABLE_TOP, 0.05), 0.0]
+	add_child(cards)
 	for i: int in seat_count:
 		var angle: float = deg_to_rad(-45.0 + 30.0 * i)  # fan on the south side
 		var pos: Vector3 = Vector3(sin(angle) * 2.2, 0.0, cos(angle) * 2.2)
 		_stool(pos, "Stool%d" % i)
 		_add_seat(pos + Vector3(0, 0.5, 0), angle)  # yaw = angle looks at the table centre
+		# Your cards land on the felt in front of you; your camera sits at your own stool.
+		var to_seat: Vector3 = (pos - ARC_CENTRE).normalized()
+		cards.spots[i] = [ARC_CENTRE + to_seat * 1.3 + Vector3(0, TABLE_TOP, 0), angle]
+		var eye := Node3D.new()
+		eye.name = "SeatCamera%d" % i
+		eye.position = pos - to_seat * 0.2 + Vector3(0, 1.45, 0)
+		eye.rotation = Vector3(deg_to_rad(-42.0), angle, 0.0)
+		eye.set_meta(&"yaw_limit", deg_to_rad(120.0))
+		add_child(eye)
+		seat_cameras.append(eye)
 	camera_anchor = Node3D.new()
 	camera_anchor.name = "CameraAnchor"
 	camera_anchor.position = Vector3(0, 1.45, 2.3)
 	camera_anchor.rotation.x = deg_to_rad(-25.0)
 	add_child(camera_anchor)
+
+
+## Card height on the felt and the centre of the half-moon's arc.
+const TABLE_TOP: float = 0.935
+const ARC_CENTRE: Vector3 = Vector3(0, 0, -0.4)
+
+var cards: TableCards
+
+
+## Mirrors the round onto the felt (see `TableCards`).
+func show_round(pub: Dictionary) -> void:
+	var seat_ids: Array = pub.get("seats", [])
+	var hands: Dictionary = pub.get("hands", {})
+	var by_seat: Dictionary = {}
+	for i: int in seat_ids.size():
+		var pid: int = int(seat_ids[i])
+		if pid < 0:
+			continue
+		for k: Variant in hands:
+			if int(k) == pid:
+				by_seat[i] = (hands[k] as Dictionary).get("cards", [])
+	var dealer: Array = (pub.get("dealer", []) as Array).duplicate()
+	if not bool(pub.get("dealer_revealed", false)) and dealer.size() == 1 and int(pub.get("state", 0)) == BlackjackLogic.State.ACTING:
+		dealer.append(TableCards.FACE_DOWN)
+	cards.show_cards(by_seat, dealer)
 
 
 const TABLE_MODEL: String = "res://assets/casino/blackjack_table.dae"

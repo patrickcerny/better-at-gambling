@@ -29,6 +29,8 @@ var capture_mouse: bool = true
 ## Mouse look sensitivity (radians per pixel).
 var mouse_sensitivity: float = 0.0025
 var invert_y: bool = false
+## Seated at a free-look station: keep the mouse captured to look around.
+var seated_capture: bool = false
 ## Beer: look is inverted on both axes and walking drifts a little.
 var drunk: bool = false
 
@@ -53,6 +55,8 @@ func set_mode(m: Mode) -> void:
 	match m:
 		Mode.WALK:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if capture_mouse else Input.MOUSE_MODE_VISIBLE
+		Mode.SEATED:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if capture_mouse and seated_capture else Input.MOUSE_MODE_VISIBLE
 		_:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 

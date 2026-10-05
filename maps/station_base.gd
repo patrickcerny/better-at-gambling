@@ -13,6 +13,10 @@ extends Node3D
 var seats: Array[Node3D] = []
 ## Where the camera eases to while seated.
 var camera_anchor: Node3D
+## Per-seat views (stations that seat you at your own spot); empty = everyone uses `camera_anchor`.
+var seat_cameras: Array[Node3D] = []
+## Seated players keep the mouse captured and look around freely (actions on the keyboard).
+var free_look: bool = false
 var interaction_area: Area3D
 var hot_light: OmniLight3D
 ## Big bouncing arrow over the hot table, drawn on top of everything so it reads across the floor.
@@ -116,6 +120,11 @@ func _build_hot_marker() -> void:
 	label.outline_size = 18
 	label.position.y = 2.1
 	hot_marker.add_child(label)
+
+
+## The camera view for a seat.
+func camera_for_seat(index: int) -> Node3D:
+	return seat_cameras[index] if index >= 0 and index < seat_cameras.size() else camera_anchor
 
 
 ## World position of a seat (first seat by default).

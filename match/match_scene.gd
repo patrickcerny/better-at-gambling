@@ -232,6 +232,10 @@ func _autosit(sid: StringName) -> void:
 	_report_position(local_id)
 	await get_tree().physics_frame
 	Net.send_intent(Intents.make(&"sit", {"station": sid}))
+	var bet: int = Cmdline.parse(OS.get_cmdline_user_args()).get_int("autobet", 0)
+	if bet > 0:  # dev/screenshots: put a bet down so the cards get dealt
+		await get_tree().create_timer(0.5).timeout
+		Net.send_intent(Intents.make(&"place_bet", {"station": sid, "bet": {"amount": bet}}))
 
 
 ## Dedicated server: the authoritative MatchServer for this room, waiting in the lobby.
@@ -1170,8 +1174,10 @@ func _seat(pid: int, sid: StringName, seat: int = -1) -> void:
 		return
 	view.resync()
 	var idx: int = seat if seat >= 0 else _seat_index(sid, pid)
-	a.sit(st.seats[clampi(idx, 0, st.seats.size() - 1)] if not st.seats.is_empty() else st, st.camera_anchor)
+	a.sit(st.seats[clampi(idx, 0, st.seats.size() - 1)] if not st.seats.is_empty() else st, st.camera_for_seat(idx))
 	if pid == local_id:
+		router.seated_capture = st.free_look
+		router.set_mode(InputRouter.Mode.SEATED)
 		hud.set_prompt("")
 		hud.set_crosshair_visible(false)
 		var ui: StationUi = station_uis.get(st.game_id, null)
@@ -1193,6 +1199,7 @@ func _unseat(pid: int) -> void:
 			current_ui.close()
 			current_ui = null
 		hud.set_crosshair_visible(true)
+		router.seated_capture = false
 		router.set_mode(InputRouter.Mode.WALK)
 
 
@@ -1648,6 +1655,8 @@ func _on_station_state(sid: StringName) -> void:
 	if node != null:
 		node.set_hot(bool(st.get("hot", false)))
 		node.set_out_of_order(float(st.get("out_of_order", 0.0)))
+		if node is BlackjackStation:
+			(node as BlackjackStation).show_round(st)
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 

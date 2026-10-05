@@ -45,6 +45,12 @@ Its camera and lights were stripped from the file. The table's texture files (Br
 uses flat casino colors. The roulette wheel carries its own textures; its floor plane, camera and
 lights are dropped in game.
 
+## Playing cards
+
+- `assets/cards/*.png`: card faces and back by Kenney (kenney.nl), CC0, taken from
+  [simple-card-pile-ui](https://github.com/insideout-andrew/simple-card-pile-ui) by Andrew Vickerman (MIT, 2024).
+  The 3D dealing code in `games/blackjack/table_cards.gd` follows that addon's approach.
+
 ## Sound effects
 
 Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KENNEY_LICENSE.txt`).

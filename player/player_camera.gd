@@ -23,6 +23,8 @@ var follow: Node3D = null
 var head_bob: bool = true
 
 var _seated_yaw_center: float = 0.0
+## How far you can turn from the station view (an anchor's "yaw_limit" meta overrides it).
+var seated_yaw_limit: float = SEATED_YAW_LIMIT
 var _bob_time: float = 0.0
 var _anchor_blend: float = 0.0
 
@@ -59,7 +61,7 @@ func look(delta_yaw: float, delta_pitch: float) -> void:
 	yaw -= delta_yaw
 	pitch = clampf(pitch - delta_pitch, deg_to_rad(-80.0), deg_to_rad(80.0))
 	if anchor != null:
-		yaw = clampf(yaw, _seated_yaw_center - SEATED_YAW_LIMIT, _seated_yaw_center + SEATED_YAW_LIMIT)
+		yaw = clampf(yaw, _seated_yaw_center - seated_yaw_limit, _seated_yaw_center + seated_yaw_limit)
 
 
 ## Eases to a station view. `null` returns to the body.
@@ -68,6 +70,7 @@ func set_anchor(a: Node3D) -> void:
 	_anchor_blend = 0.0
 	if a != null:
 		_seated_yaw_center = a.global_rotation.y
+		seated_yaw_limit = float(a.get_meta(&"yaw_limit", SEATED_YAW_LIMIT))
 		yaw = _seated_yaw_center
 		pitch = a.global_rotation.x
 
