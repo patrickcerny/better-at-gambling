@@ -208,3 +208,36 @@ func test_play_again_in_the_same_room() -> void:
 	assert_eq(s.phases.phase, Phase.Id.LOBBY)
 	assert_almost_eq(t, Registry.balance.results_return_time, 0.6)
 	assert_eq(Log.error_count, 0)
+
+
+func test_money_history_covers_the_match_for_the_results_graph() -> void:
+	_fixture(3, 5)
+	var ids: Array = fx.server.state.players.keys()
+	var start: int = fx.server.balance.start_money
+	fx.server.start_match()
+	assert_true(_step_until(func() -> bool: return fx.server.phases.casino_time >= 35.0))
+	fx.server.economy.apply(int(ids[0]), 400, &"test", &"house")
+	fx.server.run_to_end()
+	var ended: Array[Dictionary] = fx.of_type(&"match_ended")
+	assert_eq(ended.size(), 1)
+	var interval: float = MoneyHistory.interval_for(300.0)
+	assert_eq(interval, 10.0)
+	for row: Dictionary in ended[0]["standings"]:
+		var series: Array = row["series"]
+		assert_between(series.size(), 30, 33, "a sample every 10 s of casino time plus the final balance")
+		assert_eq(int(series[0]), start, "starts at the start money")
+		assert_eq(int(series[-1]), int(row["money"]), "ends at the final balance")
+		if int(row["player"]) == int(ids[0]):
+			assert_eq(int(series[3]), start, "30 s: before the windfall")
+			assert_eq(int(series[4]), start + 400, "40 s: after it")
+	var snap: Dictionary = fx.server.get_snapshot()
+	assert_eq((snap["standings"][0]["series"] as Array).size(), (ended[0]["standings"][0]["series"] as Array).size(), "a late results joiner gets the graph too")
+
+
+func test_money_history_stays_small_in_long_matches() -> void:
+	_fixture(2, 30)
+	fx.server.start_match()
+	fx.server.run_to_end()
+	var row: Dictionary = fx.of_type(&"match_ended")[0]["standings"][0]
+	assert_lte((row["series"] as Array).size(), MoneyHistory.MAX_SAMPLES + 2)
+	assert_eq(int(row["series"][-1]), int(row["money"]))

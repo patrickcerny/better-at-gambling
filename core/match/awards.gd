@@ -4,15 +4,22 @@ extends RefCounted
 
 ## [stat key, award id, title, description format (%s = value)]. Order = priority.
 const AWARDS: Array[Array] = [
-	["biggest_win", &"jackpot", "Jackpot!", "Biggest single win: $%s"],
+	["jackpot_won", &"jackpot", "Jackpot!", "Hit the jackpot for $%s"],
+	["biggest_win", &"big_winner", "Big Winner", "Biggest single win: $%s"],
 	["quiz_points", &"quiz_wiz", "Quiz Wiz", "%s quiz points"],
 	["comeback", &"comeback_kid", "Comeback Kid", "Places climbed from the bottom: %s"],
+	["knockouts_dealt", &"heavyweight", "Heavyweight", "Knockouts dealt: %s"],
 	["biggest_bet", &"high_roller", "High Roller", "Biggest single bet: $%s"],
-	["biggest_loss", &"glass_cannon", "Glass Cannon", "Biggest single loss: $%s"],
+	["loss_streak", &"unluckiest", "Unluckiest", "Lost %s bets in a row"],
 	["shaken_out", &"sticky_fingers", "Sticky Fingers", "Shook $%s out of people"],
+	["times_shoved", &"pinball", "Human Pinball", "Shoved around %s times"],
+	["biggest_loss", &"glass_cannon", "Glass Cannon", "Biggest single loss: $%s"],
 	["knockouts_suffered", &"ragdoll", "Ragdoll", "Knocked out %s times"],
 	["thrown_out", &"bouncers_favorite", "Bouncer's Favorite", "Thrown out %s times"],
 ]
+
+## Smallest value that earns an award (a single bad bet is not "unlucky").
+const MINIMUM: Dictionary = {"loss_streak": 3, "times_shoved": 2, "knockouts_suffered": 2, "thrown_out": 2}
 
 
 ## Up to `count` awards [{id, title, text, player, name, value}], spread over different players
@@ -26,7 +33,7 @@ static func pick(stats: Dictionary, names: Dictionary, count: int) -> Array[Dict
 		ids.sort()
 		for id: Variant in ids:
 			var v: int = value_of(stats[id], a[0])
-			if v > best_value:
+			if v > best_value and v >= int(MINIMUM.get(a[0], 1)):
 				best_value = v
 				best = int(id)
 		if best >= 0:
