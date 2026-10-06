@@ -98,7 +98,7 @@ func _deal(node: Node3D, key: int, index: int, delay: float) -> void:
 	var face_up: bool = bool(node.get_meta(&"face_up"))
 	var t: Tween = node.create_tween()
 	t.tween_interval(delay)
-	t.tween_callback(func() -> void: Audio.play_at(&"card_flip", node, -8.0))
+	t.tween_callback(func() -> void: Audio.play_at(&"card_deal", node, 2.0, randf_range(0.96, 1.04)))
 	t.set_parallel(true)
 	t.tween_property(node, ^"position", target, DEAL_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if face_up:
