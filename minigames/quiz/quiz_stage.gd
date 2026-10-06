@@ -502,8 +502,9 @@ func _host_say(text: String, pose: QuizHost.Pose = QuizHost.Pose.IDLE, hold: flo
 func _place_bubble() -> void:
 	if bubble == null or not bubble.visible or camera == null or host == null:
 		return
-	var p: Vector2 = camera.unproject_position(host.bubble_anchor())
-	var vp: Vector2 = get_viewport().get_visible_rect().size
+	# The camera may draw a pixelated sub viewport while the bubble sits on the sharp window.
+	var p: Vector2 = PixelView.to_canvas(camera, camera.unproject_position(host.bubble_anchor()), bubble)
+	var vp: Vector2 = bubble.get_viewport_rect().size
 	bubble.reset_size()
 	# The bubble grows up and to the left of Lucky's head, away from the contestants' podiums.
 	bubble.pivot_offset = Vector2(bubble.size.x, bubble.size.y)

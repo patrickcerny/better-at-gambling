@@ -4,7 +4,9 @@ extends Control
 ## blurry and tilting left and right, like Minecraft but with the casino room"). A decorative copy
 ## of the Lucky Lounge renders into its own half-resolution world; a camera drifts slowly along a
 ## loop over the casino floor, looks around and rolls gently from side to side, and a blur shader
-## softens the result. Nothing is built when headless.
+## softens the result. Under the pixel look (`Settings.pixel_scale()`, see `PixelView`) it renders at
+## the same 1/2..1/4 of the window as the match and is upscaled with hard pixels, the blur kept
+## narrow so the pixels stay pixels. Nothing is built when headless.
 
 ## Camera loop over the casino floor (x, y, z), visited in order and wrapped.
 const PATH: Array[Vector3] = [
@@ -63,13 +65,23 @@ func _ready() -> void:
 	_view.material = mat
 	add_child(_view)
 	resized.connect(_fit)
+	Settings.changed.connect(_fit)
 	_fit()
 	_place_camera()
 
 
+## Half resolution and bilinear when the pixel look is off; otherwise the pixel look's share of the
+## window's pixels, nearest-neighbour, with the blur scaled down to a fraction of one big pixel.
 func _fit() -> void:
-	if _viewport != null:
-		_viewport.size = Vector2i(maxi(int(size.x * 0.5), 64), maxi(int(size.y * 0.5), 36))
+	if _viewport == null:
+		return
+	var shrink: int = Settings.pixel_scale()
+	var window: Window = get_window()
+	var px: Vector2 = Vector2(window.size) if window != null else size
+	var target: Vector2 = px / float(shrink) if shrink > 1 else size * 0.5
+	_viewport.size = Vector2i(maxi(int(target.x), 64), maxi(int(target.y), 36))
+	_view.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if shrink > 1 else CanvasItem.TEXTURE_FILTER_LINEAR
+	(_view.material as ShaderMaterial).set_shader_parameter(&"blur_px", blur_px / float(shrink) if shrink > 1 else blur_px)
 
 
 func _process(delta: float) -> void:

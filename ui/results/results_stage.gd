@@ -25,6 +25,9 @@ var state: ClientMatchState
 var local_id: int = -1
 var camera: Camera3D
 var ui: CanvasLayer
+## Where the UI layer goes: the match scene points it outside the pixelated 3D view (`PixelView`)
+## so the 2D stays sharp; null keeps it under the stage. The stage frees it either way.
+var ui_host: Node = null
 var play_button: Button
 var leave_button: Button
 var wait_label: Label
@@ -53,7 +56,7 @@ func setup(p_state: ClientMatchState, p_local_id: int, room: bool) -> void:
 	_build_set()
 	ui = CanvasLayer.new()
 	ui.layer = 6
-	add_child(ui)
+	(ui_host if ui_host != null else self).add_child(ui)
 	_build_ui()
 	camera.make_current()
 	Audio.play(&"whoosh", &"SFX", -6.0)
@@ -74,6 +77,11 @@ func _process(delta: float) -> void:
 		play_button.visible = leader
 		var secs: int = ceili(maxf(state.results_return_in, 0.0))
 		wait_label.text = ("Back to the lobby in %ds" % secs) if leader else ("Waiting for the party leader… back to the lobby in %ds" % secs)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and is_instance_valid(ui) and ui.get_parent() != self:
+		ui.queue_free()  # hosted outside the stage: goes with it
 
 
 ## Runs `fn` `at` seconds into the show.

@@ -13,6 +13,8 @@ var _leave: Button
 var _back: Button
 var _first: Control
 var _mutes: VoiceMuteList
+## "Pixel look": Off / Light / Retro / Chunky (`PixelView.LABELS`).
+var _pixel: OptionButton
 
 
 func _ready() -> void:
@@ -69,6 +71,14 @@ func _ready() -> void:
 	fps.item_selected.connect(func(i: int) -> void: Settings.change("video", "max_fps", Settings.FPS_CAPS[i]))
 	fps.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fps_row.add_child(fps)
+	var pixel_row := _row(v, "Pixel look")
+	_pixel = OptionButton.new()
+	for label: String in PixelView.LABELS:
+		_pixel.add_item(label)
+	_pixel.selected = maxi(PixelView.SCALES.find(Settings.pixel_scale()), 0)
+	_pixel.item_selected.connect(func(i: int) -> void: Settings.change("video", "pixel_scale", PixelView.SCALES[i]))
+	_pixel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pixel_row.add_child(_pixel)
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override(&"separation", 12)
