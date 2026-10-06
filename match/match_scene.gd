@@ -824,7 +824,7 @@ func _on_event(ev: Dictionary) -> void:
 			if winner != null:
 				winner.visuals.react(&"big_win")
 		&"last_call":
-			Audio.play(&"last_call_bell", &"SFX", -4.0)
+			Audio.play(&"last_call_announce", &"SFX", 0.0)
 		&"phase_changed":
 			var phase: Phase.Id = int(ev["phase"]) as Phase.Id
 			if phase != Phase.Id.LOBBY:
