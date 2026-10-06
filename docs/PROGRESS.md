@@ -78,6 +78,7 @@
   - Quiz host cat, confetti, results podium show, 12 awards (`test_awards.gd`), money-over-time graph, name tags.
   - Five generated lounge-jazz loops with mood crossfades by phase (`audio/music_mood.gd`), new SFX, every event sounded (`audio/event_sfx.gd`, table in GDD.md); music and SFX not yet listened to by a human.
   - Waiter NPC who trips (by himself, on bumps or shoves) and leaves slippery puddles; Megaphone at the bar (E, 10 s of full-volume voice). Protocol 4: old 0.6 clients are refused.
+  - Pixel look (Patrick: "the pixelated effect Yap Yap has"): `client/pixel_view.gd` renders the 3D world (casino, quiz set, podium, menu panorama) in a nearest-upscaled sub viewport at 1/2, 1/3 or 1/4 of the window's pixels; all 2D stays sharp. Settings → Video → "Pixel look" Off / Light / Retro (default) / Chunky, live. Never built on the dedicated server. `tests/ui/test_pixel_view.gd`, `tests/smoke/test_pixel_scenes.gd`; screenshots `screenshots/polish1/pixel/`. Not verified by a human eye on a real GPU (xvfb only); 3D audio relies on the sub viewport's listener flag.
 
 ## Known bugs
 - The lobby doors' sign is partly hidden behind the fountain from some spawn points (greybox layout; M7 art pass).
