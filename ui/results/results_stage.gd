@@ -17,8 +17,10 @@ const PODIUM_X: Array[float] = [0.0, -2.0, 2.0]
 const PODIUM_COLORS: Array[Color] = [Palette.VIP_GOLD, Color("#C9CED6"), Color("#C07A45")]
 ## Show timeline (seconds after the screen opens).
 const T_FLOOR: float = 0.3
-const T_PLACE: Array[float] = [3.0, 1.9, 0.9]  # 1st, 2nd, 3rd
-const T_AWARDS: float = 4.0
+const T_PLACE: Array[float] = [3.6, 1.9, 0.9]  # 1st, 2nd, 3rd
+## Patrick's announcer ("the wait is over", ~1.5 s) builds up to the 1st-place reveal.
+const T_ANNOUNCE: float = 2.0
+const T_AWARDS: float = 4.6
 const AWARD_GAP: float = 0.4
 
 var state: ClientMatchState
@@ -410,6 +412,7 @@ func _build_ui() -> void:
 	gp.visible = graph.has_data()
 	graph.set_process(false)
 	_cue(1.0, func() -> void: graph.set_process(true))
+	_cue(T_ANNOUNCE, func() -> void: Audio.play(&"announcer_results", &"UI", -2.0))
 	_slide_in(gp, Vector2(660, 0), 0.6)
 	# Awards, bottom.
 	var awards := HBoxContainer.new()
