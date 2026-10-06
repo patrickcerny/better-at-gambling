@@ -15,8 +15,6 @@ var seats: Array[Node3D] = []
 var camera_anchor: Node3D
 ## Per-seat views (stations that seat you at your own spot); empty = everyone uses `camera_anchor`.
 var seat_cameras: Array[Node3D] = []
-## Seated players keep the mouse captured and look around freely (actions on the keyboard).
-var free_look: bool = false
 var interaction_area: Area3D
 var hot_light: OmniLight3D
 ## Big bouncing arrow over the hot table, drawn on top of everything so it reads across the floor.

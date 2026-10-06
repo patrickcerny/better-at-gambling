@@ -6,7 +6,6 @@ extends StationBase
 
 func _build_visuals() -> void:
 	game_id = &"blackjack"
-	free_look = true
 	seat_count = 4
 	_round_rug(4.8)
 	# Collision stays a simple cylinder; Patrick's half-moon table model is what you see.
@@ -33,9 +32,10 @@ func _build_visuals() -> void:
 		cards.spots[i + SPLIT_KEY] = [ARC_CENTRE + to_seat * 1.3 + Basis(Vector3.UP, angle) * SPLIT_OFFSET + Vector3(0, TABLE_TOP, 0), angle]
 		var eye := Node3D.new()
 		eye.name = "SeatCamera%d" % i
-		eye.position = pos - to_seat * 0.2 + Vector3(0, 1.45, 0)
-		eye.rotation = Vector3(deg_to_rad(-42.0), angle, 0.0)
-		eye.set_meta(&"yaw_limit", deg_to_rad(120.0))
+		# Leaning in over the rail: your own cards low in view, the dealer's rack above them.
+		eye.position = pos - to_seat * SEAT_EYE_LEAN + Vector3(0, SEAT_EYE_HEIGHT, 0)
+		var look: Vector3 = SEAT_LOOK_AT - eye.position
+		eye.rotation = Vector3(SEAT_EYE_PITCH, atan2(-look.x, -look.z), 0.0)
 		add_child(eye)
 		seat_cameras.append(eye)
 	camera_anchor = Node3D.new()
@@ -52,8 +52,19 @@ const ARC_CENTRE: Vector3 = Vector3(0, 0, -0.4)
 ## the first one (seat-local: -z is towards the dealer).
 const SPLIT_KEY: int = 10
 const SPLIT_OFFSET: Vector3 = Vector3(0.14, 0.0, -0.4)
+## Seated eye: how far it leans in from the stool towards the table, its height and its pitch.
+const SEAT_EYE_LEAN: float = 0.5
+const SEAT_EYE_HEIGHT: float = 1.5
+const SEAT_EYE_PITCH: float = deg_to_rad(-26.0)
+## Every seat's view is turned towards this point (between the dealer's rack and the hands).
+const SEAT_LOOK_AT: Vector3 = Vector3(0.0, 0.0, 0.2)
 
 var cards: TableCards
+
+
+## Turns the dealer's cards towards the local player's seat (-1 = nobody local is seated here).
+func set_viewer_seat(index: int) -> void:
+	cards.set_viewer(seat_cameras[index].position if index >= 0 and index < seat_cameras.size() else Vector3.INF)
 
 
 ## Mirrors the round onto the felt (see `TableCards`).

@@ -1,7 +1,8 @@
 class_name BlackjackUi
 extends StationUi
-## Blackjack strip (docs/ART_DIRECTION.md). The cards are dealt on the 3D table and you look
-## around with the mouse, so this only carries the round status, your total and the keys:
+## Blackjack strip (docs/ART_DIRECTION.md). The cards are dealt on the 3D table (the head follows
+## the cursor a little, the cursor clicks these buttons), so this only carries the round status,
+## your total and the keys:
 ## 1-4 chip, Space bet, R repeat, Backspace clear, H hit, S stand, D double, P split, C cut
 ## (gamepad: A hit, X stand, Y double, RB split). Key names follow the device in use (InputGlyphs).
 
@@ -82,7 +83,7 @@ func _on_open() -> void:
 func _hint_text() -> String:
 	if InputGlyphs.gamepad:
 		return InputGlyphs.fill("{look_left}: look around\n[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_confirm}] bet  [{bet_repeat}] repeat\n[{leave_station}] stand up")
-	return InputGlyphs.fill("Mouse: look around\n[1-4] chip  [{bet_confirm}] bet  [{bet_repeat}] repeat\n[{leave_station}] stand up")
+	return InputGlyphs.fill("Mouse: look around, click to play\n[1-4] chip  [{bet_confirm}] bet  [{bet_repeat}] repeat\n[{leave_station}] stand up")
 
 
 func _relabel() -> void:

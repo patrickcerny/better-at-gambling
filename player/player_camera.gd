@@ -1,13 +1,19 @@
 class_name PlayerCamera
 extends Node3D
 ## First-person by default with a third-person toggle (§2.4.2). Eases to a station's camera
-## anchor while seated (±40° look), auto third-person while ragdolled.
+## anchor while seated, where the head follows `seated_look` (the cursor's offset from the middle
+## of the screen, or the right stick) a little: ±25° yaw, ±15° pitch, smoothed. The mouse stays
+## free while seated so the station overlay can be clicked. Auto third-person while ragdolled.
 
 enum Mode { FIRST, THIRD }
 
 const EYE_HEIGHT: float = 1.35
 const SEATED_YAW_LIMIT: float = deg_to_rad(40.0)
 const THIRD_DISTANCE: float = 3.5
+## Seated head turn at the edge of the screen, and how fast the head catches up (1/s).
+const SEATED_LOOK_YAW: float = deg_to_rad(25.0)
+const SEATED_LOOK_PITCH: float = deg_to_rad(15.0)
+const SEATED_LOOK_SPEED: float = 7.0
 
 var mode: Mode = Mode.FIRST
 var camera: Camera3D
@@ -21,6 +27,10 @@ var anchor: Node3D = null
 ## Set while ragdolled: node to follow.
 var follow: Node3D = null
 var head_bob: bool = true
+## Seated: where the head wants to turn, [-1, 1] per axis (x right, y down). Set every frame by the owner.
+var seated_look: Vector2 = Vector2.ZERO
+## Seated: the smoothed head turn in radians (x yaw, y pitch), added on top of the station view.
+var seated_offset: Vector2 = Vector2.ZERO
 
 var _seated_yaw_center: float = 0.0
 ## How far you can turn from the station view (an anchor's "yaw_limit" meta overrides it).
@@ -68,6 +78,8 @@ func look(delta_yaw: float, delta_pitch: float) -> void:
 func set_anchor(a: Node3D) -> void:
 	anchor = a
 	_anchor_blend = 0.0
+	seated_look = Vector2.ZERO
+	seated_offset = Vector2.ZERO
 	if a != null:
 		_seated_yaw_center = a.global_rotation.y
 		seated_yaw_limit = float(a.get_meta(&"yaw_limit", SEATED_YAW_LIMIT))
@@ -90,8 +102,10 @@ func update_camera(speed: float, on_floor: bool, ragdolled: bool, delta: float) 
 	var up_rot := Basis.from_euler(Vector3(pitch, yaw, 0.0))
 	if anchor != null:
 		_anchor_blend = minf(_anchor_blend + delta / 0.4, 1.0)
+		var want := Vector2(-seated_look.x * SEATED_LOOK_YAW, -seated_look.y * SEATED_LOOK_PITCH)
+		seated_offset = seated_offset.lerp(want, 1.0 - exp(-SEATED_LOOK_SPEED * delta))
 		var target: Transform3D = anchor.global_transform
-		target.basis = Basis.from_euler(Vector3(pitch, yaw, 0.0))
+		target.basis = Basis.from_euler(Vector3(clampf(pitch + seated_offset.y, deg_to_rad(-85.0), deg_to_rad(60.0)), yaw + seated_offset.x, 0.0))
 		camera.global_transform = camera.global_transform.interpolate_with(target, _anchor_blend)
 		return
 	if ragdolled and follow != null:
