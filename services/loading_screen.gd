@@ -63,37 +63,67 @@ func begin() -> void:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override(&"separation", 18)
 	_root.add_child(box)
-	var title := Label.new()
-	title.text = "BETTER AT GAMBLING"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override(&"font_size", 84)
-	title.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-	title.add_theme_color_override(&"font_shadow_color", Color(0, 0, 0, 0.6))
-	title.add_theme_constant_override(&"shadow_offset_y", 4)
-	box.add_child(title)
+	var logo := VBoxContainer.new()
+	logo.add_theme_constant_override(&"separation", -24)
+	box.add_child(logo)
+	for line: Array in [["BETTER", 92, Palette.CREAM], ["AT", 52, Palette.CASINO_RED], ["GAMBLING", 136, Palette.VIP_GOLD]]:
+		var l := Label.new()
+		l.theme_type_variation = &"LogoLabel"
+		l.text = line[0]
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.add_theme_font_size_override(&"font_size", line[1])
+		l.add_theme_color_override(&"font_color", line[2])
+		logo.add_child(l)
+	var rule := ColorRect.new()
+	rule.color = Palette.WARM_GOLD
+	rule.custom_minimum_size = Vector2(360, 3)
+	rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(rule)
 	var loading := Label.new()
 	loading.name = "Loading"
-	loading.text = "Loading"
+	loading.text = "LOADING"
+	loading.theme_type_variation = &"HeadingLabel"
 	loading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	loading.add_theme_font_size_override(&"font_size", 40)
 	loading.add_theme_color_override(&"font_color", Palette.CREAM)
 	box.add_child(loading)
+	# The tip sits on a small printed card at the bottom of the screen.
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"HudPlate"
+	card.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	card.anchor_left = 0.5
+	card.anchor_right = 0.5
+	card.anchor_top = 1.0
+	card.anchor_bottom = 1.0
+	card.offset_left = -520
+	card.offset_right = 520
+	card.offset_top = -170
+	card.offset_bottom = -70
+	card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_root.add_child(card)
+	var tip_box := VBoxContainer.new()
+	tip_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	card.add_child(tip_box)
+	var tip_head := Label.new()
+	tip_head.text = "TIP"
+	tip_head.theme_type_variation = &"SmallLabel"
+	tip_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tip_head.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	tip_box.add_child(tip_head)
 	var tip := Label.new()
 	tip.text = InputGlyphs.fill(TIPS[randi() % TIPS.size()])
 	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tip.custom_minimum_size = Vector2(900, 0)
-	tip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	tip.custom_minimum_size = Vector2(980, 0)
 	tip.add_theme_font_size_override(&"font_size", 30)
-	tip.add_theme_color_override(&"font_color", Palette.CREAM.darkened(0.15))
-	box.add_child(tip)
+	tip_box.add_child(tip)
 
 
 func _process(_delta: float) -> void:
 	if _root == null or _finishing:
 		return
 	var dots: int = int(Time.get_ticks_msec() / 400.0) % 4
-	(_root.find_child("Loading", true, false) as Label).text = "Loading" + ".".repeat(dots)
+	(_root.find_child("Loading", true, false) as Label).text = "LOADING" + ".".repeat(dots)
 
 
 ## Fades the screen out (after `MIN_SECONDS`) and frees it.

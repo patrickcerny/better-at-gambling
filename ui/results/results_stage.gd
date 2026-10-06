@@ -137,7 +137,7 @@ func _build_set() -> void:
 	title.pixel_size = 0.008
 	title.outline_size = 14
 	title.modulate = Palette.VIP_GOLD
-	title.position = Vector3(0, 5.4, -3.8)
+	title.position = Vector3(0, 6.15, -3.8)  # clear of the name tags over a tied top step
 	add_child(title)
 	var standings: Array = state.standings
 	var on_floor: int = 0

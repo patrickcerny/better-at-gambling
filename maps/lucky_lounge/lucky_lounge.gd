@@ -71,6 +71,8 @@ func _ready() -> void:
 	_build_stations()
 	_build_props()
 	_build_lights()
+	if Vfx.enabled():
+		add_child(LoungeDecor.new(self))  # client-only art pass; never on the headless server
 	if bake_navmesh:
 		_build_navmesh()
 
@@ -496,8 +498,7 @@ func _build_lights() -> void:
 	add_child(env)
 	# Chandeliers (lobby and centre) and lamps over each area: warm, with dark corners between.
 	for p: Vector3 in [Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11), Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, MEZZ_Y + 2.5, -5)]:
-		GreyboxKit.lamp(self, p, 3.0, 16.0)
-		GreyboxKit.cylinder(self, 0.5, 0.15, p + Vector3(0, 0.3, 0), Palette.WARM_GOLD, "Chandelier", false, 0.8)
+		GreyboxKit.lamp(self, p, 3.0, 16.0)  # the chandelier itself is LoungeDecor (client only)
 	var sun := DirectionalLight3D.new()
 	sun.light_color = Color(1.0, 0.9, 0.75)
 	sun.light_energy = 0.25

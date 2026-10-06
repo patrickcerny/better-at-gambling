@@ -18,50 +18,120 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.13, 0.06, 0.2, 1)
+color = Color(0.0823529, 0.0784314, 0.0784314, 1)
 
-[node name="Center" type="CenterContainer" parent="."]
+[node name="Left" type="MarginContainer" parent="."]
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 820.0
+grow_vertical = 2
+theme_override_constants/margin_left = 110
+theme_override_constants/margin_top = 64
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 64
+
+[node name="Column" type="VBoxContainer" parent="Left"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 18
+
+[node name="Logo" type="VBoxContainer" parent="Left/Column"]
+layout_mode = 2
+theme_override_constants/separation = -26
+
+[node name="Better" type="Label" parent="Left/Column/Logo"]
+layout_mode = 2
+theme_type_variation = &"LogoLabel"
+theme_override_font_sizes/font_size = 104
+text = "BETTER"
+
+[node name="At" type="Label" parent="Left/Column/Logo"]
+layout_mode = 2
+theme_type_variation = &"LogoLabel"
+theme_override_colors/font_color = Color(0.784314, 0.239216, 0.239216, 1)
+theme_override_font_sizes/font_size = 60
+text = "AT"
+
+[node name="Gambling" type="Label" parent="Left/Column/Logo"]
+layout_mode = 2
+theme_type_variation = &"LogoLabel"
+theme_override_colors/font_color = Color(0.890196, 0.72549, 0.360784, 1)
+theme_override_font_sizes/font_size = 156
+text = "GAMBLING"
+
+[node name="Rule" type="HBoxContainer" parent="Left/Column"]
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="LineL" type="ColorRect" parent="Left/Column/Rule"]
+custom_minimum_size = Vector2(150, 3)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.839216, 0.658824, 0.294118, 1)
+
+[node name="Spade" type="Label" parent="Left/Column/Rule"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.839216, 0.658824, 0.294118, 1)
+theme_override_font_sizes/font_size = 30
+text = "♠"
+
+[node name="LineR" type="ColorRect" parent="Left/Column/Rule"]
+custom_minimum_size = Vector2(150, 3)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.839216, 0.658824, 0.294118, 1)
+
+[node name="VBox" type="VBoxContainer" parent="Left/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_constants/separation = 2
+
+[node name="PlayOnline" type="Button" parent="Left/Column/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MenuEntry"
+text = "PLAY ONLINE"
+alignment = 0
+
+[node name="Practice" type="Button" parent="Left/Column/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MenuEntry"
+text = "PRACTICE"
+alignment = 0
+
+[node name="Settings" type="Button" parent="Left/Column/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MenuEntry"
+text = "SETTINGS"
+alignment = 0
+
+[node name="Quit" type="Button" parent="Left/Column/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MenuEntry"
+text = "QUIT"
+alignment = 0
+
+[node name="Footer" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="VBox" type="VBoxContainer" parent="Center"]
-custom_minimum_size = Vector2(480, 0)
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="Title" type="Label" parent="Center/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.82, 0.3, 1)
-theme_override_font_sizes/font_size = 72
-text = "Better at Gambling"
-horizontal_alignment = 1
-
-[node name="PlayOnline" type="Button" parent="Center/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 56)
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "Play Online"
-
-[node name="Practice" type="Button" parent="Center/VBox"]
-custom_minimum_size = Vector2(0, 56)
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "Practice (solo)"
-
-[node name="Settings" type="Button" parent="Center/VBox"]
-custom_minimum_size = Vector2(0, 56)
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "Settings"
-
-[node name="Quit" type="Button" parent="Center/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 56)
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "Quit"
+offset_left = -600.0
+offset_top = -56.0
+offset_right = -32.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_type_variation = &"MutedLabel"
+horizontal_alignment = 2

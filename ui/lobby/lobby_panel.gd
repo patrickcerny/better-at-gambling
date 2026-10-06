@@ -31,8 +31,10 @@ func _ready() -> void:
 	anchor_bottom = 0.5
 	offset_left = -470
 	offset_right = 470
-	offset_top = -340
-	offset_bottom = 340
+	offset_top = -290
+	offset_bottom = 290
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	grow_vertical = Control.GROW_DIRECTION_BOTH
 	visible = false
 	_build()
 
@@ -81,7 +83,6 @@ func _build() -> void:
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(_title)
 	_countdown_label = Label.new()
-	_countdown_label.theme_type_variation = &"HeadingLabel"
 	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_countdown_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 	v.add_child(_countdown_label)
@@ -97,7 +98,8 @@ func _build() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cols.add_child(right)
 	_ready_button = Button.new()
-	_ready_button.custom_minimum_size = Vector2(0, 54)
+	_ready_button.custom_minimum_size = Vector2(0, 60)
+	_ready_button.theme_type_variation = &"ActionButton"
 	_ready_button.pressed.connect(func() -> void:
 		Net.send_intent(Intents.make(&"set_ready", {"ready": not _my_ready()})))
 	right.add_child(_ready_button)
@@ -172,13 +174,18 @@ func _refresh() -> void:
 	var ids: Array = state.players.keys()
 	ids.sort()
 	for i: int in Protocol.MAX_PLAYERS:
+		var framed := PanelContainer.new()
+		framed.custom_minimum_size = Vector2(0, 46)
+		framed.theme_type_variation = &"RowPanelHighlight" if i < ids.size() and ids[i] == local_id else &"RowPanel"
+		_slots.add_child(framed)
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override(&"separation", 8)
-		_slots.add_child(row)
+		row.add_theme_constant_override(&"separation", 10)
+		framed.add_child(row)
 		if i >= ids.size():
 			var empty := Label.new()
-			empty.text = "— open slot —"
-			empty.theme_type_variation = &"SmallLabel"
+			empty.text = "open slot"
+			empty.theme_type_variation = &"MutedLabel"
+			empty.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			row.add_child(empty)
 			continue
 		var pid: int = ids[i]
@@ -186,21 +193,24 @@ func _refresh() -> void:
 		var sw := ColorRect.new()
 		sw.custom_minimum_size = Vector2(28, 28)
 		sw.color = Palette.player_color(int(p.get("color", 0)))
+		sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(sw)
 		var label := Label.new()
 		var tags: PackedStringArray = []
 		if pid == state.leader:
 			tags.append("★")
 		if not bool(p.get("connected", true)):
-			tags.append("away")
-		label.text = "%s %s" % [str(p.get("name", "?")), " ".join(tags)]
+			tags.append("(away)")
+		label.text = "%s  %s" % [str(p.get("name", "?")), " ".join(tags)]
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if pid == local_id:
 			label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 		row.add_child(label)
 		var ready := Label.new()
 		var is_ready: bool = bool(p.get("ready", false))
-		ready.text = "READY" if is_ready else "…"
+		ready.text = "READY" if is_ready else "NOT READY"
+		ready.theme_type_variation = &"SmallLabel"
+		ready.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		ready.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if is_ready else Color("#9A8F7A"))
 		row.add_child(ready)
 	_ready_button.text = "NOT READY" if _my_ready() else "READY"

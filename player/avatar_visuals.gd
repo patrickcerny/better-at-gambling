@@ -80,7 +80,7 @@ var _face_mouth: float = 0.0
 var _get_up_from: Quaternion = Quaternion.IDENTITY
 var _get_up_t: float = -1.0
 var _ragdoll: RagdollBody = null
-var _body_mat: StandardMaterial3D
+var _body_mat: Material
 var _legs: Array[MeshInstance3D] = []
 var _anim: AnimationPlayer
 var _motion: StringName = &""
@@ -103,7 +103,7 @@ func _ready() -> void:
 func set_color(c: Color) -> void:
 	color = c
 	if _body_mat != null:
-		_body_mat.albedo_color = c
+		ToonMaterial.set_color(_body_mat, c)
 	if _ring_mat != null:
 		_ring_mat.albedo_color = c
 
@@ -432,9 +432,7 @@ func _animate_face(delta: float) -> void:
 
 
 func _build() -> void:
-	_body_mat = StandardMaterial3D.new()
-	_body_mat.albedo_color = color
-	_body_mat.roughness = 0.8
+	_body_mat = ToonMaterial.make(color)
 	_rig = Node3D.new()
 	_rig.name = "Rig"
 	add_child(_rig)

@@ -23,8 +23,10 @@ func _ready() -> void:
 	anchor_bottom = 0.5
 	offset_left = -430
 	offset_right = 430
-	offset_top = -280
-	offset_bottom = 280
+	offset_top = -310
+	offset_bottom = 310
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	grow_vertical = Control.GROW_DIRECTION_BOTH
 	visible = false
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override(&"separation", 10)
@@ -35,9 +37,9 @@ func _ready() -> void:
 	title.text = "GIFT SHOP"
 	v.add_child(title)
 	_note = Label.new()
-	_note.theme_type_variation = &"HeadingLabel"
 	_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_note.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_note.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
 	v.add_child(_note)
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override(&"separation", 6)
@@ -100,21 +102,69 @@ func _refresh() -> void:
 		return
 	_bought = bool(Net.request_private_snapshot().get("items", {}).get("shop_bought", false))
 	var money: int = state.balance(local_id)
-	_note.text = "You already bought something this round. New stock after the next minigame." if _bought else "Pick one item per round. You have $%d." % money
+	_note.text = "You already bought something this round. New stock after the next minigame." if _bought else "One item per round  ·  you have $%s" % Hud._thousands(money)
 	for c: Node in _rows.get_children():
 		c.queue_free()
 	for i: int in state.shop_offers.size():
 		var o: Dictionary = state.shop_offers[i]
 		var id: StringName = StringName(o["item"])
 		var price: int = int(o["price"])
+		var rarity: int = clampi(int(o.get("rarity", 0)), 0, 2)
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(0, 64)
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.text = "[%d]  %s  (%s)   $%d\n%s" % [i + 1, RewardPanel.item_name(id), ["common", "rare", "legendary"][clampi(int(o.get("rarity", 0)), 0, 2)], price, RewardPanel.item_description(id)]
-		b.add_theme_font_size_override(&"font_size", 18)
+		b.custom_minimum_size = Vector2(0, 96)
 		b.disabled = _bought or money < price
 		b.pressed.connect(buy.bind(i))
+		var row := HBoxContainer.new()
+		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		row.offset_left = 18
+		row.offset_right = -20
+		row.offset_top = 8
+		row.offset_bottom = -12
+		row.add_theme_constant_override(&"separation", 16)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(row)
+		var key := Label.new()
+		key.text = str(i + 1)
+		key.theme_type_variation = &"HeadingLabel"
+		key.custom_minimum_size = Vector2(34, 0)
+		key.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		key.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+		row.add_child(key)
+		var info := VBoxContainer.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.alignment = BoxContainer.ALIGNMENT_CENTER
+		info.add_theme_constant_override(&"separation", 0)
+		row.add_child(info)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override(&"separation", 12)
+		info.add_child(head)
+		var n := Label.new()
+		n.text = RewardPanel.item_name(id)
+		n.add_theme_font_size_override(&"font_size", 28)
+		head.add_child(n)
+		var tag := Label.new()
+		tag.text = RewardPanel.RARITY_NAMES[rarity]
+		tag.theme_type_variation = &"SmallLabel"
+		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tag.add_theme_color_override(&"font_color", RewardPanel.RARITY_COLORS[rarity])
+		head.add_child(tag)
+		var d := Label.new()
+		d.text = RewardPanel.item_description(id)
+		d.theme_type_variation = &"MutedLabel"
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		d.custom_minimum_size = Vector2(560, 0)
+		info.add_child(d)
+		var cost := Label.new()
+		cost.text = "$%s" % Hud._thousands(price)
+		cost.theme_type_variation = &"MoneyLabel"
+		cost.add_theme_font_size_override(&"font_size", 36)
+		cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		cost.add_theme_color_override(&"font_color", Palette.VIP_GOLD if money >= price else Palette.LOSS_RED)
+		row.add_child(cost)
+		for c: Node in [key, info, head, n, tag, d, cost]:
+			(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if b.disabled:
+			row.modulate = Color(1, 1, 1, 0.45)
 		_rows.add_child(b)
 	if state.shop_offers.is_empty():
 		var l := Label.new()

@@ -3,10 +3,11 @@ extends Control
 ## Connection errors from the last online attempt are shown here when we return.
 
 @onready var _play_online: Button = %PlayOnline
-@onready var _practice: Button = $Center/VBox/Practice
+@onready var _practice: Button = %Practice
 @onready var _quit: Button = %Quit
-@onready var _settings_button: Button = $Center/VBox/Settings
-@onready var _main_box: VBoxContainer = $Center/VBox
+@onready var _settings_button: Button = %Settings
+@onready var _main_box: VBoxContainer = %VBox
+@onready var _column: VBoxContainer = %Column
 
 var _online_box: VBoxContainer
 var _name_edit: LineEdit
@@ -27,6 +28,25 @@ func _ready() -> void:
 	pano.start_leg = randf() * CasinoPanorama.PATH.size()
 	add_child(pano)
 	move_child(pano, 1)  # above the plain background, below the buttons
+	# Dark wash behind the menu column so the logo and entries read over any part of the casino.
+	var shade := TextureRect.new()
+	shade.name = "Shade"
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	var grad := Gradient.new()
+	grad.set_color(0, Color(Palette.CASINO_BLACK, 0.92))
+	grad.set_color(1, Color(Palette.CASINO_BLACK, 0.0))
+	grad.add_point(0.38, Color(Palette.CASINO_BLACK, 0.7))
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.width = 256
+	gt.height = 4
+	gt.fill_to = Vector2(1, 0)
+	shade.texture = gt
+	add_child(shade)
+	move_child(shade, 2)
+	(%Footer as Label).text = "BUILD %s" % Protocol.BUILD_ID
 	_quit.pressed.connect(_on_quit_pressed)
 	_practice.pressed.connect(func() -> void: SceneRouter.goto(SceneRouter.MATCH))
 	_play_online.pressed.connect(_show_online)
@@ -50,13 +70,14 @@ func _ready() -> void:
 func _build_online() -> void:
 	_online_box = VBoxContainer.new()
 	_online_box.name = "Online"
-	_online_box.custom_minimum_size = Vector2(480, 0)
+	_online_box.custom_minimum_size = Vector2(540, 0)
+	_online_box.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_online_box.add_theme_constant_override(&"separation", 12)
 	_online_box.visible = false
-	$Center.add_child(_online_box)
+	_column.add_child(_online_box)
 	var title := Label.new()
 	title.text = "PLAY ONLINE"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.theme_type_variation = &"HeadingLabel"
 	title.add_theme_font_size_override(&"font_size", 44)
 	title.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 	_online_box.add_child(title)
@@ -76,7 +97,7 @@ func _build_online() -> void:
 		_code_edit.caret_column = caret)
 	_code_edit.text_submitted.connect(func(_t: String) -> void: _join_code())
 	join_row.add_child(_code_edit)
-	join_row.add_child(_button("Join", _join_code))
+	join_row.add_child(_button("Join", _join_code, 140))
 	var ip_row := HBoxContainer.new()
 	_online_box.add_child(ip_row)
 	_ip_edit = LineEdit.new()
@@ -84,14 +105,13 @@ func _build_online() -> void:
 	_ip_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_ip_edit.text_submitted.connect(func(_t: String) -> void: _join_ip())
 	ip_row.add_child(_ip_edit)
-	ip_row.add_child(_button("Connect", _join_ip))
+	ip_row.add_child(_button("Connect", _join_ip, 140))
 	_online_box.add_child(_button("Host on This PC (LAN / port %d)" % Protocol.DEFAULT_PORT, _host_local))
 	_rejoin = _button("Rejoin Last Party", _rejoin_last)
 	_online_box.add_child(_rejoin)
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status.custom_minimum_size = Vector2(480, 0)
+	_status.custom_minimum_size = Vector2(540, 0)
 	_online_box.add_child(_status)
 	_online_box.add_child(_button("Back", _show_main))
 
@@ -105,31 +125,38 @@ func _field(placeholder: String, value: String, max_len: int) -> LineEdit:
 	return e
 
 
-func _button(text: String, cb: Callable) -> Button:
+func _button(text: String, cb: Callable, min_width: float = 0.0) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(0, 48)
-	b.add_theme_font_size_override(&"font_size", 24)
+	b.custom_minimum_size = Vector2(min_width, 52)
 	b.pressed.connect(cb)
 	return b
 
 
 func _show_online() -> void:
 	_main_box.visible = false
+	_set_logo_visible(false)
 	_online_box.visible = true
 	var last: Dictionary = Net.online.last_room()
 	_rejoin.visible = str(last.get("room_id", "")) != ""
 	_rejoin.text = "Rejoin Last Party (%s)" % last.get("room_code", "") if _rejoin.visible else ""
 	_status.text = ""
-	_online_box.get_child(2).grab_focus()
+	_online_box.get_child(2).grab_focus()  # Create Party
 
 
 func _show_main() -> void:
 	if _busy:
 		return
 	_online_box.visible = false
+	_set_logo_visible(true)
 	_main_box.visible = true
 	_play_online.grab_focus()
+
+
+## The online form is tall: the big logo steps aside while it is open.
+func _set_logo_visible(on: bool) -> void:
+	(_column.get_node("Logo") as Control).visible = on
+	(_column.get_node("Rule") as Control).visible = on
 
 
 func _save_name() -> void:

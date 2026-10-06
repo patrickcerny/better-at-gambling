@@ -245,6 +245,7 @@ func _action(text: String, on_pressed: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(170, 56)
+	b.theme_type_variation = &"ActionButton"
 	b.pressed.connect(on_pressed)
 	actions.add_child(b)
 	return b

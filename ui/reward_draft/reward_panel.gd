@@ -48,8 +48,11 @@ func open(rewards: Array, seconds: float) -> void:
 	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["placement"]) < int(b["placement"]))
 	for r: Variant in sorted:
 		var row: Dictionary = r
+		var framed := PanelContainer.new()
+		framed.theme_type_variation = &"RowPanelHighlight" if int(row["player"]) == local_id else &"RowPanel"
 		var h := HBoxContainer.new()
 		h.add_theme_constant_override(&"separation", 18)
+		framed.add_child(h)
 		var place := Label.new()
 		place.text = Hud._ordinal(int(row["placement"]))
 		place.custom_minimum_size = Vector2(70, 0)
@@ -70,7 +73,8 @@ func open(rewards: Array, seconds: float) -> void:
 		cash.theme_type_variation = &"MoneyLabel"
 		cash.text = "+$%s" % Hud._thousands(int(row["cash"])) if int(row["cash"]) > 0 else ""
 		cash.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
-		cash.custom_minimum_size = Vector2(130, 0)
+		cash.add_theme_font_size_override(&"font_size", 36)
+		cash.custom_minimum_size = Vector2(150, 0)
 		h.add_child(cash)
 		var extra := Label.new()
 		extra.theme_type_variation = &"SmallLabel"
@@ -80,8 +84,9 @@ func open(rewards: Array, seconds: float) -> void:
 		if int(row.get("bonus_count", 0)) > 0:
 			bits.append("+%d bonus item%s" % [int(row["bonus_count"]), "s" if int(row["bonus_count"]) > 1 else ""])
 		extra.text = " · ".join(bits)
+		extra.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		h.add_child(extra)
-		rows_box.add_child(h)
+		rows_box.add_child(framed)
 	Audio.play(&"coin", &"UI", -6.0)
 
 
@@ -135,7 +140,7 @@ func _show_offer(draft: Dictionary) -> void:
 		c.queue_free()
 	_choice_buttons.clear()
 	var choices: Array = draft.get("choices", [])
-	draft_title.text = "PICK AN ITEM" if not choices.is_empty() else "YOUR ITEMS"
+	draft_title.text = "PICK YOUR REWARD" if not choices.is_empty() else "YOUR ITEMS"
 	for i: int in choices.size():
 		var id: StringName = StringName(choices[i])
 		var b := Button.new()
@@ -217,8 +222,10 @@ func _build() -> void:
 	panel.anchor_bottom = 0.5
 	panel.offset_left = -520
 	panel.offset_right = 520
-	panel.offset_top = -330
-	panel.offset_bottom = 330
+	panel.offset_top = -320
+	panel.offset_bottom = 320
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	add_child(panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override(&"separation", 14)
@@ -227,7 +234,7 @@ func _build() -> void:
 	v.add_child(top)
 	var title := Label.new()
 	title.theme_type_variation = &"TitleLabel"
-	title.text = "REWARDS"
+	title.text = "QUIZ RESULTS"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
 	timer_label = Label.new()
@@ -235,6 +242,7 @@ func _build() -> void:
 	timer_label.add_theme_font_size_override(&"font_size", 48)
 	top.add_child(timer_label)
 	rows_box = VBoxContainer.new()
+	rows_box.add_theme_constant_override(&"separation", 4)
 	v.add_child(rows_box)
 	draft_box = VBoxContainer.new()
 	draft_box.visible = false
@@ -249,11 +257,6 @@ func _build() -> void:
 	bonus_label = Label.new()
 	bonus_label.theme_type_variation = &"SmallLabel"
 	draft_box.add_child(bonus_label)
-	var note := Label.new()
-	note.theme_type_variation = &"SmallLabel"
-	note.text = "Item effects switch on in the next update."
-	note.add_theme_color_override(&"font_color", Palette.CREAM.darkened(0.35))
-	draft_box.add_child(note)
 	result_label = Label.new()
 	result_label.theme_type_variation = &"HeadingLabel"
 	v.add_child(result_label)
