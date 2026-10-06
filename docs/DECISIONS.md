@@ -239,3 +239,19 @@ you up.
 The server rejects emote ids that aren't in `Emotes.LIST` (`unknown_emote`). The wheel opens while
 walking or seated (and returns to that mode). Each emote shows "emoji WORD" over the character, a
 hop when standing, and plays `emote_<id>` from audio/sfx when such a clip exists, else a stock clip.
+
+## 2026-10-06 — Plinko chip flies real arcs between peg contacts, from the drop, not the result
+Patrick: "Plinko is still very buggy … better physics". The old playback put its points 0.4 m above
+the peg rows (the chip slid through pegs), the chip (r 0.12) was wider than the gaps between pegs,
+it only started when `round_result` arrived (the money moved 1.6 s before the chip even fell) and
+`bet_placed` cleared the seen-drop set, so a second drop could replay the first chip. Now
+`PlinkoFlight` turns the steered path into ballistic arcs under gravity: one contact per row on the
+side that sends the chip the way the path goes (near the crown, since a chip passing outside a peg
+can only reach the next one's top), each arc checked against every peg, the rails and the slot
+dividers, seeded so all clients play the same flight, then two hops in the slot. Contacts are
+picked from seeded candidates with a fixed-grid fallback (`test_plinko_flight.gd`: 400 drops, no
+overlap, every chip rests on its slot centre). Clients start the chip on `plinko_dropped` and scale
+its time so it touches down after `plinko_flight_time`, as the server settles; a late joiner's
+`round_result` still plays a quick fall. Still no RigidBody chip: the slot is fixed first and money
+never depends on the physics. The bucket plates show the multipliers of the row the seated player
+picked; a landing chip pops its own row's multiplier over the slot.

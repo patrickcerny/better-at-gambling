@@ -81,7 +81,7 @@ var _clock: float = 0.0
 var _vip_toast_at: float = -INF
 var _door_angle: float = 0.0
 var _owns_server: bool = false
-var _plinko_seen: Dictionary[int, bool] = {}
+var _plinko_seen: Dictionary[String, bool] = {}  # "station:drop_id" (ids count per board)
 var _pad_timer: float = 0.0
 var _countdown_shown: int = -1
 var _match_over: bool = false
@@ -807,11 +807,10 @@ func _on_event(ev: Dictionary) -> void:
 			if p != null and net != 0:
 				p.visuals.react(AvatarVisuals.reaction_for_net(net))
 			var details: Dictionary = ev.get("details", {})
-			if details.has("drop_id") and details.has("slot"):
-				_drop_plinko_chip(StringName(ev["station"]), int(ev["player"]), int(details["slot"]), int(details["drop_id"]))
-		&"bet_placed":
-			if ev.get("details", {}).get("game", "") == "plinko":
-				_plinko_seen.clear()
+			if details.has("drop_id") and details.has("slot"):  # missed the drop (joined late): quick fall
+				_drop_plinko_chip(StringName(ev["station"]), int(ev["player"]), int(details["slot"]), int(details["drop_id"]), 0.9, StringName(details.get("risk", "")))
+		&"plinko_dropped":  # the chip falls now and touches down as the server settles it
+			_drop_plinko_chip(StringName(ev["station"]), int(ev["player"]), int(ev["slot"]), int(ev["drop_id"]), Registry.balance.plinko_flight_time, StringName(ev.get("risk", "")))
 		&"jackpot_won":
 			# Patrick's 8-bit prize fanfare: full volume for the winner, from the winner's spot for
 			# everyone else, with the siren quietly announcing it across the floor.
@@ -1760,20 +1759,15 @@ func _on_station_state(sid: StringName) -> void:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 
 
-func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int) -> void:
-	# The result arrives when the server lands the chip; play the drop back now (ending exactly there).
+func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int, seconds: float, risk: StringName) -> void:
 	var st: PlinkoStation = map.stations.get(sid, null) as PlinkoStation
-	if st == null or _plinko_seen.has(drop_id):
+	var key: String = "%s:%d" % [sid, drop_id]
+	if st == null or _plinko_seen.has(key):
 		return
-	_plinko_seen[drop_id] = true
-	var rng := SeededRng.new(drop_id * 7919 + slot)
-	var path: Array[float] = PlinkoSteering.path_to_slot(PlinkoStation.ROWS, PlinkoStation.SLOTS, slot, rng)
-	var row_h: float = (PlinkoStation.BOARD_H - 1.2) / PlinkoStation.ROWS
-	var pts: Array[Vector3] = PlinkoSteering.path_points(path, st.slot_xs, st.drop_y, row_h, 0.65)
-	var chip := PlinkoChip.new()
-	chip.color = avatars[pid].color if avatars.has(pid) else Palette.CASINO_RED
-	st.add_child(chip)
-	chip.play(pts, 1.6, slot)
+	if _plinko_seen.size() > 256:
+		_plinko_seen.erase(_plinko_seen.keys()[0])  # oldest first; long since landed
+	_plinko_seen[key] = true
+	st.drop_chip(slot, drop_id, avatars[pid].color if avatars.has(pid) else Palette.CASINO_RED, seconds, risk)
 
 
 func _spawn_pile(id: int, amount: int, pos: Vector3) -> void:

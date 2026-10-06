@@ -38,16 +38,3 @@ func test_edge_slot_path_is_monotonic_when_it_has_to_be() -> void:
 	for r: int in range(1, path.size() - 1):
 		assert_true(path[r] < path[r - 1], "row %d steps toward the edge" % r)
 
-
-func test_path_points_map_onto_the_board() -> void:
-	var rng := SeededRng.new(1)
-	var slot_xs: Array[float] = []
-	for s: int in SLOTS:
-		slot_xs.append((s - (SLOTS - 1) * 0.5) * 0.3)
-	var path: Array[float] = PlinkoSteering.path_to_slot(ROWS, SLOTS, 12, rng)
-	var pts: Array[Vector3] = PlinkoSteering.path_points(path, slot_xs, 4.3, 0.23, 0.65)
-	assert_eq(pts.size(), path.size())
-	assert_almost_eq(pts[0].y, 4.3, 0.0001, "starts at the release height")
-	assert_almost_eq(pts[pts.size() - 1].y, 0.65, 0.0001, "ends on the tray")
-	assert_almost_eq(pts[pts.size() - 1].x, slot_xs[12], 0.0001, "lands on the slot centre")
-	assert_true(pts[1].y < pts[0].y, "descends row by row")
