@@ -10,9 +10,10 @@ extends Node
 ##   burst with screen shake and hit-stop.
 ## `MatchScene` creates one (never on a dedicated server) and forwards every event.
 
-## Seconds until a blackjack result reads (cards flip first) and the Plinko chip's fall.
+## Seconds until a blackjack result reads (cards flip first). The Plinko chip touches down as the
+## server settles it (it starts falling on `plinko_dropped`), so its result only waits for the clack.
 const BLACKJACK_DELAY: float = 0.35
-const PLINKO_DELAY: float = 1.6
+const PLINKO_DELAY: float = 0.15
 ## Bets older than this are swept off the felt when a new round starts (stale leftovers).
 const STALE_MS: int = 1500
 const PLAYER_HEAD: float = 2.3

@@ -103,13 +103,6 @@ func _play() -> void:
 	_ev(&"round_result", {"player": 1, "station": &"slots_1", "stake": 25, "returned": 1000, "net": 975, "details": {"line": [4, 4, 4]}})
 
 
-## Same playback as `MatchScene._drop_plinko_chip`.
+## Same playback as `MatchScene._drop_plinko_chip` (a quick fall, as for a late result).
 func _drop_plinko(drop_id: int, slot: int) -> void:
-	var st: PlinkoStation = stations[&"plinko_1"]
-	var rng := SeededRng.new(drop_id * 7919 + slot)
-	var path: Array[float] = PlinkoSteering.path_to_slot(PlinkoStation.ROWS, PlinkoStation.SLOTS, slot, rng)
-	var row_h: float = (PlinkoStation.BOARD_H - 1.2) / PlinkoStation.ROWS
-	var pts: Array[Vector3] = PlinkoSteering.path_points(path, st.slot_xs, st.drop_y, row_h, 0.65)
-	var chip := PlinkoChip.new()
-	st.add_child(chip)
-	chip.play(pts, 1.6, slot)
+	(stations[&"plinko_1"] as PlinkoStation).drop_chip(slot, drop_id, Palette.CASINO_RED, 0.9)

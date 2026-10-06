@@ -148,7 +148,25 @@ func test_plinko_panel_leaves_the_board_visible() -> void:
 	var ui: StationUi = scene.current_ui
 	assert_not_null(ui)
 	var view: Vector2 = scene.get_viewport().get_visible_rect().size
-	assert_gt(ui.panel.get_global_rect().position.x, view.x * 0.7, "panel docked at the right edge")
+	var rect: Rect2 = ui.panel.get_global_rect()
+	assert_gt(rect.position.x, view.x * 0.7, "panel docked at the right edge")
+	assert_lt(rect.size.x, view.x * 0.2, "a slim panel")
+	assert_lt(rect.size.y, view.y * 0.6)
+	# The whole board (funnel to bucket plates) is on screen and clear of the panel.
+	var st: PlinkoStation = scene.map.stations[&"plinko_1"]
+	var cam: Camera3D = scene.get_viewport().get_camera_3d()
+	var proj: Projection = Projection.create_perspective(cam.fov, view.x / view.y, cam.near, cam.far)
+	var to_screen: Callable = func(local: Vector3) -> Vector2:  # on a 1920x1080 canvas (headless windows are tiny)
+		var p: Vector3 = cam.global_transform.affine_inverse() * st.to_global(local)
+		var clip: Vector4 = proj * Vector4(p.x, p.y, p.z, 1.0)
+		return Vector2((clip.x / clip.w + 1.0) * 0.5 * view.x, (1.0 - clip.y / clip.w) * 0.5 * view.y)
+	var entry: Vector2 = to_screen.call(Vector3(0, PlinkoStation.entry_y(), 0))
+	var right_rail: Vector2 = to_screen.call(Vector3(PlinkoStation.BOARD_W * 0.5 + 0.1, PlinkoStation.FLOOR_Y + 1.0, 0.2))
+	var plate: Vector2 = to_screen.call(Vector3(PlinkoStation.slot_x(PlinkoStation.SLOTS - 1), PlinkoStation.FLOOR_Y - 0.17, 0.27))
+	assert_true(Rect2(Vector2.ZERO, view).has_point(entry), "chip entry on screen: %s" % entry)
+	assert_true(Rect2(Vector2.ZERO, view).has_point(plate), "payout plates on screen: %s" % plate)
+	assert_lt(right_rail.x, rect.position.x, "board's right edge left of the panel")
+	assert_false(rect.has_point(entry), "panel never covers where the chip enters")
 
 
 func before_all() -> void:
