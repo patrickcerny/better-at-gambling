@@ -13,7 +13,7 @@ const MOOD_CROSSFADE: float = 2.5
 const MUSIC_DB: float = -6.0
 ## Moods (`set_mood`) and their loops in res://audio/music/.
 const MOODS: Dictionary[StringName, StringName] = {
-	&"menu": &"menu", &"casino": &"casino", &"quiz": &"quiz", &"minigame": &"quiz",
+	&"menu": &"menu", &"casino": &"casino_base", &"quiz": &"quiz", &"minigame": &"quiz",
 	&"last_call": &"last_call", &"results": &"results",
 }
 const MAX_VARIANTS: int = 8

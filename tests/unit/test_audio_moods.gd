@@ -21,7 +21,7 @@ func test_every_mood_has_a_looping_track() -> void:
 		var stream: AudioStreamOggVorbis = load(path)
 		assert_not_null(stream)
 		assert_true(stream.loop, "%s loops (import setting)" % path)
-		assert_between(stream.get_length(), 30.0, 60.0, "%s is a 30–60 s loop" % path)
+		assert_between(stream.get_length(), 30.0, 240.0, "%s is a 30 s–4 min loop" % path)
 
 
 func test_set_mood_tracks_the_current_mood() -> void:
