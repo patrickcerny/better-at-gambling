@@ -37,15 +37,3 @@ static func path_to_slot(rows: int, slots: int, target_slot: int, rng: SeededRng
 		out.append(h * 0.5)
 	return out
 
-
-## Converts a path into local positions for a board with `slot_xs` (slot centre x per slot),
-## `top_y` (release height), `row_h` (peg row spacing) and `floor_y`. One point per path entry.
-static func path_points(path: Array[float], slot_xs: Array[float], top_y: float, row_h: float, floor_y: float) -> Array[Vector3]:
-	var pts: Array[Vector3] = []
-	var slot_w: float = slot_xs[1] - slot_xs[0] if slot_xs.size() > 1 else 1.0
-	var x0: float = slot_xs[0]
-	for i: int in path.size():
-		var x: float = x0 + path[i] * slot_w
-		var y: float = top_y - i * row_h if i < path.size() - 1 else floor_y
-		pts.append(Vector3(x, y, 0.0))
-	return pts

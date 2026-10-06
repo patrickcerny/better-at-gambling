@@ -10,9 +10,10 @@ extends Node
 ##   burst with screen shake and hit-stop.
 ## `MatchScene` creates one (never on a dedicated server) and forwards every event.
 
-## Seconds until a blackjack result reads (cards flip first) and the Plinko chip's fall.
+## Seconds until a blackjack result reads (cards flip first). The Plinko chip touches down as the
+## server settles it (it starts falling on `plinko_dropped`), so its result only waits for the clack.
 const BLACKJACK_DELAY: float = 0.35
-const PLINKO_DELAY: float = 1.6
+const PLINKO_DELAY: float = 0.15
 ## Bets older than this are swept off the felt when a new round starts (stale leftovers).
 const STALE_MS: int = 1500
 const PLAYER_HEAD: float = 2.3
@@ -54,7 +55,7 @@ func on_event(ev: Dictionary) -> void:
 			var rs: RouletteStation = stations.get(StringName(ev["station"]), null) as RouletteStation
 			if rs != null:
 				rs.start_spin(Registry.balance.roulette_spin_time)
-				Audio.play_at(&"ball_roll", rs, -10.0)
+				Audio.play_at(&"roulette_spin", rs, -4.0)
 		&"roulette_result":
 			var sid: StringName = StringName(ev["station"])
 			var rs: RouletteStation = stations.get(sid, null) as RouletteStation
@@ -77,7 +78,7 @@ func _on_bet(ev: Dictionary) -> void:
 	var pid: int = int(ev["player"])
 	var details: Dictionary = ev.get("details", {})
 	if st is SlotsStation:
-		(st as SlotsStation).start_spin()
+		(st as SlotsStation).start_spin(pid == local_id)
 		return
 	if not (st is RouletteStation or st is BlackjackStation):
 		return  # Plinko drops its own chip
@@ -108,7 +109,7 @@ func _on_result(ev: Dictionary) -> void:
 	var stake: int = int(ev["stake"])
 	var details: Dictionary = ev.get("details", {})
 	if st is SlotsStation and details.has("line"):
-		var t: float = (st as SlotsStation).stop_on(details["line"])
+		var t: float = (st as SlotsStation).stop_on(details["line"], pid == local_id)
 		_shown_at[sid] = Time.get_ticks_msec() + int(t * 1000.0)
 	elif st is PlinkoStation:
 		_shown_at[sid] = Time.get_ticks_msec() + int(PLINKO_DELAY * 1000.0)

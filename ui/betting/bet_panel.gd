@@ -88,19 +88,28 @@ func confirm() -> void:
 	if amount < min_bet:
 		set_amount(min_bet)
 	last_amount = amount
-	Audio.play(&"chip_clack", &"UI", -8.0)
+	Audio.play(&"chips_in_pot", &"SFX", -4.0)
 	confirmed.emit(amount)
 
 
 func clear() -> void:
-	set_amount(0)
+	_adjust(0)
 	cleared.emit()
 
 
 func repeat_last() -> void:
 	if last_amount > 0:
-		set_amount(last_amount)
+		_adjust(last_amount)
 	repeated.emit()
+
+
+## A player-made change of the bet amount: Patrick's chip sound, a touch higher when adding and
+## lower when taking chips off (programmatic `set_amount` stays silent).
+func _adjust(a: int) -> void:
+	var before: int = amount
+	set_amount(a)
+	if amount != before:
+		Audio.play(&"chips_in_pot", &"SFX", -9.0, 1.08 if amount > before else 0.9)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -168,7 +177,7 @@ func _build() -> void:
 	_minus = Button.new()
 	_minus.text = "−"
 	_minus.custom_minimum_size = Vector2(56, 48)
-	_minus.pressed.connect(func() -> void: set_amount(amount - chip_value()))
+	_minus.pressed.connect(func() -> void: _adjust(amount - chip_value()))
 	_stepper.add_child(_minus)
 	_amount_label = Label.new()
 	_amount_label.theme_type_variation = &"MoneyLabel"
@@ -178,7 +187,7 @@ func _build() -> void:
 	_plus = Button.new()
 	_plus.text = "+"
 	_plus.custom_minimum_size = Vector2(56, 48)
-	_plus.pressed.connect(func() -> void: set_amount(amount + chip_value()))
+	_plus.pressed.connect(func() -> void: _adjust(amount + chip_value()))
 	_stepper.add_child(_plus)
 	var actions := HBoxContainer.new()
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER

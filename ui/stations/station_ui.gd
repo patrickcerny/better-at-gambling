@@ -2,7 +2,8 @@ class_name StationUi
 extends Control
 ## Base for the per-game overlays shown while seated. Subclasses build their controls in
 ## `_build`, redraw from the station's public/private state in `_refresh`, and send intents
-## with `send`. Esc / leave_station is handled by the match scene (stand up).
+## with `send`. Esc / leave_station is handled by the match scene (stand up). While seated the
+## cursor is free (InputRouter), so every button here is clicked with the mouse as well.
 
 signal rejected(error: StringName)
 
@@ -88,6 +89,15 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 
 func close() -> void:
 	visible = false
+
+
+## A clicked button keeps keyboard focus, and Space/Enter would then press it again instead of
+## reaching the bet/action keys: let go of the focus once a click is done.
+func _input(event: InputEvent) -> void:
+	if visible and event is InputEventMouseButton and not (event as InputEventMouseButton).pressed:
+		var f: Control = get_viewport().gui_get_focus_owner()
+		if f != null and is_ancestor_of(f):
+			get_viewport().gui_release_focus.call_deferred()
 
 
 ## Redraws from the newest station state.

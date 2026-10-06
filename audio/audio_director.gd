@@ -13,9 +13,12 @@ const MOOD_CROSSFADE: float = 2.5
 const MUSIC_DB: float = -6.0
 ## Moods (`set_mood`) and their loops in res://audio/music/.
 const MOODS: Dictionary[StringName, StringName] = {
-	&"menu": &"menu", &"casino": &"casino", &"quiz": &"quiz", &"minigame": &"quiz",
-	&"last_call": &"last_call", &"results": &"results",
+	&"menu": &"menu", &"casino": &"casino_base", &"quiz": &"quiz", &"minigame": &"quiz",
+	&"last_call": &"casino_base", &"results": &"results_winners",
 }
+## Playback speed per mood. Last Call keeps the floor track and speeds it up (Patrick).
+const MOOD_TEMPO: Dictionary[StringName, float] = {&"last_call": 1.12}
+const TEMPO_RAMP: float = 1.5
 const MAX_VARIANTS: int = 8
 
 var _clips: Dictionary[StringName, Array] = {}
@@ -29,6 +32,8 @@ var _music_current: AudioStreamPlayer
 var _current_track: StringName = &""
 var _mood: StringName = &""
 var _fade: Tween = null
+var _tempo: float = 1.0
+var _tempo_tween: Tween = null
 
 
 func _ready() -> void:
@@ -98,6 +103,23 @@ func set_mood(mood: StringName) -> void:
 		return
 	_mood = mood
 	_crossfade(MOODS.get(mood, mood) if mood != &"" else &"", MOOD_CROSSFADE)
+	_set_tempo(MOOD_TEMPO.get(mood, 1.0))
+
+
+## Current music playback speed (1.0 = normal).
+func music_tempo() -> float:
+	return _tempo
+
+
+func _set_tempo(tempo: float) -> void:
+	_tempo = tempo
+	if _tempo_tween != null and _tempo_tween.is_valid():
+		_tempo_tween.kill()
+	var player: AudioStreamPlayer = _music_current
+	if _silent or player == null:
+		return
+	_tempo_tween = create_tween()
+	_tempo_tween.tween_property(player, ^"pitch_scale", tempo, TEMPO_RAMP).set_trans(Tween.TRANS_SINE)
 
 
 ## Current mood (&"" when none was set).
@@ -140,6 +162,7 @@ func _crossfade(name: StringName, seconds: float) -> void:
 	if stream != null:
 		next.stream = stream
 		next.volume_db = -80.0
+		next.pitch_scale = 1.0
 		next.play()
 		_fade.tween_method(func(v: float) -> void: next.volume_db = linear_to_db(maxf(sin(v * PI * 0.5), 0.0001)) + MUSIC_DB, 0.0, 1.0, seconds)
 	_fade.chain().tween_callback(func() -> void:

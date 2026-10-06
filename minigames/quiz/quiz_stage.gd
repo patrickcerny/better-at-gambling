@@ -77,7 +77,8 @@ func _build(start: Dictionary) -> void:
 	_build_ui()
 	_show_banner("CASINO QUIZ", "3 questions · answer fast · no changing answers")
 	_set_screen("?", "")
-	_host_say("Welcome to the show!", QuizHost.Pose.HAPPY)
+	_host_say("Let the ceremonies begin!", QuizHost.Pose.HAPPY)
+	Audio.play(&"announcer_opening", &"UI", -2.0)
 	_refresh_scoreboard()
 
 
@@ -340,6 +341,9 @@ func _reveal(ev: Dictionary, live: bool) -> void:
 		_host_say(ALL_RIGHT_LINES[revealed_index % ALL_RIGHT_LINES.size()], QuizHost.Pose.HAPPY)
 	else:
 		_host_say("%s It's \"%s\"!" % [SOME_RIGHT_LINES[revealed_index % SOME_RIGHT_LINES.size()], answer_text], QuizHost.Pose.SURPRISED)
+	if right_count > 0 and live:
+		# Patrick's announcer praises a correct answer (one of the `announcer_correct-vN` lines).
+		Audio.play(&"announcer_correct", &"UI", -2.0)
 	var mine: int = int(gained.get(local_id, 0))
 	if local_id in players:
 		_set_status(("CORRECT!  +%d" % mine) if mine > 0 else ("WRONG!" if my_answer >= 0 else "TOO SLOW!"), Palette.MONEY_GREEN if mine > 0 else Palette.LOSS_RED)
@@ -387,7 +391,7 @@ func _finish(ranking: Array) -> void:
 				ConfettiBurst.burst(podiums[pid]["podium"] as Node3D, Vector3(0, 2.8, 0), 140, 1.2)
 	ConfettiBurst.rain(self, Vector3(0, 9.0, 0.5), Vector3(16, 0.2, 4), 160)
 	_host_say("What a show! Give it up for %s!" % " & ".join(winners), QuizHost.Pose.HAPPY, 0.0)
-	Audio.play(&"big_win", &"UI", -6.0)
+	Audio.play(&"quiz_winner", &"UI", -3.0)
 	_refresh_scoreboard()
 
 

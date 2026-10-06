@@ -36,7 +36,9 @@ extends Resource
 @export var roulette_min_bet: int = 10
 @export var roulette_max_total: int = 300
 @export var roulette_betting_time: float = 15.0
-@export var roulette_spin_time: float = 4.0
+## Matched to Patrick's wheel recording: the ball rattles into a pocket 3.4 s in and the
+## sound ends at 5.4 s (`RouletteWheelFx.DROP_TIME` covers the rest).
+@export var roulette_spin_time: float = 3.4
 @export var roulette_result_time: float = 3.0
 ## Extra fraction of the total return (stake + winnings) paid on every winning roulette bet.
 @export var roulette_generosity: float = 0.04

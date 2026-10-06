@@ -53,7 +53,17 @@ lights are dropped in game.
 
 ## Sound effects
 
-Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KENNEY_LICENSE.txt`).
+Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KENNEY_LICENSE.txt`), except the ones listed below.
+
+Casino-floor music `audio/music/casino_base.ogg`: "base music game 2", supplied by Patrick Cerny.
+
+Results music `audio/music/results_winners.ogg`: "Winners music" from 2:10, supplied by Patrick Cerny.
+
+Supplied by Patrick Cerny for this game: `minor_win-v1.ogg`; `roulette_spin-v1.ogg`; `announcer_correct-vN.ogg` (announcer voice lines); `quiz_winner-v1.ogg`; `last_call_announce-v1.ogg`; `hot_table_announce-v1.ogg`; `card_deal-v1.ogg`; `slots_lever-v1.ogg`; `chips_in_pot-v1.ogg` (the chip part of his "Put Chips in Pot"); `slots_riser_1..3-v1.ogg` (his "Slots tripple win" riser, cut at its three onsets, 0.71 s apart).
+
+`slots_no_match-v1.ogg`: "Two Tone" from *Casino Sounds* by Bjorn Lynne, supplied by Patrick Cerny (licence held by him).
+
+`jackpot_prize-v1.ogg`: "8 Bit Prize Win" from *Casino Tones* by Callum Donaldson, supplied by Patrick Cerny (licence held by him).
 
 ## Fonts
 

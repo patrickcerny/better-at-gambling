@@ -84,7 +84,7 @@ var _clock: float = 0.0
 var _vip_toast_at: float = -INF
 var _door_angle: float = 0.0
 var _owns_server: bool = false
-var _plinko_seen: Dictionary[int, bool] = {}
+var _plinko_seen: Dictionary[String, bool] = {}  # "station:drop_id" (ids count per board)
 var _pad_timer: float = 0.0
 var _countdown_shown: int = -1
 var _match_over: bool = false
@@ -814,17 +814,23 @@ func _on_event(ev: Dictionary) -> void:
 			if p != null and net != 0:
 				p.visuals.react(AvatarVisuals.reaction_for_net(net))
 			var details: Dictionary = ev.get("details", {})
-			if details.has("drop_id") and details.has("slot"):
-				_drop_plinko_chip(StringName(ev["station"]), int(ev["player"]), int(details["slot"]), int(details["drop_id"]))
-		&"bet_placed":
-			if ev.get("details", {}).get("game", "") == "plinko":
-				_plinko_seen.clear()
+			if details.has("drop_id") and details.has("slot"):  # missed the drop (joined late): quick fall
+				_drop_plinko_chip(StringName(ev["station"]), int(ev["player"]), int(details["slot"]), int(details["drop_id"]), 0.9, StringName(details.get("risk", "")))
+		&"plinko_dropped":  # the chip falls now and touches down as the server settles it
+			_drop_plinko_chip(StringName(ev["station"]), int(ev["player"]), int(ev["slot"]), int(ev["drop_id"]), Registry.balance.plinko_flight_time, StringName(ev.get("risk", "")))
 		&"jackpot_won":
-			Audio.play(&"jackpot_siren", &"SFX", -4.0)
-			if avatars.has(int(ev["player"])):
-				avatars[int(ev["player"])].visuals.react(&"big_win")
+			# Patrick's 8-bit prize fanfare: full volume for the winner, from the winner's spot for
+			# everyone else, with the siren quietly announcing it across the floor.
+			var winner: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if int(ev["player"]) == local_id or winner == null:
+				Audio.play(&"jackpot_prize", &"SFX", -2.0)
+			else:
+				Audio.play_at(&"jackpot_prize", winner, 0.0)
+				Audio.play(&"jackpot_siren", &"SFX", -12.0)
+			if winner != null:
+				winner.visuals.react(&"big_win")
 		&"last_call":
-			Audio.play(&"last_call_bell", &"SFX", -4.0)
+			Audio.play(&"last_call_announce", &"SFX", 0.0)
 		&"phase_changed":
 			var phase: Phase.Id = int(ev["phase"]) as Phase.Id
 			if phase != Phase.Id.LOBBY:
@@ -850,7 +856,7 @@ func _on_event(ev: Dictionary) -> void:
 				if not (ev.get("items", []) as Array).is_empty():
 					_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it.", 3.0)
 		&"hot_table":
-			Audio.play(&"hot_table", &"SFX", -6.0)
+			Audio.play(&"hot_table_announce", &"SFX", -2.0)
 			hud.banner("%s IS HOT!  Winnings ×%.2f  (follow the arrow)" % [ClientMatchState.station_label(StringName(ev["station"])).to_upper(), float(ev["multiplier"])], Color(1.0, 0.55, 0.1), 4.0)
 		&"house_comp":
 			if int(ev["player"]) == local_id:
@@ -1248,8 +1254,9 @@ func _seat(pid: int, sid: StringName, seat: int = -1) -> void:
 	var idx: int = seat if seat >= 0 else _seat_index(sid, pid)
 	a.sit(st.seats[clampi(idx, 0, st.seats.size() - 1)] if not st.seats.is_empty() else st, st.camera_for_seat(idx))
 	if pid == local_id:
-		router.seated_capture = st.free_look
 		router.set_mode(InputRouter.Mode.SEATED)
+		if st is BlackjackStation:
+			(st as BlackjackStation).set_viewer_seat(idx)
 		hud.set_prompt("")
 		hud.set_crosshair_visible(false)
 		var ui: StationUi = station_uis.get(st.game_id, null)
@@ -1264,6 +1271,8 @@ func _unseat(pid: int) -> void:
 	var a: PlayerAvatar = avatars.get(pid, null)
 	if a == null:
 		return
+	if pid == local_id and a.seat != null and a.seat.get_parent() is BlackjackStation:
+		(a.seat.get_parent() as BlackjackStation).set_viewer_seat(-1)
 	a.stand()
 	_report_position(pid)
 	if pid == local_id:
@@ -1271,7 +1280,6 @@ func _unseat(pid: int) -> void:
 			current_ui.close()
 			current_ui = null
 		hud.set_crosshair_visible(true)
-		router.seated_capture = false
 		router.set_mode(InputRouter.Mode.WALK)
 
 
@@ -1763,20 +1771,15 @@ func _on_station_state(sid: StringName) -> void:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 
 
-func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int) -> void:
-	# The result arrives when the server lands the chip; play the drop back now (ending exactly there).
+func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int, seconds: float, risk: StringName) -> void:
 	var st: PlinkoStation = map.stations.get(sid, null) as PlinkoStation
-	if st == null or _plinko_seen.has(drop_id):
+	var key: String = "%s:%d" % [sid, drop_id]
+	if st == null or _plinko_seen.has(key):
 		return
-	_plinko_seen[drop_id] = true
-	var rng := SeededRng.new(drop_id * 7919 + slot)
-	var path: Array[float] = PlinkoSteering.path_to_slot(PlinkoStation.ROWS, PlinkoStation.SLOTS, slot, rng)
-	var row_h: float = (PlinkoStation.BOARD_H - 1.2) / PlinkoStation.ROWS
-	var pts: Array[Vector3] = PlinkoSteering.path_points(path, st.slot_xs, st.drop_y, row_h, 0.65)
-	var chip := PlinkoChip.new()
-	chip.color = avatars[pid].color if avatars.has(pid) else Palette.CASINO_RED
-	st.add_child(chip)
-	chip.play(pts, 1.6, slot)
+	if _plinko_seen.size() > 256:
+		_plinko_seen.erase(_plinko_seen.keys()[0])  # oldest first; long since landed
+	_plinko_seen[key] = true
+	st.drop_chip(slot, drop_id, avatars[pid].color if avatars.has(pid) else Palette.CASINO_RED, seconds, risk)
 
 
 func _spawn_pile(id: int, amount: int, pos: Vector3) -> void:
