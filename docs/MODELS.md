@@ -24,3 +24,13 @@ download has to run on Patrick's PC.
 | cone | WoXpAJT0oD | Blocks a game that is out of order / not open |
 
 Page URL: `https://poly.pizza/m/<id>`.
+
+## Lucky Lounge decor models (shipped, CC0)
+
+Under `assets/models/`, placed by `maps/lucky_lounge/lounge_decor.gd` (client only; see CREDITS.md for
+the licence lines). Loaded through `PropModels` ids: `column` (Quaternius Column_Round3, the pillars),
+`pedestal` (Column_Round1, statue bases), `window_arch` (Window_Round1), `window_large` (Window_Large1,
+unused yet), `curtains` (Curtains_Double), `door_double` (Door_Double), `mirror` (Poly Haven
+ornate_mirror_01), `picture` (fancy_picture_frame_01), `bust` (marble_bust_01), `horse` (horse_statue_01).
+Surface textures live in `assets/textures/<name>/` (1K JPG, `tools/import_textures.sh` regenerates them
+from the research folder).

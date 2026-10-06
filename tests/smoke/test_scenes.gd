@@ -59,9 +59,13 @@ func test_lounge_decor_is_client_only() -> void:
 		if c is MultiMeshInstance3D:
 			instances += (c as MultiMeshInstance3D).multimesh.instance_count
 		assert_false(c is CollisionObject3D, "decor never collides (%s)" % c.name)
-	assert_gt(instances, 200, "chandeliers, panels and bulbs are batched")
-	assert_lt(decor.get_child_count(), 40, "a handful of draw calls, not one per piece")
-	assert_true((client_map.get_node("Carpet") as MeshInstance3D).material_override is ShaderMaterial, "patterned carpet")
+	assert_gt(instances, 400, "chandeliers, balusters, mouldings and bulbs are batched")
+	# MultiMeshes plus the hero props (windows, curtains, doors, mirrors, paintings, statues).
+	assert_lt(decor.get_child_count(), 80, "a few dozen draw calls, not one per piece")
+	var carpet: Material = (client_map.get_node("Carpet") as MeshInstance3D).material_override
+	assert_true(carpet is StandardMaterial3D and (carpet as StandardMaterial3D).albedo_texture != null, "textured carpet")
+	assert_true((carpet as StandardMaterial3D).uv1_triplanar, "world-space triplanar carpet")
+	assert_true((client_map.get_node("WallN").get_node("Mesh") as MeshInstance3D).material_override is StandardMaterial3D, "wallpaper on the walls")
 
 
 ## Beans get the toon material on clients and a plain material on the server.

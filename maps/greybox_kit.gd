@@ -117,6 +117,7 @@ static func ramp(parent: Node, from: Vector3, to: Vector3, width: float, color: 
 	var mesh: ArrayMesh = st.commit()
 	var body := StaticBody3D.new()
 	body.name = name
+	body.set_meta(&"greybox", name)  # survives the auto-rename of duplicate names
 	body.add_to_group(&"navsource")
 	var mi := MeshInstance3D.new()
 	mi.name = "Mesh"
@@ -132,6 +133,25 @@ static func ramp(parent: Node, from: Vector3, to: Vector3, width: float, color: 
 	body.rotation.y = yaw
 	parent.add_child(body)
 	return body
+
+
+## A box beam from `from` to `to` (centres of its ends, any pitch) with cross-section `section`
+## (width, height). Handrails, sloped stair rails, edge trims. `show` false keeps the collision
+## but hides the mesh (invisible rail guards dressed by client-only decor).
+static func beam(parent: Node, from: Vector3, to: Vector3, section: Vector2, color: Color, name: String = "Beam", collide: bool = true, metallic: float = 0.0, show: bool = true) -> Node3D:
+	var delta: Vector3 = to - from
+	var length: float = delta.length()
+	var size := Vector3(section.x, section.y, length)
+	var node: Node3D = box(parent, size, (from + to) * 0.5, color, name, collide)
+	if length > 0.001:
+		var dir: Vector3 = delta / length
+		var up: Vector3 = Vector3.UP if absf(dir.y) < 0.99 else Vector3.FORWARD
+		node.basis = Basis.looking_at(-dir, up)
+	var mesh: MeshInstance3D = node.get_node("Mesh") as MeshInstance3D
+	if metallic > 0.0:
+		mesh.material_override = material(color, metallic, 0.35)
+	mesh.visible = show
+	return node
 
 
 static func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
@@ -158,6 +178,7 @@ static func _solid(parent: Node, mesh: Mesh, shape: Shape3D, size: Vector3, pos:
 	else:
 		root = Node3D.new()
 	root.name = name
+	root.set_meta(&"greybox", name)  # survives the auto-rename of duplicate names
 	var mi := MeshInstance3D.new()
 	mi.name = "Mesh"
 	mi.mesh = mesh

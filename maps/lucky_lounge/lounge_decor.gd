@@ -1,23 +1,42 @@
 class_name LoungeDecor
 extends Node3D
-## Client-only dressing for the Lucky Lounge (M7 art pass, docs/ART_DIRECTION.md): patterned
-## carpet, a marble lobby with a red runner, dark wood wainscoting and framed wall panels, gold
-## crown moulding, crystal chandeliers with glowing bulbs, wall sconces, marquee bulbs around the
-## signs, and a warm haze + glow on the WorldEnvironment so only bulbs and signage bloom.
+## Client-only dressing for the Lucky Lounge (docs/ART_DIRECTION.md): CC0 surface textures on the
+## greybox (wine-red casino carpet, checker marble entrance, herringbone parquet in the bar and
+## the VIP lounge, damask wallpaper over mahogany wainscoting with a brass rail, black marble
+## counters and pillar bases, red velvet, coffered wood ceiling), classical columns, arched
+## windows with velvet curtains, double doors, a baroque mirror, paintings, a bust and a horse
+## statue in the VIP lounge, balusters on every railing, brass stair nosings, crystal chandeliers,
+## sconces, marquee bulbs and a warm haze + glow on the WorldEnvironment.
 ##
 ## Nothing here collides or touches gameplay. `LuckyLounge` adds it only when `Vfx.enabled()`
-## (never on the headless dedicated server). Repeated pieces are MultiMeshes, so the whole
-## pass costs a handful of draw calls on gl_compatibility.
+## (never on the headless server). Big surfaces use world-space triplanar materials (one material
+## per surface type, no UV work), repeated pieces are MultiMeshes, so the pass stays a few dozen
+## draw calls on gl_compatibility.
 
 const FLOOR_SHADER: Shader = preload("res://vfx/shaders/casino_floor.gdshader")
+const TEX_DIR: String = "res://assets/textures/"
 ## Where the chandeliers hang (the map's room lamps sit at the same points).
 const CHANDELIERS: Array[Vector3] = [
 	Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11),
 	Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, LuckyLounge.MEZZ_Y + 2.5, -5),
 ]
 const BULB_COLOR: Color = Color(1.0, 0.82, 0.52)
-const WOOD: Color = Color("#2A1A14")
-const WALL_PANEL: Color = Color("#5A2A2A")
+const GLASS_GLOW: Color = Color(0.45, 0.42, 0.62)
+## Arched windows: [centre on the wall, inward normal, height]. The VIP back wall gets shorter
+## ones above the mezzanine floor; the Plinko wall and the mirror/board walls stay free.
+const WINDOWS: Array = [
+	[Vector3(-21.75, 3.5, -11.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, -4.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, 3.0), Vector3(1, 0, 0), 3.2],
+	[Vector3(21.75, 3.5, -11.0), Vector3(-1, 0, 0), 3.2], [Vector3(21.75, 3.5, -4.0), Vector3(-1, 0, 0), 3.2], [Vector3(21.75, 3.5, 3.0), Vector3(-1, 0, 0), 3.2],
+	[Vector3(-16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2], [Vector3(16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2],
+	[Vector3(-19.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2], [Vector3(-11.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2],
+	[Vector3(-6.0, 5.4, -15.75), Vector3(0, 0, 1), 2.3], [Vector3(6.0, 5.4, -15.75), Vector3(0, 0, 1), 2.3],
+]
+## Double doors: [centre on the wall, inward normal, height]: staff door by the slots, the VIP
+## lounge's private door, the street door seen through the revolving door.
+const DOORS: Array = [
+	[Vector3(-13.75, 0.0, -15.75), Vector3(0, 0, 1), 2.7], [Vector3(0.0, LuckyLounge.MEZZ_Y, -15.75), Vector3(0, 0, 1), 2.65],
+	[Vector3(0.0, 0.0, 20.75), Vector3(0, 0, -1), 2.9],
+]
 
 var map: LuckyLounge
 ## Batches filled while building, turned into MultiMeshes at the end: key → [mesh, material, transforms].
@@ -25,6 +44,11 @@ var _batches: Dictionary = {}
 var _bulb_mat: StandardMaterial3D
 var _crystal_mat: StandardMaterial3D
 var _gold_mat: StandardMaterial3D
+var _brass_mat: StandardMaterial3D
+var _velvet_mat: StandardMaterial3D
+var _marble_mat: StandardMaterial3D
+var _wood_mat: StandardMaterial3D
+var _mats: Dictionary = {}
 
 
 func _init(p_map: LuckyLounge = null) -> void:
@@ -51,8 +75,20 @@ func _ready() -> void:
 	_crystal_mat.roughness = 0.1
 	_crystal_mat.metallic_specular = 1.0
 	_gold_mat = GreyboxKit.gold()
+	_brass_mat = _tex("brass", 0.6, Palette.WARM_GOLD.lightened(0.05), 0.3, 0.35, 0.85)
+	_velvet_mat = _tex("velvet", 0.8, Palette.VIP_BURGUNDY.lightened(0.08), 0.4, 0.95)
+	_marble_mat = _tex("black_marble", 2.0, Color(0.9, 0.88, 0.86), 0.3, 0.25)
+	_wood_mat = _tex("wooden_panels", 2.1, Color(0.78, 0.66, 0.56), 0.5, 0.6)
 	_floors()
 	_walls()
+	_ceiling()
+	_pillars()
+	_mezzanine()
+	_stairs()
+	_furniture()
+	_windows()
+	_doors()
+	_art()
 	_chandeliers()
 	_sconces()
 	_signs()
@@ -60,24 +96,82 @@ func _ready() -> void:
 	_flush()
 
 
+# --- Materials --------------------------------------------------------------------------------
+
+## A textured material from assets/textures/<folder>/ (albedo + optional normal), projected in
+## world space (triplanar) so every box and plane shares it with no UV work. `metres` is the
+## texture's tile size in the world; photo detail stays subtle (normal strength 0.3–0.5, tinted
+## towards the palette) so it sits with the toon beans.
+func _tex(folder: String, metres: float, tint: Color = Color.WHITE, normal_strength: float = 0.4, roughness: float = 0.9, metallic: float = 0.0, albedo_file: String = "albedo.jpg") -> StandardMaterial3D:
+	var key: String = "%s/%s/%.2f/%s/%.2f/%.2f/%.2f" % [folder, albedo_file, metres, tint.to_html(), normal_strength, roughness, metallic]
+	if _mats.has(key):
+		return _mats[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = load(TEX_DIR + folder + "/" + albedo_file) as Texture2D
+	m.albedo_color = tint
+	var normal_path: String = TEX_DIR + folder + "/normal.jpg"
+	if ResourceLoader.exists(normal_path):
+		m.normal_enabled = true
+		m.normal_texture = load(normal_path) as Texture2D
+		m.normal_scale = normal_strength
+	m.roughness = roughness
+	m.metallic = metallic
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE / metres
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	_mats[key] = m
+	return m
+
+
 # --- Floors -----------------------------------------------------------------------------------
 
 func _floors() -> void:
-	_retexture("Carpet", _carpet(Palette.CASINO_RED.darkened(0.42), Palette.CASINO_RED.darkened(0.55), 1.4))
-	_retexture("VipCarpet", _carpet(Palette.VIP_BURGUNDY, Palette.VIP_BURGUNDY.darkened(0.3), 1.0))
-	# The entrance hall is marble (black and cream), with a red runner from the revolving door.
-	_retexture("LobbyCarpet", _marble())
-	# Runner from the revolving door up to the fountain.
+	# Wine-red casino carpet (gold lattice, in the palette) with the carpet-fibre normal.
+	_retexture("Carpet", _tex("casino_carpet", 2.2, Color(0.92, 0.9, 0.9), 0.35, 0.95))
+	# The VIP lounge and the bar stand on herringbone parquet.
+	var parquet: StandardMaterial3D = _tex("herringbone_parquet", 1.6, Color(0.72, 0.56, 0.44), 0.45, 0.5)
+	_retexture("VipCarpet", parquet)
+	var bar_floor := _plane(Vector2(8.6, 5.6), Vector3(LuckyLounge.BAR_X, 0.014, 4.6), parquet)
+	bar_floor.name = "BarFloor"
+	# Black and cream checker marble in the entrance hall, with a red runner from the door.
+	_retexture("LobbyCarpet", _tex("checker_marble", 2.4, Color(0.95, 0.93, 0.9), 0.3, 0.25))
 	var runner := _plane(Vector2(3.2, 3.4), Vector3(0, 0.02, 14.4), _carpet(Palette.CASINO_RED.darkened(0.15), Palette.CASINO_RED.darkened(0.35), 0.8))
 	runner.name = "Runner"
 	for x: float in [-1.66, 1.66]:
-		_box(Vector3(0.12, 0.012, 3.4), Vector3(x, 0.022, 14.4), _gold_mat, "edge")
+		_box(Vector3(0.12, 0.012, 3.4), Vector3(x, 0.022, 14.4), _brass_mat, "brass")
+	# The stair treads are red carpet, the landing blocks too.
+	var stair_carpet: StandardMaterial3D = _tex("casino_carpet", 1.1, Palette.CASINO_RED.darkened(0.1), 0.3, 0.95)
+	for n: String in ["Stairs1", "Stairs2", "Landing"]:
+		_retexture_solid(n, stair_carpet)
 
 
 func _retexture(node_name: String, mat: Material) -> void:
 	var mi: MeshInstance3D = map.get_node_or_null(node_name) as MeshInstance3D
 	if mi != null:
 		mi.material_override = mat
+
+
+## Swaps the material of every GreyboxKit solid built under `name` (its mesh is the "Mesh" child).
+func _retexture_solid(node_name: String, mat: Material) -> void:
+	for solid: Node3D in _solids(node_name):
+		var mi: MeshInstance3D = solid.get_node_or_null(^"Mesh") as MeshInstance3D
+		if mi != null:
+			mi.material_override = mat
+
+
+## Every GreyboxKit piece whose build name starts with `prefix`. Pieces built in loops share a
+## name and get auto-renamed by the tree, so the kit tags them with a "greybox" meta instead.
+func _solids(prefix: String) -> Array[Node3D]:
+	var out: Array[Node3D] = []
+	for c: Node in map.get_children():
+		if c is Node3D and c.has_meta(&"greybox") and String(c.get_meta(&"greybox")).begins_with(prefix):
+			out.append(c)
+	return out
+
+
+static func _kit_name(n: Node) -> String:
+	return String(n.get_meta(&"greybox", n.name))
 
 
 static func _carpet(base: Color, alt: Color, tile: float) -> ShaderMaterial:
@@ -92,25 +186,20 @@ static func _carpet(base: Color, alt: Color, tile: float) -> ShaderMaterial:
 	return m
 
 
-static func _marble() -> ShaderMaterial:
-	var m := ShaderMaterial.new()
-	m.shader = FLOOR_SHADER
-	m.set_shader_parameter(&"mode", 1)
-	m.set_shader_parameter(&"base_color", Color("#D6CCBA"))
-	m.set_shader_parameter(&"alt_color", Color("#3A302B"))
-	m.set_shader_parameter(&"accent_color", Palette.WARM_GOLD)
-	m.set_shader_parameter(&"tile", 1.1)
-	m.set_shader_parameter(&"roughness_value", 0.3)
-	return m
-
-
-# --- Walls ------------------------------------------------------------------------------------
+# --- Walls and ceiling ------------------------------------------------------------------------
 
 func _walls() -> void:
 	var hx: float = LuckyLounge.SIZE_X * 0.5 - 0.25
 	var hz: float = LuckyLounge.SIZE_Z * 0.5 - 0.25
-	var wood := GreyboxKit.material(WOOD)
-	var panel_mat := GreyboxKit.material(WALL_PANEL)
+	# Damask wallpaper on every wall (wine on wine), gold on black behind the VIP lounge.
+	var damask: StandardMaterial3D = _tex("damask_wallpaper", 2.0, Color(0.95, 0.9, 0.9), 0.0, 0.85)
+	for n: String in ["WallN", "WallW", "WallE", "WallS1", "WallS2", "WallSTop", "PorchWall", "PorchSide"]:
+		_retexture_solid(n, damask)
+	var vip_damask: StandardMaterial3D = _tex("damask_wallpaper", 1.6, Color(0.95, 0.92, 0.85), 0.0, 0.8, 0.0, "albedo_gold.jpg")
+	_box(Vector3(22.0, LuckyLounge.WALL_H - LuckyLounge.MEZZ_Y - 0.3, 0.04), Vector3(2.0, (LuckyLounge.WALL_H + LuckyLounge.MEZZ_Y) * 0.5 - 0.1, -hz + 0.025), vip_damask, "vipwall")
+	# The map's low gold trim strips sit where the chair rail goes now.
+	for solid: Node3D in _solids("Trim"):
+		solid.visible = false
 	# North and east/west walls run full length; the south wall has the revolving-door gap.
 	var runs: Array = [  # [start, end, inward normal]
 		[Vector3(-hx, 0, -hz), Vector3(hx, 0, -hz), Vector3(0, 0, 1)],
@@ -128,17 +217,213 @@ func _walls() -> void:
 		var dir: Vector3 = along / length
 		var mid: Vector3 = (a + b) * 0.5
 		var basis := Basis.looking_at(-n, Vector3.UP)  # local x runs along the wall, +z into the room
-		# Wainscot (dark wood to 1.05 m), gold chair rail, gold crown moulding under the ceiling.
-		_box_b(Vector3(length, 1.05, 0.06), mid + n * 0.03 + Vector3(0, 0.525, 0), basis, wood, "wood")
-		_box_b(Vector3(length, 0.09, 0.1), mid + n * 0.06 + Vector3(0, 1.08, 0), basis, _gold_mat, "gold")
+		# Mahogany wainscot to 1.05 m, brass chair rail, gold crown moulding under the ceiling.
+		_box_b(Vector3(length, 1.05, 0.06), mid + n * 0.03 + Vector3(0, 0.525, 0), basis, _wood_mat, "wood")
+		_box_b(Vector3(length, 0.09, 0.1), mid + n * 0.06 + Vector3(0, 1.08, 0), basis, _brass_mat, "brass")
 		_box_b(Vector3(length, 0.22, 0.14), mid + n * 0.07 + Vector3(0, LuckyLounge.WALL_H - 0.2, 0), basis, _gold_mat, "gold")
-		# Framed damask-coloured panels between the rail and the moulding.
+		# Gold mouldings frame the wallpaper between the rail and the ceiling, except where a
+		# window or door sits; the VIP back wall (behind the mezzanine) is handled on its own.
 		var count: int = maxi(1, int(length / 3.6))
 		var step: float = length / count
 		for i: int in count:
-			var c: Vector3 = a + dir * (step * (i + 0.5)) + Vector3(0, 3.6, 0)
-			_box_b(Vector3(step - 0.7, 3.9, 0.04), c + n * 0.02, basis, _gold_mat, "gold")
-			_box_b(Vector3(step - 0.86, 3.74, 0.05), c + n * 0.035, basis, panel_mat, "panel")
+			var c: Vector3 = a + dir * (step * (i + 0.5))
+			if _near_opening(c, 2.7) or (n.z > 0.5 and absf(c.x) < 10.0):
+				continue
+			_box_b(Vector3(step - 0.7, 3.9, 0.04), c + n * 0.02 + Vector3(0, 3.6, 0), basis, _gold_mat, "gold")
+			_box_b(Vector3(step - 0.86, 3.74, 0.05), c + n * 0.035 + Vector3(0, 3.6, 0), basis, _velvet_mat, "velvet")
+	# VIP back wall: mouldings between the windows, above the mezzanine floor.
+	for x: float in [-9.0, 0.0, 9.0]:
+		if x == 0.0:
+			continue
+		_box(Vector3(2.4, 2.4, 0.04), Vector3(x, 5.4, -hz + 0.065), _gold_mat, "gold")
+		_box(Vector3(2.24, 2.24, 0.05), Vector3(x, 5.4, -hz + 0.08), _velvet_mat, "velvet")
+
+
+func _near_opening(p: Vector3, radius: float) -> bool:
+	for w: Array in WINDOWS:
+		var c: Vector3 = w[0]
+		if Vector2(c.x, c.z).distance_to(Vector2(p.x, p.z)) < radius and absf(c.y - 3.6) < 2.0:
+			return true
+	for d: Array in DOORS:
+		var c: Vector3 = d[0]
+		if Vector2(c.x, c.z).distance_to(Vector2(p.x, p.z)) < radius and absf(c.y - 1.0) < 2.0:
+			return true
+	return false
+
+
+func _ceiling() -> void:
+	# Coffered dark wood; the chandeliers hang against it.
+	_retexture_solid("Ceiling", _tex("coffered_ceiling", 2.6, Color(0.95, 0.88, 0.8), 0.5, 0.75))
+
+
+# --- Columns, mezzanine, stairs ---------------------------------------------------------------
+
+func _pillars() -> void:
+	# Classical round columns (Quaternius) on black marble plinths replace the plain cylinders;
+	# the collision cylinder underneath stays.
+	for solid: Node3D in _solids("Pillar"):
+		(solid.get_node(^"Mesh") as Node3D).visible = false
+		var base: Node3D = solid.get_node_or_null(^"Base")
+		if base != null:
+			base.visible = false
+		var col: Node3D = PropModels.make(&"column", LuckyLounge.WALL_H - 0.5)
+		col.scale = Vector3(0.75, 1.0, 0.75)
+		col.position.y = -LuckyLounge.WALL_H * 0.5 + 0.5
+		_recolor(col, {"Marble": GreyboxKit.material(Palette.CREAM.darkened(0.12), 0.0, 0.55)})
+		solid.add_child(col)
+		var foot: Vector3 = solid.position - Vector3(0, LuckyLounge.WALL_H * 0.5, 0)
+		_box(Vector3(1.5, 0.5, 1.5), foot + Vector3(0, 0.25, 0), _marble_mat, "marble")
+		_box(Vector3(1.6, 0.06, 1.6), foot + Vector3(0, 0.53, 0), _brass_mat, "brass")
+
+
+func _mezzanine() -> void:
+	# Soffit and brass edge under the VIP floor, so the slab reads as a built balcony from the pit.
+	var y: float = LuckyLounge.MEZZ_Y
+	_box(Vector3(17.9, 0.02, 9.9), Vector3(0, y - 0.41, -5.0), _tex("coffered_ceiling", 2.0, Color(0.9, 0.84, 0.78), 0.4, 0.8), "soffit")
+	_box(Vector3(4.5, 0.02, 2.9), Vector3(11.0, y - 0.41, -3.0), _wood_mat, "wood")
+	_box(Vector3(18.1, 0.44, 0.06), Vector3(0, y - 0.2, 0.03), _wood_mat, "wood")
+	_box(Vector3(18.1, 0.1, 0.1), Vector3(0, y - 0.02, 0.05), _brass_mat, "brass")
+	_box(Vector3(0.06, 0.44, 3.1), Vector3(13.33, y - 0.2, -3.0), _wood_mat, "wood")
+	_box(Vector3(0.06, 0.44, 10.1), Vector3(-9.03, y - 0.2, -5.0), _wood_mat, "wood")
+	_box(Vector3(0.06, 0.44, 5.6), Vector3(9.03, y - 0.2, -7.25), _wood_mat, "wood")
+	_box(Vector3(0.06, 0.44, 1.6), Vector3(9.03, y - 0.2, -0.75), _wood_mat, "wood")
+	# Balusters under every handrail (the map's rails are an invisible guard + a gold bar).
+	var baluster := CylinderMesh.new()
+	baluster.top_radius = 0.025
+	baluster.bottom_radius = 0.025
+	baluster.height = 1.0
+	baluster.radial_segments = 6
+	for rail: Node3D in _solids("MezzRail") + _solids("LandingRail") + _solids("StairGuard"):
+		if not _kit_name(rail).ends_with("Bar"):
+			_balusters(rail, baluster)
+	# The VIP floor gets its own lamps: the single ceiling lamp left it dim.
+	for x: float in [-6.0, 6.0]:
+		var l: OmniLight3D = GreyboxKit.lamp(self, Vector3(x, y + 2.6, -5.0), 1.4, 8.0)
+		l.name = "VipLamp"
+	# Velvet rope across the two gate posts is not wanted (the bouncer handles entry); a red
+	# carpet runner leads from the gate to the tables instead.
+	var runner := _plane(Vector2(2.4, 7.0), Vector3(5.6, y + 0.013, -4.0), _carpet(Palette.VIP_BURGUNDY.lightened(0.05), Palette.VIP_BURGUNDY.darkened(0.2), 0.8))
+	runner.name = "VipRunner"
+	runner.rotation.y = PI * 0.5
+
+
+## Vertical balusters every 0.3 m along a GreyboxKit beam (its local z runs along the rail).
+func _balusters(rail: Node3D, mesh: Mesh) -> void:
+	var shape: CollisionShape3D = null
+	for c: Node in rail.get_children():
+		if c is CollisionShape3D:
+			shape = c
+	if shape == null or not (shape.shape is BoxShape3D):
+		return
+	var size: Vector3 = (shape.shape as BoxShape3D).size
+	var count: int = maxi(1, int(size.z / 0.3))
+	for i: int in count + 1:
+		var local := Vector3(0, 0, -size.z * 0.5 + size.z * i / count)
+		var world: Vector3 = rail.to_global(local)
+		var bottom: float = world.y - size.y * 0.5
+		# Stair guards slope: drop the baluster to the step under it.
+		var height: float = size.y - 0.08
+		_add(&"baluster", mesh, _brass_mat, Transform3D(Basis().scaled(Vector3(1, height, 1)), Vector3(world.x, bottom + height * 0.5, world.z)))
+
+
+func _stairs() -> void:
+	# Brass nosings every 25 cm of rise read as steps on the carpeted slopes.
+	for flight: Array in LuckyLounge.STAIR_FLIGHTS:
+		var a: Vector3 = flight[0]
+		var b: Vector3 = flight[1]
+		var steps: int = int(round((b.y - a.y) / 0.25))
+		for i: int in range(1, steps + 1):
+			var p: Vector3 = a.lerp(b, float(i) / steps)
+			_box(Vector3(LuckyLounge.STAIRS_W, 0.03, 0.08), p + Vector3(0, 0.012, 0), _brass_mat, "brass")
+
+
+# --- Furniture and props ----------------------------------------------------------------------
+
+func _furniture() -> void:
+	# Cashier desk and the shop counter in black marble, bar front in velvet, back bar in wood.
+	_retexture_solid("Reception", _marble_mat)
+	_retexture_solid("ShopCounter", _marble_mat)
+	_retexture_solid("Bar", _velvet_mat)
+	_retexture_solid("BackBar", _wood_mat)
+	_retexture_solid("MezzFloor", _wood_mat)
+	_retexture_solid("MezzLanding", _wood_mat)
+	_retexture_solid("Plinth", _marble_mat)
+	_retexture_solid("Rope", _velvet_mat)
+	# Marble bust and horse statue on short columns in the VIP corners.
+	var y: float = LuckyLounge.MEZZ_Y
+	for spec: Array in [[Vector3(-8.0, y, -9.0), &"bust", 0.9], [Vector3(8.0, y, -9.0), &"horse", 1.0]]:
+		var pedestal: Node3D = PropModels.make(&"pedestal", 1.0)
+		pedestal.scale = Vector3(0.55, 1.0, 0.55)
+		pedestal.position = spec[0]
+		_recolor(pedestal, {"Marble": _marble_mat})
+		add_child(pedestal)
+		var statue: Node3D = PropModels.make(spec[1], spec[2])
+		statue.position = spec[0] + Vector3(0, 1.0, 0)
+		statue.rotation.y = PI * 0.25 * (1.0 if spec[0].x < 0.0 else -1.0)
+		add_child(statue)
+
+
+func _windows() -> void:
+	var white := GreyboxKit.material(Palette.CREAM.darkened(0.08), 0.0, 0.7)
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = Color(0.06, 0.07, 0.12)
+	glass.emission_enabled = true
+	glass.emission = GLASS_GLOW
+	glass.emission_energy_multiplier = 0.35
+	glass.roughness = 0.1
+	glass.metallic = 0.3
+	var curtain_red := _tex("velvet", 0.9, Palette.CASINO_RED.darkened(0.25), 0.5, 0.95)
+	for w: Array in WINDOWS:
+		var c: Vector3 = w[0]
+		var n: Vector3 = w[1]
+		var h: float = w[2]
+		var win: Node3D = PropModels.make(&"window_arch", h)
+		win.position = c + n * 0.12 - Vector3(0, h * 0.5, 0)
+		win.rotation.y = atan2(n.x, n.z)
+		_recolor(win, {"White": white, "Glass": glass})
+		add_child(win)
+		var curtains: Node3D = PropModels.make(&"curtains", 0.0, h * 0.58 + 0.9)
+		curtains.position = c + n * 0.32 - Vector3(0, h * 0.5 + 0.2, 0)
+		curtains.rotation.y = atan2(n.x, n.z)
+		_recolor(curtains, {"Couch_Blue": curtain_red, "LightMetal": _gold_mat})
+		add_child(curtains)
+
+
+func _doors() -> void:
+	var wood := GreyboxKit.material(Color("#3A2318"), 0.0, 0.6)
+	for d: Array in DOORS:
+		var c: Vector3 = d[0]
+		var n: Vector3 = d[1]
+		var door: Node3D = PropModels.make(&"door_double", d[2])
+		door.position = c + n * 0.2
+		door.rotation.y = atan2(n.x, n.z)
+		_recolor(door, {"Wood": wood, "Gold": _gold_mat})
+		add_child(door)
+
+
+func _art() -> void:
+	# Baroque mirror in the entrance hall; paintings in the mouldings along the game floor.
+	for x: float in [-6.0, 6.0]:
+		var mirror: Node3D = PropModels.make(&"mirror", 2.2)
+		mirror.position = Vector3(x, 1.4, 15.62)
+		mirror.rotation.y = PI
+		add_child(mirror)
+	for spec: Array in [[Vector3(-21.75, 3.5, -7.5), Vector3(1, 0, 0)], [Vector3(-21.75, 3.5, 7.0), Vector3(1, 0, 0)], [Vector3(21.75, 3.5, -7.5), Vector3(-1, 0, 0)], [Vector3(21.75, 3.5, 11.0), Vector3(-1, 0, 0)]]:
+		var n: Vector3 = spec[1]
+		var pic: Node3D = PropModels.make(&"picture", 0.0, 1.6)
+		pic.position = spec[0] + n * 0.1 - Vector3(0, 0.6, 0)
+		pic.rotation.y = atan2(n.x, n.z)
+		add_child(pic)
+
+
+## Replaces a prop's materials by their source name (Quaternius models use flat named colours).
+func _recolor(prop: Node3D, by_name: Dictionary) -> void:
+	for n: Node in prop.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = n
+		for i: int in mi.mesh.get_surface_count():
+			var src: Material = mi.get_active_material(i)
+			if src != null and by_name.has(src.resource_name):
+				mi.set_surface_override_material(i, by_name[src.resource_name])
 
 
 # --- Lights -----------------------------------------------------------------------------------
@@ -214,6 +499,8 @@ func _sconces() -> void:
 	for s: Array in spots:
 		var p: Vector3 = s[0]
 		var n: Vector3 = s[1]
+		if _near_opening(p, 1.6):
+			continue
 		var basis := Basis.looking_at(-n, Vector3.UP)
 		_add(&"plate", plate, _gold_mat, Transform3D(basis, p + n * 0.03))
 		_add(&"shade", shade, shade_mat, Transform3D(Basis(), p + n * 0.2 + Vector3(0, 0.2, 0)))
@@ -232,13 +519,14 @@ func _signs() -> void:
 	title.position = sign_c + Vector3(0, 0, -0.02)
 	title.rotation.y = PI
 	add_child(title)
-	# VIP sign on the mezzanine edge.
-	var vip_c := Vector3(9.0, LuckyLounge.MEZZ_Y + 2.6, -1.0 + 0.07)
-	_marquee(bulb, vip_c + Vector3(0, 0, 0.02), Vector2(2.6, 0.8), Vector3(0, 0, 1))
+	# VIP sign over the gate line, facing the stair landing (east).
+	var vip_c: Vector3 = LuckyLounge.VIP_SIGN_POS + Vector3(0.07, 0, 0)
+	_marquee(bulb, vip_c + Vector3(0.02, 0, 0), Vector2(2.6, 0.8), Vector3(1, 0, 0))
 	var vip := _label("VIP LOUNGE", 72, Palette.VIP_BURGUNDY)
 	vip.outline_modulate = Palette.VIP_GOLD
 	vip.outline_size = 4
-	vip.position = vip_c + Vector3(0, 0, 0.01)
+	vip.position = vip_c + Vector3(0.01, 0, 0)
+	vip.rotation.y = PI * 0.5
 	add_child(vip)
 
 
