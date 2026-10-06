@@ -77,7 +77,8 @@ func _build(start: Dictionary) -> void:
 	_build_ui()
 	_show_banner("CASINO QUIZ", "3 questions · answer fast · no changing answers")
 	_set_screen("?", "")
-	_host_say("Welcome to the show!", QuizHost.Pose.HAPPY)
+	_host_say("Let the ceremonies begin!", QuizHost.Pose.HAPPY)
+	Audio.play(&"announcer_opening", &"UI", -2.0)
 	_refresh_scoreboard()
 
 
