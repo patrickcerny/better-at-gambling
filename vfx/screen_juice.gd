@@ -11,6 +11,9 @@ const MAX_OFFSET: float = 0.22
 const DECAY: float = 1.5
 
 var trauma: float = 0.0
+## The viewport whose camera the shake moves (the pixel look draws the world in a sub viewport);
+## null means this node's own viewport.
+var camera_viewport: Viewport = null
 var _stop_until_ms: int = 0
 var _stop_scale: float = 1.0
 var _restore_ms: int = 0
@@ -87,7 +90,8 @@ func _update_shake(dt: float, now: int) -> void:
 		if _cam != null:
 			_reset_cam()
 		return
-	var cam: Camera3D = get_viewport().get_camera_3d() if is_inside_tree() else null
+	var vp: Viewport = camera_viewport if is_instance_valid(camera_viewport) else (get_viewport() if is_inside_tree() else null)
+	var cam: Camera3D = vp.get_camera_3d() if vp != null else null
 	if cam != _cam:
 		_reset_cam()
 		_cam = cam

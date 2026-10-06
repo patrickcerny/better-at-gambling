@@ -30,6 +30,9 @@ var hud: Hud
 var router: InputRouter
 var emote_wheel: EmoteWheel
 var ui_layer: CanvasLayer
+## Everything 3D sits in here (the map, `world_root`, minigame stages, the results podium): the
+## pixel look renders it at a lower resolution while `ui_layer` stays sharp (`PixelView`).
+var pixel_view: PixelView
 var world_root: Node3D
 var local: PlayerAvatar = null
 var local_id: int = -1
@@ -119,12 +122,16 @@ func _ready() -> void:
 	cfg = Registry.balance
 	var cmd: Cmdline = SceneRouter.cmdline if SceneRouter.cmdline != null else Cmdline.from_os()
 	cmd_quit_after_results = cmd.has_flag("quit-after-results")
+	pixel_view = PixelView.new()
+	pixel_view.name = "PixelView"
+	add_child(pixel_view)
+	pixel_view.setup(Net.mode == Net.Mode.SERVER)  # the dedicated server renders nothing
 	map = LuckyLounge.new()
 	map.name = "LuckyLounge"
-	add_child(map)
+	pixel_view.world.add_child(map)
 	world_root = Node3D.new()
 	world_root.name = "World"
-	add_child(world_root)
+	pixel_view.world.add_child(world_root)
 	router = InputRouter.new()
 	router.name = "InputRouter"
 	add_child(router)
@@ -1006,7 +1013,7 @@ func _point_at_hot_table() -> void:
 	var target: Vector3 = node.global_position + Vector3(0, 2.0, 0)
 	var size: Vector2 = get_viewport().get_visible_rect().size
 	var on_screen: bool = not cam.is_position_behind(target)
-	var p: Vector2 = cam.unproject_position(target)
+	var p: Vector2 = PixelView.to_canvas(cam, cam.unproject_position(target), hud)
 	if on_screen and Rect2(Vector2.ZERO, size).grow(-40.0).has_point(p):
 		hud.set_hot_pointer(false)
 		return
@@ -1362,7 +1369,8 @@ func _show_results(_standings: Array) -> void:
 	hud.visible = false
 	results_panel = ResultsStage.new()
 	results_panel.name = "Results"
-	add_child(results_panel)
+	results_panel.ui_host = self  # its 2D stays sharp outside the pixelated world
+	pixel_view.world.add_child(results_panel)
 	results_panel.setup(view.state, local_id, view.state.room_mode)
 	results_panel.play_again_pressed.connect(func() -> void:
 		if view.state.room_mode:
@@ -1385,7 +1393,8 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 		return
 	stage = def.stage_script.new() as MinigameStage
 	stage.name = "MinigameStage"
-	add_child(stage)
+	stage.ui_host = self  # its 2D stays sharp outside the pixelated world
+	pixel_view.world.add_child(stage)
 	stage.begin(view.state, local_id, start, snapshot_state)
 	if current_ui != null:
 		current_ui.close()
@@ -1965,6 +1974,7 @@ func _on_ragdoll_settled(pid: int) -> void:
 func _add_table_fx() -> void:
 	var juice := ScreenJuice.new()
 	juice.name = "ScreenJuice"
+	juice.camera_viewport = pixel_view.world_viewport()  # the shake needs the camera that draws the world
 	add_child(juice)
 	table_fx = TableFx.new()
 	table_fx.name = "TableFx"

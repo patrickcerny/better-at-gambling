@@ -13,7 +13,8 @@ const DEFAULTS: Dictionary = {
 	## Voice chat: "push_to_talk", "open_mic" or "off" (see `VoiceChannel.MODE_KEYS`).
 	"voice": {"mode": "push_to_talk"},
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false},
-	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
+	## `pixel_scale`: the pixel look's shrink factor 1 (off), 2, 3 or 4 (see `PixelView`).
+	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0, "pixel_scale": 3},
 }
 const FPS_CAPS: Array[int] = [0, 60, 120, 144, 240]
 
@@ -57,6 +58,11 @@ func save() -> void:
 ## Mouse look in radians per pixel.
 func mouse_look() -> float:
 	return BASE_MOUSE * float(get_value("controls", "mouse_sensitivity"))
+
+
+## The pixel look's shrink factor, clamped to the offered steps (1 = off).
+func pixel_scale() -> int:
+	return clampi(int(get_value("video", "pixel_scale")), PixelView.SCALES[0], PixelView.SCALES[-1])
 
 
 ## Bus gain for a 0..1 volume slider. Squared amplitude so the slider feels even to the ear

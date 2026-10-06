@@ -154,7 +154,7 @@ func test_plinko_panel_leaves_the_board_visible() -> void:
 	assert_lt(rect.size.y, view.y * 0.6)
 	# The whole board (funnel to bucket plates) is on screen and clear of the panel.
 	var st: PlinkoStation = scene.map.stations[&"plinko_1"]
-	var cam: Camera3D = scene.get_viewport().get_camera_3d()
+	var cam: Camera3D = scene.pixel_view.world_viewport().get_camera_3d()  # the pixel look draws the world in a sub viewport
 	var proj: Projection = Projection.create_perspective(cam.fov, view.x / view.y, cam.near, cam.far)
 	var to_screen: Callable = func(local: Vector3) -> Vector2:  # on a 1920x1080 canvas (headless windows are tiny)
 		var p: Vector3 = cam.global_transform.affine_inverse() * st.to_global(local)

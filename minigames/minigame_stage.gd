@@ -12,6 +12,9 @@ var state: ClientMatchState
 var local_id: int = -1
 var camera: Camera3D
 var ui: CanvasLayer
+## Where the UI layer goes: the match scene points it outside the pixelated 3D view (`PixelView`)
+## so the 2D stays sharp; null keeps it under the stage. The stage frees it either way.
+var ui_host: Node = null
 
 
 ## Sets up for the minigame described by `start` (the `minigame_started` event) and, when joining
@@ -23,12 +26,17 @@ func begin(p_state: ClientMatchState, p_local_id: int, start: Dictionary, snapsh
 	ui = CanvasLayer.new()
 	ui.name = "StageUI"
 	ui.layer = 5
-	add_child(ui)
+	(ui_host if ui_host != null else self).add_child(ui)
 	_build(start)
 	if not snapshot_state.is_empty():
 		apply_state(snapshot_state)
 	if camera != null:
 		camera.make_current()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and is_instance_valid(ui) and ui.get_parent() != self:
+		ui.queue_free()  # hosted outside the stage: goes with it
 
 
 ## Subclass: build the set and UI.
