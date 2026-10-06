@@ -850,7 +850,7 @@ func _on_event(ev: Dictionary) -> void:
 				if not (ev.get("items", []) as Array).is_empty():
 					_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it.", 3.0)
 		&"hot_table":
-			Audio.play(&"hot_table", &"SFX", -6.0)
+			Audio.play(&"hot_table_announce", &"SFX", -2.0)
 			hud.banner("%s IS HOT!  Winnings ×%.2f  (follow the arrow)" % [ClientMatchState.station_label(StringName(ev["station"])).to_upper(), float(ev["multiplier"])], Color(1.0, 0.55, 0.1), 4.0)
 		&"house_comp":
 			if int(ev["player"]) == local_id:
