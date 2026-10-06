@@ -387,7 +387,7 @@ func _finish(ranking: Array) -> void:
 				ConfettiBurst.burst(podiums[pid]["podium"] as Node3D, Vector3(0, 2.8, 0), 140, 1.2)
 	ConfettiBurst.rain(self, Vector3(0, 9.0, 0.5), Vector3(16, 0.2, 4), 160)
 	_host_say("What a show! Give it up for %s!" % " & ".join(winners), QuizHost.Pose.HAPPY, 0.0)
-	Audio.play(&"big_win", &"UI", -6.0)
+	Audio.play(&"quiz_winner", &"UI", -3.0)
 	_refresh_scoreboard()
 
 

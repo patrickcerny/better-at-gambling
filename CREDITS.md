@@ -59,7 +59,7 @@ Casino-floor music `audio/music/casino_base.ogg`: "base music game 2", supplied 
 
 Results music `audio/music/results_winners.ogg`: "Winners music" from 2:10, supplied by Patrick Cerny.
 
-Supplied by Patrick Cerny for this game: `minor_win-v1.ogg`; `last_call_announce-v1.ogg`; `hot_table_announce-v1.ogg`; `card_deal-v1.ogg`; `slots_lever-v1.ogg`; `chips_in_pot-v1.ogg` (the chip part of his "Put Chips in Pot"); `slots_riser_1..3-v1.ogg` (his "Slots tripple win" riser, cut at its three onsets, 0.71 s apart).
+Supplied by Patrick Cerny for this game: `minor_win-v1.ogg`; `quiz_winner-v1.ogg`; `last_call_announce-v1.ogg`; `hot_table_announce-v1.ogg`; `card_deal-v1.ogg`; `slots_lever-v1.ogg`; `chips_in_pot-v1.ogg` (the chip part of his "Put Chips in Pot"); `slots_riser_1..3-v1.ogg` (his "Slots tripple win" riser, cut at its three onsets, 0.71 s apart).
 
 `slots_no_match-v1.ogg`: "Two Tone" from *Casino Sounds* by Bjorn Lynne, supplied by Patrick Cerny (licence held by him).
 
