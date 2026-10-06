@@ -275,7 +275,7 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ## M7 — Polish: UI/UX, audio, VFX, animation, feel
 
 ### Tasks
-- [ ] full theme pass
+- [x] full theme pass
 - [x] animated money counters
 - [x] card dealing/chip sliding/roulette ball/slot reel animations
 - [x] win/lose/jackpot VFX and hit-stop
@@ -300,10 +300,10 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 - [x] emotes wheel
 - [x] blackjack **split**
 - [x] input glyph switching (keyboard ↔ gamepad)
-- [ ] improved placeholder art (better procedural props, lighting, glow)
+- [x] improved placeholder art (better procedural props, lighting, glow)
 
 ### Tests
-- [ ] smoke tests for all scenes
+- [x] smoke tests for all scenes
 - [x] split logic unit tests
 - [x] awards computation tests
 - [ ] no FPS regression in a scripted benchmark scene (record FPS in PROGRESS.md if a renderer is available)
