@@ -235,6 +235,8 @@ func _on_money_changed(player: int, amount: int, _balance: int, reason: StringNa
 		money_pop(amount)
 	if reason == &"stake":
 		Audio.play(&"chip_clack", &"SFX", -8.0)
+	elif amount > 0 and str(reason).begins_with("win_"):
+		Audio.play(&"minor_win" if amount < AvatarVisuals.BIG_WIN else &"big_win", &"SFX", -6.0)
 	elif amount > 0:
 		Audio.play(&"coin" if amount < 200 else &"big_win", &"SFX", -6.0)
 

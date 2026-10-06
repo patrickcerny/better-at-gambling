@@ -53,7 +53,9 @@ lights are dropped in game.
 
 ## Sound effects
 
-Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KENNEY_LICENSE.txt`).
+Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KENNEY_LICENSE.txt`), except the ones listed below.
+
+Supplied by Patrick Cerny for this game: `minor_win-v1.ogg`.
 
 ## Fonts
 
