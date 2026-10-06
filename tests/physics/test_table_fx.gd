@@ -198,12 +198,11 @@ func test_last_call_dims_the_room_and_restores_it() -> void:
 	assert_almost_eq(we.environment.ambient_light_energy, 0.4 * LastCallLighting.DIM, 0.01)
 	assert_eq(lc.spots.size(), 1)
 	assert_gt(lc.spots[0].light_energy, 1.0)
-	assert_eq(Audio.mood, &"last_call")
 	state.last_call = false
 	await wait_seconds(LastCallLighting.FADE + 0.3)
 	assert_almost_eq(lamp.light_energy, 3.0, 0.01)
 	assert_almost_eq(we.environment.ambient_light_energy, 0.4, 0.01)
-	assert_eq(Audio.mood, &"")
+
 
 
 func _stacks(parent: Node) -> int:

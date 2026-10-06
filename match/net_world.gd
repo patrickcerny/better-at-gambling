@@ -18,6 +18,9 @@ var _players: Dictionary[int, InterpBuffer] = {}
 var _rags: Dictionary[int, InterpBuffer] = {}
 var _guards: Array[InterpBuffer] = []
 var _guard_states: Array[int] = []
+## The waiter rides at the end of the guard list with state `Waiter.NET_STATE` (+1 while down).
+var _waiter: InterpBuffer = null
+var _waiter_down: bool = false
 var _props: Dictionary[int, InterpBuffer] = {}
 var _server_states: Dictionary[int, int] = {}
 var _airborne: Dictionary[int, bool] = {}
@@ -62,6 +65,9 @@ func build() -> Dictionary:
 	var guards: Array = []
 	for g: Guard in scene.guards:
 		guards.append({"pos": g.global_position, "yaw": g.yaw, "state": g.state})
+	var w: Waiter = scene.casino_floor.waiter if scene.casino_floor != null else null
+	if w != null:
+		guards.append({"pos": w.global_position, "yaw": w.yaw, "state": Waiter.NET_STATE + (1 if w.down else 0)})
 	var props: Dictionary = {}
 	var now: float = Net.server_time()
 	var bodies: Array[RigidBody3D] = _prop_bodies()
@@ -105,6 +111,13 @@ func _on_world(w: Dictionary) -> void:
 			_rags.erase(id)
 	var guards: Array = w["guards"]
 	for i: int in guards.size():
+		if int(guards[i]["state"]) >= Waiter.NET_STATE:
+			if _waiter == null:
+				_waiter = InterpBuffer.new(PackedInt32Array([3]))
+			var wp: Vector3 = guards[i]["pos"]
+			_waiter.push(t, PackedFloat32Array([wp.x, wp.y, wp.z, float(guards[i]["yaw"])]))
+			_waiter_down = int(guards[i]["state"]) > Waiter.NET_STATE
+			continue
 		while _guards.size() <= i:
 			_guards.append(InterpBuffer.new(PackedInt32Array([3])))
 			_guard_states.append(0)
@@ -150,6 +163,10 @@ func _process(_delta: float) -> void:
 		var g: PackedFloat32Array = _guards[i].sample(render_t)
 		if g.size() >= 4:
 			scene.guards[i].apply_net(Vector3(g[0], g[1], g[2]), g[3], _guard_states[i])
+	if _waiter != null and scene.casino_floor != null and scene.casino_floor.waiter != null:
+		var ws: PackedFloat32Array = _waiter.sample(render_t)
+		if ws.size() >= 4:
+			scene.casino_floor.waiter.apply_net(Vector3(ws[0], ws[1], ws[2]), ws[3], _waiter_down)
 	if not _props.is_empty():
 		var bodies: Array[RigidBody3D] = _prop_bodies()
 		for i: int in _props:

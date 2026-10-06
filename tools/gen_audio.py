@@ -162,12 +162,15 @@ def jump(t, r):
     return sine(300 + 500 * t, t) * math.exp(-t * 15) * 0.6
 
 
+# big_win, loss_sting, whistle, boing, splash, jackpot_siren and slip moved to the better synth in
+# tools/audio/gen_sfx.py (M7); the recipes above stay for reference only. Most of the rest are
+# fallbacks behind the recorded Kenney takes (`<name>-vN.ogg`).
 RECIPES = [
-    ("chip_clack", 0.12, chip_clack), ("coin", 0.4, coin), ("big_win", 1.2, big_win), ("loss_sting", 0.7, loss_sting),
-    ("bonk", 0.3, bonk), ("buzzer", 0.5, buzzer), ("whistle", 0.5, whistle), ("whoosh", 0.3, whoosh), ("oof", 0.3, oof),
-    ("boing", 0.5, boing), ("splash", 0.7, splash), ("card_flip", 0.08, card_flip), ("reel_stop", 0.15, reel_stop),
+    ("chip_clack", 0.12, chip_clack), ("coin", 0.4, coin),
+    ("bonk", 0.3, bonk), ("buzzer", 0.5, buzzer), ("whoosh", 0.3, whoosh), ("oof", 0.3, oof),
+    ("card_flip", 0.08, card_flip), ("reel_stop", 0.15, reel_stop),
     ("plink", 0.1, plink), ("ui_click", 0.06, ui_click), ("ui_hover", 0.05, ui_hover), ("countdown_beep", 0.12, countdown_beep),
-    ("jackpot_siren", 2.0, jackpot_siren), ("slip", 0.4, slip), ("ball_roll", 1.5, ball_roll), ("pickup", 0.2, pickup),
+    ("ball_roll", 1.5, ball_roll), ("pickup", 0.2, pickup),
     ("footstep", 0.16, make_footstep(380, 70)), ("footstep_2", 0.16, make_footstep(320, 62)),
     ("footstep_3", 0.16, make_footstep(440, 78)), ("thud", 0.25, thud), ("jump", 0.2, jump),
 ]

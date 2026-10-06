@@ -20,6 +20,8 @@ signal effects_changed(player: int)
 signal peels_changed
 ## The Gift Shop got new stock.
 signal shop_changed
+## Waiter puddles or the Megaphone holder changed (M7).
+signal floor_changed
 
 var phase: Phase.Id = Phase.Id.LOBBY
 var casino_time: float = 0.0
@@ -58,6 +60,10 @@ var effects: Dictionary[int, Array] = {}
 var peels: Dictionary[int, Dictionary] = {}
 ## Gift Shop offers this segment [{item, price, rarity}].
 var shop_offers: Array = []
+## Drink puddles the waiter spilled (puddle id → {puddle, pos, seconds}) and the player holding
+## the Megaphone (-1: on its stand).
+var puddles: Dictionary[int, Dictionary] = {}
+var megaphone_holder: int = -1
 
 
 ## Replaces everything from a snapshot.
@@ -104,6 +110,12 @@ func apply_snapshot(snap: Dictionary) -> void:
 	peels.clear()
 	for p: Dictionary in snap.get("peels", []):
 		peels[int(p["peel"])] = p
+	var floor_state: Dictionary = snap.get("floor", {})
+	puddles.clear()
+	for p: Dictionary in floor_state.get("puddles", []):
+		puddles[int(p["puddle"])] = p
+	megaphone_holder = int((floor_state.get("megaphone", {}) as Dictionary).get("holder", -1))
+	floor_changed.emit()
 	if phase == Phase.Id.LOBBY:
 		last_call = false
 	players_changed.emit()
@@ -291,7 +303,29 @@ func apply_event(ev: Dictionary) -> bool:
 				else:
 					var l: int = int(ev["b"]) if w == int(ev["a"]) else int(ev["a"])
 					feed_message.emit("%s beat %s at Rock Paper Scissors (+$%d)" % [player_name(w), player_name(l), int(ev["amount"])], &"chaos")
+		&"waiter_tripped":
+			puddles[int(ev["puddle"])] = {"puddle": ev["puddle"], "pos": ev["puddle_pos"], "seconds": ev["seconds"]}
+			floor_changed.emit()
+			if int(ev["player"]) >= 0:
+				feed_message.emit("%s knocked the waiter over. Wet floor!" % player_name(int(ev["player"])), &"chaos")
+			else:
+				feed_message.emit("The waiter tripped. Wet floor!", &"chaos")
+		&"puddle_removed":
+			puddles.erase(int(ev["puddle"]))
+			floor_changed.emit()
+		&"puddle_slip":
+			feed_message.emit("%s slipped in a puddle" % player_name(int(ev["player"])), &"chaos")
+		&"megaphone_taken":
+			megaphone_holder = int(ev["player"])
+			floor_changed.emit()
+			feed_message.emit("%s grabbed the megaphone!" % player_name(megaphone_holder), &"chaos")
+		&"megaphone_dropped":
+			megaphone_holder = -1
+			floor_changed.emit()
 		&"match_reset":
+			puddles.clear()
+			megaphone_holder = -1
+			floor_changed.emit()
 			effects.clear()
 			peels.clear()
 			peels_changed.emit()

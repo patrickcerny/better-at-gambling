@@ -49,7 +49,6 @@ func set_active(on: bool) -> void:
 		_capture()
 	if on and spots.is_empty():
 		_build_spots()
-	Audio.set_mood(&"last_call" if on else &"")
 	if _tween != null:
 		_tween.kill()
 	_tween = create_tween()
