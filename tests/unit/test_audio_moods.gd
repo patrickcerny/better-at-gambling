@@ -28,8 +28,11 @@ func test_set_mood_tracks_the_current_mood() -> void:
 	var before: StringName = Audio.current_mood()
 	Audio.set_mood(&"last_call")
 	assert_eq(Audio.current_mood(), &"last_call")
+	assert_almost_eq(Audio.music_tempo(), 1.12, 0.001, "Last Call speeds the floor music up")
+	assert_eq(Audio.MOODS[&"last_call"], Audio.MOODS[&"casino"], "same track, just faster")
 	Audio.set_mood(&"quiz")
 	assert_eq(Audio.current_mood(), &"quiz")
+	assert_almost_eq(Audio.music_tempo(), 1.0, 0.001)
 	Audio.set_mood(before)
 
 
