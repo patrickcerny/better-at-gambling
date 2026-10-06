@@ -88,6 +88,29 @@ var _match_over: bool = false
 ## Predicted local actions awaiting the server: intent type → give-up time.
 var _predicted: Dictionary[StringName, float] = {}
 const PREDICTION_TIMEOUT: float = 0.6
+## Chip pickups: radius around a standing player's feet (floor plane) and the extra the server
+## allows a remote body (its position arrives ~100-200 ms late), and how long a predicted pickup
+## waits for the server before the chips drop back.
+const PICKUP_RADIUS: float = 1.1
+const PICKUP_LAG_SLACK: float = 0.6
+const PICKUP_PREDICT_TIMEOUT: float = 1.5
+## Knockback speed (m/s) per unit of the server's `knockback` (shoves slide ~1.7 m, hop a little).
+const SHOVE_PUSH_SCALE: float = 2.6
+const SHOVE_GLOVE_SCALE: float = 4.0
+## Local shove: when the next one may swing (client gate over the server's cooldown) and when the
+## last swing started (its contact moment syncs the impact).
+var _shove_ready_at: float = -INF
+var _swing_started: float = -INF
+## Player → scene clock of a shove impact still to land (a knockout from it waits for the hit).
+var _impact_at: Dictionary[int, float] = {}
+## Player → push direction of the last shove impact (knockdowns fall that way).
+var _impact_dir: Dictionary[int, Vector3] = {}
+## Online: the target our own swing showed hitting (impact effects already played), and when.
+var _predicted_hit: int = -1
+var _predicted_hit_at: float = -INF
+## Knocked down into a ragdoll: get up at this scene time (host only, like `_ko_until`).
+var _down_until: Dictionary[int, float] = {}
+var _pile_sync_timer: float = 0.0
 ## `--quit-after-results`: scripted clients exit once the digest is logged (network tests).
 var cmd_quit_after_results: bool = false
 
@@ -283,6 +306,7 @@ func _start_room_server(cmd: Cmdline) -> void:
 	def.shop_position = LuckyLounge.SHOP_POS
 	var settings: Dictionary = {"duration": cmd.get_int("duration", 10), "seed": cmd.get_int("seed", 0), "items_enabled": true}
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
+	server.world.obstacle_callback = _obstacle_between
 	server.timescale = cmd.get_float("timescale", 1.0)
 	server.lobby.min_participants = cmd.get_int("min-players", 2)
 	server.lobby.settings["duration"] = cmd.get_int("duration", 10)  # dev/tests may go below the menu's 5
@@ -305,6 +329,7 @@ func _start_local(cmd: Cmdline) -> void:
 	def.shop_position = LuckyLounge.SHOP_POS
 	var settings: Dictionary = {"duration": cmd.get_int("duration", 10), "seed": cmd.get_int("seed", randi() % 1000000), "items_enabled": true}
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
+	server.world.obstacle_callback = _obstacle_between
 	_owns_server = true
 	var player_name: String = str(Settings.get_value("profile", "name", "You"))
 	var id: int = Net.start_local(server, player_name)
@@ -436,9 +461,8 @@ func _connect_router() -> void:
 			return
 		if _local_holding() >= 0:
 			_throw_held()
-		elif local.is_standing():
-			_predict(&"shove")
-			Net.send_intent(Intents.make(&"shove", {"aim": Serializer.vec3(local.facing())})))
+		else:
+			_local_shove())
 	router.shake.connect(func() -> void:
 		var res: Dictionary = Net.send_intent(Intents.make(&"shake"))
 		if not res["ok"] and res["error"] != &"rate_limited":
@@ -489,9 +513,19 @@ func _process(delta: float) -> void:
 		var a: PlayerAvatar = avatars[pid]
 		var p: Dictionary = view.state.players.get(pid, {})
 		if p.has("pos") and a.is_standing() and a.drive == PlayerAvatar.Drive.SIM:
-			a.target_position = Serializer.to_vec3(p["pos"])
+			if _owns_server and a.is_pushed():
+				# Shoved: the body slides where the knockback takes it and the server follows
+				# (otherwise the dummy rubber-bands straight back to where it stood).
+				a.target_position = a.global_position
+				_report_position(pid)
+			else:
+				a.target_position = Serializer.to_vec3(p["pos"])
 	if role == Role.CLIENT:
 		connection_label.visible = Net.silence() > Net.SILENCE_WARNING
+		_pile_sync_timer += delta
+		if _pile_sync_timer >= 0.5:
+			_pile_sync_timer = 0.0
+			_sync_piles()
 	# Kill floor: anything we simulate that falls out of the world comes back at the entrance.
 	for pid: int in avatars:
 		var a: PlayerAvatar = avatars[pid]
@@ -508,6 +542,13 @@ func _process(delta: float) -> void:
 			_ko_until.erase(pid)
 			var a: PlayerAvatar = avatars.get(pid, null)
 			if a != null and a.state == PlayerAvatar.State.RAGDOLL:
+				a.end_ragdoll()
+				_got_up(pid)
+	for pid: int in _down_until.keys():
+		if _clock >= _down_until[pid]:
+			_down_until.erase(pid)
+			var a: PlayerAvatar = avatars.get(pid, null)
+			if a != null and a.state == PlayerAvatar.State.RAGDOLL and not _ko_until.has(pid):
 				a.end_ragdoll()
 				_got_up(pid)
 	for pid: int in _respawn_at.keys():
@@ -694,6 +735,7 @@ func _on_event(ev: Dictionary) -> void:
 			var pid: int = int(ev["player"])
 			var a: PlayerAvatar = avatars.get(pid, null)
 			_ko_until.erase(pid)
+			_down_until.erase(pid)
 			if a != null and a.state == PlayerAvatar.State.RAGDOLL:
 				a.end_ragdoll(Serializer.to_vec3(ev["pos"]) + Vector3(0, 0.5, 0))
 			if net_world != null:
@@ -713,24 +755,26 @@ func _on_event(ev: Dictionary) -> void:
 			map.set_lobby_open(true)
 			_hint(&"sit", "Walk up to a table and press {interact} to sit.  {grab} grabs, {shove} shoves.", 5.0)
 		&"player_shoved":
-			if int(ev["attacker"]) == local_id:
-				_predicted[&"shove"] = minf(_predicted.get(&"shove", 0.0), _clock + 0.15)  # confirmed: finish the push
-			var t: PlayerAvatar = avatars.get(int(ev["target"]), null)
-			if t != null:
-				var dir: Vector3 = Serializer.to_vec3(ev["dir"])
-				t.knockback(dir, float(ev["knockback"]) * (2.5 if bool(ev.get("spring_glove", false)) else 1.6))
-				Audio.play_at(&"bonk", t, -6.0, randf_range(0.9, 1.1))
-			var at: PlayerAvatar = avatars.get(int(ev["attacker"]), null)
-			if at != null:
-				at.visuals.react(&"win")
+			_on_shoved(ev)
 		&"player_knocked_down":
 			var t: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			if t != null:
 				t.stun(float(ev.get("seconds", cfg.knockdown_time)))
 				t.say("whoa!" if ev.get("cause", &"") in [&"banana", &"puddle"] else "ow", 1.0)
 				Audio.play_at(&"oof", t, -8.0)
+				var down_id: int = int(ev["target"])
+				var down_by: int = int(ev.get("attacker", -1))
+				var down_s: float = float(ev.get("seconds", cfg.knockdown_time))
+				if not StringName(ev.get("cause", &"")) in [&"banana", &"puddle"]:
+					# Shoved over, slammed into a table, bonked: the bean goes flying as a ragdoll
+					# when the hit lands and gets up when the knockdown ends.
+					_after(_impact_at.get(down_id, _clock) - _clock, func() -> void: _knock_down(down_id, down_by, down_s))
 		&"player_knocked_out":
-			_knock_out(int(ev["target"]), int(ev["attacker"]), StringName(ev["cause"]))
+			var ko_target: int = int(ev["target"])
+			var ko_attacker: int = int(ev["attacker"])
+			var ko_cause: StringName = StringName(ev["cause"])
+			# A knockout by shove launches when the swing lands, not before it.
+			_after(_impact_at.get(ko_target, _clock) - _clock, func() -> void: _knock_out(ko_target, ko_attacker, ko_cause))
 			var ko: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			if local != null and ko != null and ko != local and ko.global_position.distance_to(local.global_position) < 8.0:
 				_hint(&"shake", "Knocked out! Stand next to them and press {shake} to shake out their chips.", 0.5)
@@ -743,6 +787,9 @@ func _on_event(ev: Dictionary) -> void:
 				t.set_held(h)
 				h.visuals.reaching = true
 				h.visuals.reach_target = PlayerAvatar.HELD_OFFSET
+				t.visuals.hit(t.global_position - h.global_position, 0.6)
+				if int(ev["target"]) == local_id or int(ev["attacker"]) == local_id:
+					_juice(0.0, 0.18 if int(ev["target"]) == local_id else 0.1)
 				if int(ev["target"]) == local_id:
 					hud.toast("Grabbed! Mash SPACE to break free", 2.0)
 		&"player_released", &"player_broke_free":
@@ -760,6 +807,10 @@ func _on_event(ev: Dictionary) -> void:
 			var h: PlayerAvatar = avatars.get(int(ev["attacker"]), null)
 			if h != null:
 				h.visuals.reaching = false
+				if not (int(ev["attacker"]) == local_id and _clock - _swing_started < 0.5):
+					h.visuals.swing()
+			if int(ev["attacker"]) == local_id or int(ev["target"]) == local_id:
+				_juice(0.05, 0.25)
 			if t != null:
 				_ragdoll_attacker[int(ev["target"])] = int(ev["attacker"])
 				t.start_ragdoll(Serializer.to_vec3(ev["velocity"]), 3.0, not _owns_server)
@@ -767,16 +818,14 @@ func _on_event(ev: Dictionary) -> void:
 					server.set_server_owned(int(ev["target"]), true)
 				Audio.play_at(&"whoosh", t, -8.0)
 		&"chips_dropped":
-			_spawn_pile(int(ev["pile"]), int(ev["amount"]), Serializer.to_vec3(ev["pos"]))
+			_spawn_pile(int(ev["pile"]), int(ev["amount"]), Serializer.to_vec3(ev["pos"]), int(ev.get("source", -1)))
 		&"chips_collected":
-			_remove_pile(int(ev["pile"]))
-			var p: PlayerAvatar = avatars.get(int(ev["player"]), null)
-			if p != null:
-				Audio.play_at(&"pickup", p, -6.0)
-				if int(ev["player"]) != local_id:
-					p.say("+$%d" % int(ev["amount"]), 1.2)
+			_on_chips_collected(int(ev["pile"]), int(ev["player"]), int(ev["amount"]))
 		&"pickup_expired":
-			_remove_pile(int(ev["pile"]))
+			var gone: ChipPile = piles.get(int(ev["pile"]), null)
+			piles.erase(int(ev["pile"]))
+			if gone != null:
+				gone.fade_out()
 		&"chips_shaken_out":
 			var at: PlayerAvatar = avatars.get(int(ev["attacker"]), null)
 			if at != null:
@@ -799,6 +848,8 @@ func _on_event(ev: Dictionary) -> void:
 					hud.toast("VIP ACCESS — $%d+" % _vip_threshold(), 2.0)
 				elif ev.get("intent", &"") == &"use_item" or ev.get("intent", &"") == &"discard_item":
 					hud.toast(ItemController.rejection_text(err), 1.5)
+				elif ev.get("intent", &"") == &"shove" and err in [&"no_target", &"cooldown"]:
+					pass  # a whiff: the swing already showed it
 				elif err != &"rate_limited" and err != &"not_standing":
 					hud.toast(StationUi.rejection_text(err), 1.5)
 		&"round_result":
@@ -1464,6 +1515,9 @@ func _on_interact() -> void:
 
 
 func _throw_held() -> void:
+	local.visuals.swing()
+	_swing_started = _clock
+	Audio.play_at(&"whoosh", local, -10.0, randf_range(0.9, 1.05))
 	Net.send_intent(Intents.make(&"release", {"throw": true, "aim": Serializer.vec3(local.aim())}))
 
 
@@ -1473,7 +1527,7 @@ func _on_grab() -> void:
 		return
 	if local == null or not local.is_standing():
 		return
-	var target: int = _nearest_player_in_front(2.0)
+	var target: int = _reach_target(true)
 	if target >= 0:
 		_predict(&"grab")
 		Net.send_intent(Intents.make(&"grab", {"target": target}))
@@ -1487,18 +1541,130 @@ func _predict(kind: StringName) -> void:
 	local.visuals.reaching = true
 	local.visuals.reach_target = PlayerAvatar.HELD_OFFSET
 	_predicted[kind] = _clock + PREDICTION_TIMEOUT
-	if kind == &"shove":
-		Audio.play_at(&"whoosh", local, -14.0, randf_range(1.1, 1.3))
+	if kind == &"grab":
+		Audio.play_at(&"whoosh", local, -16.0, randf_range(1.3, 1.5))
 
 
-func _end_prediction(kind: StringName, denied: bool) -> void:
+func _end_prediction(kind: StringName, _denied: bool) -> void:
 	if not _predicted.has(kind):
 		return
 	_predicted.erase(kind)
 	if local != null and _local_holding() < 0:
 		local.visuals.reaching = false
-		if denied:
-			local.visuals.react(&"loss")
+
+
+## Shove press (§4.1 prediction): the swing and whoosh start now; the hit lands on the server's
+## word, synced to the swing's contact moment. The server keeps the real cooldown; this gate just
+## keeps the swing from promising a hit the server will refuse.
+func _local_shove() -> void:
+	if local == null or not local.is_standing() or _clock < _shove_ready_at:
+		return
+	_shove_ready_at = _clock + cfg.shove_cooldown + 0.1
+	_swing_started = _clock
+	local.visuals.swing()
+	Audio.play_at(&"whoosh", local, -12.0, randf_range(1.15, 1.35))
+	var payload: Dictionary = {"aim": Serializer.vec3(local.facing())}
+	var target: int = _reach_target(false)
+	if target >= 0:
+		payload["target"] = target
+		if role == Role.CLIENT:
+			# Online the server's word is a round trip away: land the hit on the swing's contact
+			# moment anyway (pop, bonk, flinch); the confirmation then only moves the body.
+			_predicted_hit = target
+			_predicted_hit_at = _clock
+			var push: Vector3 = avatars[target].global_position - local.global_position
+			push.y = 0.0
+			push = push.normalized() if push.length() > 0.01 else local.facing()
+			_after(AvatarVisuals.SWING_CONTACT, func() -> void: _impact_effects(local_id, target, push, false))
+	Net.send_intent(Intents.make(&"shove", payload))
+
+
+func _on_shoved(ev: Dictionary) -> void:
+	var attacker: int = int(ev["attacker"])
+	var target: int = int(ev["target"])
+	var at: PlayerAvatar = avatars.get(attacker, null)
+	var delay: float = AvatarVisuals.SWING_CONTACT
+	if attacker == local_id and _clock - _swing_started < 0.6:
+		delay = maxf(_swing_started + AvatarVisuals.SWING_CONTACT - _clock, 0.0)  # our swing is already out
+	elif at != null:
+		at.visuals.swing()
+	_impact_at[target] = _clock + delay
+	var dir: Vector3 = Serializer.to_vec3(ev["dir"])
+	_impact_dir[target] = dir
+	var glove: bool = bool(ev.get("spring_glove", false))
+	var strength: float = float(ev["knockback"]) * (SHOVE_GLOVE_SCALE if glove else SHOVE_PUSH_SCALE)
+	var shown: bool = attacker == local_id and _predicted_hit == target and _clock - _predicted_hit_at < 1.0
+	if shown:
+		_predicted_hit = -1
+	_after(delay, func() -> void: _shove_impact(attacker, target, dir, strength, glove, not shown))
+
+
+## The moment the hands land: knockback, flinch, bonk, a pop at the contact point, and hit-stop
+## plus shake when it's us giving or taking it.
+func _shove_impact(attacker: int, target: int, dir: Vector3, strength: float, glove: bool, effects: bool = true) -> void:
+	_impact_at.erase(target)
+	var t: PlayerAvatar = avatars.get(target, null)
+	if t == null or not is_instance_valid(t):
+		return
+	if t.is_standing():
+		t.knockback(dir, strength, 0.45)
+		t.stun(0.3)
+	if effects:
+		_impact_effects(attacker, target, dir, glove or t.state == PlayerAvatar.State.STUNNED)
+
+
+## Pop, bonk and (for us) hit-stop and shake where a shove lands.
+func _impact_effects(attacker: int, target: int, dir: Vector3, heavy: bool) -> void:
+	var t: PlayerAvatar = avatars.get(target, null)
+	if t == null or not is_instance_valid(t):
+		return
+	if t.drive == PlayerAvatar.Drive.PUPPET and attacker == local_id:
+		t.visuals.hit(dir, 1.0)  # predicted: the body moves when the server's stream says so
+	Audio.play_at(&"bonk", t, -4.0 if heavy else -6.0, randf_range(0.9, 1.1))
+	var contact: Vector3 = t.global_position + Vector3(0.0, 1.05, 0.0) - dir.normalized() * 0.4
+	HitPop.at(world_root, contact, 2.0 if heavy else 1.0)
+	if target == local_id:
+		_juice(0.07, 0.45 if heavy else 0.3)
+	elif attacker == local_id:
+		_juice(0.06, 0.15)
+
+
+## Knocked down by a shove, a wall slam or an item: a ragdoll launched along the hit until the
+## knockdown ends. The host simulates it (and owns the body); clients show the streamed pose.
+func _knock_down(pid: int, attacker: int, seconds: float) -> void:
+	var t: PlayerAvatar = avatars.get(pid, null)
+	if t == null or not (t.is_standing() or t.state == PlayerAvatar.State.SEATED or t.state == PlayerAvatar.State.HELD):
+		return
+	var dir: Vector3 = _impact_dir.get(pid, Vector3.ZERO)
+	_impact_dir.erase(pid)
+	var at: PlayerAvatar = avatars.get(attacker, null)
+	if dir == Vector3.ZERO and at != null:
+		dir = t.global_position - at.global_position
+		dir.y = 0.0
+	dir = dir.normalized() if dir.length() > 0.01 else -t.facing()
+	_ragdoll_attacker[pid] = attacker
+	t.start_ragdoll(dir * 3.5 + Vector3.UP * 2.2, seconds + 1.5, not _owns_server)
+	if _owns_server:
+		server.set_server_owned(pid, true)
+		_down_until[pid] = _clock + seconds
+	if pid == local_id:
+		_juice(0.0, 0.35)
+
+
+func _juice(stop_seconds: float, shake: float) -> void:
+	if table_fx == null or table_fx.juice == null:
+		return
+	if stop_seconds > 0.0:
+		table_fx.juice.hit_stop(stop_seconds, 0.06)
+	table_fx.juice.shake(shake)
+
+
+## Runs `fn` after `seconds` of game time (right away when that's not positive).
+func _after(seconds: float, fn: Callable) -> void:
+	if seconds <= 0.001 or not is_inside_tree():
+		fn.call()
+		return
+	get_tree().create_timer(seconds, false).timeout.connect(fn)
 
 
 func _expire_predictions() -> void:
@@ -1586,7 +1752,7 @@ func _update_prompt() -> void:
 			text += "   VIP ACCESS — $%d+" % _vip_threshold()
 		hud.set_prompt(text)
 	else:
-		var target: int = _nearest_player_in_front(2.0)
+		var target: int = _reach_target(true)
 		hud.set_prompt(InputGlyphs.fill("[{interact} / {grab}] Grab %s   [{shove}] Shove") % view.state.player_name(target) if target >= 0 else "")
 
 
@@ -1651,16 +1817,75 @@ func _check_vip_gate() -> void:
 				hud.toast("VIP ACCESS — $%d+" % threshold, 1.5)
 
 
+## Chip pickups. The host (Practice or the room server) decides who touched a pile and reports it;
+## the money is the server's alone. Online, our own client predicts its pickups: the chips fly into
+## us with the clink and "+$X" right away, and drop back if the server gives no confirmation.
 func _check_pickups() -> void:
-	if not _owns_server or piles.is_empty():
+	if piles.is_empty():
+		return
+	if _owns_server:
+		for pile_id: int in piles.keys():
+			var pile: ChipPile = piles[pile_id]
+			if not pile.is_collectable(_clock):
+				continue
+			var best: int = -1
+			var best_d: float = INF
+			for pid: int in avatars:
+				var a: PlayerAvatar = avatars[pid]
+				if not a.is_standing() or a.connection_away:
+					continue
+				var reach: float = PICKUP_RADIUS + (PICKUP_LAG_SLACK if a.drive == PlayerAvatar.Drive.PUPPET else 0.0)
+				var d: float = _pickup_distance(a, pile)
+				if d <= reach and d < best_d:
+					best_d = d
+					best = pid
+			if best >= 0:
+				server.report_pickup(best, pile_id)
+		return
+	if local == null or not local.is_standing():
 		return
 	for pile_id: int in piles.keys():
 		var pile: ChipPile = piles[pile_id]
-		for pid: int in avatars:
-			var a: PlayerAvatar = avatars[pid]
-			if a.is_standing() and a.global_position.distance_to(pile.global_position) < 0.9:
-				server.report_pickup(pid, pile_id)
-				break
+		if pile.predicted_until > -INF:
+			if _clock > pile.predicted_until:
+				pile.restore()  # the server never confirmed: someone else got there first, or lag
+			continue
+		if pile.is_collectable(_clock) and _pickup_distance(local, pile) <= PICKUP_RADIUS:
+			pile.predicted_until = _clock + PICKUP_PREDICT_TIMEOUT
+			pile.fly_to(local, true)
+			_pickup_feedback(local, pile.amount)
+
+
+## Floor-plane distance from a player's feet to a pile (INF on another floor).
+static func _pickup_distance(a: PlayerAvatar, pile: ChipPile) -> float:
+	var to: Vector3 = pile.global_position - a.global_position
+	if absf(to.y) > 1.2:
+		return INF
+	return Vector2(to.x, to.z).length()
+
+
+func _pickup_feedback(who: PlayerAvatar, amount: int) -> void:
+	Audio.play_at(&"chip_clack", who, -4.0, randf_range(1.05, 1.2))
+	Audio.play_at(&"coin", who, -10.0, randf_range(1.0, 1.15))
+	WinFx.money_delta(world_root, who.global_position + Vector3(0.0, 2.0, 0.0), amount)
+
+
+func _on_chips_collected(pile_id: int, player: int, amount: int) -> void:
+	var pile: ChipPile = piles.get(pile_id, null)
+	piles.erase(pile_id)
+	var who: PlayerAvatar = avatars.get(player, null)
+	var predicted: bool = pile != null and pile.predicted_until > -INF
+	if pile != null:
+		if predicted and player == local_id:
+			# Confirmed: the chips are already in our pocket (or finishing the flight).
+			pile.predicted_until = INF
+			get_tree().create_timer(ChipPile.FLY_SECONDS + 0.05).timeout.connect(pile.queue_free)
+		else:
+			if predicted:
+				pile.restore()  # we guessed wrong: the chips go to whoever really got them
+			pile.fly_to(who)
+	if who != null and not (predicted and player == local_id):
+		_pickup_feedback(who, amount)
 
 
 func _update_guards() -> void:
@@ -1714,6 +1939,8 @@ func _on_ragdoll_settled(pid: int) -> void:
 	var a: PlayerAvatar = avatars.get(pid, null)
 	if a == null or a.state != PlayerAvatar.State.RAGDOLL:
 		return
+	if _down_until.has(pid):
+		return  # knocked down: up when the knockdown ends (_process)
 	if _respawn_at.has(pid):
 		a.set_away(true)
 		return
@@ -1769,15 +1996,21 @@ func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int) -> vo
 	chip.play(pts, 1.6, slot)
 
 
-func _spawn_pile(id: int, amount: int, pos: Vector3) -> void:
+func _spawn_pile(id: int, amount: int, pos: Vector3, source: int = -1) -> void:
 	if piles.has(id):
 		return
 	var p := ChipPile.new()
 	p.pile_id = id
 	p.amount = amount
-	p.position = Vector3(pos.x, maxf(pos.y, 0.0), pos.z)
+	p.position = _floor_under(pos)
 	world_root.add_child(p)
 	piles[id] = p
+	var from: PlayerAvatar = avatars.get(source, null)
+	if from != null:
+		# Shaken out of someone: the chips arc out of them and can't be grabbed mid-air.
+		p.settles_at = _clock + ChipPile.SETTLE_SECONDS
+		var origin: Vector3 = from.ragdoll.body_position() if from.ragdoll != null and is_instance_valid(from.ragdoll) else from.global_position + Vector3(0.0, 0.9, 0.0)
+		p.arc_from(origin)
 	Audio.play_at(&"chip_clack", p, -8.0)
 
 
@@ -1785,6 +2018,37 @@ func _remove_pile(id: int) -> void:
 	if piles.has(id):
 		piles[id].queue_free()
 		piles.erase(id)
+
+
+## Late joiners and resyncs: piles from the snapshot that we never saw dropped, and piles we still
+## show that the server no longer has.
+func _sync_piles() -> void:
+	for id: int in view.state.piles:
+		if not piles.has(id):
+			var row: Dictionary = view.state.piles[id]
+			_spawn_pile(id, int(row["amount"]), Serializer.to_vec3(row["pos"]))
+	for id: int in piles.keys():
+		if not view.state.piles.has(id) and not piles[id].is_leaving():
+			_remove_pile(id)
+
+
+## Server query: a wall, table or the fountain between two points at hip height (wall slams).
+func _obstacle_between(from: Vector3, to: Vector3) -> bool:
+	if not is_inside_tree():
+		return false
+	var q := PhysicsRayQueryParameters3D.create(from + Vector3(0.0, 0.6, 0.0), to + Vector3(0.0, 0.6, 0.0), 1)
+	return not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+
+## Where something dropped at `pos` comes to rest: the floor (or table top) below it.
+func _floor_under(pos: Vector3) -> Vector3:
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state if is_inside_tree() else null
+	if space != null:
+		var q := PhysicsRayQueryParameters3D.create(pos + Vector3(0.0, 0.6, 0.0), pos + Vector3(0.0, -4.0, 0.0), 1)
+		var hit: Dictionary = space.intersect_ray(q)
+		if not hit.is_empty():
+			return hit["position"]
+	return Vector3(pos.x, maxf(pos.y, 0.0), pos.z)
 
 
 # --- Helpers -----------------------------------------------------------------------------------
@@ -1803,27 +2067,20 @@ func _local_holding() -> int:
 	return -1
 
 
-func _nearest_player_in_front(range_m: float) -> int:
+## Who a shove (or grab) would hit right now: the same reach cone the server uses
+## (`InteractionRules.reach_score`), over players we can see standing (not seated, away or out).
+func _reach_target(for_grab: bool) -> int:
 	if local == null:
 		return -1
-	var best: int = -1
-	var best_d: float = INF
-	var fwd: Vector3 = local.facing()
+	var candidates: Dictionary = {}
 	for pid: int in avatars:
 		if pid == local_id:
 			continue
 		var a: PlayerAvatar = avatars[pid]
-		if a.state == PlayerAvatar.State.AWAY or a.connection_away:
+		if a.connection_away or not (a.is_standing() or (a.state == PlayerAvatar.State.HELD and not for_grab)):
 			continue
-		var to: Vector3 = a.global_position - local.global_position
-		to.y = 0.0
-		var d: float = to.length()
-		if d > range_m or (d > 0.05 and fwd.dot(to.normalized()) < 0.3):
-			continue
-		if d < best_d:
-			best_d = d
-			best = pid
-	return best
+		candidates[pid] = a.global_position
+	return InteractionRules.pick_in_reach(local.global_position, local.facing(), candidates, local_id)
 
 
 func _seat_index(sid: StringName, pid: int) -> int:

@@ -21,6 +21,8 @@ var rng: SeededRng
 ## Set by the MatchServer: knockouts (Baseball Bat), the current limits multiplier, standing a
 ## player up from a VIP table when their pass runs out, and the loot pool (Scratch Ticket).
 var interactions: InteractionResolver = null
+## Callable(player) → stands a seated player up through the station (MatchServer.stand_up).
+var unseat: Callable = Callable()
 var limits: Callable = func() -> float: return 1.0
 var on_vip_lost: Callable = Callable()
 var loot: LootTables = null
@@ -341,6 +343,14 @@ func pass_monkey(from: int, to: int, now: float) -> void:
 
 
 ## Knocks a player down for `seconds` (they drop to the floor and can't act).
+## Knocks a seated target off their seat first (bat, bottle: items can hit people at tables, bare
+## hands can't). Their bet is handled exactly as if they had stood up themselves.
+func pull_off_seat(player: int) -> void:
+	if rules.status(player).seated and unseat.is_valid():
+		unseat.call(player)
+	rules.status(player).seated = false
+
+
 func knock_down(player: int, seconds: float, attacker: int, cause: StringName, now: float) -> void:
 	rules.status(player).knocked_down_until = maxf(rules.status(player).knocked_down_until, now + seconds)
 	events.append(GameEvents.make(&"player_knocked_down", {"target": player, "attacker": attacker, "seconds": seconds, "cause": cause}))

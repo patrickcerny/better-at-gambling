@@ -136,12 +136,24 @@ func test_bat_knocks_out_and_spills_chips() -> void:
 	assert_eq(eco.balance(2), 920)
 
 
-func test_bat_needs_range_and_a_standing_target() -> void:
+func test_bat_needs_range_and_knocks_a_seated_target_off_their_seat() -> void:
 	_give(1, [&"baseball_bat"])
 	assert_eq(sys.use(1, 0, 2, now)["error"], &"out_of_range")
 	_near(1, 2)
 	rules.status(2).seated = true
-	assert_eq(sys.use(1, 0, 2, now)["error"], &"target_seated")
+	var unseated: Array[int] = []
+	sys.unseat = func(p: int) -> Dictionary:
+		unseated.append(p)
+		return {"ok": true}
+	assert_true(sys.use(1, 0, 2, now)["ok"], "items can hit people at tables")
+	assert_eq(unseated, [2] as Array[int], "stood up through the station first")
+	assert_false(rules.status(2).seated)
+	assert_true(rules.is_knocked_out(2, now))
+	rules.status(1).seated = true
+	_give(1, [&"baseball_bat"])
+	now += cfg.item_cooldown + 0.1
+	world.set_transform(3, world.get_position(1) + Vector3(0, 0, 1.5), 0.0)
+	assert_eq(sys.use(1, 0, 3, now)["error"], &"seated", "but not from a seat")
 
 
 func test_beer_luck_then_empty_bottle_which_stuns() -> void:

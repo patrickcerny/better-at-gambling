@@ -122,6 +122,7 @@ func _build_match_systems(seed_value: int) -> void:
 	items = ItemSystem.new(Registry.items, balance, state.players, economy, modifiers, rules, world, pickups, rng.fork())
 	interactions.ko_shield = items.shield_knockout
 	items.interactions = interactions
+	items.unseat = stand_up
 	items.limits = func() -> float: return stations._limits_multiplier
 	items.on_vip_lost = _on_vip_pass_ended
 	items.loot = loot
@@ -601,13 +602,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				_emit(GameEvents.make(&"player_sat", {"player": player, "station": sid, "seat": state.players[player].seat}))
 			return res
 		&"leave":
-			var res: Dictionary = stations.leave(player)
-			if res["ok"]:
-				rules.status(player).seated = false
-				state.players[player].station = &""
-				state.players[player].seat = -1
-				_emit(GameEvents.make(&"player_stood", {"player": player}))
-			return res
+			return stand_up(player)
 		&"place_bet", &"clear_bets", &"action":
 			return stations.route(player, intent)
 		&"move":
@@ -626,7 +621,9 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if stations.is_seated(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player):
 				return StationLogicBase.fail(&"not_standing")
 			var glove: bool = modifiers.has_flag(player, &"spring_glove", &"spring_glove")
-			var shoved: Dictionary = interactions.shove(player, Serializer.to_vec3(intent["aim"]), match_time, glove)
+			# Optional "target": who the client swung at (older clients leave it out).
+			var hint: int = int(intent.get("target", -1)) if typeof(intent.get("target", -1)) in [TYPE_INT, TYPE_FLOAT] else -1
+			var shoved: Dictionary = interactions.shove(player, Serializer.to_vec3(intent["aim"]), match_time, glove, hint)
 			if glove and shoved["ok"]:
 				modifiers.consume_round(player, &"spring_glove")
 			if shoved["ok"]:
@@ -696,6 +693,18 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			_emit(GameEvents.make(&"lobby_settings", {"settings": lobby.settings.duplicate()}))
 			return StationLogicBase.OK_RESULT
 	return StationLogicBase.fail(&"not_implemented")
+
+
+## Gets a seated player off their seat, exactly like their own "leave" (a round in play is settled
+## by the station the same way). Items that knock people down use it on seated targets.
+func stand_up(player: int) -> Dictionary:
+	var res: Dictionary = stations.leave(player)
+	if res["ok"]:
+		rules.status(player).seated = false
+		state.players[player].station = &""
+		state.players[player].seat = -1
+		_emit(GameEvents.make(&"player_stood", {"player": player}))
+	return res
 
 
 ## True while the player's own client drives their body (standing, not held or ragdolled).

@@ -37,7 +37,11 @@ func _of(type: StringName) -> Array[Dictionary]:
 	return events.filter(func(e: Dictionary) -> bool: return e["type"] == type)
 
 
+var _spot: Array = []
+
+
 func _face_off(pos: Vector3, dist: float = 1.5, yaw: float = 0.0) -> void:
+	_spot = [pos, dist, yaw]
 	scene.local.teleport(pos, yaw)
 	var bpos: Vector3 = pos + Vector3(-sin(yaw), 0.0, -cos(yaw)) * dist
 	scene.avatars[bot].teleport(bpos, yaw + PI)
@@ -45,8 +49,36 @@ func _face_off(pos: Vector3, dist: float = 1.5, yaw: float = 0.0) -> void:
 	scene.server.set_server_position(scene.local_id, pos)
 
 
+## Waits until the server's shove cooldown is over (its clock steps at 20 Hz, so a fixed real-time
+## wait can land a hair early and get the shove refused).
+func _cooldown_over() -> void:
+	var st: InteractionRules.Status = scene.server.rules.status(scene.local_id)
+	while scene.server.match_time - st.last_shove_given < Registry.balance.shove_cooldown + 0.01:
+		await wait_physics_frames(1)
+
+
+## Shoves the dummy, first closing in on it like a player would (a shove slides it ~1.7 m away).
 func _shove() -> Dictionary:
+	_close_in()
 	return Net.send_intent(Intents.make(&"shove", {"aim": Serializer.vec3(scene.local.facing())}))
+
+
+## Shoves from the last face-off spot with the dummy put back in front (guard tests need the fight
+## to stay where the guards can or can't see it).
+func _shove_here() -> Dictionary:
+	_face_off(_spot[0], _spot[1], _spot[2])
+	return Net.send_intent(Intents.make(&"shove", {"aim": Serializer.vec3(scene.local.facing())}))
+
+
+func _close_in(dist: float = 1.4) -> void:
+	var bp: Vector3 = scene.server.world.get_position(bot)
+	var me: Vector3 = scene.local.global_position
+	var away: Vector3 = Vector3(me.x - bp.x, 0.0, me.z - bp.z)
+	if away.length() <= dist + 0.3:
+		return
+	var pos: Vector3 = Vector3(bp.x, me.y, bp.z) + away.normalized() * dist
+	scene.local.teleport(pos, atan2(away.x, away.z))
+	scene.server.set_server_position(scene.local_id, pos)
 
 
 func _meshes(n: Node) -> int:
@@ -57,8 +89,11 @@ func test_knockout_birdies_follow_the_ragdoll_head_and_go_away_on_get_up() -> vo
 	_face_off(Vector3(0, 0, 5))
 	await wait_seconds(0.2)
 	for i: int in 3:
-		_shove()
-		await wait_seconds(1.3)
+		await _cooldown_over()
+		var res: Dictionary = _shove()
+		assert_true(res["ok"], "shove %d lands: %s" % [i + 1, res])
+		await wait_seconds(0.4)
+	await wait_seconds(0.5)
 	assert_eq(_of(&"player_knocked_out").size(), 1)
 	var b: PlayerAvatar = scene.avatars[bot]
 	var orbit: KnockoutOrbit = b.visuals.stars as KnockoutOrbit
@@ -116,7 +151,8 @@ func test_guard_carries_the_offender_toward_the_door_then_tosses_them() -> void:
 	_face_off(Vector3(-12, 0, -1), 1.5, PI)
 	await wait_seconds(0.2)
 	for i: int in 3:
-		_shove()
+		await _cooldown_over()
+		_shove_here()
 		await wait_seconds(1.3)
 	var money: int = scene.server.economy.balance(scene.local_id)
 	var waited: float = 0.0

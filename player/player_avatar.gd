@@ -167,19 +167,25 @@ func is_soaked() -> bool:
 	return _clock < soaked_until
 
 
-## Applies a knockback impulse (shove, door panel). Puppets only flinch: their owner moves them.
-func knockback(dir: Vector3, strength: float) -> void:
+## Applies a knockback impulse (shove, door panel): a slide along `dir` with a little hop
+## (`lift` × strength upwards). The body tips with the hit. Puppets only flinch: their owner
+## moves them.
+func knockback(dir: Vector3, strength: float, lift: float = 0.3) -> void:
 	var d: Vector3 = Vector3(dir.x, 0.0, dir.z)
 	if d.length() < 0.01:
 		return
+	if visuals != null:
+		visuals.hit(d, clampf(strength / 5.0, 0.4, 1.5))
 	if drive == Drive.PUPPET:
-		if visuals != null:
-			visuals.react(&"loss")
 		return
 	push_velocity += d.normalized() * strength
-	velocity.y = maxf(velocity.y, strength * 0.3)
-	if visuals != null:
-		visuals.react(&"loss")
+	velocity.y = maxf(velocity.y, strength * lift)
+
+
+## True while a knockback is still sliding us (the server should follow this body, not the
+## other way round).
+func is_pushed() -> bool:
+	return push_velocity.length() > 0.2 or (state == State.STUNNED and not is_on_floor())
 
 
 ## One-off impulse: vertical goes straight into the body, horizontal into the push buffer.
@@ -190,11 +196,11 @@ func hop(impulse: Vector3) -> void:
 	push_velocity += Vector3(impulse.x, 0.0, impulse.z)
 
 
-## Brief stumble: no input for `seconds`.
+## Brief stumble: no input for `seconds` (never shortens a longer stun already running).
 func stun(seconds: float) -> void:
 	if state == State.STANDING:
 		state = State.STUNNED
-	stunned_until = _clock + seconds
+	stunned_until = maxf(stunned_until, _clock + seconds)
 
 
 ## Gets wet: slow for the configured duration.

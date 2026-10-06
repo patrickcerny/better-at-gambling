@@ -59,8 +59,12 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
   pose; it hands the body back with `player_got_up {pos}` / `player_respawned {pos}`.
   Avatars have a `Drive`: INPUT (our player), SIM (bots, and everything in practice), PUPPET
   (network-driven).
-* **Prediction:** grab and shove pose immediately on press; the server's event confirms it, an
-  `intent_rejected` (or 0.6 s of silence) drops it.
+* **Prediction:** grab reaches and shove swings immediately on press; online the shove's impact
+  (pop, bonk, flinch) also lands at the swing's contact moment, and the server's `player_shoved`
+  then moves the body. The client and server share one reach cone (`InteractionRules.reach_score`);
+  the shove intent may name the client's `target`, which the server accepts within
+  `REACH + LAG_SLACK`. Own chip pickups are predicted (chips fly in, "+$X") and drop back after
+  1.5 s without `chips_collected`; the host alone decides pickups and money.
 * **Lobby:** `LobbyController` on the server: leader = longest-connected human, ready = own pad or
   the panel toggle, everyone ready and ≥ 2 participants → 3 s countdown → `start_match`.
 

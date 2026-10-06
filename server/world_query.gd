@@ -9,6 +9,9 @@ var yaws: Dictionary[int, float] = {}
 var airborne: Dictionary[int, bool] = {}
 ## Callable(from: Vector3, to: Vector3) -> bool, set by the world scene.
 var los_callback: Callable
+## Callable(from: Vector3, to: Vector3) -> bool: true when something solid (wall, table, fountain)
+## stands between two points at hip height. Unset (tests without a world): nothing is in the way.
+var obstacle_callback: Callable
 
 
 ## Records a player's reported transform.
@@ -41,6 +44,11 @@ func distance(a: int, b: int) -> float:
 	var d: Vector3 = get_position(a) - get_position(b)
 	d.y = 0.0
 	return d.length()
+
+
+## True when a wall, table or the fountain is between `from` and `to` (hip height).
+func obstacle_between(from: Vector3, to: Vector3) -> bool:
+	return obstacle_callback.is_valid() and bool(obstacle_callback.call(from, to))
 
 
 ## True if nothing blocks the line between two points.
