@@ -54,7 +54,7 @@ func on_event(ev: Dictionary) -> void:
 			var rs: RouletteStation = stations.get(StringName(ev["station"]), null) as RouletteStation
 			if rs != null:
 				rs.start_spin(Registry.balance.roulette_spin_time)
-				Audio.play_at(&"ball_roll", rs, -10.0)
+				Audio.play_at(&"roulette_spin", rs, -4.0)
 		&"roulette_result":
 			var sid: StringName = StringName(ev["station"])
 			var rs: RouletteStation = stations.get(sid, null) as RouletteStation

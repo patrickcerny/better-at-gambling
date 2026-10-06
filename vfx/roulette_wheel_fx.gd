@@ -19,7 +19,7 @@ const RING_R: float = 0.84
 const RING_Y: float = -0.03
 const BALL_R: float = 0.075
 ## Seconds from `roulette_result` until the ball rests in its pocket.
-const DROP_TIME: float = 1.1
+const DROP_TIME: float = 2.0  # spin (3.4 s) + drop = the 5.4 s wheel recording
 
 ## Rotor angle (clockwise seen from above, radians) and speed.
 var rotor_angle: float = 0.0
