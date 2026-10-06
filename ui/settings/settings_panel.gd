@@ -7,6 +7,9 @@ extends PanelContainer
 signal closed
 signal leave_requested
 
+## Bus each volume slider previews its click on (music is audible already).
+const PREVIEW_BUS: Dictionary = {"master": &"SFX", "sfx": &"SFX", "ui": &"UI", "voice": &"Voice"}
+
 var in_game: bool = false
 var _resume: Button
 var _leave: Button
@@ -135,8 +138,8 @@ func _slider(parent: Control, text: String, section: String, key: String, lo: fl
 	s.value_changed.connect(func(x: float) -> void:
 		show.call(x)
 		Settings.change(section, key, x)
-		if section == "audio":
-			Audio.play(&"ui_click", &"UI" if key == "ui" else &"SFX", -6.0))
+		if section == "audio" and key != "music":
+			Audio.play(&"ui_click", PREVIEW_BUS.get(key, &"SFX"), -6.0))
 	return s
 
 

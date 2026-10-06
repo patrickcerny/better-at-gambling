@@ -59,6 +59,13 @@ func mouse_look() -> float:
 	return BASE_MOUSE * float(get_value("controls", "mouse_sensitivity"))
 
 
+## Bus gain for a 0..1 volume slider. Squared amplitude so the slider feels even to the ear
+## (50% ≈ -12 dB, 25% ≈ -24 dB); a plain linear mapping only reaches -6 dB at 50% and the
+## sliders seemed to do nothing.
+static func slider_db(v: float) -> float:
+	return linear_to_db(maxf(v * v, 0.00001))
+
+
 ## Pushes engine-owned settings: bus volumes, window mode, vsync, frame cap.
 func apply() -> void:
 	for pair: Array in [["Master", "master"], ["Music", "music"], ["SFX", "sfx"], ["UI", "ui"], ["Voice", "voice"]]:
@@ -66,7 +73,7 @@ func apply() -> void:
 		if idx >= 0:
 			var v: float = clampf(float(get_value("audio", pair[1])), 0.0, 1.0)
 			AudioServer.set_bus_mute(idx, v <= 0.001)
-			AudioServer.set_bus_volume_db(idx, linear_to_db(maxf(v, 0.001)))
+			AudioServer.set_bus_volume_db(idx, slider_db(v))
 	Engine.max_fps = int(get_value("video", "max_fps"))
 	if DisplayServer.get_name() == "headless":
 		return
