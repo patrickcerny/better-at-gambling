@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Renders a scene under Xvfb with the Compatibility renderer and saves a PNG.
-#   scripts/screenshot.sh [res://scene.tscn] [name] [frames]
+#   scripts/screenshot.sh [res://scene.tscn] [name] [frames] [extra args for the scene...]
 set -euo pipefail
 source "$(dirname "$0")/_common.sh"
 SCENE="${1:-res://ui/menus/main_menu.tscn}"
@@ -10,5 +10,5 @@ OUT="$ROOT/build/screenshots"
 mkdir -p "$OUT"
 xvfb-run -a -s "-screen 0 1920x1080x24" "$GODOT" --path "$ROOT" --rendering-driver opengl3 \
 	--rendering-method gl_compatibility --resolution 1920x1080 --audio-driver Dummy -s tools/screenshot.gd -- \
-	--scene "$SCENE" --out "$OUT/$NAME.png" --frames "$FRAMES"
+	--scene "$SCENE" --out "$OUT/$NAME.png" --frames "$FRAMES" "${@:4}"
 echo "$OUT/$NAME.png"

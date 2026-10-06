@@ -1,6 +1,6 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|shop|rewards|settings|online|leaderboard` over the blurred casino panorama:
+## `--panel lobby|shop|rewards|settings|online` over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Big Wendy", "Snake Eyes"]
@@ -51,12 +51,6 @@ func _ready() -> void:
 			add_child(menu)
 			menu.call(&"_show_online")
 			menu.call(&"_set_status", "Room codes have 5 letters.", true)
-		"leaderboard":
-			var hud := Hud.new()
-			hud.state = st
-			hud.local_id = 1
-			add_child(hud)
-			hud.show_leaderboard(true)
 
 
 func _state() -> ClientMatchState:

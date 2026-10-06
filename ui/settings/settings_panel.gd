@@ -23,13 +23,13 @@ func _ready() -> void:
 	anchor_bottom = 0.5
 	offset_left = -380
 	offset_right = 380
-	offset_top = -420
-	offset_bottom = 420
+	offset_top = -410
+	offset_bottom = 400  # clear of the item bar at the bottom of the HUD
 	grow_horizontal = Control.GROW_DIRECTION_BOTH
 	grow_vertical = Control.GROW_DIRECTION_BOTH
 	visible = false
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override(&"separation", 8)
+	v.add_theme_constant_override(&"separation", 4)
 	add_child(v)
 	var title := Label.new()
 	title.theme_type_variation = &"TitleLabel"

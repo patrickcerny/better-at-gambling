@@ -24,3 +24,8 @@ shot results 240 --dummies 3 --seed 3 --skip-to 300 --duration 5
 shot quiz_end 400 --dummies 3 --seed 3 --skip-to 100 --duration 5
 shot pause_menu 90 --dummies 3 --seed 3 --pause-menu
 shot items 760 --dummies 3 --seed 3 --third-person --autoplay --give-items lucky_clover,black_cat,banana_peel
+# 2D screens with made-up state (theme pass): lobby panel, gift shop, reward draft, settings, online menu, loading.
+for panel in lobby shop rewards settings online; do
+	scripts/screenshot.sh res://tools/dev/ui_gallery_shot.tscn "ui_$panel" 60 --panel "$panel" >/dev/null && echo "build/screenshots/ui_$panel.png"
+done
+scripts/screenshot.sh res://tools/dev/loading_shot.tscn loading 60
