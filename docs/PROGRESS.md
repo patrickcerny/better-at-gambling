@@ -1,7 +1,7 @@
 # Progress
 
-## Current milestone: M6 done (0.6.0-m6). M7 waits for Patrick's word.
-## Next step: Patrick says go for M7. Still owed by Patrick: 7 poly.pizza models, 6 licence lines, the roulette wheel texture; "update the server" so the VPS auto-update runs again.
+## Current milestone: M7 (0.7.0-m7, protocol 4) built locally, not pushed: Patrick said "dont push yet to git or swrver".
+## Next step: Patrick says ship, then main + release + VPS deploy (from his PC session). Still owed by Patrick: 7 poly.pizza models, 6 licence lines, the roulette wheel texture.
 
 ## Status by milestone
 - M0: DONE (evidence: `scripts/test.sh all` green; `godot --headless --path . -- --smoke-test` exit 0; exports built)
@@ -68,6 +68,14 @@
 - Gamepad play end to end (bindings exist and the bet panel is tested with joypad events; nobody has held a real pad yet).
 - The reward draft panel and the results buttons by hand (the intents they send are tested; the draft panel has no screenshot yet because the screenshot tool's frame timing skips past the 8 s draft).
 - Revolving door "stuck" feel and the mezzanine railing shove-off: both work in tests, tuning is by eye in M7.
+
+- M7: built (local only until Patrick says ship). Evidence: lint; unit 251, integration 68, physics 48, ui 26, sim 9, smoke 1; `scripts/test.sh net` 5/5 (12.5 min). Contents:
+  - Tables and VFX (`vfx/`): chips slide onto the felt, roulette ball and number ring, slot reels, win/loss deltas, coin bursts, shake, hit-stop, HUD money counter, Hot Table spotlight and fire, Last Call lighting.
+  - Characters: squash/stretch, arm swing, blink, win/big win/loss/slip reactions, ragdoll flail and get-up, KO stars and birdies, guard carry-and-toss, fountain splash, leader crown (`tests/physics/test_chaos_feel.gd`).
+  - Blackjack split (P / RB, rules in DECISIONS.md, Dealer Bust Bonus now 1.07:1, RTP 101.5%), emote wheel (G / D-pad down), keyboard/gamepad glyphs.
+  - Quiz host cat, confetti, results podium show, 12 awards (`test_awards.gd`), money-over-time graph, name tags.
+  - Five generated lounge-jazz loops with mood crossfades by phase (`audio/music_mood.gd`), new SFX, every event sounded (`audio/event_sfx.gd`, table in GDD.md); music and SFX not yet listened to by a human.
+  - Waiter NPC who trips (by himself, on bumps or shoves) and leaves slippery puddles; Megaphone at the bar (E, 10 s of full-volume voice). Protocol 4: old 0.6 clients are refused.
 
 ## Known bugs
 - The lobby doors' sign is partly hidden behind the fountain from some spawn points (greybox layout; M7 art pass).
