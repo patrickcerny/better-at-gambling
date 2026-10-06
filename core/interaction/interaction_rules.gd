@@ -21,8 +21,54 @@ class Status:
 	## attacker → time they started shaking this player.
 	var shake_sessions: Dictionary[int, float] = {}
 
+## Reach for shoves and grabs, centre to centre on the floor plane (two bean radii are 0.84 m of it).
+const REACH: float = 2.2
+## Extra distance the server allows for a target the client picked (it saw the world ~100-200 ms
+## ago); at a sprint that is about half a metre.
+const LAG_SLACK: float = 0.5
+## Reach cone: cos of the half angle (~67°). Closer than `TOUCH_RANGE` anything not behind counts.
+const CONE_DOT: float = 0.4
+const TOUCH_RANGE: float = 1.0
+
 var cfg: BalanceConfig
 var _status: Dictionary[int, Status] = {}
+
+
+## How well `target_pos` sits in the reach of someone at `origin` facing `facing` (lower is better:
+## distance plus a penalty for being off-centre), or INF when out of reach. Client and server use
+## the same function, so the prompt, the swing and the server's verdict agree.
+static func reach_score(origin: Vector3, facing: Vector3, target_pos: Vector3, range_m: float = REACH) -> float:
+	var to: Vector3 = target_pos - origin
+	if absf(to.y) > 1.6:
+		return INF  # different floor (balcony above, pit below)
+	to.y = 0.0
+	var d: float = to.length()
+	if d > range_m:
+		return INF
+	if d < 0.05:
+		return 0.0
+	var fwd: Vector3 = Vector3(facing.x, 0.0, facing.z)
+	if fwd.length() < 0.01:
+		return d
+	var dot: float = fwd.normalized().dot(to / d)
+	var min_dot: float = -0.2 if d <= TOUCH_RANGE else CONE_DOT
+	if dot < min_dot:
+		return INF
+	return d + (1.0 - dot) * 1.2
+
+
+## The best target in reach among `positions` (player id → position), or -1.
+static func pick_in_reach(origin: Vector3, facing: Vector3, positions: Dictionary, exclude: int, range_m: float = REACH) -> int:
+	var best: int = -1
+	var best_s: float = INF
+	for pid: int in positions:
+		if pid == exclude:
+			continue
+		var s: float = reach_score(origin, facing, positions[pid], range_m)
+		if s < best_s:
+			best_s = s
+			best = pid
+	return best
 
 
 func _init(p_cfg: BalanceConfig) -> void:
@@ -101,6 +147,15 @@ func shove(attacker: int, target: int, now: float, target_airborne: bool = false
 		t.knocked_down_until = now + cfg.knockdown_time
 		res["knockdown"] = true
 	return res
+
+
+## Knocks a player down for `seconds` (shoved into a wall). Returns false if they're out already.
+func knock_down(target: int, now: float, seconds: float = -1.0) -> bool:
+	if is_knocked_out(target, now) or status(target).away:
+		return false
+	var t: Status = status(target)
+	t.knocked_down_until = maxf(t.knocked_down_until, now + (cfg.knockdown_time if seconds < 0.0 else seconds))
+	return true
 
 
 ## Knocks a player out (thrown into a wall, fell from the mezzanine, 3 shoves…). Returns false if immune.

@@ -70,8 +70,8 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | match_started / phase INTRO | chime (lounge vibes roll) |
 | phase PRE_MINIGAME | countdown_beep (+ HUD per-second beeps) |
 | phase CASINO after rewards | chime |
-| player_shoved | bonk at the target |
-| player_knocked_down | oof (banana/puddle: slip first) |
+| player_shoved | whoosh on the press (predicted swing), bonk + hit pop at the contact moment |
+| player_knocked_down | oof (banana/puddle: slip pose; shove, wall slam, bottle: ragdoll) |
 | player_knocked_out | bonk, low |
 | player_got_up | jump, low and quiet |
 | player_respawned (you) | whoosh, low |
@@ -79,7 +79,7 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | player_released / player_broke_free | thud / whoosh |
 | player_thrown | whoosh |
 | chips_dropped | chip_clack at the pile |
-| chips_collected | pickup |
+| chips_collected | chip_clack + coin, chips fly into the collector, "+$X" pop (own pickups predicted online) |
 | pickup_expired | — (piles fade out) |
 | chips_shaken_out | coin |
 | player_sat (you) / player_stood (you) | ui_click / ui_hover |

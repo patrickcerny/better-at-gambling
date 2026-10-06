@@ -3,12 +3,17 @@ extends RefCounted
 ## Server-side resolution of grab / release / throw / shove / shake / break-free requests using
 ## server-side positions (§2.4.1, §2.20). Physics in the world only animates what is decided here.
 
-const GRAB_RANGE: float = 2.2
-const SHOVE_RANGE: float = 2.2
+## Reach the client aims with; the server allows `InteractionRules.LAG_SLACK` more for a target
+## the client picked, since it saw everyone a little in the past.
+const GRAB_RANGE: float = InteractionRules.REACH
+const SHOVE_RANGE: float = InteractionRules.REACH
 const SHAKE_RANGE: float = 2.5
 const THROW_SPEED: float = 6.0
 const THROW_UP: float = 3.0
 const SHOVE_KNOCKBACK: float = 2.0
+## How far behind a shoved player we look for a wall/table/fountain to slam them into (about the
+## distance the knockback slides them).
+const SLAM_DISTANCE: float = 1.5
 
 var rules: InteractionRules
 var world: WorldQuery
@@ -51,7 +56,8 @@ func is_held(player: int) -> bool:
 func grab(holder: int, target: int, now: float) -> Dictionary:
 	if holder == target or holding.has(holder) or held_by.has(target):
 		return StationLogicBase.fail(&"invalid_target")
-	if world.distance(holder, target) > GRAB_RANGE:
+	# The client already checked its reach cone; the server only checks distance, with lag slack.
+	if not world.positions.has(target) or world.distance(holder, target) > GRAB_RANGE + InteractionRules.LAG_SLACK:
 		return StationLogicBase.fail(&"out_of_range")
 	var why: StringName = rules.immunity_reason(target, now)
 	if why != &"":
@@ -95,9 +101,10 @@ func break_free(player: int, now: float) -> Dictionary:
 	return StationLogicBase.OK_RESULT
 
 
-## Shove request: nearest standing player within range in front of the attacker.
-func shove(attacker: int, aim: Vector3, now: float, spring_glove: bool = false) -> Dictionary:
-	var target: int = _nearest_in_front(attacker, aim, SHOVE_RANGE)
+## Shove request: the player the client swung at (`hint`, if still in reach give or take lag), else
+## the best touchable player in the reach cone of `aim`.
+func shove(attacker: int, aim: Vector3, now: float, spring_glove: bool = false, hint: int = -1) -> Dictionary:
+	var target: int = _shove_target(attacker, aim, hint, now)
 	if target < 0:
 		return StationLogicBase.fail(&"no_target")
 	var res: Dictionary = rules.shove(attacker, target, now, world.is_airborne(target), spring_glove)
@@ -110,13 +117,22 @@ func shove(attacker: int, aim: Vector3, now: float, spring_glove: bool = false) 
 	var dir: Vector3 = (world.get_position(target) - world.get_position(attacker))
 	dir.y = 0.0
 	dir = dir.normalized() if dir.length() > 0.01 else world.get_facing(attacker)
+	var cause: StringName = &"shove"
+	if not res["knockout"] and not res["knockdown"]:
+		# Shoved into a wall, a table or the fountain: down they go.
+		var at: Vector3 = world.get_position(target)
+		if world.obstacle_between(at, at + dir * SLAM_DISTANCE) and rules.knock_down(target, now):
+			res["knockdown"] = true
+			cause = &"wall"
 	events.append(GameEvents.make(&"player_shoved", {"attacker": attacker, "target": target, "dir": Serializer.vec3(dir), "knockback": SHOVE_KNOCKBACK, "spring_glove": spring_glove}))
 	if held_by.has(target):
-		_end_hold(int(held_by[target]["holder"]), target)
+		var holder: int = int(held_by[target]["holder"])
+		_end_hold(holder, target)
+		events.append(GameEvents.make(&"player_released", {"attacker": holder, "target": target}))
 	if res["knockout"]:
 		_knocked_out(target, attacker, now, &"shoves")
 	elif res["knockdown"]:
-		events.append(GameEvents.make(&"player_knocked_down", {"target": target, "attacker": attacker}))
+		events.append(GameEvents.make(&"player_knocked_down", {"target": target, "attacker": attacker, "cause": cause}))
 	return {"ok": true, "error": &"", "target": target}
 
 
@@ -217,25 +233,27 @@ func _end_hold(holder: int, target: int) -> void:
 	held_by.erase(target)
 
 
-func _nearest_in_front(attacker: int, aim: Vector3, range_m: float) -> int:
+func _shove_target(attacker: int, aim: Vector3, hint: int, now: float) -> int:
 	var origin: Vector3 = world.get_position(attacker)
 	var dir: Vector3 = Vector3(aim.x, 0.0, aim.z)
 	dir = dir.normalized() if dir.length() > 0.01 else world.get_facing(attacker)
-	var best: int = -1
-	var best_d: float = INF
+	if hint >= 0 and hint != attacker and world.positions.has(hint):
+		if InteractionRules.reach_score(origin, dir, world.get_position(hint), SHOVE_RANGE + InteractionRules.LAG_SLACK) < INF:
+			return hint
+	# Prefer someone who can actually be shoved: a seated player next to you shouldn't eat the
+	# swing meant for the one standing behind them. If only untouchables are in reach, pick one so
+	# the rejection says why (seated, protected).
+	var touchable: Dictionary = {}
+	var anyone: Dictionary = {}
 	for p: int in world.positions:
 		if p == attacker:
 			continue
-		var to: Vector3 = world.get_position(p) - origin
-		to.y = 0.0
-		var d: float = to.length()
-		if d > range_m:
-			continue
-		if d > 0.05 and dir.dot(to.normalized()) < 0.3:
-			continue
-		if d < best_d:
-			best_d = d
-			best = p
+		anyone[p] = world.positions[p]
+		if rules.immunity_reason(p, now) == &"":
+			touchable[p] = world.positions[p]
+	var best: int = InteractionRules.pick_in_reach(origin, dir, touchable, attacker, SHOVE_RANGE)
+	if best < 0:
+		best = InteractionRules.pick_in_reach(origin, dir, anyone, attacker, SHOVE_RANGE)
 	return best
 
 

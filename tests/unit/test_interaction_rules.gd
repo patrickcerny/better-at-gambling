@@ -131,3 +131,27 @@ func test_guard_sight() -> void:
 	assert_false(r.guard_sees(g, fwd, Vector3(0, 0, 5), true), "behind")
 	assert_true(r.guard_sees(g, fwd, Vector3(3, 0, -3), true), "45 degrees")
 	assert_false(r.guard_sees(g, fwd, Vector3(5, 0, -1), true), "outside 60 degree cone")
+
+
+func test_reach_cone_for_shoves_and_grabs() -> void:
+	var o: Vector3 = Vector3.ZERO
+	var f: Vector3 = Vector3(0, 0, -1)
+	assert_lt(InteractionRules.reach_score(o, f, Vector3(0, 0, -2.19)), INF, "edge of reach")
+	assert_eq(InteractionRules.reach_score(o, f, Vector3(0, 0, -2.3)), INF, "just past it")
+	assert_lt(InteractionRules.reach_score(o, f, Vector3(1.2, 0, -1.6)), INF, "~37° off-centre")
+	assert_eq(InteractionRules.reach_score(o, f, Vector3(1.7, 0, -0.5)), INF, "~74°: outside the cone")
+	assert_lt(InteractionRules.reach_score(o, f, Vector3(0.9, 0, 0.1)), INF, "touching at the shoulder counts")
+	assert_eq(InteractionRules.reach_score(o, f, Vector3(0, 0, 0.9)), INF, "right behind doesn't")
+	assert_eq(InteractionRules.reach_score(o, f, Vector3(0, 3.0, -1.0)), INF, "balcony above")
+	# The centred target wins over a nearer one at the edge of the cone.
+	var pick: int = InteractionRules.pick_in_reach(o, f, {1: Vector3(0, 0, 0), 2: Vector3(0, 0, -1.6), 3: Vector3(1.1, 0, -1.0)}, 1)
+	assert_eq(pick, 2)
+	assert_eq(InteractionRules.pick_in_reach(o, f, {2: Vector3(0, 0, 3)}, 1), -1)
+
+
+func test_knock_down_does_not_stack_on_a_knockout() -> void:
+	var r := InteractionRules.new(BalanceConfig.new())
+	assert_true(r.knock_down(2, 0.0))
+	assert_true(r.is_knocked_down(2, 1.0))
+	r.knock_out(2, 5.0)
+	assert_false(r.knock_down(2, 5.5), "already out cold")

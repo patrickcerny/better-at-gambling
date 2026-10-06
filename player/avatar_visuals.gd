@@ -27,6 +27,10 @@ const BIG_WIN: int = 500
 ## The bean's centre of rotation for whole-body poses (slip, get-up), near the bottom of the body.
 const PIVOT: Vector3 = Vector3(0.0, 0.42, 0.0)
 const GET_UP_SECONDS: float = 0.55
+## Shove / throw swing: wind-up, a two-handed thrust that lands at `SWING_CONTACT`, recovery.
+const SWING_WINDUP: float = 0.07
+const SWING_CONTACT: float = 0.12
+const SWING_SECONDS: float = 0.38
 
 var body: MeshInstance3D
 var eye_l: MeshInstance3D
@@ -59,6 +63,8 @@ var reaching: bool = false
 ## The reaction playing now (&"" = none) and for how long it has played.
 var reaction: StringName = &""
 var reaction_time: float = 0.0
+## Seconds into the current shove/throw swing (-1 = none).
+var swing_time: float = -1.0
 
 var _rig: Node3D
 var _lean: Vector2 = Vector2.ZERO
@@ -200,6 +206,26 @@ func react(kind: StringName) -> void:
 	reaction_time = 0.0
 
 
+## Starts a shove (or throw) swing: lean back, thrust both arms out, lunge, recover. Runs on
+## real game time, so the local press shows at once while the server confirms.
+func swing() -> void:
+	swing_time = 0.0
+
+
+func is_swinging() -> bool:
+	return swing_time >= 0.0 and swing_time < SWING_SECONDS
+
+
+## Took a hit pushing us along `dir` (world): the body tips that way on its lean spring and
+## squashes, then wobbles back.
+func hit(dir: Vector3, strength: float = 1.0) -> void:
+	var d: Vector3 = global_basis.inverse() * Vector3(dir.x, 0.0, dir.z)
+	if d.length() > 0.01:
+		d = d.normalized()
+		_lean_vel += Vector2(d.z, d.x) * 9.0 * strength
+	_squash_vel -= 2.5 * strength
+
+
 ## The reaction for a round's net result.
 static func reaction_for_net(net: int) -> StringName:
 	if net >= BIG_WIN:
@@ -250,6 +276,10 @@ func set_carried(on: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	if swing_time >= 0.0:
+		swing_time += minf(delta, 1.0 / 30.0)
+		if swing_time >= SWING_SECONDS:
+			swing_time = -1.0
 	if _headless or not is_visible_in_tree():
 		return
 	_animate(delta)
@@ -293,7 +323,7 @@ func _animate(frame_delta: float) -> void:
 	_animate_arms(walk)
 	_animate_legs(walk)
 	_animate_face(delta)
-	if reaching:
+	if reaching and not is_swinging():
 		_point_arms(reach_target)
 
 
@@ -318,6 +348,10 @@ func _animate_rig() -> void:
 			lift.y = absf(sin(t * TAU * 1.8)) * 0.18 if t < 1.1 else 0.0
 		&"surprise":
 			lift.y = sin(clampf(t / 0.3, 0.0, 1.0) * PI) * 0.2
+	if swing_time >= 0.0 and not carried:
+		var lunge: float = _swing_curve(swing_time)
+		pitch += 0.12 * (1.0 - lunge) * (1.0 if swing_time < SWING_WINDUP else 0.0) - 0.38 * lunge
+		lift.z -= 0.22 * lunge
 	if carried:
 		roll = -PI * 0.5
 		lift = Vector3(-(BODY_HEIGHT * 0.5 - PIVOT.y), 0.0, 0.0)  # centre the lying body
@@ -332,6 +366,17 @@ func _animate_rig() -> void:
 			_get_up_t = -1.0
 	var b: Basis = Basis(q)
 	_rig.transform = Transform3D(b, PIVOT - b * PIVOT + lift)
+
+
+## 0 → 1 → 0 over the swing: snaps out by the contact moment, eases back.
+func _swing_curve(t: float) -> float:
+	if t < SWING_WINDUP:
+		return 0.0
+	if t < SWING_CONTACT:
+		return smoothstep(SWING_WINDUP, SWING_CONTACT, t)
+	if t < SWING_CONTACT + 0.06:
+		return 1.0
+	return 1.0 - smoothstep(SWING_CONTACT + 0.06, SWING_SECONDS, t)
 
 
 func _slip_curve(t: float) -> float:
@@ -363,6 +408,13 @@ func _animate_arms(walk: float) -> void:
 		&"slip", &"surprise":
 			l = Vector2(1.2 + sin(t * 25.0) * 0.6, 0.8)
 			r = Vector2(1.2 + cos(t * 23.0) * 0.6, 0.8)
+	if swing_time >= 0.0 and not carried:
+		# Wind-up pulls the hands back by the hips, the thrust shoots them straight out.
+		var k: float = _swing_curve(swing_time)
+		var back: float = smoothstep(0.0, SWING_WINDUP, swing_time) if swing_time < SWING_WINDUP else 0.0
+		var pitch: float = lerpf(ARM_REST - 0.5 * back, 0.08, k)
+		l = Vector2(pitch, lerpf(-0.12, -0.2, k))
+		r = Vector2(pitch, lerpf(-0.12, -0.2, k))
 	if carried:
 		l = Vector2(0.4 + sin(_time * 19.0) * 0.8, 0.3 + cos(_time * 13.0) * 0.4)
 		r = Vector2(0.4 + cos(_time * 17.0) * 0.8, 0.3 + sin(_time * 11.0) * 0.4)
