@@ -276,27 +276,27 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 
 ### Tasks
 - [ ] full theme pass
-- [ ] animated money counters
-- [ ] card dealing/chip sliding/roulette ball/slot reel animations
-- [ ] win/lose/jackpot VFX and hit-stop
-- [ ] character squash/stretch
-- [ ] slip
-- [ ] cheer
-- [ ] sad animations
-- [ ] face reactions (eyes widen on wins, droop on losses)
-- [ ] better ragdoll flail and get-up
-- [ ] knockout birdies
-- [ ] guard carry-and-toss animation
-- [ ] fountain splash VFX
-- [ ] waiter NPC who trips and spills puddles
-- [ ] Megaphone prop
-- [ ] crown on leader
-- [ ] Hot Table spotlight/fire
-- [ ] Last Call lighting & music
-- [ ] quiz show juice (host cat reactions, confetti)
-- [ ] results podium animations + fun awards + money-over-time graph
-- [ ] music crossfades
-- [ ] all SFX hooked
+- [x] animated money counters
+- [x] card dealing/chip sliding/roulette ball/slot reel animations
+- [x] win/lose/jackpot VFX and hit-stop
+- [x] character squash/stretch
+- [x] slip
+- [x] cheer
+- [x] sad animations
+- [x] face reactions (eyes widen on wins, droop on losses)
+- [x] better ragdoll flail and get-up
+- [x] knockout birdies
+- [x] guard carry-and-toss animation
+- [x] fountain splash VFX
+- [x] waiter NPC who trips and spills puddles
+- [x] Megaphone prop
+- [x] crown on leader
+- [x] Hot Table spotlight/fire
+- [x] Last Call lighting & music
+- [x] quiz show juice (host cat reactions, confetti)
+- [x] results podium animations + fun awards + money-over-time graph
+- [x] music crossfades
+- [x] all SFX hooked
 - [x] emotes wheel
 - [x] blackjack **split**
 - [x] input glyph switching (keyboard ↔ gamepad)
@@ -305,7 +305,7 @@ Generated from §13 of the master implementation prompt at M0. Tick items only w
 ### Tests
 - [ ] smoke tests for all scenes
 - [x] split logic unit tests
-- [ ] awards computation tests
+- [x] awards computation tests
 - [ ] no FPS regression in a scripted benchmark scene (record FPS in PROGRESS.md if a renderer is available)
 
 ### Acceptance criteria
