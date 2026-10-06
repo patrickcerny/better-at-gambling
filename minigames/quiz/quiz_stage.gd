@@ -340,6 +340,9 @@ func _reveal(ev: Dictionary, live: bool) -> void:
 		_host_say(ALL_RIGHT_LINES[revealed_index % ALL_RIGHT_LINES.size()], QuizHost.Pose.HAPPY)
 	else:
 		_host_say("%s It's \"%s\"!" % [SOME_RIGHT_LINES[revealed_index % SOME_RIGHT_LINES.size()], answer_text], QuizHost.Pose.SURPRISED)
+	if right_count > 0 and live:
+		# Patrick's announcer praises a correct answer (one of the `announcer_correct-vN` lines).
+		Audio.play(&"announcer_correct", &"UI", -2.0)
 	var mine: int = int(gained.get(local_id, 0))
 	if local_id in players:
 		_set_status(("CORRECT!  +%d" % mine) if mine > 0 else ("WRONG!" if my_answer >= 0 else "TOO SLOW!"), Palette.MONEY_GREEN if mine > 0 else Palette.LOSS_RED)
