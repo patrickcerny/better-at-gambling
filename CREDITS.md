@@ -55,7 +55,7 @@ lights are dropped in game.
 
 Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KENNEY_LICENSE.txt`), except the ones listed below.
 
-Supplied by Patrick Cerny for this game: `minor_win-v1.ogg`.
+Supplied by Patrick Cerny for this game: `minor_win-v1.ogg`, `slots_riser_1-v1.ogg`, `slots_riser_2-v1.ogg`, `slots_riser_3-v1.ogg` (cut from his "Slots tripple win" riser at its three onsets, 0.71 s apart).
 
 ## Fonts
 
