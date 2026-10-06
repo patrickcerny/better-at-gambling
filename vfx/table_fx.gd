@@ -77,7 +77,7 @@ func _on_bet(ev: Dictionary) -> void:
 	var pid: int = int(ev["player"])
 	var details: Dictionary = ev.get("details", {})
 	if st is SlotsStation:
-		(st as SlotsStation).start_spin()
+		(st as SlotsStation).start_spin(pid == local_id)
 		return
 	if not (st is RouletteStation or st is BlackjackStation):
 		return  # Plinko drops its own chip
@@ -108,7 +108,7 @@ func _on_result(ev: Dictionary) -> void:
 	var stake: int = int(ev["stake"])
 	var details: Dictionary = ev.get("details", {})
 	if st is SlotsStation and details.has("line"):
-		var t: float = (st as SlotsStation).stop_on(details["line"])
+		var t: float = (st as SlotsStation).stop_on(details["line"], pid == local_id)
 		_shown_at[sid] = Time.get_ticks_msec() + int(t * 1000.0)
 	elif st is PlinkoStation:
 		_shown_at[sid] = Time.get_ticks_msec() + int(PLINKO_DELAY * 1000.0)
