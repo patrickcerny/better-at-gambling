@@ -57,6 +57,8 @@ Kenney (kenney.nl), CC0: the `*-vN.ogg` files in `audio/sfx/` (see `audio/sfx/KE
 
 Supplied by Patrick Cerny for this game: `minor_win-v1.ogg`; `chips_in_pot-v1.ogg` (the chip part of his "Put Chips in Pot"); `slots_riser_1..3-v1.ogg` (his "Slots tripple win" riser, cut at its three onsets, 0.71 s apart).
 
+`slots_no_match-v1.ogg`: "Two Tone" from *Casino Sounds* by Bjorn Lynne, supplied by Patrick Cerny (licence held by him).
+
 ## Fonts
 
 Barlow Condensed, SIL Open Font License.
