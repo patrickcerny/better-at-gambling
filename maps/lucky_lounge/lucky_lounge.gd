@@ -30,11 +30,20 @@ const SPAWNS: Array[Vector3] = [
 ]
 const GUARD_ROUTES: Array = [
 	[Vector3(-12, 0, 0), Vector3(-12, 0, -11), Vector3(0, 0, -11), Vector3(0, 0, 0)],
-	[Vector3(12, 0, 2), Vector3(18, 0, -8), Vector3(8, 0, -8), Vector3(2, 0, 7)],
+	[Vector3(12, 0, 0.5), Vector3(18, 0, -8), Vector3(8, 0, -8), Vector3(2, 0, 7)],
 ]
-const VIP_GATE_POS: Vector3 = Vector3(9.0, MEZZ_Y, -0.5)
+## Middle of the velvet-rope gate between the stair landing and the VIP floor (x = 9 is the
+## mezzanine edge; the landing runs z -4.5..-1.5).
+const VIP_GATE_POS: Vector3 = Vector3(9.0, MEZZ_Y, -3.0)
+## Stairs: two flights at x = 12 (lobby floor -> landing at 2 m -> mezzanine landing at 4 m).
+const STAIRS_X: float = 12.0
+const STAIRS_W: float = 2.4
+const STAIR_FLIGHTS: Array = [[Vector3(12.0, 0.0, 9.0), Vector3(12.0, 2.0, 4.2)], [Vector3(12.0, 2.0, 1.8), Vector3(12.0, 4.0, -1.5)]]
+const PILLARS: Array[Vector3] = [Vector3(-9.6, 0, -1), Vector3(9.6, 0, -1), Vector3(-9.6, 0, 8), Vector3(9.6, 0, 8)]
 const ENTRANCE_POS: Vector3 = Vector3(0, 0, 15.0)
 const RESPAWN_POS: Vector3 = Vector3(0, 0, 13.0)
+## Marquee sign over the gate line, facing the stair landing (east).
+const VIP_SIGN_POS: Vector3 = Vector3(9.0, MEZZ_Y + 2.6, -3.0)
 const FOUNTAIN_POS: Vector3 = Vector3(0, 0, 10.0)
 ## Where online players appear in the entrance hall (off the ready pads, clear of the fountain).
 const LOBBY_SPAWNS: Array[Vector3] = [
@@ -43,6 +52,8 @@ const LOBBY_SPAWNS: Array[Vector3] = [
 ]
 ## Where players stand to shop at the Gift Shop kiosk (east wall, next to the bar).
 const SHOP_POS: Vector3 = Vector3(19.6, 0, 1.5)
+const BAR_X: float = 17.7
+const BAR_W: float = 7.0
 const MIRROR_POS: Vector3 = Vector3(-21.3, 0, 12.0)
 const SETTINGS_BOARD_POS: Vector3 = Vector3(12.5, 0, 14.6)
 ## Radius around a ready pad's centre that counts as standing on it.
@@ -139,7 +150,9 @@ func _build_floor_and_walls() -> void:
 	for z: float in [-SIZE_Z * 0.5 + 0.3, SIZE_Z * 0.5 - 0.3]:
 		GreyboxKit.box(self, Vector3(SIZE_X, 0.15, 0.1), Vector3(0, 1.0, z), Palette.WARM_GOLD, "Trim", false)
 	# Pillars.
-	for p: Vector3 in [Vector3(-11, 0, -1), Vector3(11, 0, -1), Vector3(-11, 0, 8), Vector3(11, 0, 8)]:
+	# Pillars stand clear of the staircase (x 10.8..13.2): the east pair frames the VIP gate and
+	# the lobby doors instead of standing in the first flight.
+	for p: Vector3 in PILLARS:
 		var col: Node3D = GreyboxKit.cylinder(self, 0.45, WALL_H, p + Vector3(0, WALL_H * 0.5, 0), Color("#B8A890"), "Pillar")
 		GreyboxKit.cylinder(col, 0.55, 0.3, Vector3(0, -WALL_H * 0.5 + 0.15, 0), Palette.WARM_GOLD, "Base", false, 0.7)
 
@@ -230,12 +243,26 @@ func _build_lobby() -> void:
 	door_area.add_child(dcs)
 	door_area.set_meta(&"hazard", &"revolving_door")
 	revolving_door.add_child(door_area)
-	# Stairs (two ramps with a landing) up to the mezzanine on the east side of the lobby.
-	GreyboxKit.ramp(self, Vector3(12.0, 0.0, 9.0), Vector3(12.0, MEZZ_Y * 0.5, 4.5), 2.4, Palette.CASINO_RED.darkened(0.2), "Stairs1")
-	GreyboxKit.box(self, Vector3(2.6, 0.3, 2.4), Vector3(12.0, MEZZ_Y * 0.5 - 0.15, 3.0), Palette.CASINO_RED.darkened(0.2), "Landing")
-	GreyboxKit.ramp(self, Vector3(12.0, MEZZ_Y * 0.5, 1.5), Vector3(12.0, MEZZ_Y, -1.5), 2.4, Palette.CASINO_RED.darkened(0.2), "Stairs2")
-	for side: float in [-1.3, 1.3]:
-		GreyboxKit.box(self, Vector3(0.1, 1.0, 11.0), Vector3(12.0 + side, MEZZ_Y * 0.5 + 0.5, 3.75), Palette.WARM_GOLD, "StairRail", true)
+	# Stairs (two flights with a landing) up to the mezzanine on the east side of the lobby. The
+	# flights meet the landings exactly (no slots, no lips): flight 1 ends where the landing block
+	# starts (z 4.2), flight 2 leaves its far side (z 1.8) and arrives flush with the mezzanine
+	# landing's south face (z -1.5).
+	var stair_color: Color = Palette.CASINO_RED.darkened(0.2)
+	GreyboxKit.ramp(self, STAIR_FLIGHTS[0][0], STAIR_FLIGHTS[0][1], STAIRS_W, stair_color, "Stairs1")
+	GreyboxKit.box(self, Vector3(STAIRS_W + 0.2, MEZZ_Y * 0.5, 2.4), Vector3(STAIRS_X, MEZZ_Y * 0.25, 3.0), stair_color, "Landing")
+	GreyboxKit.ramp(self, STAIR_FLIGHTS[1][0], STAIR_FLIGHTS[1][1], STAIRS_W, stair_color, "Stairs2")
+	# Rail guards along both flights and the landing's open sides: invisible walls 0.15..1.15 m
+	# above the steps under a visible handrail bar; the client decor adds the balusters.
+	for side: float in [-STAIRS_W * 0.5 - 0.1, STAIRS_W * 0.5 + 0.1]:
+		for flight: Array in STAIR_FLIGHTS:
+			var a: Vector3 = flight[0] + Vector3(side, 0.65, 0)
+			var b: Vector3 = flight[1] + Vector3(side, 0.65, 0)
+			GreyboxKit.beam(self, a, b, Vector2(0.08, 1.0), Palette.WARM_GOLD, "StairGuard", true, 0.0, false)
+			GreyboxKit.beam(self, a + Vector3(0, 0.46, 0), b + Vector3(0, 0.46, 0), Vector2(0.1, 0.08), Palette.WARM_GOLD, "StairRail", false, 0.8)
+		var la: Vector3 = Vector3(STAIRS_X + side, MEZZ_Y * 0.5 + 0.65, 4.2)
+		var lb: Vector3 = Vector3(STAIRS_X + side, MEZZ_Y * 0.5 + 0.65, 1.8)
+		GreyboxKit.beam(self, la, lb, Vector2(0.08, 1.0), Palette.WARM_GOLD, "StairGuard", true, 0.0, false)
+		GreyboxKit.beam(self, la + Vector3(0, 0.46, 0), lb + Vector3(0, 0.46, 0), Vector2(0.1, 0.08), Palette.WARM_GOLD, "StairRail", false, 0.8)
 
 
 func _build_settings_board() -> void:
@@ -318,12 +345,13 @@ func _build_floor_areas() -> void:
 	_plane(Vector2(18, 8), Vector3(0, 0.012, -3), Palette.CASINO_RED.darkened(0.5), "RouletteRug")
 	_plane(Vector2(16, 9), Vector3(-13.5, 0.012, -11), Palette.WARM_GOLD.darkened(0.6), "SlotsRug")
 	_plane(Vector2(12, 5), Vector3(14, 0.012, -13), Palette.VIP_BURGUNDY.darkened(0.3), "PlinkoRug")
-	# Bar (south-east, decoration; also the quiz entry area later).
-	GreyboxKit.box(self, Vector3(8.0, 1.1, 1.2), Vector3(16.0, 0.55, 5.0), Color("#3A2A1E"), "Bar")
-	GreyboxKit.box(self, Vector3(8.0, 0.08, 1.3), Vector3(16.0, 1.14, 5.0), Palette.WARM_GOLD, "BarTop", false)
-	GreyboxKit.box(self, Vector3(8.0, 2.5, 0.4), Vector3(16.0, 1.25, 7.0), Color("#2A1E18"), "BackBar")
+	# Bar (south-east, decoration; also the quiz entry area later). It starts east of the
+	# staircase (x > 13.2); its back bar used to run across the first flight.
+	GreyboxKit.box(self, Vector3(BAR_W, 1.1, 1.2), Vector3(BAR_X, 0.55, 5.0), Color("#3A2A1E"), "Bar")
+	GreyboxKit.box(self, Vector3(BAR_W, 0.08, 1.3), Vector3(BAR_X, 1.14, 5.0), Palette.WARM_GOLD, "BarTop", false)
+	GreyboxKit.box(self, Vector3(BAR_W, 2.5, 0.4), Vector3(BAR_X, 1.25, 7.0), Color("#2A1E18"), "BackBar")
 	for i: int in 6:
-		GreyboxKit.box(self, Vector3(0.25, 0.4, 0.25), Vector3(12.5 + i * 1.4, 1.6, 6.9), [Palette.CASINO_RED, Palette.WARM_GOLD, Palette.FELT_GREEN][i % 3], "Bottle", false)
+		GreyboxKit.box(self, Vector3(0.25, 0.4, 0.25), Vector3(BAR_X - BAR_W * 0.5 + 0.5 + i * 1.3, 1.6, 6.9), [Palette.CASINO_RED, Palette.WARM_GOLD, Palette.FELT_GREEN][i % 3], "Bottle", false)
 	_build_gift_shop()
 	# Plants and a few obstacles for lanes.
 	for p: Vector3 in [Vector3(-20, 0, 14), Vector3(20, 0, 14), Vector3(-20, 0, -1), Vector3(20, 0, -1), Vector3(-5, 0, 8.6), Vector3(5, 0, 8.6)]:
@@ -350,13 +378,19 @@ func _build_mezzanine() -> void:
 	# Platform above the roulette pit, open on the south side with a low railing (shove-able).
 	GreyboxKit.box(self, Vector3(18.0, 0.4, 10.0), Vector3(0, MEZZ_Y - 0.2, -5.0), Color("#3A2A1E"), "MezzFloor")
 	_plane(Vector2(17.5, 9.5), Vector3(0, MEZZ_Y + 0.01, -5.0), Palette.VIP_BURGUNDY, "VipCarpet")
-	for x: float in [-9.0, 9.0]:
-		GreyboxKit.box(self, Vector3(0.1, 0.9, 10.0), Vector3(x, MEZZ_Y + 0.45, -5.0), Palette.WARM_GOLD, "MezzRailSide", true)
-	# South railing is low: 0.6 m, with a gap where the stairs arrive (x 10.8..13.2 handled by platform extension).
-	GreyboxKit.box(self, Vector3(16.0, 0.6, 0.1), Vector3(-1.0, MEZZ_Y + 0.3, 0.0), Palette.WARM_GOLD, "MezzRailSouth", true)
-	GreyboxKit.box(self, Vector3(18.0, 0.6, 0.1), Vector3(0.0, MEZZ_Y + 0.3, -10.0), Palette.WARM_GOLD, "MezzRailNorth", true)
-	# Stair arrival platform + velvet rope gate with the bouncer.
-	GreyboxKit.box(self, Vector3(4.6, 0.4, 3.0), Vector3(11.0, MEZZ_Y - 0.2, -1.5), Color("#3A2A1E"), "MezzLanding")
+	# Railings: 0.9 m on the sides, 0.6 m (shove-able) along the south edge over the pit. The
+	# east rail leaves the gate open (z -4.5..-1.5) where the stair landing joins the floor.
+	_rail(Vector3(-9.0, MEZZ_Y, -10.0), Vector3(-9.0, MEZZ_Y, 0.0), 0.9, "MezzRailSide")
+	_rail(Vector3(9.0, MEZZ_Y, -10.0), Vector3(9.0, MEZZ_Y, -4.5), 0.9, "MezzRailSide")
+	_rail(Vector3(9.0, MEZZ_Y, -1.5), Vector3(9.0, MEZZ_Y, 0.0), 0.9, "MezzRailSide")
+	_rail(Vector3(-9.0, MEZZ_Y, 0.0), Vector3(9.0, MEZZ_Y, 0.0), 0.6, "MezzRailSouth")
+	_rail(Vector3(-9.0, MEZZ_Y, -10.0), Vector3(9.0, MEZZ_Y, -10.0), 0.6, "MezzRailNorth")
+	# Stair arrival landing (x 8.7..13.3, z -4.5..-1.5) + velvet rope gate with the bouncer. Its
+	# open sides are railed except where flight 2 arrives (x 10.8..13.2 on the south edge).
+	GreyboxKit.box(self, Vector3(4.6, 0.4, 3.0), Vector3(11.0, MEZZ_Y - 0.2, -3.0), Color("#3A2A1E"), "MezzLanding")
+	_rail(Vector3(9.0, MEZZ_Y, -1.5), Vector3(STAIRS_X - STAIRS_W * 0.5 - 0.1, MEZZ_Y, -1.5), 0.9, "LandingRail")
+	_rail(Vector3(13.3, MEZZ_Y, -4.5), Vector3(13.3, MEZZ_Y, -1.5), 0.9, "LandingRail")
+	_rail(Vector3(9.0, MEZZ_Y, -4.5), Vector3(13.3, MEZZ_Y, -4.5), 0.9, "LandingRail")
 	vip_gate_area = Area3D.new()
 	vip_gate_area.name = "VipGate"
 	vip_gate_area.collision_layer = 0
@@ -370,15 +404,23 @@ func _build_mezzanine() -> void:
 	vip_gate_area.position = VIP_GATE_POS
 	vip_gate_area.set_meta(&"hazard", &"vip_gate")
 	add_child(vip_gate_area)
-	for z: float in [-2.9, 0.9]:
-		GreyboxKit.cylinder(self, 0.06, 1.0, VIP_GATE_POS + Vector3(0, 0.5, z), Palette.WARM_GOLD, "GatePost", true, 0.8)
+	for z: float in [-1.35, 1.35]:
+		var post: Node3D = GreyboxKit.cylinder(self, 0.06, 1.0, VIP_GATE_POS + Vector3(0, 0.5, z), Palette.WARM_GOLD, "GatePost", true, 0.8)
+		GreyboxKit.sphere(post, 0.1, Vector3(0, 0.55, 0), Palette.WARM_GOLD, "Knob")
 	# VIP sign.
-	GreyboxKit.box(self, Vector3(2.6, 0.8, 0.1), Vector3(9.0, MEZZ_Y + 2.6, -1.0), Palette.VIP_BURGUNDY, "VipSign", false)
-	GreyboxKit.box(self, Vector3(2.4, 0.6, 0.12), Vector3(9.0, MEZZ_Y + 2.6, -1.0), Palette.VIP_GOLD, "VipSignFace", false)
+	GreyboxKit.box(self, Vector3(0.1, 0.8, 2.6), VIP_SIGN_POS, Palette.VIP_BURGUNDY, "VipSign", false)
+	GreyboxKit.box(self, Vector3(0.12, 0.6, 2.4), VIP_SIGN_POS, Palette.VIP_GOLD, "VipSignFace", false)
 	# Gold statues: the VIP floor is intentionally excessive.
 	for x: float in [-7.5, 7.5]:
 		var plinth: Node3D = GreyboxKit.box(self, Vector3(0.8, 0.8, 0.8), Vector3(x, MEZZ_Y + 0.4, -1.2), Color("#D8D0C4"), "Plinth")
 		GreyboxKit.capsule(plinth, 0.3, 1.2, Vector3(0, 1.1, 0), GreyboxKit.gold(), "Statue")
+
+
+## Railing from `a` to `b` (floor level): an invisible guard wall `height` tall plus a visible
+## gold handrail bar on top; the client decor adds balusters under it.
+func _rail(a: Vector3, b: Vector3, height: float, name: String) -> void:
+	GreyboxKit.beam(self, a + Vector3(0, height * 0.5, 0), b + Vector3(0, height * 0.5, 0), Vector2(0.08, height), Palette.WARM_GOLD, name, true, 0.0, false)
+	GreyboxKit.beam(self, a + Vector3(0, height - 0.04, 0), b + Vector3(0, height - 0.04, 0), Vector2(0.1, 0.08), Palette.WARM_GOLD, name + "Bar", false, 0.8)
 
 
 func _build_stations() -> void:
@@ -413,7 +455,7 @@ func _build_props() -> void:
 	props_parent.name = "Props"
 	add_child(props_parent)
 	for i: int in 5:
-		_stool(Vector3(12.5 + i * 1.5, 0.0, 3.6))
+		_stool(Vector3(BAR_X - BAR_W * 0.5 + 0.3 + i * 1.5, 0.0, 3.6))
 	for p: Vector3 in [Vector3(-3, 0, 1), Vector3(3, 0, 1), Vector3(14, 0, -9), Vector3(-19, 0, 2)]:
 		_chip_stack(p)
 

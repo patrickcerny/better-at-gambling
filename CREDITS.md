@@ -45,6 +45,38 @@ Its camera and lights were stripped from the file. The table's texture files (Br
 uses flat casino colors. The roulette wheel carries its own textures; its floor plane, camera and
 lights are dropped in game.
 
+## Lucky Lounge surfaces and decor (CC0)
+
+Picked from the 2026-10-06 texture research (notes in `/mnt/project-files/better-at-gambling/textures/NOTES.md`),
+downscaled to 1K JPG by `tools/import_textures.sh`, applied client-side by `maps/lucky_lounge/lounge_decor.gd`.
+All CC0 (public domain); credit lines kept anyway.
+
+| Folder under `assets/textures/` | Source | Author / licence |
+|---|---|---|
+| casino_carpet/albedo.jpg | custom wine-red casino carpet (gold lattice), made for this project | Patrick Cerny / CC0 |
+| casino_carpet/normal.jpg | Fabric026 (https://ambientcg.com/a/Fabric026) | ambientCG (Lennart Demes) / CC0 |
+| checker_marble/ | Tiles074 (https://ambientcg.com/a/Tiles074) | ambientCG (Lennart Demes) / CC0 |
+| herringbone_parquet/ | herringbone_parquet (https://polyhaven.com/a/herringbone_parquet) | Poly Haven (Rob Tuytel) / CC0 |
+| damask_wallpaper/ | custom stylised damask, wine-on-wine and gold-on-black | Patrick Cerny / CC0 |
+| wooden_panels/ | wooden_panels (https://polyhaven.com/a/wooden_panels) | Poly Haven / CC0 |
+| black_marble/ | Marble016 (https://ambientcg.com/a/Marble016) | ambientCG (Lennart Demes) / CC0 |
+| velvet/ | velour_velvet (https://polyhaven.com/a/velour_velvet) | Poly Haven / CC0 |
+| brass/ | Metal048A (https://ambientcg.com/a/Metal048A) | ambientCG (Lennart Demes) / CC0 |
+| coffered_ceiling/ | dark_paneled_wood (https://polyhaven.com/a/dark_paneled_wood) | Poly Haven / CC0 |
+
+| File under `assets/models/` | Model | Source | Author / licence |
+|---|---|---|---|
+| quaternius_interior/Column_Round3.fbx | classical round column (the pillars) | Ultimate House Interior Pack (https://quaternius.com/packs/ultimatehomeinterior.html) | Quaternius / CC0 |
+| quaternius_interior/Column_Round1.fbx | short column (statue pedestals in the VIP lounge) | same pack | Quaternius / CC0 |
+| quaternius_interior/Window_Round1.fbx | arched window | same pack | Quaternius / CC0 |
+| quaternius_interior/Window_Large1.fbx | large window (kept for later use) | same pack | Quaternius / CC0 |
+| quaternius_interior/Curtains_Double.fbx | curtains (recoloured red velvet) | same pack | Quaternius / CC0 |
+| quaternius_interior/Door_Double.fbx | double doors (staff door, VIP door, street door) | same pack | Quaternius / CC0 |
+| polyhaven/ornate_mirror_01/ | gold baroque mirror (entrance hall) | https://polyhaven.com/a/ornate_mirror_01 | Poly Haven (Rico Cilliers) / CC0 |
+| polyhaven/fancy_picture_frame_01/ | gold picture frame with painting (game floor walls) | https://polyhaven.com/a/fancy_picture_frame_01 | Poly Haven / CC0 |
+| polyhaven/marble_bust_01/ | marble bust (VIP lounge) | https://polyhaven.com/a/marble_bust_01 | Poly Haven / CC0 |
+| polyhaven/horse_statue_01/ | horse statue (VIP lounge) | https://polyhaven.com/a/horse_statue_01 | Poly Haven / CC0 |
+
 ## Playing cards
 
 - `assets/cards/*.png`: card faces and back by Kenney (kenney.nl), CC0, taken from

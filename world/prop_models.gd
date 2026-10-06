@@ -15,6 +15,17 @@ const PATHS: Dictionary = {
 	&"plant_3": "res://assets/polypizza/flowers_03.glb",
 	&"cone": "res://assets/polypizza/cone.glb",
 	&"beer": "res://assets/polypizza/beer_empty.glb",
+	# Lounge decor (CC0, see CREDITS.md): Quaternius Ultimate House Interior and Poly Haven.
+	&"column": "res://assets/models/quaternius_interior/Column_Round3.fbx",
+	&"pedestal": "res://assets/models/quaternius_interior/Column_Round1.fbx",
+	&"window_arch": "res://assets/models/quaternius_interior/Window_Round1.fbx",
+	&"window_large": "res://assets/models/quaternius_interior/Window_Large1.fbx",
+	&"door_double": "res://assets/models/quaternius_interior/Door_Double.fbx",
+	&"curtains": "res://assets/models/quaternius_interior/Curtains_Double.fbx",
+	&"mirror": "res://assets/models/polyhaven/ornate_mirror_01/ornate_mirror_01_1k.gltf",
+	&"picture": "res://assets/models/polyhaven/fancy_picture_frame_01/fancy_picture_frame_01_1k.gltf",
+	&"bust": "res://assets/models/polyhaven/marble_bust_01/marble_bust_01_1k.gltf",
+	&"horse": "res://assets/models/polyhaven/horse_statue_01/horse_statue_01_1k.gltf",
 }
 ## Item → prop the user holds up when they use it. Items without their own model show nothing yet.
 const ITEM_PROPS: Dictionary = {&"beer": &"beer"}

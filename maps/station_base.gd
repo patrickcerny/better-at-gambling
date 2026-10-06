@@ -217,6 +217,7 @@ func _rug(size: Vector2, color: Color) -> void:
 	var mi := MeshInstance3D.new()
 	mi.name = "Rug"
 	mi.mesh = mesh
-	mi.material_override = GreyboxKit.material(color)
+	# Patterned carpet on clients (same shader as the lounge floor), flat colour headless.
+	mi.material_override = LoungeDecor._carpet(color, color.darkened(0.25), 1.0) if Vfx.enabled() else GreyboxKit.material(color)
 	mi.position.y = 0.02
 	add_child(mi)

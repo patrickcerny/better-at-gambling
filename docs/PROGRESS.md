@@ -78,6 +78,10 @@
   - Waiter NPC who trips (by himself, on bumps or shoves) and leaves slippery puddles; Megaphone at the bar (E, 10 s of full-volume voice). Protocol 4: old 0.6 clients are refused.
 
 ## Known bugs
+- (fixed 2026-10-06) The VIP mezzanine could not be reached on foot: the south-east pillar and the back bar
+  stood across the bottom of the first stair flight (0.55 m gap for a 0.84 m capsule), flight 2 ran into the
+  mezzanine landing's side face, and the east mezzanine railing ran straight across the VIP gate. Covered by
+  `tests/physics/test_vip_access.gd` (walk up, bounce while broke, walk in and sit when rich).
 - The lobby doors' sign is partly hidden behind the fountain from some spawn points (greybox layout; M7 art pass).
 - Stairs are not on the navmesh (guards never go upstairs; players do, it's physics). Fine for now, revisit when bots roam (M6).
 - The slots camera anchor sits too close to the cabinet screen (M7 station polish).
@@ -107,3 +111,12 @@
 - Quiz (logic, questions, dynamic templates, stage), minigame framework, reward director + draft panel, Hot Table, House Comp, closing tables, awards, results podium, play again in the same room, half-RTT from ENet, autoplay answers and drafts, `--skip-to` for screenshots.
 - Bugs found and fixed: the quiz scoreboard and reveal read typed int-keyed dictionaries with string keys (engine errors in the full-match session), opening the quiz called a missing `EmoteWheel.close()`, results beans stood on the floor inside the podiums and faced away, quiz beans faced away, the old question stayed on the big screen under the winner banner, a hot table could repeat the same station.
 - Patrick's PC set up `.github/workflows/release.yml`: every push to main publishes a GitHub Release (`releases/latest`).
+### 2026-10-06 / polish 1 (map)
+- VIP access fixed (see Known bugs); stairs rebuilt as two flights meeting their landings flush, rail guards
+  as invisible walls under visible handrails, bar moved east of the staircase, pillars moved off it.
+- Lucky Lounge textures and decor (client only, `lounge_decor.gd`): CC0 set from the texture research
+  (casino carpet + fibre normal, checker marble, herringbone parquet, damask wallpaper, mahogany wainscot,
+  brass, black marble, velvet, coffered ceiling; ~1.8 MB), Quaternius columns/windows/curtains/doors, Poly
+  Haven mirror, paintings, bust and horse (~3.7 MB). `tools/import_textures.sh` regenerates the textures.
+  Map shots: `scripts/map_shots.sh` (free camera via `tools/screenshot.gd --cam/--look`), copies in
+  `/mnt/project-files/better-at-gambling/screenshots/polish1/map/`.
