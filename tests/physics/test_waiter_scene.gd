@@ -33,10 +33,12 @@ func test_server_trip_shows_fall_and_puddle_then_he_gets_up() -> void:
 		await wait_physics_frames(1)
 	await wait_seconds(0.3)
 	var w: Waiter = scene.casino_floor.waiter
+	# He may already have tripped on his own (about once every 40 s), so count from here.
+	var puddles_before: int = scene.view.state.puddles.size()
 	scene.server.waiter.trip(scene.server.match_time, &"clumsy", -1)
 	await wait_seconds(0.3)
 	assert_true(w.down, "on the floor")
-	assert_eq(scene.view.state.puddles.size(), 1)
+	assert_eq(scene.view.state.puddles.size(), puddles_before + 1)
 	assert_true(scene.casino_floor.puddle_nodes.is_empty(), "no meshes on a headless run (the screenshot tool shows them)")
 	var pos: Vector3 = w.global_position
 	await wait_seconds(1.0)
