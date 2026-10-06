@@ -116,7 +116,7 @@ func test_slot_reels_stop_one_after_another() -> void:
 	Vfx.force_enabled = true
 	var ss: SlotsStation = await _station(SlotsStation.new()) as SlotsStation
 	ss.start_spin()
-	await wait_process_frames(2)
+	await wait_seconds(SlotsStation.LEVER_DOWN + 0.1)  # the reels start on the lever's down-stroke
 	assert_true(ss.reels_fx.is_spinning())
 	var t: float = ss.stop_on([4, 4, 4])
 	assert_gt(t, SlotReelsFx.STAGGER * 2.0)
