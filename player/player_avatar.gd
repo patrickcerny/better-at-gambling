@@ -404,6 +404,8 @@ func _physics_process(delta: float) -> void:
 		State.SEATED:
 			visuals.update_motion(Vector3.ZERO, true, delta)
 			if cam != null:
+				if router != null:
+					cam.seated_look = router.seated_look()  # the head follows the cursor a little
 				cam.update_camera(0.0, true, false, delta)
 			return
 	if state == State.STUNNED and _clock >= stunned_until:

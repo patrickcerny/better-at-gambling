@@ -1247,8 +1247,9 @@ func _seat(pid: int, sid: StringName, seat: int = -1) -> void:
 	var idx: int = seat if seat >= 0 else _seat_index(sid, pid)
 	a.sit(st.seats[clampi(idx, 0, st.seats.size() - 1)] if not st.seats.is_empty() else st, st.camera_for_seat(idx))
 	if pid == local_id:
-		router.seated_capture = st.free_look
 		router.set_mode(InputRouter.Mode.SEATED)
+		if st is BlackjackStation:
+			(st as BlackjackStation).set_viewer_seat(idx)
 		hud.set_prompt("")
 		hud.set_crosshair_visible(false)
 		var ui: StationUi = station_uis.get(st.game_id, null)
@@ -1263,6 +1264,8 @@ func _unseat(pid: int) -> void:
 	var a: PlayerAvatar = avatars.get(pid, null)
 	if a == null:
 		return
+	if pid == local_id and a.seat != null and a.seat.get_parent() is BlackjackStation:
+		(a.seat.get_parent() as BlackjackStation).set_viewer_seat(-1)
 	a.stand()
 	_report_position(pid)
 	if pid == local_id:
@@ -1270,7 +1273,6 @@ func _unseat(pid: int) -> void:
 			current_ui.close()
 			current_ui = null
 		hud.set_crosshair_visible(true)
-		router.seated_capture = false
 		router.set_mode(InputRouter.Mode.WALK)
 
 

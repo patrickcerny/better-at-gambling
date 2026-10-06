@@ -1,8 +1,11 @@
 class_name InputRouter
 extends Node
 ## Turns raw input into gameplay signals and owns the input mode (walking, seated at a station,
-## in a menu, emote wheel open). Mouse capture follows the mode. Movement/look vectors are polled
-## by the avatar; discrete actions arrive as signals. Keyboard+mouse and gamepad are equivalent.
+## in a menu, emote wheel open). Mouse capture follows the mode: captured while walking, a free
+## cursor everywhere else. Seated, the cursor's offset from the middle of the screen (or the right
+## stick) turns the head a little (`seated_look`) so the overlay stays clickable. Movement/look
+## vectors are polled by the avatar; discrete actions arrive as signals. Keyboard+mouse and
+## gamepad are equivalent.
 
 signal look(relative: Vector2)
 signal interact
@@ -29,8 +32,10 @@ var capture_mouse: bool = true
 ## Mouse look sensitivity (radians per pixel).
 var mouse_sensitivity: float = 0.0025
 var invert_y: bool = false
-## Seated at a free-look station: keep the mouse captured to look around.
-var seated_capture: bool = false
+## Seated look: the cursor sits in a dead zone this big (fraction of half the screen) before the head turns.
+const SEATED_DEAD_ZONE: float = 0.12
+## Last cursor position seen (viewport pixels); NAN until the mouse moves.
+var _cursor: Vector2 = Vector2(NAN, NAN)
 ## Beer: look is inverted on both axes and walking drifts a little.
 var drunk: bool = false
 ## Mode to return to when the emote wheel closes (you can emote while seated too).
@@ -51,16 +56,49 @@ func _apply_settings() -> void:
 
 ## Switches input mode and the mouse capture that goes with it.
 func set_mode(m: Mode) -> void:
+	var sitting_down: bool = m == Mode.SEATED and mode == Mode.WALK
 	mode = m
+	if sitting_down:
+		_cursor = Vector2(NAN, NAN)  # sit facing the table; the head only turns once the mouse moves
 	if DisplayServer.get_name() == "headless":
 		return
-	match m:
-		Mode.WALK:
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if capture_mouse else Input.MOUSE_MODE_VISIBLE
-		Mode.SEATED:
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if capture_mouse and seated_capture else Input.MOUSE_MODE_VISIBLE
-		_:
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Input.mouse_mode = desired_mouse_mode()
+	if sitting_down:
+		Input.warp_mouse(Vector2(get_window().size) * 0.5)
+
+
+## The mouse mode that goes with the current input mode: only walking captures the mouse.
+## Seated, in menus and on the emote wheel the cursor is free so every button can be clicked.
+func desired_mouse_mode() -> Input.MouseMode:
+	if mode == Mode.WALK and capture_mouse:
+		return Input.MOUSE_MODE_CAPTURED
+	return Input.MOUSE_MODE_VISIBLE
+
+
+## Seated head turn in [-1, 1] per axis (x right, y down): the right stick while it is pushed,
+## otherwise where the cursor sits relative to the middle of the screen (with a small dead zone).
+func seated_look() -> Vector2:
+	if mode != Mode.SEATED:
+		return Vector2.ZERO
+	var stick: Vector2 = Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
+	if stick.length() > 0.2:
+		return stick * (-1.0 if drunk else 1.0)
+	if InputGlyphs.gamepad or is_nan(_cursor.x):
+		return Vector2.ZERO
+	var half: Vector2 = get_viewport().get_visible_rect().size * 0.5
+	if half.x <= 0.0 or half.y <= 0.0:
+		return Vector2.ZERO
+	var n: Vector2 = ((_cursor - half) / half).clampf(-1.0, 1.0)
+	var out := Vector2(_dead_zone(n.x), _dead_zone(n.y))
+	if invert_y:
+		out.y = -out.y
+	return -out if drunk else out
+
+
+static func _dead_zone(v: float) -> float:
+	if absf(v) <= SEATED_DEAD_ZONE:
+		return 0.0
+	return signf(v) * (absf(v) - SEATED_DEAD_ZONE) / (1.0 - SEATED_DEAD_ZONE)
 
 
 ## WASD / left stick, as a 2D vector (x right, y forward) in [-1, 1].
@@ -90,6 +128,8 @@ func sprint_held() -> bool:
 ## Sees every event first (even ones a UI consumes) so key hints follow the device in use.
 func _input(event: InputEvent) -> void:
 	InputGlyphs.observe(event)
+	if event is InputEventMouse:
+		_cursor = (event as InputEventMouse).position
 
 
 func _unhandled_input(event: InputEvent) -> void:
