@@ -59,6 +59,8 @@ Supplied by Patrick Cerny for this game: `minor_win-v1.ogg`; `chips_in_pot-v1.og
 
 `slots_no_match-v1.ogg`: "Two Tone" from *Casino Sounds* by Bjorn Lynne, supplied by Patrick Cerny (licence held by him).
 
+`jackpot_prize-v1.ogg`: "8 Bit Prize Win" from *Casino Tones* by Callum Donaldson, supplied by Patrick Cerny (licence held by him).
+
 ## Fonts
 
 Barlow Condensed, SIL Open Font License.

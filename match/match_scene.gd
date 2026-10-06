@@ -813,9 +813,16 @@ func _on_event(ev: Dictionary) -> void:
 			if ev.get("details", {}).get("game", "") == "plinko":
 				_plinko_seen.clear()
 		&"jackpot_won":
-			Audio.play(&"jackpot_siren", &"SFX", -4.0)
-			if avatars.has(int(ev["player"])):
-				avatars[int(ev["player"])].visuals.react(&"big_win")
+			# Patrick's 8-bit prize fanfare: full volume for the winner, from the winner's spot for
+			# everyone else, with the siren quietly announcing it across the floor.
+			var winner: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if int(ev["player"]) == local_id or winner == null:
+				Audio.play(&"jackpot_prize", &"SFX", -2.0)
+			else:
+				Audio.play_at(&"jackpot_prize", winner, 0.0)
+				Audio.play(&"jackpot_siren", &"SFX", -12.0)
+			if winner != null:
+				winner.visuals.react(&"big_win")
 		&"last_call":
 			Audio.play(&"last_call_bell", &"SFX", -4.0)
 		&"phase_changed":
