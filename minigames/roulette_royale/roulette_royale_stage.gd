@@ -417,6 +417,8 @@ func _refresh_board() -> void:
 		c.free()  # detached: free now (no orphans waiting for the frame end)
 	var order: Array[int] = players.duplicate()
 	order.sort_custom(func(a: int, b: int) -> bool:
+		if finished and int(places.get(a, 99)) != int(places.get(b, 99)):
+			return int(places.get(a, 99)) < int(places.get(b, 99))
 		var aa: bool = a in alive
 		var ba: bool = b in alive
 		if aa != ba:

@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"roulette_royale"
 display_name = "Roulette Royale"
-rules_text = "Each player starts with 3 hearts. Pick red, black, or green as the wheel spins. Correct picks keep your hearts; wrong picks cost one. Last player standing wins!"
+rules_text = "Everyone starts with 3 hearts. Each spin, secretly pick RED, BLACK or GREEN before the ball flies. Wrong colour (or no pick) costs a heart; calling the rare green gives one back. Last bean with hearts wins!"
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2
