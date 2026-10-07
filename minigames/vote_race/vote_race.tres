@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/vote_race/vote_race_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/vote_race/vote_race_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"vote_race"
+display_name = "Vote Race"
+rules_text = "Each round, vote for another player to vote them down. Players with zero votes advance one position. First to reach position 5 wins. Requires 4+ players."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 4
+weight = 1.0

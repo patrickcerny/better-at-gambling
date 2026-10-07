@@ -92,7 +92,7 @@ func _dealer_attacked(attacker: int, now: float, cause: StringName) -> void:
 	}))
 
 	# Call station to cancel hand and refund all bets
-	var logic: StationLogicBase = stations.get_logic(station_id)
+	var logic: StationLogicBase = stations.logics.get(station_id)
 	if logic != null:
 		logic.refund_all()
 		events.append_array(logic.drain_events())

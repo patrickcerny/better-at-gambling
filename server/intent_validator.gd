@@ -15,6 +15,8 @@ const PHASES: Dictionary = {
 	&"shop_buy": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 	&"discard_item": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME, Phase.Id.MINIGAME, Phase.Id.REWARDS, Phase.Id.REGROUP],
 	&"submit_answer": [Phase.Id.MINIGAME],
+	&"bust_or_bank_action": [Phase.Id.MINIGAME],
+	&"vote_race_vote": [Phase.Id.MINIGAME],
 	&"set_ready": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"lobby_setting": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"set_skin": [Phase.Id.LOBBY, Phase.Id.RESULTS],
