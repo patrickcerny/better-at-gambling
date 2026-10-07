@@ -36,6 +36,18 @@ func _dock_right() -> bool:
 	return true  # the cards are on the table in the middle of the screen
 
 
+## Locked while bets are open (or no round yet) and while your own hand still has to act.
+func wants_camera_lock() -> bool:
+	match int(pub.get("state", 0)):
+		BlackjackLogic.State.IDLE, BlackjackLogic.State.BETTING:
+			return true
+		BlackjackLogic.State.ACTING:
+			var hands: Dictionary = pub.get("hands", {})
+			var mine: Dictionary = hands.get(local_id, hands.get(str(local_id), {}))
+			return not mine.is_empty() and not bool(mine.get("done", true))
+	return false
+
+
 func _build() -> void:
 	dealer_label = _line("DEALER  —", 22, Palette.WARM_GOLD)
 	dealer_label.visible = false  # the dealer's cards are on the felt

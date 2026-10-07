@@ -18,6 +18,9 @@ var selected_chip: int = 0
 var last_amount: int = 0
 ## When true, selecting a chip confirms immediately (slots/Plinko style).
 var instant: bool = false
+## Chip button size and gap; slim docked panels (roulette) set smaller ones before `_ready`.
+var chip_size: Vector2 = Vector2(84, 56)
+var chip_gap: int = 10
 
 var _chip_buttons: Array[Button] = []
 var _amount_label: Label
@@ -167,7 +170,7 @@ func _build() -> void:
 	_chips_row = HBoxContainer.new()
 	_chips_row.name = "Chips"
 	_chips_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_chips_row.add_theme_constant_override(&"separation", 10)
+	_chips_row.add_theme_constant_override(&"separation", chip_gap)
 	v.add_child(_chips_row)
 	_make_chip_buttons()
 	_stepper = HBoxContainer.new()
@@ -225,7 +228,7 @@ func _make_chip_buttons() -> void:
 		b.theme_type_variation = &"ChipButton"
 		b.toggle_mode = not instant
 		b.text = "$%d" % chips[i]
-		b.custom_minimum_size = Vector2(84, 56)
+		b.custom_minimum_size = chip_size
 		b.focus_mode = Control.FOCUS_ALL
 		var idx: int = i
 		b.pressed.connect(func() -> void: select_chip(idx))

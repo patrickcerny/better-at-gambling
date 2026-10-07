@@ -22,6 +22,10 @@ const PLAYER_HEAD: float = 2.3
 var stations: Dictionary = {}
 ## (pid: int) -> PlayerAvatar or null.
 var avatar_of: Callable
+## (pid: int) -> Color: the player's colour for their chips (unset = size-tier colours).
+var color_of: Callable
+## (sid: StringName) -> int: the table minimum at the current limits, one chip each (unset = size scale).
+var min_bet_of: Callable
 var local_id: int = -1
 var juice: ScreenJuice
 ## Parent for world-space effects.
@@ -35,9 +39,11 @@ var _shown_at: Dictionary[StringName, int] = {}
 var _pending: Dictionary[String, Dictionary] = {}
 
 
-func setup(p_stations: Dictionary, p_avatar_of: Callable, p_local_id: int, p_juice: ScreenJuice, p_world: Node3D) -> void:
+func setup(p_stations: Dictionary, p_avatar_of: Callable, p_local_id: int, p_juice: ScreenJuice, p_world: Node3D, p_color_of: Callable = Callable(), p_min_bet_of: Callable = Callable()) -> void:
 	stations = p_stations
 	avatar_of = p_avatar_of
+	color_of = p_color_of
+	min_bet_of = p_min_bet_of
 	local_id = p_local_id
 	juice = p_juice
 	world = p_world
@@ -92,7 +98,9 @@ func _on_bet(ev: Dictionary) -> void:
 	for b: Dictionary in list:  # stacking on the same spot again: nudge it over
 		if b["type"] == type and int(b["value"]) == value:
 			target += Vector3(ChipStack.CHIP_RADIUS * 1.6, 0, 0)
-	var stack: ChipStack = ChipStack.make(int(ev["amount"]))
+	var color: Color = color_of.call(pid) if color_of.is_valid() else ChipStack.NO_COLOR
+	var unit: int = int(min_bet_of.call(sid)) if min_bet_of.is_valid() else 0
+	var stack: ChipStack = ChipStack.make(int(ev["amount"]), color, unit)
 	st.add_child(stack)
 	stack.position = start
 	stack.slide_to(st.to_global(target), 0.4, 0.12)
