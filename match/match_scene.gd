@@ -844,7 +844,7 @@ func _on_event(ev: Dictionary) -> void:
 		&"chips_collected":
 			_on_chips_collected(int(ev["pile"]), int(ev["player"]), int(ev["amount"]))
 		&"pickup_expired":
-			var gone: ChipPile = piles.get(int(ev["pile"]), null)
+			var gone: CoinPile = piles.get(int(ev["pile"]), null)
 			piles.erase(int(ev["pile"]))
 			if gone != null:
 				gone.fade_out()

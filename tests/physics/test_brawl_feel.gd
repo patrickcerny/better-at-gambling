@@ -187,7 +187,7 @@ func test_chips_land_on_the_floor_and_are_picked_up_within_the_radius_with_exact
 	var spot: Vector3 = OPEN + Vector3(0.0, 1.0, -(MatchScene.PICKUP_RADIUS + 0.4))
 	var ids: Array[int] = scene.server.pickups.spawn(137, spot, 1, SeededRng.new(3), scene.server.match_time, 0.01)
 	await wait_physics_frames(1)
-	var pile: ChipPile = scene.piles.get(ids[0], null)
+	var pile: CoinPile = scene.piles.get(ids[0], null)
 	assert_not_null(pile, "the pile is in the world")
 	assert_almost_eq(pile.global_position.y, 0.0, 0.05, "on the floor, not floating where it was dropped")
 	var at: Vector3 = Vector3(pile.global_position.x, 0.0, pile.global_position.z)
@@ -211,7 +211,7 @@ func test_shaken_chips_cannot_be_grabbed_mid_air() -> void:
 	scene.server._flush()
 	await wait_physics_frames(3)
 	assert_true(scene.piles.has(ids[0]), "still flying out of the victim")
-	await wait_seconds(ChipPile.SETTLE_SECONDS + 0.1)
+	await wait_seconds(CoinPile.SETTLE_SECONDS + 0.1)
 	assert_false(scene.piles.has(ids[0]), "landed: now it's anyone's")
 
 
