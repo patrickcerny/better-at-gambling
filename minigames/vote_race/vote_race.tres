@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"vote_race"
 display_name = "Vote Race"
-rules_text = "Each round, vote for another player to vote them down. Players with zero votes advance one position. First to reach position 5 wins. Requires 4+ players."
+rules_text = "Everyone stands on a 5-step track to the cashier. Each round, secretly vote for one other racer (8 seconds). Everyone with ZERO votes steps forward; then the votes are revealed. First to step 5 wins, the rest finish in order. The race ends when only 2 racers are left. Requires 4+ players."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 4
