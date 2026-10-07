@@ -85,13 +85,13 @@ func test_reveal_runs_its_timer_then_is_done() -> void:
 func test_full_inventory_goes_through_grant() -> void:
 	var s: Array = _setup(2)
 	var players: Dictionary[int, PlayerState] = s[1]
-	players[1].inventory.assign([&"black_cat", &"bodyguard", &"mirror"])
+	players[1].inventory.assign([&"black_cat", &"bodyguard", &"mirror", &"golden_chip", &"rock_paper_scissors", &"lucky_clover"])
 	var granted: Array = []
 	var rd := RewardDirector.new()
 	rd.grant = func(p: int, item: StringName) -> void: granted.append([p, item])
 	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(2), players)
 	assert_eq(granted.size(), 2, "the ItemSystem decides (discard choice when full)")
-	assert_eq(players[1].inventory.size(), 3)
+	assert_eq(players[1].inventory.size(), 6)
 
 
 func test_items_off_means_cash_only() -> void:

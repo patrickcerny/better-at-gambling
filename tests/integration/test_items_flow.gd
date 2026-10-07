@@ -88,7 +88,7 @@ func test_rewards_fill_inventories_and_ask_when_full() -> void:
 	_start()
 	var a: int = fx.player_ids[0]
 	var b: int = fx.player_ids[1]
-	_give(a, [&"lucky_clover", &"black_cat", &"mirror"])
+	_give(a, [&"lucky_clover", &"black_cat", &"mirror", &"bodyguard", &"golden_chip", &"rock_paper_scissors"])
 	fx.server.run_to_end(200.0)  # through the first quiz and its rewards
 	var started: Array[Dictionary] = fx.of_type(&"rewards_started")
 	assert_gt(started.size(), 0)
@@ -97,7 +97,7 @@ func test_rewards_fill_inventories_and_ask_when_full() -> void:
 	assert_eq(fx.server.state.players[b].inventory.size(), 1, "B's item landed in the inventory")
 	var full: Array[Dictionary] = fx.of_type(&"discard_needed").filter(func(e: Dictionary) -> bool: return e["player"] == a)
 	assert_gt(full.size(), 0, "a full inventory asks what to drop")
-	assert_eq(fx.server.state.players[a].inventory.size(), 3)
+	assert_eq(fx.server.state.players[a].inventory.size(), 6)
 
 
 func test_scripted_players_use_items_in_a_full_match_and_money_is_conserved() -> void:

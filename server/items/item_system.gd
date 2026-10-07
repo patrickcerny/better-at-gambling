@@ -1,6 +1,6 @@
 class_name ItemSystem
 extends RefCounted
-## Items on the server (§2.8): inventories (3 slots with a discard choice when full), activation
+## Items on the server (0.8.6): inventories (6 slots with a discard choice when full), activation
 ## with cooldowns and target checks, protections (Bodyguard, Mirror, spawn and away protection,
 ## the negative-item grace window), effect expiry, and banana peels lying on the floor.
 ## Player intents go through `use`.

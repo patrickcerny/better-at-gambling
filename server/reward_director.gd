@@ -10,7 +10,7 @@ extends RefCounted
 
 enum State { IDLE, REVEAL, DONE }
 
-const INVENTORY_SLOTS: int = 3
+const INVENTORY_SLOTS: int = 6
 
 var state: State = State.IDLE
 var timer: float = 0.0
