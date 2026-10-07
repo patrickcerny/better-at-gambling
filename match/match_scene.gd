@@ -2125,7 +2125,10 @@ func _floor_under(pos: Vector3) -> Vector3:
 		var q := PhysicsRayQueryParameters3D.create(pos + Vector3(0.0, 0.6, 0.0), pos + Vector3(0.0, -4.0, 0.0), 1)
 		var hit: Dictionary = space.intersect_ray(q)
 		if not hit.is_empty():
-			return hit["position"]
+			var hit_y: float = hit["position"].y
+			# Don't place coins more than 1.5 units below their origin (keeps table coins above the rim)
+			if hit_y > pos.y - 1.5:
+				return hit["position"]
 	return Vector3(pos.x, maxf(pos.y, 0.0), pos.z)
 
 
