@@ -74,8 +74,9 @@ var effect_tags: Dictionary[int, Label3D] = {}
 ## Beer: full-screen wobble/blur under the HUD, and the money we had when we got drunk.
 var drunk_overlay: ColorRect
 var _drunk_money: int = -1
-## Curtain transition for minigames (closes while loading, opens after).
-var minigame_curtain: ColorRect = null
+## Curtain transition for minigames: left and right panels that slide in and out.
+var curtain_left: ColorRect = null
+var curtain_right: ColorRect = null
 ## Gold crown over the money leader (not on the dedicated server).
 var crown: LeaderCrown = null
 
@@ -149,13 +150,27 @@ func _ready() -> void:
 	drunk_overlay.material = drunk_mat
 	drunk_overlay.visible = false
 	ui_layer.add_child(drunk_overlay)
-	minigame_curtain = ColorRect.new()
-	minigame_curtain.name = "MinigameCurtain"
-	minigame_curtain.set_anchors_preset(Control.PRESET_FULL_RECT)
-	minigame_curtain.color = Color.BLACK
-	minigame_curtain.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	minigame_curtain.visible = false
-	ui_layer.add_child(minigame_curtain)
+	# Curtain transition: two panels that slide in from the sides
+	curtain_left = ColorRect.new()
+	curtain_left.name = "CurtainLeft"
+	curtain_left.color = Color("#2B1A1A")  # dark burgundy, casino-themed
+	curtain_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	curtain_left.anchor_left = 0.0
+	curtain_left.anchor_top = 0.0
+	curtain_left.anchor_right = 0.5
+	curtain_left.anchor_bottom = 1.0
+	curtain_left.offset_right = 0.0
+	ui_layer.add_child(curtain_left)
+	curtain_right = ColorRect.new()
+	curtain_right.name = "CurtainRight"
+	curtain_right.color = Color("#2B1A1A")
+	curtain_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	curtain_right.anchor_left = 0.5
+	curtain_right.anchor_top = 0.0
+	curtain_right.anchor_right = 1.0
+	curtain_right.anchor_bottom = 1.0
+	curtain_right.offset_left = 0.0
+	ui_layer.add_child(curtain_right)
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
@@ -1425,14 +1440,13 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 	if def == null or def.stage_script == null:
 		Log.warn(&"match", "no stage for minigame %s" % start.get("minigame", "?"))
 		return
-	# Close curtain while loading the stage
-	minigame_curtain.visible = true
-	minigame_curtain.modulate.a = 0.0
+	# Close curtain (panels slide in from sides) while loading the stage
 	var close_tween := create_tween()
-	close_tween.set_parallel(false)
-	close_tween.tween_property(minigame_curtain, "modulate:a", 1.0, 0.4)
+	close_tween.set_parallel(true)
+	close_tween.tween_property(curtain_left, "offset_right", -960.0, 0.5)  # half screen width
+	close_tween.tween_property(curtain_right, "offset_left", 960.0, 0.5)
 	close_tween.tween_callback(func() -> void:
-		# Stage is now hidden behind the curtain; load it
+		# Stage is now hidden behind the curtains; load it
 		stage = def.stage_script.new() as MinigameStage
 		stage.name = "MinigameStage"
 		stage.ui_host = self  # its 2D stays sharp outside the pixelated world
@@ -1454,7 +1468,11 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 			local.auto_target = Vector3.INF
 		Audio.play(&"whoosh", &"SFX", -4.0)
 	)
-	close_tween.tween_property(minigame_curtain, "modulate:a", 0.0, 0.5)
+	# Open curtain (panels slide out to sides)
+	var open_tween := create_tween()
+	open_tween.set_parallel(true)
+	open_tween.tween_property(curtain_left, "offset_right", 0.0, 0.6)
+	open_tween.tween_property(curtain_right, "offset_left", 0.0, 0.6)
 
 
 func _close_stage() -> void:
@@ -1466,7 +1484,9 @@ func _close_stage() -> void:
 ## Regroup over: the hall doors open and everyone runs back in with spawn protection.
 func _back_to_casino() -> void:
 	_close_stage()
-	minigame_curtain.visible = false
+	# Reset curtain panels to open position
+	curtain_left.offset_right = 0.0
+	curtain_right.offset_left = 0.0
 	reward_panel.close()
 	if role == Role.SERVER:
 		return
