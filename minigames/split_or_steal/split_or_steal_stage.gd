@@ -423,15 +423,15 @@ func _refresh_standings() -> void:
 		if i == 0 or _pts(pid) != _pts(rows[i - 1]) or _stl(pid) != _stl(rows[i - 1]):
 			place = i + 1
 		var h := HBoxContainer.new()
-		h.add_theme_constant_override(&"separation", 10)
-		h.add_child(_label(str(place), 26, Palette.VIP_GOLD if place == 1 else Palette.CREAM.darkened(0.25), 28))
+		h.add_theme_constant_override(&"separation", 8)
+		h.add_child(_label(str(place), 26, Palette.VIP_GOLD if place == 1 else Palette.CREAM.darkened(0.25), 24))
 		h.add_child(_dot(_player_color(pid), 16))
 		var n: Label = _label(state.player_name(pid), 26, Palette.VIP_GOLD if pid == local_id else Palette.CREAM)
 		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		n.clip_text = true
 		n.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		h.add_child(n)
-		var tag: Label = _label("", 18, MUTED, 70)
+		var tag: Label = _label("", 18, MUTED, 64)
 		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		if phase == Step.REVEAL and last_gain.has(pid):
 			tag.text = "+%d" % int(last_gain[pid])
@@ -442,10 +442,10 @@ func _refresh_standings() -> void:
 		elif pid == bye and phase != Step.OUTRO:
 			tag.text = "bye"
 		h.add_child(tag)
-		var pts: Label = _label(str(_pts(pid)), 28, Palette.CREAM, 44)
+		var pts: Label = _label(str(_pts(pid)), 28, Palette.CREAM, 40)
 		pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		h.add_child(pts)
-		var st: Label = _label("%d stl" % _stl(pid), 18, Palette.LOSS_RED.lerp(MUTED, 0.4) if _stl(pid) > 0 else MUTED, 58)
+		var st: Label = _label("%d steal%s" % [_stl(pid), "" if _stl(pid) == 1 else "s"], 16, Palette.LOSS_RED.lerp(Palette.CREAM, 0.3) if _stl(pid) > 0 else MUTED, 70)
 		st.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		h.add_child(st)
 		standings.add_child(h)
@@ -578,8 +578,8 @@ func _build_ui() -> void:
 	card.anchor_right = 0.5
 	card.anchor_top = 0.5
 	card.anchor_bottom = 0.5
-	card.offset_left = -520
-	card.offset_right = 520
+	card.offset_left = -420
+	card.offset_right = 420
 	card.offset_top = -230
 	card.offset_bottom = 60
 	root.add_child(card)
@@ -593,7 +593,7 @@ func _build_ui() -> void:
 	me_name = me_col[0]
 	me_mic = me_col[1]
 	me_tag = me_col[2]
-	vs_label = _label("VS", 44, Palette.VIP_GOLD, 200)
+	vs_label = _label("VS", 44, Palette.VIP_GOLD, 170)
 	vs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vs_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	vs_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -606,8 +606,8 @@ func _build_ui() -> void:
 	result_label = _label("", 30, Palette.CREAM)
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	result_label.custom_minimum_size = Vector2(980, 84)
-	result_label.pivot_offset = Vector2(490, 42)
+	result_label.custom_minimum_size = Vector2(780, 84)
+	result_label.pivot_offset = Vector2(390, 42)
 	cv.add_child(result_label)
 
 	# SPLIT / STEAL buttons under the card.
@@ -617,16 +617,16 @@ func _build_ui() -> void:
 	bar.anchor_right = 0.5
 	bar.anchor_top = 0.5
 	bar.anchor_bottom = 0.5
-	bar.offset_left = -520
-	bar.offset_right = 520
+	bar.offset_left = -420
+	bar.offset_right = 420
 	bar.offset_top = 90
 	bar.offset_bottom = 230
-	bar.add_theme_constant_override(&"separation", 40)
+	bar.add_theme_constant_override(&"separation", 32)
 	root.add_child(bar)
 	for c: String in [SPLIT, STEAL]:
 		var b := Button.new()
 		b.text = ("1   " if c == SPLIT else "2   ") + c
-		b.custom_minimum_size = Vector2(500, 130)
+		b.custom_minimum_size = Vector2(380, 130)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.add_theme_font_size_override(&"font_size", 52)
 		b.focus_mode = Control.FOCUS_NONE
@@ -642,8 +642,8 @@ func _build_ui() -> void:
 	hint_label.anchor_right = 0.5
 	hint_label.anchor_top = 0.5
 	hint_label.anchor_bottom = 0.5
-	hint_label.offset_left = -520
-	hint_label.offset_right = 520
+	hint_label.offset_left = -420
+	hint_label.offset_right = 420
 	hint_label.offset_top = 244
 	hint_label.offset_bottom = 284
 	root.add_child(hint_label)
@@ -688,17 +688,17 @@ func _side_column(parent: Control, color: Color) -> Array:
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_theme_constant_override(&"separation", 6)
 	parent.add_child(col)
-	var line := HBoxContainer.new()
-	line.alignment = BoxContainer.ALIGNMENT_CENTER
-	line.add_theme_constant_override(&"separation", 10)
-	col.add_child(line)
-	var dot: ColorRect = _dot(color, 22)
-	line.add_child(dot)
+	var dot := ColorRect.new()  # the player's colour as a stripe over their name
+	dot.custom_minimum_size = Vector2(0, 8)
+	dot.color = color
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(dot)
 	var name_l: Label = _label("", 38, color)
+	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_l.clip_text = true
 	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_l.custom_minimum_size = Vector2(0, 52)
-	line.add_child(name_l)
+	col.add_child(name_l)
 	var mic: Label = _label("", 20, Palette.MONEY_GREEN)
 	mic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mic.custom_minimum_size = Vector2(0, 28)
@@ -718,8 +718,8 @@ func _side_panel(root: Control, title: String, left: bool) -> VBoxContainer:
 	p.anchor_right = p.anchor_left
 	p.anchor_top = 0.5
 	p.anchor_bottom = 0.5
-	p.offset_left = 72.0 if left else -452.0
-	p.offset_right = 392.0 if left else -72.0
+	p.offset_left = 72.0 if left else -512.0
+	p.offset_right = 452.0 if left else -72.0
 	p.offset_top = -230
 	root.add_child(p)
 	var v := VBoxContainer.new()
