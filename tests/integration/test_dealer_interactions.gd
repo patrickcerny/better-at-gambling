@@ -46,8 +46,8 @@ func test_dealer_shove_sends_player_to_jail() -> void:
 	fx.intent(attacker, &"stand")
 	fx.run(0.1)
 
-	# Shove the dealer
-	fx.intent(attacker, &"shove", {"aim": [0, 0, -1]})
+	# Shove the dealer (aim toward positive Z where dealer is)
+	fx.intent(attacker, &"shove", {"aim": [0, 0, 1]})
 	fx.run(0.1)
 
 	# Check if player went to jail
@@ -80,7 +80,7 @@ func test_dealer_shove_refunds_all_bets() -> void:
 	# P1 stands up and shoves the dealer
 	fx.intent(p1, &"stand")
 	fx.run(0.1)
-	fx.intent(p1, &"shove", {"aim": [0, 0, -1]})
+	fx.intent(p1, &"shove", {"aim": [0, 0, 1]})
 	fx.run(0.1)
 
 	# Check refund events
@@ -115,7 +115,7 @@ func test_dealer_shove_cancels_hand() -> void:
 	# Stand and shove the dealer
 	fx.intent(p, &"stand")
 	fx.run(0.1)
-	fx.intent(p, &"shove", {"aim": [0, 0, -1]})
+	fx.intent(p, &"shove", {"aim": [0, 0, 1]})
 	fx.run(0.1)
 
 	# Check hand was cancelled
@@ -145,7 +145,7 @@ func test_roulette_dealer_shove_refunds_bets() -> void:
 	# P1 stands and shoves the dealer
 	fx.intent(p1, &"stand")
 	fx.run(0.1)
-	fx.intent(p1, &"shove", {"aim": [0, 0, -1]})
+	fx.intent(p1, &"shove", {"aim": [0, 0, 1]})
 	fx.run(0.1)
 
 	# Check refunds
@@ -168,7 +168,7 @@ func test_multiple_dealer_attacks_increase_jail_time() -> void:
 	fx.run(1.0)
 	fx.intent(p, &"stand")
 	fx.run(0.1)
-	fx.intent(p, &"shove", {"aim": [0, 0, -1]})
+	fx.intent(p, &"shove", {"aim": [0, 0, 1]})
 	var jail_time_1: float = fx.server.state.players[p].jail_time_remaining
 	fx.run(0.1)
 
@@ -183,7 +183,7 @@ func test_multiple_dealer_attacks_increase_jail_time() -> void:
 	fx.run(1.0)
 	fx.intent(p, &"stand")
 	fx.run(0.1)
-	fx.intent(p, &"shove", {"aim": [0, 0, -1]})
+	fx.intent(p, &"shove", {"aim": [0, 0, 1]})
 	var jail_time_2: float = fx.server.state.players[p].jail_time_remaining
 
 	# Second jail should be longer
