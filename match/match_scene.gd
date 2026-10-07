@@ -77,6 +77,10 @@ var _drunk_money: int = -1
 ## Curtain transition for minigames: left and right panels that slide in and out.
 var curtain_left: ColorRect = null
 var curtain_right: ColorRect = null
+## 1.0 = curtain fully open (panels off screen), 0.0 = closed (panels cover the screen).
+var curtain_open: float = 1.0
+var curtain_tween: Tween = null
+const CURTAIN_TIME: float = 0.45
 ## Gold crown over the money leader (not on the dedicated server).
 var crown: LeaderCrown = null
 
@@ -150,27 +154,23 @@ func _ready() -> void:
 	drunk_overlay.material = drunk_mat
 	drunk_overlay.visible = false
 	ui_layer.add_child(drunk_overlay)
-	# Curtain transition: two panels that slide in from the sides
+	# Minigame curtain: two half-screen panels positioned by anchors, so they close and open the
+	# same way at any window size. They start fully open (parked off both edges).
 	curtain_left = ColorRect.new()
 	curtain_left.name = "CurtainLeft"
-	curtain_left.color = Color("#2B1A1A")  # dark burgundy, casino-themed
+	curtain_left.color = Color("#2B1A1A")
 	curtain_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	curtain_left.anchor_left = 0.0
 	curtain_left.anchor_top = 0.0
-	curtain_left.anchor_right = 0.5
 	curtain_left.anchor_bottom = 1.0
-	curtain_left.offset_right = 0.0
 	ui_layer.add_child(curtain_left)
 	curtain_right = ColorRect.new()
 	curtain_right.name = "CurtainRight"
 	curtain_right.color = Color("#2B1A1A")
 	curtain_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	curtain_right.anchor_left = 0.5
 	curtain_right.anchor_top = 0.0
-	curtain_right.anchor_right = 1.0
 	curtain_right.anchor_bottom = 1.0
-	curtain_right.offset_left = 0.0
 	ui_layer.add_child(curtain_right)
+	_set_curtain(1.0)
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
@@ -357,6 +357,7 @@ func _length_settings(cmd: Cmdline) -> Dictionary:
 		"minigames": clampi(cmd.get_int("minigames", presets.default_minigames), 0, presets.max_minigames),
 		"gamble_minutes": clampi(cmd.get_int("gamble-minutes", presets.default_gamble_minutes), presets.min_gamble_minutes, presets.max_gamble_minutes),
 		"gamble_seconds": maxf(cmd.get_float("gamble-seconds", 0.0), 0.0),
+		"minigame_pool": cmd.get_string("minigame-pool", ""),
 		"items_enabled": true,
 	}
 
@@ -1440,13 +1441,12 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 	if def == null or def.stage_script == null:
 		Log.warn(&"match", "no stage for minigame %s" % start.get("minigame", "?"))
 		return
-	# Close curtain (panels slide in from sides) while loading the stage
-	var close_tween := create_tween()
-	close_tween.set_parallel(true)
-	close_tween.tween_property(curtain_left, "offset_right", -960.0, 0.5)  # half screen width
-	close_tween.tween_property(curtain_right, "offset_left", 960.0, 0.5)
-	close_tween.tween_callback(func() -> void:
-		# Stage is now hidden behind the curtains; load it
+	# One sequential tween: close the curtain, build the stage behind it, open it again.
+	if curtain_tween != null and curtain_tween.is_valid():
+		curtain_tween.kill()
+	curtain_tween = create_tween()
+	curtain_tween.tween_method(_set_curtain, curtain_open, 0.0, CURTAIN_TIME * curtain_open)
+	curtain_tween.tween_callback(func() -> void:
 		stage = def.stage_script.new() as MinigameStage
 		stage.name = "MinigameStage"
 		stage.ui_host = self  # its 2D stays sharp outside the pixelated world
@@ -1468,11 +1468,17 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 			local.auto_target = Vector3.INF
 		Audio.play(&"whoosh", &"SFX", -4.0)
 	)
-	# Open curtain (panels slide out to sides)
-	var open_tween := create_tween()
-	open_tween.set_parallel(true)
-	open_tween.tween_property(curtain_left, "offset_right", 0.0, 0.6)
-	open_tween.tween_property(curtain_right, "offset_left", 0.0, 0.6)
+	curtain_tween.tween_method(_set_curtain, 0.0, 1.0, CURTAIN_TIME)
+
+
+## Moves both curtain panels: `amount` 1.0 parks them off screen, 0.0 covers the screen.
+func _set_curtain(amount: float) -> void:
+	curtain_open = clampf(amount, 0.0, 1.0)
+	var shift: float = 0.5 * curtain_open
+	curtain_left.anchor_left = -shift
+	curtain_left.anchor_right = 0.5 - shift
+	curtain_right.anchor_right = 1.0 + shift
+	curtain_right.anchor_left = 0.5 + shift
 
 
 func _close_stage() -> void:
@@ -1484,9 +1490,9 @@ func _close_stage() -> void:
 ## Regroup over: the hall doors open and everyone runs back in with spawn protection.
 func _back_to_casino() -> void:
 	_close_stage()
-	# Reset curtain panels to open position
-	curtain_left.offset_right = 0.0
-	curtain_right.offset_left = 0.0
+	if curtain_tween != null and curtain_tween.is_valid():
+		curtain_tween.kill()
+	_set_curtain(1.0)
 	reward_panel.close()
 	if role == Role.SERVER:
 		return

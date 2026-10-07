@@ -23,7 +23,8 @@ def _client(procs, name, port, *extra):
 
 def test_two_clients_play_a_match_and_agree_on_every_balance(procs):
     port = free_port()
-    server = _server(procs, "sync-server", port, "--minigames", str(SYNC_MINIGAMES), "--gamble-seconds", str(SYNC_GAMBLE_S), "--seed", "11", "--dummies", "2")
+    # The scripted clients only answer quiz questions, so pin the pool to the quiz.
+    server = _server(procs, "sync-server", port, "--minigames", str(SYNC_MINIGAMES), "--gamble-seconds", str(SYNC_GAMBLE_S), "--seed", "11", "--dummies", "2", "--minigame-pool", "quiz")
     server.wait_for(r"server listening", 30)
     alice = _client(procs, "sync-alice", port)
     bob = _client(procs, "sync-bob", port, "--autoplay-variant", "1")

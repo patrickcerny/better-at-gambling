@@ -87,9 +87,12 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	lobby.settings["minigames"] = int(settings.get("minigames", presets.default_minigames))
 	lobby.settings["gamble_minutes"] = int(settings.get("gamble_minutes", presets.default_gamble_minutes))
 	_apply_length()
+	# Dev/tests may pin the pool: `minigame_pool` = "quiz,vote_race" (empty = every minigame).
+	var pool: PackedStringArray = str(settings.get("minigame_pool", "")).split(",", false)
 	var defs: Array[MinigameDefinition] = []
 	for id: StringName in Registry.minigames:
-		defs.append(Registry.minigames[id])
+		if pool.is_empty() or pool.has(String(id)):
+			defs.append(Registry.minigames[id])
 	minigames = MinigameDirector.new(defs, Registry.quiz_bank)
 	var rarities: Dictionary[StringName, int] = {}
 	for id: StringName in Registry.items:

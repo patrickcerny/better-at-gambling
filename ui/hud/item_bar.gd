@@ -205,7 +205,7 @@ func _build() -> void:
 	luck_label.custom_minimum_size = Vector2(80, 0)
 	luck_row.add_child(luck_label)
 	luck_dial = _create_luck_dial()
-	luck_dial.custom_minimum_size = Vector2(120, 60)
+	luck_dial.custom_minimum_size = Vector2(150, 78)
 	luck_row.add_child(luck_dial)
 	# Inventory slots: 3 visible, scrollable through 6 total.
 	var row := HBoxContainer.new()
@@ -237,45 +237,49 @@ func _build() -> void:
 	set_private({})
 
 
-## Creates the luck dial gauge with gradient background and needle.
+## Creates the luck barometer: a half ring (red on the left, gold in the middle, green on the
+## right) with tick marks and a tapered needle swinging from a hub at the bottom centre.
 func _create_luck_dial() -> Control:
 	var dial := Control.new()
 	dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dial.draw.connect(func() -> void:
-		var rect: Rect2 = dial.get_rect()
-		var center: Vector2 = rect.get_center()
-		var width: float = rect.size.x
-		var height: float = rect.size.y
-
-		# Draw gradient bar background (red to green)
-		for x in range(int(rect.size.x)):
-			var t: float = float(x) / rect.size.x
-			var color: Color = Palette.LOSS_RED.lerp(Palette.MONEY_GREEN, t)
-			dial.draw_line(
-				Vector2(rect.position.x + x, center.y - height * 0.3),
-				Vector2(rect.position.x + x, center.y + height * 0.3),
-				color,
-				2.0
-			)
-
-		# Draw scale marks
-		for i in range(-3, 4):
-			var t: float = (float(i) + 3.0) / 6.0  # Map -3..3 to 0..1
-			var x: float = rect.position.x + t * rect.size.x
-			var mark_height: float = 6.0 if i % 3 == 0 else 3.0
-			dial.draw_line(
-				Vector2(x, center.y - mark_height),
-				Vector2(x, center.y + mark_height),
-				Palette.CREAM,
-				1.0
-			)
-
-		# Draw needle pointing to current luck value
-		var needle_t: float = (float(luck) + 3.0) / 6.0
-		var needle_x: float = rect.position.x + needle_t * rect.size.x
-		var needle_color: Color = Palette.LOSS_RED if luck < 0 else (Palette.MONEY_GREEN if luck > 0 else Palette.CREAM)
-		dial.draw_line(Vector2(needle_x, center.y - height * 0.4), Vector2(needle_x, center.y + height * 0.4), needle_color, 2.0)
-		dial.draw_circle(Vector2(needle_x, center.y), 3.0, needle_color)
+		var size: Vector2 = dial.size
+		var hub := Vector2(size.x * 0.5, size.y - 6.0)
+		var radius: float = minf(size.x * 0.5, size.y) - 14.0
+		if radius < 8.0:
+			return
+		var band: float = maxf(radius * 0.3, 6.0)
+		# Upper half circle runs from PI (left) over 1.5 PI (top) to 2 PI (right).
+		dial.draw_arc(hub, radius, PI, TAU, 48, Palette.CASINO_BLACK, band + 6.0, true)
+		var steps: int = 36
+		for i: int in steps:
+			var t0: float = float(i) / steps
+			var t1: float = float(i + 1) / steps
+			var mid: float = (t0 + t1) * 0.5
+			var color: Color
+			if mid < 0.5:
+				color = Palette.LOSS_RED.lerp(Palette.WARM_GOLD, mid * 2.0)
+			else:
+				color = Palette.WARM_GOLD.lerp(Palette.MONEY_GREEN, (mid - 0.5) * 2.0)
+			dial.draw_arc(hub, radius, PI + t0 * PI, PI + t1 * PI + 0.01, 4, color, band, true)
+		# Ticks for each luck step (−3…+3); the ends and the centre are longer.
+		for i: int in range(-3, 4):
+			var a: float = PI + (float(i) + 3.0) / 6.0 * PI
+			var dir := Vector2(cos(a), sin(a))
+			var len: float = band * 0.9 if i % 3 == 0 else band * 0.45
+			var outer: Vector2 = hub + dir * (radius + band * 0.5)
+			dial.draw_line(outer, outer - dir * len, Palette.CREAM, 2.0, true)
+		# Needle: tapered triangle pointing at the current luck, with a round hub.
+		var needle_t: float = clampf((float(luck) + 3.0) / 6.0, 0.0, 1.0)
+		var na: float = PI + needle_t * PI
+		var ndir := Vector2(cos(na), sin(na))
+		var side := Vector2(-ndir.y, ndir.x) * 3.5
+		var tip: Vector2 = hub + ndir * (radius - band * 0.5 - 1.0)
+		var needle := PackedVector2Array([tip, hub + side, hub - ndir * 5.0, hub - side])
+		dial.draw_colored_polygon(needle, Palette.CASINO_BLACK)
+		dial.draw_colored_polygon(PackedVector2Array([tip, hub + side * 0.6, hub - ndir * 3.0, hub - side * 0.6]), Palette.CREAM)
+		dial.draw_circle(hub, 6.0, Palette.CASINO_BLACK)
+		dial.draw_circle(hub, 4.0, Palette.WARM_GOLD)
 	)
 	return dial
 

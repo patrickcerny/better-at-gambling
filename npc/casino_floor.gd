@@ -66,7 +66,7 @@ func _spawn_dealers() -> void:
 		var logic: StationLogicBase = scene.server.stations.logics[sid]
 		if logic.game_id != &"blackjack" and logic.game_id != &"roulette":
 			continue
-		var station: StationBase = scene.stations.get(sid, null) as StationBase
+		var station: StationBase = scene.map.stations.get(sid, null) as StationBase
 		if station == null:
 			continue
 		var dealer_pos: Vector3 = Vector3.ZERO
