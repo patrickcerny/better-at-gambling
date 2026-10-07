@@ -153,7 +153,10 @@ func _build_match_systems(seed_value: int) -> void:
 		var logic: StationLogicBase = stations.logics[sid]
 		if logic.game_id == &"blackjack" or logic.game_id == &"roulette":
 			var dealer_rng: SeededRng = SeededRng.new(seed_value ^ StringName(sid).hash())
-			dealers[sid] = DealerLogic.new(sid, state.players, rules, world, dealer_rng, stations)
+			# For headless/testing: initialize dealer at a default position in front of the table
+			# In actual gameplay, this will be updated by CasinoFloor._physics_process
+			var dealer_pos: Vector3 = Vector3(0.0, 0.5, 0.5)  # A default position in front
+			dealers[sid] = DealerLogic.new(sid, state.players, rules, world, dealer_rng, stations, dealer_pos)
 	minigames.reset()
 	minigame = null
 	rewards = RewardDirector.new()

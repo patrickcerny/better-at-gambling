@@ -23,13 +23,14 @@ var events: Array[Dictionary] = []
 
 
 func _init(p_station_id: StringName, p_players: Dictionary, p_rules: InteractionRules,
-		p_world: WorldQuery, p_rng: SeededRng, p_stations: StationManager) -> void:
+		p_world: WorldQuery, p_rng: SeededRng, p_stations: StationManager, initial_pos: Vector3 = Vector3.ZERO) -> void:
 	station_id = p_station_id
 	players = p_players
 	rules = p_rules
 	world = p_world
 	rng = p_rng
 	stations = p_stations
+	position = initial_pos
 
 
 ## A player's shove: attacks the dealer if they are in range. Returns true if it did.
