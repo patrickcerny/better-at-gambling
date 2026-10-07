@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"split_or_steal"
 display_name = "Split or Steal Tournament"
-rules_text = "Round-robin tournament: face each opponent once. Choose SPLIT or STEAL. Both SPLIT: 500 each. Both STEAL: 0 each. Split vs Steal: stealer gets 1000. Highest total score wins!"
+rules_text = "Round robin: everyone plays everyone once, all pairs at the same time. Talk for 8 s, then secretly pick SPLIT or STEAL. Both SPLIT: 1 point each. STEAL vs SPLIT: stealer 3, splitter 0. Both STEAL: 0. Most points wins; ties go to whoever stole least."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2

@@ -85,6 +85,9 @@ func _on_event(ev: Dictionary) -> void:
 	match ev["type"]:
 		&"quiz_question":
 			_answer(int(ev["index"]), (ev["answers"] as Array).size())
+		&"roulette_royale_pick_open":
+			if scene.local_id in (ev.get("alive", []) as Array):
+				_answer(int(ev["spin"]), 2)  # red or black; the pick window is 5 s
 		&"rewards_started":
 			for row: Dictionary in ev["rewards"]:
 				if int(row["player"]) == scene.local_id and StringName(row.get("item", &"")) != &"":

@@ -16,6 +16,7 @@ const SCHEMA: Dictionary = {
 	&"submit_answer": ["question", "index"],
 	&"bust_or_bank_action": ["action"],
 	&"vote_race_vote": ["target"],
+	&"split_or_steal_pick": ["choice"],
 	&"set_ready": ["ready"],
 	&"lobby_setting": ["key", "value"],
 	&"set_skin": ["skin"],
