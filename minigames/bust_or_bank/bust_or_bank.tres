@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/bust_or_bank/bust_or_bank_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/bust_or_bank/bust_or_bank_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"bust_or_bank"
+display_name = "Bust or Bank"
+rules_text = "Shared deck of cards. Each round, hit to take a card or stand. Bust = over 21, you're out. Lowest valid hand each round is out. 5 rounds, rank by points won."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 2
+weight = 1.0

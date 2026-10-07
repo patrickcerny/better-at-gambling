@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/roulette_royale/roulette_royale_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/roulette_royale/roulette_royale_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"roulette_royale"
+display_name = "Roulette Royale"
+rules_text = "Each player starts with 3 hearts. Pick red, black, or green as the wheel spins. Correct picks keep your hearts; wrong picks cost one. Last player standing wins!"
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 2
+weight = 1.0
