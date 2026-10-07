@@ -261,6 +261,13 @@ func drop_chip(p_slot: int, drop_id: int, color: Color, seconds: float, p_risk: 
 	return chip
 
 
+## Chips still falling vanish (their drops were refunded for a minigame). Client only.
+func reset_table() -> void:
+	for c: Node in get_children():
+		if c is PlinkoChip:
+			c.queue_free()
+
+
 ## A peg the chip just struck lights up for a moment.
 func flash_peg(row: int, col: int) -> void:
 	if _flash_mesh == null or row < 0:

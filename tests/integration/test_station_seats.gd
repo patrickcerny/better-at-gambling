@@ -6,7 +6,7 @@ var fx: ServerFixture
 
 
 func before_each() -> void:
-	fx = ServerFixture.new(4, {"duration": 5, "seed": 5})
+	fx = ServerFixture.new(4, {"minigames": 2, "gamble_seconds": 100.0, "seed": 5})
 	fx.server.start_match()
 	fx.run(3.1)
 

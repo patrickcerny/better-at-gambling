@@ -11,6 +11,8 @@ var player: int = -1
 var spinning: bool = false
 var line: Array[int] = []
 var stake: int = 0
+## Part of `stake` Fake Cash paid for.
+var stake_covered: int = 0
 var spin_elapsed: float = 0.0
 var spins_played: int = 0
 
@@ -57,6 +59,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not _take_stake(p, amount):
 		return fail(&"insufficient_funds")
 	stake = amount
+	stake_covered = last_covered
 	if jackpot != null:
 		jackpot.feed(amount)
 	var lk: int = modifiers.get_luck(p, game_id)
@@ -100,6 +103,19 @@ func has_stake(p: int) -> bool:
 func auto_resolve() -> void:
 	if spinning:
 		_finish_spin()
+
+
+## The spinning stake comes back (the jackpot keeps its feed: that was house money).
+func refund_all() -> void:
+	if not spinning:
+		return
+	var totals: Dictionary = {}
+	_refund(player, stake, stake_covered, totals)
+	spinning = false
+	line.clear()
+	stake = 0
+	stake_covered = 0
+	_emit_refunds(totals)
 
 
 func get_public_state() -> Dictionary:

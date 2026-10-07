@@ -2,7 +2,7 @@ class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
 ## accessibility: the 8 slots (name, color, skin, ready, leader), the ready toggle, your skin
-## and — for the party leader — duration and items. Every
+## and — for the party leader — match length (minigames, gambling minutes between them) and items. Every
 ## button sends an intent; the panel only redraws from the ClientMatchState mirror.
 
 signal closed
@@ -17,8 +17,10 @@ var _ready_button: Button
 var _settings_box: VBoxContainer
 var _settings_note: Label
 var _countdown_label: Label
-var _duration_buttons: Dictionary[int, Button] = {}
+## Match length steppers (Patrick's note #12): setting key → {minus, plus, value: Label}.
+var _steppers: Dictionary[String, Dictionary] = {}
 var _items_button: Button
+var _length_note: Label
 var _skin_label: Label
 var _skin_next: Button
 ## The 8 slot rows, built once and updated in place (rebuilding them made the panel, and the
@@ -60,8 +62,8 @@ func open(focus: StringName = &"") -> void:
 	_refresh()
 	match focus:
 		&"settings":
-			if not _duration_buttons.is_empty():
-				_duration_buttons.values()[0].grab_focus()
+			if _steppers.has("minigames"):
+				(_steppers["minigames"]["plus"] as Button).grab_focus()
 		&"wardrobe":
 			_skin_next.grab_focus()
 		_:
@@ -143,15 +145,8 @@ func _build() -> void:
 	right.add_child(_settings_note)
 	_settings_box = VBoxContainer.new()
 	right.add_child(_settings_box)
-	var dur := HBoxContainer.new()
-	_settings_box.add_child(dur)
-	for d: int in LobbyController.DURATIONS:
-		var b := Button.new()
-		b.text = "%d MIN" % d
-		b.toggle_mode = true
-		b.pressed.connect(func() -> void: Net.send_intent(Intents.make(&"lobby_setting", {"key": "duration", "value": d})))
-		dur.add_child(b)
-		_duration_buttons[d] = b
+	_add_stepper("minigames", "MINIGAMES")
+	_add_stepper("gamble_minutes", "GAMBLING BETWEEN")
 	_items_button = Button.new()
 	_items_button.toggle_mode = true
 	_items_button.pressed.connect(func() -> void:
@@ -247,12 +242,59 @@ func _refresh() -> void:
 	_skin_label.text = str(Cosmetics.SKIN_NAMES.get(_my_skin(), "Bean"))
 	var leader: bool = local_id == state.leader
 	_settings_note.text = "You lead this party." if leader else "Only the party leader (★) can change these."
-	for d: int in _duration_buttons:
-		_duration_buttons[d].button_pressed = int(state.lobby_settings.get("duration", 10)) == d
-		_duration_buttons[d].disabled = not leader
+	var presets: MatchPresets = Registry.presets
+	var mg: int = int(state.lobby_settings.get("minigames", presets.default_minigames))
+	var gm: int = int(state.lobby_settings.get("gamble_minutes", presets.default_gamble_minutes))
+	_set_stepper("minigames", "%d" % mg, leader and mg > presets.min_minigames, leader and mg < presets.max_minigames)
+	_set_stepper("gamble_minutes", "%d MIN" % gm, leader and gm > presets.min_gamble_minutes, leader and gm < presets.max_gamble_minutes)
+	_length_note.text = "About %d min of gambling in all" % (gm * (mg + 1))
 	_items_button.text = "ITEMS: %s" % ("ON" if bool(state.lobby_settings.get("items_enabled", true)) else "OFF")
 	_items_button.button_pressed = bool(state.lobby_settings.get("items_enabled", true))
 	_items_button.disabled = not leader
+
+
+## One "LABEL  [−] value [+]" row; the buttons ask the server to step the setting by one.
+func _add_stepper(key: String, title: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 10)
+	_settings_box.add_child(row)
+	var label := Label.new()
+	label.text = title
+	label.custom_minimum_size = Vector2(220, 0)
+	row.add_child(label)
+	var minus := Button.new()
+	minus.text = "−"
+	minus.custom_minimum_size = Vector2(54, 44)
+	minus.pressed.connect(_step_setting.bind(key, -1))
+	row.add_child(minus)
+	var value := Label.new()
+	value.custom_minimum_size = Vector2(90, 0)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(value)
+	var plus := Button.new()
+	plus.text = "+"
+	plus.custom_minimum_size = Vector2(54, 44)
+	plus.pressed.connect(_step_setting.bind(key, 1))
+	row.add_child(plus)
+	_steppers[key] = {"minus": minus, "plus": plus, "value": value}
+	if key == "gamble_minutes":
+		_length_note = Label.new()
+		_length_note.theme_type_variation = &"SmallLabel"
+		_settings_box.add_child(_length_note)
+
+
+func _set_stepper(key: String, text: String, can_down: bool, can_up: bool) -> void:
+	var s: Dictionary = _steppers[key]
+	(s["value"] as Label).text = text
+	(s["minus"] as Button).disabled = not can_down
+	(s["plus"] as Button).disabled = not can_up
+
+
+func _step_setting(key: String, step: int) -> void:
+	var presets: MatchPresets = Registry.presets
+	var fallback: int = presets.default_minigames if key == "minigames" else presets.default_gamble_minutes
+	var now: int = int(state.lobby_settings.get(key, fallback))
+	Net.send_intent(Intents.make(&"lobby_setting", {"key": key, "value": now + step}))
 
 
 func _my_skin() -> StringName:

@@ -171,6 +171,15 @@ func stop_on(line: Array, own: bool = false) -> float:
 	return land_seconds()
 
 
+## Stops every reel on the symbol it shows right now (a refunded spin: no result, no payline).
+func cancel() -> void:
+	_clear_win()
+	for i: int in 3:
+		_spinning[i] = false
+		_stop_in[i] = -1.0
+		reels[i].position.y = 0.0
+
+
 func is_spinning() -> bool:
 	return _spinning[0] or _spinning[1] or _spinning[2]
 

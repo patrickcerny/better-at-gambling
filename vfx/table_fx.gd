@@ -63,6 +63,10 @@ func on_event(ev: Dictionary) -> void:
 				_shown_at[sid] = Time.get_ticks_msec() + int(rs.land(int(ev["number"])) * 1000.0)
 		&"round_result":
 			_on_result(ev)
+		&"bets_refunded":
+			_return_chips(StringName(ev["station"]), int(ev["player"]))
+		&"table_reset":
+			_reset_table(StringName(ev["station"]))
 		&"jackpot_won":
 			var sid: StringName = StringName(ev.get("station", &""))
 			var pid: int = int(ev["player"])
@@ -188,6 +192,38 @@ func _jackpot(sid: StringName, pid: int, amount: int) -> void:
 		var me: PlayerAvatar = avatar_of.call(local_id) if avatar_of.is_valid() else null
 		if me != null and me.global_position.distance_to(pos) < 14.0:
 			juice.shake(0.25)
+
+
+## A minigame refunded the bets (Patrick's note #9): the player's chips slide back to their seat.
+func _return_chips(sid: StringName, pid: int) -> void:
+	var st: StationBase = stations.get(sid, null)
+	var key: String = _key(sid, pid)
+	var list: Array = _bets.get(key, [])
+	_bets.erase(key)
+	_pending.erase(key)
+	if st == null:
+		return
+	var seat: Vector3 = st.to_global(_seat_edge(st, _seat_index(st, pid)))
+	for b: Dictionary in list:
+		var s: ChipStack = b["stack"]
+		if is_instance_valid(s):
+			s.collect(seat, 0.45)
+
+
+## The table was cleared for the minigame: nothing left on the felt, no result still to show.
+func _reset_table(sid: StringName) -> void:
+	var st: StationBase = stations.get(sid, null)
+	_shown_at.erase(sid)
+	for key: String in _bets.keys():
+		if not key.begins_with(String(sid) + ":"):
+			continue
+		var pid: int = int(key.get_slice(":", 1))
+		_return_chips(sid, pid)
+	for key: String in _pending.keys():
+		if key.begins_with(String(sid) + ":"):
+			_pending.erase(key)
+	if st != null and st.has_method(&"reset_table"):
+		st.call(&"reset_table")
 
 
 ## Moves chips left over from an earlier round to the house.

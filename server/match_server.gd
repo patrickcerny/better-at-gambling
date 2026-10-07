@@ -53,8 +53,9 @@ var results_return_in: float = -1.0
 var timescale: float = 1.0
 ## Match seconds elapsed (all phases), the server clock.
 var match_time: float = 0.0
-## Settings: duration, seed, items_enabled.
-var settings: Dictionary = {"duration": 10, "seed": 0, "items_enabled": true}
+## Settings: minigames, gamble_minutes, seed, items_enabled; dev/tests may add `gamble_seconds`
+## (> 0 overrides the minutes, so tests can run short matches).
+var settings: Dictionary = {"minigames": 5, "gamble_minutes": 3, "seed": 0, "items_enabled": true}
 ## Recent events kept for gap recovery.
 var event_log: Array[Dictionary] = []
 var running: bool = false
@@ -80,7 +81,10 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	presets = p_presets
 	map_def = p_map
 	_logic_scripts = logic_scripts
-	state.duration_minutes = int(settings.get("duration", presets.default_duration))
+	lobby.presets = presets
+	lobby.settings["minigames"] = int(settings.get("minigames", presets.default_minigames))
+	lobby.settings["gamble_minutes"] = int(settings.get("gamble_minutes", presets.default_gamble_minutes))
+	_apply_length()
 	var defs: Array[MinigameDefinition] = []
 	for id: StringName in Registry.minigames:
 		defs.append(Registry.minigames[id])
@@ -90,10 +94,18 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 		if Registry.items[id].in_loot:
 			rarities[id] = Registry.items[id].rarity
 	loot = LootTables.new(Registry.loot, rarities)
-	lobby.settings["duration"] = state.duration_minutes
 	lobby.settings["items_enabled"] = bool(settings.get("items_enabled", true))
 	_build_match_systems(int(settings.get("seed", 0)))
-	Log.info(&"server", "configured: duration %d min, seed %d, %d stations" % [state.duration_minutes, state.match_seed, stations.logics.size()])
+	Log.info(&"server", "configured: %d minigames, %.0f s gambling between, seed %d, %d stations" % [state.minigames, state.gamble_s, state.match_seed, stations.logics.size()])
+
+
+## Match length from the lobby settings (`minigames`, `gamble_minutes`) or the dev override
+## `settings.gamble_seconds` (Patrick's note #12).
+func _apply_length() -> void:
+	state.minigames = int(lobby.settings.get("minigames", presets.default_minigames))
+	var override_s: float = float(settings.get("gamble_seconds", 0.0))
+	state.gamble_s = override_s if override_s > 0.0 else int(lobby.settings.get("gamble_minutes", presets.default_gamble_minutes)) * 60.0
+	state.duration_s = state.gamble_s * (state.minigames + 1)
 
 
 ## Everything that lives for one match (money, tables, RNG, schedule). Called by `configure` and
@@ -144,8 +156,8 @@ func _build_match_systems(seed_value: int) -> void:
 
 
 func _build_schedule() -> void:
-	schedule = MatchSchedule.new(state.duration_minutes, presets, balance.last_call_seconds)
-	phases = PhaseMachine.new(schedule)
+	schedule = MatchSchedule.new(state.minigames, state.gamble_s, balance.last_call_seconds)
+	phases = PhaseMachine.new(schedule, balance.regroup_time)
 	phases.phase_changed.connect(_on_phase_changed)
 
 
@@ -225,6 +237,7 @@ func _check_leader() -> void:
 	var now: int = lobby.leader()
 	if now != _leader:
 		_leader = now
+		Log.info(&"server", "party leader is now player %d" % now)
 		_emit(GameEvents.make(&"leader_changed", {"player": now}))
 
 
@@ -241,10 +254,10 @@ func start_match() -> void:
 	if running:
 		return
 	if room_mode:
-		# Lobby settings apply now: duration rebuilds the schedule.
+		# Lobby settings apply now: the match length rebuilds the schedule.
 		settings["items_enabled"] = bool(lobby.settings["items_enabled"])
-		if int(lobby.settings["duration"]) != state.duration_minutes:
-			state.duration_minutes = int(lobby.settings["duration"])
+		_apply_length()
+		if schedule.minigames != state.minigames or not is_equal_approx(schedule.segment_s, state.gamble_s):
 			_build_schedule()
 	running = true
 	match_time = 0.0
@@ -253,7 +266,7 @@ func start_match() -> void:
 	stations.set_limits_multiplier(balance.limits_multiplier(0))
 	for id: int in state.players:
 		rules.protect(id, match_time)
-	_emit(GameEvents.make(&"match_started", {"seed": state.match_seed, "duration": state.duration_minutes, "segment_s": schedule.segment_s, "minigames": schedule.minigames}))
+	_emit(GameEvents.make(&"match_started", {"seed": state.match_seed, "minigames": schedule.minigames, "gamble_s": schedule.segment_s, "duration_s": schedule.duration_s, "segment_s": schedule.segment_s}))
 	_flush()
 
 
@@ -291,6 +304,8 @@ func get_snapshot() -> Dictionary:
 		snap["minigame"] = minigame.get_public_state()
 	if phases.phase == Phase.Id.REWARDS:
 		snap["rewards"] = rewards.get_public_state()
+	if phases.phase == Phase.Id.REGROUP:
+		snap["regroup_in"] = snappedf(maxf(phases.phase_timer, 0.0), 0.01)
 	if phases.phase == Phase.Id.RESULTS:
 		snap["standings"] = get_standings()
 		snap["awards"] = get_awards()
@@ -303,7 +318,6 @@ func get_private_snapshot(player: int) -> Dictionary:
 	var out: Dictionary = {"station": stations.private_state(player)}
 	if minigame != null:
 		out["minigame"] = minigame.private_state(player)
-	out.merge(rewards.private_state(player))
 	out["items"] = items.private_state(player, match_time)
 	return out
 
@@ -355,7 +369,7 @@ func _step(delta: float) -> void:
 		if minigame.is_finished():
 			_finish_minigame()
 	elif phases.phase == Phase.Id.REWARDS:
-		rewards.tick(delta, state.players)
+		rewards.tick(delta)
 		if rewards.is_done():
 			phases.rewards_finished()
 	modifiers.expire(match_time)
@@ -389,7 +403,10 @@ func _on_phase_note(note: StringName) -> void:
 		&"minigame_due":
 			_emit(GameEvents.make(&"minigame_warning", {"seconds": PhaseMachine.PRE_MINIGAME_SECONDS}))
 		&"segment_ended":
-			stations.auto_resolve_all()
+			if phases.phase == Phase.Id.MINIGAME:
+				_refund_and_stand_everyone()
+			else:
+				stations.auto_resolve_all()  # end of the match: open rounds play out
 			items.end_segment()
 			_emit(GameEvents.make(&"segment_ended", {"segment": phases.segment_index()}))
 		&"minigame_started":
@@ -399,18 +416,49 @@ func _on_phase_note(note: StringName) -> void:
 
 
 func _on_phase_changed(from: Phase.Id, to: Phase.Id) -> void:
+	Log.info(&"server", "phase %s (casino %.1f s, segment %d)" % [Phase.name_of(to), phases.casino_time, phases.segment_index()])
 	if to == Phase.Id.CASINO:
 		var seg: int = phases.segment_index()
 		state.segment_index = seg
 		stations.set_limits_multiplier(balance.limits_multiplier(seg))
 		interactions.limits_multiplier = balance.limits_multiplier(seg)
-		if from == Phase.Id.INTRO or from == Phase.Id.REWARDS:
+		if from == Phase.Id.INTRO or from == Phase.Id.REGROUP:
 			items.shop.restock(balance.limits_multiplier(seg))
 			_emit(GameEvents.make(&"shop_restocked", items.shop.wire()))
-		if from == Phase.Id.REWARDS:
+		if from == Phase.Id.REGROUP:
 			for id: int in state.players:
 				rules.protect(id, match_time)
 	_emit(GameEvents.make(&"phase_changed", {"phase": to, "from": from, "phase_name": Phase.name_of(to), "casino_time": snappedf(phases.casino_time, 0.001), "segment": phases.segment_index()}))
+	if to == Phase.Id.REGROUP:
+		_start_regroup()
+
+
+## A minigame starts (Patrick's notes #9, #21): every open bet is refunded first (blackjack would
+## auto-stand a hand on leave), then everyone seated is stood up.
+func _refund_and_stand_everyone() -> void:
+	stations.refund_all()
+	_flush()
+	for id: int in state.players:
+		if stations.is_seated(id):
+			stand_up(id, &"minigame")
+
+
+## After the rewards everyone is back in the entrance hall (Patrick's note #10): holds end,
+## ragdolls and knockouts are over, bodies go to their hall spot and the doors stay shut for
+## `regroup_time` seconds. `regroup_started {seconds, positions: {player: [x, y, z]}}`.
+func _start_regroup() -> void:
+	interactions.regroup()
+	_flush()
+	var positions: Dictionary = {}
+	for id: int in state.players:
+		if stations.is_seated(id):
+			stand_up(id, &"regroup")
+		_server_owned.erase(id)
+		var spot: Vector3 = map_def.lobby_spawn(id) if map_def != null else Vector3.INF
+		if spot.is_finite():
+			set_server_position(id, spot)
+			positions[id] = Serializer.vec3(spot)
+	_emit(GameEvents.make(&"regroup_started", {"seconds": balance.regroup_time, "positions": positions}))
 
 
 func _finish_match() -> void:
@@ -456,7 +504,10 @@ func _finish_minigame() -> void:
 	var played_segment: int = maxi(phases.segment_index() - 1, 0)
 	rewards = RewardDirector.new()
 	rewards.grant = func(p: int, item: StringName) -> void: items.give(p, item, match_time)
-	rewards.start(ranking, economy, loot, bool(settings.get("items_enabled", true)), balance.limits_multiplier(played_segment), balance, _logic_rng.fork())
+	# The House Comp is checked here too (W5), for the segment that starts after this minigame,
+	# so the casino check later in that segment doesn't pay it twice.
+	var seg: int = phases.segment_index()
+	rewards.start(ranking, economy, loot, bool(settings.get("items_enabled", true)), balance.limits_multiplier(played_segment), balance, _logic_rng.fork(), state.players, func(p: int) -> int: return _try_comp(p, seg, false))
 	_flush()
 
 
@@ -486,19 +537,33 @@ func _closing_in() -> float:
 	return left if left <= PhaseMachine.PRE_MINIGAME_SECONDS else INF
 
 
-## House Comp (§2.1): below the lowest table minimum, nothing in play → $150, once per segment.
+## House Comp (§2.1): below the comp threshold (× table limits), nothing in play → once per
+## segment, $300 growing by $150 per minigame played up to $900 (`BalanceConfig.comp_amounts`).
 func _check_comps() -> void:
 	var seg: int = phases.segment_index()
-	var threshold: int = int(floor(balance.comp_threshold * balance.limits_multiplier(seg)))
 	for id: int in state.players:
-		var p: PlayerState = state.players[id]
-		if not p.connected or _comped.get(id, -1) == seg:
-			continue
-		if economy.balance(id) >= threshold or stations.has_stake(id) or interactions.is_held(id):
-			continue
-		_comped[id] = seg
-		economy.apply(id, balance.comp_amount, &"house_comp", &"house")
-		_emit(GameEvents.make(&"house_comp", {"player": id, "amount": balance.comp_amount}))
+		_try_comp(id, seg, true)
+
+
+## Pays the House Comp to a broke player once per segment. Returns the amount (0 = none).
+## `toast`: also emit `house_comp` (the reward screen shows its own row instead and emits it too,
+## flagged `rewards: true`, for the feed and stats).
+func _try_comp(id: int, seg: int, toast: bool) -> int:
+	var p: PlayerState = state.players.get(id, null)
+	if p == null or not p.connected or _comped.get(id, -1) == seg:
+		return 0
+	var threshold: int = int(floor(balance.comp_threshold * balance.limits_multiplier(seg)))
+	if economy.balance(id) >= threshold or stations.has_stake(id) or interactions.is_held(id):
+		return 0
+	var amount: int = balance.comp_amount_for(seg)
+	if amount <= 0:
+		return 0
+	_comped[id] = seg
+	economy.apply(id, amount, &"house_comp", &"house")
+	if stats.has(id):
+		stats[id]["comps"] = int(stats[id]["comps"]) + 1
+	_emit(GameEvents.make(&"house_comp", {"player": id, "amount": amount, "rewards": not toast}))
+	return amount
 
 
 # --- Results & play again ----------------------------------------------------------------------
@@ -547,9 +612,9 @@ func return_to_lobby() -> void:
 	_server_owned.clear()
 	_accumulator = 0.0
 	match_time = 0.0
-	state.duration_minutes = int(lobby.settings["duration"])
+	_apply_length()
 	_build_match_systems(0)
-	_emit(GameEvents.make(&"match_reset", {"duration": state.duration_minutes}))
+	_emit(GameEvents.make(&"match_reset", {"minigames": state.minigames, "gamble_s": state.gamble_s, "duration_s": state.duration_s}))
 	_flush()
 
 
@@ -648,8 +713,6 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if minigame == null:
 				return StationLogicBase.fail(&"too_late")
 			return minigame.submit(player, intent, match_time)
-		&"draft_pick":
-			return rewards.pick(player, int(intent["choice"]))
 		&"use_item":
 			if not bool(settings.get("items_enabled", true)):
 				return StationLogicBase.fail(&"items_off")
@@ -696,14 +759,18 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 
 
 ## Gets a seated player off their seat, exactly like their own "leave" (a round in play is settled
-## by the station the same way). Items that knock people down use it on seated targets.
-func stand_up(player: int) -> Dictionary:
+## by the station the same way). Items that knock people down use it on seated targets; the
+## server uses it with a `reason` (minigame, regroup, thrown_out, vip_pass_ended).
+func stand_up(player: int, reason: StringName = &"") -> Dictionary:
 	var res: Dictionary = stations.leave(player)
 	if res["ok"]:
 		rules.status(player).seated = false
 		state.players[player].station = &""
 		state.players[player].seat = -1
-		_emit(GameEvents.make(&"player_stood", {"player": player}))
+		var ev: Dictionary = {"player": player}
+		if reason != &"":
+			ev["reason"] = reason
+		_emit(GameEvents.make(&"player_stood", ev))
 	return res
 
 
@@ -923,11 +990,7 @@ func _fake_cash_caught(player: int, amount: int) -> void:
 	var fine: int = economy.take_up_to(player, amount, &"fake_cash_fine")
 	_emit(GameEvents.make(&"fake_cash_caught", {"player": player, "fine": fine}))
 	if stations.is_seated(player):
-		stations.leave(player)
-		rules.status(player).seated = false
-		state.players[player].station = &""
-		state.players[player].seat = -1
-		_emit(GameEvents.make(&"player_stood", {"player": player, "reason": &"thrown_out"}))
+		stand_up(player, &"thrown_out")
 	interactions.report_thrown_out(player, &"bouncer", match_time)
 
 
@@ -954,8 +1017,4 @@ func _on_vip_pass_ended(player: int) -> void:
 	var sid: StringName = stations.station_of(player)
 	if sid == &"" or not stations.vip.get(sid, false) or economy.balance(player) >= vip_threshold():
 		return
-	stations.leave(player)
-	rules.status(player).seated = false
-	state.players[player].station = &""
-	state.players[player].seat = -1
-	_emit(GameEvents.make(&"player_stood", {"player": player, "reason": &"vip_pass_ended"}))
+	stand_up(player, &"vip_pass_ended")

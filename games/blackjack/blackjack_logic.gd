@@ -74,7 +74,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 		return fail(&"above_max")
 	if not _take_stake(p, amount):
 		return fail(&"insufficient_funds")
-	hands[p] = {"stake": amount, "cards": [] as Array[int], "done": false, "doubled": false, "blackjack": false, "settled": false}
+	hands[p] = {"stake": amount, "cards": [] as Array[int], "done": false, "doubled": false, "blackjack": false, "settled": false, "covered": last_covered}
 	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id}))
 	if state == State.IDLE:
 		state = State.BETTING
@@ -104,6 +104,7 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 			if not _take_stake(p, int(cur["stake"])):
 				return fail(&"insufficient_funds")
 			cur["stake"] = int(cur["stake"]) * 2
+			cur["covered"] = int(cur.get("covered", 0)) + last_covered
 			cur["doubled"] = true
 			_deal_card(p, cur["cards"])
 			_finish_active(h)
@@ -114,7 +115,7 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 				return fail(&"insufficient_funds")
 			var first: Array[int] = h["cards"]
 			var second: Array[int] = [first.pop_back()]
-			h["split"] = {"stake": int(h["stake"]), "cards": second, "doubled": false}
+			h["split"] = {"stake": int(h["stake"]), "cards": second, "doubled": false, "covered": last_covered}
 			h["active"] = 0
 			var aces: bool = Card.bj_value(first[0]) == 1
 			_deal_card(p, first)
@@ -202,6 +203,30 @@ func auto_resolve() -> void:
 		_dealer_and_settle()
 	if state == State.PAYOUT:
 		_end_round()
+
+
+## Every unsettled hand (and split hand, doubled stakes included) is handed back; naturals were
+## already paid and stay paid. The table is cleared for the next segment.
+func refund_all() -> void:
+	if state == State.IDLE and hands.is_empty():
+		return
+	var totals: Dictionary = {}
+	for p: int in hands.keys():
+		var h: Dictionary = hands[p]
+		if bool(h.get("settled", false)):
+			modifiers.consume_round(p, game_id)  # this hand was played (a paid natural)
+			continue
+		_refund(p, int(h["stake"]), int(h.get("covered", 0)), totals)
+		if h.has("split"):
+			_refund(p, int(h["split"]["stake"]), int(h["split"].get("covered", 0)), totals)
+	hands.clear()
+	dealer.clear()
+	dealer_revealed = false
+	state = State.IDLE
+	timer = 0.0
+	if shoe.needs_reshuffle():
+		shoe.reshuffle()
+	_emit_refunds(totals)
 
 
 func get_public_state() -> Dictionary:

@@ -1,4 +1,5 @@
 extends GutTest
+## The item roll after each minigame (Patrick's note #11): rarity weighted by placement.
 
 const R := ItemDefinition.Rarity
 
@@ -7,57 +8,61 @@ var rar: Dictionary[StringName, int] = {
 	&"lucky_clover": R.COMMON, &"black_cat": R.COMMON, &"loaded_reels": R.COMMON, &"hot_hands": R.COMMON,
 	&"golden_chip": R.COMMON, &"banana_peel": R.COMMON, &"bodyguard": R.COMMON, &"boxing_glove": R.COMMON,
 	&"double_down": R.RARE, &"pickpocket": R.RARE, &"mirror": R.RARE,
+	&"crown": R.LEGENDARY, &"golden_ticket": R.LEGENDARY,
 }
 
 
-func test_draft_shapes_per_placement() -> void:
-	var lt := LootTables.new(cfg, rar)
-	var rng := SeededRng.new(1)
-	var d1: Dictionary = lt.draft(1, false, 4, rng)
-	assert_eq((d1["choices"] as Array).size(), 3)
-	assert_eq((d1["bonus"] as Array).size(), 1)
-	for id: StringName in d1["choices"]:
-		assert_eq(rar[id], R.RARE, "1st offers rare (no legendaries registered)")
-	assert_eq(rar[d1["bonus"][0]], R.COMMON)
-	var d3: Dictionary = lt.draft(3, false, 4, rng)
-	assert_eq((d3["choices"] as Array).size(), 2)
-	for id: StringName in d3["choices"]:
-		assert_eq(rar[id], R.COMMON)
-	var d4: Dictionary = lt.draft(4, false, 6, rng)
-	assert_eq((d4["choices"] as Array).size(), 0)
-	assert_eq((d4["bonus"] as Array).size(), 1)
+func _counts(lt: LootTables, placement: int, players: int, n: int, seed_value: int) -> Array[float]:
+	var rng := SeededRng.new(seed_value)
+	var c: Array[float] = [0.0, 0.0, 0.0]
+	for i: int in n:
+		c[rar[lt.roll(placement, players, rng)]] += 1.0
+	for r: int in 3:
+		c[r] /= n
+	return c
 
 
-func test_offers_have_no_duplicates() -> void:
+func test_weights_blend_from_first_to_last() -> void:
 	var lt := LootTables.new(cfg, rar)
-	var rng := SeededRng.new(5)
+	assert_eq(lt.weights_for(1, 4), PackedFloat32Array([0.0, 3.0, 1.0]), "1st: 0/3/1")
+	assert_eq(lt.weights_for(4, 4), PackedFloat32Array([4.0, 1.0, 0.0]), "last: 4/1/0")
+	var mid: PackedFloat32Array = lt.weights_for(2, 3)
+	assert_almost_eq(mid[0], 2.0, 0.001)
+	assert_almost_eq(mid[1], 2.0, 0.001)
+	assert_almost_eq(mid[2], 0.5, 0.001)
+	assert_eq(lt.weights_for(1, 1), PackedFloat32Array([0.0, 3.0, 1.0]), "alone: first-place odds")
+
+
+func test_first_place_odds_statistical() -> void:
+	var c: Array[float] = _counts(LootTables.new(cfg, rar), 1, 4, 4000, 9)
+	assert_eq(c[R.COMMON], 0.0, "1st never gets a Common")
+	assert_between(c[R.RARE], 0.72, 0.78)
+	assert_between(c[R.LEGENDARY], 0.22, 0.28)
+
+
+func test_last_place_odds_statistical() -> void:
+	var c: Array[float] = _counts(LootTables.new(cfg, rar), 4, 4, 4000, 11)
+	assert_between(c[R.COMMON], 0.77, 0.83)
+	assert_between(c[R.RARE], 0.17, 0.23)
+	assert_eq(c[R.LEGENDARY], 0.0, "last never gets a Legendary")
+
+
+func test_empty_pool_falls_back_to_the_nearest_rarity() -> void:
+	var no_legend: Dictionary[StringName, int] = {&"lucky_clover": R.COMMON, &"mirror": R.RARE}
+	var lt := LootTables.new(cfg, no_legend)
+	var rng := SeededRng.new(3)
 	for i: int in 200:
-		var c: Array = lt.draft(2, false, 4, rng)["choices"]
-		var seen: Dictionary = {}
-		for id: StringName in c:
-			assert_false(seen.has(id))
-			seen[id] = true
+		assert_true(no_legend.has(lt.roll(1, 4, rng)))
+	var only_common: Dictionary[StringName, int] = {&"lucky_clover": R.COMMON}
+	assert_eq(LootTables.new(cfg, only_common).roll(1, 4, rng), &"lucky_clover")
+	var empty: Dictionary[StringName, int] = {}
+	assert_eq(LootTables.new(cfg, empty).roll(1, 4, rng), &"")
 
 
-func test_underdog_only_with_three_or_more_players() -> void:
+func test_underdog_only_for_last_with_three_or_more_players() -> void:
 	var lt := LootTables.new(cfg, rar)
 	var rng := SeededRng.new(2)
-	var with3: Dictionary = lt.draft(3, true, 3, rng)
-	assert_eq((with3["bonus"] as Array).size(), 1)
-	assert_eq(rar[with3["bonus"][0]], R.RARE)
-	var with2: Dictionary = lt.draft(2, true, 2, rng)
-	assert_eq((with2["bonus"] as Array).size(), 0)
-
-
-func test_second_place_weights_statistical() -> void:
-	var lt := LootTables.new(cfg, rar)
-	var rng := SeededRng.new(9)
-	var commons: int = 0
-	var total: int = 0
-	for i: int in 3000:
-		for id: StringName in lt.draft(2, false, 4, rng)["choices"]:
-			total += 1
-			if rar[id] == R.COMMON:
-				commons += 1
-	# Weights common:rare = 2:1, but rares run out within an offer (only 3), so ≥ 2/3 common.
-	assert_between(commons / float(total), 0.62, 0.75)
+	var id: StringName = lt.underdog(3, 3, 3, rng)
+	assert_eq(rar[id], R.RARE)
+	assert_eq(lt.underdog(2, 2, 2, rng), &"", "two players: no underdog")
+	assert_eq(lt.underdog(2, 3, 3, rng), &"", "not last")

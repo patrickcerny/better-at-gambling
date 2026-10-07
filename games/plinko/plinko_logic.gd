@@ -64,7 +64,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	var weights: PackedInt32Array = balance.plinko_weights(risk)
 	var lk: int = modifiers.get_luck(p, game_id)
 	var d: LuckRng.Draw = luck.draw(lk, func() -> int: return rng.weighted_index(Array(weights)), func(s: int) -> float: return mults[s])
-	var drop: Dictionary = {"drop_id": _next_drop_id, "player": p, "stake": amount, "risk": risk, "slot": int(d.value), "time_left": balance.plinko_flight_time}
+	var drop: Dictionary = {"drop_id": _next_drop_id, "player": p, "stake": amount, "risk": risk, "slot": int(d.value), "time_left": balance.plinko_flight_time, "covered": last_covered}
 	_next_drop_id += 1
 	drops.append(drop)
 	cooldowns[p] = balance.plinko_drop_cooldown
@@ -96,6 +96,18 @@ func has_stake(p: int) -> bool:
 func auto_resolve() -> void:
 	for drop: Dictionary in drops.duplicate():
 		_land(drop)
+
+
+## Every chip in flight is taken off the board and its stake comes back.
+func refund_all() -> void:
+	if drops.is_empty():
+		return
+	var totals: Dictionary = {}
+	for drop: Dictionary in drops:
+		_refund(int(drop["player"]), int(drop["stake"]), int(drop.get("covered", 0)), totals)
+	drops.clear()
+	cooldowns.clear()
+	_emit_refunds(totals)
 
 
 func get_public_state() -> Dictionary:

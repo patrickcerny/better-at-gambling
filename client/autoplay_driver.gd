@@ -27,9 +27,9 @@ var script_name: String = ""
 var _last_rag: Dictionary[int, Vector3] = {}
 ## "wait_event" step: [type, deadline].
 var _awaiting: Array = []
-## Quiz answers given / drafts picked (logged for the network tests).
+## Quiz answers given / reward rows that gave us an item (logged for the network tests).
 var answers_sent: int = 0
-var drafts_picked: int = 0
+var rewards_items: int = 0
 ## Items: the default script presses an item key every few seconds through the real ItemController
 ## (target picker included) and counts the server's confirmations.
 var items_used: int = 0
@@ -86,9 +86,12 @@ func _on_event(ev: Dictionary) -> void:
 		&"quiz_question":
 			_answer(int(ev["index"]), (ev["answers"] as Array).size())
 		&"rewards_started":
-			_pick_draft()
+			for row: Dictionary in ev["rewards"]:
+				if int(row["player"]) == scene.local_id and StringName(row.get("item", &"")) != &"":
+					rewards_items += 1
+					Log.info(&"autoplay", "reward item %s" % row["item"])
 		&"match_ended":
-			Log.info(&"nettest", "NETTEST autoplay answers=%d drafts=%d items=%d" % [answers_sent, drafts_picked, items_used])
+			Log.info(&"nettest", "NETTEST autoplay answers=%d rewards=%d items=%d" % [answers_sent, rewards_items, items_used])
 		&"item_used":
 			if int(ev["player"]) == scene.local_id:
 				items_used += 1
@@ -105,21 +108,6 @@ func _answer(question: int, count: int) -> void:
 	var res: Dictionary = Net.send_intent(Intents.make(&"submit_answer", {"question": question, "index": randi() % count}))
 	answers_sent += 1
 	Log.info(&"autoplay", "quiz answer %d -> %s" % [question, res])
-
-
-## Reward draft: wait for the private offer, then take the last option (the default is the first).
-func _pick_draft() -> void:
-	for i: int in 20:
-		await get_tree().create_timer(0.25).timeout
-		if not is_inside_tree():
-			return
-		var draft: Dictionary = Net.request_private_snapshot().get("draft", {})
-		var choices: Array = draft.get("choices", [])
-		if not choices.is_empty():
-			var res: Dictionary = Net.send_intent(Intents.make(&"draft_pick", {"choice": choices.size() - 1}))
-			drafts_picked += 1
-			Log.info(&"autoplay", "draft pick %s -> %s" % [choices[-1], res])
-			return
 
 
 func _build_steps() -> void:

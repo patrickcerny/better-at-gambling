@@ -26,7 +26,7 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
 |---|---|
 | `--smoke-test [--frames N \| --seconds S]` | run, then exit 1 if anything logged an error |
 | `--practice`, `--autoplay [--autoplay-variant 1 \| --autoplay-script thrower\|victim]` | practice match / scripted local player |
-| `--server --port P [--dummies N --duration M --seed N --timescale X --min-players N --empty-timeout S]` | headless dedicated room server (dev mode trusts client names) |
+| `--server --port P [--dummies N --minigames N --gamble-minutes M --gamble-seconds S --seed N --timescale X --min-players N --empty-timeout S]` | headless dedicated room server (dev mode trusts client names) |
 | `… --room-id ID --room-code CODE --room-secret S --orchestrator URL --build B` | added by the orchestrator: verify join tokens, heartbeats, close when empty |
 | `--connect host:port --name N [--uid U --color C --hat H --build B]` | join a server directly (dev/tests) |
 | `--orchestrator URL --create-room \| --join-code CODE` | create/join a party through the orchestrator |

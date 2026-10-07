@@ -12,7 +12,18 @@ extends Resource
 @export var station_positions: Dictionary = {}
 ## Spawn points in the entrance hall.
 @export var spawn_points: Array[Vector3] = []
+## Where players stand in the entrance hall at the lobby and after each minigame (REGROUP), one
+## per player id (filled by the map scene; empty = `spawn_points`).
+@export var lobby_spawns: Array[Vector3] = []
 ## Gift Shop counter (filled by the map scene; INF = no distance check, e.g. in tests).
 @export var shop_position: Vector3 = Vector3.INF
 ## Max distance from a station's interaction point to sit down.
 @export var interact_range: float = 3.5
+
+
+## Entrance-hall spot for a player id (Vector3.INF when the map has none).
+func lobby_spawn(player_id: int) -> Vector3:
+	var list: Array[Vector3] = lobby_spawns if not lobby_spawns.is_empty() else spawn_points
+	if list.is_empty():
+		return Vector3.INF
+	return list[posmod(player_id - 1, list.size())]

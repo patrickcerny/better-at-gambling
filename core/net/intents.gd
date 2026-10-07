@@ -14,7 +14,6 @@ const SCHEMA: Dictionary = {
 	&"rps_pick": ["duel", "pick"],
 	&"shop_buy": ["index"],
 	&"submit_answer": ["question", "index"],
-	&"draft_pick": ["choice"],
 	&"set_ready": ["ready"],
 	&"lobby_setting": ["key", "value"],
 	&"set_skin": ["skin"],

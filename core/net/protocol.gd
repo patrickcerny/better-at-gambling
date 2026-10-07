@@ -2,9 +2,9 @@ class_name Protocol
 extends RefCounted
 ## Network protocol constants (§4.1). Bump PROTOCOL_VERSION on any wire change.
 
-const PROTOCOL_VERSION: int = 4
+const PROTOCOL_VERSION: int = 5
 ## Build string clients and servers must share exactly (the orchestrator checks it too).
-const BUILD_ID: String = "0.7.2-fixes"
+const BUILD_ID: String = "0.7.4-rules"
 const DEFAULT_PORT: int = 24680
 const MAX_PLAYERS: int = 8
 const SERVER_TICK_HZ: int = 20

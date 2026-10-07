@@ -2,7 +2,7 @@ class_name MusicMood
 extends Node
 ## Keeps the music in step with the match: casino lounge jazz on the floor (and in the entrance
 ## lobby), the faster Last Call take once last call is announced, game-show jazz for the quiz and
-## the reward draft, the warm results theme on the podium. Polls the client mirror so snapshots,
+## the round results, the warm results theme on the podium. Polls the client mirror so snapshots,
 ## late joins and "play again" land on the right mood without extra event wiring.
 
 var state: ClientMatchState = null

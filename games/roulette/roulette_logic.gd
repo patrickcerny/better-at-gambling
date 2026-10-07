@@ -83,7 +83,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 		return fail(&"above_max")
 	if not _take_stake(p, amount):
 		return fail(&"insufficient_funds")
-	bets.append({"player": p, "type": type, "value": value, "amount": amount})
+	bets.append({"player": p, "type": type, "value": value, "amount": amount, "covered": last_covered})
 	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id, "type": type, "value": value}))
 	return OK_RESULT
 
@@ -95,7 +95,10 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 		for b: Dictionary in bets.duplicate():
 			if b["player"] == p:
 				bets.erase(b)
-				economy.apply(p, int(b["amount"]), &"bet_cleared", station_id)
+				# Only what the player paid comes back: Fake Cash never turns into real money.
+				var back: int = int(b["amount"]) - int(b.get("covered", 0))
+				if back > 0:
+					economy.apply(p, back, &"bet_cleared", station_id)
 		return OK_RESULT
 	return fail(&"unknown_action")
 
@@ -139,6 +142,20 @@ func auto_resolve() -> void:
 		_resolve()
 	if state == State.BETTING and bets.is_empty():
 		state = State.IDLE
+
+
+func refund_all() -> void:
+	if state == State.IDLE:
+		return
+	var totals: Dictionary = {}
+	if state == State.BETTING or state == State.SPINNING:
+		for b: Dictionary in bets:
+			_refund(int(b["player"]), int(b["amount"]), int(b.get("covered", 0)), totals)
+	bets.clear()
+	_pending_result = -1
+	state = State.IDLE
+	timer = 0.0
+	_emit_refunds(totals)
 
 
 func get_public_state() -> Dictionary:

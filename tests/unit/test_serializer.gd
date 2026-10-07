@@ -5,7 +5,9 @@ func _sample_state() -> MatchState:
 	var s := MatchState.new()
 	s.match_seed = 99
 	s.phase = Phase.Id.CASINO
-	s.duration_minutes = 15
+	s.minigames = 4
+	s.gamble_s = 150.0
+	s.duration_s = 750.0
 	s.casino_time = 123.456
 	s.segment_index = 1
 	for i: int in range(1, 4):

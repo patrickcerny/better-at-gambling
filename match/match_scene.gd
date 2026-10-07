@@ -310,18 +310,31 @@ func _start_room_server(cmd: Cmdline) -> void:
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
 	def.spawn_points = map.spawn_points()
+	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
-	var settings: Dictionary = {"duration": cmd.get_int("duration", 10), "seed": cmd.get_int("seed", 0), "items_enabled": true}
+	var settings: Dictionary = _length_settings(cmd)
+	settings["seed"] = cmd.get_int("seed", 0)
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
 	server.world.obstacle_callback = _obstacle_between
 	server.timescale = cmd.get_float("timescale", 1.0)
 	server.lobby.min_participants = cmd.get_int("min-players", 2)
-	server.lobby.settings["duration"] = cmd.get_int("duration", 10)  # dev/tests may go below the menu's 5
 	server.open_lobby()
 	_owns_server = true
 	Net.attach_server(server)
 	for i: int in clampi(cmd.get_int("dummies", 0), 0, 7):
 		_add_dummy(i)
+
+
+## Match length from the command line (Patrick's note #12): `--minigames N`, `--gamble-minutes M`,
+## and for tests/dev `--gamble-seconds S` (overrides the minutes; `--minigames 0` is allowed here).
+func _length_settings(cmd: Cmdline) -> Dictionary:
+	var presets: MatchPresets = Registry.presets
+	return {
+		"minigames": clampi(cmd.get_int("minigames", presets.default_minigames), 0, presets.max_minigames),
+		"gamble_minutes": clampi(cmd.get_int("gamble-minutes", presets.default_gamble_minutes), presets.min_gamble_minutes, presets.max_gamble_minutes),
+		"gamble_seconds": maxf(cmd.get_float("gamble-seconds", 0.0), 0.0),
+		"items_enabled": true,
+	}
 
 
 ## Practice: host the server in-process. Just you in the casino (Patrick: no bots); tests and
@@ -333,8 +346,10 @@ func _start_local(cmd: Cmdline) -> void:
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
 	def.spawn_points = map.spawn_points()
+	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
-	var settings: Dictionary = {"duration": cmd.get_int("duration", 10), "seed": cmd.get_int("seed", randi() % 1000000), "items_enabled": true}
+	var settings: Dictionary = _length_settings(cmd)
+	settings["seed"] = cmd.get_int("seed", randi() % 1000000)
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
 	server.world.obstacle_callback = _obstacle_between
 	_owns_server = true
@@ -759,7 +774,6 @@ func _on_event(ev: Dictionary) -> void:
 			if net_world != null:
 				net_world.reset_player(pid)
 		&"match_started":
-			map.set_lobby_open(true)
 			_hint(&"sit", "Walk up to a table and press {interact} to sit.  {grab} grabs, {shove} shoves.", 5.0)
 		&"player_shoved":
 			_on_shoved(ev)
@@ -884,15 +898,18 @@ func _on_event(ev: Dictionary) -> void:
 			Audio.play(&"last_call_announce", &"SFX", 0.0)
 		&"phase_changed":
 			var phase: Phase.Id = int(ev["phase"]) as Phase.Id
-			if phase != Phase.Id.LOBBY:
+			if phase != Phase.Id.LOBBY and lobby_panel.visible:
+				lobby_panel.close()
+			# The hall doors open when the casino does (after the intro and after each regroup).
+			if phase in [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME, Phase.Id.RESULTS]:
 				map.set_lobby_open(true)
-				if lobby_panel.visible:
-					lobby_panel.close()
+			elif phase == Phase.Id.REGROUP:
+				map.set_lobby_open(false)
 			if phase == Phase.Id.INTRO:
 				hud.toast("WELCOME TO THE LUCKY LOUNGE", 3.0)
 			elif phase == Phase.Id.CASINO and int(ev.get("from", -1)) == Phase.Id.INTRO:
 				hud.toast("Gamble. Shove. Don't get caught.", 3.0)
-			elif phase == Phase.Id.CASINO and int(ev.get("from", -1)) == Phase.Id.REWARDS:
+			elif phase == Phase.Id.CASINO and int(ev.get("from", -1)) == Phase.Id.REGROUP:
 				_back_to_casino()
 			elif phase == Phase.Id.PRE_MINIGAME:
 				Audio.play(&"countdown_beep", &"SFX", -4.0, 0.8)
@@ -901,16 +918,23 @@ func _on_event(ev: Dictionary) -> void:
 		&"rewards_started":
 			if role != Role.SERVER:
 				reward_panel.open(ev["rewards"], float(ev["seconds"]))
-		&"draft_result":
-			if int(ev["player"]) == local_id:
-				reward_panel.show_result(ev.get("items", []), ev.get("kept", []))
-				if not (ev.get("items", []) as Array).is_empty():
-					_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it.", 3.0)
+				for row: Dictionary in ev["rewards"]:
+					if int(row["player"]) == local_id and StringName(row.get("item", &"")) != &"":
+						_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it.", float(ev["seconds"]))
+		&"regroup_started":
+			_regroup()
+			var spot: Variant = (ev.get("positions", {}) as Dictionary).get(local_id, null)
+			if role == Role.CLIENT and local != null and spot != null:
+				# Network tests: our own body really went to the hall spot the server picked.
+				Log.info(&"nettest", "NETTEST regroup player=%d dist=%.2f" % [local_id, local.global_position.distance_to(Serializer.to_vec3(spot))])
+		&"bets_refunded":
+			if int(ev["player"]) == local_id and int(ev.get("amount", 0)) > 0:
+				hud.toast("Bets returned: +$%d" % int(ev["amount"]), 2.5)
 		&"hot_table":
 			Audio.play(&"hot_table_announce", &"SFX", -2.0)
 			hud.banner("%s IS HOT!  Winnings ×%.2f  (follow the arrow)" % [ClientMatchState.station_label(StringName(ev["station"])).to_upper(), float(ev["multiplier"])], Color(1.0, 0.55, 0.1), 4.0)
 		&"house_comp":
-			if int(ev["player"]) == local_id:
+			if int(ev["player"]) == local_id and not bool(ev.get("rewards", false)):
 				hud.toast("The house feels sorry for you: +$%d" % int(ev["amount"]), 3.0)
 				Audio.play(&"cash_register", &"SFX", -4.0)
 		&"match_ended":
@@ -1419,26 +1443,16 @@ func _close_stage() -> void:
 		stage = null
 
 
-## Rewards over: back on the casino floor with spawn protection.
+## Regroup over: the hall doors open and everyone runs back in with spawn protection.
 func _back_to_casino() -> void:
 	_close_stage()
 	reward_panel.close()
 	if role == Role.SERVER:
 		return
 	hud.visible = true
-	if local != null:
-		local.cam.activate()
-		var seated: bool = local.state == PlayerAvatar.State.SEATED
-		router.set_mode(InputRouter.Mode.SEATED if seated else InputRouter.Mode.WALK)
-		if seated and current_ui == null:
-			var sid: StringName = view.state.seat_of.get(local_id, &"")
-			var st: StationBase = map.stations.get(sid, null)
-			var ui: StationUi = station_uis.get(st.game_id, null) if st != null else null
-			if ui != null:
-				current_ui = ui
-				ui.open(sid, local_id, view.state)
-				_on_station_state(sid)
-	hud.toast("Back to the tables! (%ds spawn protection)" % int(cfg.spawn_protection), 2.5)
+	if local != null and local.state != PlayerAvatar.State.SEATED:
+		router.set_mode(InputRouter.Mode.WALK)
+	hud.toast("Doors are open! Back to the tables (%ds spawn protection)" % int(cfg.spawn_protection), 2.5)
 
 
 ## A view created mid-match (late join, reconnect) catches up with a minigame, rewards or results.
@@ -1450,12 +1464,64 @@ func _catch_up_phase() -> void:
 				_open_stage({"minigame": st.minigame.get("minigame", &"quiz"), "players": st.minigame.get("players", [])}, st.minigame)
 		Phase.Id.REWARDS:
 			if role != Role.SERVER:
-				reward_panel.open(st.rewards, Registry.balance.draft_time)
+				reward_panel.open(st.rewards, Registry.balance.reward_reveal_time, true)
 				hud.visible = false
 				router.set_mode(InputRouter.Mode.MENU)
+		Phase.Id.REGROUP:
+			map.set_lobby_open(false)
 		Phase.Id.RESULTS:
 			_match_over = true
 			_show_results(st.standings)
+
+
+## Everyone back to their entrance-hall spot with the lobby doors shut: the lobby after a match,
+## and REGROUP after each minigame (Patrick's note #10). Ragdolls, holds, seats, knockouts and
+## throw-outs all end; whoever owns a body puts it there (the server, or our own client).
+func _gather_in_hall() -> void:
+	map.set_lobby_open(false)
+	_ko_until.clear()
+	_down_until.clear()
+	_respawn_at.clear()
+	_ragdoll_attacker.clear()
+	for pid: int in avatars:
+		var a: PlayerAvatar = avatars[pid]
+		if a.state == PlayerAvatar.State.RAGDOLL:
+			a.end_ragdoll(map.lobby_spawn(pid))
+		elif a.state == PlayerAvatar.State.SEATED:
+			a.stand()
+		elif a.state == PlayerAvatar.State.HELD:
+			a.release_held()
+		if a.state == PlayerAvatar.State.AWAY:
+			a.set_away(false)
+		if a.state == PlayerAvatar.State.STUNNED:
+			a.state = PlayerAvatar.State.STANDING
+		a.visuals.set_knocked_out(false)
+		a.visuals.reaching = false
+		if _owns_server or pid == local_id:
+			a.teleport(map.lobby_spawn(pid), 0.0)
+			if _owns_server:
+				server.set_server_position(pid, map.lobby_spawn(pid))
+				server.set_server_owned(pid, false)
+		if net_world != null:
+			net_world.reset_player(pid)
+	if current_ui != null:
+		current_ui.close()
+		current_ui = null
+
+
+## After the rewards (REGROUP): back in the entrance hall, doors shut, a short countdown.
+func _regroup() -> void:
+	_close_stage()
+	reward_panel.close()
+	_gather_in_hall()
+	if role == Role.SERVER:
+		return
+	hud.visible = true
+	if local != null:
+		local.cam.activate()
+		hud.set_crosshair_visible(true)
+	router.set_mode(InputRouter.Mode.WALK)
+	hud.toast("Back in the hall! The doors open in %d…" % int(cfg.regroup_time), 2.5)
 
 
 ## Online room went back to its lobby for another match ("play again in the same room").
@@ -1475,29 +1541,7 @@ func _on_match_reset() -> void:
 	for pid: int in effect_tags.keys():
 		_refresh_effect_tag(pid)
 	items_ctl.cancel()
-	map.set_lobby_open(false)
-	for pid: int in avatars:
-		var a: PlayerAvatar = avatars[pid]
-		if a.state == PlayerAvatar.State.RAGDOLL:
-			a.end_ragdoll(map.lobby_spawn(pid))
-		elif a.state == PlayerAvatar.State.SEATED:
-			a.stand()
-		elif a.state == PlayerAvatar.State.HELD:
-			a.release_held()
-		if a.state == PlayerAvatar.State.AWAY:
-			a.set_away(false)
-		a.visuals.set_knocked_out(false)
-		if _owns_server or pid == local_id:
-			a.teleport(map.lobby_spawn(pid), 0.0)
-			if _owns_server:
-				server.set_server_position(pid, map.lobby_spawn(pid))
-			else:
-				_report_position(pid)
-		if net_world != null:
-			net_world.reset_player(pid)
-	if current_ui != null:
-		current_ui.close()
-		current_ui = null
+	_gather_in_hall()
 	if role == Role.SERVER:
 		return
 	hud.visible = true

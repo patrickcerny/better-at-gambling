@@ -31,7 +31,7 @@ def test_create_join_by_code_play_and_room_closes_when_empty(procs):
         "BUILD_ID": build_id(),
         "BIND_PORT": str(http_port),
         "PORT_RANGE": f"{udp}-{udp}",
-        "GAME_SERVER_CMD": f"{GODOT} --headless --path {ROOT} --audio-driver Dummy -- --duration 1 --empty-timeout 3",
+        "GAME_SERVER_CMD": f"{GODOT} --headless --path {ROOT} --audio-driver Dummy -- --minigames 0 --gamble-seconds 60 --empty-timeout 3",
         "GAME_SERVER_CWD": str(ROOT),
         "LOG_DIR": str(LOG_DIR / "rooms"),
         "REAP_INTERVAL": "1",

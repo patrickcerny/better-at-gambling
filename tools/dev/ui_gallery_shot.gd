@@ -37,11 +37,14 @@ func _ready() -> void:
 			p.bind(st, 1)
 			var rows: Array = []
 			for i: int in NAMES.size():
-				rows.append({"player": i + 1, "placement": i + 1, "cash": [300, 200, 100, 0, 0][i], "draft": i < 3, "bonus_count": 1 if i == 4 else 0})
-			p.open(rows, 8.0)
+				var row: Dictionary = {"player": i + 1, "placement": i + 1, "cash": [150, 100, 75, 50, 25][i], "item": [&"golden_chip", &"lucky_clover", &"banana_peel", &"beer", &"beer"][i]}
+				if i == NAMES.size() - 1:
+					row["bonus"] = &"lucky_clover"
+					row["comp"] = 450
+				rows.append(row)
+			p.open(rows, 6.0, true)
 			p.set_process(false)
 			p.timer_label.text = "6"
-			p._show_offer({"choices": [&"lucky_clover", &"banana_peel", &"golden_chip"], "bonus": [&"beer"]})
 		"settings":
 			var p := SettingsPanel.new()
 			add_child(p)
@@ -58,7 +61,7 @@ func _state() -> ClientMatchState:
 	st.room_mode = true
 	st.leader = 1
 	st.countdown = -1.0
-	st.lobby_settings = {"duration": 10, "items_enabled": true}
+	st.lobby_settings = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true}
 	for i: int in NAMES.size():
 		var pid: int = i + 1
 		st.players[pid] = {"id": pid, "name": NAMES[i], "color": i, "ready": i % 2 == 0, "skin": "bean", "connected": i != 3, "inventory": []}

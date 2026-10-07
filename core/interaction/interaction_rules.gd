@@ -179,6 +179,16 @@ func cancel_knockout(target: int, now: float) -> void:
 	t.knocked_down_until = now + cfg.knockdown_time
 
 
+## Ends every knockout and knockdown (regroup in the entrance hall); shove counts start over.
+func clear_downs() -> void:
+	for id: int in _status:
+		var t: Status = _status[id]
+		t.knocked_out_until = -INF
+		t.knocked_down_until = -INF
+		t.shove_hits.clear()
+		t.shake_sessions.clear()
+
+
 ## Maximum total that can be shaken out of one knockout.
 func shake_cap(money: int, limits_multiplier: float) -> int:
 	var cap_amount: int = int(floor(cfg.shake_cap_amount * limits_multiplier))

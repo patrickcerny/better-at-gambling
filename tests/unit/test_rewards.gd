@@ -1,5 +1,6 @@
 extends GutTest
-## Reward phase (§2.10): placement cash, the private item draft, defaults and inventory limits.
+## Reward phase (§2.10, Patrick's note #11): no draft. Placement cash for every place, one item per
+## player rolled by placement, the Underdog Rare, the House Comp on the rows and the reveal timer.
 
 const R := ItemDefinition.Rarity
 
@@ -8,6 +9,7 @@ var rar: Dictionary[StringName, int] = {
 	&"lucky_clover": R.COMMON, &"black_cat": R.COMMON, &"loaded_reels": R.COMMON, &"hot_hands": R.COMMON,
 	&"golden_chip": R.COMMON, &"banana_peel": R.COMMON, &"bodyguard": R.COMMON, &"boxing_glove": R.COMMON,
 	&"double_down": R.RARE, &"pickpocket": R.RARE, &"mirror": R.RARE,
+	&"crown": R.LEGENDARY,
 }
 var loot: LootTables = LootTables.new(load("res://data/items/loot_tables.tres"), rar)
 
@@ -30,96 +32,95 @@ func _setup(n: int) -> Array:
 	return [eco, players]
 
 
-func test_cash_by_placement_and_multipliers() -> void:
+func test_cash_by_placement_for_every_place() -> void:
 	assert_eq(RewardDirector.cash_for(1, true, 1.0, cfg), 150)
 	assert_eq(RewardDirector.cash_for(2, true, 1.0, cfg), 100)
-	assert_eq(RewardDirector.cash_for(3, true, 1.0, cfg), 50)
-	assert_eq(RewardDirector.cash_for(4, true, 1.0, cfg), 0)
+	assert_eq(RewardDirector.cash_for(3, true, 1.0, cfg), 75)
+	assert_eq(RewardDirector.cash_for(4, true, 1.0, cfg), 50)
+	assert_eq(RewardDirector.cash_for(5, true, 1.0, cfg), 25)
+	assert_eq(RewardDirector.cash_for(8, true, 1.0, cfg), 25, "places past the list get the last prize")
 	assert_eq(RewardDirector.cash_for(1, true, 2.0, cfg), 300, "limits multiplier of the segment")
 	assert_eq(RewardDirector.cash_for(1, false, 1.0, cfg), 300, "items off doubles cash")
 	assert_eq(RewardDirector.cash_for(0, true, 1.0, cfg), 0)
 
 
-func test_start_pays_cash_and_announces_without_offers() -> void:
+func test_start_pays_cash_gives_one_item_each_and_announces_everything() -> void:
 	var s: Array = _setup(4)
 	var eco: Economy = s[0]
+	var players: Dictionary[int, PlayerState] = s[1]
 	var rd := RewardDirector.new()
-	rd.start(_ranking(4), eco, loot, true, 1.0, cfg, SeededRng.new(3))
+	rd.start(_ranking(4), eco, loot, true, 1.0, cfg, SeededRng.new(3), players)
 	assert_eq(eco.balance(1), 1150)
 	assert_eq(eco.balance(2), 1100)
-	assert_eq(eco.balance(3), 1050)
-	assert_eq(eco.balance(4), 1000)
+	assert_eq(eco.balance(3), 1075)
+	assert_eq(eco.balance(4), 1050)
 	var ev: Array[Dictionary] = rd.drain_events()
 	assert_eq(ev.size(), 1)
 	assert_eq(ev[0]["type"], &"rewards_started")
-	var wire: String = JSON.stringify(ev[0])
-	for id: StringName in rar:
-		assert_false(wire.contains(String(id)), "offers stay private")
-	assert_false(rd.private_state(1).is_empty())
-	assert_true((rd.private_state(1)["draft"]["choices"] as Array).size() > 0)
+	var rows: Array = ev[0]["rewards"]
+	assert_eq(rows.size(), 4)
+	for i: int in rows.size():
+		assert_eq(int(rows[i]["placement"]), i + 1, "rows in placement order")
+		assert_true(rar.has(StringName(rows[i]["item"])), "everyone gets an item")
+		assert_eq(players[i + 1].inventory[0], StringName(rows[i]["item"]), "granted right away")
+	assert_true(rows[3].has("bonus"), "last of 4: Underdog Rare")
+	assert_eq(rar[StringName(rows[3]["bonus"])], R.RARE)
+	assert_false(rows[0].has("bonus"))
+	assert_almost_eq(float(ev[0]["seconds"]), cfg.reward_reveal_time + cfg.reward_row_time * 4, 0.01)
 
 
-func test_default_pick_is_first_option_on_timeout() -> void:
+func test_reveal_runs_its_timer_then_is_done() -> void:
 	var s: Array = _setup(2)
-	var players: Dictionary[int, PlayerState] = s[1]
 	var rd := RewardDirector.new()
-	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(7))
-	var first: StringName = StringName(rd.private_state(1)["draft"]["choices"][0])
+	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(7), s[1])
 	var t: float = 0.0
 	while not rd.is_done() and t < 30.0:
-		rd.tick(0.05, players)
+		rd.tick(0.05)
 		t += 0.05
 	assert_true(rd.is_done())
-	assert_almost_eq(t, cfg.draft_time + cfg.reward_outro_time, 0.11)
-	assert_eq(players[1].inventory[0], first)
-	assert_true(rd.private_state(1).is_empty(), "no offer after the draft")
+	assert_almost_eq(t, cfg.reward_reveal_time + cfg.reward_row_time * 2, 0.11)
+	assert_eq((rd.get_public_state()["rewards"] as Array).size(), 2, "snapshot keeps the rows")
 
 
-func test_pick_validation_and_early_close() -> void:
-	var s: Array = _setup(2)
-	var players: Dictionary[int, PlayerState] = s[1]
-	var rd := RewardDirector.new()
-	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(9))
-	var n1: int = (rd.private_state(1)["draft"]["choices"] as Array).size()
-	assert_eq(rd.pick(1, n1)["error"], &"bad_value")
-	assert_eq(rd.pick(1, -1)["error"], &"bad_value")
-	assert_eq(rd.pick(99, 0)["error"], &"no_reward")
-	assert_true(rd.pick(1, n1 - 1)["ok"])
-	assert_eq(rd.pick(1, 0)["error"], &"already_picked")
-	var chosen: StringName = StringName(rd.rewards[1]["choices"][n1 - 1])
-	assert_true(rd.pick(2, 0)["ok"])
-	rd.tick(0.05, players)
-	assert_eq(rd.state, RewardDirector.State.OUTRO, "everyone picked: the draft closes early")
-	assert_eq(players[1].inventory[0], chosen)
-	assert_eq(rd.pick(2, 0)["error"], &"too_late")
-
-
-func test_inventory_capped_at_three() -> void:
+func test_full_inventory_goes_through_grant() -> void:
 	var s: Array = _setup(2)
 	var players: Dictionary[int, PlayerState] = s[1]
 	players[1].inventory.assign([&"black_cat", &"bodyguard", &"mirror"])
+	var granted: Array = []
 	var rd := RewardDirector.new()
-	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(2))
-	rd.pick(1, 0)
-	rd.pick(2, 0)
-	rd.tick(0.05, players)
+	rd.grant = func(p: int, item: StringName) -> void: granted.append([p, item])
+	rd.start(_ranking(2), s[0], loot, true, 1.0, cfg, SeededRng.new(2), players)
+	assert_eq(granted.size(), 2, "the ItemSystem decides (discard choice when full)")
 	assert_eq(players[1].inventory.size(), 3)
-	var res: Array[Dictionary] = rd.drain_events().filter(func(e: Dictionary) -> bool: return e["type"] == &"draft_result" and e["player"] == 1)
-	assert_eq(res.size(), 1)
-	assert_eq((res[0]["kept"] as Array).size(), 0)
 
 
-func test_items_off_means_cash_only_and_no_draft() -> void:
+func test_items_off_means_cash_only() -> void:
 	var s: Array = _setup(3)
 	var eco: Economy = s[0]
 	var players: Dictionary[int, PlayerState] = s[1]
 	var rd := RewardDirector.new()
-	rd.start(_ranking(3), eco, loot, false, 1.0, cfg, SeededRng.new(4))
+	rd.start(_ranking(3), eco, loot, false, 1.0, cfg, SeededRng.new(4), players)
 	assert_eq(eco.balance(1), 1300)
-	assert_true(rd.private_state(1).is_empty())
-	var t: float = 0.0
-	while not rd.is_done() and t < 30.0:
-		rd.tick(0.05, players)
-		t += 0.05
-	assert_almost_eq(t, cfg.reward_outro_time, 0.11, "no draft wait")
+	assert_eq(eco.balance(3), 1150)
+	var rows: Array = rd.drain_events()[0]["rewards"]
+	assert_eq(StringName(rows[0]["item"]), &"")
 	assert_eq(players[1].inventory.size(), 0)
+
+
+func test_comp_runs_before_the_prize_and_lands_on_the_row() -> void:
+	var s: Array = _setup(2)
+	var eco: Economy = s[0]
+	eco.apply(2, -1000, &"test")
+	var asked: Array = []
+	var rd := RewardDirector.new()
+	rd.start(_ranking(2), eco, loot, true, 1.0, cfg, SeededRng.new(5), s[1], func(p: int) -> int:
+		asked.append([p, eco.balance(p)])
+		if eco.balance(p) < 10:
+			eco.apply(p, 450, &"house_comp")
+			return 450
+		return 0)
+	assert_eq(asked, [[1, 1000], [2, 0]], "broke means broke at the end of the round, before the prize")
+	var rows: Array = rd.drain_events()[0]["rewards"]
+	assert_false(rows[0].has("comp"))
+	assert_eq(int(rows[1]["comp"]), 450)
+	assert_eq(eco.balance(2), 450 + 100)

@@ -54,6 +54,12 @@ func start_spin(own: bool = false) -> void:
 	t.tween_property(lever, "rotation:x", 0.0, 0.45).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
+## The spin was refunded for a minigame: the reels stop where they are, no result.
+func reset_table() -> void:
+	if reels_fx != null:
+		reels_fx.cancel()
+
+
 ## The reels stop on `line` one by one; returns the seconds until the last one has stopped.
 ## `own` = the local player's spin (plays the riser / no-match sounds).
 func stop_on(line: Array, own: bool = false) -> float:

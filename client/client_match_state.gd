@@ -29,7 +29,12 @@ var time_left: float = 0.0
 var next_minigame_in: float = -1.0
 var segment_index: int = 0
 var last_call: bool = false
-var duration_minutes: int = 10
+## Match length (Patrick's note #12): minigames, gambling seconds between them, casino seconds.
+var minigames: int = 5
+var gamble_s: float = 180.0
+var duration_s: float = 1080.0
+## REGROUP: seconds until the entrance-hall doors open (counted down locally).
+var regroup_in: float = -1.0
 var players: Dictionary[int, Dictionary] = {}
 var balances: Dictionary[int, int] = {}
 var stations: Dictionary = {}
@@ -49,7 +54,7 @@ var hot_station: StringName = &""
 var hot_left: float = 0.0
 ## Minigame public state from the last snapshot (a view joining mid-minigame starts from it).
 var minigame: Dictionary = {}
-## Reward phase summary [{player, placement, cash, draft, bonus_count}].
+## Reward rows [{player, placement, cash, item, bonus?, comp?}] in placement order.
 var rewards: Array = []
 var awards: Array = []
 ## Online results screen: seconds until the room goes back to its lobby (-1 = never).
@@ -74,7 +79,10 @@ func apply_snapshot(snap: Dictionary) -> void:
 	next_minigame_in = float(snap.get("next_minigame_in", -1.0))
 	segment_index = int(snap.get("segment", 0))
 	last_call = bool(snap.get("last_call", false))
-	duration_minutes = int(snap.get("duration", 10))
+	minigames = int(snap.get("minigames", minigames))
+	gamble_s = float(snap.get("gamble_s", gamble_s))
+	duration_s = float(snap.get("duration_s", duration_s))
+	regroup_in = float(snap.get("regroup_in", -1.0))
 	players.clear()
 	seat_of.clear()
 	for id: Variant in snap.get("players", {}):
@@ -144,6 +152,8 @@ func apply_event(ev: Dictionary) -> bool:
 			players_changed.emit()
 		&"phase_changed":
 			phase = int(ev["phase"]) as Phase.Id
+			if phase != Phase.Id.REGROUP:
+				regroup_in = -1.0
 			casino_time = float(ev.get("casino_time", casino_time))
 			segment_index = int(ev.get("segment", segment_index))
 			phase_changed.emit(phase)
@@ -214,7 +224,9 @@ func apply_event(ev: Dictionary) -> bool:
 			players_changed.emit()
 			lobby_changed.emit()
 		&"match_started":
-			duration_minutes = int(ev["duration"])
+			minigames = int(ev.get("minigames", minigames))
+			gamble_s = float(ev.get("gamble_s", gamble_s))
+			duration_s = float(ev.get("duration_s", duration_s))
 			countdown = -1.0
 		&"match_ended":
 			standings = ev["standings"]
@@ -242,11 +254,15 @@ func apply_event(ev: Dictionary) -> bool:
 			minigame = {}
 		&"rewards_started":
 			rewards = ev["rewards"]
-		&"draft_result":
-			var pid: int = int(ev["player"])
-			if players.has(pid):
-				players[pid]["inventory"] = ev.get("inventory", [])
-			players_changed.emit()
+		&"regroup_started":
+			regroup_in = float(ev.get("seconds", 5.0))
+			rewards = []
+			for pid: Variant in (ev.get("positions", {}) as Dictionary):
+				if players.has(int(pid)):
+					players[int(pid)]["pos"] = ev["positions"][pid]
+		&"bets_refunded":
+			if int(ev.get("amount", 0)) > 0:
+				feed_message.emit("%s got $%d back from %s" % [player_name(int(ev["player"])), int(ev["amount"]), station_label(StringName(ev["station"]))], &"info")
 		&"inventory_changed":
 			var pid: int = int(ev["player"])
 			if players.has(pid):
@@ -323,6 +339,10 @@ func apply_event(ev: Dictionary) -> bool:
 			megaphone_holder = -1
 			floor_changed.emit()
 		&"match_reset":
+			minigames = int(ev.get("minigames", minigames))
+			gamble_s = float(ev.get("gamble_s", gamble_s))
+			duration_s = float(ev.get("duration_s", duration_s))
+			regroup_in = -1.0
 			puddles.clear()
 			megaphone_holder = -1
 			floor_changed.emit()

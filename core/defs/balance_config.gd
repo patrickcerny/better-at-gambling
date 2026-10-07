@@ -5,7 +5,9 @@ extends Resource
 
 @export_group("Economy")
 @export var start_money: int = 1000
-@export var comp_amount: int = 150
+## House Comp for broke players by minigames played so far (Patrick, 2026-10-07): $300 at the
+## start, +$150 after each minigame, $900 from the fourth minigame on (the last entry repeats).
+@export var comp_amounts: PackedInt32Array = PackedInt32Array([300, 450, 600, 750, 900])
 @export var comp_threshold: int = 10
 @export var limits_multiplier_step: float = 0.5
 @export var limits_multiplier_cap: float = 3.0
@@ -111,7 +113,8 @@ extends Resource
 @export var quiz_answer_time: float = 12.0
 @export var quiz_base_points: int = 500
 @export var quiz_speed_points: int = 500
-@export var quiz_cash_prizes: PackedInt32Array = PackedInt32Array([150, 100, 50])
+## Cash for each placement after any minigame (× table limits); places past the end get the last.
+@export var quiz_cash_prizes: PackedInt32Array = PackedInt32Array([150, 100, 75, 50, 25])
 ## Phase timings inside one question: get ready, then answer window, then reveal.
 @export var quiz_ready_time: float = 2.0
 @export var quiz_reveal_time: float = 2.5
@@ -121,10 +124,12 @@ extends Resource
 @export var quiz_dynamic_chance: float = 0.4
 
 @export_group("Rewards")
-## Seconds to pick from the draft (default: first option).
-@export var draft_time: float = 8.0
-## Extra seconds for the reward screen after the draft closes.
-@export var reward_outro_time: float = 2.0
+## Reward reveal (Patrick's note #11, no draft): base seconds plus this much per player row (the
+## rows flip their item cards one after another).
+@export var reward_reveal_time: float = 3.0
+@export var reward_row_time: float = 0.6
+## Seconds everyone waits in the entrance hall after the rewards before the doors open (#10).
+@export var regroup_time: float = 5.0
 ## Cash rewards are multiplied by this when items are disabled in the lobby (§2.10).
 @export var cash_only_factor: float = 2.0
 
@@ -144,6 +149,13 @@ extends Resource
 @export_group("Results")
 ## Seconds the results screen stays up before an online room returns to its lobby on its own.
 @export var results_return_time: float = 60.0
+
+
+## House Comp after `minigames_played` minigames (the last `comp_amounts` entry from then on).
+func comp_amount_for(minigames_played: int) -> int:
+	if comp_amounts.is_empty():
+		return 0
+	return comp_amounts[clampi(minigames_played, 0, comp_amounts.size() - 1)]
 
 
 ## Limits multiplier for a casino segment index (0-based): 1 + step × index, capped.

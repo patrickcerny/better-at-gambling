@@ -1,8 +1,8 @@
 class_name PhaseMachine
 extends RefCounted
-## Drives LOBBY → INTRO → CASINO ⇄ (PRE_MINIGAME → MINIGAME → REWARDS) → RESULTS (§3.6).
-## Casino time only advances in CASINO. Pure: the MatchServer feeds `advance(delta)` and reacts to
-## the returned transitions.
+## Drives LOBBY → INTRO → CASINO ⇄ (PRE_MINIGAME → MINIGAME → REWARDS → REGROUP) → RESULTS (§3.6).
+## Casino time only advances in CASINO (and the PRE_MINIGAME warning). Pure: the MatchServer feeds
+## `advance(delta)` and reacts to the returned transitions.
 
 signal phase_changed(from: Phase.Id, to: Phase.Id)
 
@@ -12,16 +12,19 @@ const PRE_MINIGAME_SECONDS: float = 10.0
 var phase: Phase.Id = Phase.Id.LOBBY
 var schedule: MatchSchedule
 var casino_time: float = 0.0
-## Seconds left in the current timed phase (intro, warning).
+## Seconds left in the current timed phase (intro, warning, regroup).
 var phase_timer: float = 0.0
 var minigames_done: int = 0
 var last_call_announced: bool = false
 ## Set by the server while a minigame or reward phase is running; the machine waits for it.
 var waiting_external: bool = false
+## Seconds everyone waits in the entrance hall after the rewards (`BalanceConfig.regroup_time`).
+var regroup_seconds: float = 5.0
 
 
-func _init(p_schedule: MatchSchedule) -> void:
+func _init(p_schedule: MatchSchedule, p_regroup_seconds: float = 5.0) -> void:
 	schedule = p_schedule
+	regroup_seconds = p_regroup_seconds
 
 
 ## Starts the match: LOBBY → INTRO.
@@ -31,7 +34,7 @@ func start() -> void:
 
 
 ## Advances time. Returns a list of notifications: &"last_call", &"segment_ended", &"minigame_due",
-## &"minigame_started", &"rewards_started", &"casino_resumed", &"match_over".
+## &"minigame_started", &"match_over".
 func advance(delta: float) -> Array[StringName]:
 	var out: Array[StringName] = []
 	match phase:
@@ -59,10 +62,14 @@ func advance(delta: float) -> Array[StringName]:
 			casino_time += step
 			phase_timer -= delta
 			if phase_timer <= 0.0:
-				out.append(&"segment_ended")
 				_go(Phase.Id.MINIGAME)
 				waiting_external = true
+				out.append(&"segment_ended")
 				out.append(&"minigame_started")
+		Phase.Id.REGROUP:
+			phase_timer -= delta
+			if phase_timer <= 0.0:
+				_go(Phase.Id.CASINO)
 		Phase.Id.MINIGAME, Phase.Id.REWARDS:
 			pass  # waits for minigame_finished / rewards_finished
 	return out
@@ -76,12 +83,13 @@ func minigame_finished() -> void:
 	_go(Phase.Id.REWARDS)
 
 
-## Called by the server when the reward draft is over.
+## Called by the server when the reward reveal is over: everyone regroups in the entrance hall.
 func rewards_finished() -> void:
 	if phase != Phase.Id.REWARDS:
 		return
 	waiting_external = false
-	_go(Phase.Id.CASINO)
+	phase_timer = regroup_seconds
+	_go(Phase.Id.REGROUP)
 
 
 ## Current casino segment index.

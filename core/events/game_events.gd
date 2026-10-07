@@ -34,6 +34,12 @@ const SCHEMA: Dictionary = {
 	&"rps_cancelled": ["duel", "a", "b", "reason"],
 	&"shop_restocked": ["offers"],
 	&"shop_bought": ["player", "item", "price"],
+	&"bets_refunded": ["station", "player", "amount"],
+	&"table_reset": ["station"],
+	&"regroup_started": ["seconds", "positions"],
+	&"rewards_started": ["rewards", "seconds"],
+	&"house_comp": ["player", "amount"],
+	&"match_started": ["minigames", "gamble_s", "duration_s"],
 }
 
 

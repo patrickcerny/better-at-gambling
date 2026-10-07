@@ -1,7 +1,8 @@
 class_name MatchSchedule
 extends RefCounted
-## Casino-time schedule for a match duration (§2.1): segment = duration / (minigames + 1),
-## quizzes at each segment boundary, Last Call in the final `last_call_seconds`.
+## Casino-time schedule (§2.1, Patrick's note #12): the host picks a number of minigames and the
+## gambling time between them. Segments = minigames + 1 (a last gambling stretch follows the final
+## minigame; Last Call is its final `last_call_seconds`), duration = gamble_s × (minigames + 1).
 
 var duration_s: float
 var minigames: int
@@ -9,16 +10,11 @@ var segment_s: float
 var last_call_s: float
 
 
-func _init(duration_minutes: int, presets: MatchPresets, last_call_seconds: float = 60.0) -> void:
-	duration_s = duration_minutes * 60.0
-	minigames = int(presets.minigames_by_duration.get(duration_minutes, 0))
-	segment_s = duration_s / float(minigames + 1)
+func _init(p_minigames: int, gamble_s: float, last_call_seconds: float = 60.0) -> void:
+	minigames = maxi(p_minigames, 0)
+	segment_s = maxf(gamble_s, 1.0)
+	duration_s = segment_s * float(minigames + 1)
 	last_call_s = last_call_seconds
-
-
-## True if the preset table knows this duration.
-static func is_valid_duration(duration_minutes: int, presets: MatchPresets) -> bool:
-	return presets.minigames_by_duration.has(duration_minutes)
 
 
 ## Casino times (seconds) at which minigames start.

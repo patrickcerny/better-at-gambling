@@ -19,9 +19,9 @@ shot roulette 420 --dummies 3 --seed 3 --autosit roulette_1
 shot slots 420 --dummies 3 --seed 3 --autosit slot_8
 shot plinko 420 --dummies 3 --seed 3 --autosit plinko_1
 shot vip_blackjack 420 --dummies 3 --seed 3 --autosit vip_blackjack_1
-shot quiz_question 200 --dummies 3 --seed 3 --skip-to 100 --duration 5
-shot results 240 --dummies 3 --seed 3 --skip-to 300 --duration 5
-shot quiz_end 400 --dummies 3 --seed 3 --skip-to 100 --duration 5
+shot quiz_question 200 --dummies 3 --seed 3 --skip-to 100 --minigames 2 --gamble-seconds 100
+shot results 240 --dummies 3 --seed 3 --skip-to 300 --minigames 2 --gamble-seconds 100
+shot quiz_end 400 --dummies 3 --seed 3 --skip-to 100 --minigames 2 --gamble-seconds 100
 shot pause_menu 90 --dummies 3 --seed 3 --pause-menu
 shot items 760 --dummies 3 --seed 3 --third-person --autoplay --give-items lucky_clover,black_cat,banana_peel
 # 2D screens with made-up state (theme pass): lobby panel, gift shop, reward draft, settings, online menu, loading.

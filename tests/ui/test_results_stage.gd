@@ -6,7 +6,7 @@ var stage: ResultsStage
 
 func _state(n: int) -> ClientMatchState:
 	var st := ClientMatchState.new()
-	st.duration_minutes = 5
+	st.duration_s = 300.0
 	var rows: Array = []
 	for i: int in n:
 		var pid: int = i + 1

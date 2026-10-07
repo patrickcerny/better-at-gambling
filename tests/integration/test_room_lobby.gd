@@ -9,7 +9,7 @@ var events: Array[Dictionary] = []
 func before_each() -> void:
 	events.clear()
 	server = MatchServer.new()
-	server.configure({"duration": 5, "seed": 3}, Registry.balance, Registry.presets, Registry.game_logic_scripts(), Registry.maps[&"lucky_lounge"])
+	server.configure({"minigames": 2, "seed": 3}, Registry.balance, Registry.presets, Registry.game_logic_scripts(), Registry.maps[&"lucky_lounge"])
 	server.event_emitted.connect(func(ev: Dictionary) -> void: events.append(ev))
 	server.open_lobby()
 
@@ -71,8 +71,10 @@ func test_leader_settings_ready_countdown_and_start() -> void:
 	var a: int = server.add_player("dev:a", "A")
 	var b: int = server.add_player("dev:b", "B")
 	assert_eq(server.lobby.leader(), a)
-	assert_eq(_intent(b, &"lobby_setting", {"key": "duration", "value": 15})["error"], &"not_leader")
-	assert_true(_intent(a, &"lobby_setting", {"key": "duration", "value": 15})["ok"])
+	assert_eq(_intent(b, &"lobby_setting", {"key": "minigames", "value": 4})["error"], &"not_leader")
+	assert_true(_intent(a, &"lobby_setting", {"key": "minigames", "value": 4})["ok"])
+	assert_true(_intent(a, &"lobby_setting", {"key": "gamble_minutes", "value": 2})["ok"])
+	assert_eq(_intent(a, &"lobby_setting", {"key": "gamble_minutes", "value": 9})["error"], &"bad_value")
 	assert_eq(server.submit_intent(a, {"type": &"add_bot"})["error"], &"malformed", "the game has no bots")
 	assert_eq(_intent(a, &"place_bet", {"station": &"slot_1", "bet": {"amount": 10}})["error"], &"wrong_phase", "no gambling in the lobby")
 	_intent(a, &"set_ready", {"ready": true})
@@ -87,7 +89,11 @@ func test_leader_settings_ready_countdown_and_start() -> void:
 	server.report_on_pad(b, true)
 	_tick(LobbyController.COUNTDOWN_SECONDS + 0.5)
 	assert_eq(_of(&"match_started").size(), 1)
-	assert_eq(int(_of(&"match_started")[0]["duration"]), 15, "the leader's duration applies")
+	var started: Dictionary = _of(&"match_started")[0]
+	assert_eq(int(started["minigames"]), 4, "the leader's match length applies")
+	assert_almost_eq(float(started["gamble_s"]), 120.0, 0.001)
+	assert_almost_eq(float(started["duration_s"]), 600.0, 0.001, "2 min × (4 minigames + the last stretch)")
+	assert_eq(server.schedule.minigames, 4)
 	assert_ne(server.phases.phase, Phase.Id.LOBBY)
 
 

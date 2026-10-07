@@ -7,7 +7,7 @@ const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice", "Big Wendy", "
 
 func _ready() -> void:
 	var st := ClientMatchState.new()
-	st.duration_minutes = 10
+	st.duration_s = 600.0
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var rows: Array = []

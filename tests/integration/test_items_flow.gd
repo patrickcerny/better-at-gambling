@@ -6,7 +6,7 @@ var fx: ServerFixture
 
 
 func before_each() -> void:
-	fx = ServerFixture.new(2, {"duration": 5, "seed": 21})
+	fx = ServerFixture.new(2, {"minigames": 2, "gamble_seconds": 100.0, "seed": 21})
 
 
 func after_each() -> void:
@@ -84,12 +84,17 @@ func test_bodyguard_absorbs_a_knockout_from_an_item_user() -> void:
 	assert_true(fx.server.report_knockout(b, a, &"thrown"), "only once")
 
 
-func test_reward_draft_fills_inventories_and_asks_when_full() -> void:
+func test_rewards_fill_inventories_and_ask_when_full() -> void:
 	_start()
 	var a: int = fx.player_ids[0]
+	var b: int = fx.player_ids[1]
 	_give(a, [&"lucky_clover", &"black_cat", &"mirror"])
 	fx.server.run_to_end(200.0)  # through the first quiz and its rewards
-	assert_gt(fx.of_type(&"draft_result").size(), 0)
+	var started: Array[Dictionary] = fx.of_type(&"rewards_started")
+	assert_gt(started.size(), 0)
+	for row: Dictionary in started[0]["rewards"]:
+		assert_true(Registry.items.has(StringName(row["item"])), "everyone gets one item")
+	assert_eq(fx.server.state.players[b].inventory.size(), 1, "B's item landed in the inventory")
 	var full: Array[Dictionary] = fx.of_type(&"discard_needed").filter(func(e: Dictionary) -> bool: return e["player"] == a)
 	assert_gt(full.size(), 0, "a full inventory asks what to drop")
 	assert_eq(fx.server.state.players[a].inventory.size(), 3)

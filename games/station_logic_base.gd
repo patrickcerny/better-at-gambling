@@ -26,6 +26,8 @@ var global_multiplier: float = 1.0
 var hot_multiplier: float = 1.0
 ## Outgoing events since last drain.
 var events: Array[Dictionary] = []
+## Part of the last stake `_take_stake` took that Fake Cash paid for (never refunded).
+var last_covered: int = 0
 
 
 ## Wires dependencies. Call once after construction.
@@ -86,8 +88,14 @@ func has_stake(_player: int) -> bool:
 	return false
 
 
-## Resolves everything open right now (phase end).
+## Resolves everything open right now (end of the match).
 func auto_resolve() -> void:
+	pass
+
+
+## A minigame starts (Patrick's note #9): every open bet goes back to its owner, no loss and no
+## win, and the table resets. Only the part the player paid comes back (never the Fake Cash part).
+func refund_all() -> void:
 	pass
 
 
@@ -147,14 +155,33 @@ const COLLAR_SHARE: float = 0.15
 ## next stake; whether the bouncer noticed is in the `fake_cash_used` event (the MatchServer fines
 ## and throws out a caught player).
 func _take_stake(player: int, amount: int) -> bool:
+	last_covered = 0
 	if modifiers.has_flag(player, &"fake_cash"):
 		var covered: int = mini(amount, scaled(FAKE_CASH_CAP))
 		if economy.balance(player) < amount - covered:
 			return false
 		modifiers.consume_flag(player, &"fake_cash")
 		economy.apply(player, covered, &"item_fake_cash", station_id)
+		last_covered = covered
 		events.append(GameEvents.make(&"fake_cash_used", {"player": player, "station": station_id, "amount": covered, "caught": rng.chance(FAKE_CASH_CAUGHT)}))
 	return economy.apply(player, -amount, StringName("bet_" + game_id), station_id)
+
+
+## Gives back what a player paid for an unsettled stake (`stake` minus the Fake Cash `covered`
+## part) with reason `bet_refunded`. Adds it to `totals` (player → refunded so far).
+func _refund(player: int, stake: int, covered: int, totals: Dictionary) -> void:
+	var back: int = maxi(stake - covered, 0)
+	if back > 0:
+		economy.apply(player, back, &"bet_refunded", station_id)
+	totals[player] = int(totals.get(player, 0)) + back
+
+
+## One `bets_refunded {station, player, amount}` per player in `totals` (player → amount), then
+## `table_reset {station}` so clients clear chips and cards.
+func _emit_refunds(totals: Dictionary) -> void:
+	for p: Variant in totals:
+		events.append(GameEvents.make(&"bets_refunded", {"station": station_id, "player": int(p), "amount": int(totals[p])}))
+	events.append(GameEvents.make(&"table_reset", {"station": station_id}))
 
 
 ## Pays out a settled bet. `base_return` is what the game pays before multipliers (0 = loss,

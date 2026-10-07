@@ -28,7 +28,7 @@ var last_call_banner: Label
 var pops: Control
 ## Item activation banner (centre-top).
 var item_banner: Label
-## Under the timer: "QUIZ IN 1:12".
+## Under the timer: "MINIGAME IN 1:12".
 var next_quiz_label: Label
 ## Centre warning during the 10 s before a minigame.
 var minigame_warning: Label
@@ -185,12 +185,15 @@ func _update_countdowns() -> void:
 	next_quiz_label.visible = casino and nm >= 0.0
 	if next_quiz_label.visible:
 		var n: int = ceili(nm)
-		next_quiz_label.text = "QUIZ IN %d:%02d" % [n / 60, n % 60]
+		next_quiz_label.text = "MINIGAME IN %d:%02d" % [n / 60, n % 60]
 	var warn: bool = state.phase == Phase.Id.PRE_MINIGAME
-	minigame_warning.visible = warn
-	if warn:
+	var regroup: bool = state.phase == Phase.Id.REGROUP and state.regroup_in >= 0.0
+	minigame_warning.visible = warn or regroup
+	if regroup:
+		minigame_warning.text = "Everyone back in the hall!  Doors open in %d…" % maxi(ceili(state.regroup_in), 1)
+	elif warn:
 		var sec: int = ceili(maxf(nm, 0.0))
-		minigame_warning.text = "QUIZ TIME in %d…  Tables closing!" % sec
+		minigame_warning.text = "MINIGAME in %d…  Tables closing!" % sec
 		if sec != _last_warning_second and sec > 0:
 			_last_warning_second = sec
 			Audio.play(&"countdown_beep", &"UI", -12.0, 1.0 + (10 - sec) * 0.03)

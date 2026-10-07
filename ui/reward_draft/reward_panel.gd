@@ -1,25 +1,27 @@
 class_name RewardPanel
 extends Control
-## The reward phase after a minigame (§2.10): everyone's placement and cash, and the local
-## player's item draft (pick 1 of the offered items with a click or 1-3, 8 s, default = first).
-## Offers arrive as private data; picks go out as `draft_pick` intents.
+## "ROUND RESULTS" after a minigame (§2.10, Patrick's note #11): no draft. One row per player in
+## placement order; the rows flip their item card one after another while the cash counts up, and
+## a broke player's House Comp shows on their row ("Lucky slips you $300"). Purely a display of
+## the public `rewards_started` rows; it never takes input, so the inventory-full discard choice
+## (keys 1-4, handled by the ItemController) shows on top of it without being blocked.
 
 const RARITY_COLORS: Array[Color] = [Palette.CREAM, Color("#6FA8DC"), Palette.VIP_GOLD]
 const RARITY_NAMES: Array[String] = ["COMMON", "RARE", "LEGENDARY"]
+## Seconds before the first row flips, and how long the cash takes to count up.
+const FIRST_FLIP: float = 0.5
+const COUNT_UP: float = 0.6
 
 var state: ClientMatchState
 var local_id: int = -1
 var rows_box: VBoxContainer
-var draft_box: VBoxContainer
-var choices_row: HBoxContainer
-var draft_title: Label
-var bonus_label: Label
 var timer_label: Label
-var result_label: Label
+var discard_label: Label
 var time_left: float = 0.0
-var _offer_key: String = ""
-var _picked: int = -1
-var _choice_buttons: Array[Button] = []
+## Per row: {data, card: Label, rarity: Label, cash: Label, comp: Label, flip_at: float, flipped: bool}.
+var _rows: Array[Dictionary] = []
+var _clock: float = 0.0
+var _poll: float = 0.0
 
 
 func _ready() -> void:
@@ -34,167 +36,160 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	local_id = p_local_id
 
 
-## Shows the reward table from `rewards_started` ([{player, placement, cash, draft, bonus_count}]).
-func open(rewards: Array, seconds: float) -> void:
+## Shows the rows from `rewards_started` ([{player, placement, cash, item, bonus?, comp?}]).
+## `instant`: everything already revealed (joining in the middle of the reveal).
+func open(rewards: Array, seconds: float, instant: bool = false) -> void:
 	visible = true
 	time_left = seconds
-	_offer_key = ""
-	_picked = -1
-	result_label.text = ""
-	draft_box.visible = false
+	_clock = 0.0
+	_rows.clear()
+	discard_label.text = ""
 	for c: Node in rows_box.get_children():
 		c.queue_free()
 	var sorted: Array = rewards.duplicate()
 	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["placement"]) < int(b["placement"]))
-	for r: Variant in sorted:
-		var row: Dictionary = r
-		var framed := PanelContainer.new()
-		framed.theme_type_variation = &"RowPanelHighlight" if int(row["player"]) == local_id else &"RowPanel"
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override(&"separation", 18)
-		framed.add_child(h)
-		var place := Label.new()
-		place.text = Hud._ordinal(int(row["placement"]))
-		place.custom_minimum_size = Vector2(70, 0)
-		place.add_theme_color_override(&"font_color", Palette.VIP_GOLD if int(row["placement"]) == 1 else Palette.CREAM)
-		h.add_child(place)
-		var dot := ColorRect.new()
-		dot.custom_minimum_size = Vector2(18, 18)
-		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		dot.color = Palette.player_color(int(state.players.get(int(row["player"]), {}).get("color", 0)))
-		h.add_child(dot)
-		var n := Label.new()
-		n.text = state.player_name(int(row["player"]))
-		n.custom_minimum_size = Vector2(260, 0)
-		if int(row["player"]) == local_id:
-			n.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-		h.add_child(n)
-		var cash := Label.new()
-		cash.theme_type_variation = &"MoneyLabel"
-		cash.text = "+$%s" % Hud._thousands(int(row["cash"])) if int(row["cash"]) > 0 else ""
-		cash.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
-		cash.add_theme_font_size_override(&"font_size", 36)
-		cash.custom_minimum_size = Vector2(150, 0)
-		h.add_child(cash)
-		var extra := Label.new()
-		extra.theme_type_variation = &"SmallLabel"
-		var bits: PackedStringArray = []
-		if bool(row.get("draft", false)):
-			bits.append("item pick")
-		if int(row.get("bonus_count", 0)) > 0:
-			bits.append("+%d bonus item%s" % [int(row["bonus_count"]), "s" if int(row["bonus_count"]) > 1 else ""])
-		extra.text = " · ".join(bits)
-		extra.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		h.add_child(extra)
-		rows_box.add_child(framed)
-	Audio.play(&"coin", &"UI", -6.0)
+	var step: float = Registry.balance.reward_row_time
+	for i: int in sorted.size():
+		var row: Dictionary = sorted[i]
+		var r: Dictionary = _build_row(row)
+		r["flip_at"] = -1.0 if instant else FIRST_FLIP + step * i
+		_rows.append(r)
+		if instant:
+			_flip(r, false)
+	Audio.play(&"whoosh", &"UI", -8.0)
 
 
 func close() -> void:
 	visible = false
-
-
-## Our own draft result (`draft_result` for the local player).
-func show_result(items: Array, kept: Array) -> void:
-	var names: PackedStringArray = []
-	for id: Variant in items:
-		names.append(item_name(StringName(id)))
-	result_label.text = "You got: %s" % ", ".join(names) if not names.is_empty() else ""
-	if kept.size() < items.size():
-		result_label.text += "  (inventory full: %d dropped)" % (items.size() - kept.size())
+	_rows.clear()
 
 
 func _process(delta: float) -> void:
 	if not visible:
 		return
+	_clock += delta
 	time_left = maxf(time_left - delta, 0.0)
 	timer_label.text = "%d" % ceili(time_left) if time_left > 0.0 else ""
-	var priv: Dictionary = Net.request_private_snapshot()
-	var draft: Dictionary = priv.get("draft", {})
-	var key: String = str(draft.get("choices", [])) + str(draft.get("bonus", []))
-	if not draft.is_empty() and key != _offer_key:
-		_offer_key = key
-		_show_offer(draft)
-	if not draft.is_empty() and int(draft.get("pick", -1)) >= 0 and _picked < 0:
-		_mark_pick(int(draft["pick"]))
+	for r: Dictionary in _rows:
+		if not bool(r["flipped"]) and _clock >= float(r["flip_at"]):
+			_flip(r, true)
+		if bool(r["flipped"]):
+			var cash: int = int(r["data"].get("cash", 0))
+			var t: float = clampf((_clock - float(r["flip_at"])) / COUNT_UP, 0.0, 1.0) if float(r["flip_at"]) >= 0.0 else 1.0
+			(r["cash"] as Label).text = "+$%s" % Hud._thousands(int(round(cash * t))) if cash > 0 else ""
+	_poll += delta
+	if _poll >= 0.25:
+		_poll = 0.0
+		discard_label.text = discard_text(Net.request_private_snapshot().get("items", {}), _inventory())
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not visible or _choice_buttons.is_empty() or _picked >= 0:
-		return
-	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
-		var i: int = (event as InputEventKey).keycode - KEY_1
-		if i >= 0 and i < _choice_buttons.size():
-			_pick(i)
-			get_viewport().set_input_as_handled()
-	elif event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
-		var i: int = [JOY_BUTTON_A, JOY_BUTTON_B, JOY_BUTTON_X].find((event as InputEventJoypadButton).button_index)
-		if i >= 0 and i < _choice_buttons.size():
-			_pick(i)
-			get_viewport().set_input_as_handled()
+## "INVENTORY FULL" line while the server waits for the local player's discard choice ("" if none).
+static func discard_text(items_priv: Dictionary, inventory: Array) -> String:
+	var d: Dictionary = items_priv.get("discard", {})
+	if d.is_empty():
+		return ""
+	var parts: PackedStringArray = []
+	for i: int in inventory.size():
+		parts.append("[%d] %s" % [i + 1, item_name(StringName(inventory[i]))])
+	parts.append("[4] new %s" % item_name(StringName(d.get("item", ""))))
+	return "INVENTORY FULL: drop one (%ds)   %s" % [ceili(float(d.get("left", 0.0))), "   ".join(parts)]
 
 
-func _show_offer(draft: Dictionary) -> void:
-	draft_box.visible = true
-	for c: Node in choices_row.get_children():
-		c.queue_free()
-	_choice_buttons.clear()
-	var choices: Array = draft.get("choices", [])
-	draft_title.text = "PICK YOUR REWARD" if not choices.is_empty() else "YOUR ITEMS"
-	for i: int in choices.size():
-		var id: StringName = StringName(choices[i])
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(300, 170)
-		b.focus_mode = Control.FOCUS_NONE
-		b.pressed.connect(_pick.bind(i))
-		var v := VBoxContainer.new()
-		v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		v.offset_left = 14
-		v.offset_right = -14
-		v.offset_top = 10
-		v.offset_bottom = -10
-		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(v)
-		var rarity: int = item_rarity(id)
-		var r := Label.new()
-		r.theme_type_variation = &"SmallLabel"
-		r.text = "%d · %s" % [i + 1, RARITY_NAMES[rarity]]
-		r.add_theme_color_override(&"font_color", RARITY_COLORS[rarity])
-		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(r)
-		var n := Label.new()
-		n.theme_type_variation = &"HeadingLabel"
-		n.text = item_name(id)
-		n.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(n)
-		var d := Label.new()
-		d.theme_type_variation = &"SmallLabel"
-		d.text = item_description(id)
-		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(d)
-		choices_row.add_child(b)
-		_choice_buttons.append(b)
-	var bonus: Array = draft.get("bonus", [])
-	var names: PackedStringArray = []
-	for id: Variant in bonus:
-		names.append(item_name(StringName(id)))
-	bonus_label.text = ("Bonus: %s" % ", ".join(names)) if not names.is_empty() else ""
+func _inventory() -> Array:
+	if state == null:
+		return []
+	return state.players.get(local_id, {}).get("inventory", [])
 
 
-func _pick(i: int) -> void:
-	if _picked >= 0:
-		return
-	_mark_pick(i)
-	Audio.play(&"ui_click", &"UI", -4.0)
-	Net.send_intent(Intents.make(&"draft_pick", {"choice": i}))
+func _flip(r: Dictionary, sound: bool) -> void:
+	r["flipped"] = true
+	var data: Dictionary = r["data"]
+	var item: StringName = StringName(data.get("item", &""))
+	var card: Label = r["card"]
+	var rarity_label: Label = r["rarity"]
+	if item == &"":
+		card.text = "—"
+		rarity_label.text = ""
+	else:
+		var rarity: int = item_rarity(item)
+		card.text = item_name(item)
+		card.add_theme_color_override(&"font_color", RARITY_COLORS[rarity])
+		rarity_label.text = RARITY_NAMES[rarity]
+		rarity_label.add_theme_color_override(&"font_color", RARITY_COLORS[rarity])
+		var bonus: StringName = StringName(data.get("bonus", &""))
+		if bonus != &"":
+			rarity_label.text += "  + UNDERDOG %s" % item_name(bonus).to_upper()
+	var comp: int = int(data.get("comp", 0))
+	(r["comp"] as Label).text = "Lucky slips you $%s" % Hud._thousands(comp) if comp > 0 else ""
+	var card_box: Control = card.get_parent().get_parent()
+	card_box.pivot_offset = card_box.size * 0.5
+	card_box.scale = Vector2(0.0, 1.0)
+	var tw: Tween = create_tween()
+	tw.tween_property(card_box, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if sound:
+		Audio.play(&"ui_click", &"UI", -6.0)
+		if int(data.get("cash", 0)) > 0 or comp > 0:
+			Audio.play(&"coin", &"UI", -8.0 if int(data.get("player", -1)) != local_id else -3.0)
 
 
-func _mark_pick(i: int) -> void:
-	_picked = i
-	for j: int in _choice_buttons.size():
-		_choice_buttons[j].disabled = j != i
-		_choice_buttons[j].modulate = Color.WHITE if j == i else Color(1, 1, 1, 0.4)
+func _build_row(row: Dictionary) -> Dictionary:
+	var pid: int = int(row["player"])
+	var framed := PanelContainer.new()
+	framed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	framed.theme_type_variation = &"RowPanelHighlight" if pid == local_id else &"RowPanel"
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override(&"separation", 16)
+	framed.add_child(h)
+	var place := Label.new()
+	place.text = Hud._ordinal(int(row["placement"]))
+	place.custom_minimum_size = Vector2(64, 0)
+	place.add_theme_color_override(&"font_color", Palette.VIP_GOLD if int(row["placement"]) == 1 else Palette.CREAM)
+	h.add_child(place)
+	var dot := ColorRect.new()
+	dot.custom_minimum_size = Vector2(18, 18)
+	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	dot.color = Palette.player_color(int(state.players.get(pid, {}).get("color", 0))) if state != null else Palette.CREAM
+	h.add_child(dot)
+	var n := Label.new()
+	n.text = state.player_name(pid) if state != null else "Player"
+	n.custom_minimum_size = Vector2(210, 0)
+	n.clip_text = true
+	if pid == local_id:
+		n.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	h.add_child(n)
+	var cash := Label.new()
+	cash.theme_type_variation = &"MoneyLabel"
+	cash.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
+	cash.add_theme_font_size_override(&"font_size", 32)
+	cash.custom_minimum_size = Vector2(130, 0)
+	h.add_child(cash)
+	# The item card: face down ("?") until its row flips.
+	var card_box := PanelContainer.new()
+	card_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_box.theme_type_variation = &"RowPanel"
+	card_box.custom_minimum_size = Vector2(300, 0)
+	var cv := VBoxContainer.new()
+	cv.add_theme_constant_override(&"separation", 0)
+	card_box.add_child(cv)
+	var card := Label.new()
+	card.theme_type_variation = &"HeadingLabel"
+	card.text = "?"
+	card.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cv.add_child(card)
+	var rarity := Label.new()
+	rarity.theme_type_variation = &"SmallLabel"
+	rarity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cv.add_child(rarity)
+	h.add_child(card_box)
+	var comp := Label.new()
+	comp.theme_type_variation = &"SmallLabel"
+	comp.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	comp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	comp.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	comp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(comp)
+	rows_box.add_child(framed)
+	return {"data": row, "card": card, "rarity": rarity, "cash": cash, "comp": comp, "flip_at": 0.0, "flipped": false}
 
 
 static func item_name(id: StringName) -> String:
@@ -215,13 +210,14 @@ static func item_rarity(id: StringName) -> int:
 func _build() -> void:
 	theme = load("res://ui/theme/main_theme.tres") as Theme
 	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.anchor_left = 0.5
 	panel.anchor_right = 0.5
 	panel.anchor_top = 0.5
 	panel.anchor_bottom = 0.5
-	panel.offset_left = -520
-	panel.offset_right = 520
+	panel.offset_left = -560
+	panel.offset_right = 560
 	panel.offset_top = -320
 	panel.offset_bottom = 320
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -234,7 +230,7 @@ func _build() -> void:
 	v.add_child(top)
 	var title := Label.new()
 	title.theme_type_variation = &"TitleLabel"
-	title.text = "QUIZ RESULTS"
+	title.text = "ROUND RESULTS"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
 	timer_label = Label.new()
@@ -244,19 +240,8 @@ func _build() -> void:
 	rows_box = VBoxContainer.new()
 	rows_box.add_theme_constant_override(&"separation", 4)
 	v.add_child(rows_box)
-	draft_box = VBoxContainer.new()
-	draft_box.visible = false
-	v.add_child(draft_box)
-	draft_title = Label.new()
-	draft_title.theme_type_variation = &"HeadingLabel"
-	draft_title.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-	draft_box.add_child(draft_title)
-	choices_row = HBoxContainer.new()
-	choices_row.add_theme_constant_override(&"separation", 16)
-	draft_box.add_child(choices_row)
-	bonus_label = Label.new()
-	bonus_label.theme_type_variation = &"SmallLabel"
-	draft_box.add_child(bonus_label)
-	result_label = Label.new()
-	result_label.theme_type_variation = &"HeadingLabel"
-	v.add_child(result_label)
+	discard_label = Label.new()
+	discard_label.theme_type_variation = &"HeadingLabel"
+	discard_label.add_theme_color_override(&"font_color", Palette.LOSS_RED)
+	discard_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(discard_label)

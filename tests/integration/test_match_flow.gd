@@ -11,8 +11,9 @@ func after_each() -> void:
 		fx = null
 
 
-func _fixture(players: int, duration: int, seed_value: int = 1) -> void:
-	fx = ServerFixture.new(players, {"duration": duration, "seed": seed_value})
+## `minigames` and the gambling seconds before each (Patrick's note #12).
+func _fixture(players: int, minigames: int, gamble_s: float, seed_value: int = 1) -> void:
+	fx = ServerFixture.new(players, {"minigames": minigames, "gamble_seconds": gamble_s, "seed": seed_value})
 
 
 ## Steps until `cond` holds (or `max_seconds` of game time pass). Returns whether it held.
@@ -25,8 +26,8 @@ func _step_until(cond: Callable, max_seconds: float = 2000.0) -> bool:
 	return cond.call()
 
 
-func test_quizzes_follow_the_schedule_for_5_and_30_minutes() -> void:
-	_fixture(2, 5)
+func test_minigames_follow_the_schedule() -> void:
+	_fixture(2, 2, 100.0)
 	fx.server.start_match()
 	fx.server.run_to_end()
 	assert_eq(fx.of_type(&"minigame_started").size(), 2)
@@ -34,7 +35,7 @@ func test_quizzes_follow_the_schedule_for_5_and_30_minutes() -> void:
 	assert_almost_eq(float(mg[0]), 100.0, 0.06)
 	assert_almost_eq(float(mg[1]), 200.0, 0.06)
 	fx.server.free()
-	_fixture(2, 30)
+	_fixture(2, 7, 225.0)
 	fx.server.start_match()
 	fx.server.run_to_end()
 	assert_eq(fx.of_type(&"minigame_started").size(), 7)
@@ -44,7 +45,7 @@ func test_quizzes_follow_the_schedule_for_5_and_30_minutes() -> void:
 
 
 func test_last_call_only_in_the_final_minute() -> void:
-	_fixture(2, 5)
+	_fixture(2, 2, 100.0)
 	fx.server.start_match()
 	var seen_at: Array[float] = []
 	fx.server.event_emitted.connect(func(ev: Dictionary) -> void:
@@ -60,7 +61,7 @@ func test_last_call_only_in_the_final_minute() -> void:
 
 
 func test_hot_table_rotates_on_casino_time() -> void:
-	_fixture(2, 5)
+	_fixture(2, 2, 100.0)
 	fx.server.start_match()
 	var starts: Array[float] = []
 	fx.server.event_emitted.connect(func(ev: Dictionary) -> void:
@@ -81,7 +82,7 @@ func test_hot_table_rotates_on_casino_time() -> void:
 
 
 func test_house_comp_once_per_segment_and_not_with_money_in_play() -> void:
-	_fixture(2, 5)
+	_fixture(2, 2, 100.0)
 	fx.server.start_match()
 	fx.run(3.1)
 	fx.place_all()
@@ -96,7 +97,8 @@ func test_house_comp_once_per_segment_and_not_with_money_in_play() -> void:
 	var comps: Array[Dictionary] = fx.of_type(&"house_comp")
 	assert_eq(comps.size(), 1)
 	assert_eq(comps[0]["player"], a)
-	assert_eq(fx.server.economy.balance(a), 155)
+	assert_eq(comps[0]["amount"], 300, "Patrick: $300 before the first minigame")
+	assert_eq(fx.server.economy.balance(a), 305)
 	fx.server.economy.apply(a, -150, &"test")
 	fx.run(1.0)
 	assert_eq(fx.of_type(&"house_comp").size(), 1, "only once per segment")
@@ -108,11 +110,12 @@ func test_house_comp_once_per_segment_and_not_with_money_in_play() -> void:
 	fx.server.economy.apply(a, -fx.server.economy.balance(a), &"test")
 	fx.run(0.1)
 	assert_eq(fx.of_type(&"house_comp").filter(func(e: Dictionary) -> bool: return e["player"] == a).size(), 2, "new segment, new comp")
-	assert_eq(fx.of_type(&"house_comp").back()["amount"], 150)
+	assert_eq(fx.of_type(&"house_comp").back()["amount"], 450, "$450 after one minigame")
+	assert_eq(int(fx.server.stats[a]["comps"]), 2, "the comps stat counts (Comeback award)")
 
 
 func test_tables_close_before_the_quiz() -> void:
-	_fixture(2, 5)
+	_fixture(2, 2, 100.0)
 	fx.server.start_match()
 	fx.run(3.1)
 	fx.place_all()
@@ -128,7 +131,7 @@ func test_tables_close_before_the_quiz() -> void:
 
 
 func test_standings_tiebreakers() -> void:
-	_fixture(3, 5)
+	_fixture(3, 2, 100.0)
 	var ids: Array[int] = fx.player_ids
 	fx.server.state.players[ids[0]].quiz_points = 100
 	fx.server.state.players[ids[1]].quiz_points = 900
@@ -148,7 +151,7 @@ func test_standings_tiebreakers() -> void:
 
 
 func test_secrets_never_in_snapshots_or_events_during_a_full_match() -> void:
-	_fixture(2, 5)
+	_fixture(2, 2, 100.0)
 	fx.server.start_match()
 	var leaks: Array[String] = []
 	fx.server.event_emitted.connect(func(ev: Dictionary) -> void:
@@ -165,8 +168,8 @@ func test_secrets_never_in_snapshots_or_events_during_a_full_match() -> void:
 				leaks.append("snapshot")
 			checked += 1
 		if fx.server.phases.phase == Phase.Id.REWARDS:
-			if JSON.stringify(fx.server.get_snapshot()).contains("choices"):
-				leaks.append("draft offers in public snapshot")
+			if JSON.stringify(fx.server.get_private_snapshot(fx.player_ids[0])).contains("draft"):
+				leaks.append("a draft in the private snapshot")
 	assert_gt(checked, 100)
 	assert_eq(leaks, [] as Array[String])
 
@@ -211,7 +214,7 @@ func test_play_again_in_the_same_room() -> void:
 
 
 func test_money_history_covers_the_match_for_the_results_graph() -> void:
-	_fixture(3, 5)
+	_fixture(3, 2, 100.0)
 	var ids: Array = fx.server.state.players.keys()
 	var start: int = fx.server.balance.start_money
 	fx.server.start_match()
@@ -235,9 +238,114 @@ func test_money_history_covers_the_match_for_the_results_graph() -> void:
 
 
 func test_money_history_stays_small_in_long_matches() -> void:
-	_fixture(2, 30)
+	_fixture(2, 7, 225.0)
 	fx.server.start_match()
 	fx.server.run_to_end()
 	var row: Dictionary = fx.of_type(&"match_ended")[0]["standings"][0]
 	assert_lte((row["series"] as Array).size(), MoneyHistory.MAX_SAMPLES + 2)
 	assert_eq(int(row["series"][-1]), int(row["money"]))
+
+
+func test_minigame_start_refunds_everything_and_stands_everyone_up() -> void:
+	# Patrick's notes #9 and #21: open bets come back (no loss, no win) and nobody stays seated.
+	_fixture(3, 2, 100.0)
+	fx.server.start_match()
+	fx.run(3.1)
+	fx.place_all()
+	var a: int = fx.player_ids[0]
+	var b: int = fx.player_ids[1]
+	var c: int = fx.player_ids[2]
+	assert_true(_step_until(func() -> bool: return fx.server.phases.casino_time >= 86.0))
+	assert_true(fx.intent(a, &"sit", {"station": &"roulette_1"})["ok"])
+	assert_true(fx.intent(b, &"sit", {"station": &"blackjack_1"})["ok"])
+	assert_true(fx.intent(c, &"sit", {"station": &"plinko_1"})["ok"])
+	var rl: RouletteLogic = fx.server.stations.logics[&"roulette_1"]
+	assert_true(_step_until(func() -> bool: return rl.state == RouletteLogic.State.BETTING))
+	var before: Dictionary = {a: fx.server.economy.balance(a), b: fx.server.economy.balance(b)}
+	assert_true(fx.intent(a, &"place_bet", {"station": &"roulette_1", "bet": {"type": &"red", "amount": 10}})["ok"])
+	assert_true(fx.intent(a, &"place_bet", {"station": &"roulette_1", "bet": {"type": &"straight", "value": 7, "amount": 10}})["ok"])
+	assert_true(fx.intent(b, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 50}})["ok"])
+	assert_true(_step_until(func() -> bool: return fx.server.phases.phase == Phase.Id.MINIGAME))
+	assert_eq(fx.server.economy.balance(a), int(before[a]), "roulette bets came back in full")
+	var bj_paid: bool = fx.of_type(&"round_result").any(func(e: Dictionary) -> bool: return int(e["player"]) == b)
+	if not bj_paid:
+		assert_eq(fx.server.economy.balance(b), int(before[b]), "the open hand came back")
+	for id: int in fx.player_ids:
+		assert_false(fx.server.stations.is_seated(id), "stood up for the minigame")
+		assert_false(fx.server.stations.has_stake(id))
+		assert_eq(fx.server.state.players[id].station, &"")
+	var refunds: Array[Dictionary] = fx.of_type(&"bets_refunded")
+	assert_true(refunds.any(func(e: Dictionary) -> bool: return int(e["player"]) == a and int(e["amount"]) == 20))
+	var stood: Array[Dictionary] = fx.of_type(&"player_stood").filter(func(e: Dictionary) -> bool: return e.get("reason", &"") == &"minigame")
+	assert_eq(stood.size(), 3)
+	# Refund first, then the stand-up (blackjack would otherwise auto-stand the hand).
+	assert_lt(int(refunds[0]["seq"]), int(stood[0]["seq"]))
+	var total: int = 0
+	for id: int in fx.player_ids:
+		total += fx.server.economy.balance(id)
+	assert_eq(fx.server.economy.ledger.total(), total)
+	assert_eq(Log.error_count, 0)
+
+
+func test_after_the_rewards_everyone_regroups_in_the_hall() -> void:
+	_fixture(2, 2, 100.0)
+	var def: MapDefinition = fx.server.map_def.duplicate() as MapDefinition
+	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
+	fx.server.map_def = def
+	fx.server.start_match()
+	fx.run(3.1)
+	fx.place_all(Vector3(3, 0, -5))
+	assert_true(_step_until(func() -> bool: return fx.server.phases.phase == Phase.Id.REGROUP))
+	var casino_at: float = fx.server.phases.casino_time
+	var ev: Dictionary = fx.of_type(&"regroup_started")[0]
+	assert_almost_eq(float(ev["seconds"]), Registry.balance.regroup_time, 0.001)
+	for id: int in fx.player_ids:
+		assert_eq(fx.server.world.get_position(id), def.lobby_spawn(id), "everyone in the hall")
+		assert_true((ev["positions"] as Dictionary).has(id))
+	assert_eq(fx.intent(fx.player_ids[0], &"sit", {"station": &"slot_1"})["error"], &"wrong_phase", "no sitting while the doors are shut")
+	var t0: float = fx.server.match_time
+	assert_true(_step_until(func() -> bool: return fx.server.phases.phase == Phase.Id.CASINO))
+	assert_almost_eq(fx.server.match_time - t0, Registry.balance.regroup_time, 0.06)
+	assert_almost_eq(fx.server.phases.casino_time, casino_at, 0.001, "casino time doesn't run during the regroup")
+	var names: Array = fx.of_type(&"phase_changed").map(func(e: Dictionary) -> StringName: return e["phase_name"])
+	var i: int = names.find(&"rewards")
+	assert_eq(names.slice(i, i + 3), [&"rewards", &"regroup", &"casino"])
+
+
+func test_regroup_snapshot_for_late_joiners_and_reconnects() -> void:
+	_fixture(2, 2, 100.0)
+	fx.server.start_match()
+	assert_true(_step_until(func() -> bool: return fx.server.phases.phase == Phase.Id.REGROUP))
+	var a: int = fx.player_ids[0]
+	fx.server.player_disconnected(a)
+	fx.server.player_reconnected(a)
+	var snap: Dictionary = fx.server.get_snapshot()
+	assert_eq(int(snap["phase"]), Phase.Id.REGROUP)
+	assert_between(float(snap["regroup_in"]), 0.0, Registry.balance.regroup_time)
+	var st := ClientMatchState.new()
+	st.apply_snapshot(snap)
+	assert_eq(st.phase, Phase.Id.REGROUP)
+	assert_gt(st.regroup_in, 0.0)
+	assert_eq(st.minigames, 2)
+	assert_almost_eq(st.duration_s, 300.0, 0.01)
+
+
+func test_house_comp_on_the_reward_rows_grows_per_minigame() -> void:
+	_fixture(2, 3, 60.0)
+	fx.server.start_match()
+	fx.run(3.1)
+	var a: int = fx.player_ids[0]
+	var seen: Array[int] = []
+	for round_i: int in 3:
+		assert_true(_step_until(func() -> bool: return fx.server.phases.phase == Phase.Id.MINIGAME))
+		fx.server.economy.apply(a, -fx.server.economy.balance(a), &"test")
+		assert_true(_step_until(func() -> bool: return fx.server.phases.phase == Phase.Id.REWARDS))
+		var rows: Array = fx.of_type(&"rewards_started").back()["rewards"]
+		for row: Dictionary in rows:
+			if int(row["player"]) == a:
+				seen.append(int(row.get("comp", 0)))
+		assert_true(_step_until(func() -> bool: return fx.server.phases.phase == Phase.Id.CASINO))
+	assert_eq(seen, [450, 600, 750] as Array[int], "$450 after the 1st minigame, $600 after the 2nd, $750 after the 3rd")
+	var mine: Array[Dictionary] = fx.of_type(&"house_comp").filter(func(e: Dictionary) -> bool: return int(e["player"]) == a)
+	assert_eq(mine.size(), 3, "never paid twice in a segment")
+	assert_eq(int(fx.server.stats[a]["comps"]), 3)

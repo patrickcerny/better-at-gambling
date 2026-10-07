@@ -54,7 +54,7 @@ def main() -> None:
     ap.add_argument("--minutes", type=int, default=2)
     a = ap.parse_args()
     port = free_port()
-    server = godot("server", ["--server", "--port", str(port), "--duration", str(a.minutes), "--seed", "3", "--empty-timeout", "4"])
+    server = godot("server", ["--server", "--port", str(port), "--minigames", "0", "--gamble-seconds", str(a.minutes * 60), "--seed", "3", "--empty-timeout", "4"])
     time.sleep(3)
     clients = [godot(f"client{i}", ["--connect", f"127.0.0.1:{port}", "--name", f"Load{i}", "--autoplay", "--quit-after-results", "--autoplay-variant", str(i % 2)]) for i in range(a.clients)]
     hz = os.sysconf("SC_CLK_TCK")

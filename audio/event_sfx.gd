@@ -22,7 +22,7 @@ func on_event(ev: Dictionary) -> void:
 		&"phase_changed":
 			var phase: int = int(ev["phase"])
 			var from: int = int(ev.get("from", -1))
-			if phase == Phase.Id.INTRO or (phase == Phase.Id.CASINO and from == Phase.Id.REWARDS):
+			if phase == Phase.Id.INTRO or (phase == Phase.Id.CASINO and from == Phase.Id.REGROUP):
 				Audio.play(&"chime", &"SFX", -8.0)
 		&"round_result":
 			if int(ev["player"]) == me and int(ev["net"]) < 0:
@@ -52,9 +52,11 @@ func on_event(ev: Dictionary) -> void:
 		&"rps_start":
 			if int(ev["a"]) == me or int(ev["b"]) == me:
 				Audio.play(&"countdown_beep", &"UI", -8.0, 1.1)
-		&"draft_result":
-			if int(ev["player"]) == me and not (ev.get("items", []) as Array).is_empty():
-				Audio.play(&"card_flip", &"UI", -6.0)
+		&"bets_refunded":
+			if int(ev["player"]) == me and int(ev.get("amount", 0)) > 0:
+				Audio.play(&"chip_clack", &"SFX", -6.0, 0.9)
+		&"regroup_started":
+			Audio.play(&"whoosh", &"SFX", -8.0)
 		&"banana_placed":
 			_at(int(ev["owner"]), &"thud", -10.0, 1.4)
 		&"player_grabbed":

@@ -7,7 +7,7 @@ var events: Array[Dictionary] = []
 var player_ids: Array[int] = []
 
 
-func _init(player_count: int = 2, settings: Dictionary = {"duration": 5, "seed": 1}) -> void:
+func _init(player_count: int = 2, settings: Dictionary = {"minigames": 2, "gamble_seconds": 100.0, "seed": 1}) -> void:
 	server = MatchServer.new()
 	server.configure(settings, Registry.balance, Registry.presets, Registry.game_logic_scripts(), Registry.maps[&"lucky_lounge"])
 	server.event_emitted.connect(func(ev: Dictionary) -> void: events.append(ev))

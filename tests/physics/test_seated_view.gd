@@ -143,9 +143,10 @@ func test_minigame_keeps_the_cursor_when_you_are_stood_up() -> void:
 	for ui: StationUi in scene.station_uis.values():
 		assert_false(ui.visible, "%s panel closed" % ui.name)
 	assert_false(scene.shop_panel.visible, "shop closed")
-	# An item hit stands you up mid-minigame: the stage keeps the cursor.
-	assert_true(scene.server.stand_up(scene.local_id)["ok"])
+	# The server stood everyone up as the minigame started (Patrick's note #21): the stage keeps
+	# the cursor anyway.
 	await wait_physics_frames(3)
+	assert_false(scene.server.stations.is_seated(scene.local_id), "stood up for the minigame")
 	assert_eq(scene.local.state, PlayerAvatar.State.STANDING)
 	assert_eq(router.mode, InputRouter.Mode.STAGE, "standing up does not leave the stage mode")
 	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CONFINED)

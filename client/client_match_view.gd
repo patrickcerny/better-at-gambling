@@ -41,6 +41,8 @@ func _process(delta: float) -> void:
 		state.hot_left = maxf(state.hot_left - delta, 0.0)
 	if state.results_return_in > 0.0:
 		state.results_return_in = maxf(state.results_return_in - delta, 0.0)
+	if state.regroup_in > 0.0 and state.phase == Phase.Id.REGROUP:
+		state.regroup_in = maxf(state.regroup_in - delta, 0.0)
 	_since_refresh += delta
 	if _since_refresh >= station_refresh_interval:
 		_since_refresh = 0.0

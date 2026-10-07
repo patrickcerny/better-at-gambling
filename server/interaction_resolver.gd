@@ -196,6 +196,17 @@ func report_thrown_out(attacker: int, guard: StringName, now: float) -> void:
 	rules.protect(attacker, now + 4.0)
 
 
+## Regroup after the rewards (Patrick's note #10): every hold ends (`player_released`), knockouts and
+## knockdowns are over and pending guard offences are forgotten. Everyone gets back up in the hall.
+func regroup() -> void:
+	for holder: int in holding.keys():
+		var target: int = holding[holder]
+		_end_hold(holder, target)
+		events.append(GameEvents.make(&"player_released", {"attacker": holder, "target": target}))
+	offences.clear()
+	rules.clear_downs()
+
+
 ## Forgets offences older than 10 s and breaks holds that timed out.
 func tick(now: float) -> void:
 	offences = offences.filter(func(o: Dictionary) -> bool: return now - float(o["time"]) <= 10.0)

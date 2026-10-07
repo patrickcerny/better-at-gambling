@@ -5,7 +5,11 @@ extends RefCounted
 
 var match_seed: int = 0
 var phase: Phase.Id = Phase.Id.LOBBY
-var duration_minutes: int = 10
+## Match length (Patrick's note #12): minigames, gambling seconds before each (and after the
+## last), total casino seconds.
+var minigames: int = 5
+var gamble_s: float = 180.0
+var duration_s: float = 1080.0
 var casino_time: float = 0.0
 var segment_index: int = 0
 var players: Dictionary[int, PlayerState] = {}
@@ -30,7 +34,7 @@ func to_wire() -> Dictionary:
 	for id: int in balances:
 		bs[id] = balances[id]
 	return {
-		"phase": phase, "duration": duration_minutes, "casino_time": snappedf(casino_time, 0.001),
+		"phase": phase, "minigames": minigames, "gamble_s": snappedf(gamble_s, 0.001), "duration_s": snappedf(duration_s, 0.001), "casino_time": snappedf(casino_time, 0.001),
 		"segment": segment_index, "players": ps, "balances": bs, "jackpot": jackpot, "seq": event_seq,
 		"stations": stations.duplicate(true),
 	}
@@ -40,7 +44,9 @@ func to_wire() -> Dictionary:
 static func from_wire(d: Dictionary) -> MatchState:
 	var s := MatchState.new()
 	s.phase = int(d.get("phase", 0)) as Phase.Id
-	s.duration_minutes = int(d.get("duration", 10))
+	s.minigames = int(d.get("minigames", 5))
+	s.gamble_s = float(d.get("gamble_s", 180.0))
+	s.duration_s = float(d.get("duration_s", 1080.0))
 	s.casino_time = float(d.get("casino_time", 0.0))
 	s.segment_index = int(d.get("segment", 0))
 	var ps: Dictionary = d.get("players", {})

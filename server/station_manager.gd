@@ -150,10 +150,16 @@ func has_stake(player: int) -> bool:
 	return false
 
 
-## Resolves every open round (phase end).
+## Resolves every open round (end of the match).
 func auto_resolve_all() -> void:
 	for sid: StringName in logics:
 		logics[sid].auto_resolve()
+
+
+## A minigame starts: every open bet everywhere goes back to its owner and the tables reset.
+func refund_all() -> void:
+	for sid: StringName in logics:
+		logics[sid].refund_all()
 
 
 ## Collects events from all stations.

@@ -416,7 +416,7 @@ func _build_ui() -> void:
 	if not state.standings.is_empty():
 		var s0: Array = (state.standings[0] as Dictionary).get("series", [])
 		start = int(s0[0]) if not s0.is_empty() else 0
-	graph.setup(state.standings, colors, local_id, state.duration_minutes * 60.0, start)
+	graph.setup(state.standings, colors, local_id, state.duration_s, start)
 	gp.visible = graph.has_data()
 	graph.set_process(false)
 	_cue(1.0, func() -> void: graph.set_process(true))

@@ -5,10 +5,12 @@ extends RefCounted
 ## start countdown. Pure logic: the MatchServer feeds it and turns its notes into events.
 
 const COUNTDOWN_SECONDS: float = 3.0
-const DURATIONS: Array[int] = [5, 10, 15, 30]
 
-## Host settings shown on the board and the 2D panel.
-var settings: Dictionary = {"duration": 10, "items_enabled": true, "quiz_category": &"all"}
+## Host settings shown on the board and the 2D panel: match length as a number of minigames and
+## the gambling minutes before each one (Patrick's note #12), items on/off, quiz category.
+var settings: Dictionary = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "quiz_category": &"all"}
+## Defaults and bounds for the match length (data/balance/match_presets.tres).
+var presets: MatchPresets = MatchPresets.new()
 ## Seconds left on the start countdown (-1 when not counting).
 var countdown: float = -1.0
 var min_participants: int = 2
@@ -106,10 +108,14 @@ func set_setting(player: int, key: String, value: Variant) -> StringName:
 	if player != _leader:
 		return &"not_leader"
 	match key:
-		"duration":
-			if not int(value) in DURATIONS:
+		"minigames":
+			if not _is_whole(value) or not presets.is_valid_minigames(int(value)):
 				return &"bad_value"
-			settings["duration"] = int(value)
+			settings["minigames"] = int(value)
+		"gamble_minutes":
+			if not _is_whole(value) or not presets.is_valid_gamble_minutes(int(value)):
+				return &"bad_value"
+			settings["gamble_minutes"] = int(value)
 		"items_enabled":
 			settings["items_enabled"] = bool(value)
 		"quiz_category":
@@ -144,6 +150,10 @@ func participant_count() -> int:
 		if _members[id]["connected"]:
 			n += 1
 	return n
+
+
+static func _is_whole(value: Variant) -> bool:
+	return typeof(value) == TYPE_INT or (typeof(value) == TYPE_FLOAT and is_equal_approx(float(value), roundf(float(value))))
 
 
 func to_wire() -> Dictionary:

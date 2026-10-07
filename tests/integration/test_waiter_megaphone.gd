@@ -12,7 +12,7 @@ const WAITER_POS: Vector3 = Vector3(0, 0, -10)
 
 
 func before_each() -> void:
-	fx = ServerFixture.new(2, {"duration": 5, "seed": 4})
+	fx = ServerFixture.new(2, {"minigames": 2, "gamble_seconds": 100.0, "seed": 4})
 	fx.server.start_match()
 	fx.run(3.1)  # past the intro: casino
 	a = fx.player_ids[0]

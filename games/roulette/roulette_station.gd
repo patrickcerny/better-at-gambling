@@ -61,6 +61,12 @@ func start_spin(seconds: float) -> void:
 		wheel_fx.start_spin(seconds)
 
 
+## The spin was called off (bets refunded for a minigame): the ball comes off the wheel.
+func reset_table() -> void:
+	if wheel_fx != null and wheel_fx.ball != null:
+		wheel_fx.ball.visible = false
+
+
 ## The ball drops into `number`'s pocket; returns the seconds until it rests there.
 func land(number: int) -> float:
 	return wheel_fx.land(number) if wheel_fx != null else 0.0
