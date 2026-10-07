@@ -312,7 +312,9 @@ func test_idle_players_still_finish() -> void:
 		_tick(logic, 0.1)
 		t += 0.1
 	assert_true(logic.is_finished(), "nobody pressing anything can't stall the match")
-	assert_lte(logic.round, BustOrBankLogic.MAX_ROUNDS)
+	assert_lte(logic.round, logic.max_rounds)
+	assert_eq(logic.max_rounds, 3 + BustOrBankLogic.SPARE_ROUNDS)
+	assert_lt(t, 90.0, "idle table ends well inside a minigame slot")
 	assert_eq(logic.ranking().size(), 3)
 
 

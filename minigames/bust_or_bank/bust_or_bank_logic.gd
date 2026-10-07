@@ -19,14 +19,17 @@ extends MinigameLogicBase
 enum State { INTRO, DEALING, RESULT, DONE }
 
 ## Seconds before the first cards of a round.
-const INTRO_TIME: float = 2.5
+const INTRO_TIME: float = 2.0
 ## Seconds between shared cards while players are still drawing.
 const DEAL_INTERVAL: float = 1.6
 ## Seconds the round result is shown before the next round (or the end).
-const RESULT_TIME: float = 3.5
+const RESULT_TIME: float = 3.0
 ## Cards dealt at the start of a round (blackjack-style two-card start).
 const OPENING_CARDS: int = 2
-## Safety cap (counts replays): survivors after this many rounds share first place.
+## Safety cap (counts replays): survivors after `max_rounds` rounds share first place. It's the
+## player count + `SPARE_ROUNDS` (one knock-out per round plus a few replays), capped at
+## `MAX_ROUNDS`, so a table of idle players (everyone busts, every round) still ends quickly.
+const SPARE_ROUNDS: int = 3
 const MAX_ROUNDS: int = 12
 const SHOE_DECKS: int = 2
 const BLACKJACK: int = 21
@@ -44,6 +47,7 @@ var busted: Dictionary[int, bool] = {}
 ## Thrown-out groups, worst first: each entry is the players who share one rank.
 var elim_groups: Array[Array] = []
 var last_card: int = -1
+var max_rounds: int = MAX_ROUNDS
 ## The round that just ended was an everyone-busted replay (the next one replays it).
 var _last_was_replay: bool = false
 
@@ -52,10 +56,11 @@ func _on_setup(_context: Dictionary) -> void:
 	shoe = Shoe.new(rng, SHOE_DECKS)
 	in_round = players.duplicate()
 	in_round.sort()
+	max_rounds = mini(in_round.size() + SPARE_ROUNDS, MAX_ROUNDS)
 	events.append(GameEvents.make(&"bust_or_bank_started", {
 		"players": in_round.duplicate(),
 		"deal_interval": DEAL_INTERVAL,
-		"max_rounds": MAX_ROUNDS,
+		"max_rounds": max_rounds,
 	}))
 	if in_round.size() <= 1:
 		_finish()
@@ -250,7 +255,7 @@ func _end_round() -> void:
 
 
 func _game_over() -> bool:
-	return in_round.size() <= 1 or round >= MAX_ROUNDS
+	return in_round.size() <= 1 or round >= max_rounds
 
 
 ## Ends right away (not enough players left to play on).
