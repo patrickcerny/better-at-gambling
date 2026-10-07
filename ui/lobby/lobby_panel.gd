@@ -21,6 +21,11 @@ var _duration_buttons: Dictionary[int, Button] = {}
 var _items_button: Button
 var _skin_label: Label
 var _skin_next: Button
+## The 8 slot rows, built once and updated in place (rebuilding them made the panel, and the
+## READY button with it, jump on every snapshot, so clicks missed). Each: {frame, swatch, name, ready, empty}.
+var _rows: Array[Dictionary] = []
+## Frame the panel was opened on: the Tab press that opened it must not close it again.
+var _opened_frame: int = -1
 
 
 func _ready() -> void:
@@ -51,6 +56,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 ## Shows the panel; `focus` is &"settings", &"wardrobe" or &"" (general).
 func open(focus: StringName = &"") -> void:
 	visible = true
+	_opened_frame = Engine.get_process_frames()
 	_refresh()
 	match focus:
 		&"settings":
@@ -69,7 +75,10 @@ func close() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if visible and (event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause")):
+	if not visible:
+		return
+	var tab: bool = event.is_action_pressed(&"leaderboard") and Engine.get_process_frames() != _opened_frame
+	if event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause") or tab:
 		get_viewport().set_input_as_handled()
 		close()
 
@@ -93,6 +102,8 @@ func _build() -> void:
 	_slots.custom_minimum_size = Vector2(420, 0)
 	_slots.add_theme_constant_override(&"separation", 4)
 	cols.add_child(_slots)
+	for i: int in Protocol.MAX_PLAYERS:
+		_rows.append(_make_row())
 	var right := VBoxContainer.new()
 	right.add_theme_constant_override(&"separation", 8)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -100,8 +111,12 @@ func _build() -> void:
 	_ready_button = Button.new()
 	_ready_button.custom_minimum_size = Vector2(0, 60)
 	_ready_button.theme_type_variation = &"ActionButton"
-	_ready_button.pressed.connect(func() -> void:
-		Net.send_intent(Intents.make(&"set_ready", {"ready": not _my_ready()})))
+	_ready_button.toggle_mode = true
+	# The button's own pressed flag is what gets sent, so a click always means "this state",
+	# even if a snapshot lands between the click and the server's answer.
+	_ready_button.toggled.connect(func(on: bool) -> void:
+		_ready_button.text = "NOT READY" if on else "READY"
+		Net.send_intent(Intents.make(&"set_ready", {"ready": on})))
 	right.add_child(_ready_button)
 	right.add_child(_heading("YOUR SKIN"))
 	var skin_row := HBoxContainer.new()
@@ -156,6 +171,34 @@ func _build() -> void:
 	bottom.add_child(leave)
 
 
+func _make_row() -> Dictionary:
+	var framed := PanelContainer.new()
+	framed.custom_minimum_size = Vector2(0, 46)
+	framed.theme_type_variation = &"RowPanel"
+	_slots.add_child(framed)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 10)
+	framed.add_child(row)
+	var empty := Label.new()
+	empty.text = "open slot"
+	empty.theme_type_variation = &"MutedLabel"
+	empty.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(empty)
+	var sw := ColorRect.new()
+	sw.custom_minimum_size = Vector2(28, 28)
+	sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(sw)
+	var label := Label.new()
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.clip_text = true
+	row.add_child(label)
+	var ready := Label.new()
+	ready.theme_type_variation = &"SmallLabel"
+	ready.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(ready)
+	return {"frame": framed, "swatch": sw, "name": label, "ready": ready, "empty": empty}
+
+
 func _heading(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -169,50 +212,37 @@ func _refresh() -> void:
 	var code: String = str(Net.room.get("room_code", ""))
 	_title.text = "PARTY LOBBY" + ("   ·   CODE %s" % code if code != "" else "")
 	_countdown_label.text = "Doors open in %d…" % ceili(state.countdown) if state.countdown > 0.0 else "Stand on your colored READY pad (or press READY)."
-	for c: Node in _slots.get_children():
-		c.queue_free()
 	var ids: Array = state.players.keys()
 	ids.sort()
-	for i: int in Protocol.MAX_PLAYERS:
-		var framed := PanelContainer.new()
-		framed.custom_minimum_size = Vector2(0, 46)
-		framed.theme_type_variation = &"RowPanelHighlight" if i < ids.size() and ids[i] == local_id else &"RowPanel"
-		_slots.add_child(framed)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override(&"separation", 10)
-		framed.add_child(row)
-		if i >= ids.size():
-			var empty := Label.new()
-			empty.text = "open slot"
-			empty.theme_type_variation = &"MutedLabel"
-			empty.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			row.add_child(empty)
+	for i: int in _rows.size():
+		var r: Dictionary = _rows[i]
+		var taken: bool = i < ids.size()
+		(r["frame"] as PanelContainer).theme_type_variation = &"RowPanelHighlight" if taken and ids[i] == local_id else &"RowPanel"
+		(r["empty"] as Label).visible = not taken
+		(r["swatch"] as ColorRect).visible = taken
+		(r["name"] as Label).visible = taken
+		(r["ready"] as Label).visible = taken
+		if not taken:
 			continue
 		var pid: int = ids[i]
 		var p: Dictionary = state.players[pid]
-		var sw := ColorRect.new()
-		sw.custom_minimum_size = Vector2(28, 28)
-		sw.color = Palette.player_color(int(p.get("color", 0)))
-		sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(sw)
-		var label := Label.new()
+		(r["swatch"] as ColorRect).color = Palette.player_color(int(p.get("color", 0)))
 		var tags: PackedStringArray = []
 		if pid == state.leader:
 			tags.append("★")
 		if not bool(p.get("connected", true)):
 			tags.append("(away)")
+		var label: Label = r["name"]
 		label.text = "%s  %s" % [str(p.get("name", "?")), " ".join(tags)]
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if pid == local_id:
 			label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-		row.add_child(label)
-		var ready := Label.new()
+		else:
+			label.remove_theme_color_override(&"font_color")
 		var is_ready: bool = bool(p.get("ready", false))
+		var ready: Label = r["ready"]
 		ready.text = "READY" if is_ready else "NOT READY"
-		ready.theme_type_variation = &"SmallLabel"
-		ready.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		ready.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if is_ready else Color("#9A8F7A"))
-		row.add_child(ready)
+	_ready_button.set_pressed_no_signal(_my_ready())
 	_ready_button.text = "NOT READY" if _my_ready() else "READY"
 	_skin_label.text = str(Cosmetics.SKIN_NAMES.get(_my_skin(), "Bean"))
 	var leader: bool = local_id == state.leader

@@ -165,14 +165,14 @@ func _ready() -> void:
 	lobby_panel.name = "LobbyPanel"
 	lobby_panel.closed.connect(func() -> void:
 		if router.mode == InputRouter.Mode.MENU and results_panel == null:
-			router.set_mode(InputRouter.Mode.WALK))
+			router.set_play_mode(InputRouter.Mode.WALK))
 	lobby_panel.leave_requested.connect(_leave_to_menu)
 	ui_layer.add_child(lobby_panel)
 	shop_panel = ShopPanel.new()
 	shop_panel.name = "ShopPanel"
 	shop_panel.closed.connect(func() -> void:
 		if router.mode == InputRouter.Mode.MENU and results_panel == null:
-			router.set_mode(InputRouter.Mode.WALK))
+			router.set_play_mode(InputRouter.Mode.WALK))
 	ui_layer.add_child(shop_panel)
 	reward_panel = RewardPanel.new()
 	reward_panel.name = "RewardPanel"
@@ -697,7 +697,7 @@ func _leave_to_menu() -> void:
 func _open_lobby_panel(focus: StringName) -> void:
 	if local == null:
 		return
-	router.set_mode(InputRouter.Mode.MENU)
+	router.set_play_mode(InputRouter.Mode.MENU)
 	lobby_panel.open(focus)
 
 
@@ -1305,7 +1305,7 @@ func _seat(pid: int, sid: StringName, seat: int = -1) -> void:
 	var idx: int = seat if seat >= 0 else _seat_index(sid, pid)
 	a.sit(st.seats[clampi(idx, 0, st.seats.size() - 1)] if not st.seats.is_empty() else st, st.camera_for_seat(idx))
 	if pid == local_id:
-		router.set_mode(InputRouter.Mode.SEATED)
+		router.set_play_mode(InputRouter.Mode.SEATED)
 		if st is BlackjackStation:
 			(st as BlackjackStation).set_viewer_seat(idx)
 		hud.set_prompt("")
@@ -1331,7 +1331,7 @@ func _unseat(pid: int) -> void:
 			current_ui.close()
 			current_ui = null
 		hud.set_crosshair_visible(true)
-		router.set_mode(InputRouter.Mode.WALK)
+		router.set_play_mode(InputRouter.Mode.WALK)
 
 
 func _throw_out(pid: int, guard_name: String) -> void:
@@ -1396,13 +1396,18 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 	stage.ui_host = self  # its 2D stays sharp outside the pixelated world
 	pixel_view.world.add_child(stage)
 	stage.begin(view.state, local_id, start, snapshot_state)
-	if current_ui != null:
-		current_ui.close()
-		current_ui = null
+	# The minigame owns the screen: every table panel, menu and wheel goes away, and the cursor
+	# stays put (STAGE mode ignores sit/stand/menu-closed mode changes until the stage is over).
+	router.set_mode(InputRouter.Mode.STAGE)
+	current_ui = null
+	for ui: StationUi in station_uis.values():
+		ui.close()
 	emote_wheel.visible = false
 	lobby_panel.close()
+	shop_panel.close_panel()
+	if settings_panel != null and settings_panel.visible:
+		settings_panel.close()
 	hud.visible = false
-	router.set_mode(InputRouter.Mode.MENU)
 	if local != null:
 		local.auto_target = Vector3.INF
 	Audio.play(&"whoosh", &"SFX", -4.0)
@@ -1691,8 +1696,8 @@ func _expire_predictions() -> void:
 
 
 func _on_pause() -> void:
-	if results_panel != null:
-		return
+	if results_panel != null or router.mode == InputRouter.Mode.STAGE:
+		return  # the settings live on the HUD, which a minigame hides
 	if settings_panel != null and settings_panel.visible:
 		settings_panel.close()
 	elif router.mode == InputRouter.Mode.MENU:
@@ -1708,7 +1713,7 @@ func _on_pause() -> void:
 
 
 func _resume_play() -> void:
-	router.set_mode(InputRouter.Mode.SEATED if local != null and local.state == PlayerAvatar.State.SEATED else InputRouter.Mode.WALK)
+	router.set_play_mode(InputRouter.Mode.SEATED if local != null and local.state == PlayerAvatar.State.SEATED else InputRouter.Mode.WALK)
 	hud.toast("", 0.0)
 
 

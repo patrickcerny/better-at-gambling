@@ -59,7 +59,7 @@ extends Resource
 @export_group("Plinko")
 @export var plinko_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var plinko_drop_cooldown: float = 2.5
-@export var plinko_flight_time: float = 3.0
+@export var plinko_flight_time: float = 2.0
 @export var plinko_mult_low: PackedFloat32Array = PackedFloat32Array([5, 2, 1.5, 1.1, 1, 0.6, 0.5, 0.6, 1, 1.1, 1.5, 2, 5])
 @export var plinko_mult_medium: PackedFloat32Array = PackedFloat32Array([13, 4, 2, 1.4, 0.8, 0.5, 0.3, 0.5, 0.8, 1.4, 2, 4, 13])
 @export var plinko_mult_high: PackedFloat32Array = PackedFloat32Array([60, 12, 3, 1.2, 0.4, 0.2, 0.2, 0.2, 0.4, 1.2, 3, 12, 60])

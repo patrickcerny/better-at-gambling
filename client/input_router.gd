@@ -1,8 +1,8 @@
 class_name InputRouter
 extends Node
 ## Turns raw input into gameplay signals and owns the input mode (walking, seated at a station,
-## in a menu, emote wheel open). Mouse capture follows the mode: captured while walking, a free
-## cursor everywhere else. Seated, the cursor's offset from the middle of the screen (or the right
+## in a menu, emote wheel open, on a minigame stage). Mouse capture follows the mode: captured while
+## walking, a free cursor kept inside the window everywhere else (released when the window loses focus). Seated, the cursor's offset from the middle of the screen (or the right
 ## stick) turns the head a little (`seated_look`) so the overlay stays clickable. Movement/look
 ## vectors are polled by the avatar; discrete actions arrive as signals. Keyboard+mouse and
 ## gamepad are equivalent.
@@ -22,7 +22,9 @@ signal leaderboard_toggled(shown: bool)
 signal pause
 signal ping
 
-enum Mode { WALK, SEATED, MENU, EMOTE }
+## STAGE: a minigame owns the screen. Only the stage opening/closing changes it (`set_play_mode`
+## leaves it alone), so standing up or closing a panel mid-minigame never grabs the cursor.
+enum Mode { WALK, SEATED, MENU, EMOTE, STAGE }
 
 const STICK_LOOK_SPEED: float = 3.2
 
@@ -40,6 +42,8 @@ var _cursor: Vector2 = Vector2(NAN, NAN)
 var drunk: bool = false
 ## Mode to return to when the emote wheel closes (you can emote while seated too).
 var _mode_before_emote: Mode = Mode.WALK
+## False while the window is in the background: the cursor is then free to leave it.
+var _focused: bool = true
 
 
 func _ready() -> void:
@@ -67,12 +71,24 @@ func set_mode(m: Mode) -> void:
 		Input.warp_mouse(Vector2(get_window().size) * 0.5)
 
 
+## Mode change from gameplay (sitting, standing, menus closing): ignored while a minigame stage is
+## up, so the stage keeps its cursor until `_back_to_casino` / results switch the mode themselves.
+func set_play_mode(m: Mode) -> void:
+	if mode == Mode.STAGE:
+		return
+	set_mode(m)
+
+
 ## The mouse mode that goes with the current input mode: only walking captures the mouse.
-## Seated, in menus and on the emote wheel the cursor is free so every button can be clicked.
+## Seated, in menus, on the emote wheel and on a minigame stage the cursor is visible so every
+## button can be clicked, but confined to the window (fullscreen on two monitors included).
+## In the background (focus lost) it is free.
 func desired_mouse_mode() -> Input.MouseMode:
-	if mode == Mode.WALK and capture_mouse:
-		return Input.MOUSE_MODE_CAPTURED
-	return Input.MOUSE_MODE_VISIBLE
+	if not _focused:
+		return Input.MOUSE_MODE_VISIBLE
+	if mode == Mode.WALK:
+		return Input.MOUSE_MODE_CAPTURED if capture_mouse else Input.MOUSE_MODE_VISIBLE
+	return Input.MOUSE_MODE_CONFINED
 
 
 ## Seated head turn in [-1, 1] per axis (x right, y down): the right stick while it is pushed,
@@ -115,7 +131,7 @@ func move_vector() -> Vector2:
 
 ## Right stick look, radians per second.
 func stick_look() -> Vector2:
-	if mode == Mode.MENU:
+	if mode == Mode.MENU or mode == Mode.STAGE:
 		return Vector2.ZERO
 	var v: Vector2 = Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
 	return v * STICK_LOOK_SPEED * (-1.0 if drunk else 1.0)
@@ -145,7 +161,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		pause.emit()
 		get_viewport().set_input_as_handled()
 		return
-	if mode == Mode.MENU:
+	if mode == Mode.MENU or mode == Mode.STAGE:
 		return
 	if event.is_action_pressed(&"leaderboard"):
 		leaderboard_toggled.emit(true)
@@ -198,5 +214,14 @@ func _item_slot(event: InputEvent) -> int:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and DisplayServer.get_name() != "headless":
+	if DisplayServer.get_name() == "headless":
+		return
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_focused = false
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_focused = true
+		if mode != Mode.WALK:
+			Input.mouse_mode = desired_mouse_mode()  # walking recaptures on the next click
+	elif what == NOTIFICATION_EXIT_TREE:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE  # leaving the match: menus get a free cursor

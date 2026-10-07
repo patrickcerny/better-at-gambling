@@ -30,12 +30,15 @@ func test_drop_flow_cooldown_and_payout() -> void:
 	assert_true(pl.place_bet(1, {"amount": 100, "risk": &"medium"})["ok"])
 	assert_eq(pl.place_bet(1, {"amount": 100, "risk": &"medium"})["error"], &"cooldown")
 	var slot: int = pl.drops[0]["slot"]
-	pl.tick(2.5)
+	var flight: float = fx.balance.plinko_flight_time
+	assert_almost_eq(flight, 2.0, 0.001, "faster drop (Patrick's #7)")
+	pl.tick(flight - 0.5)
 	assert_eq(pl.drops.size(), 1, "still flying")
 	pl.tick(0.5)
 	assert_eq(pl.drops.size(), 0)
 	var mult: float = fx.balance.plinko_mult_medium[slot]
 	assert_eq(fx.economy.balance(1), 900 + int(floor(100 * mult + 0.000001)))
+	pl.tick(maxf(fx.balance.plinko_drop_cooldown - flight, 0.0) + 0.05)
 	assert_true(pl.place_bet(1, {"amount": 10, "risk": &"low"})["ok"])
 
 

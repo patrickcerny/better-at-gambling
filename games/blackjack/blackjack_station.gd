@@ -60,6 +60,16 @@ const SEAT_EYE_PITCH: float = deg_to_rad(-26.0)
 const SEAT_LOOK_AT: Vector3 = Vector3(0.0, 0.0, 0.2)
 
 var cards: TableCards
+const HOT_CARD_LIGHT: float = 3.5
+## The dealer's face-up total, floating over the dealer's cards (client only; built on first use).
+var dealer_total_label: Label3D
+## Where that number floats: above the dealer's card spot, under the dealer's head.
+const DEALER_TOTAL_POS: Vector3 = Vector3(-0.1, TABLE_TOP + 0.5, 0.05)
+
+
+## A softer hot-table spotlight: the cards under it must stay readable (no bloom).
+func hot_light_energy() -> float:
+	return HOT_CARD_LIGHT
 
 
 ## Turns the dealer's cards towards the local player's seat (-1 = nobody local is seated here).
@@ -83,9 +93,35 @@ func show_round(pub: Dictionary) -> void:
 				if h.has("split"):
 					by_seat[i + SPLIT_KEY] = (h["split"] as Dictionary).get("cards", [])
 	var dealer: Array = (pub.get("dealer", []) as Array).duplicate()
+	_show_dealer_total(dealer)
 	if not bool(pub.get("dealer_revealed", false)) and dealer.size() == 1 and int(pub.get("state", 0)) == BlackjackLogic.State.ACTING:
 		dealer.append(TableCards.FACE_DOWN)
 	cards.show_cards(by_seat, dealer)
+
+
+## Total of the dealer's face-up cards (the hole card never reaches the client before the reveal);
+## hidden while the dealer has no cards.
+func _show_dealer_total(dealer: Array) -> void:
+	if not Vfx.enabled():
+		return
+	if dealer_total_label == null:
+		dealer_total_label = Label3D.new()
+		dealer_total_label.name = "DealerTotal"
+		dealer_total_label.font = Vfx.font()
+		dealer_total_label.font_size = 64
+		dealer_total_label.pixel_size = 0.0028
+		dealer_total_label.outline_size = 16
+		dealer_total_label.modulate = Palette.CREAM
+		dealer_total_label.outline_modulate = Palette.CASINO_BLACK
+		dealer_total_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		dealer_total_label.position = DEALER_TOTAL_POS
+		add_child(dealer_total_label)
+	var shown: Array[int] = []
+	for c: Variant in dealer:
+		if int(c) != TableCards.FACE_DOWN:
+			shown.append(int(c))
+	dealer_total_label.visible = not shown.is_empty()
+	dealer_total_label.text = str(HandEval.total(shown)) if not shown.is_empty() else ""
 
 
 const TABLE_MODEL: String = "res://assets/casino/blackjack_table.dae"

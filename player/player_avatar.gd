@@ -333,7 +333,7 @@ func sit(p_seat: Node3D, anchor: Node3D) -> void:
 	if cam != null:
 		cam.set_anchor(anchor)
 	if router != null:
-		router.set_mode(InputRouter.Mode.SEATED)
+		router.set_play_mode(InputRouter.Mode.SEATED)
 
 
 ## Stands up next to the seat.
@@ -628,7 +628,7 @@ func _leave_seat() -> void:
 	if cam != null:
 		cam.set_anchor(null)
 	if router != null:
-		router.set_mode(InputRouter.Mode.WALK)
+		router.set_play_mode(InputRouter.Mode.WALK)
 
 
 func _on_ragdoll_settled() -> void:

@@ -102,14 +102,14 @@ func test_cursor_is_free_while_seated_and_captured_after_standing() -> void:
 	await _sit(SID)
 	assert_eq(scene.local.state, PlayerAvatar.State.SEATED)
 	assert_eq(router.mode, InputRouter.Mode.SEATED)
-	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_VISIBLE, "seated at blackjack shows the cursor")
+	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CONFINED, "seated at blackjack shows the cursor, kept inside the window")
 	# Esc menu while seated, then back to the table with the cursor still free.
 	scene._on_pause()
 	assert_eq(router.mode, InputRouter.Mode.MENU)
-	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_VISIBLE)
+	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CONFINED)
 	scene._on_pause()
 	assert_eq(router.mode, InputRouter.Mode.SEATED, "closing the menu goes back to the seat")
-	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_VISIBLE)
+	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CONFINED)
 	assert_true(Net.send_intent(Intents.make(&"leave"))["ok"])
 	await wait_physics_frames(2)
 	assert_eq(scene.local.state, PlayerAvatar.State.STANDING)
@@ -119,10 +119,86 @@ func test_cursor_is_free_while_seated_and_captured_after_standing() -> void:
 	for sid: StringName in [&"roulette_1", &"slot_8", &"plinko_1"]:
 		await _sit(sid)
 		assert_eq(router.mode, InputRouter.Mode.SEATED, String(sid))
-		assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_VISIBLE, "cursor free at %s" % sid)
+		assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CONFINED, "cursor free at %s" % sid)
 		Net.send_intent(Intents.make(&"leave"))
 		await wait_physics_frames(2)
 		assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CAPTURED)
+
+
+func test_minigame_keeps_the_cursor_when_you_are_stood_up() -> void:
+	await _start_scene()
+	await _sit(SID)
+	var router: InputRouter = scene.router
+	assert_eq(router.mode, InputRouter.Mode.SEATED)
+	scene.shop_panel.open()
+	# Jump the clock to just before the first minigame.
+	var ph: PhaseMachine = scene.server.phases
+	ph.casino_time = ph.schedule.minigame_times()[0] - 0.3
+	await wait_seconds(1.0)
+	assert_eq(ph.phase, Phase.Id.MINIGAME)
+	assert_not_null(scene.stage, "minigame stage open")
+	assert_eq(router.mode, InputRouter.Mode.STAGE)
+	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CONFINED, "visible cursor, inside the window")
+	assert_null(scene.current_ui)
+	for ui: StationUi in scene.station_uis.values():
+		assert_false(ui.visible, "%s panel closed" % ui.name)
+	assert_false(scene.shop_panel.visible, "shop closed")
+	# An item hit stands you up mid-minigame: the stage keeps the cursor.
+	assert_true(scene.server.stand_up(scene.local_id)["ok"])
+	await wait_physics_frames(3)
+	assert_eq(scene.local.state, PlayerAvatar.State.STANDING)
+	assert_eq(router.mode, InputRouter.Mode.STAGE, "standing up does not leave the stage mode")
+	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CONFINED)
+	scene._on_pause()
+	assert_eq(router.mode, InputRouter.Mode.STAGE, "Esc does not open the hidden settings over a minigame")
+	scene._back_to_casino()
+	assert_eq(router.mode, InputRouter.Mode.WALK)
+	assert_eq(router.desired_mouse_mode(), Input.MOUSE_MODE_CAPTURED)
+
+
+func test_dealer_total_counts_face_up_cards_only() -> void:
+	Vfx.force_enabled = true
+	var st := BlackjackStation.new()
+	add_child_autofree(st)
+	await wait_process_frames(1)
+	var king: int = Card.make(13, 1)
+	st.show_round({"state": BlackjackLogic.State.ACTING, "seats": [7, -1, -1, -1], "dealer_revealed": false,
+		"dealer": [king], "hands": {7: {"cards": [Card.make(8, 0), Card.make(3, 2)]}}})
+	assert_not_null(st.dealer_total_label)
+	assert_true(st.dealer_total_label.visible)
+	assert_eq(st.dealer_total_label.text, "10", "K showing, hole card ignored")
+	assert_false(st.cards.is_ancestor_of(st.dealer_total_label), "not in the card piles")
+	await wait_seconds(1.2)
+	assert_eq(st.cards.pile_nodes(-1).size(), 2, "up card and hole card only")
+	assert_gt(st.dealer_total_label.global_position.y, st.cards.pile_nodes(-1)[0].global_position.y, "above the dealer's cards")
+	st.show_round({"state": BlackjackLogic.State.PAYOUT, "seats": [7, -1, -1, -1], "dealer_revealed": true,
+		"dealer": [king, Card.make(1, 2)], "hands": {}})
+	assert_eq(st.dealer_total_label.text, "21")
+	st.show_round({"state": BlackjackLogic.State.IDLE, "seats": [-1, -1, -1, -1], "dealer": [], "hands": {}})
+	assert_false(st.dealer_total_label.visible, "hidden without dealer cards")
+	Vfx.force_enabled = false
+
+
+func test_cards_stay_under_the_bloom() -> void:
+	var st := BlackjackStation.new()
+	add_child_autofree(st)
+	await wait_process_frames(1)
+	st.show_round({"state": BlackjackLogic.State.ACTING, "seats": [7, -1, -1, -1], "dealer_revealed": false,
+		"dealer": [Card.make(13, 1)], "hands": {7: {"cards": [Card.make(8, 0), Card.make(3, 2)]}}})
+	await wait_seconds(1.2)
+	var threshold: float = 1.1  # LoungeDecor glow_hdr_threshold
+	for n: Node3D in st.cards.pile_nodes(0):
+		var m: StandardMaterial3D = (n.get_node(^"Face") as MeshInstance3D).material_override
+		var c: Color = m.albedo_color
+		assert_lte(maxf(c.r, maxf(c.g, c.b)), 0.851, "card face albedo toned down")
+		assert_lt(maxf(c.r, maxf(c.g, c.b)), threshold)
+	st.set_hot(true)
+	assert_lte(st.hot_light.light_energy, 3.5, "hot spotlight over a card table is softer")
+	var rs := RouletteStation.new()
+	add_child_autofree(rs)
+	await wait_process_frames(1)
+	rs.set_hot(true)
+	assert_eq(rs.hot_light.light_energy, 6.0, "other tables keep the full spotlight")
 
 
 func test_head_follows_the_cursor_a_little() -> void:

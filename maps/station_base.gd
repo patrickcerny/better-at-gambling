@@ -61,9 +61,14 @@ func _ready() -> void:
 	add_child(hot_light)
 
 
+## Spotlight energy while hot. Card tables use less so the cards don't bloom (see BlackjackStation).
+func hot_light_energy() -> float:
+	return 6.0
+
+
 ## Marks the station hot (spotlight and bouncing arrow) or not.
 func set_hot(hot: bool) -> void:
-	hot_light.light_energy = 6.0 if hot else 0.0
+	hot_light.light_energy = hot_light_energy() if hot else 0.0
 	if hot and hot_fx == null and Vfx.enabled():
 		hot_fx = HotTableFx.new()
 		hot_fx.radius = interact_radius * 0.8

@@ -43,6 +43,8 @@ const ACTIONS: Array = [
 	["bj_split", 0.5, ["key:P", "joy:10"]],
 	["break_free", 0.5, ["key:Space", "joy:0"]],
 	["shake", 0.5, ["key:E", "joy:2"]],
+	# Tab is the leaderboard / lobby panel key: it must not move GUI focus (it pulled focus off READY).
+	["ui_focus_next", 0.5, []],
 ]
 
 

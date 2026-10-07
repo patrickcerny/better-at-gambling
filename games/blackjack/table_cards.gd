@@ -13,6 +13,9 @@ const DEAL_TIME: float = 0.35
 const FACE_DOWN: int = -1
 ## The stock back art is pale blue; casino red makes the hole card obvious.
 const BACK_TINT: Color = Color("#C83D3D")
+## Card faces are a touch grey so a white card under a spotlight stays below the room's bloom
+## threshold (LoungeDecor glow_hdr_threshold 1.1) and never smears over its neighbours.
+const FACE_TINT: Color = Color(0.85, 0.85, 0.85)
 ## How far cards lean up from the felt towards their reader (0 = flat, PI/2 = upright).
 const HAND_TILT: float = deg_to_rad(28.0)
 const DEALER_TILT: float = deg_to_rad(68.0)
@@ -227,11 +230,11 @@ func _make_card(card: int) -> Node3D:
 
 
 func _set_face(root: Node3D, card: int) -> void:
-	var tint: Color = BACK_TINT if card == FACE_DOWN else Color.WHITE
+	var tint: Color = BACK_TINT if card == FACE_DOWN else FACE_TINT
 	(root.get_node(^"Face") as MeshInstance3D).material_override = _material(_texture(card), tint)
 
 
-static func _material(tex: Texture2D, tint: Color = Color.WHITE) -> StandardMaterial3D:
+static func _material(tex: Texture2D, tint: Color = FACE_TINT) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = tex
 	m.albedo_color = tint

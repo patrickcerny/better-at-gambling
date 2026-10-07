@@ -135,7 +135,7 @@ func _build_steps() -> void:
 				["walk", THROW_SPOT + Vector3(0, 0, 1.4)],
 				["wait_near", bot, 1.0], ["wait", 1.0],
 				["face_partner", bot], ["wait", 0.2],
-				["intent", &"shove", {"aim": [0, 0, 0]}],
+				["shove_partner", bot],
 				["wait_event", &"player_shoved", 30.0], ["wait", 0.5],  # the victim shoves back
 				["wait_near", bot, 1.0], ["wait", 0.5],
 				["approach_partner", bot], ["wait", 0.3],
@@ -144,9 +144,9 @@ func _build_steps() -> void:
 				["intent", &"release", {"throw": true, "aim": [1, 0, -0.4]}],
 				["wait_event", &"player_got_up", 30.0, bot], ["wait", 5.0],  # victim checks its body
 				# Three quick shoves knock the victim out.
-				["approach_if_far", bot], ["face_partner", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.25],
-				["approach_if_far", bot], ["face_partner", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.25],
-				["approach_if_far", bot], ["face_partner", bot], ["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 8.0],
+				["approach_if_far", bot], ["face_partner", bot], ["shove_partner", bot], ["wait", 1.25],
+				["approach_if_far", bot], ["face_partner", bot], ["shove_partner", bot], ["wait", 1.25],
+				["approach_if_far", bot], ["face_partner", bot], ["shove_partner", bot], ["wait", 8.0],
 				["done", null],
 			]
 			return
@@ -155,7 +155,7 @@ func _build_steps() -> void:
 				["walk", THROW_SPOT], ["wait", 0.5],
 				["wait_event", &"player_shoved", 45.0], ["wait", 0.6],
 				["walk", THROW_SPOT], ["wait", 0.3],
-				["face_partner", bot], ["wait", 0.2], ["intent", &"shove", {"aim": [0, 0, 0]}],
+				["face_partner", bot], ["wait", 0.2], ["shove_partner", bot],
 				["wait_event", &"player_got_up", 45.0], ["wait", 1.0],
 				["walk_by", Vector3(0, 0, 3.0)], ["wait", 1.5],
 				["check_authority"],
@@ -193,9 +193,9 @@ func _build_steps() -> void:
 		["intent", &"leave", {}], ["wait", 0.5],
 		["walk", LuckyLounge.SPAWNS[1] + Vector3(0, 0, -1.5)],
 		["face_partner", bot], ["wait", 0.3],
-		["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.4],
-		["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.4],
-		["intent", &"shove", {"aim": [0, 0, 0]}], ["wait", 1.0],
+		["shove_partner", bot], ["wait", 1.4],
+		["shove_partner", bot], ["wait", 1.4],
+		["shove_partner", bot], ["wait", 1.0],
 		["intent", &"shake", {}], ["wait", 0.7], ["intent", &"shake", {}], ["wait", 0.7], ["intent", &"shake", {}], ["wait", 4.0],
 		["approach_partner", bot], ["wait", 0.5],
 		["face_partner", bot], ["intent", &"grab", {"target": bot}], ["wait", 1.0],
@@ -341,6 +341,19 @@ func _process(delta: float) -> void:
 				to.y = 0.0
 				var goal: Vector3 = partner.global_position + (to.normalized() if to.length() > 0.1 else Vector3.BACK) * 1.3
 				steps.insert(index, ["walk", goal])
+		"shove_partner":
+			# Like a real client: aim at the partner and name them, so lag on their position
+			# (150 ms, 2% loss in the net tests) doesn't turn the swing into a whiff.
+			var mark: PlayerAvatar = scene.avatars.get(int(step[1]), null)
+			var aim: Vector3 = scene.local.facing()
+			if mark != null:
+				var to: Vector3 = mark.global_position - scene.local.global_position
+				to.y = 0.0
+				if to.length() > 0.05:
+					aim = to.normalized()
+			var payload: Dictionary = {"aim": Serializer.vec3(aim), "target": int(step[1])}
+			var res: Dictionary = Net.send_intent(Intents.make(&"shove", payload))
+			Log.info(&"autoplay", "shove %s -> %s" % [payload, res])
 		"approach_if_far":
 			var other: PlayerAvatar = scene.avatars.get(int(step[1]), null)
 			if other != null and other.global_position.distance_to(scene.local.global_position) > 1.7:

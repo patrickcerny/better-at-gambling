@@ -87,7 +87,7 @@
   `tests/physics/test_vip_access.gd` (walk up, bounce while broke, walk in and sit when rich).
 - The lobby doors' sign is partly hidden behind the fountain from some spawn points (greybox layout; M7 art pass).
 - Stairs are not on the navmesh (guards never go upstairs; players do, it's physics). Fine for now, revisit when bots roam (M6).
-- The slots camera anchor sits too close to the cabinet screen (M7 station polish).
+- (checked 2026-10-07, S13) The slots camera anchor no longer sits too close: the seated view frames the marquee and reels at about 1 m with the panel below them. No change needed.
 
 ## Blockers
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
