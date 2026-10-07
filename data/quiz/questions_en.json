@@ -59,7 +59,7 @@
    "id": "ct_005",
    "category": "casino_trivia",
    "difficulty": 2,
-   "question": "A roulette bet on a single number is called…",
+   "question": "A roulette bet on a single number is called\u2026",
    "answers": [
     "Straight up",
     "Split",
@@ -124,7 +124,7 @@
    "id": "ct_010",
    "category": "casino_trivia",
    "difficulty": 2,
-   "question": "In casino slang, a \"whale\" is…",
+   "question": "In casino slang, a \"whale\" is\u2026",
    "answers": [
     "A gambler who bets huge sums",
     "A broken slot machine",
@@ -137,7 +137,7 @@
    "id": "ct_011",
    "category": "casino_trivia",
    "difficulty": 1,
-   "question": "\"One-armed bandit\" is a nickname for…",
+   "question": "\"One-armed bandit\" is a nickname for\u2026",
    "answers": [
     "A slot machine",
     "A pickpocket",
@@ -150,7 +150,7 @@
    "id": "ct_012",
    "category": "casino_trivia",
    "difficulty": 2,
-   "question": "A croupier is…",
+   "question": "A croupier is\u2026",
    "answers": [
     "The person who runs a casino table",
     "A French pastry",
@@ -163,7 +163,7 @@
    "id": "ct_013",
    "category": "casino_trivia",
    "difficulty": 2,
-   "question": "In a casino, a \"comp\" is…",
+   "question": "In a casino, a \"comp\" is\u2026",
    "answers": [
     "A free gift from the house",
     "A computer that counts cards",
@@ -189,7 +189,7 @@
    "id": "ct_015",
    "category": "casino_trivia",
    "difficulty": 1,
-   "question": "A \"high roller\" is someone who…",
+   "question": "A \"high roller\" is someone who\u2026",
    "answers": [
     "Bets very big",
     "Rolls dice very high",
@@ -319,7 +319,7 @@
    "id": "cd_005",
    "category": "cards_and_dice",
    "difficulty": 1,
-   "question": "Going over 21 in blackjack is called…",
+   "question": "Going over 21 in blackjack is called\u2026",
    "answers": [
     "Busting",
     "Folding",
@@ -332,7 +332,7 @@
    "id": "cd_006",
    "category": "cards_and_dice",
    "difficulty": 1,
-   "question": "Asking for another card in blackjack is called…",
+   "question": "Asking for another card in blackjack is called\u2026",
    "answers": [
     "Hit",
     "Stand",
@@ -345,7 +345,7 @@
    "id": "cd_007",
    "category": "cards_and_dice",
    "difficulty": 2,
-   "question": "Doubling your bet for exactly one more card is called…",
+   "question": "Doubling your bet for exactly one more card is called\u2026",
    "answers": [
     "Double down",
     "Split",
@@ -358,7 +358,7 @@
    "id": "cd_008",
    "category": "cards_and_dice",
    "difficulty": 2,
-   "question": "A tie with the dealer in blackjack is called a…",
+   "question": "A tie with the dealer in blackjack is called a\u2026",
    "answers": [
     "Push",
     "Draw",
@@ -371,7 +371,7 @@
    "id": "cd_009",
    "category": "cards_and_dice",
    "difficulty": 2,
-   "question": "Opposite faces of a standard die always add up to…",
+   "question": "Opposite faces of a standard die always add up to\u2026",
    "answers": [
     "7",
     "6",
@@ -384,7 +384,7 @@
    "id": "cd_010",
    "category": "cards_and_dice",
    "difficulty": 1,
-   "question": "Rolling two ones is called…",
+   "question": "Rolling two ones is called\u2026",
    "answers": [
     "Snake eyes",
     "Boxcars",
@@ -449,7 +449,7 @@
    "id": "cd_015",
    "category": "cards_and_dice",
    "difficulty": 2,
-   "question": "In poker, three of a kind plus a pair is a…",
+   "question": "In poker, three of a kind plus a pair is a\u2026",
    "answers": [
     "Full house",
     "Flush",
@@ -475,7 +475,7 @@
    "id": "cd_017",
    "category": "cards_and_dice",
    "difficulty": 2,
-   "question": "In standard blackjack, the dealer keeps drawing until reaching at least…",
+   "question": "In standard blackjack, the dealer keeps drawing until reaching at least\u2026",
    "answers": [
     "17",
     "16",
@@ -540,7 +540,7 @@
    "id": "cd_022",
    "category": "cards_and_dice",
    "difficulty": 2,
-   "question": "Rolling two sixes is called…",
+   "question": "Rolling two sixes is called\u2026",
    "answers": [
     "Boxcars",
     "Snake eyes",
@@ -566,7 +566,7 @@
    "id": "ls_002",
    "category": "luck_and_superstition",
    "difficulty": 1,
-   "question": "A four-leaf clover is said to bring…",
+   "question": "A four-leaf clover is said to bring\u2026",
    "answers": [
     "Good luck",
     "Rain",
@@ -618,7 +618,7 @@
    "id": "ls_006",
    "category": "luck_and_superstition",
    "difficulty": 3,
-   "question": "Fear of the number 13 is called…",
+   "question": "Fear of the number 13 is called\u2026",
    "answers": [
     "Triskaidekaphobia",
     "Arachnophobia",
@@ -657,7 +657,7 @@
    "id": "ls_009",
    "category": "luck_and_superstition",
    "difficulty": 2,
-   "question": "To keep its luck in, a horseshoe is often hung with its ends…",
+   "question": "To keep its luck in, a horseshoe is often hung with its ends\u2026",
    "answers": [
     "Pointing up",
     "Pointing down",
@@ -670,7 +670,7 @@
    "id": "ls_010",
    "category": "luck_and_superstition",
    "difficulty": 1,
-   "question": "\"Beginner's luck\" is the idea that…",
+   "question": "\"Beginner's luck\" is the idea that\u2026",
    "answers": [
     "New players often win",
     "Experts always win",
@@ -709,7 +709,7 @@
    "id": "ls_013",
    "category": "luck_and_superstition",
    "difficulty": 3,
-   "question": "The gambler's fallacy is believing that…",
+   "question": "The gambler's fallacy is believing that\u2026",
    "answers": [
     "Past results change the odds of independent events",
     "Casinos always lose money",
@@ -735,7 +735,7 @@
    "id": "ls_015",
    "category": "luck_and_superstition",
    "difficulty": 2,
-   "question": "Walking under a ladder is supposed to bring…",
+   "question": "Walking under a ladder is supposed to bring\u2026",
    "answers": [
     "Bad luck",
     "Good luck",
@@ -761,7 +761,7 @@
    "id": "ls_017",
    "category": "luck_and_superstition",
    "difficulty": 2,
-   "question": "Crossing your fingers is supposed to…",
+   "question": "Crossing your fingers is supposed to\u2026",
    "answers": [
     "Bring good luck",
     "Ward off the dealer",
@@ -828,9 +828,9 @@
    "difficulty": 2,
    "question": "How much more does a HOT table pay on winnings?",
    "answers": [
-    "×1.25",
-    "×2",
-    "×10",
+    "\u00d71.25",
+    "\u00d72",
+    "\u00d710",
     "Nothing extra"
    ],
    "correct_index": 0
@@ -904,7 +904,7 @@
    "id": "gr_011",
    "category": "game_rules",
    "difficulty": 1,
-   "question": "In the quiz, answering faster gives you…",
+   "question": "In the quiz, answering faster gives you\u2026",
    "answers": [
     "More points",
     "Fewer points",
@@ -930,7 +930,7 @@
    "id": "gr_013",
    "category": "game_rules",
    "difficulty": 3,
-   "question": "In the Lucky Lounge, when the dealer busts, winning blackjack hands are paid…",
+   "question": "In the Lucky Lounge, when the dealer busts, winning blackjack hands are paid\u2026",
    "answers": [
     "1.1 to 1",
     "2 to 1",
@@ -982,7 +982,7 @@
    "id": "gr_017",
    "category": "game_rules",
    "difficulty": 2,
-   "question": "Your luck can range from…",
+   "question": "Your luck can range from\u2026",
    "answers": [
     "-3 to +3",
     "0 to 100",
@@ -1263,6 +1263,2411 @@
     "They mumble"
    ],
    "correct_index": 0
+  },
+  {
+   "id": "ct_098",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What total is called blackjack when made with the first two cards?",
+   "answers": [
+    "22",
+    "20",
+    "21",
+    "19"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_099",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which two-card combination is a natural blackjack?",
+   "answers": [
+    "A king and a queen only",
+    "Any two cards totaling 20",
+    "Two aces",
+    "An ace plus any 10-value card"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_100",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What value do kings, queens, and jacks have in blackjack?",
+   "answers": [
+    "10",
+    "Face value varies",
+    "12",
+    "11"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_101",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What values can an ace have in blackjack?",
+   "answers": [
+    "1 or 11",
+    "Only 1",
+    "10 or 11",
+    "1 or 10"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_102",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'hit' mean in blackjack?",
+   "answers": [
+    "Take another card",
+    "Double the wager automatically",
+    "Split a pair",
+    "End the hand"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_103",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'stand' mean in blackjack?",
+   "answers": [
+    "Match the dealer's wager",
+    "Take exactly one more card",
+    "Surrender the hand",
+    "Take no more cards"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_104",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'bust' mean in blackjack?",
+   "answers": [
+    "The player splits",
+    "The dealer has an ace",
+    "A hand totals exactly 21",
+    "A hand total exceeds 21"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_105",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a 'push' in blackjack?",
+   "answers": [
+    "A dealer bust",
+    "A tie between player and dealer",
+    "A player blackjack",
+    "A doubled bet"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_106",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What action is normally available when the first two cards have the same rank?",
+   "answers": [
+    "Call",
+    "Split",
+    "Fold",
+    "Check"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_107",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'double down' normally mean?",
+   "answers": [
+    "Double the original wager and receive one final card",
+    "Double the wager and receive unlimited cards",
+    "Split a hand into two",
+    "Give up half the bet"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_108",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In blackjack, who acts first after the initial deal: player or dealer?",
+   "answers": [
+    "Dealer",
+    "Pit boss",
+    "Player",
+    "It is simultaneous"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_109",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the dealer's exposed card commonly called?",
+   "answers": [
+    "Upcard",
+    "Burn card",
+    "River",
+    "Door card"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_110",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If a blackjack hand contains an ace counted as 11 without busting, what is it called?",
+   "answers": [
+    "Natural only",
+    "Hard",
+    "Soft",
+    "Dead"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_111",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "A hand with no ace counted as 11 is generally called what?",
+   "answers": [
+    "Soft",
+    "Cold",
+    "Hard",
+    "Locked"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_112",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a 'soft 17'?",
+   "answers": [
+    "Any 17 with two cards",
+    "A 17 containing an ace counted as 11",
+    "A 17 after splitting",
+    "A 17 made only from face cards"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_113",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which hand is worth 20 in blackjack?",
+   "answers": [
+    "King and queen",
+    "Seven and two",
+    "Ace and eight",
+    "Nine and ten"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_114",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the highest non-busting total in blackjack?",
+   "answers": [
+    "21",
+    "20",
+    "22",
+    "19"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_115",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the lowest possible total of two aces in blackjack?",
+   "answers": [
+    "2",
+    "22",
+    "12",
+    "11"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_116",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If you hold 10 and 6, what is your total?",
+   "answers": [
+    "15",
+    "18",
+    "17",
+    "16"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_117",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If you hold an ace and a 6, what is the best non-busting total?",
+   "answers": [
+    "16",
+    "17",
+    "18",
+    "7"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_118",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If you hold ace, 6, and 10, what is the total?",
+   "answers": [
+    "27",
+    "16",
+    "17",
+    "18"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_119",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What blackjack option lets a player give up the hand and recover part of the wager where offered?",
+   "answers": [
+    "Split",
+    "Insurance",
+    "Push",
+    "Surrender"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_120",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Insurance in blackjack is associated with which dealer upcard?",
+   "answers": [
+    "7",
+    "10",
+    "2",
+    "Ace"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_121",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the usual target of an insurance bet?",
+   "answers": [
+    "That the dealer has blackjack",
+    "That the dealer will bust",
+    "That the player will make 21",
+    "That the next card is an ace"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_122",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which card ranks are 10-value cards in blackjack?",
+   "answers": [
+    "Jack, queen, king, ace",
+    "10, jack, queen, king",
+    "8, 9, 10, jack",
+    "9, 10, jack, queen"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_123",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What happens to an ace's value when counting it as 11 would bust the hand?",
+   "answers": [
+    "It becomes 10",
+    "It stays 11",
+    "It is counted as 1",
+    "It is removed"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_124",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which total is automatically a bust?",
+   "answers": [
+    "19",
+    "20",
+    "21",
+    "22"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_125",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "A pair of eights can be turned into how many starting hands by splitting once?",
+   "answers": [
+    "One",
+    "Three",
+    "Two",
+    "Four"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_126",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does the dealer generally do according to fixed house rules rather than personal choice?",
+   "answers": [
+    "Hit or stand based on the house rule",
+    "Always split pairs",
+    "Always double on 11",
+    "Choose any action strategically"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_127",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What card is often placed face down under the dealer's upcard in hole-card blackjack games?",
+   "answers": [
+    "Burn card",
+    "Community card",
+    "River card",
+    "Hole card"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_128",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'blackjack pays 3 to 2' describe?",
+   "answers": [
+    "The dealer's draw rule",
+    "The shuffle ratio",
+    "The number of cards dealt",
+    "A common payout for a winning natural blackjack"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_129",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which total can be either soft or hard depending on the cards?",
+   "answers": [
+    "23",
+    "22",
+    "17",
+    "24"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_130",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If your first two cards are 9 and 9, what blackjack action may be available?",
+   "answers": [
+    "Split",
+    "Insurance",
+    "Ante",
+    "Check"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_131",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In blackjack, what is card counting primarily tracking?",
+   "answers": [
+    "The roulette wheel speed",
+    "The dealer's chip stack",
+    "The exact next card",
+    "The changing composition of cards remaining"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_132",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What kind of casino game is blackjack?",
+   "answers": [
+    "Wheel game",
+    "Lottery draw",
+    "Dice game",
+    "Comparing card game"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_133",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What object determines the winning number in roulette?",
+   "answers": [
+    "A shuffled card",
+    "A ball landing in a numbered wheel pocket",
+    "A spinning coin",
+    "A pair of dice"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_134",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many numbered pockets are on a standard European roulette wheel?",
+   "answers": [
+    "37",
+    "38",
+    "40",
+    "36"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_135",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many numbered pockets are on a standard American double-zero roulette wheel?",
+   "answers": [
+    "36",
+    "37",
+    "38",
+    "39"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_136",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which special green pocket exists on both European and standard American roulette wheels?",
+   "answers": [
+    "1",
+    "0",
+    "00",
+    "000"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_137",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which extra green pocket distinguishes standard American roulette from European roulette?",
+   "answers": [
+    "36",
+    "00",
+    "0",
+    "000"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_138",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What color is the zero pocket traditionally?",
+   "answers": [
+    "Red",
+    "Gold",
+    "Green",
+    "Black"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_139",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What are the three main pocket colors on a roulette wheel?",
+   "answers": [
+    "Red, black, and green",
+    "Black, white, and gold",
+    "Red, blue, and green",
+    "Red, black, and white"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_140",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "An 'inside' roulette bet is placed primarily on what?",
+   "answers": [
+    "Only dozens",
+    "Only red or black",
+    "Only odd or even",
+    "Specific numbers or small groups of adjacent numbers"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_141",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "An 'outside' roulette bet includes which example?",
+   "answers": [
+    "Split",
+    "Straight-up number",
+    "Corner",
+    "Red or black"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_142",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a straight-up roulette bet?",
+   "answers": [
+    "A bet on one number",
+    "A bet on two numbers",
+    "A bet on twelve numbers",
+    "A bet on four numbers"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_143",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a split bet in roulette?",
+   "answers": [
+    "A bet on six numbers",
+    "A bet on four numbers",
+    "A bet on two adjacent numbers",
+    "A bet on three numbers in a row"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_144",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a street bet in roulette?",
+   "answers": [
+    "A bet on four numbers meeting at a corner",
+    "A bet on three numbers in one horizontal row",
+    "A bet on two adjacent numbers",
+    "A bet on twelve numbers"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_145",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a corner bet in roulette?",
+   "answers": [
+    "A bet on a whole dozen",
+    "A bet on three numbers",
+    "A bet on one number",
+    "A bet on four numbers meeting at one point"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_146",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a six-line bet in roulette?",
+   "answers": [
+    "A bet on six red numbers only",
+    "A bet covering six numbers in two adjacent rows",
+    "A bet on zero through five",
+    "A bet on six odd numbers"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_147",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many numbers does a dozen bet cover in roulette?",
+   "answers": [
+    "12",
+    "6",
+    "10",
+    "18"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_148",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many numbers does a column bet cover on the standard roulette layout?",
+   "answers": [
+    "3",
+    "18",
+    "12",
+    "6"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_149",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many regular numbers, excluding zero pockets, are on a roulette layout?",
+   "answers": [
+    "37",
+    "35",
+    "36",
+    "38"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_150",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the range of regular roulette numbers?",
+   "answers": [
+    "0 through 36",
+    "0 through 35",
+    "1 through 37",
+    "1 through 36"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_151",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which roulette bet covers 18 regular numbers?",
+   "answers": [
+    "A street",
+    "A dozen",
+    "A corner",
+    "Red or black"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_152",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which roulette bet also covers 18 regular numbers?",
+   "answers": [
+    "A column",
+    "Odd or even",
+    "A split",
+    "A street"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_153",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which roulette bet covers the numbers 1 through 18?",
+   "answers": [
+    "High",
+    "Low",
+    "First dozen",
+    "First column"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_154",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which roulette bet covers the numbers 19 through 36?",
+   "answers": [
+    "Third dozen only",
+    "Second column",
+    "Low",
+    "High"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_155",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the usual payout for a winning straight-up roulette bet?",
+   "answers": [
+    "35 to 1",
+    "5 to 1",
+    "11 to 1",
+    "17 to 1"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_156",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the usual payout for a winning split roulette bet?",
+   "answers": [
+    "8 to 1",
+    "11 to 1",
+    "35 to 1",
+    "17 to 1"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_157",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the usual payout for a winning street roulette bet?",
+   "answers": [
+    "17 to 1",
+    "8 to 1",
+    "5 to 1",
+    "11 to 1"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_158",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the usual payout for a winning corner roulette bet?",
+   "answers": [
+    "8 to 1",
+    "11 to 1",
+    "5 to 1",
+    "17 to 1"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_159",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the usual payout for a winning six-line roulette bet?",
+   "answers": [
+    "8 to 1",
+    "5 to 1",
+    "2 to 1",
+    "11 to 1"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_160",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the usual payout for a winning dozen roulette bet?",
+   "answers": [
+    "1 to 1",
+    "11 to 1",
+    "2 to 1",
+    "5 to 1"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_161",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the usual payout for a winning red/black roulette bet?",
+   "answers": [
+    "1 to 1",
+    "3 to 2",
+    "5 to 1",
+    "2 to 1"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_162",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "On a single-zero European wheel, what is the probability of one specific number winning?",
+   "answers": [
+    "2 in 37",
+    "1 in 38",
+    "1 in 36",
+    "1 in 37"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_163",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "On a double-zero American wheel, what is the probability of one specific number winning?",
+   "answers": [
+    "1 in 36",
+    "1 in 38",
+    "2 in 38",
+    "1 in 37"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_164",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Why is red not exactly a 50% bet in roulette?",
+   "answers": [
+    "Because the ball can stop between pockets",
+    "Because the green zero pocket or pockets can win",
+    "Because red numbers repeat",
+    "Because there are more black than red numbers"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_165",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many red regular numbers are on a standard roulette wheel?",
+   "answers": [
+    "17",
+    "18",
+    "19",
+    "20"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_166",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many black regular numbers are on a standard roulette wheel?",
+   "answers": [
+    "19",
+    "18",
+    "17",
+    "16"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_167",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What device is spun in one direction while the roulette ball is typically sent around the rim?",
+   "answers": [
+    "The layout",
+    "The shoe",
+    "The wheel",
+    "The chip rack"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_168",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which total has the most combinations with two standard dice?",
+   "answers": [
+    "5",
+    "6",
+    "8",
+    "7"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_169",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many combinations produce a total of 7 with two dice?",
+   "answers": [
+    "6",
+    "5",
+    "3",
+    "4"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_170",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many combinations produce a total of 2 with two dice?",
+   "answers": [
+    "1",
+    "6",
+    "2",
+    "3"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_171",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many combinations produce a total of 12 with two dice?",
+   "answers": [
+    "6",
+    "2",
+    "1",
+    "3"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_172",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which two-dice total has exactly two combinations?",
+   "answers": [
+    "5",
+    "9",
+    "7",
+    "3"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_173",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which two-dice total has exactly three combinations?",
+   "answers": [
+    "4",
+    "8",
+    "6",
+    "10"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_174",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which two-dice total has exactly four combinations?",
+   "answers": [
+    "4",
+    "2",
+    "5",
+    "3"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_175",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which two-dice total has exactly five combinations?",
+   "answers": [
+    "5",
+    "6",
+    "3",
+    "4"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_176",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling any 7 with two fair six-sided dice?",
+   "answers": [
+    "1 in 6",
+    "5 in 36",
+    "1 in 36",
+    "1 in 12"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_177",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many equally likely ordered outcomes are there when rolling two fair six-sided dice?",
+   "answers": [
+    "12",
+    "42",
+    "18",
+    "36"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_178",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which pair is a hardway result?",
+   "answers": [
+    "5 and 3",
+    "4 and 2",
+    "3 and 3",
+    "6 and 2"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_179",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If the Player's first two cards total 6 or 7 and there is no natural, what normally happens?",
+   "answers": [
+    "The Player stands",
+    "The Player folds",
+    "The Player draws twice",
+    "The Player doubles"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_180",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the highest standard poker hand?",
+   "answers": [
+    "Royal flush",
+    "Full house",
+    "Straight",
+    "Four of a kind"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_181",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What five ranks make a royal flush?",
+   "answers": [
+    "Ace, 2, 3, 4, 5",
+    "10, jack, queen, king, ace",
+    "9, 10, jack, queen, king",
+    "Jack, queen, king, ace, 2"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_182",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a straight flush?",
+   "answers": [
+    "Five cards of one suit in any order",
+    "Three of a kind plus a pair",
+    "Five consecutive cards of the same suit",
+    "Four cards of one rank"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_183",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is four of a kind?",
+   "answers": [
+    "Four consecutive cards",
+    "Two pairs",
+    "Four cards of the same suit",
+    "Four cards of the same rank"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_184",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a full house?",
+   "answers": [
+    "Three of a kind plus a pair",
+    "A straight plus a pair",
+    "Two sets of three",
+    "Five cards of one suit"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_185",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a flush?",
+   "answers": [
+    "Four equal ranks",
+    "Five cards of the same suit not necessarily consecutive",
+    "Three of a kind plus a pair",
+    "Five consecutive cards of mixed suits"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_186",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a straight?",
+   "answers": [
+    "Five cards of one suit",
+    "Five consecutive ranks not necessarily of one suit",
+    "Five face cards",
+    "Five cards of the same rank"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_187",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is three of a kind?",
+   "answers": [
+    "Three pairs",
+    "Three cards of one suit",
+    "Three consecutive cards",
+    "Three cards of the same rank"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_188",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is two pair?",
+   "answers": [
+    "Two cards total",
+    "Four cards of one rank",
+    "Two different pairs plus a fifth card",
+    "A pair plus three suited cards"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_189",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is one pair?",
+   "answers": [
+    "Two cards of the same suit",
+    "Two cards of the same rank",
+    "Two consecutive cards",
+    "Two face cards"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_190",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which hand ranks higher: flush or straight?",
+   "answers": [
+    "Depends on suit",
+    "Straight",
+    "Flush",
+    "They are equal"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_191",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which hand ranks higher: full house or flush?",
+   "answers": [
+    "Full house",
+    "Flush",
+    "They are equal",
+    "Depends on the pair"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_192",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which hand ranks higher: four of a kind or full house?",
+   "answers": [
+    "Full house",
+    "Four of a kind",
+    "They are equal",
+    "Depends on suit"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_193",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which hand ranks higher: straight flush or four of a kind?",
+   "answers": [
+    "Straight flush",
+    "Four of a kind",
+    "They are equal",
+    "Depends on the ace"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_194",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which hand ranks higher: three of a kind or two pair?",
+   "answers": [
+    "They are equal",
+    "Two pair",
+    "Three of a kind",
+    "Depends on suit"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_195",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many private hole cards does each player receive in Texas Hold'em?",
+   "answers": [
+    "Five",
+    "Two",
+    "One",
+    "Four"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_196",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many community cards are ultimately available in Texas Hold'em?",
+   "answers": [
+    "Two",
+    "Five",
+    "Three",
+    "Seven"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_197",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What are the first three community cards in Texas Hold'em called collectively?",
+   "answers": [
+    "The turn",
+    "The draw",
+    "The flop",
+    "The river"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_198",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the fourth community card in Texas Hold'em called?",
+   "answers": [
+    "The door",
+    "The river",
+    "The flop",
+    "The turn"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_199",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the fifth community card in Texas Hold'em called?",
+   "answers": [
+    "The river",
+    "The turn",
+    "The burn",
+    "The flop"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_200",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'check' mean in poker when no bet is facing you?",
+   "answers": [
+    "Raise the maximum",
+    "Match a bet",
+    "Fold the hand",
+    "Pass the action without betting"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_201",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'call' mean in poker?",
+   "answers": [
+    "Bet nothing",
+    "Show your cards immediately",
+    "Fold",
+    "Match the current bet"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_202",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'raise' mean in poker?",
+   "answers": [
+    "Fold",
+    "Match the current bet exactly",
+    "Increase the current bet",
+    "End the betting round instantly"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_203",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'fold' mean in poker?",
+   "answers": [
+    "Increase the bet",
+    "Take another card automatically",
+    "Match the bet",
+    "Give up the hand"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_204",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the 'pot' in poker?",
+   "answers": [
+    "A type of straight",
+    "The deck tray",
+    "The chips or money being contested in the hand",
+    "The dealer button"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_205",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a 'kicker' in poker?",
+   "answers": [
+    "An unpaired side card used to break some ties",
+    "A forced blind",
+    "The final community card",
+    "A wild card"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_206",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many cards are in a standard deck without jokers?",
+   "answers": [
+    "56",
+    "52",
+    "54",
+    "48"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_207",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many cards are in each suit of a standard deck?",
+   "answers": [
+    "10",
+    "13",
+    "12",
+    "14"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_208",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which suit is traditionally paired with hearts as a red suit?",
+   "answers": [
+    "Spades",
+    "Clubs",
+    "Jokers",
+    "Diamonds"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_209",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which suits are traditionally black?",
+   "answers": [
+    "Clubs and spades",
+    "Spades and hearts",
+    "Hearts and diamonds",
+    "Clubs and diamonds"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_210",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many aces are in a standard 52-card deck?",
+   "answers": [
+    "3",
+    "4",
+    "2",
+    "5"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_211",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many kings are in a standard 52-card deck?",
+   "answers": [
+    "6",
+    "3",
+    "2",
+    "4"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_212",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many face cards are in a standard 52-card deck?",
+   "answers": [
+    "16",
+    "12",
+    "8",
+    "10"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_213",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In Texas Hold'em, how many cards make up a player's final poker hand?",
+   "answers": [
+    "Five",
+    "Four",
+    "Two",
+    "Seven"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_214",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In Texas Hold'em, can a player use all five community cards as the final hand?",
+   "answers": [
+    "No",
+    "Yes",
+    "Only heads-up",
+    "Only with a flush"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_215",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many hole cards does each player receive in Omaha?",
+   "answers": [
+    "Five",
+    "Two",
+    "Four",
+    "Three"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_216",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In standard Omaha, how many hole cards must be used in the final hand?",
+   "answers": [
+    "Exactly one",
+    "All four",
+    "Any number from zero to four",
+    "Exactly two"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_217",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In standard Omaha, how many community cards must be used in the final hand?",
+   "answers": [
+    "Any number",
+    "Exactly two",
+    "Exactly three",
+    "All five"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_218",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In seven-card stud, are there community cards shared by all players?",
+   "answers": [
+    "No",
+    "Yes, three",
+    "Yes, five",
+    "Yes, one"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_219",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What object usually marks the nominal dealer position in casino hold'em games?",
+   "answers": [
+    "Shoe",
+    "Marker chip",
+    "Cut card",
+    "Dealer button"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_220",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is an 'ante' in poker?",
+   "answers": [
+    "The dealer's tip",
+    "A forced contribution made before a hand in games that use one",
+    "The highest card",
+    "A raise after the river"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_221",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If two poker players have identical five-card hands at showdown, what usually happens to the pot?",
+   "answers": [
+    "It is split",
+    "The dealer wins it",
+    "The player nearest the dealer wins",
+    "Suit determines the winner"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_222",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a dealer's 'toke'?",
+   "answers": [
+    "A marker loan",
+    "A shuffle",
+    "A tip",
+    "A losing hand"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_223",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a 'comp' in casino terminology?",
+   "answers": [
+    "A complimentary benefit or service",
+    "A computer malfunction",
+    "A compulsory wager",
+    "A completed poker hand"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_224",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the purpose of a cut card in many card games?",
+   "answers": [
+    "To increase card values",
+    "To indicate a cut point or prevent exposure of the bottom card",
+    "To mark winning hands",
+    "To replace the joker"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_225",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a table minimum?",
+   "answers": [
+    "The shortest game duration",
+    "The smallest permitted wager on a table",
+    "The lowest chip denomination in the casino",
+    "The minimum dealer age"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_226",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a table maximum?",
+   "answers": [
+    "The largest permitted wager on a table",
+    "The highest card value",
+    "The maximum number of chairs",
+    "The largest roulette number"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_227",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is keno primarily based on?",
+   "answers": [
+    "Rolling two dice",
+    "Building poker hands",
+    "Selecting numbers for a random draw",
+    "Spinning a roulette wheel"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_228",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What does 'house edge' mean?",
+   "answers": [
+    "The casino's mathematical advantage over the long run",
+    "The difference between table minimum and maximum",
+    "The edge of the gaming table",
+    "A guaranteed casino win on every wager"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_229",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a side bet?",
+   "answers": [
+    "A dealer's personal wager",
+    "An additional wager separate from the main wager",
+    "A bet placed after the game ends",
+    "A mandatory tax"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_230",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is a jackpot?",
+   "answers": [
+    "A losing poker hand",
+    "A casino entrance fee",
+    "A dealer break",
+    "A large prize or top payout"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_231",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In which U.S. state is Las Vegas located?",
+   "answers": [
+    "Utah",
+    "Arizona",
+    "California",
+    "Nevada"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_232",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "On what famous road are many major Las Vegas resorts located?",
+   "answers": [
+    "Broadway",
+    "Sunset Boulevard",
+    "Las Vegas Boulevard",
+    "Ocean Drive"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_233",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What nickname is commonly used for the resort corridor along Las Vegas Boulevard?",
+   "answers": [
+    "The Loop",
+    "The Mile",
+    "The Strip",
+    "The Boardwalk"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_234",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "In what year did Nevada legalize casino gambling statewide?",
+   "answers": [
+    "1946",
+    "1919",
+    "1966",
+    "1931"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_235",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Caesars Palace in Las Vegas opened in which decade?",
+   "answers": [
+    "2000s",
+    "1960s",
+    "1980s",
+    "1940s"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_236",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Caesars Palace opened in what year?",
+   "answers": [
+    "1966",
+    "1977",
+    "1955",
+    "1989"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_237",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "The Mirage, a landmark Las Vegas megaresort, opened in what year?",
+   "answers": [
+    "1979",
+    "1999",
+    "1989",
+    "2009"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_238",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Bellagio opened in Las Vegas in what year?",
+   "answers": [
+    "1988",
+    "1975",
+    "1998",
+    "2005"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_239",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Luxor Las Vegas is famous for being shaped like what?",
+   "answers": [
+    "A pyramid",
+    "A Roman temple",
+    "A castle",
+    "A sailing ship"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_240",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Excalibur Las Vegas is themed primarily around what?",
+   "answers": [
+    "A medieval castle",
+    "Paris",
+    "Ancient Egypt",
+    "Venice"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_241",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "The Venetian Las Vegas is themed after which Italian city?",
+   "answers": [
+    "Venice",
+    "Milan",
+    "Florence",
+    "Rome"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_242",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Paris Las Vegas features a replica of which landmark?",
+   "answers": [
+    "The Leaning Tower of Pisa",
+    "Big Ben",
+    "The Eiffel Tower",
+    "The Colosseum"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_243",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "New York-New York Las Vegas is themed after which U.S. city?",
+   "answers": [
+    "Boston",
+    "New York City",
+    "Miami",
+    "Chicago"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_244",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Monte Carlo Casino is located in which sovereign state?",
+   "answers": [
+    "Monaco",
+    "France",
+    "Switzerland",
+    "Italy"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_245",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Macau is a special administrative region of which country?",
+   "answers": [
+    "South Korea",
+    "Japan",
+    "China",
+    "Singapore"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_246",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which European city is closely associated with Casino de Monte-Carlo?",
+   "answers": [
+    "Monte Carlo",
+    "Madrid",
+    "Vienna",
+    "Lisbon"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_247",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which card-game inventor is widely credited with popularizing card counting through the 1962 book 'Beat the Dealer'?",
+   "answers": [
+    "Blaise Pascal",
+    "Doyle Brunson",
+    "Edward O. Thorp",
+    "John Scarne"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_248",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which city is the Bellagio resort located in?",
+   "answers": [
+    "Las Vegas",
+    "Reno",
+    "Macau",
+    "Atlantic City"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_249",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which city is Caesars Palace located in?",
+   "answers": [
+    "Singapore",
+    "Monte Carlo",
+    "London",
+    "Las Vegas"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_250",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which city is known for casinos along the Boardwalk and Marina District in New Jersey?",
+   "answers": [
+    "Reno",
+    "Atlantic City",
+    "Las Vegas",
+    "New Orleans"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_251",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "Which U.S. state is Atlantic City located in?",
+   "answers": [
+    "New Jersey",
+    "New York",
+    "Pennsylvania",
+    "Delaware"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_252",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the primary gaming currency used at most table games instead of cash at the table?",
+   "answers": [
+    "Casino chips",
+    "Hotel keys",
+    "Playing cards",
+    "Tokens called reels"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_253",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of drawing an ace from a full 52-card deck?",
+   "answers": [
+    "4/52, or 1/13",
+    "13/52",
+    "1/4",
+    "1/52"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_254",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of drawing a heart from a full 52-card deck?",
+   "answers": [
+    "1/13",
+    "26/52",
+    "4/52",
+    "13/52, or 1/4"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_255",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of drawing a face card from a full 52-card deck?",
+   "answers": [
+    "16/52",
+    "4/52",
+    "12/52, or 3/13",
+    "10/52"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_256",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many red cards are in a standard 52-card deck?",
+   "answers": [
+    "28",
+    "24",
+    "13",
+    "26"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_257",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many black cards are in a standard 52-card deck?",
+   "answers": [
+    "13",
+    "28",
+    "24",
+    "26"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_258",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many total possible outcomes are there for one fair six-sided die?",
+   "answers": [
+    "8",
+    "36",
+    "12",
+    "6"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_259",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a 6 on one fair six-sided die?",
+   "answers": [
+    "1/6",
+    "1/36",
+    "1/3",
+    "1/12"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_260",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling doubles with two fair six-sided dice?",
+   "answers": [
+    "1/36",
+    "6/36, or 1/6",
+    "12/36",
+    "5/36"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_261",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many ordered outcomes produce doubles with two six-sided dice?",
+   "answers": [
+    "1",
+    "12",
+    "6",
+    "18"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_262",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 2 with two fair dice?",
+   "answers": [
+    "1/36",
+    "2/36",
+    "1/12",
+    "1/6"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_263",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 12 with two fair dice?",
+   "answers": [
+    "1/6",
+    "1/36",
+    "1/12",
+    "2/36"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_264",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 6 with two fair dice?",
+   "answers": [
+    "5/36",
+    "6/36",
+    "4/36",
+    "3/36"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_265",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 8 with two fair dice?",
+   "answers": [
+    "6/36",
+    "5/36",
+    "3/36",
+    "4/36"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_266",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 5 with two fair dice?",
+   "answers": [
+    "5/36",
+    "2/36",
+    "4/36",
+    "3/36"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_267",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 9 with two fair dice?",
+   "answers": [
+    "4/36",
+    "2/36",
+    "3/36",
+    "5/36"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_268",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 4 with two fair dice?",
+   "answers": [
+    "4/36",
+    "3/36",
+    "1/36",
+    "2/36"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_269",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 10 with two fair dice?",
+   "answers": [
+    "2/36",
+    "1/36",
+    "4/36",
+    "3/36"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_270",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 3 with two fair dice?",
+   "answers": [
+    "2/36",
+    "1/36",
+    "4/36",
+    "3/36"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_271",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "What is the probability of rolling a total of 11 with two fair dice?",
+   "answers": [
+    "1/36",
+    "2/36",
+    "4/36",
+    "3/36"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_272",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many distinct five-card combinations can be drawn from a 52-card deck?",
+   "answers": [
+    "1,326",
+    "52,000",
+    "311,875,200",
+    "2,598,960"
+   ],
+   "correct_index": 3
+  },
+  {
+   "id": "ct_273",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many possible two-card combinations can be drawn from 52 cards, ignoring order?",
+   "answers": [
+    "2,652",
+    "1,326",
+    "52",
+    "2,598,960"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_274",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many possible unordered starting hands are there in Texas Hold'em before considering suits/ranks as strategically equivalent?",
+   "answers": [
+    "1,326",
+    "169",
+    "52",
+    "2,598,960"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_275",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many distinct rank classes of Texas Hold'em starting hands are commonly listed when suit-equivalent hands are grouped?",
+   "answers": [
+    "1,326",
+    "169",
+    "221",
+    "52"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_276",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many cards remain in a 52-card deck after five cards are dealt?",
+   "answers": [
+    "46",
+    "45",
+    "47",
+    "48"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_277",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many cards remain after two hole cards are dealt to one player from a fresh 52-card deck?",
+   "answers": [
+    "51",
+    "49",
+    "50",
+    "48"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_278",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If one card is drawn from a standard deck, what is the chance it is a king?",
+   "answers": [
+    "4/13",
+    "1/52",
+    "1/13",
+    "1/4"
+   ],
+   "correct_index": 2
+  },
+  {
+   "id": "ct_279",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "If one card is drawn from a standard deck, what is the chance it is a spade?",
+   "answers": [
+    "1/4",
+    "4/13",
+    "1/2",
+    "1/13"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_280",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many queens are in a standard deck?",
+   "answers": [
+    "2",
+    "4",
+    "3",
+    "8"
+   ],
+   "correct_index": 1
+  },
+  {
+   "id": "ct_281",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many jacks are in a standard deck?",
+   "answers": [
+    "4",
+    "12",
+    "2",
+    "8"
+   ],
+   "correct_index": 0
+  },
+  {
+   "id": "ct_282",
+   "category": "casino_trivia",
+   "difficulty": 1,
+   "question": "How many number cards from 2 through 10 are in a standard 52-card deck?",
+   "answers": [
+    "28",
+    "32",
+    "36",
+    "40"
+   ],
+   "correct_index": 2
   }
  ]
 }
