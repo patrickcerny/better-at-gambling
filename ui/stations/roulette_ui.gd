@@ -2,10 +2,20 @@ class_name RouletteUi
 extends StationUi
 ## Roulette overlay: pick a chip, click a spot on the layout to place it. Shows the betting
 ## timer, your bets, the result. Straight numbers 0–36, red/black, odd/even, low/high,
-## dozens and columns (§2.5.2).
+## dozens and columns (§2.5.2). Docked at the right edge and laid out like the real felt
+## (zero on top, 12 rows of three numbers, the outside bets in two narrow columns beside them),
+## so the wheel and the table stay visible while you bet.
+
+const PANEL_W: float = 340.0
+## Number spot size; outside columns are as tall as the rows they cover.
+const SPOT: Vector2 = Vector2(44, 26)
+const GAP: int = 3
+const DOZEN_W: float = 50.0
+const EVEN_W: float = 62.0
 
 var bet_panel: BetPanel
 var grid: GridContainer
+## The two narrow outside-bet columns: dozens, then the even-money bets.
 var outside: HBoxContainer
 var my_bets: Label
 var result_label: Label
@@ -21,48 +31,99 @@ func _init() -> void:
 
 
 func _panel_height() -> float:
-	return 560.0
+	return 640.0
+
+
+func _dock_right() -> bool:
+	return true
+
+
+## Locked while bets are open.
+func wants_camera_lock() -> bool:
+	return int(pub.get("state", 0)) == RouletteLogic.State.BETTING
 
 
 func _build() -> void:
+	panel.offset_left = panel.offset_right - PANEL_W
+	body.add_theme_constant_override(&"separation", 6)
+	status_label.add_theme_font_size_override(&"font_size", 20)
 	result_label = Label.new()
+	result_label.name = "Result"
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_label.add_theme_font_size_override(&"font_size", 40)
+	result_label.add_theme_font_size_override(&"font_size", 22)
 	body.add_child(result_label)
-	grid = GridContainer.new()
-	grid.columns = 13
-	grid.add_theme_constant_override(&"h_separation", 4)
-	grid.add_theme_constant_override(&"v_separation", 4)
-	var centre := CenterContainer.new()
-	centre.add_child(grid)
-	body.add_child(centre)
-	# Standard 3-row layout: row 0 = 3,6,9… row 1 = 2,5,8… row 2 = 1,4,7…; zero spans the left.
-	for row: int in 3:
-		var zero: Button = _spot("0" if row == 1 else "", &"straight", 0, Palette.FELT_GREEN)
-		zero.disabled = row != 1
-		for col: int in 12:
-			var n: int = col * 3 + (3 - row)
-			_spot(str(n), &"straight", n, Palette.CASINO_RED if n in RouletteLogic.RED else Palette.CASINO_BLACK)
+	var felt := HBoxContainer.new()
+	felt.name = "Felt"
+	felt.alignment = BoxContainer.ALIGNMENT_CENTER
+	felt.add_theme_constant_override(&"separation", GAP)
+	body.add_child(felt)
 	outside = HBoxContainer.new()
-	outside.alignment = BoxContainer.ALIGNMENT_CENTER
-	outside.add_theme_constant_override(&"separation", 4)
-	body.add_child(outside)
-	for spec: Array in [["1-12", &"dozen", 1], ["13-24", &"dozen", 2], ["25-36", &"dozen", 3], ["1st COL", &"column", 1], ["2nd COL", &"column", 2], ["3rd COL", &"column", 3]]:
-		_spot(spec[0], spec[1], int(spec[2]), Palette.WARM_CHARCOAL, outside, Vector2(92, 40))
-	var outside2 := HBoxContainer.new()
-	outside2.alignment = BoxContainer.ALIGNMENT_CENTER
-	outside2.add_theme_constant_override(&"separation", 4)
-	body.add_child(outside2)
-	for spec: Array in [["LOW 1-18", &"low", 0, Palette.WARM_CHARCOAL], ["EVEN", &"even", 0, Palette.WARM_CHARCOAL], ["RED", &"red", 0, Palette.CASINO_RED], ["BLACK", &"black", 0, Palette.CASINO_BLACK], ["ODD", &"odd", 0, Palette.WARM_CHARCOAL], ["HIGH 19-36", &"high", 0, Palette.WARM_CHARCOAL]]:
-		_spot(spec[0], spec[1], int(spec[2]), spec[3], outside2, Vector2(110, 40))
+	outside.name = "Outside"
+	outside.add_theme_constant_override(&"separation", GAP)
+	felt.add_child(outside)
+	var even_col: VBoxContainer = _outside_column()
+	for spec: Array in [["1-18", &"low", Palette.WARM_CHARCOAL], ["EVEN", &"even", Palette.WARM_CHARCOAL], ["RED", &"red", Palette.CASINO_RED], ["BLACK", &"black", Palette.CASINO_BLACK], ["ODD", &"odd", Palette.WARM_CHARCOAL], ["19-36", &"high", Palette.WARM_CHARCOAL]]:
+		_spot(spec[0], spec[1], 0, spec[2], even_col, Vector2(EVEN_W, _rows_h(2)))
+	var dozen_col: VBoxContainer = _outside_column()
+	for d: int in [1, 2, 3]:
+		_spot(["1st 12", "2nd 12", "3rd 12"][d - 1], &"dozen", d, Palette.WARM_CHARCOAL, dozen_col, Vector2(DOZEN_W, _rows_h(4)))
+	outside.add_child(even_col)
+	outside.add_child(dozen_col)
+	var numbers := VBoxContainer.new()
+	numbers.name = "Numbers"
+	numbers.add_theme_constant_override(&"separation", GAP)
+	felt.add_child(numbers)
+	_spot("0", &"straight", 0, Palette.FELT_GREEN, numbers, Vector2(SPOT.x * 3 + GAP * 2, SPOT.y))
+	grid = GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override(&"h_separation", GAP)
+	grid.add_theme_constant_override(&"v_separation", GAP)
+	numbers.add_child(grid)
+	# Rows run 1-2-3, 4-5-6 … 34-35-36 away from the zero, like the felt seen from the chair.
+	for row: int in 12:
+		for col: int in 3:
+			var n: int = row * 3 + col + 1
+			_spot(str(n), &"straight", n, Palette.CASINO_RED if n in RouletteLogic.RED else Palette.CASINO_BLACK)
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override(&"separation", GAP)
+	numbers.add_child(cols)
+	for c: int in [1, 2, 3]:
+		_spot("2:1", &"column", c, Palette.WARM_CHARCOAL, cols, SPOT)
+	var bets_row := HBoxContainer.new()
+	bets_row.name = "BetsRow"
+	bets_row.add_theme_constant_override(&"separation", 6)
+	body.add_child(bets_row)
 	my_bets = Label.new()
+	my_bets.name = "MyBets"
 	my_bets.theme_type_variation = &"SmallLabel"
-	my_bets.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	my_bets.autowrap_mode = TextServer.AUTOWRAP_WORD
-	body.add_child(my_bets)
+	my_bets.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	my_bets.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	my_bets.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	my_bets.custom_minimum_size = Vector2(80, 0)
+	my_bets.add_theme_font_size_override(&"font_size", 14)
+	bets_row.add_child(my_bets)
 	bet_panel = BetPanel.new()
+	bet_panel.chip_size = Vector2(50, 40)
+	bet_panel.chip_gap = 4
+	bet_panel.add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
 	bet_panel.cleared.connect(func() -> void: send(&"clear_bets"))
-	body.add_child(bet_panel)
+	bets_row.add_child(bet_panel)
+
+
+## Height of `n` number rows including the gaps between them.
+static func _rows_h(n: int) -> float:
+	return SPOT.y * n + GAP * (n - 1)
+
+
+## A narrow outside column: starts below the zero and ends above the column bets.
+func _outside_column() -> VBoxContainer:
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override(&"separation", GAP)
+	var top := Control.new()
+	top.custom_minimum_size = Vector2(0, SPOT.y)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(top)
+	return v
 
 
 func _on_open() -> void:
@@ -95,7 +156,7 @@ func _refresh() -> void:
 	else:
 		result_label.text = ""
 	for b: Button in _buttons:
-		b.disabled = not open_bets or (b.text == "" and b.get_meta(&"type") == &"straight")
+		b.disabled = not open_bets
 	var on_spot: Dictionary = {}
 	var others_on: Dictionary = {}
 	for b: Dictionary in pub.get("bets", []):
@@ -130,14 +191,17 @@ func _refresh() -> void:
 		elif t == &"dozen" or t == &"column":
 			label = "%s %d" % [label, int(b["value"])]
 		mine.append("%s $%d" % [label, int(b["amount"])])
-	my_bets.text = ("YOUR BETS ($%d): " % total) + ", ".join(mine) if not mine.is_empty() else "No bets yet — pick a chip, click a spot"
+	if mine.size() > 4:
+		mine = mine.slice(0, 4) + ["+%d more" % (mine.size() - 4)]
+	my_bets.text = ("YOUR BETS $%d\n" % total) + ", ".join(mine) if not mine.is_empty() else "No bets yet: pick a chip, click a spot"
 
 
-func _spot(text: String, type: StringName, value: int, color: Color, parent: Control = null, size: Vector2 = Vector2(46, 40)) -> Button:
+func _spot(text: String, type: StringName, value: int, color: Color, parent: Control = null, size: Vector2 = SPOT) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = size
-	b.add_theme_font_size_override(&"font_size", 18)
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override(&"font_size", 15 if type == &"straight" else 13)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = color
 	sb.set_corner_radius_all(4)
@@ -167,16 +231,16 @@ func _spot(text: String, type: StringName, value: int, color: Color, parent: Con
 		badge.add_theme_stylebox_override(&"normal", chip)
 		# Sits on the spot's own bottom edge, centred. (It used to be anchored top-right with a
 		# position computed before layout, which pushed it onto the neighbouring number.)
-		badge.add_theme_font_size_override(&"font_size", 13)
+		badge.add_theme_font_size_override(&"font_size", 11)
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		badge.anchor_left = 0.5
 		badge.anchor_right = 0.5
 		badge.anchor_top = 1.0
 		badge.anchor_bottom = 1.0
-		badge.offset_left = -22
-		badge.offset_right = 22
-		badge.offset_top = -12
-		badge.offset_bottom = 8
+		badge.offset_left = -17
+		badge.offset_right = 17
+		badge.offset_top = -9
+		badge.offset_bottom = 6
 		badge.grow_horizontal = Control.GROW_DIRECTION_BOTH
 		badge.clip_text = false
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -185,8 +249,8 @@ func _spot(text: String, type: StringName, value: int, color: Color, parent: Con
 		b.add_child(badge)
 		_badges[key] = badge
 		var dots := Label.new()
-		dots.add_theme_font_size_override(&"font_size", 12)
-		dots.position = Vector2(3, -3)
+		dots.add_theme_font_size_override(&"font_size", 9)
+		dots.position = Vector2(2, -4)
 		dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		dots.visible = false
 		b.add_child(dots)

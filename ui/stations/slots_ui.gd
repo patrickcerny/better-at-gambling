@@ -95,6 +95,11 @@ static func _plural(sym: int) -> String:
 	return String(SlotsLogic.SYMBOL_NAMES[sym]).capitalize()
 
 
+## Locked while picking a bet; the head is free while the reels spin.
+func wants_camera_lock() -> bool:
+	return not bool(pub.get("spinning", false))
+
+
 func _build() -> void:
 	# Small strip at the bottom centre instead of the base's wide panel.
 	panel.offset_left = -STRIP_WIDTH * 0.5
@@ -163,16 +168,25 @@ func _build_paytable() -> void:
 		var row: PanelContainer = _pay_row(e)
 		v.add_child(row)
 		pay_rows.append(row)
-	for note: String in [
-		"%s Clover is WILD: it completes any three of a kind." % SlotReelsFx.SYMBOL_TEXT[&"clover"],
-		"Only three real Diamonds win the JACKPOT pot.",
-	]:
-		var l := Label.new()
-		l.theme_type_variation = &"SmallLabel"
-		l.text = note
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.add_theme_color_override(&"font_color", Color("#B8AD95"))
-		v.add_child(l)
+	var wild := HBoxContainer.new()  # the wild note shows the clover's own picture
+	wild.name = "WildNote"
+	wild.add_theme_constant_override(&"separation", 6)
+	v.add_child(wild)
+	wild.add_child(_symbol_tile(SlotsLogic.Sym.CLOVER))
+	var wl := _note_label("The Clover is WILD: it completes any three of a kind.")
+	wl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wild.add_child(wl)
+	v.add_child(_note_label("Only three real Diamonds win the JACKPOT pot."))
+
+
+func _note_label(text: String) -> Label:
+	var l := Label.new()
+	l.theme_type_variation = &"SmallLabel"
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.add_theme_color_override(&"font_color", Color("#B8AD95"))
+	return l
 
 
 func _pay_row(e: Dictionary) -> PanelContainer:
@@ -211,7 +225,7 @@ func _pay_row(e: Dictionary) -> PanelContainer:
 	return p
 
 
-## A small reel window showing a symbol as the machine shows it (same text and colour).
+## A small reel window showing a symbol's picture, as the machine shows it.
 func _symbol_tile(sym: int) -> Control:
 	var tile := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
@@ -219,20 +233,26 @@ func _symbol_tile(sym: int) -> Control:
 	sb.border_color = Color(Palette.WARM_GOLD, 0.6)
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(4)
+	sb.set_content_margin_all(2)
 	tile.add_theme_stylebox_override(&"panel", sb)
-	tile.custom_minimum_size = Vector2(44, 34)
-	var l := Label.new()
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override(&"font_size", 18)
+	tile.custom_minimum_size = Vector2(44, 38)
 	if sym == ANY:
+		var l := Label.new()
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.add_theme_font_size_override(&"font_size", 18)
 		l.text = "–"
 		l.add_theme_color_override(&"font_color", Color("#6E6656"))
+		tile.add_child(l)
 	else:
-		var key: StringName = SlotsLogic.SYMBOL_NAMES[sym]
-		l.text = SlotReelsFx.SYMBOL_TEXT[key]
-		l.add_theme_color_override(&"font_color", SlotReelsFx.SYMBOL_COLORS[key])
-	tile.add_child(l)
+		var icon := TextureRect.new()
+		icon.name = "Icon"
+		icon.texture = SlotReelsFx.symbol_texture(sym)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(34, 34)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tile.add_child(icon)
 	return tile
 
 

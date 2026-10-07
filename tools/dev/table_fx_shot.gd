@@ -39,7 +39,8 @@ func _ready() -> void:
 	add_child(fx)
 	var juice := ScreenJuice.new()
 	add_child(juice)
-	fx.setup(stations, func(_pid: int) -> PlayerAvatar: return null, 1, juice, self)
+	fx.setup(stations, func(_pid: int) -> PlayerAvatar: return null, 1, juice, self,
+		func(pid: int) -> Color: return Palette.player_color(pid - 1), func(_sid: StringName) -> int: return 10)
 	var cam := Camera3D.new()
 	add_child(cam)
 	match args.get_string("view", "roulette"):

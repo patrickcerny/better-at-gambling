@@ -11,10 +11,6 @@ const STAGGER: float = 0.71
 const FIRST_STOP: float = 0.12
 ## Settle time after the last reel lands before the payout reads as final.
 const SETTLE: float = 0.15
-const SYMBOL_COLORS: Dictionary = {
-	&"cherry": Color("#E55353"), &"lemon": Color("#F0D25A"), &"bell": Color("#E3B95C"), &"bar": Color("#F2E6C9"),
-	&"seven": Color("#C83D3D"), &"clover": Color("#68C26F"), &"diamond": Color("#F2E6C9"),
-}
 ## Riser segments played on the local player's own spin as the reels land (see `stop_sounds_for`).
 const RISERS: Array[StringName] = [&"slots_riser_1", &"slots_riser_2", &"slots_riser_3"]
 ## Played instead of the next riser when a reel breaks the match (the chain ends there).
@@ -22,14 +18,24 @@ const NO_MATCH: StringName = &"slots_no_match"
 ## Reel spin speed (symbols per second), and the slower roll of the last reel while it teases.
 const ROLL_SPEED: float = 22.0
 const TEASE_SPEED: float = 8.0
-## Short text glyphs that read in the condensed font (the paytable uses the same ones).
-const SYMBOL_TEXT: Dictionary = {
-	&"cherry": "CH", &"lemon": "LEM", &"bell": "BELL", &"bar": "BAR", &"seven": "7", &"clover": "♣", &"diamond": "◆",
+## Bold picture per symbol (the paytable uses the same ones).
+const SYMBOL_TEXTURES: Dictionary = {
+	&"cherry": preload("res://assets/icons/slots/cherry.png"),
+	&"lemon": preload("res://assets/icons/slots/lemon.png"),
+	&"bell": preload("res://assets/icons/slots/bell.png"),
+	&"bar": preload("res://assets/icons/slots/bar.png"),
+	&"seven": preload("res://assets/icons/slots/seven.png"),
+	&"clover": preload("res://assets/icons/slots/clover.png"),
+	&"diamond": preload("res://assets/icons/slots/diamond.png"),
 }
 const REEL_SPACING: float = 0.22
 const WINDOW_SIZE: Vector2 = Vector2(0.2, 0.3)
+## Win pulse peak: the paying pictures brighten towards warm gold.
+const WIN_TINT: Color = Color(1.5, 1.3, 0.85)
 
-var reels: Array[Label3D] = []
+var reels: Array[Sprite3D] = []
+## Symbol index each reel shows right now (tests read this).
+var shown: Array[int] = [0, 0, 0]
 ## Gold bar across the reels, lit on a win.
 var payline: MeshInstance3D
 ## Reel indices that paid on the last line (empty = loss or still spinning).
@@ -108,13 +114,13 @@ func _ready() -> void:
 		window.material_override = wm
 		window.position = Vector3(x, 0.0, -0.004)
 		add_child(window)
-		var l := Label3D.new()
+		var l := Sprite3D.new()
 		l.name = "Reel%d" % i
-		l.font = Vfx.font()
-		l.font_size = 64
-		l.pixel_size = 0.0018
-		l.outline_size = 10
-		l.outline_modulate = Palette.CASINO_BLACK
+		l.texture = SYMBOL_TEXTURES[&"cherry"]
+		l.pixel_size = WINDOW_SIZE.x * 0.85 / float(l.texture.get_width())  # fills the window's width
+		l.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD  # scissor: no transparent sorting against the window
+		l.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		l.shaded = false
 		l.position = Vector3(x, 0.0, 0.0)
 		add_child(l)
 		reels.append(l)
@@ -223,13 +229,13 @@ func _process(delta: float) -> void:
 		payline.transparency = 0.55 * (1.0 - pulse)
 		for i: int in winners:
 			reels[i].scale = Vector3.ONE * (1.0 + 0.18 * pulse)
-			reels[i].outline_modulate = Palette.CASINO_BLACK.lerp(Palette.WARM_GOLD, pulse)
+			reels[i].modulate = Color.WHITE.lerp(WIN_TINT, pulse)
 		if _win_time > (6.0 if _jackpot else 3.0):
 			_win_time = -1.0  # settle: payline stays lit, reels go back to rest size
 			payline.transparency = 0.0
 			for i: int in winners:
 				reels[i].scale = Vector3.ONE
-				reels[i].outline_modulate = Palette.WARM_GOLD
+				reels[i].modulate = Color.WHITE
 
 
 func _clear_win() -> void:
@@ -239,12 +245,16 @@ func _clear_win() -> void:
 	winners.clear()
 	if payline != null:
 		payline.visible = false
-	for l: Label3D in reels:
+	for l: Sprite3D in reels:
 		l.scale = Vector3.ONE
-		l.outline_modulate = Palette.CASINO_BLACK
+		l.modulate = Color.WHITE
 
 
 func _show(i: int, sym: int) -> void:
-	var key: StringName = SlotsLogic.SYMBOL_NAMES[clampi(sym, 0, SlotsLogic.SYMBOL_NAMES.size() - 1)]
-	reels[i].text = SYMBOL_TEXT.get(key, "?")
-	reels[i].modulate = SYMBOL_COLORS.get(key, Palette.CREAM)
+	shown[i] = clampi(sym, 0, SlotsLogic.SYMBOL_NAMES.size() - 1)
+	reels[i].texture = symbol_texture(shown[i])
+
+
+## The picture for symbol index `sym` (reels and paytable).
+static func symbol_texture(sym: int) -> Texture2D:
+	return SYMBOL_TEXTURES[SlotsLogic.SYMBOL_NAMES[clampi(sym, 0, SlotsLogic.SYMBOL_NAMES.size() - 1)]]

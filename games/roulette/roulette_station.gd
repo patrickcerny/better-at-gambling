@@ -19,7 +19,7 @@ func _build_visuals() -> void:
 		_add_seat(spots[i] + Vector3(0, 0.5, 0), 0.0 if spots[i].z > 0 else PI)
 	camera_anchor = Node3D.new()
 	camera_anchor.name = "CameraAnchor"
-	camera_anchor.position = Vector3(1.0, 1.7, 1.9)
+	camera_anchor.position = Vector3(0.9, 1.7, 1.9)  # wheel and felt both clear of the panel docked right
 	camera_anchor.rotation.x = deg_to_rad(-35.0)
 	add_child(camera_anchor)
 

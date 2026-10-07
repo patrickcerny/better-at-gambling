@@ -1,4 +1,6 @@
-# Builds the Windows and Linux clients on every push to main and publishes them as a GitHub Release.
+# Builds the Windows and Linux clients on every push to main. Each game version (BUILD_ID in
+# core/net/protocol.gd, bumped once per stage) gets its own release v<version>; later pushes with the
+# same version refresh that release's downloads instead of adding a new one.
 # Shareable links that always point at the newest build:
 #   https://github.com/patrickcerny/better-at-gambling/releases/latest
 #   https://github.com/patrickcerny/better-at-gambling/releases/latest/download/BetterAtGambling-windows.zip
@@ -24,6 +26,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # changelog since the previous version tag
 
       - name: Cache Godot + export templates
         uses: actions/cache@v4
@@ -58,16 +62,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           build_id=$(sed -n 's/^const BUILD_ID: String = "\(.*\)"/\1/p' core/net/protocol.gd)
-          tag="build-${GITHUB_RUN_NUMBER}"
-          cat > notes.md <<EOF
-          Game version **${build_id}**, commit ${GITHUB_SHA::7}.
-
-          **Windows:** download \`BetterAtGambling-windows.zip\`, unzip, run \`BetterAtGambling.exe\`
-          (SmartScreen: "More info" → "Run anyway"). Then Play Online → Create Party and share the code.
-          Online parties run on the game server automatically, no setup needed.
-          EOF
-          gh release create "$tag" dist/*.zip --target "$GITHUB_SHA" \
-            --title "Better at Gambling ${build_id} (build ${GITHUB_RUN_NUMBER})" --notes-file notes.md --latest
-          # Keep the 5 newest builds so the release list stays short.
-          gh release list --limit 100 --json tagName,createdAt -q 'sort_by(.createdAt) | reverse | .[5:] | .[].tagName' \
-            | grep '^build-' | xargs -r -n1 gh release delete --cleanup-tag -y
+          tag="v${build_id}"
+          prev=$(git tag -l 'v*' --sort=-creatordate | grep -vx "$tag" | head -1)
+          {
+            echo "Game version **${build_id}**, commit ${GITHUB_SHA::7}."
+            echo
+            echo '**Windows:** download `BetterAtGambling-windows.zip`, unzip, run `BetterAtGambling.exe`'
+            echo '(SmartScreen: "More info" → "Run anyway"). Then Play Online → Create Party and share the code.'
+            echo 'Online parties run on the game server automatically, no setup needed. Older versions cannot join.'
+            echo
+            echo "### Changes${prev:+ since $prev}"
+            git log --no-merges --format='- %s' ${prev:+$prev..}HEAD | head -60
+          } > notes.md
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # Same version, newer commit: refresh the downloads and notes, keep it the latest release.
+            gh release upload "$tag" dist/*.zip --clobber
+            gh release edit "$tag" --notes-file notes.md --latest
+          else
+            gh release create "$tag" dist/*.zip --target "$GITHUB_SHA" \
+              --title "Better at Gambling ${build_id}" --notes-file notes.md --latest
+          fi

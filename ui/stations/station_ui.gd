@@ -138,6 +138,12 @@ func _panel_height() -> float:
 	return 360.0
 
 
+## True while the player has to act here (bet, play a hand): the head stays on the table instead
+## of following the cursor (InputRouter.look_locked).
+func wants_camera_lock() -> bool:
+	return false
+
+
 ## True for overlays that sit at the right edge instead of over the middle of the screen.
 func _dock_right() -> bool:
 	return false

@@ -34,8 +34,6 @@ func test_bet_strip_has_no_reel_display() -> void:
 	var texts: Array[String] = []
 	_texts(ui.panel, texts)
 	for t: String in texts:
-		for glyph: String in SlotReelsFx.SYMBOL_TEXT.values():
-			assert_ne(t.strip_edges(), glyph, "no symbol sign in the bet strip: %s" % t)
 		assert_false(t.strip_edges() == "?", "no placeholder reels")
 	assert_lt(ui.panel.get_global_rect().size.x, 700.0, "the strip is small")
 	assert_lt(ui.panel.get_global_rect().size.y, 300.0)
@@ -72,6 +70,23 @@ func test_paytable_matches_the_payout_rules() -> void:
 	assert_string_contains(ui.jackpot_label.text, "$777", "the live jackpot pot")
 	assert_eq(SlotsUi.entry_index([SlotsLogic.Sym.LEMON, SlotsLogic.Sym.CHERRY, SlotsLogic.Sym.BELL] as Array[int], entries), -1, "a loss highlights nothing")
 	assert_eq(SlotsUi.entry_index([SlotsLogic.Sym.CLOVER, SlotsLogic.Sym.CLOVER, SlotsLogic.Sym.CLOVER] as Array[int], entries), 1, "three clovers are the Clovers row, not the jackpot")
+
+
+func test_paytable_shows_pictures_not_glyphs() -> void:
+	var icons: Array[Node] = ui.paytable.find_children("Icon", "TextureRect", true, false)
+	assert_gt(icons.size(), ui.pay_rows.size(), "every paying symbol is a picture")
+	for n: Node in icons:
+		assert_not_null((n as TextureRect).texture)
+	var row_labels: Array[String] = []
+	for row: PanelContainer in ui.pay_rows:
+		_texts(row, row_labels)
+	for t: String in row_labels:
+		for glyph: String in ["CH", "LEM", "BELL", "♣", "◆"]:
+			assert_ne(t.strip_edges(), glyph, "no text glyph left in the paytable")
+	var wild: Node = ui.paytable.find_child("WildNote", true, false)
+	assert_not_null(wild, "the wild note shows the clover picture")
+	var clover: TextureRect = wild.find_child("Icon", true, false) as TextureRect
+	assert_eq(clover.texture, SlotReelsFx.symbol_texture(SlotsLogic.Sym.CLOVER))
 
 
 func test_paytable_sits_on_the_right_clear_of_the_strip() -> void:

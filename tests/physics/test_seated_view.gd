@@ -202,9 +202,51 @@ func test_cards_stay_under_the_bloom() -> void:
 	assert_eq(rs.hot_light.light_energy, 6.0, "other tables keep the full spotlight")
 
 
+## Bets once, deals, stands: the round is past the point where you act, and held there.
+func _past_betting() -> void:
+	var logic: BlackjackLogic = scene.server.stations.logics[SID]
+	var bet: Dictionary = Net.send_intent(Intents.make(&"place_bet", {"station": SID, "bet": {"amount": 10}}))
+	assert_true(bet["ok"], str(bet))
+	logic.timer = 0.0  # close the betting window now
+	await wait_seconds(0.3)
+	Net.send_intent(Intents.make(&"action", {"station": SID, "action": &"stand"}))  # may already be done (natural)
+	await wait_seconds(0.3)
+	assert_eq(logic.state, BlackjackLogic.State.PAYOUT, "dealer played, round paying out")
+	logic.timer = 999.0  # hold the payout for the rest of the test
+	await wait_seconds(0.3)
+
+
+func test_no_head_turn_while_betting() -> void:
+	await _start_scene()
+	await _sit(SID)
+	var cam: PlayerCamera = scene.local.cam
+	var size: Vector2 = get_viewport().get_visible_rect().size
+	var ui: StationUi = scene.current_ui
+	assert_true(ui.wants_camera_lock(), "no round yet: betting, the head stays on the table")
+	assert_true(Net.send_intent(Intents.make(&"place_bet", {"station": SID, "bet": {"amount": 10}}))["ok"])
+	await wait_seconds(0.3)
+	assert_eq(int(ui.pub.get("state", -1)), BlackjackLogic.State.BETTING)
+	_move_mouse(Vector2(size.x - 1.0, size.y * 0.5))
+	await wait_seconds(1.0)
+	assert_true(scene.router.look_locked, "locked while betting is open")
+	assert_eq(scene.router.seated_look(), Vector2.ZERO, "cursor at the edge turns nothing")
+	assert_almost_eq(cam.seated_offset.x, 0.0, deg_to_rad(0.5), "head still on the table")
+	# Your hand to play: still locked.
+	var logic: BlackjackLogic = scene.server.stations.logics[SID]
+	logic.timer = 0.0
+	await wait_seconds(0.3)
+	if logic.state == BlackjackLogic.State.ACTING:
+		assert_true(scene.router.look_locked, "locked while your hand still acts")
+		Net.send_intent(Intents.make(&"action", {"station": SID, "action": &"stand"}))
+		await wait_seconds(0.3)
+	assert_false(scene.router.look_locked, "free once you have nothing left to do")
+	assert_gt(scene.router.seated_look().x, 0.9)
+
+
 func test_head_follows_the_cursor_a_little() -> void:
 	await _start_scene()
 	await _sit(SID)
+	await _past_betting()
 	var cam: PlayerCamera = scene.local.cam
 	var size: Vector2 = get_viewport().get_visible_rect().size
 	_move_mouse(size * 0.5)
