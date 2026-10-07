@@ -44,6 +44,7 @@ func test_casino_quiz_and_results_under_every_look() -> void:
 		assert_false(pv.viewport.is_ancestor_of(scene.ui_layer), "HUD stays on the window")
 		# Quiz: the stage's set is pixelated, its UI is not, and a number key still answers.
 		scene._open_stage({"minigame": &"quiz", "players": _players()}, {})
+		await wait_process_frames(40)  # curtain animation (0.5s) + stage creation
 		var stage: QuizStage = scene.stage as QuizStage
 		assert_not_null(stage, "quiz stage opened")
 		if stage == null:

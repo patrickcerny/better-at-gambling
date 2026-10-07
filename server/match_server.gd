@@ -754,6 +754,14 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if minigame == null or not minigame is SplitOrStealLogic:
 				return StationLogicBase.fail(&"too_late")
 			return minigame.submit(player, intent, match_time)
+		&"bust_or_bank_action":
+			if minigame == null or not minigame is BustOrBankLogic:
+				return StationLogicBase.fail(&"too_late")
+			return minigame.submit(player, intent, match_time)
+		&"vote_race_vote":
+			if minigame == null or not minigame is VoteRaceLogic:
+				return StationLogicBase.fail(&"too_late")
+			return minigame.submit(player, intent, match_time)
 		&"use_item":
 			if not bool(settings.get("items_enabled", true)):
 				return StationLogicBase.fail(&"items_off")
