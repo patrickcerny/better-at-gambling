@@ -138,8 +138,44 @@ func test_roulette_chip_badge_sits_on_its_own_spot() -> void:
 	assert_eq(spot.text, "17")
 	var centre: Vector2 = badge.get_global_rect().get_center()
 	assert_true(centre.x > spot.get_global_rect().position.x and centre.x < spot.get_global_rect().end.x, "badge centred over 17, not the neighbour")
+	assert_lt(badge.get_global_rect().size.x, spot.get_global_rect().size.x + 1.0, "badge no wider than its spot")
 	# The overlay stays clear of the item bar.
 	assert_true(ui.panel.get_global_rect().end.y <= scene.hud.items.slots[0].get_global_rect().position.y + 1.0, "station panel above the item slots")
+
+
+func test_roulette_panel_leaves_the_table_visible() -> void:
+	var sid: StringName = &"roulette_1"
+	scene._autosit(sid)
+	await wait_seconds(4.0)
+	var ui: StationUi = scene.current_ui
+	assert_true(ui is RouletteUi)
+	var view: Vector2 = scene.get_viewport().get_visible_rect().size
+	var rect: Rect2 = ui.panel.get_global_rect()
+	assert_gt(rect.position.x, view.x * 0.7, "panel docked at the right edge")
+	assert_lt(rect.size.x, view.x * 0.2, "a slim panel")
+	assert_true(rect.end.y <= scene.hud.items.slots[0].get_global_rect().position.y + 1.0, "panel above the item slots")
+	assert_true(rect.position.y >= 0.0, "panel fully on screen")
+	# Projected on a 16:9 1920x1080 frame like a real window (headless views are square); the panel is
+	# docked to the right edge, so only its left edge matters for what it covers.
+	var st: RouletteStation = scene.map.stations[sid]
+	var cam: Camera3D = scene.pixel_view.world_viewport().get_camera_3d()
+	var frame: Vector2 = Vector2(1920, 1080)
+	var proj: Projection = Projection.create_perspective(cam.fov, frame.x / frame.y, cam.near, cam.far)
+	var to_screen: Callable = func(local: Vector3) -> Vector2:
+		var p: Vector3 = cam.global_transform.affine_inverse() * st.to_global(local)
+		var clip: Vector4 = proj * Vector4(p.x, p.y, p.z, 1.0)
+		return Vector2((clip.x / clip.w + 1.0) * 0.5 * frame.x, (1.0 - clip.y / clip.w) * 0.5 * frame.y)
+	var panel_left: float = rect.position.x - (view.x - frame.x)
+	var points: Dictionary = {
+		"wheel's left rim": Vector3(-2.05, RouletteStation.FELT_Y, 0),
+		"wheel": Vector3(-1.3, RouletteStation.FELT_Y, 0),
+		"felt": RouletteStation.bet_spot(&"straight", 17),
+		"column bets": RouletteStation.bet_spot(&"column", 2),
+	}
+	for what: String in points:
+		var p: Vector2 = to_screen.call(points[what])
+		assert_true(Rect2(Vector2.ZERO, frame).has_point(p), "%s on screen: %s" % [what, p])
+		assert_lt(p.x, panel_left, "panel does not cover the %s: %s" % [what, p])
 
 
 func test_plinko_panel_leaves_the_board_visible() -> void:

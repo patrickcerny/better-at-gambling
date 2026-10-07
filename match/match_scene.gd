@@ -511,6 +511,7 @@ func _process(delta: float) -> void:
 				(node as PlinkoStation).set_jackpot(_shown_jackpot, cfg.jackpot_seed)
 	if stage != null:
 		stage.on_private(Net.request_private_snapshot())
+	_update_look_lock()
 	if _owns_server and server != null:
 		server.advance(ScreenJuice.unscaled(delta))  # a hit-stop slows the client, not the server
 	# Simulated bodies (dummies) follow the server's last known position.
@@ -1984,11 +1985,17 @@ func _add_table_fx() -> void:
 	table_fx = TableFx.new()
 	table_fx.name = "TableFx"
 	add_child(table_fx)
-	table_fx.setup(map.stations, func(pid: int) -> PlayerAvatar: return avatars.get(pid, null), local_id, juice, world_root)
+	table_fx.setup(map.stations, func(pid: int) -> PlayerAvatar: return avatars.get(pid, null), local_id, juice, world_root, _chip_color,
+		func(sid: StringName) -> int: return _min_bet(map.stations[sid]) if map.stations.has(sid) else 0)
 	var lc := LastCallLighting.new()
 	lc.name = "LastCallLighting"
 	lc.setup(view.state, map, map.stations)
 	add_child(lc)
+
+
+## A player's colour, for their chips on the tables and their Plinko chip.
+func _chip_color(pid: int) -> Color:
+	return Palette.player_color(int(view.state.players.get(pid, {}).get("color", pid - 1)))
 
 
 func _on_station_state(sid: StringName) -> void:
@@ -2001,6 +2008,13 @@ func _on_station_state(sid: StringName) -> void:
 			(node as BlackjackStation).show_round(st)
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
+	_update_look_lock()
+
+
+## The head stays on the table while the open overlay wants you to act (S6).
+func _update_look_lock() -> void:
+	if router != null:
+		router.look_locked = current_ui != null and current_ui.visible and current_ui.wants_camera_lock()
 
 
 func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int, seconds: float, risk: StringName) -> void:
@@ -2011,7 +2025,7 @@ func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int, secon
 	if _plinko_seen.size() > 256:
 		_plinko_seen.erase(_plinko_seen.keys()[0])  # oldest first; long since landed
 	_plinko_seen[key] = true
-	st.drop_chip(slot, drop_id, avatars[pid].color if avatars.has(pid) else Palette.CASINO_RED, seconds, risk)
+	st.drop_chip(slot, drop_id, _chip_color(pid), seconds, risk)
 
 
 func _spawn_pile(id: int, amount: int, pos: Vector3, source: int = -1) -> void:

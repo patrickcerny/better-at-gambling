@@ -74,10 +74,19 @@ func test_chips_slide_on_and_off_the_felt() -> void:
 	var rs: RouletteStation = await _station(RouletteStation.new()) as RouletteStation
 	var fx := TableFx.new()
 	add_child_autofree(fx)
-	fx.setup({&"r": rs}, func(_p: int) -> PlayerAvatar: return null, 1, null, w)
+	fx.setup({&"r": rs}, func(_p: int) -> PlayerAvatar: return null, 1, null, w,
+		func(pid: int) -> Color: return Palette.player_color(pid - 1), func(_sid: StringName) -> int: return 10)
 	fx.on_event({"type": &"bet_placed", "player": 1, "station": &"r", "amount": 50, "details": {"game": "roulette", "type": &"straight", "value": 17}})
 	fx.on_event({"type": &"bet_placed", "player": 2, "station": &"r", "amount": 100, "details": {"game": "roulette", "type": &"red", "value": 0}})
 	assert_eq(_stacks(rs), 2, "a stack per bet")
+	var by_color: Dictionary = {}
+	for c: Node in rs.get_children():
+		if c is ChipStack:
+			by_color[(c as ChipStack).amount] = c
+	assert_eq((by_color[50] as ChipStack).color, Palette.player_color(0), "player 1's chips in player 1's colour")
+	assert_eq((by_color[100] as ChipStack).color, Palette.player_color(1), "player 2's chips in player 2's colour")
+	assert_eq((by_color[50] as ChipStack).get_child_count(), 5, "one chip per $10 table minimum")
+	assert_eq((by_color[100] as ChipStack).get_child_count(), 10)
 	await wait_seconds(0.6)
 	var spot: Vector3 = rs.to_global(RouletteStation.bet_spot(&"straight", 17))
 	var on_spot: bool = false
@@ -125,8 +134,9 @@ func test_slot_reels_stop_one_after_another() -> void:
 	assert_true(ss.reels_fx._spinning[2], "right reel still turning")
 	await wait_seconds(t)
 	assert_false(ss.reels_fx.is_spinning())
-	for l: Label3D in ss.reels_fx.reels:
-		assert_eq(l.text, SlotReelsFx.SYMBOL_TEXT[&"seven"])
+	for i: int in 3:
+		assert_eq(ss.reels_fx.shown[i], 4, "reel shows the seven")
+		assert_eq(ss.reels_fx.reels[i].texture, SlotReelsFx.SYMBOL_TEXTURES[&"seven"])
 
 
 func test_hot_table_fire_turns_on_and_off() -> void:

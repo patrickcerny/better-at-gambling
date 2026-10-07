@@ -40,6 +40,9 @@ const SEATED_DEAD_ZONE: float = 0.12
 var _cursor: Vector2 = Vector2(NAN, NAN)
 ## Beer: look is inverted on both axes and walking drifts a little.
 var drunk: bool = false
+## Seated and asked to act (betting open, your hand to play, Plinko panel under the cursor): the
+## head stays on the table, `seated_look` is zero. Set by the match scene from the open overlay.
+var look_locked: bool = false
 ## Mode to return to when the emote wheel closes (you can emote while seated too).
 var _mode_before_emote: Mode = Mode.WALK
 ## False while the window is in the background: the cursor is then free to leave it.
@@ -94,7 +97,7 @@ func desired_mouse_mode() -> Input.MouseMode:
 ## Seated head turn in [-1, 1] per axis (x right, y down): the right stick while it is pushed,
 ## otherwise where the cursor sits relative to the middle of the screen (with a small dead zone).
 func seated_look() -> Vector2:
-	if mode != Mode.SEATED:
+	if mode != Mode.SEATED or look_locked:
 		return Vector2.ZERO
 	var stick: Vector2 = Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
 	if stick.length() > 0.2:

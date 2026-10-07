@@ -35,6 +35,11 @@ func _dock_right() -> bool:
 	return true
 
 
+## Locked while the cursor is over the panel (picking risk and bet); free while you watch the drop.
+func wants_camera_lock() -> bool:
+	return is_visible_in_tree() and panel.get_global_rect().has_point(panel.get_global_mouse_position())
+
+
 func _build() -> void:
 	panel.offset_left = panel.offset_right - PANEL_W
 	body.add_theme_constant_override(&"separation", 8)
