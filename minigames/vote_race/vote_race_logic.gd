@@ -11,6 +11,7 @@ var positions: Dictionary[int, int] = {}  # player → current position (0-5)
 var votes: Dictionary[int, int] = {}  # player → target they voted for
 var vote_counts: Dictionary[int, int] = {}  # player → votes received this round
 var round_count: int = 0
+var last_round_with_votes: int = -1  # track which round the current votes belong to
 var finished_game: bool = false
 var winner: int = -1
 
@@ -23,6 +24,8 @@ func _on_setup(_context: Dictionary) -> void:
 
 	for p: int in players:
 		positions[p] = 0
+
+	last_round_with_votes = 0
 
 	events.append(GameEvents.make(&"vote_race_started", {
 		"players": players.duplicate(),
@@ -40,6 +43,13 @@ func submit(player: int, intent: Dictionary, now: float) -> Dictionary:
 		return StationLogicBase.fail(&"unknown_player")
 	if finished:
 		return StationLogicBase.fail(&"game_over")
+
+	# Clear votes from previous round if this is the first vote of a new round
+	if last_round_with_votes != round_count:
+		votes.clear()
+		vote_counts.clear()
+		last_round_with_votes = round_count
+
 	if player in votes:
 		return StationLogicBase.fail(&"already_voted")
 
@@ -87,9 +97,7 @@ func _end_round() -> void:
 				}))
 				return
 
-	# Reset for next round
-	votes.clear()
-	vote_counts.clear()
+	# Mark round as complete; votes will be cleared when next round begins
 	round_count += 1
 
 

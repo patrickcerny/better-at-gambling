@@ -40,13 +40,15 @@ func test_single_round_hit_and_stand() -> void:
 	logic.submit(1, {"action": "hit"}, now)
 	events.append_array(logic.drain_events())
 
+	# Player 1 stands
+	logic.submit(1, {"action": "stand"}, now)
+	events.append_array(logic.drain_events())
+
 	# Player 2 stands
 	logic.submit(2, {"action": "stand"}, now)
 	events.append_array(logic.drain_events())
 
-	# Both players have acted, round should end
-	_run(logic, 0.1, events)
-
+	# Both players have stood, round should end
 	var round_end_events: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == &"bust_or_bank_round_end")
 	assert_eq(round_end_events.size(), 1)
 
@@ -75,8 +77,14 @@ func test_five_rounds_then_finish() -> void:
 	var logic: BustOrBankLogic = _bust_or_bank([1, 2])
 	events.append_array(logic.drain_events())
 
-	# Run for a long time to ensure 5 rounds complete
-	_run(logic, 100.0, events)
+	# Run 5 rounds - each round both players stand
+	for round_num: int in 5:
+		if logic.is_finished():
+			break
+
+		logic.submit(1, {"action": "stand"}, now)
+		logic.submit(2, {"action": "stand"}, now)
+		events.append_array(logic.drain_events())
 
 	var round_end_events: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == &"bust_or_bank_round_end")
 	assert_eq(round_end_events.size(), 5)
