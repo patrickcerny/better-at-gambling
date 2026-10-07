@@ -124,24 +124,75 @@ func _show_dealer_total(dealer: Array) -> void:
 	dealer_total_label.text = str(HandEval.total(shown)) if not shown.is_empty() else ""
 
 
-const TABLE_MODEL: String = "res://assets/casino/blackjack_table.dae"
-## Flat colors per part of the model (its texture files were not included).
-const TABLE_COLORS: Dictionary = {
-	"Table top": Color("#275E49"), "arm rest (for players)": Color("#681F2C"), "Rubber pad strip": Color("#151414"),
-}
+## Half-moon geometry, measured from the arc centre: the straight edge is on z = ARC_CENTRE.z and
+## the curve bulges towards +z. Built in-engine so every part is mirrored by construction.
+const FELT_RADIUS: float = 1.6
+const RAIL_RADIUS: float = 1.78
+const RAIL_WIDTH: float = 0.2
+const ARC_SEGMENTS: int = 28
+const FELT_COLOR: Color = Color("#275E49")
+const RAIL_COLOR: Color = Color("#681F2C")
+const WOOD_COLOR: Color = Color("#3A2A1E")
 
 
 func _add_table_model() -> void:
-	var ps: PackedScene = load(TABLE_MODEL) as PackedScene
-	if ps == null:
-		return
-	var model: Node3D = ps.instantiate()
-	model.name = "Table"
-	# Native: 2.24 m across, straight edge on z = 0, curved side towards +z, top at ~0.97 m.
-	model.scale = Vector3(1.7, 0.95, 1.7)
-	model.position = Vector3(0, 0, -0.4)
-	add_child(model)
-	for n: Node in model.find_children("*", "", true, false):
-		if n is MeshInstance3D:
-			var c: Color = TABLE_COLORS.get(String(n.name), Palette.WARM_GOLD)
-			(n as MeshInstance3D).material_override = GreyboxKit.gold() if c == Palette.WARM_GOLD else GreyboxKit.material(c, 0.0, 0.7)
+	var table := Node3D.new()
+	table.name = "Table"
+	table.position = ARC_CENTRE
+	add_child(table)
+	var top: float = TABLE_TOP
+	_half_disc(table, FELT_RADIUS, top, GreyboxKit.material(FELT_COLOR, 0.0, 0.8), "Felt")
+	_half_disc(table, RAIL_RADIUS, top - 0.14, GreyboxKit.material(WOOD_COLOR), "Underside")
+	for i: int in ARC_SEGMENTS:
+		var a0: float = PI * i / ARC_SEGMENTS
+		var a1: float = PI * (i + 1) / ARC_SEGMENTS
+		# Padded rail with a wooden apron beneath it, and the brass foot ring near the floor.
+		_arc_piece(table, a0, a1, RAIL_RADIUS - RAIL_WIDTH * 0.5, RAIL_WIDTH, 0.07, top + 0.015, RAIL_COLOR, "Rail%d" % i)
+		_arc_piece(table, a0, a1, RAIL_RADIUS - 0.03, 0.06, 0.14, top - 0.07, WOOD_COLOR, "Apron%d" % i)
+		_arc_piece(table, a0, a1, 1.3, 0.05, 0.04, 0.22, Palette.WARM_GOLD, "FootRing%d" % i, true)
+	# Straight (dealer) side: rail, apron and brass foot bar.
+	var w: float = RAIL_RADIUS * 2.0
+	GreyboxKit.box(table, Vector3(w, 0.07, 0.14), Vector3(0, top + 0.015, -0.07), RAIL_COLOR, "RailStraight", false)
+	GreyboxKit.box(table, Vector3(w, 0.14, 0.05), Vector3(0, top - 0.07, -0.025), WOOD_COLOR, "ApronStraight", false)
+	var bar: Node3D = GreyboxKit.cylinder(table, 0.025, w - 0.5, Vector3(0, 0.22, 0.12), Palette.WARM_GOLD, "FootBar", false, 0.8)
+	bar.rotation.z = PI / 2.0
+	# Four legs, mirrored left/right: two at the straight corners, two under the curve.
+	var leg_h: float = top - 0.14
+	for sx: float in [-1.0, 1.0]:
+		for leg: Vector2 in [Vector2(1.35, 0.14), Vector2(0.85, 1.1)]:
+			var lp := Vector3(sx * leg.x, leg_h * 0.5, leg.y)
+			var tag: String = "Leg%s%s" % ["L" if sx < 0.0 else "R", "Back" if leg.y < 0.5 else "Front"]
+			GreyboxKit.cylinder(table, 0.07, leg_h, lp, WOOD_COLOR, tag, false)
+			GreyboxKit.cylinder(table, 0.085, 0.04, Vector3(lp.x, 0.22, lp.z), Palette.WARM_GOLD, tag + "Brass", false, 0.8)
+			GreyboxKit.cylinder(table, 0.1, 0.03, Vector3(lp.x, 0.015, lp.z), Palette.WARM_GOLD, tag + "Foot", false, 0.8)
+
+
+## Flat half disc (curve towards +z) at height `y`, double sided.
+func _half_disc(parent: Node3D, radius: float, y: float, mat: StandardMaterial3D, node_name: String) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	for i: int in ARC_SEGMENTS:
+		var a0: float = PI * i / ARC_SEGMENTS
+		var a1: float = PI * (i + 1) / ARC_SEGMENTS
+		st.add_vertex(Vector3(0, y, 0))
+		st.add_vertex(Vector3(cos(a0) * radius, y, sin(a0) * radius))
+		st.add_vertex(Vector3(cos(a1) * radius, y, sin(a1) * radius))
+	var m: StandardMaterial3D = mat.duplicate() as StandardMaterial3D
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mi := MeshInstance3D.new()
+	mi.name = node_name
+	mi.mesh = st.commit()
+	mi.material_override = m
+	parent.add_child(mi)
+
+
+## One box standing on the arc between angles a0 and a1 (radius `r`, `thick` radially, `h` tall,
+## centred at height `y`). Visual only.
+func _arc_piece(parent: Node3D, a0: float, a1: float, r: float, thick: float, h: float, y: float, color: Color, node_name: String, brass: bool = false) -> void:
+	var am: float = (a0 + a1) * 0.5
+	var length: float = 2.0 * r * sin((a1 - a0) * 0.5) * 1.04
+	var node: Node3D = GreyboxKit.box(parent, Vector3(thick, h, length), Vector3(cos(am) * r, y, sin(am) * r), color, node_name, false)
+	node.rotation.y = -am  # local +x points away from the centre
+	if brass:
+		(node.get_node("Mesh") as MeshInstance3D).material_override = GreyboxKit.gold()
