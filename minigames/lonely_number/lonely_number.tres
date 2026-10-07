@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"lonely_number"
 display_name = "Lonely Number"
-rules_text = "Everyone picks 1-20 secretly. The highest number nobody else picked wins the round. 5 rounds."
+rules_text = "Everyone picks 1-20 secretly. The highest number nobody else picked wins the round. 5 rounds: most round wins ranks first, ties go to the higher total of winning numbers."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2
