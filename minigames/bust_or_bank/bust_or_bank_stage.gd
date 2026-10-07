@@ -213,8 +213,8 @@ func _update_my_hand_display() -> void:
 	if my_hand.is_empty():
 		total_label.text = "Total: 0"
 	else:
-		my_total = HandEval.total(my_hand)
-		if HandEval.is_bust(my_hand):
+		my_total = HandEval.total(my_hand as Array[int])
+		if HandEval.is_bust(my_hand as Array[int]):
 			total_label.text = "Total: %d (BUST)" % my_total
 		else:
 			total_label.text = "Total: %d" % my_total

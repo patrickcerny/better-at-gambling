@@ -19,7 +19,7 @@ var points_per_player: Dictionary = {}  # player → total points won
 
 func _on_setup(_context: Dictionary) -> void:
 	for p: int in players:
-		hands[p] = []
+		hands[p] = [] as Array[int]
 		standing[p] = false
 		busted[p] = false
 		points_per_player[p] = 0
@@ -42,7 +42,7 @@ func _start_round() -> void:
 
 	# Reset per-round state
 	for p: int in players:
-		hands[p].clear()
+		(hands[p] as Array[int]).clear()
 		standing[p] = false
 		busted[p] = false
 
@@ -62,21 +62,21 @@ func _deal_card(player: int) -> void:
 
 	var card: int = deck[deck_index]
 	deck_index += 1
-	hands[player].append(card)
+	(hands[player] as Array[int]).append(card)
 
 	events.append(GameEvents.make(&"bust_or_bank_card_dealt", {
 		"player": player,
 		"card": card,
 		"hand": hands[player].duplicate(),
-		"total": HandEval.total(hands[player])
+		"total": HandEval.total(hands[player] as Array[int])
 	}))
 
 	# Check for bust
-	if HandEval.is_bust(hands[player]):
+	if HandEval.is_bust(hands[player] as Array[int]):
 		busted[player] = true
 		events.append(GameEvents.make(&"bust_or_bank_player_bust", {
 			"player": player,
-			"total": HandEval.total(hands[player])
+			"total": HandEval.total(hands[player] as Array[int])
 		}))
 
 
@@ -93,14 +93,14 @@ func submit(player: int, intent: Dictionary, now: float) -> Dictionary:
 	var action: String = str(intent.get("action", "")).to_lower()
 	if action == "hit":
 		_deal_card(player)
-		if HandEval.is_bust(hands[player]):
+		if HandEval.is_bust(hands[player] as Array[int]):
 			_check_round_end()
 		return StationLogicBase.OK_RESULT
 	elif action == "stand":
 		standing[player] = true
 		events.append(GameEvents.make(&"bust_or_bank_player_stood", {
 			"player": player,
-			"total": HandEval.total(hands[player])
+			"total": HandEval.total(hands[player] as Array[int])
 		}))
 		_check_round_end()
 		return StationLogicBase.OK_RESULT
