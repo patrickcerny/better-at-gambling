@@ -548,8 +548,8 @@ func _build_ui() -> void:
 	head.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	head.anchor_left = 0.5
 	head.anchor_right = 0.5
-	head.offset_left = -520
-	head.offset_right = 520
+	head.offset_left = -420
+	head.offset_right = 420
 	head.offset_top = 64
 	head.add_theme_constant_override(&"separation", 6)
 	root.add_child(head)
