@@ -34,8 +34,9 @@ func test_dealer_shove_sends_player_to_jail() -> void:
 	_start_at_blackjack()
 	var attacker: int = fx.player_ids[0]
 
-	# Place player in world (required for dealer range detection)
-	fx.place_all(Vector3(1.0, 0.5, 0.5))
+	# Place player in front of dealer (required for dealer range detection)
+	# Dealer is at blackjack_1 position, player shoves toward it
+	fx.place_all(Vector3(0.0, 0.5, -0.5))
 
 	# Place bet (sits player)
 	fx.intent(attacker, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 100}})
@@ -62,8 +63,8 @@ func test_dealer_shove_refunds_all_bets() -> void:
 	var initial_p1: int = fx.server.economy.balance(p1)
 	var initial_p2: int = fx.server.economy.balance(p2)
 
-	# Place players in world (required for dealer range detection)
-	fx.place_all(Vector3(1.0, 0.5, 0.5))
+	# Place players in front of dealer (required for dealer range detection)
+	fx.place_all(Vector3(0.0, 0.5, -0.5))
 
 	# Both players place bets
 	fx.intent(p1, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 200}})
@@ -99,8 +100,8 @@ func test_dealer_shove_cancels_hand() -> void:
 	_start_at_blackjack()
 	var p: int = fx.player_ids[0]
 
-	# Place player in world (required for dealer range detection)
-	fx.place_all(Vector3(1.0, 0.5, 0.5))
+	# Place player in front of dealer (required for dealer range detection)
+	fx.place_all(Vector3(0.0, 0.5, -0.5))
 
 	# Place bet and let hand start
 	fx.intent(p, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 100}})
@@ -129,8 +130,8 @@ func test_roulette_dealer_shove_refunds_bets() -> void:
 	var initial_p1: int = fx.server.economy.balance(p1)
 	var initial_p2: int = fx.server.economy.balance(p2)
 
-	# Place players in world (required for dealer range detection)
-	fx.place_all(Vector3(1.0, 0.5, 0.5))
+	# Place players in front of dealer (required for dealer range detection)
+	fx.place_all(Vector3(0.0, 0.5, -0.5))
 
 	# Both players place bets
 	fx.intent(p1, &"place_bet", {"station": &"roulette_1", "bet": {"type": &"red", "amount": 100}})
@@ -159,8 +160,8 @@ func test_multiple_dealer_attacks_increase_jail_time() -> void:
 	_start_at_blackjack()
 	var p: int = fx.player_ids[0]
 
-	# Place player in world (required for dealer range detection)
-	fx.place_all(Vector3(1.0, 0.5, 0.5))
+	# Place player in front of dealer (required for dealer range detection)
+	fx.place_all(Vector3(0.0, 0.5, -0.5))
 
 	# First attack
 	fx.intent(p, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 50}})
