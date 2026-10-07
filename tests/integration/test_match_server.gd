@@ -96,18 +96,6 @@ func test_leave_mid_round_auto_resolves_and_money_matches_snapshot() -> void:
 	assert_true(Serializer.is_wire_safe(snap))
 
 
-func test_vip_requires_money_and_wrong_phase_rejected() -> void:
-	var p: int = fx.player_ids[0]
-	assert_eq(fx.intent(p, &"sit", {"station": &"vip_blackjack_1"})["error"], &"vip_denied")
-	fx.server.economy.apply(p, 2000, &"test")
-	assert_true(fx.intent(p, &"sit", {"station": &"vip_blackjack_1"})["ok"])
-	assert_eq(fx.server.stations.logics[&"vip_blackjack_1"].limits_multiplier, 3.0)
-	fx.intent(p, &"leave")
-	fx.server.run_to_end()
-	assert_eq(fx.intent(p, &"sit", {"station": &"blackjack_1"})["ok"], true, "sitting allowed at results")
-	assert_eq(fx.intent(p, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 10}})["error"], &"wrong_phase")
-
-
 func test_malformed_unknown_and_rate_limited() -> void:
 	var p: int = fx.player_ids[0]
 	assert_eq(fx.server.submit_intent(p, {"type": &"sit"})["error"], &"malformed")

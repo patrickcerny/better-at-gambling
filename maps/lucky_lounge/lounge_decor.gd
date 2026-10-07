@@ -512,22 +512,14 @@ func _signs() -> void:
 	bulb.height = 0.12
 	bulb.radial_segments = 8
 	bulb.rings = 4
-	# Casino name over the inside of the entrance, ringed with marquee bulbs.
-	var sign_c := Vector3(0, 5.0, LuckyLounge.SIZE_Z * 0.5 - 0.62)
-	_marquee(bulb, sign_c, Vector2(7.0, 1.2), Vector3(0, 0, -1))
-	var title := _label("THE LUCKY LOUNGE", 120, Palette.VIP_GOLD)
-	title.position = sign_c + Vector3(0, 0, -0.02)
-	title.rotation.y = PI
-	add_child(title)
-	# VIP sign over the gate line, facing the stair landing (east).
-	var vip_c: Vector3 = LuckyLounge.VIP_SIGN_POS + Vector3(0.07, 0, 0)
-	_marquee(bulb, vip_c + Vector3(0.02, 0, 0), Vector2(2.6, 0.8), Vector3(1, 0, 0))
-	var vip := _label("VIP LOUNGE", 72, Palette.VIP_BURGUNDY)
-	vip.outline_modulate = Palette.VIP_GOLD
-	vip.outline_size = 4
-	vip.position = vip_c + Vector3(0.01, 0, 0)
-	vip.rotation.y = PI * 0.5
-	add_child(vip)
+	# Split casino name over the two lobby doors, each at x ±3, height 4.3 (fountain no longer blocks).
+	for dx: float in [-3.0, 3.0]:
+		var sign_c := Vector3(dx, 4.3, LuckyLounge.SIZE_Z * 0.5 - 0.62)
+		_marquee(bulb, sign_c, Vector2(3.5, 1.2), Vector3(0, 0, -1))
+		var title := _label("LUCKY LOUNGE", 80, Palette.VIP_GOLD)
+		title.position = sign_c + Vector3(0, 0, -0.02)
+		title.rotation.y = PI
+		add_child(title)
 
 
 ## Bulbs around a rectangular sign (centre `c`, size `s`, facing `n`).

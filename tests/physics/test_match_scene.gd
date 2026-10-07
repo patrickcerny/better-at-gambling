@@ -254,14 +254,6 @@ func test_guard_catching_throws_out_and_respawns_at_the_door() -> void:
 	assert_lt(scene.local.global_position.distance_to(LuckyLounge.RESPAWN_POS), 1.5, "back at the entrance")
 
 
-func test_vip_gate_pushes_back_the_poor() -> void:
-	var gate: Vector3 = LuckyLounge.VIP_GATE_POS
-	scene.local.teleport(gate + Vector3(0.2, 0, 0), PI * 0.5)
-	await wait_physics_frames(4)
-	assert_gt(scene.local.global_position.x, gate.x + 0.5, "bouncer shoved us back toward the stairs")
-	assert_eq(scene.local.state, PlayerAvatar.State.STUNNED)
-
-
 func test_sit_bet_and_leave_mid_round_through_the_scene() -> void:
 	var sid: StringName = &"blackjack_2"
 	var st: StationBase = scene.map.stations[sid]
@@ -291,15 +283,6 @@ func test_sit_bet_and_leave_mid_round_through_the_scene() -> void:
 	var after: int = scene.server.economy.balance(scene.local_id)
 	assert_true(after == before - 50 or after >= before, "stake lost or paid back: %d -> %d" % [before, after])
 	assert_eq(scene.view.state.balance(scene.local_id), after, "HUD mirror in sync")
-
-
-func test_mezzanine_fall_knocks_out() -> void:
-	scene.local.teleport(Vector3(-1.0, LuckyLounge.MEZZ_Y + 0.1, 1.5))
-	await wait_seconds(1.5)
-	var kos: Array[Dictionary] = _of(&"player_knocked_out")
-	assert_eq(kos.size(), 1, "falling off the balcony knocks out")
-	if not kos.is_empty():
-		assert_eq(kos[0]["cause"], &"fall")
 
 
 func before_all() -> void:

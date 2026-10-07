@@ -1,6 +1,6 @@
 extends Node
 ## Scripted local player for `--autoplay`: walks to each station type, plays a few rounds,
-## shoves/grabs/throws another player (a test dummy), shakes chips, visits the fountain and the VIP gate, then idles.
+## shoves/grabs/throws another player (a test dummy), shakes chips, visits the fountain, then idles.
 ## Used by the 3-minute no-errors session (M2 acceptance) and handy for screenshots.
 ## Every step is an intent or a walk target; nothing bypasses the server.
 
@@ -192,8 +192,6 @@ func _build_steps() -> void:
 		["walk", LuckyLounge.FOUNTAIN_POS + Vector3(2.6, 0, 0)], ["wait", 0.5],
 		["jump_to", LuckyLounge.FOUNTAIN_POS + Vector3(0.5, 0, 0)], ["wait", 6.0],
 		["walk", Vector3(12.0, 0, 9.5)], ["walk", Vector3(12.0, LuckyLounge.MEZZ_Y, -1.5)], ["wait", 0.5],
-		["walk", LuckyLounge.VIP_GATE_POS + Vector3(-0.8, 0, 0)], ["wait", 2.0],
-		["walk", Vector3(12.0, LuckyLounge.MEZZ_Y, -1.5)],
 		["walk", Vector3(-1.0, LuckyLounge.MEZZ_Y, -0.6)], ["wait", 0.5],
 		["jump_to", Vector3(-1.0, LuckyLounge.MEZZ_Y, 2.0)], ["wait", 5.0],
 		["walk", Vector3(sp[_st(&"blackjack_2")]) + Vector3(0, 0, 2.6)],

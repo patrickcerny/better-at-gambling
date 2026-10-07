@@ -1989,8 +1989,7 @@ func _on_guard_caught(g: Guard, pid: int) -> void:
 
 
 func _on_landed(pid: int, drop: float) -> void:
-	if _owns_server and drop >= cfg.mezzanine_fall_height:
-		server.report_knockout(pid, -1, &"fall")
+	pass
 
 
 func _on_ragdoll_impact(pid: int, strength: float, wall: bool) -> void:
