@@ -11,4 +11,5 @@ extends Resource
 @export var stage_script: Script
 @export var scene: PackedScene
 @export var weight: float = 1.0
+@export var min_players: int = 2
 @export var params: Dictionary = {}

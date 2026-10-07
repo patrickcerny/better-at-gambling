@@ -20,6 +20,12 @@ var station: StringName = &""
 ## two players never share a chair.
 var seat: int = -1
 var position: Vector3 = Vector3.ZERO
+## Jail system (v0.8.3): count of how many times caught; resets to 0 on Get Out of Jail Free item use.
+var catch_count: int = 0
+## Seconds remaining in jail (0 = not in jail).
+var jail_time_remaining: float = 0.0
+## Fine amount for the current jail stay (deducted when released).
+var jail_fine: int = 0
 
 
 ## Wire dictionary.
@@ -29,6 +35,7 @@ func to_wire() -> Dictionary:
 		"connected": connected, "ready": ready, "inventory": inventory.duplicate(),
 		"quiz_points": quiz_points, "quiz_time": quiz_correct_time, "biggest_win": biggest_win, "station": station, "seat": seat,
 		"pos": Serializer.vec3(position),
+		"catch_count": catch_count, "jail_time": snappedf(jail_time_remaining, 0.01), "jail_fine": jail_fine,
 	}
 
 
@@ -50,4 +57,7 @@ static func from_wire(d: Dictionary) -> PlayerState:
 	p.station = StringName(d.get("station", ""))
 	p.seat = int(d.get("seat", -1))
 	p.position = Serializer.to_vec3(d.get("pos", []))
+	p.catch_count = int(d.get("catch_count", 0))
+	p.jail_time_remaining = float(d.get("jail_time", 0.0))
+	p.jail_fine = int(d.get("jail_fine", 0))
 	return p

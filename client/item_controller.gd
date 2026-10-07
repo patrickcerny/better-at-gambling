@@ -1,9 +1,9 @@
 class_name ItemController
 extends Node3D
-## Client side of items (M5): turns item keys into `use_item` intents, runs the target picker
+## Client side of items (0.8.6): turns item keys into `use_item` intents, runs the target picker
 ## (cycle with the mouse wheel or shoulder buttons, press the same key or E to confirm, 4 s to
 ## decide), draws the proximity ring for NEAR items and a marker over the chosen target, answers the
-## "inventory full" choice (keys 1–4) and feeds the ItemBar from the private snapshot. Never decides
+## "inventory full" choice (keys 1–6) and feeds the ItemBar from the private snapshot. Never decides
 ## anything: the server validates every use.
 
 const PICK_SECONDS: float = 4.0
@@ -65,7 +65,7 @@ func _ready() -> void:
 	add_child(marker)
 
 
-## Item key `slot` (0–2) was pressed.
+## Item key `slot` (0–5) was pressed. Maps to actual inventory slot (may not equal visual position).
 func on_slot(slot: int) -> void:
 	if _discard_open:
 		_discard(slot)
@@ -252,7 +252,7 @@ func _input(event: InputEvent) -> void:
 		return
 	if _discard_open and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var k: Key = (event as InputEventKey).physical_keycode
-		if k >= KEY_1 and k <= KEY_4:
+		if k >= KEY_1 and k <= KEY_6:
 			_discard(int(k - KEY_1))
 			get_viewport().set_input_as_handled()
 		return
@@ -260,14 +260,28 @@ func _input(event: InputEvent) -> void:
 		_discard(DISCARD_INCOMING)
 		get_viewport().set_input_as_handled()
 		return
-	if picking_slot < 0:
-		return
+	# Handle item slot keys (1-6) even when not picking, to support scrolling/inventory access
+	if not _discard_open and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var k: Key = (event as InputEventKey).physical_keycode
+		if k >= KEY_1 and k <= KEY_6:
+			on_slot(int(k - KEY_1))
+			get_viewport().set_input_as_handled()
+			return
+	# Mouse wheel scrolls through inventory when not picking
 	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
 		var b: MouseButton = (event as InputEventMouseButton).button_index
 		if b == MOUSE_BUTTON_WHEEL_UP or b == MOUSE_BUTTON_WHEEL_DOWN:
-			cycle(1 if b == MOUSE_BUTTON_WHEEL_DOWN else -1)
+			if picking_slot < 0:
+				# Scroll inventory slots in the ItemBar
+				scene.hud.items.scroll_slots(1 if b == MOUSE_BUTTON_WHEEL_DOWN else -1)
+			else:
+				# Scroll target picker when picking
+				cycle(1 if b == MOUSE_BUTTON_WHEEL_DOWN else -1)
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(&"bet_chip_next"):
+			return
+	if picking_slot < 0:
+		return
+	if event.is_action_pressed(&"bet_chip_next"):
 		cycle(1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(&"bet_chip_prev"):

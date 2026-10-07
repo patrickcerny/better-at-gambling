@@ -5,9 +5,9 @@ extends RefCounted
 ## the negative-item grace window), effect expiry, and banana peels lying on the floor.
 ## Player intents go through `use`.
 
-const SLOTS: int = 3
+const SLOTS: int = 6
 ## `discard_item` slot meaning "throw away the incoming item" while a discard choice is open.
-const DISCARD_INCOMING: int = 3
+const DISCARD_INCOMING: int = 6
 
 var defs: Dictionary[StringName, ItemDefinition] = {}
 var balance: BalanceConfig
@@ -33,6 +33,8 @@ var find_station: Callable = Callable()
 var duels: RpsDuels
 var shop: GiftShop
 var close_station: Callable = Callable()
+## Callable(player) → clears the player's catch count (Get Out of Jail Free item).
+var clear_jail: Callable = Callable()
 var events: Array[Dictionary] = []
 ## When each player last used an item, and when each was last hit by a negative one.
 var last_use: Dictionary[int, float] = {}

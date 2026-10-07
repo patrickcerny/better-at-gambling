@@ -40,7 +40,7 @@ var cfg: BalanceConfig
 var avatars: Dictionary[int, PlayerAvatar] = {}
 ## Player ids of test dummies this process simulates (server side only).
 var dummies: Dictionary[int, bool] = {}
-var piles: Dictionary[int, ChipPile] = {}
+var piles: Dictionary[int, CoinPile] = {}
 var guards: Array[Guard] = []
 ## Waiter NPC, puddles and the Megaphone (M7, npc/) and the event sounds (audio/event_sfx.gd).
 var casino_floor: CasinoFloor = null
@@ -1892,7 +1892,7 @@ func _check_pickups() -> void:
 		return
 	if _owns_server:
 		for pile_id: int in piles.keys():
-			var pile: ChipPile = piles[pile_id]
+			var pile: CoinPile = piles[pile_id]
 			if not pile.is_collectable(_clock):
 				continue
 			var best: int = -1
@@ -1912,7 +1912,7 @@ func _check_pickups() -> void:
 	if local == null or not local.is_standing():
 		return
 	for pile_id: int in piles.keys():
-		var pile: ChipPile = piles[pile_id]
+		var pile: CoinPile = piles[pile_id]
 		if pile.predicted_until > -INF:
 			if _clock > pile.predicted_until:
 				pile.restore()  # the server never confirmed: someone else got there first, or lag
@@ -1924,7 +1924,7 @@ func _check_pickups() -> void:
 
 
 ## Floor-plane distance from a player's feet to a pile (INF on another floor).
-static func _pickup_distance(a: PlayerAvatar, pile: ChipPile) -> float:
+static func _pickup_distance(a: PlayerAvatar, pile: CoinPile) -> float:
 	var to: Vector3 = pile.global_position - a.global_position
 	if absf(to.y) > 1.2:
 		return INF
@@ -1938,18 +1938,18 @@ func _pickup_feedback(who: PlayerAvatar, amount: int) -> void:
 
 
 func _on_chips_collected(pile_id: int, player: int, amount: int) -> void:
-	var pile: ChipPile = piles.get(pile_id, null)
+	var pile: CoinPile = piles.get(pile_id, null)
 	piles.erase(pile_id)
 	var who: PlayerAvatar = avatars.get(player, null)
 	var predicted: bool = pile != null and pile.predicted_until > -INF
 	if pile != null:
 		if predicted and player == local_id:
-			# Confirmed: the chips are already in our pocket (or finishing the flight).
+			# Confirmed: the coins are already in our pocket (or finishing the flight).
 			pile.predicted_until = INF
-			get_tree().create_timer(ChipPile.FLY_SECONDS + 0.05).timeout.connect(pile.queue_free)
+			get_tree().create_timer(CoinPile.FLY_SECONDS + 0.05).timeout.connect(pile.queue_free)
 		else:
 			if predicted:
-				pile.restore()  # we guessed wrong: the chips go to whoever really got them
+				pile.restore()  # we guessed wrong: the coins go to whoever really got them
 			pile.fly_to(who)
 	if who != null and not (predicted and player == local_id):
 		_pickup_feedback(who, amount)
@@ -2074,7 +2074,7 @@ func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int, secon
 func _spawn_pile(id: int, amount: int, pos: Vector3, source: int = -1) -> void:
 	if piles.has(id):
 		return
-	var p := ChipPile.new()
+	var p := CoinPile.new()
 	p.pile_id = id
 	p.amount = amount
 	p.position = _floor_under(pos)
@@ -2082,11 +2082,14 @@ func _spawn_pile(id: int, amount: int, pos: Vector3, source: int = -1) -> void:
 	piles[id] = p
 	var from: PlayerAvatar = avatars.get(source, null)
 	if from != null:
-		# Shaken out of someone: the chips arc out of them and can't be grabbed mid-air.
-		p.settles_at = _clock + ChipPile.SETTLE_SECONDS
+		# Shaken out of someone: the coins burst out and can't be grabbed mid-air.
+		p.settles_at = _clock + CoinPile.SETTLE_SECONDS
 		var origin: Vector3 = from.ragdoll.body_position() if from.ragdoll != null and is_instance_valid(from.ragdoll) else from.global_position + Vector3(0.0, 0.9, 0.0)
-		p.arc_from(origin)
-	Audio.play_at(&"chip_clack", p, -8.0)
+		p.create_coins(origin)
+	else:
+		# Late join sync: coins already on floor
+		p.create_coins(p.position)
+	Audio.play_at(&"coin", p, -8.0)
 
 
 func _remove_pile(id: int) -> void:

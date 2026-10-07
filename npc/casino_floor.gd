@@ -1,9 +1,10 @@
 class_name CasinoFloor
 extends Node3D
-## The match scene's side of the waiter NPC and the Megaphone prop (M7). Spawns the waiter on
-## his route once the navmesh is ready, keeps the server's `WaiterLogic` told where his body is
-## (on the process that simulates the world), shows puddles and the megaphone from the
-## replicated state, and plays their sounds. All decisions come from the server.
+## The match scene's side of the waiter NPC, dealers at tables, and the Megaphone prop (M7, v0.8.4).
+## Spawns the waiter on his route once the navmesh is ready, spawns dealers at blackjack and
+## roulette tables, keeps the server's `WaiterLogic` and `DealerLogic` told where their bodies are
+## (on the process that simulates the world), shows puddles and the megaphone from the replicated
+## state, and plays their sounds. All decisions come from the server.
 
 ## Service loop: from the bar's service end out across the floor and back (navmesh points).
 const WAITER_ROUTE: Array[Vector3] = [
@@ -14,6 +15,8 @@ const PUDDLE_COLOR: Color = Color("#7A3B22")
 
 var scene: MatchScene
 var waiter: Waiter = null
+## Dealers at each blackjack and roulette table (v0.8.4): station_id → Dealer node.
+var dealers: Dictionary[StringName, Dealer] = {}
 var puddle_nodes: Dictionary[int, Node3D] = {}
 var stand: Node3D = null
 ## The megaphone model (on the stand, or in the holder's hand).
@@ -31,6 +34,7 @@ func setup(p_scene: MatchScene) -> void:
 	scene.view.state.floor_changed.connect(_sync)
 	_sync()
 	_spawn_waiter()
+	_spawn_dealers()
 
 
 func _exit_tree() -> void:
@@ -52,6 +56,33 @@ func _spawn_waiter() -> void:
 	scene.world_root.add_child(waiter)
 
 
+## Spawn dealers at each blackjack and roulette table (v0.8.4).
+func _spawn_dealers() -> void:
+	if scene.server == null or _headless:
+		return
+	dealers.clear()
+	# Get dealer positions from stations
+	for sid: StringName in scene.server.stations.logics:
+		var logic: StationLogicBase = scene.server.stations.logics[sid]
+		if logic.game_id != &"blackjack" and logic.game_id != &"roulette":
+			continue
+		var station: StationBase = scene.stations.get(sid, null) as StationBase
+		if station == null:
+			continue
+		var dealer_pos: Vector3 = Vector3.ZERO
+		if logic.game_id == &"blackjack":
+			dealer_pos = BlackjackStation.DEALER_POS
+		elif logic.game_id == &"roulette":
+			dealer_pos = RouletteStation.DEALER_POS
+		var dealer := Dealer.new()
+		dealer.name = "Dealer_%s" % sid
+		dealer.station_id = sid
+		dealer.position_offset = station.global_position + dealer_pos
+		dealer.puppet = scene.role == MatchScene.Role.CLIENT
+		scene.world_root.add_child(dealer)
+		dealers[sid] = dealer
+
+
 func _physics_process(_delta: float) -> void:
 	if waiter == null or scene == null or scene.server == null or scene.role == MatchScene.Role.CLIENT:
 		return
@@ -62,6 +93,13 @@ func _physics_process(_delta: float) -> void:
 		waiter.trip()
 	else:
 		waiter.get_up()
+	# Update dealer positions (v0.8.4)
+	for sid: StringName in dealers:
+		var dealer: Dealer = dealers[sid]
+		if dealer != null and scene.server.dealers.has(sid):
+			var dealer_logic: DealerLogic = scene.server.dealers[sid]
+			dealer_logic.position = dealer.global_position
+			dealer_logic.yaw = dealer.yaw
 
 
 ## In a holder's hand: held up to their mouth, pulsing while they talk.
@@ -133,6 +171,16 @@ func on_event(ev: Dictionary) -> void:
 		&"megaphone_dropped":
 			if int(ev["player"]) == scene.local_id:
 				scene.hud.toast("Megaphone back on its stand", 1.5)
+		&"dealer_attacked":
+			# Dealer was attacked; player goes to jail (v0.8.4)
+			var sid: StringName = StringName(ev.get("station", ""))
+			var by: PlayerAvatar = scene.avatars.get(int(ev["player"]), null)
+			if by != null:
+				by.say("NO!", 1.2)
+			var dealer: Dealer = dealers.get(sid, null)
+			if dealer != null and dealer.visuals != null:
+				Audio.play_at(&"tray_crash", dealer, -5.0)  # Reuse tray crash sound
+				dealer.visuals.react(&"ko")  # Dealer reacts in shock
 
 
 ## Puddles and the megaphone follow the replicated state.

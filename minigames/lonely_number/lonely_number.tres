@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/lonely_number/lonely_number_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/lonely_number/lonely_number_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"lonely_number"
+display_name = "Lonely Number"
+rules_text = "Everyone picks 1-20 secretly. The highest number nobody else picked wins the round. 5 rounds."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 2
+weight = 1.0

@@ -3,6 +3,9 @@ extends StationBase
 ## Half-moon blackjack table (Patrick's model, flat casino colors since its textures did not come
 ## along): green felt, padded rail, gold legs, 4 seats on the curved side, dealer on the straight one.
 
+## Dealer position: stands at the north side, between the shoe and chip rack.
+const DEALER_POS: Vector3 = Vector3(0.0, 0.5, -1.2)
+
 
 func _build_visuals() -> void:
 	game_id = &"blackjack"

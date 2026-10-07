@@ -1,23 +1,25 @@
 class_name ItemBar
 extends Control
-## Bottom-centre item HUD (M5): three inventory slots with key hints and a cooldown shade, the
-## luck meter (−3…+3), running effects with their timers, the target picker line and the
-## "inventory full" discard choice. Pure display: ItemController feeds it.
+## Bottom-centre item HUD (0.8.6): six inventory slots with mouse wheel scrolling, dial gauge
+## for luck (red to green with swinging needle), running effects with their timers, the target
+## picker line and the "inventory full" discard choice. Pure display: ItemController feeds it.
 
-const SLOTS: int = 3
+const SLOTS: int = 6
 const LUCK_MAX: int = 3
+const VISIBLE_SLOTS: int = 3  # Display 3 slots at a time, scroll through 6
 
 var slots: Array[PanelContainer] = []
 var slot_names: Array[Label] = []
 var slot_keys: Array[Label] = []
+var luck_dial: Control
 var luck_label: Label
-var luck_pips: Array[ColorRect] = []
 var effects_label: Label
 var target_label: Label
 var discard_panel: PanelContainer
 var discard_label: Label
 var duel_panel: PanelContainer
 var duel_label: Label
+var slot_scroll_index: int = 0  # Which slot is first on screen (0-3)
 
 var inventory: Array = []
 var luck: int = 0
@@ -30,14 +32,17 @@ func _ready() -> void:
 	set_inventory([])
 
 
-## Shows the inventory (item ids, oldest first).
+## Shows the inventory (item ids, oldest first), with 3 visible slots that scroll through 6 total.
 func set_inventory(inv: Array) -> void:
 	inventory = inv.duplicate()
-	for i: int in SLOTS:
-		var has: bool = i < inventory.size()
-		slot_names[i].text = RewardPanel.item_name(StringName(inventory[i])) if has else "—"
+	# Clamp scroll position to valid range
+	slot_scroll_index = clampi(slot_scroll_index, 0, maxf(SLOTS - VISIBLE_SLOTS, 0))
+	for i: int in VISIBLE_SLOTS:
+		var inv_idx: int = slot_scroll_index + i
+		var has: bool = inv_idx < inventory.size()
+		slot_names[i].text = RewardPanel.item_name(StringName(inventory[inv_idx])) if has else "—"
 		slot_names[i].modulate.a = 1.0 if has else 0.45
-		slots[i].add_theme_stylebox_override(&"panel", _slot_style(_rarity_color(StringName(inventory[i])) if has else Palette.WARM_CHARCOAL))
+		slots[i].add_theme_stylebox_override(&"panel", _slot_style(_rarity_color(StringName(inventory[inv_idx])) if has else Palette.WARM_CHARCOAL))
 	_refresh_keys()
 
 
@@ -60,10 +65,8 @@ func set_private(priv: Dictionary) -> void:
 	luck = int(priv.get("luck", 0))
 	luck_label.text = "LUCK %s%d" % ["+" if luck > 0 else "", luck]
 	luck_label.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if luck > 0 else (Palette.LOSS_RED if luck < 0 else Palette.CREAM))
-	for i: int in luck_pips.size():
-		var v: int = i - LUCK_MAX  # −3 … +3
-		var lit: bool = (luck > 0 and v > 0 and v <= luck) or (luck < 0 and v < 0 and v >= luck) or v == 0
-		luck_pips[i].color = (Palette.MONEY_GREEN if v > 0 else (Palette.LOSS_RED if v < 0 else Palette.WARM_GOLD)) if lit else Color(1, 1, 1, 0.15)
+	# Update dial gauge: needle position based on luck (−3…+3 mapped to 0…1)
+	_update_luck_dial()
 	var lines: PackedStringArray = []
 	for e: Dictionary in priv.get("effects", []):
 		lines.append(effect_text(e))
@@ -75,7 +78,7 @@ func set_private(priv: Dictionary) -> void:
 		var parts: PackedStringArray = ["INVENTORY FULL: drop one (%ds)" % ceili(float(d.get("left", 0.0)))]
 		for i: int in inventory.size():
 			parts.append("[%d] %s" % [i + 1, RewardPanel.item_name(StringName(inventory[i]))])
-		parts.append("[4] new %s" % RewardPanel.item_name(StringName(d.get("item", ""))))
+		parts.append("[6] new %s" % RewardPanel.item_name(StringName(d.get("item", ""))))
 		discard_label.text = "\n".join(parts)
 
 
@@ -106,9 +109,30 @@ func show_target(text: String) -> void:
 	target_label.visible = text != ""
 
 
+## Scroll inventory slots (direction: 1 = right, -1 = left).
+func scroll_slots(direction: int) -> void:
+	slot_scroll_index = posmod(slot_scroll_index + direction, SLOTS - VISIBLE_SLOTS + 1)
+	set_inventory(inventory)
+
+
+## Update the dial gauge based on current luck value.
+func _update_luck_dial() -> void:
+	if luck_dial == null:
+		return
+	# Needle angle: −3 (far left, red) to +3 (far right, green)
+	# Map luck range to needle rotation: -3 = 240°, 0 = 180°, +3 = 120° (swinging left to right)
+	var normalized: float = clampf(float(luck) / float(LUCK_MAX), -1.0, 1.0)
+	var angle_deg: float = 180.0 - (normalized * 60.0)  # 240° to 120°
+	luck_dial.rotation = deg_to_rad(angle_deg)
+
+
 func _refresh_keys() -> void:
-	for i: int in SLOTS:
-		slot_keys[i].text = ("⇧%d" if seated else "%d") % (i + 1)
+	for i: int in VISIBLE_SLOTS:
+		var slot_num: int = slot_scroll_index + i + 1
+		slot_keys[i].text = ("⇧%d" if seated else "%d") % slot_num
+		# Grayed out if no item at that slot
+		var has: bool = (slot_scroll_index + i) < inventory.size()
+		slot_keys[i].modulate.a = 1.0 if has else 0.45
 
 
 func _rarity_color(id: StringName) -> Color:
@@ -173,28 +197,25 @@ func _build() -> void:
 	effects_label.add_theme_color_override(&"font_color", Palette.CREAM)
 	effects_label.visible = false
 	col.add_child(effects_label)
-	# Luck meter: "LUCK +2" and seven pips.
+	# Luck dial gauge: "LUCK +2" with dial meter (red to green, swinging needle).
 	var luck_row := HBoxContainer.new()
 	luck_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	luck_row.add_theme_constant_override(&"separation", 4)
+	luck_row.add_theme_constant_override(&"separation", 12)
 	col.add_child(luck_row)
 	luck_label = Label.new()
 	luck_label.theme_type_variation = &"SmallLabel"
 	luck_label.text = "LUCK 0"
-	luck_label.custom_minimum_size = Vector2(110, 0)
+	luck_label.custom_minimum_size = Vector2(80, 0)
 	luck_row.add_child(luck_label)
-	for i: int in LUCK_MAX * 2 + 1:
-		var pip := ColorRect.new()
-		pip.custom_minimum_size = Vector2(22, 10) if i != LUCK_MAX else Vector2(6, 16)
-		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		luck_row.add_child(pip)
-		luck_pips.append(pip)
+	luck_dial = _create_luck_dial()
+	luck_dial.custom_minimum_size = Vector2(120, 60)
+	luck_row.add_child(luck_dial)
+	# Inventory slots: 3 visible, scrollable through 6 total.
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override(&"separation", 14)
 	col.add_child(row)
-	for i: int in SLOTS:
+	for i: int in VISIBLE_SLOTS:
 		var p := PanelContainer.new()
 		p.custom_minimum_size = Vector2(180, 52)
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -217,6 +238,40 @@ func _build() -> void:
 	for l: Label in [discard_label, duel_label, target_label, effects_label, luck_label]:
 		_outline(l)
 	set_private({})
+
+
+## Creates the luck dial gauge with gradient background and needle.
+func _create_luck_dial() -> Control:
+	var dial := Control.new()
+	dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Background: gradient from red (left) to green (right)
+	var bg := ColorRect.new()
+	bg.color = Palette.LOSS_RED
+	dial.add_child(bg)
+	var shader := ShaderMaterial.new()
+	shader.shader = Shader.new()
+	shader.shader.code = """
+shader_type canvas_item;
+
+void fragment() {
+	// Red (left, x=0) to green (right, x=1)
+	COLOR = mix(vec4(1.0, 0.2, 0.2, 1.0), vec4(0.2, 1.0, 0.2, 1.0), UV.x);
+}
+"""
+	bg.material = shader
+	# Needle: red line that swings from left to right
+	var needle := Control.new()
+	needle.custom_minimum_size = Vector2(120, 60)
+	dial.add_child(needle)
+	needle.draw.connect(func() -> void:
+		var center: Vector2 = needle.get_rect().get_center()
+		var length: float = 50.0
+		var needle_end: Vector2 = center + Vector2(cos(needle.rotation), sin(needle.rotation)) * length
+		needle.draw_line(center, needle_end, Palette.LOSS_RED, 3.0)
+		# Draw small circle at the pivot
+		needle.draw_circle(center, 4.0, Palette.LOSS_RED)
+	)
+	return dial
 
 
 static func _outline(l: Label) -> void:

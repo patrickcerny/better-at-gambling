@@ -41,6 +41,8 @@ var items: ItemSystem
 ## The waiter NPC's trips and drink puddles, and the Megaphone prop by the bar (M7, npc/).
 var waiter: WaiterLogic
 var megaphone: MegaphoneLogic
+## Dealers at blackjack and roulette tables (v0.8.4, npc/): station_id → DealerLogic.
+var dealers: Dictionary[StringName, DealerLogic] = {}
 ## Smoothed half round-trip time of a player in seconds (set by the network layer; 0 offline).
 var half_rtt_provider: Callable = func(_p: int) -> float: return 0.0
 ## Per-player match stats for awards and dynamic quiz questions.
@@ -142,8 +144,16 @@ func _build_match_systems(seed_value: int) -> void:
 	items.jackpot = jackpot
 	items.find_station = _nearest_station
 	items.close_station = func(sid: StringName, seconds: float) -> void: stations.out_of_order[sid] = seconds
+	items.clear_jail = clear_catch_count  # Jail system (v0.8.3)
 	waiter = WaiterLogic.new(state.players, rules, world, SeededRng.new(seed_value ^ 0x3A11E5))
 	megaphone = MegaphoneLogic.new(state.players, rules, world)
+	# Initialize dealers for each blackjack and roulette station (v0.8.4)
+	dealers.clear()
+	for sid: StringName in stations.logics:
+		var logic: StationLogicBase = stations.logics[sid]
+		if logic.game_id == &"blackjack" or logic.game_id == &"roulette":
+			var dealer_rng: SeededRng = SeededRng.new(seed_value ^ StringName(sid).hash())
+			dealers[sid] = DealerLogic.new(sid, state.players, rules, world, dealer_rng, stations)
 	minigames.reset()
 	minigame = null
 	rewards = RewardDirector.new()
@@ -377,6 +387,7 @@ func _step(delta: float) -> void:
 	waiter.tick(match_time, casino_open)
 	megaphone.tick(match_time)
 	interactions.tick(match_time)
+	_tick_jail(delta)
 	pickups.tick(match_time)
 
 
@@ -475,6 +486,10 @@ func _finish_match() -> void:
 # --- Minigames & rewards -----------------------------------------------------------------------
 
 func _start_minigame() -> void:
+	# Release all jailed players when minigame starts (v0.8.3)
+	for id: int in state.players:
+		if state.players[id].jail_time_remaining > 0.0:
+			release_from_jail(id)
 	var players: Array[int] = []
 	for id: int in state.players:
 		if state.players[id].connected:
@@ -496,6 +511,10 @@ func _finish_minigame() -> void:
 		if state.players.has(p):
 			state.players[p].quiz_points += int(row.get("points", 0))
 			state.players[p].quiz_correct_time += float(row.get("time", 0.0))
+	# Jail system (v0.8.3): decrement catch count after each minigame
+	for id: int in state.players:
+		if state.players[id].catch_count > 0:
+			state.players[id].catch_count -= 1
 	_flush()
 	minigame = null
 	minigames.end()
@@ -607,6 +626,9 @@ func return_to_lobby() -> void:
 		p.station = &""
 		p.seat = -1
 		p.ready = false
+		p.catch_count = 0
+		p.jail_time_remaining = 0.0
+		p.jail_fine = 0
 		lobby.set_on_pad(id, false)
 		lobby.set_panel_ready(id, false)
 	_server_owned.clear()
@@ -693,8 +715,20 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				modifiers.consume_round(player, &"spring_glove")
 			if shoved["ok"]:
 				items.pass_monkey(player, int(shoved["target"]), match_time)
-			elif shoved["error"] == &"no_target" and waiter.shove(player, Serializer.to_vec3(intent["aim"]), match_time):
-				return StationLogicBase.OK_RESULT  # nobody to push, but the waiter goes flying
+			elif shoved["error"] == &"no_target":
+				# Try waiter or dealer
+				if waiter.shove(player, Serializer.to_vec3(intent["aim"]), match_time):
+					return StationLogicBase.OK_RESULT  # nobody to push, but the waiter goes flying
+				# Try dealer at any table with a dealer
+				var dealer_hit: bool = false
+				for sid: StringName in dealers:
+					if dealers[sid].shove(player, Serializer.to_vec3(intent["aim"]), match_time):
+						# Dealer attacked! Go to jail and refund bets.
+						put_in_jail(player)
+						dealer_hit = true
+						break
+				if dealer_hit:
+					return StationLogicBase.OK_RESULT  # dealer attacked
 			return shoved
 		&"shake":
 			if stations.is_seated(player) or rules.is_knocked_down(player, match_time):
@@ -887,6 +921,8 @@ func _flush() -> void:
 	batch.append_array(items.drain_events())
 	batch.append_array(waiter.drain_events())
 	batch.append_array(megaphone.drain_events())
+	for sid: StringName in dealers:
+		batch.append_array(dealers[sid].drain_events())
 	var caught: Array[Dictionary] = []
 	for ev: Dictionary in batch:
 		_track_stats(ev)
@@ -1018,3 +1054,61 @@ func _on_vip_pass_ended(player: int) -> void:
 	if sid == &"" or not stations.vip.get(sid, false) or economy.balance(player) >= vip_threshold():
 		return
 	stand_up(player, &"vip_pass_ended")
+
+
+# --- Jail system (v0.8.3) ---
+
+
+## Jail timing and fine amounts based on catch_count: [8s, 15s, 25s, 40s] and [$100, $200, $400, $800]
+const JAIL_TIMES: Array[float] = [8.0, 15.0, 25.0, 40.0]
+const JAIL_FINES: Array[int] = [100, 200, 400, 800]
+
+
+## The guard catches a player and puts them in jail. Increases catch count and applies jail timer/fine.
+func put_in_jail(player: int) -> void:
+	if not state.players.has(player) or state.players[player].jail_time_remaining > 0.0:
+		return  # already in jail
+	var p: PlayerState = state.players[player]
+	# Stand them up and release any holds
+	if stations.is_seated(player):
+		stand_up(player, &"caught")
+	if interactions.is_held(player):
+		interactions.release(player, false, Vector3.ZERO, match_time)
+	# Get jail time and fine based on catch count (capped at 3+)
+	var level: int = mini(p.catch_count, JAIL_TIMES.size() - 1)
+	p.jail_time_remaining = JAIL_TIMES[level]
+	p.jail_fine = JAIL_FINES[level]
+	p.catch_count += 1
+	_emit(GameEvents.make(&"player_jailed", {"player": player, "time": snappedf(p.jail_time_remaining, 0.01), "fine": p.jail_fine, "catch_count": p.catch_count}))
+
+
+## Release a jailed player and deduct the fine from their balance (never below $0).
+func release_from_jail(player: int) -> void:
+	if not state.players.has(player) or state.players[player].jail_time_remaining <= 0.0:
+		return  # not in jail
+	var p: PlayerState = state.players[player]
+	var fine: int = p.jail_fine
+	p.jail_time_remaining = 0.0
+	p.jail_fine = 0
+	var deducted: int = economy.take_up_to(player, fine, &"jail_fine")
+	_emit(GameEvents.make(&"player_released_from_jail", {"player": player, "fine": deducted}))
+
+
+## Reset a player's catch count to 0 (used by Get Out of Jail Free item).
+func clear_catch_count(player: int) -> void:
+	if not state.players.has(player):
+		return
+	state.players[player].catch_count = 0
+	if state.players[player].jail_time_remaining > 0.0:
+		release_from_jail(player)
+	_emit(GameEvents.make(&"catch_count_cleared", {"player": player}))
+
+
+## Advance jail timers and release players when time is up.
+func _tick_jail(delta: float) -> void:
+	for id: int in state.players:
+		var p: PlayerState = state.players[id]
+		if p.jail_time_remaining > 0.0:
+			p.jail_time_remaining -= delta
+			if p.jail_time_remaining <= 0.0:
+				release_from_jail(id)

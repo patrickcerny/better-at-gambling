@@ -23,11 +23,13 @@ func has_minigames() -> bool:
 	return not defs.is_empty()
 
 
-## Chooses the next definition.
-func pick(rng: SeededRng) -> MinigameDefinition:
+## Chooses the next definition, filtered for `player_count`.
+func pick(rng: SeededRng, player_count: int = 2) -> MinigameDefinition:
 	if defs.is_empty():
 		return null
-	var pool: Array[MinigameDefinition] = defs.filter(func(d: MinigameDefinition) -> bool: return d.id != _last_id or defs.size() == 1)
+	var pool: Array[MinigameDefinition] = defs.filter(func(d: MinigameDefinition) -> bool: return (d.id != _last_id or defs.size() == 1) and player_count >= d.min_players)
+	if pool.is_empty():
+		return null
 	var weights: Array = []
 	for d: MinigameDefinition in pool:
 		weights.append(maxf(d.weight, 0.0))
@@ -37,7 +39,7 @@ func pick(rng: SeededRng) -> MinigameDefinition:
 
 ## Starts a minigame for `players`. Returns the running logic.
 func begin(players: Array[int], rng: SeededRng, balance: BalanceConfig, stats: Dictionary, half_rtt: Callable) -> MinigameLogicBase:
-	current_def = pick(rng)
+	current_def = pick(rng, players.size())
 	if current_def == null or current_def.logic_script == null:
 		return null
 	_last_id = current_def.id

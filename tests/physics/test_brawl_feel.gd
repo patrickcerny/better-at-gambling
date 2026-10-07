@@ -223,7 +223,7 @@ func test_predicted_pickup_rolls_back_when_the_server_does_not_confirm() -> void
 	# Act as an online client for a moment: the pickup is ours to predict, not to decide.
 	scene._owns_server = false
 	scene._spawn_pile(9001, 40, OPEN + Vector3(0.0, 0.0, -0.5))
-	var pile: ChipPile = scene.piles[9001]
+	var pile: Node3D = scene.piles[9001]
 	await wait_physics_frames(2)
 	assert_true(pile.is_leaving(), "chips fly to us at once")
 	assert_gt(pile.predicted_until, scene._clock)

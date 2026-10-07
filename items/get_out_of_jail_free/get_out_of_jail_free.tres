@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+[ext_resource type="Script" path="res://items/effects/jail_free_effect.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"get_out_of_jail_free"
+display_name = "Get Out of Jail Free"
+description = "Walk out of jail at once and reset your catch count."
+rarity = 2
+target_mode = 0
+requires_proximity = false
+range_m = 0.0
+is_negative = false
+duration = 0.0
+params = {}
+effect_script = ExtResource("2")
+in_loot = true
