@@ -6,10 +6,10 @@ var picks_panel: Control
 var buttons: Array[Button] = []
 
 
-func _ready() -> void:
+func _build(_start: Dictionary) -> void:
 	picks_panel = Control.new()
 	picks_panel.custom_minimum_size = Vector2(400, 300)
-	add_child(picks_panel)
+	ui.add_child(picks_panel)
 	_build_ui()
 
 

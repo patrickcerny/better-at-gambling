@@ -119,11 +119,8 @@ func scroll_slots(direction: int) -> void:
 func _update_luck_dial() -> void:
 	if luck_dial == null:
 		return
-	# Needle angle: −3 (far left, red) to +3 (far right, green)
-	# Map luck range to needle rotation: -3 = 240°, 0 = 180°, +3 = 120° (swinging left to right)
-	var normalized: float = clampf(float(luck) / float(LUCK_MAX), -1.0, 1.0)
-	var angle_deg: float = 180.0 - (normalized * 60.0)  # 240° to 120°
-	luck_dial.rotation = deg_to_rad(angle_deg)
+	# Redraw the dial with updated needle position
+	luck_dial.queue_redraw()
 
 
 func _refresh_keys() -> void:
@@ -244,32 +241,41 @@ func _build() -> void:
 func _create_luck_dial() -> Control:
 	var dial := Control.new()
 	dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Background: gradient from red (left) to green (right)
-	var bg := ColorRect.new()
-	bg.color = Palette.LOSS_RED
-	dial.add_child(bg)
-	var shader := ShaderMaterial.new()
-	shader.shader = Shader.new()
-	shader.shader.code = """
-shader_type canvas_item;
+	dial.draw.connect(func() -> void:
+		var rect: Rect2 = dial.get_rect()
+		var center: Vector2 = rect.get_center()
+		var width: float = rect.size.x
+		var height: float = rect.size.y
 
-void fragment() {
-	// Red (left, x=0) to green (right, x=1)
-	COLOR = mix(vec4(1.0, 0.2, 0.2, 1.0), vec4(0.2, 1.0, 0.2, 1.0), UV.x);
-}
-"""
-	bg.material = shader
-	# Needle: red line that swings from left to right
-	var needle := Control.new()
-	needle.custom_minimum_size = Vector2(120, 60)
-	dial.add_child(needle)
-	needle.draw.connect(func() -> void:
-		var center: Vector2 = needle.get_rect().get_center()
-		var length: float = 50.0
-		var needle_end: Vector2 = center + Vector2(cos(needle.rotation), sin(needle.rotation)) * length
-		needle.draw_line(center, needle_end, Palette.LOSS_RED, 3.0)
-		# Draw small circle at the pivot
-		needle.draw_circle(center, 4.0, Palette.LOSS_RED)
+		# Draw gradient bar background (red to green)
+		for x in range(int(rect.size.x)):
+			var t: float = float(x) / rect.size.x
+			var color: Color = Palette.LOSS_RED.lerp(Palette.MONEY_GREEN, t)
+			dial.draw_line(
+				Vector2(rect.position.x + x, center.y - height * 0.3),
+				Vector2(rect.position.x + x, center.y + height * 0.3),
+				color,
+				2.0
+			)
+
+		# Draw scale marks
+		for i in range(-3, 4):
+			var t: float = (float(i) + 3.0) / 6.0  # Map -3..3 to 0..1
+			var x: float = rect.position.x + t * rect.size.x
+			var mark_height: float = 6.0 if i % 3 == 0 else 3.0
+			dial.draw_line(
+				Vector2(x, center.y - mark_height),
+				Vector2(x, center.y + mark_height),
+				Palette.CREAM,
+				1.0
+			)
+
+		# Draw needle pointing to current luck value
+		var needle_t: float = (float(luck) + 3.0) / 6.0
+		var needle_x: float = rect.position.x + needle_t * rect.size.x
+		var needle_color: Color = Palette.LOSS_RED if luck < 0 else (Palette.MONEY_GREEN if luck > 0 else Palette.CREAM)
+		dial.draw_line(Vector2(needle_x, center.y - height * 0.4), Vector2(needle_x, center.y + height * 0.4), needle_color, 2.0)
+		dial.draw_circle(Vector2(needle_x, center.y), 3.0, needle_color)
 	)
 	return dial
 

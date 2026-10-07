@@ -24,7 +24,7 @@ var busted: bool = false
 var all_hands: Dictionary = {}  # player -> {cards, total, busted, stood}
 
 
-func _ready() -> void:
+func _build(start: Dictionary) -> void:
 	_build_ui()
 
 

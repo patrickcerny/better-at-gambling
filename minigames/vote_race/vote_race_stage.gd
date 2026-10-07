@@ -17,8 +17,11 @@ var players_list: Array[int] = []
 var current_positions: Dictionary[int, int] = {}  # player -> position
 
 
-func _ready() -> void:
+func _build(start: Dictionary) -> void:
+	players_list = start.get("players", [])
 	_build_ui()
+	_build_lanes()
+	_build_voting_buttons()
 
 
 func _build_ui() -> void:

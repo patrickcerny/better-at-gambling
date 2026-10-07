@@ -321,6 +321,7 @@ func _refresh() -> void:
 	var line: Array = pub.get("line", [])
 	stop_btn.visible = spinning
 	bet_panel.visible = not spinning
+	bet_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE if spinning else Control.MOUSE_FILTER_STOP
 	if spinning:
 		status_label.text = "Spinning…"
 		status_label.remove_theme_color_override(&"font_color")
