@@ -22,6 +22,8 @@ const DUMMY_NAMES: Array[String] = ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bl
 
 ## Practice dummies when no `--dummies` flag is given (scene tests set this; the game keeps 0).
 static var test_dummies: int = 0
+## Tests: seconds of the pre-minigame rules briefing (−1 = the normal 30 s, or `--minigame-briefing`).
+static var test_briefing: float = -1.0
 
 var map: LuckyLounge
 var server: MatchServer = null
@@ -54,6 +56,8 @@ var settings_panel: SettingsPanel = null
 var _shown_jackpot: int = -1
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
+## The rules screen over the stage until everyone is ready (or 30 s pass).
+var briefing: MinigameBriefing = null
 var reward_panel: RewardPanel
 ## Scripted driver (--autoplay); null in normal play.
 var autoplay: Node = null
@@ -333,6 +337,7 @@ func _start_room_server(cmd: Cmdline) -> void:
 	add_child(server)
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
+	def.station_seats = map.station_seats()
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
@@ -358,6 +363,7 @@ func _length_settings(cmd: Cmdline) -> Dictionary:
 		"gamble_minutes": clampi(cmd.get_int("gamble-minutes", presets.default_gamble_minutes), presets.min_gamble_minutes, presets.max_gamble_minutes),
 		"gamble_seconds": maxf(cmd.get_float("gamble-seconds", 0.0), 0.0),
 		"minigame_pool": cmd.get_string("minigame-pool", ""),
+		"minigame_briefing": maxf(cmd.get_float("minigame-briefing", test_briefing if test_briefing >= 0.0 else 30.0), 0.0),
 		"items_enabled": true,
 	}
 
@@ -370,6 +376,7 @@ func _start_local(cmd: Cmdline) -> void:
 	add_child(server)
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
+	def.station_seats = map.station_seats()
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
@@ -757,6 +764,10 @@ func _on_event(ev: Dictionary) -> void:
 	var type: StringName = ev["type"]
 	if stage != null:
 		stage.on_event(ev)
+	if briefing != null and is_instance_valid(briefing):
+		briefing.on_event(ev)
+		if type == &"minigame_go":
+			briefing = null
 	if table_fx != null:
 		table_fx.on_event(ev)
 	if casino_floor != null:
@@ -946,7 +957,7 @@ func _on_event(ev: Dictionary) -> void:
 				reward_panel.open(ev["rewards"], float(ev["seconds"]))
 				for row: Dictionary in ev["rewards"]:
 					if int(row["player"]) == local_id and StringName(row.get("item", &"")) != &"":
-						_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it.", float(ev["seconds"]))
+						_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it, scroll to select and I for info.", float(ev["seconds"]))
 		&"regroup_started":
 			_regroup()
 			var spot: Variant = (ev.get("positions", {}) as Dictionary).get(local_id, null)
@@ -1452,6 +1463,11 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 		stage.ui_host = self  # its 2D stays sharp outside the pixelated world
 		pixel_view.world.add_child(stage)
 		stage.begin(view.state, local_id, start, snapshot_state)
+		var hold: Variant = start.get("briefing", snapshot_state.get("briefing", 0.0))
+		if (hold is Dictionary) or float(hold) > 0.0:
+			briefing = MinigameBriefing.new()
+			add_child(briefing)
+			briefing.open(start if start.has("briefing") else {"minigame": start.get("minigame", ""), "players": start.get("players", []), "briefing": hold}, view.state, local_id)
 		# The minigame owns the screen: every table panel, menu and wheel goes away, and the cursor
 		# stays put (STAGE mode ignores sit/stand/menu-closed mode changes until the stage is over).
 		router.set_mode(InputRouter.Mode.STAGE)
@@ -1485,6 +1501,9 @@ func _close_stage() -> void:
 	if stage != null:
 		stage.queue_free()
 		stage = null
+	if briefing != null and is_instance_valid(briefing):
+		briefing.queue_free()
+	briefing = null
 
 
 ## Regroup over: the hall doors open and everyone runs back in with spawn protection.

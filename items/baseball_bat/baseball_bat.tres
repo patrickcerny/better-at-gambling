@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"baseball_bat"
 display_name = "Baseball Bat"
-description = "One swing at a standing player within 2 m: knocked out on the spot, chips everywhere."
+description = "One swing at a player within 2 m, seated or not: knocked out on the spot, chips everywhere."
 rarity = 1
 target_mode = 2
 requires_proximity = true

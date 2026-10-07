@@ -17,6 +17,8 @@ const SCHEMA: Dictionary = {
 	&"bust_or_bank_action": ["action"],
 	&"vote_race_vote": ["target"],
 	&"split_or_steal_pick": ["choice"],
+	&"lonely_number_pick": ["number"],
+	&"minigame_ready": [],
 	&"set_ready": ["ready"],
 	&"lobby_setting": ["key", "value"],
 	&"set_skin": ["skin"],

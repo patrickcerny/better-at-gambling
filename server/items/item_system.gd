@@ -1,13 +1,13 @@
 class_name ItemSystem
 extends RefCounted
-## Items on the server (0.8.6): inventories (6 slots with a discard choice when full), activation
+## Items on the server (0.8.6): inventories (3 slots with a discard choice when full), activation
 ## with cooldowns and target checks, protections (Bodyguard, Mirror, spawn and away protection,
 ## the negative-item grace window), effect expiry, and banana peels lying on the floor.
 ## Player intents go through `use`.
 
-const SLOTS: int = 6
+const SLOTS: int = 3
 ## `discard_item` slot meaning "throw away the incoming item" while a discard choice is open.
-const DISCARD_INCOMING: int = 6
+const DISCARD_INCOMING: int = 3
 
 var defs: Dictionary[StringName, ItemDefinition] = {}
 var balance: BalanceConfig

@@ -318,10 +318,11 @@ func _highlight(index: int) -> void:
 
 func _refresh() -> void:
 	var spinning: bool = bool(pub.get("spinning", false))
+	var settling: bool = bool(pub.get("settling", false))  # reels still landing: no new pull yet
 	var line: Array = pub.get("line", [])
 	stop_btn.visible = spinning
-	bet_panel.visible = not spinning
-	bet_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE if spinning else Control.MOUSE_FILTER_STOP
+	bet_panel.visible = not spinning and not settling
+	bet_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE if spinning or settling else Control.MOUSE_FILTER_STOP
 	if spinning:
 		status_label.text = "Spinning…"
 		status_label.remove_theme_color_override(&"font_color")

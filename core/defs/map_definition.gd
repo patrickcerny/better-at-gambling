@@ -10,6 +10,9 @@ extends Resource
 @export var hot_table_candidates: Array[StringName] = []
 ## Station id → world position of its interaction point (filled by the map scene at load).
 @export var station_positions: Dictionary = {}
+## Station id → seat world positions in seat order (filled by the map scene at load). Seated
+## players are moved here server-side so reach checks see them at the table.
+@export var station_seats: Dictionary = {}
 ## Spawn points in the entrance hall.
 @export var spawn_points: Array[Vector3] = []
 ## Where players stand in the entrance hall at the lobby and after each minigame (REGROUP), one

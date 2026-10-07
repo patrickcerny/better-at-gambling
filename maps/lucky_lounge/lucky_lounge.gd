@@ -96,6 +96,18 @@ func station_positions() -> Dictionary:
 	return out
 
 
+## Station id → world positions of its seats, in seat order.
+func station_seats() -> Dictionary:
+	var out: Dictionary = {}
+	for sid: StringName in stations:
+		var st: StationBase = stations[sid]
+		var seats: Array = []
+		for i: int in st.seats.size():
+			seats.append(st.seat_position(i))
+		out[sid] = seats
+	return out
+
+
 ## Spawn points (world).
 func spawn_points() -> Array[Vector3]:
 	return SPAWNS.duplicate()

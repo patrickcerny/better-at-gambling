@@ -168,7 +168,7 @@ func _on_pick(num: int) -> void:
 	my_pick = num
 	_typed = ""
 	Audio.play(&"ui_click", &"UI", -4.0)
-	Net.send_intent(Intents.make(&"submit_answer", {"number": num}))
+	Net.send_intent(Intents.make(&"lonely_number_pick", {"number": num}))
 	_refresh()
 
 

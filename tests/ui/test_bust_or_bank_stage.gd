@@ -47,8 +47,17 @@ func _row(p: int) -> Label:
 		if row.is_queued_for_deletion():
 			continue
 		if int(row.get_meta("player", -1)) == p:
-			return row as Label
+			return stage.board_rows[p]["label"] as Label
 	return null
+
+
+## The cards a row of `CardFace`s shows, in order.
+func _faces(row: HBoxContainer) -> Array[int]:
+	var out: Array[int] = []
+	for f: Node in row.get_children():
+		if not f.is_queued_for_deletion():
+			out.append((f as CardFace).card)
+	return out
 
 
 func test_cards_and_totals_follow_the_shared_shoe() -> void:
@@ -56,8 +65,37 @@ func test_cards_and_totals_follow_the_shared_shoe() -> void:
 	assert_eq(stage.hands[1]["total"], 15)
 	assert_eq(stage.hands[3]["total"], 15)
 	assert_eq(stage.my_total_label.text, "15")
-	assert_eq(stage.shoe_card.text, Card.label(Card.make(5)))
+	assert_eq(stage.dealt_face.card, Card.make(5))
+	assert_true(stage.dealt_face.is_face_up())
+	assert_eq(_faces(stage.my_hand_row), [Card.make(10), Card.make(5)] as Array[int], "real card faces in your hand")
+	assert_eq(_faces(stage.board_rows[2]["cards"]), [Card.make(10), Card.make(5)] as Array[int])
+	assert_eq((stage.board_rows[2]["total"] as Label).text, "Total 15", "total under each hand")
 	assert_false(stage.stand_button.disabled, "can stand while cards are coming")
+
+
+func test_next_card_is_shown_face_up_and_then_dealt() -> void:
+	_open([10, 2, 5, 3])
+	assert_eq(stage.next_card, Card.make(5))
+	assert_eq(stage.next_face.card, Card.make(5))
+	assert_true(stage.next_face.is_face_up(), "everyone sees the next card")
+	assert_eq(stage.next_face.text(), "5♠")
+	_next_card()
+	assert_eq(stage.dealt_face.card, Card.make(5), "the shown card is the one dealt")
+	assert_eq(stage.next_face.card, Card.make(3), "and the one after it is revealed")
+	assert_eq(_faces(stage.my_hand_row).back(), Card.make(5))
+
+
+func test_deal_bar_follows_the_event_timings() -> void:
+	assert_almost_eq(stage.deal_left, BustOrBankLogic.INTRO_TIME, 0.001, "intro countdown from round_started")
+	assert_string_contains(stage.deal_time_label.text, "Dealing in")
+	_open([10, 2, 5])
+	assert_almost_eq(stage.deal_left, BustOrBankLogic.DEAL_INTERVAL, 0.001, "next_in from the card event")
+	assert_almost_eq(stage.deal_span, BustOrBankLogic.DEAL_INTERVAL, 0.001)
+	assert_string_contains(stage.deal_time_label.text, "Next card in 3.2")
+	stage.on_event({"type": &"bust_or_bank_card", "card": Card.make(5), "next_card": Card.make(6), "receivers": [1, 2, 3], "totals": {1: 17, 2: 17, 3: 17}, "next_in": 7.5})
+	assert_almost_eq(stage.deal_span, 7.5, 0.001, "uses the server's value, not a local constant")
+	stage._process(2.5)
+	assert_almost_eq(stage.deal_bar.value, 2.5 / 7.5, 0.001)
 
 
 func test_points_update_from_round_end() -> void:
@@ -113,6 +151,8 @@ func test_everyone_busting_shows_a_replay_not_an_elimination() -> void:
 	_pump()
 	assert_true(stage.replay)
 	assert_eq(stage.hands[1]["total"], 0, "fresh count")
+	assert_eq(_faces(stage.my_hand_row), [] as Array[int], "hands cleared for the new round")
+	assert_eq(stage.next_face.card, logic.next_card, "the new round reveals its first card")
 	assert_string_contains(stage.round_label.text, "replay")
 
 
@@ -137,6 +177,9 @@ func test_snapshot_catches_up_mid_round() -> void:
 	late.begin(st, 3, {"minigame": &"bust_or_bank", "players": [1, 2, 3]}, logic.get_public_state())
 	assert_eq(late.hands[3]["total"], 17)
 	assert_true(late.hands[2]["stood"])
+	assert_eq(late.next_face.card, Card.make(3), "late joiners see the next card")
+	assert_eq(late.dealt_face.card, Card.make(5))
+	assert_eq(_faces(late.my_hand_row), [Card.make(10), Card.make(2), Card.make(5)] as Array[int])
 	assert_true(late.dealing)
 	assert_false(late.stand_button.disabled)
 

@@ -34,6 +34,10 @@ var phases: PhaseMachine
 ## Minigames between segments (§2.9), the reward phase after them (§2.10) and the Hot Table event.
 var minigames: MinigameDirector
 var minigame: MinigameLogicBase = null
+## The rules briefing before a minigame: the logic doesn't tick and refuses input until everyone
+## playing sent `minigame_ready` or the briefing ran out (`minigame_briefing` seconds, default 30).
+var briefing_left: float = 0.0
+var ready_players: Dictionary = {}
 var rewards: RewardDirector = RewardDirector.new()
 var hot_tables: HotTableDirector
 var loot: LootTables
@@ -221,6 +225,7 @@ func player_disconnected(player: int) -> void:
 	lobby.set_connected(player, false, _uptime)
 	if minigame != null:
 		minigame.remove_player(player)  # away players score 0 and get no minigame reward (§2.12)
+		_check_all_ready()  # the briefing doesn't wait for someone who left
 	_emit(GameEvents.make(&"player_left", {"player": player}))
 	_check_leader()
 	_flush()
@@ -314,7 +319,9 @@ func get_snapshot() -> Dictionary:
 	snap["shop"] = items.shop.wire() if items.shop != null else {}
 	snap["hot_table"] = {"station": hot_tables.current, "time_left": snappedf(hot_tables.time_left, 0.01)} if hot_tables.current != &"" else {}
 	if minigame != null:
-		snap["minigame"] = minigame.get_public_state()
+		snap["minigame"] = minigame.get_public_state().duplicate()
+		if briefing_left > 0.0:
+			snap["minigame"]["briefing"] = {"left": snappedf(briefing_left, 0.01), "ready": ready_players.keys()}
 	if phases.phase == Phase.Id.REWARDS:
 		snap["rewards"] = rewards.get_public_state()
 	if phases.phase == Phase.Id.REGROUP:
@@ -378,9 +385,14 @@ func _step(delta: float) -> void:
 		_check_comps()
 		money_history.tick(phases.casino_time, _balances())
 	elif phases.phase == Phase.Id.MINIGAME and minigame != null:
-		minigame.tick(delta, match_time)
-		if minigame.is_finished():
-			_finish_minigame()
+		if briefing_left > 0.0:
+			briefing_left -= delta
+			if briefing_left <= 0.0:
+				_go_minigame()
+		else:
+			minigame.tick(delta, match_time)
+			if minigame.is_finished():
+				_finish_minigame()
 	elif phases.phase == Phase.Id.REWARDS:
 		rewards.tick(delta)
 		if rewards.is_done():
@@ -503,8 +515,32 @@ func _start_minigame() -> void:
 		phases.minigame_finished()
 		phases.rewards_finished()
 		return
-	_emit(GameEvents.make(&"minigame_started", {"minigame": minigames.current_def.id, "name": minigames.current_def.display_name, "rules": minigames.current_def.rules_text, "players": players}))
+	briefing_left = maxf(float(settings.get("minigame_briefing", 30.0)), 0.0)
+	ready_players = {}
+	_emit(GameEvents.make(&"minigame_started", {"minigame": minigames.current_def.id, "name": minigames.current_def.display_name, "rules": minigames.current_def.rules_text, "players": players, "briefing": briefing_left}))
 	_flush()
+
+
+## The briefing is over (everyone ready, or time ran out): the minigame starts ticking.
+func _go_minigame() -> void:
+	if minigame == null:
+		return
+	briefing_left = 0.0
+	_emit(GameEvents.make(&"minigame_go", {}))
+
+
+## True while the pre-minigame briefing holds the minigame.
+func in_briefing() -> bool:
+	return minigame != null and briefing_left > 0.0
+
+
+func _check_all_ready() -> void:
+	if not in_briefing():
+		return
+	for id: int in minigame.players:
+		if state.players.has(id) and state.players[id].connected and not ready_players.has(id):
+			return
+	_go_minigame()
 
 
 func _finish_minigame() -> void:
@@ -689,6 +725,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				rules.status(player).seated = true
 				state.players[player].station = sid
 				state.players[player].seat = _free_seat(sid, player)
+				_move_to_seat(player, sid, state.players[player].seat)
 				_emit(GameEvents.make(&"player_sat", {"player": player, "station": sid, "seat": state.players[player].seat}))
 			return res
 		&"leave":
@@ -746,21 +783,43 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				return StationLogicBase.fail(&"unknown_emote")
 			_emit(GameEvents.make(&"emote", {"player": player, "id": StringName(intent["id"])}))
 			return StationLogicBase.OK_RESULT
+		&"minigame_ready":
+			if not in_briefing() or not minigame.players.has(player):
+				return StationLogicBase.fail(&"too_late")
+			if not ready_players.has(player):
+				ready_players[player] = true
+				_emit(GameEvents.make(&"minigame_ready", {"player": player, "ready": ready_players.keys()}))
+				_check_all_ready()
+			return StationLogicBase.OK_RESULT
 		&"submit_answer":
 			if minigame == null:
 				return StationLogicBase.fail(&"too_late")
+			if in_briefing():
+				return StationLogicBase.fail(&"too_early")
 			return minigame.submit(player, intent, match_time)
 		&"split_or_steal_pick":
 			if minigame == null or not minigame is SplitOrStealLogic:
 				return StationLogicBase.fail(&"too_late")
+			if in_briefing():
+				return StationLogicBase.fail(&"too_early")
 			return minigame.submit(player, intent, match_time)
 		&"bust_or_bank_action":
 			if minigame == null or not minigame is BustOrBankLogic:
 				return StationLogicBase.fail(&"too_late")
+			if in_briefing():
+				return StationLogicBase.fail(&"too_early")
 			return minigame.submit(player, intent, match_time)
 		&"vote_race_vote":
 			if minigame == null or not minigame is VoteRaceLogic:
 				return StationLogicBase.fail(&"too_late")
+			if in_briefing():
+				return StationLogicBase.fail(&"too_early")
+			return minigame.submit(player, intent, match_time)
+		&"lonely_number_pick":
+			if minigame == null or not minigame is LonelyNumberLogic:
+				return StationLogicBase.fail(&"too_late")
+			if in_briefing():
+				return StationLogicBase.fail(&"too_early")
 			return minigame.submit(player, intent, match_time)
 		&"use_item":
 			if not bool(settings.get("items_enabled", true)):
@@ -1021,6 +1080,17 @@ func _track_ranks() -> void:
 
 
 ## Lowest seat index at `sid` no other seated player holds.
+## A seated body sits at its seat as far as the server is concerned, so bats, bottles and
+## dealers reach it there and not where the player stood before sitting down.
+func _move_to_seat(player: int, sid: StringName, seat: int) -> void:
+	var seats: Array = map_def.station_seats.get(sid, []) if map_def != null else []
+	if seat < 0 or seat >= seats.size():
+		return
+	var pos: Vector3 = Vector3(seats[seat])
+	world.set_transform(player, pos, world.get_yaw(player))
+	state.players[player].position = pos
+
+
 func _free_seat(sid: StringName, player: int) -> int:
 	var logic: StationLogicBase = stations.logics.get(sid, null)
 	if logic is BlackjackLogic and (logic as BlackjackLogic).seats.has(player):

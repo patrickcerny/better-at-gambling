@@ -82,16 +82,76 @@ func test_shared_shoe_deals_the_same_cards_to_everyone_at_once() -> void:
 	for p: int in [1, 2, 3]:
 		assert_eq(logic._total(p), 15)
 	assert_eq(logic.state, BustOrBankLogic.State.DEALING)
+	assert_eq(int(dealt[0]["next_card"]), int(dealt[1]["card"]), "the revealed next card is the one dealt")
+
+
+func test_pacing_is_slow_enough_to_decide() -> void:
+	assert_eq(BustOrBankLogic.INTRO_TIME, 4.0)
+	assert_eq(BustOrBankLogic.DEAL_INTERVAL, 3.2)
+	assert_eq(BustOrBankLogic.RESULT_TIME, 5.0)
+	var logic := _game([1, 2])
+	assert_eq(float(_of(&"bust_or_bank_started")[0]["deal_interval"]), BustOrBankLogic.DEAL_INTERVAL)
+	assert_eq(float(_of(&"bust_or_bank_round_started")[0]["deal_in"]), BustOrBankLogic.INTRO_TIME)
+	_tick(logic, BustOrBankLogic.INTRO_TIME - 0.1)
+	assert_eq(_of(&"bust_or_bank_card").size(), 0, "no cards during the intro")
+	logic.shoe.stack_top([Card.make(2), Card.make(3), Card.make(4)] as Array[int])
+	_tick(logic, 0.2)
+	var dealt: Array[Dictionary] = _of(&"bust_or_bank_card")
+	assert_eq(dealt.size(), 2)
+	assert_eq(float(dealt[0]["next_in"]), 0.0, "the opening cards land together")
+	assert_eq(float(dealt[1]["next_in"]), BustOrBankLogic.DEAL_INTERVAL)
+	_tick(logic, BustOrBankLogic.DEAL_INTERVAL - 0.1)
+	assert_eq(_of(&"bust_or_bank_card").size(), 2, "a full decision window before the next card")
+	_tick(logic, 0.2)
+	assert_eq(_of(&"bust_or_bank_card").size(), 3)
+	assert_eq(float(_of(&"bust_or_bank_card")[2]["next_in"]), BustOrBankLogic.DEAL_INTERVAL)
+
+
+func test_next_card_is_shown_face_up_and_then_dealt() -> void:
+	var logic := _game([1, 2])
+	_open(logic, [10, 2, 5, 3, 4])
+	assert_eq(logic.next_card, Card.make(5), "the third stacked card is up next")
+	assert_eq(int(_of(&"bust_or_bank_card").back()["next_card"]), Card.make(5))
+	assert_eq(int(logic.get_public_state()["next_card"]), Card.make(5), "late joiners see it too")
+	_next_card(logic)
+	_next_card(logic)
+	var dealt: Array[Dictionary] = _of(&"bust_or_bank_card")
+	assert_eq(dealt.size(), 4)
+	for i: int in dealt.size() - 1:
+		assert_eq(int(dealt[i]["next_card"]), int(dealt[i + 1]["card"]), "card %d announced the following card" % i)
+	assert_eq(int(dealt[2]["card"]), Card.make(5))
+	assert_eq(int(dealt[3]["card"]), Card.make(3))
+	assert_eq(logic.next_card, Card.make(4), "the one after becomes the next card")
+	assert_eq(logic.next_card, logic.shoe.peek())
+
+
+func test_round_started_reveals_the_first_card() -> void:
+	var logic := _game([1, 2])
+	assert_eq(int(_of(&"bust_or_bank_round_started")[0]["next_card"]), logic.shoe.peek())
+	_open(logic, [10, 7])
+	_stand(logic, 1)
+	_stand(logic, 2)  # tie: they play again
+	assert_eq(logic.next_card, -1, "hidden while the result shows")
+	logic.shoe.stack_top([Card.make(9), Card.make(8)] as Array[int])
+	_tick(logic, BustOrBankLogic.RESULT_TIME)
+	var rs: Dictionary = _of(&"bust_or_bank_round_started").back()
+	assert_eq(int(rs["next_card"]), Card.make(9))
+	_tick(logic, BustOrBankLogic.INTRO_TIME)
+	var dealt: Array[Dictionary] = _of(&"bust_or_bank_card")
+	assert_eq(int(dealt[dealt.size() - 2]["card"]), Card.make(9), "the revealed card opens the round")
+	assert_eq(int(dealt.back()["card"]), Card.make(8))
 
 
 func test_standing_stops_your_cards_but_not_the_others() -> void:
 	var logic := _game([1, 2])
 	_open(logic, [10, 5, 3])
 	assert_true(_stand(logic, 1)["ok"])
+	var before: Dictionary = _of(&"bust_or_bank_card").back()
 	_next_card(logic)
 	assert_eq(logic._total(1), 15, "stood: keeps 15")
 	assert_eq(logic._total(2), 18)
 	assert_eq(_of(&"bust_or_bank_card").back()["receivers"], [2])
+	assert_eq(int(before["next_card"]), int(_of(&"bust_or_bank_card").back()["card"]), "the shown next card arrived")
 
 
 func test_cards_keep_coming_on_a_timer() -> void:
@@ -308,13 +368,14 @@ func test_shared_ranks_skip_like_competition_ranking() -> void:
 func test_idle_players_still_finish() -> void:
 	var logic := _game([1, 2, 3])
 	var t: float = 0.0
-	while not logic.is_finished() and t < 600.0:
+	while not logic.is_finished() and t < 900.0:
 		_tick(logic, 0.1)
 		t += 0.1
 	assert_true(logic.is_finished(), "nobody pressing anything can't stall the match")
 	assert_lte(logic.round, logic.max_rounds)
 	assert_eq(logic.max_rounds, 3 + BustOrBankLogic.SPARE_ROUNDS)
-	assert_lt(t, 90.0, "idle table ends well inside a minigame slot")
+	# Bound scaled with the slower pacing (intro 4 s, 3.2 s per card, 5 s result: about 2x the old).
+	assert_lt(t, 180.0, "idle table ends well inside a minigame slot")
 	assert_eq(logic.ranking().size(), 3)
 
 

@@ -1,12 +1,13 @@
 class_name ItemBar
 extends Control
-## Bottom-centre item HUD (0.8.6): six inventory slots with mouse wheel scrolling, dial gauge
-## for luck (red to green with swinging needle), running effects with their timers, the target
-## picker line and the "inventory full" discard choice. Pure display: ItemController feeds it.
+## Bottom-centre item HUD (0.8.6): three inventory slots with a selection the mouse wheel moves
+## (the slot under it is highlighted, "I: info" appears on the right and I opens a card with the
+## item's name, rarity and what it does), the half-ring luck gauge, running effects with their
+## timers, the target picker line and the "inventory full" discard choice. Pure display:
+## ItemController feeds it.
 
-const SLOTS: int = 6
+const SLOTS: int = 3
 const LUCK_MAX: int = 3
-const VISIBLE_SLOTS: int = 3  # Display 3 slots at a time, scroll through 6
 
 var slots: Array[PanelContainer] = []
 var slot_names: Array[Label] = []
@@ -19,7 +20,11 @@ var discard_panel: PanelContainer
 var discard_label: Label
 var duel_panel: PanelContainer
 var duel_label: Label
-var slot_scroll_index: int = 0  # Which slot is first on screen (0-3)
+var info_hint: Label
+var info_panel: PanelContainer
+var info_label: Label
+## The highlighted slot (0–2); the wheel moves it.
+var selected: int = 0
 
 var inventory: Array = []
 var luck: int = 0
@@ -32,18 +37,69 @@ func _ready() -> void:
 	set_inventory([])
 
 
-## Shows the inventory (item ids, oldest first), with 3 visible slots that scroll through 6 total.
+## Shows the inventory (item ids, oldest first) in the three slots.
 func set_inventory(inv: Array) -> void:
 	inventory = inv.duplicate()
-	# Clamp scroll position to valid range
-	slot_scroll_index = clampi(slot_scroll_index, 0, maxf(SLOTS - VISIBLE_SLOTS, 0))
-	for i: int in VISIBLE_SLOTS:
-		var inv_idx: int = slot_scroll_index + i
-		var has: bool = inv_idx < inventory.size()
-		slot_names[i].text = RewardPanel.item_name(StringName(inventory[inv_idx])) if has else "—"
+	for i: int in SLOTS:
+		var has: bool = i < inventory.size()
+		slot_names[i].text = RewardPanel.item_name(StringName(inventory[i])) if has else "—"
 		slot_names[i].modulate.a = 1.0 if has else 0.45
-		slots[i].add_theme_stylebox_override(&"panel", _slot_style(_rarity_color(StringName(inventory[inv_idx])) if has else Palette.WARM_CHARCOAL))
+		var border: Color = _rarity_color(StringName(inventory[i])) if has else Palette.WARM_CHARCOAL
+		slots[i].add_theme_stylebox_override(&"panel", _slot_style(border, i == selected))
 	_refresh_keys()
+	var item: StringName = selected_item()
+	info_hint.visible = item != &""
+	if info_panel.visible:
+		if item == &"":
+			info_panel.visible = false
+		else:
+			_fill_info(item)
+
+
+## Moves the selection by `step` slots (wheel down = right), wrapping around.
+func select(step: int) -> void:
+	selected = posmod(selected + step, SLOTS)
+	set_inventory(inventory)
+
+
+## The item in the selected slot (&"" when it is empty).
+func selected_item() -> StringName:
+	return StringName(inventory[selected]) if selected < inventory.size() else &""
+
+
+## I toggles the info card for the selected item; nothing happens on an empty slot.
+func toggle_info() -> void:
+	if info_panel.visible:
+		info_panel.visible = false
+		return
+	var item: StringName = selected_item()
+	if item == &"":
+		return
+	_fill_info(item)
+	info_panel.visible = true
+
+
+func hide_info() -> void:
+	info_panel.visible = false
+
+
+func _fill_info(item: StringName) -> void:
+	var def: ItemDefinition = Registry.items.get(item, null)
+	if def == null:
+		info_label.text = RewardPanel.item_name(item)
+		return
+	var desc: String = def.description if def.description != "" else "No description yet."
+	info_label.text = "%s  ·  %s\n%s" % [def.display_name, rarity_name(def.rarity), desc]
+	info_panel.add_theme_stylebox_override(&"panel", _slot_style(_rarity_color(item)))
+
+
+static func rarity_name(r: ItemDefinition.Rarity) -> String:
+	match r:
+		ItemDefinition.Rarity.LEGENDARY:
+			return "Legendary"
+		ItemDefinition.Rarity.RARE:
+			return "Rare"
+	return "Common"
 
 
 ## Seated players use Shift+1–3 for items (plain 1–4 pick chips).
@@ -78,7 +134,7 @@ func set_private(priv: Dictionary) -> void:
 		var parts: PackedStringArray = ["INVENTORY FULL: drop one (%ds)" % ceili(float(d.get("left", 0.0)))]
 		for i: int in inventory.size():
 			parts.append("[%d] %s" % [i + 1, RewardPanel.item_name(StringName(inventory[i]))])
-		parts.append("[6] new %s" % RewardPanel.item_name(StringName(d.get("item", ""))))
+		parts.append("[%d] new %s" % [ItemSystem.DISCARD_INCOMING + 1, RewardPanel.item_name(StringName(d.get("item", "")))])
 		discard_label.text = "\n".join(parts)
 
 
@@ -109,12 +165,6 @@ func show_target(text: String) -> void:
 	target_label.visible = text != ""
 
 
-## Scroll inventory slots (direction: 1 = right, -1 = left).
-func scroll_slots(direction: int) -> void:
-	slot_scroll_index = posmod(slot_scroll_index + direction, SLOTS - VISIBLE_SLOTS + 1)
-	set_inventory(inventory)
-
-
 ## Update the dial gauge based on current luck value.
 func _update_luck_dial() -> void:
 	if luck_dial == null:
@@ -124,12 +174,9 @@ func _update_luck_dial() -> void:
 
 
 func _refresh_keys() -> void:
-	for i: int in VISIBLE_SLOTS:
-		var slot_num: int = slot_scroll_index + i + 1
-		slot_keys[i].text = ("⇧%d" if seated else "%d") % slot_num
-		# Grayed out if no item at that slot
-		var has: bool = (slot_scroll_index + i) < inventory.size()
-		slot_keys[i].modulate.a = 1.0 if has else 0.45
+	for i: int in SLOTS:
+		slot_keys[i].text = ("⇧%d" if seated else "%d") % (i + 1)
+		slot_keys[i].modulate.a = 1.0 if i < inventory.size() else 0.45
 
 
 func _rarity_color(id: StringName) -> Color:
@@ -144,11 +191,11 @@ func _rarity_color(id: StringName) -> Color:
 	return Palette.FELT_GREEN
 
 
-static func _slot_style(border: Color) -> StyleBoxFlat:
+static func _slot_style(border: Color, highlighted: bool = false) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.CASINO_BLACK, 0.82)
-	sb.border_color = border
-	sb.set_border_width_all(3)
+	sb.bg_color = Color(Palette.CASINO_BLACK.lerp(Palette.WARM_GOLD, 0.18), 0.9) if highlighted else Color(Palette.CASINO_BLACK, 0.82)
+	sb.border_color = Palette.WARM_GOLD if highlighted else border
+	sb.set_border_width_all(5 if highlighted else 3)
 	sb.set_corner_radius_all(8)
 	sb.content_margin_left = 12
 	sb.content_margin_right = 12
@@ -207,12 +254,24 @@ func _build() -> void:
 	luck_dial = _create_luck_dial()
 	luck_dial.custom_minimum_size = Vector2(150, 78)
 	luck_row.add_child(luck_dial)
-	# Inventory slots: 3 visible, scrollable through 6 total.
+	# Item info card (I on the selected slot).
+	info_panel = PanelContainer.new()
+	info_panel.add_theme_stylebox_override(&"panel", _slot_style(Palette.WARM_GOLD))
+	info_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	info_panel.visible = false
+	col.add_child(info_panel)
+	info_label = Label.new()
+	info_label.theme_type_variation = &"SmallLabel"
+	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info_label.custom_minimum_size = Vector2(420, 0)
+	info_panel.add_child(info_label)
+	# Inventory slots: three, the selected one highlighted, "I: info" to its right.
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override(&"separation", 14)
 	col.add_child(row)
-	for i: int in VISIBLE_SLOTS:
+	for i: int in SLOTS:
 		var p := PanelContainer.new()
 		p.custom_minimum_size = Vector2(180, 52)
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -232,7 +291,14 @@ func _build() -> void:
 		slots.append(p)
 		slot_keys.append(k)
 		slot_names.append(n)
-	for l: Label in [discard_label, duel_label, target_label, effects_label, luck_label]:
+	info_hint = Label.new()
+	info_hint.theme_type_variation = &"SmallLabel"
+	info_hint.text = "I: info"
+	info_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	info_hint.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	info_hint.visible = false
+	row.add_child(info_hint)
+	for l: Label in [discard_label, duel_label, target_label, effects_label, luck_label, info_label, info_hint]:
 		_outline(l)
 	set_private({})
 
