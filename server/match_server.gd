@@ -156,10 +156,7 @@ func _build_match_systems(seed_value: int) -> void:
 		var logic: StationLogicBase = stations.logics[sid]
 		if logic.game_id == &"blackjack" or logic.game_id == &"roulette":
 			var dealer_rng: SeededRng = SeededRng.new(seed_value ^ StringName(sid).hash())
-			# For headless/testing: initialize dealer at a default position in front of the table
-			# In actual gameplay, this will be updated by CasinoFloor._physics_process
-			var dealer_pos: Vector3 = Vector3(0.0, 0.5, 0.5)  # A default position in front
-			dealers[sid] = DealerLogic.new(sid, state.players, rules, world, dealer_rng, stations, dealer_pos)
+			dealers[sid] = DealerLogic.new(sid, state.players, rules, world, dealer_rng, stations, map_def, DealerLogic.OFFSETS[logic.game_id])
 	minigames.reset()
 	minigame = null
 	rewards = RewardDirector.new()
@@ -1100,15 +1097,16 @@ func put_in_jail(player: int) -> void:
 	_emit(GameEvents.make(&"player_jailed", {"player": player, "time": snappedf(p.jail_time_remaining, 0.01), "fine": p.jail_fine, "catch_count": p.catch_count}))
 
 
-## Release a jailed player and deduct the fine from their balance (never below $0).
-func release_from_jail(player: int) -> void:
+## Release a jailed player and deduct the fine from their balance (never below $0); the Get Out of
+## Jail Free card waives it.
+func release_from_jail(player: int, with_fine: bool = true) -> void:
 	if not state.players.has(player) or state.players[player].jail_time_remaining <= 0.0:
 		return  # not in jail
 	var p: PlayerState = state.players[player]
-	var fine: int = p.jail_fine
+	var fine: int = p.jail_fine if with_fine else 0
 	p.jail_time_remaining = 0.0
 	p.jail_fine = 0
-	var deducted: int = economy.take_up_to(player, fine, &"jail_fine")
+	var deducted: int = economy.take_up_to(player, fine, &"jail_fine") if fine > 0 else 0
 	_emit(GameEvents.make(&"player_released_from_jail", {"player": player, "fine": deducted}))
 
 
@@ -1118,7 +1116,7 @@ func clear_catch_count(player: int) -> void:
 		return
 	state.players[player].catch_count = 0
 	if state.players[player].jail_time_remaining > 0.0:
-		release_from_jail(player)
+		release_from_jail(player, false)
 	_emit(GameEvents.make(&"catch_count_cleared", {"player": player}))
 
 
@@ -1126,7 +1124,9 @@ func clear_catch_count(player: int) -> void:
 func _tick_jail(delta: float) -> void:
 	for id: int in state.players:
 		var p: PlayerState = state.players[id]
-		if p.jail_time_remaining > 0.0:
+		if p.jail_time_remaining <= 0.0:
+			continue
+		if p.jail_time_remaining <= delta:
+			release_from_jail(id)  # while still "in jail", so the release takes the fine
+		else:
 			p.jail_time_remaining -= delta
-			if p.jail_time_remaining <= 0.0:
-				release_from_jail(id)

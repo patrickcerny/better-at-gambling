@@ -2,9 +2,6 @@ class_name RouletteStation
 extends StationBase
 ## Roulette table: long red layout, Patrick's wheel model at one end, 6 stools around it.
 
-## Dealer (croupier) position: stands by the wheel.
-const DEALER_POS: Vector3 = Vector3(-1.5, 0.5, 0.0)
-
 
 func _build_visuals() -> void:
 	game_id = &"roulette"

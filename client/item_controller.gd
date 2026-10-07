@@ -260,8 +260,9 @@ func _input(event: InputEvent) -> void:
 		_discard(DISCARD_INCOMING)
 		get_viewport().set_input_as_handled()
 		return
-	# Handle item slot keys (1-6) even when not picking, to support scrolling/inventory access
-	if not _discard_open and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+	# Plain number keys use items only while walking: seated they pick chips, in menus (shop,
+	# settings) and on a minigame stage they belong to that panel.
+	if not _discard_open and scene.router.mode == InputRouter.Mode.WALK and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var k: Key = (event as InputEventKey).physical_keycode
 		if k >= KEY_1 and k <= KEY_6:
 			on_slot(int(k - KEY_1))

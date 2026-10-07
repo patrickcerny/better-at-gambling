@@ -8,6 +8,7 @@
 script = ExtResource("1")
 id = &"quiz"
 display_name = "Casino Quiz"
+min_players = 1
 rules_text = "Three questions. Answer fast: a right answer is worth 500 to 1,000 points. One answer per question, no changes."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")

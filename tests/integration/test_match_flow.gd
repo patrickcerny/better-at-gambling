@@ -151,7 +151,7 @@ func test_standings_tiebreakers() -> void:
 
 
 func test_secrets_never_in_snapshots_or_events_during_a_full_match() -> void:
-	fx = ServerFixture.new(2, {"minigames": 2, "gamble_seconds": 100.0, "seed": 1, "minigame_pool": "quiz"})
+	_fixture(2, 2, 100.0)
 	fx.server.start_match()
 	var leaks: Array[String] = []
 	fx.server.event_emitted.connect(func(ev: Dictionary) -> void:

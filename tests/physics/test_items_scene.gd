@@ -143,14 +143,15 @@ func test_banana_peel_mesh_and_slip() -> void:
 
 
 func test_discard_choice_with_number_keys() -> void:
-	_give([&"lucky_clover", &"black_cat", &"mirror", &"bodyguard"])
+	# Six slots: the seventh item asks which one to throw away; key 2 swaps out slot 2.
+	_give([&"lucky_clover", &"black_cat", &"mirror", &"sunglasses", &"scissors", &"hot_hands", &"bodyguard"])
 	await wait_seconds(0.5)
 	assert_true(scene.hud.items.discard_panel.visible, "inventory full panel")
 	assert_string_contains(scene.hud.items.discard_label.text, "Bodyguard")
 	await _key(KEY_2)
 	await wait_seconds(0.3)
 	assert_false(scene.hud.items.discard_panel.visible)
-	assert_eq(scene.server.state.players[scene.local_id].inventory, [&"lucky_clover", &"mirror", &"bodyguard"] as Array[StringName])
+	assert_eq(scene.server.state.players[scene.local_id].inventory, [&"lucky_clover", &"mirror", &"sunglasses", &"scissors", &"hot_hands", &"bodyguard"] as Array[StringName])
 	assert_eq(_of(&"item_used").size(), 0, "the key answered the discard, not an item")
 
 

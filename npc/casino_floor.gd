@@ -69,11 +69,7 @@ func _spawn_dealers() -> void:
 		var station: StationBase = scene.map.stations.get(sid, null) as StationBase
 		if station == null:
 			continue
-		var dealer_pos: Vector3 = Vector3.ZERO
-		if logic.game_id == &"blackjack":
-			dealer_pos = BlackjackStation.DEALER_POS
-		elif logic.game_id == &"roulette":
-			dealer_pos = RouletteStation.DEALER_POS
+		var dealer_pos: Vector3 = DealerLogic.OFFSETS[logic.game_id]
 		var dealer := Dealer.new()
 		dealer.name = "Dealer_%s" % sid
 		dealer.station_id = sid
