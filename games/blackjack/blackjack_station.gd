@@ -27,9 +27,9 @@ func _build_visuals() -> void:
 		_add_seat(pos + Vector3(0, 0.5, 0), angle)  # yaw = angle looks at the table centre
 		# Your cards land on the felt in front of you; your camera sits at your own stool.
 		var to_seat: Vector3 = (pos - ARC_CENTRE).normalized()
-		cards.spots[i] = [ARC_CENTRE + to_seat * 1.3 + Vector3(0, TABLE_TOP, 0), angle]
+		cards.spots[i] = [ARC_CENTRE + to_seat * CARD_RADIUS + Vector3(0, TABLE_TOP, 0), angle]
 		# A split's second hand: one row closer to the dealer, nudged right, so both stay readable.
-		cards.spots[i + SPLIT_KEY] = [ARC_CENTRE + to_seat * 1.3 + Basis(Vector3.UP, angle) * SPLIT_OFFSET + Vector3(0, TABLE_TOP, 0), angle]
+		cards.spots[i + SPLIT_KEY] = [ARC_CENTRE + to_seat * CARD_RADIUS + Basis(Vector3.UP, angle) * SPLIT_OFFSET + Vector3(0, TABLE_TOP, 0), angle]
 		var eye := Node3D.new()
 		eye.name = "SeatCamera%d" % i
 		# Leaning in over the rail: your own cards low in view, the dealer's rack above them.
@@ -48,6 +48,11 @@ func _build_visuals() -> void:
 ## Card height on the felt and the centre of the half-moon's arc.
 const TABLE_TOP: float = 0.935
 const ARC_CENTRE: Vector3 = Vector3(0, 0, -0.4)
+## Where a seat's cards and bet stack sit, measured from the arc centre: cards first, the chips
+## in front of them, both clear of the felt edge (1.6). The chips used to sit at 1.6, right under
+## the padded rail, so the bet showed inside it.
+const CARD_RADIUS: float = 1.2
+const BET_RADIUS: float = 1.45
 ## Card-spot key offset for a seat's second (split) hand, and where that hand lies relative to
 ## the first one (seat-local: -z is towards the dealer).
 const SPLIT_KEY: int = 10

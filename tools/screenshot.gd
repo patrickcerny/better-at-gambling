@@ -62,7 +62,13 @@ func _process(delta: float) -> bool:
 		var cam := Camera3D.new()
 		cam.fov = _fov
 		cam.near = 0.05
-		root.add_child(cam)
+		# The match renders its 3D inside the pixel view's own viewport: the camera goes there.
+		var host: Node = root
+		for child: Node in root.get_children():
+			var pv: Variant = child.get("pixel_view")  # MatchScene (no class reference: this tool script loads before the game's)
+			if pv != null and (pv as Node).get("world") != null:
+				host = (pv as Node).get("world")
+		host.add_child(cam)
 		cam.global_position = _cam_pos
 		cam.look_at(_look_at, Vector3.UP)
 		cam.current = true

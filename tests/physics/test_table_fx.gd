@@ -106,6 +106,35 @@ func test_chips_slide_on_and_off_the_felt() -> void:
 	assert_eq(w.get_child_count(), 0, "win and loss effects freed")
 
 
+func test_blackjack_chips_land_on_the_felt_inside_the_rail() -> void:
+	# Patrick (0.8.14): the bet showed inside the padded rail. The stack now starts above the rail
+	# and lands between the cards and the felt edge, at felt height.
+	Vfx.force_enabled = true
+	var w: Node3D = _fx_world()
+	var bj: BlackjackStation = await _station(BlackjackStation.new()) as BlackjackStation
+	var fx := TableFx.new()
+	add_child_autofree(fx)
+	fx.setup({&"b": bj}, func(_p: int) -> PlayerAvatar: return null, 1, null, w,
+		func(pid: int) -> Color: return Palette.player_color(pid - 1), func(_sid: StringName) -> int: return 10)
+	fx.on_event({"type": &"bet_placed", "player": 1, "station": &"b", "amount": 50, "details": {"game": "blackjack"}})
+	var stack: ChipStack = null
+	for c: Node in bj.get_children():
+		if c is ChipStack:
+			stack = c
+	assert_not_null(stack)
+	var start: Vector3 = stack.position
+	var start_r: float = Vector2(start.x - BlackjackStation.ARC_CENTRE.x, start.z - BlackjackStation.ARC_CENTRE.z).length()
+	assert_almost_eq(start_r, BlackjackStation.RAIL_RADIUS, 0.02, "slides in from the rail")
+	assert_gt(start.y, BlackjackStation.TABLE_TOP + 0.085, "over the rail (its top), not inside it")
+	await wait_seconds(0.6)
+	var at: Vector3 = stack.position
+	var r: float = Vector2(at.x - BlackjackStation.ARC_CENTRE.x, at.z - BlackjackStation.ARC_CENTRE.z).length()
+	assert_almost_eq(at.y, BlackjackStation.TABLE_TOP, 0.005, "on the felt")
+	assert_lt(r + ChipStack.CHIP_RADIUS + 0.03, BlackjackStation.RAIL_RADIUS - BlackjackStation.RAIL_WIDTH, "clear of the rail's inner edge")
+	assert_gt(r - ChipStack.CHIP_RADIUS, BlackjackStation.CARD_RADIUS + 0.13, "clear of the cards (a tilted card reaches about 0.12 out)")
+	assert_lt(r + ChipStack.CHIP_RADIUS, BlackjackStation.FELT_RADIUS, "still on the felt")
+
+
 func test_ball_lands_in_every_pocket() -> void:
 	Vfx.force_enabled = true
 	var rs: RouletteStation = await _station(RouletteStation.new()) as RouletteStation

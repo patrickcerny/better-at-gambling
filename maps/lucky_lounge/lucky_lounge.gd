@@ -96,6 +96,14 @@ func station_positions() -> Dictionary:
 	return out
 
 
+## Station id → the table's rotation about y (radians).
+func station_yaws() -> Dictionary:
+	var out: Dictionary = {}
+	for sid: StringName in stations:
+		out[sid] = (stations[sid] as Node3D).rotation.y
+	return out
+
+
 ## Station id → world positions of its seats, in seat order.
 func station_seats() -> Dictionary:
 	var out: Dictionary = {}

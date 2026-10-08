@@ -13,6 +13,8 @@ extends Resource
 ## Station id → seat world positions in seat order (filled by the map scene at load). Seated
 ## players are moved here server-side so reach checks see them at the table.
 @export var station_seats: Dictionary = {}
+## Station id → the table's rotation about y in radians (dealers stand in the table's frame).
+@export var station_yaws: Dictionary = {}
 ## Spawn points in the entrance hall.
 @export var spawn_points: Array[Vector3] = []
 ## Where players stand in the entrance hall at the lobby and after each minigame (REGROUP), one

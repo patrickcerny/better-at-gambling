@@ -21,6 +21,7 @@ func _init(player_count: int = 2, settings: Dictionary = {"minigames": 2, "gambl
 	var map: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	map.station_positions = map.station_positions.duplicate()  # Resource.duplicate shares the dictionary
 	map.station_seats = map.station_seats.duplicate()
+	map.station_yaws = map.station_yaws.duplicate()
 	server.configure(s, Registry.balance, Registry.presets, Registry.game_logic_scripts(), map)
 	server.event_emitted.connect(func(ev: Dictionary) -> void: events.append(ev))
 	for i: int in player_count:

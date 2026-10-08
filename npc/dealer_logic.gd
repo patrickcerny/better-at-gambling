@@ -8,9 +8,14 @@ extends RefCounted
 ## Shove/bat range detection
 const ATTACK_RANGE: float = 2.2
 
-## Where the dealer stands relative to its table's origin, per game (the scene's `Dealer` node
-## uses the same offsets).
-const OFFSETS: Dictionary = {&"blackjack": Vector3(0.0, 0.5, -1.2), &"roulette": Vector3(-1.5, 0.5, 0.0)}
+## Where the dealer stands in the table's own frame, per game (the scene's `Dealer` node uses
+## the same offsets): blackjack on the straight north edge, roulette just past the wheel end
+## (the table body runs from x −1.5 to 2.7, the wheel sits around x −1.3). The table's yaw turns
+## these, so a mirrored table (roulette_2 at 180°) keeps its dealer at the wheel.
+const OFFSETS: Dictionary = {&"blackjack": Vector3(0.0, 0.5, -1.2), &"roulette": Vector3(-2.5, 0.5, 0.0)}
+## Which way the dealer faces in the table's frame: at the players (blackjack: +z, the stools;
+## roulette: +x, along the layout). Yaw 0 looks down −z, like every avatar.
+const FACINGS: Dictionary = {&"blackjack": PI, &"roulette": -PI * 0.5}
 
 var station_id: StringName
 var players: Dictionary
@@ -46,7 +51,17 @@ func where() -> Vector3:
 	if position.is_finite():
 		return position
 	var spos: Variant = map_def.station_positions.get(station_id, null) if map_def != null else null
-	return Vector3(spos) + offset if spos != null else Vector3.INF
+	return Vector3(spos) + offset.rotated(Vector3.UP, table_yaw()) if spos != null else Vector3.INF
+
+
+## The table's rotation about y (0 when the map doesn't say).
+func table_yaw() -> float:
+	return float(map_def.station_yaws.get(station_id, 0.0)) if map_def != null else 0.0
+
+
+## Which way the dealer faces (world yaw): the table's yaw plus the game's facing.
+func facing(game_id: StringName) -> float:
+	return wrapf(table_yaw() + float(FACINGS.get(game_id, 0.0)), -PI, PI)
 
 
 ## A player's shove: attacks the dealer if they are in range. Returns true if it did.

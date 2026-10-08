@@ -338,6 +338,7 @@ func _start_room_server(cmd: Cmdline) -> void:
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
 	def.station_seats = map.station_seats()
+	def.station_yaws = map.station_yaws()
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
@@ -377,6 +378,7 @@ func _start_local(cmd: Cmdline) -> void:
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
 	def.station_seats = map.station_seats()
+	def.station_yaws = map.station_yaws()
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS

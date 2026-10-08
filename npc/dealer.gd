@@ -57,9 +57,10 @@ func _physics_process(delta: float) -> void:
 			yaw = lerp_angle(yaw, _net_yaw, minf(1.0, 10.0 * delta))
 			rotation.y = yaw
 		return
-	# Server: dealer stands still at position_offset from table centre
+	# Host or offline: the dealer stands still on its spot, turned towards the players.
 	if position_offset.is_finite():
 		global_position = position_offset
+	rotation.y = yaw
 
 
 func _build_visuals() -> void:
