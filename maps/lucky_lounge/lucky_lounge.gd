@@ -60,6 +60,9 @@ const SETTINGS_BOARD_POS: Vector3 = Vector3(12.5, 0, 14.6)
 ## (you have to be up on it, not beside it).
 const PAD_RADIUS: float = 0.75
 const PEDESTAL_TOP: float = 0.8
+## Floor layers (y): carpet 0.01, area rugs 0.02, station rugs 0.03. Keep 1 cm apart.
+const AREA_RUG_Y: float = 0.02
+const STATION_RUG_Y: float = 0.03
 ## The ready pedestals (0.8.15, Patrick: "Podeste"): Greek marble column pedestals along the
 ## south wall of the entrance hall, one per player colour, nearest the door first, each with a
 ## marble stair up to its top. The revolving door gap runs x −2..2; the reception desk moved
@@ -403,11 +406,13 @@ func _sign_label(pos: Vector3, yaw: float, text: String, size: int) -> Label3D:
 
 
 func _build_floor_areas() -> void:
-	# Coloured rugs identify game areas (readable from a distance).
-	_plane(Vector2(22, 5), Vector3(-13, 0.012, 4), Palette.FELT_GREEN.darkened(0.6), "BlackjackRug")
-	_plane(Vector2(18, 8), Vector3(0, 0.012, -3), Palette.CASINO_RED.darkened(0.5), "RouletteRug")
-	_plane(Vector2(16, 9), Vector3(-13.5, 0.012, -11), Palette.WARM_GOLD.darkened(0.6), "SlotsRug")
-	_plane(Vector2(12, 5), Vector3(14, 0.012, -13), Palette.VIP_BURGUNDY.darkened(0.3), "PlinkoRug")
+	# Coloured rugs identify game areas (readable from a distance). They sit 1 cm above the
+	# carpet (0.01) and 1 cm below the station rugs (0.03): closer layers z-fight at distance.
+	# LoungeDecor turns them into patterned, brass-edged carpets on clients.
+	_plane(Vector2(22, 5), Vector3(-13, AREA_RUG_Y, 4), Palette.FELT_GREEN.darkened(0.6), "BlackjackRug")
+	_plane(Vector2(18, 8), Vector3(0, AREA_RUG_Y, -3), Palette.CASINO_RED.darkened(0.5), "RouletteRug")
+	_plane(Vector2(16, 9), Vector3(-13.5, AREA_RUG_Y, -11), Palette.WARM_GOLD.darkened(0.6), "SlotsRug")
+	_plane(Vector2(12, 5), Vector3(14, AREA_RUG_Y, -13), Palette.VIP_BURGUNDY.darkened(0.3), "PlinkoRug")
 	# Bar (south-east, decoration; also the quiz entry area later). It starts east of the
 	# staircase (x > 13.2); its back bar used to run across the first flight.
 	GreyboxKit.box(self, Vector3(BAR_W, 1.1, 1.2), Vector3(BAR_X, 0.55, 5.0), Color("#3A2A1E"), "Bar")

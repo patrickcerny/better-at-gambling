@@ -143,10 +143,30 @@ func _floors() -> void:
 	runner.name = "Runner"
 	for x: float in [-1.66, 1.66]:
 		_box(Vector3(0.12, 0.012, 3.4), Vector3(x, 0.022, 14.4), _brass_mat, "brass")
+	# The game-area rugs: patterned carpet in the area colour with a brass edge, instead of the
+	# flat colour patches the greybox lays over the carpet.
+	_area_rug("BlackjackRug", Palette.FELT_GREEN.darkened(0.45), Palette.FELT_GREEN.darkened(0.62))
+	_area_rug("RouletteRug", Palette.CASINO_RED.darkened(0.3), Palette.CASINO_RED.darkened(0.5))
+	_area_rug("SlotsRug", Palette.WARM_GOLD.darkened(0.5), Palette.WARM_GOLD.darkened(0.66))
+	_area_rug("PlinkoRug", Palette.VIP_BURGUNDY.darkened(0.15), Palette.VIP_BURGUNDY.darkened(0.38))
 	# The stair treads are red carpet, the landing blocks too.
 	var stair_carpet: StandardMaterial3D = _tex("casino_carpet", 1.1, Palette.CASINO_RED.darkened(0.1), 0.3, 0.95)
 	for n: String in ["Stairs1", "Stairs2", "Landing"]:
 		_retexture_solid(n, stair_carpet)
+
+
+## Patterned carpet on the greybox area rug `node_name`, with a brass strip around its edge.
+func _area_rug(node_name: String, base: Color, alt: Color) -> void:
+	var mi: MeshInstance3D = map.get_node_or_null(node_name) as MeshInstance3D
+	if mi == null or not (mi.mesh is PlaneMesh):
+		return
+	mi.material_override = _carpet(base, alt, 1.0)
+	var size: Vector2 = (mi.mesh as PlaneMesh).size
+	var c: Vector3 = mi.position + Vector3(0, 0.002, 0)
+	var w: float = 0.1
+	for sx: float in [-1.0, 1.0]:
+		_box(Vector3(w, 0.008, size.y), c + Vector3(sx * (size.x - w) * 0.5, 0, 0), _brass_mat, "brass")
+		_box(Vector3(size.x, 0.008, w), c + Vector3(0, 0, sx * (size.y - w) * 0.5), _brass_mat, "brass")
 
 
 func _retexture(node_name: String, mat: Material) -> void:
