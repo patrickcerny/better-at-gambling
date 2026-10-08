@@ -381,7 +381,8 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	for k: int in 4:
 		var rise: float = PEDESTAL_TOP / 4.0
 		var run: float = stair_len / 4.0
-		var step: Node3D = GreyboxKit.box(root, Vector3(0.96, rise, run), Vector3(0, rise * (k + 0.5), -0.45 - stair_len + run * (3.5 - k)), MARBLE if k % 2 == 0 else MARBLE_DARK, "Step%d" % k, false)
+		# Step k climbs from the room side: lowest tread farthest from the column.
+		var step: Node3D = GreyboxKit.box(root, Vector3(0.96, rise, run), Vector3(0, rise * (k + 0.5), -0.45 - stair_len + run * (k + 0.5)), MARBLE if k % 2 == 0 else MARBLE_DARK, "Step%d" % k, false)
 		(step.get_node("Mesh") as MeshInstance3D).material_override = marble if k % 2 == 0 else marble_dark
 	# Name on the wall above, facing the room.
 	var label: Label3D = _sign_label(Vector3(pos.x, 2.2, SIZE_Z * 0.5 - 0.3), PI, "", 64)
