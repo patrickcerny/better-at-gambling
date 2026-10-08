@@ -185,7 +185,7 @@ func recent_offences(now: float, window: float = 3.0) -> Array[Dictionary]:
 	return out
 
 
-## A guard caught the attacker: thrown out through the revolving door (no money loss).
+## A guard caught the attacker: thrown out through the front door (no money loss).
 func report_thrown_out(attacker: int, guard: StringName, now: float) -> void:
 	if holding.has(attacker):
 		_end_hold(attacker, holding[attacker])

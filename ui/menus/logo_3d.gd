@@ -2,7 +2,8 @@ class_name Logo3D
 extends Node3D
 ## The 3D "BETTER AT GAMBLING" sign (mesh from tools/logo/build_logo3d.py) with its own camera,
 ## warm lights and a lighting-only environment, so it renders on a transparent background inside
-## a SubViewport. Sways slowly when `sway` is on.
+## a SubViewport (see `Logo3DView`). Sways slowly when `sway` is on. `build_model()` gives just the
+## sign, for placing it in the casino.
 
 const MODEL: PackedScene = preload("res://assets/models/logo/logo_3d.glb")
 ## Per-material look, keyed by the material names the generator writes.
@@ -27,11 +28,10 @@ func _ready() -> void:
 	_pivot = Node3D.new()
 	_pivot.name = "Pivot"
 	add_child(_pivot)
-	var model: Node3D = MODEL.instantiate()
-	_pivot.add_child(model)
-	_apply_materials(model)
+	_pivot.add_child(build_model())
 	camera = Camera3D.new()
-	camera.fov = 30.0
+	camera.keep_aspect = Camera3D.KEEP_WIDTH  # the sign always fills the width, any aspect
+	camera.fov = 54.0
 	camera.position = Vector3(0, 0, 14.8)
 	camera.current = true
 	add_child(camera)
@@ -53,19 +53,33 @@ func _apply_pose() -> void:
 	_pivot.position.y = sin(_t * 0.9) * 0.08 if sway else 0.0
 
 
-func _apply_materials(node: Node) -> void:
+## The sign alone (about 13.6 x 6 m, facing +Z, centred on the origin), materials applied.
+static func build_model() -> Node3D:
+	var model: Node3D = MODEL.instantiate()
+	model.name = "LogoSign"
+	_apply_materials(model)
+	return model
+
+
+## Swaps the imported materials for the logo's own (vertex colours as albedo) on the shared mesh,
+## once; later instances find them already in place.
+static func _apply_materials(node: Node) -> void:
 	if node is MeshInstance3D:
-		var mi := node as MeshInstance3D
-		for i in mi.mesh.get_surface_count():
-			var src: Material = mi.mesh.surface_get_material(i)
+		var mesh: Mesh = (node as MeshInstance3D).mesh
+		for i in mesh.get_surface_count():
+			var src: Material = mesh.surface_get_material(i)
+			if src is StandardMaterial3D and (src as StandardMaterial3D).has_meta(&"logo_look"):
+				continue
 			var key: StringName = StringName(src.resource_name) if src != null else &""
 			var look: Dictionary = LOOK.get(key, LOOK[&"LogoBanner"])
 			var m := StandardMaterial3D.new()
+			m.resource_name = key
+			m.set_meta(&"logo_look", true)
 			m.vertex_color_use_as_albedo = true
 			m.metallic = look["metallic"]
 			m.roughness = look["roughness"]
 			m.metallic_specular = look["specular"]
-			mi.set_surface_override_material(i, m)
+			mesh.surface_set_material(i, m)
 	for child in node.get_children():
 		_apply_materials(child)
 

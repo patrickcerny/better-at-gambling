@@ -32,11 +32,14 @@ const WINDOWS: Array = [
 	[Vector3(-6.0, 5.4, -15.75), Vector3(0, 0, 1), 2.3], [Vector3(6.0, 5.4, -15.75), Vector3(0, 0, 1), 2.3],
 ]
 ## Double doors: [centre on the wall, inward normal, height]: staff door by the slots, the VIP
-## lounge's private door, the street door seen through the revolving door.
+## lounge's private door, the street door seen through the entrance.
 const DOORS: Array = [
 	[Vector3(-13.75, 0.0, -15.75), Vector3(0, 0, 1), 2.7], [Vector3(0.0, LuckyLounge.MEZZ_Y, -15.75), Vector3(0, 0, 1), 2.65],
 	[Vector3(0.0, 0.0, 20.75), Vector3(0, 0, -1), 2.9],
 ]
+
+## Size of the entrance logo against the 13.6 m model (about 6.8 m wide in the room).
+const SIGN_SCALE: float = 0.5
 
 var map: LuckyLounge
 ## Batches filled while building, turned into MultiMeshes at the end: key → [mesh, material, transforms].
@@ -200,7 +203,7 @@ func _walls() -> void:
 	# The map's low gold trim strips sit where the chair rail goes now.
 	for solid: Node3D in _solids("Trim"):
 		solid.visible = false
-	# North and east/west walls run full length; the south wall has the revolving-door gap.
+	# North and east/west walls run full length; the south wall has the entrance gap.
 	var runs: Array = [  # [start, end, inward normal]
 		[Vector3(-hx, 0, -hz), Vector3(hx, 0, -hz), Vector3(0, 0, 1)],
 		[Vector3(-hx, 0, -hz), Vector3(-hx, 0, hz), Vector3(1, 0, 0)],
@@ -506,47 +509,14 @@ func _sconces() -> void:
 		_add(&"shade", shade, shade_mat, Transform3D(Basis(), p + n * 0.2 + Vector3(0, 0.2, 0)))
 
 
+## The 3D title logo (`Logo3D`), once, above the entrance on the south wall, facing the room.
 func _signs() -> void:
-	var bulb := SphereMesh.new()
-	bulb.radius = 0.06
-	bulb.height = 0.12
-	bulb.radial_segments = 8
-	bulb.rings = 4
-	# Split casino name over the two lobby doors, each at x ±3, height 4.3 (fountain no longer blocks).
-	for dx: float in [-3.0, 3.0]:
-		var sign_c := Vector3(dx, 4.3, LuckyLounge.SIZE_Z * 0.5 - 0.62)
-		_marquee(bulb, sign_c, Vector2(3.5, 1.2), Vector3(0, 0, -1))
-		var title := _label("LUCKY LOUNGE", 80, Palette.VIP_GOLD)
-		title.position = sign_c + Vector3(0, 0, -0.02)
-		title.rotation.y = PI
-		add_child(title)
-
-
-## Bulbs around a rectangular sign (centre `c`, size `s`, facing `n`).
-func _marquee(bulb: Mesh, c: Vector3, s: Vector2, n: Vector3) -> void:
-	var right: Vector3 = Vector3.UP.cross(n).normalized()
-	var nx: int = int(s.x / 0.32)
-	var ny: int = int(s.y / 0.32)
-	for i: int in nx + 1:
-		var x: float = -s.x * 0.5 + s.x * i / nx
-		for y: float in [-s.y * 0.5, s.y * 0.5]:
-			_add(&"marquee", bulb, _bulb_mat, Transform3D(Basis(), c + right * x + Vector3(0, y, 0) + n * 0.08))
-	for j: int in range(1, ny):
-		var y: float = -s.y * 0.5 + s.y * j / ny
-		for x: float in [-s.x * 0.5, s.x * 0.5]:
-			_add(&"marquee", bulb, _bulb_mat, Transform3D(Basis(), c + right * x + Vector3(0, y, 0) + n * 0.08))
-
-
-func _label(text: String, size: int, color: Color) -> Label3D:
-	var l := Label3D.new()
-	l.text = text
-	l.font = Vfx.font()
-	l.font_size = size
-	l.pixel_size = 0.005
-	l.modulate = color
-	l.outline_modulate = Palette.CASINO_BLACK
-	l.outline_size = 12
-	return l
+	var sign: Node3D = Logo3D.build_model()
+	sign.scale = Vector3.ONE * SIGN_SCALE
+	sign.rotation.y = PI
+	# The sign bends back towards the wall at its ends (~1.7 m deep at full size).
+	sign.position = Vector3(0.0, 4.95, LuckyLounge.SIZE_Z * 0.5 - 0.25 - 1.8 * SIGN_SCALE)
+	add_child(sign)
 
 
 ## Warm haze in the distance and glow that only catches bright things (bulbs, signs, emissive VFX).

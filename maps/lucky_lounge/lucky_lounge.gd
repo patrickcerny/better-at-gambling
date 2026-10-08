@@ -1,7 +1,7 @@
 class_name LuckyLounge
 extends Node3D
 ## Greybox of "The Lucky Lounge" (§2.3, docs/ART_DIRECTION.md): entrance lobby with fountain,
-## revolving door, reception, staircase to the VIP mezzanine; blackjack lounge, roulette pit,
+## front entrance, reception, staircase to the VIP mezzanine; blackjack lounge, roulette pit,
 ## slot rows, Plinko wall, bar. Built procedurally from the tables below so it is easy to tune.
 
 const SIZE_X: float = 44.0
@@ -63,7 +63,6 @@ const LOBBY_DOORS_Z: float = 8.2
 var stations: Dictionary[StringName, StationBase] = {}
 var fountain_area: Area3D
 var vip_gate_area: Area3D
-var revolving_door: Node3D
 var nav_region: NavigationRegion3D
 var props_parent: Node3D
 var navmesh_ready: bool = false
@@ -155,11 +154,11 @@ func _build_floor_and_walls() -> void:
 	GreyboxKit.box(self, Vector3(SIZE_X, WALL_H, 0.5), Vector3(0, WALL_H * 0.5, -SIZE_Z * 0.5), wall, "WallN")
 	GreyboxKit.box(self, Vector3(0.5, WALL_H, SIZE_Z), Vector3(-SIZE_X * 0.5, WALL_H * 0.5, 0), wall, "WallW")
 	GreyboxKit.box(self, Vector3(0.5, WALL_H, SIZE_Z), Vector3(SIZE_X * 0.5, WALL_H * 0.5, 0), wall, "WallE")
-	# South wall with a gap for the revolving door.
+	# South wall with the entrance gap.
 	GreyboxKit.box(self, Vector3(SIZE_X * 0.5 - 2.0, WALL_H, 0.5), Vector3(-SIZE_X * 0.25 - 1.0, WALL_H * 0.5, SIZE_Z * 0.5), wall, "WallS1")
 	GreyboxKit.box(self, Vector3(SIZE_X * 0.5 - 2.0, WALL_H, 0.5), Vector3(SIZE_X * 0.25 + 1.0, WALL_H * 0.5, SIZE_Z * 0.5), wall, "WallS2")
 	GreyboxKit.box(self, Vector3(4.5, WALL_H - 3.2, 0.5), Vector3(0, WALL_H - 1.6, SIZE_Z * 0.5), wall, "WallSTop")
-	# Porch outside the revolving door, closed off: nobody leaves the building on foot.
+	# Porch outside the entrance, closed off: nobody leaves the building on foot.
 	GreyboxKit.box(self, Vector3(8.0, 0.5, 5.0), Vector3(0, -0.25, SIZE_Z * 0.5 + 2.5), Color("#8C7F78"), "Porch")
 	GreyboxKit.box(self, Vector3(8.0, WALL_H, 0.5), Vector3(0, WALL_H * 0.5, SIZE_Z * 0.5 + 5.0), wall, "PorchWall")
 	for x: float in [-4.0, 4.0]:
@@ -206,8 +205,6 @@ func _build_lobby() -> void:
 		GreyboxKit.sphere(post, 0.1, Vector3(0, 0.55, 0), Palette.WARM_GOLD, "Knob")
 		if i == 0 or i == 3:  # ropes at the sides only: the middle stays open for the stampede
 			GreyboxKit.box(self, Vector3(3.3, 0.08, 0.08), Vector3(x + 1.75, 0.85, 8.6), Palette.CASINO_RED, "Rope", false)
-	# Casino sign above the entrance (inside).
-	GreyboxKit.box(self, Vector3(7.0, 1.2, 0.2), Vector3(0, 5.0, SIZE_Z * 0.5 - 0.5), Palette.CASINO_RED, "Sign", false)
 	# Ready pads for the physical lobby (M3 uses them; placed now for layout).
 	for i: int in SPAWNS.size():
 		var pad: Node3D = GreyboxKit.cylinder(self, 0.6, 0.06, SPAWNS[i] + Vector3(0, 0.03, 0), Palette.player_color(i).darkened(0.2), "ReadyPad%d" % i, false)
@@ -222,47 +219,6 @@ func _build_lobby() -> void:
 		PropModels.dress(couch, &"couch", 0.45, 0.0, 2.5).rotation.y = PI
 	_build_settings_board()
 	_build_lobby_doors()
-	# Revolving door: rotating 4-panel cylinder in the south wall gap.
-	revolving_door = Node3D.new()
-	revolving_door.name = "RevolvingDoor"
-	revolving_door.position = ENTRANCE_POS + Vector3(0, 0, 1.0)
-	add_child(revolving_door)
-	var spinner := AnimatableBody3D.new()
-	spinner.name = "Spinner"
-	spinner.sync_to_physics = true
-	for i: int in 4:
-		var panel := MeshInstance3D.new()
-		var pm := BoxMesh.new()
-		pm.size = Vector3(0.1, 3.0, 2.0)
-		panel.mesh = pm
-		panel.material_override = GreyboxKit.material(Color("#9AC4D8", ))
-		panel.position = Vector3(0, 1.5, 1.0)
-		var pivot := Node3D.new()
-		pivot.rotation.y = i * PI * 0.5
-		pivot.add_child(panel)
-		var cs := CollisionShape3D.new()
-		var sh := BoxShape3D.new()
-		sh.size = pm.size
-		cs.shape = sh
-		cs.position = panel.position
-		pivot.add_child(cs)
-		spinner.add_child(pivot)
-	revolving_door.add_child(spinner)
-	var drum: Node3D = GreyboxKit.cylinder(revolving_door, 2.2, 0.2, Vector3(0, 3.1, 0), Palette.WARM_GOLD, "DrumTop", false, 0.7)
-	drum.visible = true
-	var door_area := Area3D.new()
-	door_area.name = "DoorArea"
-	door_area.collision_layer = 0
-	door_area.collision_mask = 2
-	var dcs := CollisionShape3D.new()
-	var dsh := CylinderShape3D.new()
-	dsh.radius = 2.1
-	dsh.height = 3.0
-	dcs.shape = dsh
-	dcs.position.y = 1.5
-	door_area.add_child(dcs)
-	door_area.set_meta(&"hazard", &"revolving_door")
-	revolving_door.add_child(door_area)
 	# Stairs (two flights with a landing) up to the mezzanine on the east side of the lobby. The
 	# flights meet the landings exactly (no slots, no lips): flight 1 ends where the landing block
 	# starts (z 4.2), flight 2 leaves its far side (z 1.8) and arrives flush with the mezzanine
