@@ -58,7 +58,7 @@
 - Room orchestrator (`services/orchestrator/`, FastAPI): rooms, codes, port pool, join tokens, spawn/heartbeat/reap, rate limits, dev/Steam auth — 62 pytest.
 - Entrance-hall lobby: ready pads, wardrobe mirror and settings board prompts, closed doors until the match starts, `LobbyPanel` (slots, colors, hats, ready, leader settings, add/remove bots), `LobbyController` — `tests/unit/test_lobby_controller.gd`, `tests/integration/test_room_lobby.gd`, screenshot `build/screenshots/online_lobby.png`.
 - Body authority handoff (client while standing, server while held/ragdolled/thrown), puppet ragdolls and guards, prop sync, grab/shove prediction — `tests/net/test_net_match.py`.
-- Main menu Play Online: create party, join by code, join by address, rejoin last party, connection errors.
+- Main menu Play Online: create party, join by code, join by address, connection errors ("Host on this PC" and "Rejoin last party" removed after Patrick's playtest notes).
 
 - M4 match flow: Casino Quiz (`QuizLogic`, `QuestionBank` with 97 questions in `data/quiz/questions_en.json`, 2 dynamic templates, RTT-credited timing, ties) — `test_quiz_logic.gd`, `test_question_bank.gd`, `test_dynamic_questions.gd`; `QuizStage` — `tests/ui/test_quiz_input.gd`, screenshots.
 - Rewards (`RewardDirector`: placement cash, private draft, defaults, bots, 3-slot cap, cash-only mode) — `test_rewards.gd`; `RewardPanel` draft UI.
@@ -78,7 +78,7 @@
   - Quiz host cat, confetti, results podium show, 12 awards (`test_awards.gd`), money-over-time graph, name tags.
   - Five generated lounge-jazz loops with mood crossfades by phase (`audio/music_mood.gd`), new SFX, every event sounded (`audio/event_sfx.gd`, table in GDD.md); music and SFX not yet listened to by a human.
   - Waiter NPC who trips (by himself, on bumps or shoves) and leaves slippery puddles; Megaphone at the bar (E, 10 s of full-volume voice). Protocol 4: old 0.6 clients are refused.
-  - Pixel look (Patrick: "the pixelated effect Yap Yap has"): `client/pixel_view.gd` renders the 3D world (casino, quiz set, podium, menu panorama) in a nearest-upscaled sub viewport at 1/2, 1/3 or 1/4 of the window's pixels; all 2D stays sharp. Settings → Video → "Pixel look" Off / Light / Retro (default) / Chunky, live. Never built on the dedicated server. `tests/ui/test_pixel_view.gd`, `tests/smoke/test_pixel_scenes.gd`; screenshots `screenshots/polish1/pixel/`. Not verified by a human eye on a real GPU (xvfb only); 3D audio relies on the sub viewport's listener flag.
+  - Pixel look (Patrick: "the pixelated effect Yap Yap has"): `client/pixel_view.gd` renders the 3D world (casino, quiz set, podium, menu panorama) in a nearest-upscaled sub viewport at 1/2, 1/3 or 1/4 of the window's pixels; all 2D stays sharp. Now fixed at 1/3 for everyone (Patrick: "pixel look cannot be set"); old saved choices are dropped, `Settings.set_pixel_override` is for dev tools only. Never built on the dedicated server. `tests/ui/test_pixel_view.gd`, `tests/smoke/test_pixel_scenes.gd`; screenshots `screenshots/polish1/pixel/`. Not verified by a human eye on a real GPU (xvfb only); 3D audio relies on the sub viewport's listener flag.
 
 ## Known bugs
 - (fixed 2026-10-06) The VIP mezzanine could not be reached on foot: the south-east pillar and the back bar

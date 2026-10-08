@@ -36,7 +36,7 @@ func test_main_menu_uses_the_3d_logo() -> void:
 	var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 	add_child_autofree(menu)
 	await wait_process_frames(2)
-	var logo: Node = menu.get_node("Left/Column/Logo")
+	var logo: Node = menu.get_node("Center/Column/Logo")
 	assert_true(logo is Logo3DView, "the menu logo is the 3D view")
 	assert_null(menu.find_child("Gambling", true, false), "the old text logo is gone")
 

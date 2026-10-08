@@ -1,23 +1,23 @@
 extends GutTest
-## The match scene, the quiz stage and the results podium run under every pixel look (Off, Light,
-## Retro, Chunky) without errors: the 3D sits in the pixel view's sub viewport with the current
-## camera, the stages' 2D layers stay on the sharp window, keys still reach the stage through the
-## container, and the setting flips live mid-match.
+## The match scene, the quiz stage and the results podium run under every shrink the pixel view
+## supports (players get 1/3, the developer override covers 1..4) without errors: the 3D sits in
+## the pixel view's sub viewport with the current camera, the stages' 2D layers stay on the sharp
+## window, keys still reach the stage through the container, and the override flips live mid-match.
 
 var scene: MatchScene
 var _old_scale: int
 
 
 func before_each() -> void:
-	_old_scale = Settings.pixel_scale()
+	_old_scale = Settings.pixel_scale_override
 
 
 func after_each() -> void:
-	Settings.change("video", "pixel_scale", _old_scale)
+	Settings.set_pixel_override(_old_scale)
 
 
 func _start(scale: int) -> void:
-	Settings.change("video", "pixel_scale", scale)
+	Settings.set_pixel_override(scale)
 	Net.stop()
 	scene = (load("res://match/match_scene.tscn") as PackedScene).instantiate()
 	add_child_autofree(scene)
@@ -92,7 +92,7 @@ func test_casino_quiz_and_results_under_every_look() -> void:
 		await wait_process_frames(2)
 		# Flip the look live.
 		var other: int = 1 if s != 1 else 4
-		Settings.change("video", "pixel_scale", other)
+		Settings.set_pixel_override(other)
 		await wait_process_frames(2)
 		assert_eq(pv.shrink(), other, "applied live")
 		assert_eq(pv.viewport.size, Vector2i(get_tree().root.size) / other)

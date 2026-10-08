@@ -1,7 +1,7 @@
 extends SceneTree
 ## Loads a scene, waits N frames, saves the viewport to a PNG, quits.
 ## Used by scripts/screenshot.sh (needs a display; Xvfb is fine).
-## `--pixel N` sets the pixel look (video/pixel_scale 1..4) for this run without saving it; the
+## `--pixel N` overrides the fixed pixel look (shrink 1..4, 1 = off) for this run only; the
 ## log line also reports the mean frame time and the window's measured render time (CPU and GPU)
 ## over the last `--perf-frames` (default 60) frames; `--no-vsync` so a swap wait doesn't hide them.
 ## `--cam x,y,z --look x,y,z [--fov 70]` swaps in a free camera for the last frames (map shots).
@@ -37,8 +37,8 @@ func _initialize() -> void:
 
 
 func _start(packed: PackedScene, c: Cmdline) -> void:
-	if c.has("pixel"):  # the autoloads are up by now; not saved, so the dev's own setting survives
-		_settings().set_value("video", "pixel_scale", c.get_int("pixel", 1))
+	if c.has("pixel"):  # the autoloads are up by now; a run-only override, never saved
+		_settings().call(&"set_pixel_override", c.get_int("pixel", 1))
 	if c.has_flag("no-vsync"):
 		_settings().set_value("video", "vsync", false)
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)

@@ -1,6 +1,6 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|shop|rewards|settings|online` over the blurred casino panorama:
+## `--panel lobby|shop|rewards|settings|controls|pause|tutorial|online` over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Big Wendy", "Snake Eyes"]
@@ -45,10 +45,19 @@ func _ready() -> void:
 			p.open(rows, 6.0, true)
 			p.set_process(false)
 			p.timer_label.text = "6"
-		"settings":
+		"settings", "controls":
 			var p := SettingsPanel.new()
 			add_child(p)
+			p.current_tab = 3 if which == "controls" else 0
 			p.open(true)
+		"pause":
+			var p := PauseMenu.new()
+			add_child(p)
+			p.open()
+		"tutorial":
+			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
+			add_child(menu)
+			menu.call(&"_show_tutorial")
 		"online":
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)

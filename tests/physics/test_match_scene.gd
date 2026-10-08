@@ -131,13 +131,16 @@ func test_shake_drops_exactly_the_capped_amount_as_piles_and_pickup_pays_it() ->
 	# Piles that landed within reach were picked up on the spot; walk over the rest.
 	var remaining: int = scene.piles.size()
 	assert_eq(remaining + _of(&"chips_collected").size(), _of(&"chips_dropped").size(), "every drop is a pile or already collected")
-	for ev: Dictionary in _of(&"chips_dropped"):
-		var pid: int = int(ev["pile"])
-		if not scene.piles.has(pid):
-			continue
-		scene.local.teleport(scene.piles[pid].global_position)
+	# A pile can still be sliding when we land on it: walk over what is left a few times.
+	for attempt: int in 4:
+		for pid: int in scene.piles.keys():
+			if not scene.piles.has(pid):
+				continue
+			scene.local.teleport(scene.piles[pid].global_position)
+			await wait_physics_frames(3)
 		await wait_physics_frames(3)
-	await wait_physics_frames(3)
+		if scene.piles.is_empty():
+			break
 	assert_eq(scene.piles.size(), 0, "all piles collected")
 	assert_eq(scene.server.economy.balance(scene.local_id), mine_before + shaken, "pickups paid the full amount")
 	assert_eq(scene.view.state.balance(scene.local_id), scene.server.economy.balance(scene.local_id), "HUD mirror matches the server")
