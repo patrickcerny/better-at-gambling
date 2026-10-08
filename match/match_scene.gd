@@ -93,7 +93,6 @@ var _ragdoll_attacker: Dictionary[int, int] = {}
 var _respawn_at: Dictionary[int, float] = {}
 var _clock: float = 0.0
 var _vip_toast_at: float = -INF
-var _door_angle: float = 0.0
 var _owns_server: bool = false
 var _plinko_seen: Dictionary[String, bool] = {}  # "station:drop_id" (ids count per board)
 var _pad_timer: float = 0.0
@@ -624,7 +623,6 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	_spin_door(delta)
 	_check_fountain()
 	_check_vip_gate()
 	_check_pickups()
@@ -1920,21 +1918,6 @@ func _near_shop() -> bool:
 		return false
 	var p: Vector3 = local.global_position
 	return Vector2(p.x - LuckyLounge.SHOP_POS.x, p.z - LuckyLounge.SHOP_POS.z).length() < 2.2 and absf(p.y - LuckyLounge.SHOP_POS.y) < 1.5
-
-
-func _spin_door(delta: float) -> void:
-	_door_angle += delta * 0.9
-	var spinner: AnimatableBody3D = map.revolving_door.get_node_or_null("Spinner")
-	if spinner != null:
-		spinner.rotation.y = _door_angle
-	var area: Area3D = map.revolving_door.get_node_or_null("DoorArea")
-	if area == null:
-		return
-	for body: Node3D in area.get_overlapping_bodies():
-		if body is PlayerAvatar and (body as PlayerAvatar).is_standing() and _simulates(body):
-			var rel: Vector3 = body.global_position - map.revolving_door.global_position
-			var tangent: Vector3 = Vector3(-rel.z, 0.0, rel.x).normalized()
-			(body as PlayerAvatar).push_velocity += tangent * 4.0 * delta
 
 
 func _check_fountain() -> void:
