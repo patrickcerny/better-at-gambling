@@ -42,12 +42,23 @@ func test_casino_quiz_and_results_under_every_look() -> void:
 		assert_eq(pv.viewport.get_camera_3d(), scene.local.cam.camera, "the player's camera draws the viewport")
 		assert_null(get_tree().root.get_camera_3d(), "the window itself draws no 3D")
 		assert_false(pv.viewport.is_ancestor_of(scene.ui_layer), "HUD stays on the window")
+		# The curtain starts parked off both edges, so the casino is visible at spawn.
+		var w: float = scene.curtain_left.get_parent_area_size().x
+		assert_true(scene.curtain_left.get_global_rect().end.x <= 0.0, "left curtain off screen at spawn")
+		assert_true(scene.curtain_right.get_global_rect().position.x >= w, "right curtain off screen at spawn")
+		scene._set_curtain(0.0)
+		assert_almost_eq(scene.curtain_left.get_global_rect().position.x, 0.0, 0.5, "closed curtain covers the left half")
+		assert_almost_eq(scene.curtain_right.get_global_rect().end.x, w, 0.5, "closed curtain covers the right half")
+		scene._set_curtain(1.0)
 		# Quiz: the stage's set is pixelated, its UI is not, and a number key still answers.
 		scene._open_stage({"minigame": &"quiz", "players": _players()}, {})
+		await wait_seconds(MatchScene.CURTAIN_TIME + 0.3)  # curtain closes, then the stage is created behind it
 		var stage: QuizStage = scene.stage as QuizStage
 		assert_not_null(stage, "quiz stage opened")
 		if stage == null:
 			continue
+		await wait_seconds(MatchScene.CURTAIN_TIME + 0.3)
+		assert_true(scene.curtain_left.get_global_rect().end.x <= 0.0, "curtain opened again on the stage")
 		assert_true(pv.viewport.is_ancestor_of(stage), "stage set inside the pixel viewport")
 		assert_eq(stage.ui.get_parent(), scene, "stage UI hosted on the sharp window")
 		assert_eq(pv.viewport.get_camera_3d(), stage.camera, "stage camera took over")

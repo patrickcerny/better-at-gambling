@@ -14,6 +14,8 @@ var stake: int = 0
 ## Part of `stake` Fake Cash paid for.
 var stake_covered: int = 0
 var spin_elapsed: float = 0.0
+## Seconds the reels are still settling after a spin; no new pull until it hits 0.
+var settle_left: float = 0.0
 var spins_played: int = 0
 
 
@@ -53,6 +55,8 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 		return fail(&"not_seated")
 	if spinning:
 		return fail(&"busy")
+	if settle_left > 0.0:
+		return fail(&"too_early")
 	var amount: int = int(bet.get("amount", 0))
 	if not amount in bet_sizes():
 		return fail(&"invalid_amount")
@@ -90,6 +94,8 @@ func tick(delta: float) -> void:
 		spin_elapsed += delta
 		if spin_elapsed >= balance.slots_spin_time:
 			_finish_spin()
+	elif settle_left > 0.0:
+		settle_left = maxf(settle_left - delta, 0.0)
 
 
 func round_seconds() -> float:
@@ -103,6 +109,7 @@ func has_stake(p: int) -> bool:
 func auto_resolve() -> void:
 	if spinning:
 		_finish_spin()
+	settle_left = 0.0  # resolved for good (leaving, match end, simulations): nothing left to land
 
 
 ## The spinning stake comes back (the jackpot keeps its feed: that was house money).
@@ -119,11 +126,12 @@ func refund_all() -> void:
 
 
 func get_public_state() -> Dictionary:
-	return {"game": game_id, "player": player, "spinning": spinning, "line": line.duplicate() if not spinning else [], "stake": stake}
+	return {"game": game_id, "player": player, "spinning": spinning, "settling": settle_left > 0.0, "line": line.duplicate() if not spinning else [], "stake": stake}
 
 
 func _finish_spin() -> void:
 	spinning = false
+	settle_left = balance.slots_settle_time
 	spins_played += 1
 	var mult: int = payout_multiplier(line, balance)
 	var details: Dictionary = {"line": line.duplicate(), "multiplier_base": mult}

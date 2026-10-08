@@ -58,27 +58,20 @@ func _spawn_waiter() -> void:
 
 ## Spawn dealers at each blackjack and roulette table (v0.8.4).
 func _spawn_dealers() -> void:
-	if scene.server == null or _headless:
-		return
 	dealers.clear()
-	# Get dealer positions from stations
-	for sid: StringName in scene.server.stations.logics:
-		var logic: StationLogicBase = scene.server.stations.logics[sid]
-		if logic.game_id != &"blackjack" and logic.game_id != &"roulette":
+	# One dealer per blackjack and roulette table, placed in the table's own frame (its yaw turns
+	# the offset) and facing the players. Dealers stand still, so online clients place them from
+	# the map too; a host (headless servers included) also reports them to the server's DealerLogic.
+	for sid: StringName in scene.map.stations:
+		var station: StationBase = scene.map.stations[sid] as StationBase
+		if station == null or not DealerLogic.OFFSETS.has(station.game_id):
 			continue
-		var station: StationBase = scene.stations.get(sid, null) as StationBase
-		if station == null:
-			continue
-		var dealer_pos: Vector3 = Vector3.ZERO
-		if logic.game_id == &"blackjack":
-			dealer_pos = BlackjackStation.DEALER_POS
-		elif logic.game_id == &"roulette":
-			dealer_pos = RouletteStation.DEALER_POS
 		var dealer := Dealer.new()
 		dealer.name = "Dealer_%s" % sid
 		dealer.station_id = sid
-		dealer.position_offset = station.global_position + dealer_pos
-		dealer.puppet = scene.role == MatchScene.Role.CLIENT
+		dealer.position_offset = station.global_position + (DealerLogic.OFFSETS[station.game_id] as Vector3).rotated(Vector3.UP, station.global_rotation.y)
+		dealer.yaw = wrapf(station.global_rotation.y + float(DealerLogic.FACINGS[station.game_id]), -PI, PI)
+		dealer.puppet = false
 		scene.world_root.add_child(dealer)
 		dealers[sid] = dealer
 

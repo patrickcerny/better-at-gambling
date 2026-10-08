@@ -4,7 +4,9 @@ extends MinigameLogicBase
 ##
 ## Each round one shared shoe deals a card every `DEAL_INTERVAL` seconds to everyone still in play
 ## at once; each player adds it to their own total and may STAND (bank) at any moment. Going over
-## 21 busts you on the spot. When nobody is still drawing, the round ends: busted players and the
+## 21 busts you on the spot. The upcoming card is no secret: `next_card` (the shoe's top card) is
+## shown face up to everyone in every `bust_or_bank_card` / `bust_or_bank_round_started` event and in
+## the snapshot, so the decision is "do I want THAT card?". When nobody is still drawing, the round ends: busted players and the
 ## worst standing hand(s) are thrown out (ties for worst all go). Survivors play again with a fresh
 ## count until one player is left.
 ##
@@ -18,15 +20,18 @@ extends MinigameLogicBase
 
 enum State { INTRO, DEALING, RESULT, DONE }
 
-## Seconds before the first cards of a round.
-const INTRO_TIME: float = 2.5
-## Seconds between shared cards while players are still drawing.
-const DEAL_INTERVAL: float = 1.6
+## Seconds before the first cards of a round (players read the next card and get ready).
+const INTRO_TIME: float = 4.0
+## Seconds between shared cards while players are still drawing: the stand-decision window.
+const DEAL_INTERVAL: float = 3.2
 ## Seconds the round result is shown before the next round (or the end).
-const RESULT_TIME: float = 3.5
+const RESULT_TIME: float = 5.0
 ## Cards dealt at the start of a round (blackjack-style two-card start).
 const OPENING_CARDS: int = 2
-## Safety cap (counts replays): survivors after this many rounds share first place.
+## Safety cap (counts replays): survivors after `max_rounds` rounds share first place. It's the
+## player count + `SPARE_ROUNDS` (one knock-out per round plus a few replays), capped at
+## `MAX_ROUNDS`, so a table of idle players (everyone busts, every round) still ends quickly.
+const SPARE_ROUNDS: int = 3
 const MAX_ROUNDS: int = 12
 const SHOE_DECKS: int = 2
 const BLACKJACK: int = 21
@@ -44,6 +49,10 @@ var busted: Dictionary[int, bool] = {}
 ## Thrown-out groups, worst first: each entry is the players who share one rank.
 var elim_groups: Array[Array] = []
 var last_card: int = -1
+## The card the shoe deals next, shown face up to everyone (-1 while the game is over). It is the
+## shoe's top card, so `shoe.stack_top` still decides the order (tests and tutorial scripting).
+var next_card: int = -1
+var max_rounds: int = MAX_ROUNDS
 ## The round that just ended was an everyone-busted replay (the next one replays it).
 var _last_was_replay: bool = false
 
@@ -52,10 +61,11 @@ func _on_setup(_context: Dictionary) -> void:
 	shoe = Shoe.new(rng, SHOE_DECKS)
 	in_round = players.duplicate()
 	in_round.sort()
+	max_rounds = mini(in_round.size() + SPARE_ROUNDS, MAX_ROUNDS)
 	events.append(GameEvents.make(&"bust_or_bank_started", {
 		"players": in_round.duplicate(),
 		"deal_interval": DEAL_INTERVAL,
-		"max_rounds": MAX_ROUNDS,
+		"max_rounds": max_rounds,
 	}))
 	if in_round.size() <= 1:
 		_finish()
@@ -74,11 +84,12 @@ func tick(delta: float, _now: float) -> void:
 			state = State.DEALING
 			for i: int in OPENING_CARDS:
 				if state == State.DEALING:
-					_deal()
+					# The opening cards land together: only the last one waits a full interval.
+					_deal(DEAL_INTERVAL if i == OPENING_CARDS - 1 else 0.0)
 			if state == State.DEALING:
 				timer = DEAL_INTERVAL
 		State.DEALING:
-			_deal()
+			_deal(DEAL_INTERVAL)
 			if state == State.DEALING:
 				timer = DEAL_INTERVAL
 		State.RESULT:
@@ -139,6 +150,7 @@ func _begin_round(replay: bool) -> void:
 		standing[p] = false
 		busted[p] = false
 	last_card = -1
+	next_card = shoe.peek()
 	state = State.INTRO
 	timer = INTRO_TIME
 	events.append(GameEvents.make(&"bust_or_bank_round_started", {
@@ -146,6 +158,7 @@ func _begin_round(replay: bool) -> void:
 		"players": in_round.duplicate(),
 		"replay": replay,
 		"deal_in": INTRO_TIME,
+		"next_card": next_card,
 	}))
 
 
@@ -158,14 +171,16 @@ func _active() -> Array[int]:
 	return out
 
 
-## One card from the shared shoe to everyone still drawing.
-func _deal() -> void:
+## One card from the shared shoe to everyone still drawing; the one after it is revealed as
+## `next_card`. `next_in` is the seconds until that next card (0 between the opening cards).
+func _deal(next_in: float) -> void:
 	var receivers: Array[int] = _active()
 	if receivers.is_empty():
 		_end_round()
 		return
 	var card: int = shoe.draw()
 	last_card = card
+	next_card = shoe.peek()
 	var totals: Dictionary[int, int] = {}
 	for p: int in receivers:
 		(hands[p] as Array).append(card)
@@ -175,7 +190,8 @@ func _deal() -> void:
 		"card": card,
 		"receivers": receivers.duplicate(),
 		"totals": totals.duplicate(),
-		"next_in": DEAL_INTERVAL,
+		"next_card": next_card,
+		"next_in": next_in,
 	}))
 	for p: int in receivers:
 		var t: int = totals[p]
@@ -232,6 +248,7 @@ func _end_round() -> void:
 		hands_out[p] = {"cards": (hands[p] as Array).duplicate(), "total": _total(p), "busted": busted.get(p, false)}
 
 	_last_was_replay = replay
+	next_card = -1  # revealed again when the next round starts (the shoe may reshuffle first)
 	events.append(GameEvents.make(&"bust_or_bank_round_end", {
 		"round": round,
 		"hands": hands_out,
@@ -250,13 +267,14 @@ func _end_round() -> void:
 
 
 func _game_over() -> bool:
-	return in_round.size() <= 1 or round >= MAX_ROUNDS
+	return in_round.size() <= 1 or round >= max_rounds
 
 
 ## Ends right away (not enough players left to play on).
 func _finish() -> void:
 	state = State.DONE
 	finished = true
+	next_card = -1
 	events.append(GameEvents.make(&"bust_or_bank_finished", {"ranking": ranking().duplicate(true), "points": points()}))
 
 
@@ -325,6 +343,7 @@ func get_public_state() -> Dictionary:
 		"out": out_players,
 		"hands": hands_public,
 		"last_card": last_card,
+		"next_card": next_card,
 		"points": points(),
 		"deal_interval": DEAL_INTERVAL,
 	}

@@ -51,6 +51,8 @@ extends Resource
 @export var slots_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var slots_spin_time: float = 1.6
 @export var slots_skip_after: float = 0.5
+## Seconds after a spin ends (or is stopped) before the next pull is accepted: the reels settle.
+@export var slots_settle_time: float = 1.7
 ## Symbol order: cherry, lemon, bell, bar, seven, clover (wild), diamond.
 @export var slots_reel_weights: PackedInt32Array = PackedInt32Array([9, 11, 9, 7, 3, 1, 1])
 ## Three-of-a-kind multipliers, same symbol order (clover x3 pays as diamond).

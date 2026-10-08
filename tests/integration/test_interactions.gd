@@ -180,7 +180,15 @@ func test_shove_into_a_wall_knocks_down_and_a_held_victim_is_released() -> void:
 func test_items_knock_a_seated_player_off_their_seat_with_the_bet_settled() -> void:
 	var sid: StringName = &"blackjack_1"
 	var before: int = fx.server.economy.balance(b)
+	# Sitting moves the player onto the seat on the server too (0.8.13): b walks up from 3.5 m away
+	# (out of the bat's 2 m), the seat itself is 1.5 m from a, so the swing only lands if the
+	# server put b on the seat like the client does.
+	fx.server.map_def.station_seats[sid] = [Vector3(0, 0, -1.5), Vector3(0.8, 0, -1.5), Vector3(-0.8, 0, -1.5)]
+	fx.server.world.set_transform(a, Vector3.ZERO, 0.0)
+	fx.server.world.set_transform(b, Vector3(0, 0, -3.5), 0.0)
 	assert_true(fx.intent(b, &"sit", {"station": sid})["ok"])
+	assert_almost_eq(fx.server.world.get_position(b).distance_to(Vector3(0, 0, -1.5)), 0.0, 0.01, "on the seat server-side")
+	assert_almost_eq(Vector3(fx.server.state.players[b].position).z, -1.5, 0.01)
 	assert_true(fx.intent(b, &"place_bet", {"station": sid, "bet": {"amount": 50}})["ok"])
 	fx.run(0.5)
 	var floor_before: int = fx.server.pickups.total_on_floor()

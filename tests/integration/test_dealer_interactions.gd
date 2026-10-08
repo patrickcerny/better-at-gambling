@@ -12,26 +12,34 @@ func after_each() -> void:
 	fx.server.free()
 
 
-func _start_at_blackjack() -> void:
+## Aim from the attacker's spot towards the dealer (set by `_start_at`).
+var aim: Array = [0, 0, -1]
+
+
+## Gives the table its real Lucky Lounge position (the fixture's map has none), stands both
+## players next to it, P1 one metre from the dealer and P2 behind P1, and sits them down.
+func _start_at(sid: StringName) -> void:
 	fx.server.start_match()
 	fx.run(3.1)
-	# Place players in world before sitting (required for dealer range detection)
-	fx.place_all(Vector3(0.0, 0.5, -0.5))
-	# Sit at blackjack table
-	fx.intent(fx.player_ids[0], &"sit", {"station": &"blackjack_1"})
-	fx.intent(fx.player_ids[1], &"sit", {"station": &"blackjack_1"})
+	var table: Vector3 = LuckyLounge.STATIONS[sid][1]
+	fx.server.map_def.station_positions[sid] = table
+	var offset: Vector3 = DealerLogic.OFFSETS[fx.server.stations.logics[sid].game_id]
+	var towards: Vector3 = Vector3(offset.x, 0.0, offset.z).normalized()
+	aim = [towards.x, 0.0, towards.z]
+	var dealer: Vector3 = table + offset
+	fx.server.world.set_transform(fx.player_ids[0], dealer - towards * 1.0, 0.0)
+	fx.server.world.set_transform(fx.player_ids[1], dealer - towards * 1.8, 0.0)
+	assert_true(fx.intent(fx.player_ids[0], &"sit", {"station": sid})["ok"])
+	assert_true(fx.intent(fx.player_ids[1], &"sit", {"station": sid})["ok"])
 	fx.run(0.5)
+
+
+func _start_at_blackjack() -> void:
+	_start_at(&"blackjack_1")
 
 
 func _start_at_roulette() -> void:
-	fx.server.start_match()
-	fx.run(3.1)
-	# Place players in world before sitting (required for dealer range detection)
-	fx.place_all(Vector3(0.0, 0.5, -0.5))
-	# Sit at roulette table
-	fx.intent(fx.player_ids[0], &"sit", {"station": &"roulette_1"})
-	fx.intent(fx.player_ids[1], &"sit", {"station": &"roulette_1"})
-	fx.run(0.5)
+	_start_at(&"roulette_1")
 
 
 func test_dealer_shove_sends_player_to_jail() -> void:
@@ -42,12 +50,12 @@ func test_dealer_shove_sends_player_to_jail() -> void:
 	fx.intent(attacker, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 100}})
 	fx.run(0.5)
 
-	# Stand up to shove
-	fx.intent(attacker, &"stand")
+	# Stand up to shove (leave the table)
+	fx.intent(attacker, &"leave")
 	fx.run(0.1)
 
-	# Shove the dealer (aim toward positive Z where dealer is)
-	fx.intent(attacker, &"shove", {"aim": [0, 0, 1]})
+	# Shove the dealer
+	fx.intent(attacker, &"shove", {"aim": aim})
 	fx.run(0.1)
 
 	# Check if player went to jail
@@ -75,22 +83,21 @@ func test_dealer_shove_refunds_all_bets() -> void:
 	assert_eq(after_bet_p2, initial_p2 - 150)
 
 	# P1 stands up and shoves the dealer
-	fx.intent(p1, &"stand")
+	fx.intent(p1, &"leave")
 	fx.run(0.1)
-	fx.intent(p1, &"shove", {"aim": [0, 0, 1]})
+	fx.intent(p1, &"shove", {"aim": aim})
 	fx.run(0.1)
 
 	# Check refund events
 	var refund_events: Array[Dictionary] = fx.of_type(&"bets_refunded")
 	assert_gt(refund_events.size(), 0, "Should have refund events")
 
-	# Check balances were restored (minus jail fine)
-	var after_refund_p1: int = fx.server.economy.balance(p1)
-	var after_refund_p2: int = fx.server.economy.balance(p2)
-	# P1 gets refunded minus jail fine (100)
-	assert_eq(after_refund_p1, initial_p1 - 100, "P1 should get bet refunded minus jail fine")
-	# P2 gets full refund (no jail)
-	assert_eq(after_refund_p2, initial_p2, "P2 should get full bet refund")
+	# Both stakes come back at once; the jail fine ($100) is taken when P1 is released.
+	assert_eq(fx.server.economy.balance(p1), initial_p1, "P1 refunded in full while in jail")
+	assert_eq(fx.server.economy.balance(p2), initial_p2, "P2 should get full bet refund")
+	fx.run(8.1)
+	assert_eq(fx.server.economy.balance(p1), initial_p1 - 100, "P1 pays the jail fine on release")
+	assert_eq(fx.server.economy.balance(p2), initial_p2, "P2 pays nothing")
 
 
 func test_dealer_shove_cancels_hand() -> void:
@@ -107,9 +114,9 @@ func test_dealer_shove_cancels_hand() -> void:
 	assert_gt(hands_before, 0, "Should have active hands")
 
 	# Stand and shove the dealer
-	fx.intent(p, &"stand")
+	fx.intent(p, &"leave")
 	fx.run(0.1)
-	fx.intent(p, &"shove", {"aim": [0, 0, 1]})
+	fx.intent(p, &"shove", {"aim": aim})
 	fx.run(0.1)
 
 	# Check hand was cancelled
@@ -134,9 +141,9 @@ func test_roulette_dealer_shove_refunds_bets() -> void:
 	assert_eq(fx.server.economy.balance(p2), initial_p2 - 75)
 
 	# P1 stands and shoves the dealer
-	fx.intent(p1, &"stand")
+	fx.intent(p1, &"leave")
 	fx.run(0.1)
-	fx.intent(p1, &"shove", {"aim": [0, 0, 1]})
+	fx.intent(p1, &"shove", {"aim": aim})
 	fx.run(0.1)
 
 	# Check refunds
@@ -154,9 +161,9 @@ func test_multiple_dealer_attacks_increase_jail_time() -> void:
 	# First attack
 	fx.intent(p, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 50}})
 	fx.run(1.0)
-	fx.intent(p, &"stand")
+	fx.intent(p, &"leave")
 	fx.run(0.1)
-	fx.intent(p, &"shove", {"aim": [0, 0, 1]})
+	fx.intent(p, &"shove", {"aim": aim})
 	var jail_time_1: float = fx.server.state.players[p].jail_time_remaining
 	fx.run(0.1)
 
@@ -169,9 +176,9 @@ func test_multiple_dealer_attacks_increase_jail_time() -> void:
 	fx.run(0.5)
 	fx.intent(p, &"place_bet", {"station": &"blackjack_1", "bet": {"amount": 50}})
 	fx.run(1.0)
-	fx.intent(p, &"stand")
+	fx.intent(p, &"leave")
 	fx.run(0.1)
-	fx.intent(p, &"shove", {"aim": [0, 0, 1]})
+	fx.intent(p, &"shove", {"aim": aim})
 	var jail_time_2: float = fx.server.state.players[p].jail_time_remaining
 
 	# Second jail should be longer

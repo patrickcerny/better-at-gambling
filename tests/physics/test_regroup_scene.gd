@@ -11,6 +11,7 @@ func before_each() -> void:
 	events.clear()
 	Net.stop()
 	MatchScene.test_dummies = 1
+	MatchScene.test_briefing = 0.0  # straight into the minigame: the rules screen has its own tests
 	scene = (load("res://match/match_scene.tscn") as PackedScene).instantiate()
 	add_child_autofree(scene)
 	Net.event_received.connect(_collect)
@@ -19,6 +20,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	MatchScene.test_dummies = 0
+	MatchScene.test_briefing = -1.0
 	if Net.event_received.is_connected(_collect):
 		Net.event_received.disconnect(_collect)
 

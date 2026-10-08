@@ -275,34 +275,34 @@ func test_effects_and_luck_in_private_state() -> void:
 # --- Inventory & discard ------------------------------------------------------------------------
 
 func test_full_inventory_asks_which_to_discard() -> void:
-	_give(1, [&"lucky_clover", &"black_cat", &"mirror", &"bodyguard", &"golden_chip", &"rock_paper_scissors"])
-	assert_false(sys.give(1, &"pickpocket", now))
+	_give(1, [&"lucky_clover", &"black_cat", &"mirror"])
+	assert_false(sys.give(1, &"bodyguard", now))
 	assert_eq(_events(&"discard_needed").size(), 1)
-	assert_eq(sys.private_state(1, now)["discard"]["item"], &"pickpocket")
+	assert_eq(sys.private_state(1, now)["discard"]["item"], &"bodyguard")
 	assert_true(sys.discard(1, 1, now)["ok"])
-	assert_eq(players[1].inventory, [&"lucky_clover", &"mirror", &"bodyguard", &"golden_chip", &"rock_paper_scissors", &"pickpocket"] as Array[StringName])
+	assert_eq(players[1].inventory, [&"lucky_clover", &"mirror", &"bodyguard"] as Array[StringName])
 	assert_false(sys.private_state(1, now).has("discard"))
 
 
 func test_discard_defaults_to_oldest_and_can_drop_the_newcomer() -> void:
-	_give(1, [&"lucky_clover", &"black_cat", &"mirror", &"bodyguard", &"golden_chip", &"rock_paper_scissors"])
-	sys.give(1, &"pickpocket", now)
-	sys.give(1, &"banana_peel", now)
+	_give(1, [&"lucky_clover", &"black_cat", &"mirror"])
+	sys.give(1, &"bodyguard", now)
+	sys.give(1, &"golden_chip", now)
 	sys.tick(now + cfg.discard_time - 0.1, false)
 	assert_eq(players[1].inventory[0], &"lucky_clover")
 	sys.tick(now + cfg.discard_time, false)
-	assert_eq(players[1].inventory, [&"black_cat", &"mirror", &"bodyguard", &"golden_chip", &"rock_paper_scissors", &"pickpocket"] as Array[StringName])
+	assert_eq(players[1].inventory, [&"black_cat", &"mirror", &"bodyguard"] as Array[StringName])
 	assert_eq(_events(&"discard_needed").size(), 2, "the second item asks next")
 	assert_true(sys.discard(1, ItemSystem.DISCARD_INCOMING, now + 6.0)["ok"])
-	assert_eq(players[1].inventory, [&"black_cat", &"mirror", &"bodyguard", &"golden_chip", &"rock_paper_scissors", &"pickpocket"] as Array[StringName])
-	assert_eq(_events(&"item_discarded").back()["item"], &"banana_peel")
+	assert_eq(players[1].inventory, [&"black_cat", &"mirror", &"bodyguard"] as Array[StringName])
+	assert_eq(_events(&"item_discarded").back()["item"], &"golden_chip")
 
 
 func test_using_an_item_lets_the_waiting_one_in() -> void:
-	_give(1, [&"lucky_clover", &"black_cat", &"mirror", &"bodyguard", &"golden_chip", &"rock_paper_scissors"])
-	sys.give(1, &"pickpocket", now)
+	_give(1, [&"lucky_clover", &"black_cat", &"mirror"])
+	sys.give(1, &"bodyguard", now)
 	assert_true(_use(1)["ok"])
-	assert_eq(players[1].inventory, [&"black_cat", &"mirror", &"bodyguard", &"golden_chip", &"rock_paper_scissors", &"pickpocket"] as Array[StringName])
+	assert_eq(players[1].inventory, [&"black_cat", &"mirror", &"bodyguard"] as Array[StringName])
 	assert_true(sys.pending.is_empty())
 
 

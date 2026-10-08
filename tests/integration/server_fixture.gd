@@ -7,9 +7,22 @@ var events: Array[Dictionary] = []
 var player_ids: Array[int] = []
 
 
+## Tests that count quiz events pin the minigame pool to the quiz; pass your own `minigame_pool`
+## (or "" for every minigame) to change that. The rules briefing before a minigame is off unless
+## the test passes `minigame_briefing`. The map definition is a private copy, so a test may fill in
+## station positions without leaking them into the next test.
 func _init(player_count: int = 2, settings: Dictionary = {"minigames": 2, "gamble_seconds": 100.0, "seed": 1}) -> void:
 	server = MatchServer.new()
-	server.configure(settings, Registry.balance, Registry.presets, Registry.game_logic_scripts(), Registry.maps[&"lucky_lounge"])
+	var s: Dictionary = settings.duplicate()
+	if not s.has("minigame_pool"):
+		s["minigame_pool"] = "quiz"
+	if not s.has("minigame_briefing"):
+		s["minigame_briefing"] = 0.0
+	var map: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
+	map.station_positions = map.station_positions.duplicate()  # Resource.duplicate shares the dictionary
+	map.station_seats = map.station_seats.duplicate()
+	map.station_yaws = map.station_yaws.duplicate()
+	server.configure(s, Registry.balance, Registry.presets, Registry.game_logic_scripts(), map)
 	server.event_emitted.connect(func(ev: Dictionary) -> void: events.append(ev))
 	for i: int in player_count:
 		player_ids.append(server.add_player("uid-%d" % (i + 1), "P%d" % (i + 1)))

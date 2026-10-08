@@ -321,9 +321,10 @@ static func _seat_edge(st: StationBase, seat: int) -> Vector3:
 	if st is RouletteStation:
 		return Vector3(p.x, RouletteStation.FELT_Y, signf(p.z) * 0.8)
 	if st is BlackjackStation:
+		# Over the padded rail (not inside it): the stack arcs from here down onto the felt.
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
 		to_seat.y = 0.0
-		return BlackjackStation.ARC_CENTRE + to_seat.normalized() * 1.85 + Vector3(0, BlackjackStation.TABLE_TOP, 0)
+		return BlackjackStation.ARC_CENTRE + to_seat.normalized() * BlackjackStation.RAIL_RADIUS + Vector3(0, BlackjackStation.TABLE_TOP + 0.12, 0)
 	return Vector3(p.x * 0.6, 0.95, p.z * 0.6)
 
 
@@ -337,7 +338,7 @@ static func _bet_spot(st: StationBase, seat: int, type: StringName, value: int) 
 		var p: Vector3 = st.seats[clampi(seat, 0, st.seats.size() - 1)].position
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
 		to_seat.y = 0.0
-		return BlackjackStation.ARC_CENTRE + to_seat.normalized() * 1.6 + Vector3(0, BlackjackStation.TABLE_TOP, 0)
+		return BlackjackStation.ARC_CENTRE + to_seat.normalized() * BlackjackStation.BET_RADIUS + Vector3(0, BlackjackStation.TABLE_TOP, 0)
 	return Vector3(0, 0.95, 0)
 
 

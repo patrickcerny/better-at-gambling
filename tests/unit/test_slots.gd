@@ -62,6 +62,15 @@ func test_spin_flow_and_skip_stop() -> void:
 	if SlotsLogic.is_jackpot(sl.line):
 		return
 	assert_eq(fx.economy.balance(1), expected)
+	# The reels still land on screen: no new spin (and no spamming STOP/spin) until they settle.
+	assert_true(sl.get_public_state()["settling"], "settling after the stop")
+	assert_eq(sl.place_bet(1, {"amount": 25})["error"], &"too_early")
+	assert_eq(sl.player_action(1, &"stop")["error"], &"too_early", "nothing to stop")
+	sl.tick(fx.balance.slots_settle_time - 0.1)
+	assert_eq(sl.place_bet(1, {"amount": 25})["error"], &"too_early", "still landing")
+	sl.tick(0.2)
+	assert_false(sl.get_public_state()["settling"])
+	assert_true(sl.place_bet(1, {"amount": 25})["ok"], "settled: the next spin may start")
 
 
 func test_bet_sizes_scale_with_limits() -> void:

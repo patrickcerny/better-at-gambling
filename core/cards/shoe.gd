@@ -44,6 +44,13 @@ func draw() -> int:
 	return _cards.pop_back()
 
 
+## The card `draw()` will deal next, without dealing it (reshuffles first if empty, like `draw()`).
+func peek() -> int:
+	if _cards.is_empty():
+		reshuffle()
+	return _cards.back()
+
+
 ## Puts a card back at a random position (used for luck-rejected candidates).
 func return_card(card: int) -> void:
 	_cards.insert(rng.range_int(0, _cards.size()), card)

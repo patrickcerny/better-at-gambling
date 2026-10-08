@@ -143,6 +143,7 @@ func test_banana_peel_mesh_and_slip() -> void:
 
 
 func test_discard_choice_with_number_keys() -> void:
+	# Three slots: the fourth item asks which one to throw away; key 2 swaps out slot 2.
 	_give([&"lucky_clover", &"black_cat", &"mirror", &"bodyguard"])
 	await wait_seconds(0.5)
 	assert_true(scene.hud.items.discard_panel.visible, "inventory full panel")

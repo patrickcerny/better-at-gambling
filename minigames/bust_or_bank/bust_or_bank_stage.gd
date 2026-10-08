@@ -1,23 +1,36 @@
 class_name BustOrBankStage
 extends MinigameStage
 ## Client presentation for Bust or Bank: one shared shoe flips a card every few seconds; everyone
-## still drawing adds it to their total. STAND (button, Space/Enter, gamepad A) banks your total.
-## Everything shown comes from server events / snapshots; the only input is the stand intent.
+## still drawing adds it to their total. The NEXT card is shown face up, so the decision is "do I
+## want that card?". STAND (button, Space/Enter, gamepad A) banks your total. Cards are drawn as
+## real faces (`CardFace`). Everything shown comes from server events / snapshots; the only input
+## is the stand intent. Timings (deal bar) come from the events' `next_in` / `deal_in` / snapshot
+## `timer`, never from local constants.
 
 const PAD_STAND: JoyButton = JOY_BUTTON_A
+## Card heights (px): the shared next / dealt cards, your hand, the board's small hands.
+const BIG_CARD_H: float = 150.0
+const HAND_CARD_H: float = 112.0
+const BOARD_CARD_H: float = 50.0
 
 var root: Control
 var round_label: Label
 var banner: Label
-var shoe_card: Label
+## The shared upcoming card, face up for everyone.
+var next_face: CardFace
+## The card the shoe just dealt (face down before the first card of a round).
+var dealt_face: CardFace
+var deal_time_label: Label
 var deal_bar: ProgressBar
-var my_cards: Label
+## Your hand: a row of `CardFace`s.
+var my_hand_row: HBoxContainer
 var my_total_label: Label
 var status_label: Label
 var stand_button: Button
 var points_label: Label
 var board: VBoxContainer
-## player → their row on the board (built once, updated in place).
+## player → {box: VBoxContainer, label: Label, cards: HBoxContainer, total: Label} on the board
+## (built once, updated in place).
 var board_rows: Dictionary = {}
 
 ## Everyone who started (display order).
@@ -29,6 +42,9 @@ var hands: Dictionary = {}
 ## player → players outlasted (absolute, straight from the server).
 var points: Dictionary = {}
 var current_round: int = 0
+## The shared upcoming card (-1 = unknown, drawn face down) and the one just dealt.
+var next_card: int = -1
+var last_card: int = -1
 var replay: bool = false
 ## The round that just ended was an everyone-busted replay: busts there don't mean "out".
 var end_was_replay: bool = false
@@ -91,20 +107,48 @@ func _build_ui() -> void:
 	banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	table.add_child(banner)
 
-	table.add_child(_label("Shared shoe", 20, Palette.CREAM.darkened(0.25)))
-	shoe_card = _label("--", 72, Palette.CREAM)
-	table.add_child(shoe_card)
+	# The shoe: the next card (face up, the whole point) and the card just dealt.
+	var shoe_row := HBoxContainer.new()
+	shoe_row.add_theme_constant_override("separation", 36)
+	table.add_child(shoe_row)
+	var next_col := VBoxContainer.new()
+	next_col.add_theme_constant_override("separation", 6)
+	shoe_row.add_child(next_col)
+	var next_title := _label("NEXT CARD", 24, Palette.WARM_GOLD)
+	next_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	next_col.add_child(next_title)
+	next_face = CardFace.make(-1, BIG_CARD_H)
+	next_face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	next_col.add_child(next_face)
+	var dealt_col := VBoxContainer.new()
+	dealt_col.add_theme_constant_override("separation", 6)
+	shoe_row.add_child(dealt_col)
+	var dealt_title := _label("JUST DEALT", 20, Palette.CREAM.darkened(0.25))
+	dealt_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dealt_col.add_child(dealt_title)
+	dealt_face = CardFace.make(-1, BIG_CARD_H * 0.8)
+	dealt_face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	dealt_col.add_child(dealt_face)
+	var timer_col := VBoxContainer.new()
+	timer_col.add_theme_constant_override("separation", 8)
+	timer_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	shoe_row.add_child(timer_col)
+	deal_time_label = _label("", 24, Palette.CREAM)
+	timer_col.add_child(deal_time_label)
 	deal_bar = ProgressBar.new()
-	deal_bar.custom_minimum_size = Vector2(360, 14)
+	deal_bar.custom_minimum_size = Vector2(280, 16)
 	deal_bar.show_percentage = false
 	deal_bar.max_value = 1.0
+	deal_bar.step = 0.0  # smooth fill
 	deal_bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	table.add_child(deal_bar)
+	timer_col.add_child(deal_bar)
 
 	table.add_child(_label("Your hand", 20, Palette.CREAM.darkened(0.25)))
-	my_cards = _label("", 30, Palette.CREAM)
-	table.add_child(my_cards)
-	my_total_label = _label("", 56, Palette.CREAM)
+	my_hand_row = HBoxContainer.new()
+	my_hand_row.add_theme_constant_override("separation", 10)
+	my_hand_row.custom_minimum_size = Vector2(0, HAND_CARD_H)
+	table.add_child(my_hand_row)
+	my_total_label = _label("", 48, Palette.CREAM)
 	table.add_child(my_total_label)
 	status_label = _label("", 30, Palette.WARM_GOLD)
 	table.add_child(status_label)
@@ -128,7 +172,7 @@ func _build_ui() -> void:
 	columns.add_child(side)
 	side.add_child(_label("Players", 26, Palette.WARM_GOLD))
 	board = VBoxContainer.new()
-	board.add_theme_constant_override("separation", 6)
+	board.add_theme_constant_override("separation", 10)
 	side.add_child(board)
 
 
@@ -176,10 +220,23 @@ func _on_stand() -> void:
 
 
 func _process(delta: float) -> void:
-	if dealing and deal_left > 0.0:
+	if deal_left > 0.0:
 		deal_left = maxf(deal_left - delta, 0.0)
-	if deal_bar != null:
-		deal_bar.value = 1.0 - deal_left / maxf(deal_span, 0.01) if (dealing or deal_left > 0.0) else 0.0
+	_update_deal_timer()
+
+
+## The bar fills up towards the next card; the label counts down the seconds left.
+func _update_deal_timer() -> void:
+	if deal_bar == null:
+		return
+	var counting: bool = not over and (dealing or deal_left > 0.0)
+	deal_bar.value = 1.0 - deal_left / maxf(deal_span, 0.01) if counting else 0.0
+	if not counting:
+		deal_time_label.text = ""
+	elif dealing:
+		deal_time_label.text = "Next card in %.1fs" % deal_left
+	else:
+		deal_time_label.text = "Dealing in %.1fs" % deal_left
 
 
 # --- Server data -------------------------------------------------------------------------------
@@ -204,8 +261,7 @@ func apply_state(st: Dictionary) -> void:
 	dealing = s == BustOrBankLogic.State.DEALING
 	deal_left = float(st.get("timer", 0.0))
 	deal_span = deal_interval if dealing else maxf(deal_left, 0.01)
-	var last: int = int(st.get("last_card", -1))
-	shoe_card.text = Card.label(last) if last >= 0 else "--"
+	_show_shoe(int(st.get("next_card", -1)), int(st.get("last_card", -1)), false)
 	if st.has("ranking"):
 		_show_finish(st["ranking"])
 	else:
@@ -235,13 +291,13 @@ func on_event(ev: Dictionary) -> void:
 			stand_sent = false
 			deal_left = float(ev.get("deal_in", 0.0))
 			deal_span = maxf(deal_left, 0.01)
-			shoe_card.text = "--"
+			_show_shoe(int(ev.get("next_card", -1)), -1, true)
 			banner.text = "Everyone busted. Replay!" if replay else "New round: fresh count"
 
 		&"bust_or_bank_card":
 			dealing = true
 			var card: int = int(ev.get("card", -1))
-			shoe_card.text = Card.label(card) if card >= 0 else "--"
+			_show_shoe(int(ev.get("next_card", -1)), card, true)
 			var totals: Dictionary = ev.get("totals", {})
 			for p: Variant in ev.get("receivers", []):
 				var pid: int = int(p)
@@ -275,6 +331,7 @@ func on_event(ev: Dictionary) -> void:
 			dealing = false
 			stand_sent = false
 			deal_left = 0.0
+			_show_shoe(-1, last_card, false)  # the next round reveals its own next card
 			_set_points(ev.get("points", {}))
 			end_was_replay = bool(ev.get("replay", false))
 			in_game.clear()
@@ -286,6 +343,20 @@ func on_event(ev: Dictionary) -> void:
 			_set_points(ev.get("points", {}))
 			_show_finish(ev.get("ranking", []))
 	_refresh()
+
+
+## Shows the shared next card (face up) and the card just dealt; `animate` flips changed cards in.
+func _show_shoe(p_next: int, p_last: int, animate: bool) -> void:
+	var next_changed: bool = p_next != next_card
+	var last_changed: bool = p_last != last_card
+	next_card = p_next
+	last_card = p_last
+	next_face.card = next_card
+	dealt_face.card = last_card
+	if animate and next_changed and next_card >= 0:
+		next_face.flip_in()
+	if animate and last_changed and last_card >= 0:
+		dealt_face.deal_in()
 
 
 func on_private(_priv: Dictionary) -> void:
@@ -343,13 +414,9 @@ func _show_finish(ranking: Array) -> void:
 func _refresh() -> void:
 	round_label.text = "Round %d%s  ·  %d left" % [current_round + 1, "  (replay)" if replay else "", in_game.size()]
 	var mine: Dictionary = hands.get(local_id, _empty_hand())
-	var cards: Array = mine["cards"]
-	var labels: Array[String] = []
-	for c: Variant in cards:
-		labels.append(Card.label(int(c)))
-	my_cards.text = "  ".join(labels) if not labels.is_empty() else "-"
-	my_total_label.text = str(int(mine["total"]))
 	var bust: bool = bool(mine["busted"])
+	_sync_faces(my_hand_row, mine["cards"], HAND_CARD_H, bust)
+	my_total_label.text = str(int(mine["total"]))
 	my_total_label.add_theme_color_override("font_color", Palette.LOSS_RED if bust else Palette.CREAM)
 
 	if over:
@@ -371,18 +438,16 @@ func _refresh() -> void:
 	stand_button.disabled = not can_stand()
 	points_label.text = "Points (players outlasted): %d" % int(points.get(local_id, 0))
 	_update_board()
+	_update_deal_timer()
 
 
 func _update_board() -> void:
 	for p: Variant in board_rows:
-		(board_rows[p] as Label).visible = int(p) in players  # gone after a disconnect
+		(board_rows[p]["box"] as Control).visible = int(p) in players  # gone after a disconnect
 	for p: int in players:
-		var row: Label = board_rows.get(p)
-		if row == null:
-			row = Label.new()
-			row.add_theme_font_size_override("font_size", 22)
-			row.set_meta("player", p)
-			board.add_child(row)
+		var row: Dictionary = board_rows.get(p, {})
+		if row.is_empty():
+			row = _make_board_row(p)
 			board_rows[p] = row
 		var h: Dictionary = hands.get(p, _empty_hand())
 		var status: String
@@ -401,6 +466,48 @@ func _update_board() -> void:
 			color = Palette.WARM_GOLD
 		else:
 			status = "drawing" if dealing else ""
-		row.text = "%s   %d   %s   (%d pts)" % [_name(p), int(h["total"]), status, int(points.get(p, 0))]
-		row.add_theme_color_override("font_color", color)
-		row.set_meta("status", status)
+		var label: Label = row["label"]
+		label.text = "%s   %s   (%d pts)" % [_name(p), status, int(points.get(p, 0))]
+		label.add_theme_color_override("font_color", color)
+		label.set_meta("status", status)
+		_sync_faces(row["cards"], h["cards"], BOARD_CARD_H, bool(h["busted"]))
+		var total: Label = row["total"]
+		total.text = "Total %d" % int(h["total"]) if not (h["cards"] as Array).is_empty() else ""
+		total.add_theme_color_override("font_color", color)
+
+
+func _make_board_row(p: int) -> Dictionary:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	box.set_meta("player", p)
+	board.add_child(box)
+	var label := _label("", 22, Palette.CREAM)
+	label.set_meta("player", p)
+	box.add_child(label)
+	var cards := HBoxContainer.new()
+	cards.add_theme_constant_override("separation", 4)
+	cards.custom_minimum_size = Vector2(0, BOARD_CARD_H)
+	box.add_child(cards)
+	var total := _label("", 18, Palette.CREAM)
+	box.add_child(total)
+	return {"box": box, "label": label, "cards": cards, "total": total}
+
+
+## Makes `row` show `cards` as faces `height` px tall: new cards are dealt in with a short tween,
+## a new round (fewer cards) clears the row first.
+func _sync_faces(row: HBoxContainer, cards: Array, height: float, dim: bool) -> void:
+	var faces: Array[Node] = row.get_children()
+	if faces.size() > cards.size():
+		for f: Node in faces:
+			row.remove_child(f)
+			f.queue_free()
+		faces.clear()
+	for i: int in faces.size():
+		var face: CardFace = faces[i]
+		face.card = int(cards[i])
+		face.dimmed = dim
+	for i: int in range(faces.size(), cards.size()):
+		var face: CardFace = CardFace.make(int(cards[i]), height)
+		face.dimmed = dim
+		row.add_child(face)
+		face.deal_in(0.12 * (i - faces.size()))

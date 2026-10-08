@@ -22,6 +22,8 @@ const DUMMY_NAMES: Array[String] = ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bl
 
 ## Practice dummies when no `--dummies` flag is given (scene tests set this; the game keeps 0).
 static var test_dummies: int = 0
+## Tests: seconds of the pre-minigame rules briefing (−1 = the normal 30 s, or `--minigame-briefing`).
+static var test_briefing: float = -1.0
 
 var map: LuckyLounge
 var server: MatchServer = null
@@ -54,6 +56,8 @@ var settings_panel: SettingsPanel = null
 var _shown_jackpot: int = -1
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
+## The rules screen over the stage until everyone is ready (or 30 s pass).
+var briefing: MinigameBriefing = null
 var reward_panel: RewardPanel
 ## Scripted driver (--autoplay); null in normal play.
 var autoplay: Node = null
@@ -77,6 +81,10 @@ var _drunk_money: int = -1
 ## Curtain transition for minigames: left and right panels that slide in and out.
 var curtain_left: ColorRect = null
 var curtain_right: ColorRect = null
+## 1.0 = curtain fully open (panels off screen), 0.0 = closed (panels cover the screen).
+var curtain_open: float = 1.0
+var curtain_tween: Tween = null
+const CURTAIN_TIME: float = 0.45
 ## Gold crown over the money leader (not on the dedicated server).
 var crown: LeaderCrown = null
 
@@ -150,27 +158,23 @@ func _ready() -> void:
 	drunk_overlay.material = drunk_mat
 	drunk_overlay.visible = false
 	ui_layer.add_child(drunk_overlay)
-	# Curtain transition: two panels that slide in from the sides
+	# Minigame curtain: two half-screen panels positioned by anchors, so they close and open the
+	# same way at any window size. They start fully open (parked off both edges).
 	curtain_left = ColorRect.new()
 	curtain_left.name = "CurtainLeft"
-	curtain_left.color = Color("#2B1A1A")  # dark burgundy, casino-themed
+	curtain_left.color = Color("#2B1A1A")
 	curtain_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	curtain_left.anchor_left = 0.0
 	curtain_left.anchor_top = 0.0
-	curtain_left.anchor_right = 0.5
 	curtain_left.anchor_bottom = 1.0
-	curtain_left.offset_right = 0.0
 	ui_layer.add_child(curtain_left)
 	curtain_right = ColorRect.new()
 	curtain_right.name = "CurtainRight"
 	curtain_right.color = Color("#2B1A1A")
 	curtain_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	curtain_right.anchor_left = 0.5
 	curtain_right.anchor_top = 0.0
-	curtain_right.anchor_right = 1.0
 	curtain_right.anchor_bottom = 1.0
-	curtain_right.offset_left = 0.0
 	ui_layer.add_child(curtain_right)
+	_set_curtain(1.0)
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
@@ -333,6 +337,8 @@ func _start_room_server(cmd: Cmdline) -> void:
 	add_child(server)
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
+	def.station_seats = map.station_seats()
+	def.station_yaws = map.station_yaws()
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
@@ -357,6 +363,8 @@ func _length_settings(cmd: Cmdline) -> Dictionary:
 		"minigames": clampi(cmd.get_int("minigames", presets.default_minigames), 0, presets.max_minigames),
 		"gamble_minutes": clampi(cmd.get_int("gamble-minutes", presets.default_gamble_minutes), presets.min_gamble_minutes, presets.max_gamble_minutes),
 		"gamble_seconds": maxf(cmd.get_float("gamble-seconds", 0.0), 0.0),
+		"minigame_pool": cmd.get_string("minigame-pool", ""),
+		"minigame_briefing": maxf(cmd.get_float("minigame-briefing", test_briefing if test_briefing >= 0.0 else 30.0), 0.0),
 		"items_enabled": true,
 	}
 
@@ -369,6 +377,8 @@ func _start_local(cmd: Cmdline) -> void:
 	add_child(server)
 	var def: MapDefinition = Registry.maps[&"lucky_lounge"].duplicate() as MapDefinition
 	def.station_positions = map.station_positions()
+	def.station_seats = map.station_seats()
+	def.station_yaws = map.station_yaws()
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
@@ -756,6 +766,10 @@ func _on_event(ev: Dictionary) -> void:
 	var type: StringName = ev["type"]
 	if stage != null:
 		stage.on_event(ev)
+	if briefing != null and is_instance_valid(briefing):
+		briefing.on_event(ev)
+		if type == &"minigame_go":
+			briefing = null
 	if table_fx != null:
 		table_fx.on_event(ev)
 	if casino_floor != null:
@@ -945,7 +959,7 @@ func _on_event(ev: Dictionary) -> void:
 				reward_panel.open(ev["rewards"], float(ev["seconds"]))
 				for row: Dictionary in ev["rewards"]:
 					if int(row["player"]) == local_id and StringName(row.get("item", &"")) != &"":
-						_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it.", float(ev["seconds"]))
+						_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it, scroll to select and I for info.", float(ev["seconds"]))
 		&"regroup_started":
 			_regroup()
 			var spot: Variant = (ev.get("positions", {}) as Dictionary).get(local_id, null)
@@ -1440,18 +1454,22 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 	if def == null or def.stage_script == null:
 		Log.warn(&"match", "no stage for minigame %s" % start.get("minigame", "?"))
 		return
-	# Close curtain (panels slide in from sides) while loading the stage
-	var close_tween := create_tween()
-	close_tween.set_parallel(true)
-	close_tween.tween_property(curtain_left, "offset_right", -960.0, 0.5)  # half screen width
-	close_tween.tween_property(curtain_right, "offset_left", 960.0, 0.5)
-	close_tween.tween_callback(func() -> void:
-		# Stage is now hidden behind the curtains; load it
+	# One sequential tween: close the curtain, build the stage behind it, open it again.
+	if curtain_tween != null and curtain_tween.is_valid():
+		curtain_tween.kill()
+	curtain_tween = create_tween()
+	curtain_tween.tween_method(_set_curtain, curtain_open, 0.0, CURTAIN_TIME * curtain_open)
+	curtain_tween.tween_callback(func() -> void:
 		stage = def.stage_script.new() as MinigameStage
 		stage.name = "MinigameStage"
 		stage.ui_host = self  # its 2D stays sharp outside the pixelated world
 		pixel_view.world.add_child(stage)
 		stage.begin(view.state, local_id, start, snapshot_state)
+		var hold: Variant = start.get("briefing", snapshot_state.get("briefing", 0.0))
+		if (hold is Dictionary) or float(hold) > 0.0:
+			briefing = MinigameBriefing.new()
+			add_child(briefing)
+			briefing.open(start if start.has("briefing") else {"minigame": start.get("minigame", ""), "players": start.get("players", []), "briefing": hold}, view.state, local_id)
 		# The minigame owns the screen: every table panel, menu and wheel goes away, and the cursor
 		# stays put (STAGE mode ignores sit/stand/menu-closed mode changes until the stage is over).
 		router.set_mode(InputRouter.Mode.STAGE)
@@ -1468,25 +1486,34 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 			local.auto_target = Vector3.INF
 		Audio.play(&"whoosh", &"SFX", -4.0)
 	)
-	# Open curtain (panels slide out to sides)
-	var open_tween := create_tween()
-	open_tween.set_parallel(true)
-	open_tween.tween_property(curtain_left, "offset_right", 0.0, 0.6)
-	open_tween.tween_property(curtain_right, "offset_left", 0.0, 0.6)
+	curtain_tween.tween_method(_set_curtain, 0.0, 1.0, CURTAIN_TIME)
+
+
+## Moves both curtain panels: `amount` 1.0 parks them off screen, 0.0 covers the screen.
+func _set_curtain(amount: float) -> void:
+	curtain_open = clampf(amount, 0.0, 1.0)
+	var shift: float = 0.5 * curtain_open
+	curtain_left.anchor_left = -shift
+	curtain_left.anchor_right = 0.5 - shift
+	curtain_right.anchor_right = 1.0 + shift
+	curtain_right.anchor_left = 0.5 + shift
 
 
 func _close_stage() -> void:
 	if stage != null:
 		stage.queue_free()
 		stage = null
+	if briefing != null and is_instance_valid(briefing):
+		briefing.queue_free()
+	briefing = null
 
 
 ## Regroup over: the hall doors open and everyone runs back in with spawn protection.
 func _back_to_casino() -> void:
 	_close_stage()
-	# Reset curtain panels to open position
-	curtain_left.offset_right = 0.0
-	curtain_right.offset_left = 0.0
+	if curtain_tween != null and curtain_tween.is_valid():
+		curtain_tween.kill()
+	_set_curtain(1.0)
 	reward_panel.close()
 	if role == Role.SERVER:
 		return
