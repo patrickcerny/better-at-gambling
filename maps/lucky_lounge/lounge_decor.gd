@@ -31,10 +31,12 @@ const WINDOWS: Array = [
 	[Vector3(-19.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2], [Vector3(-11.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2],
 	[Vector3(-6.0, 5.4, -15.75), Vector3(0, 0, 1), 2.3], [Vector3(6.0, 5.4, -15.75), Vector3(0, 0, 1), 2.3],
 ]
-## Double doors: [centre on the wall, inward normal, height]: staff door by the slots, the VIP
-## lounge's private door, the street door seen through the entrance.
+## Double doors: [centre on the wall, inward normal, height]: staff door by the slots, a closed
+## back door in the middle of the north wall (it used to be the VIP lounge's private door at
+## mezzanine height, floating 4 m up over the pit since the balcony ends 6 m short of that wall),
+## the street door seen through the entrance.
 const DOORS: Array = [
-	[Vector3(-13.75, 0.0, -15.75), Vector3(0, 0, 1), 2.7], [Vector3(0.0, LuckyLounge.MEZZ_Y, -15.75), Vector3(0, 0, 1), 2.65],
+	[Vector3(-13.75, 0.0, -15.75), Vector3(0, 0, 1), 2.7], [Vector3(0.0, 0.0, -15.75), Vector3(0, 0, 1), 2.7],
 	[Vector3(0.0, 0.0, 20.75), Vector3(0, 0, -1), 2.9],
 ]
 
@@ -402,6 +404,16 @@ func _doors() -> void:
 		door.rotation.y = atan2(n.x, n.z)
 		_recolor(door, {"Wood": wood, "Gold": _gold_mat})
 		add_child(door)
+		# Gold casing (two jambs and a lintel) so each door reads as built into the wall.
+		var h: float = d[2]
+		var w: float = PropModels.scaled_size(&"door_double", h).x
+		if w <= 0.0:
+			continue
+		var basis := Basis.looking_at(-n, Vector3.UP)
+		var side: Vector3 = basis.x
+		for sgn: float in [-1.0, 1.0]:
+			_box_b(Vector3(0.16, h + 0.12, 0.08), c + n * 0.04 + side * sgn * (w * 0.5 + 0.08) + Vector3(0, (h + 0.12) * 0.5, 0), basis, _gold_mat, "gold")
+		_box_b(Vector3(w + 0.32, 0.18, 0.1), c + n * 0.05 + Vector3(0, h + 0.09, 0), basis, _gold_mat, "gold")
 
 
 func _art() -> void:

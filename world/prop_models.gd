@@ -61,6 +61,13 @@ static func make(id: StringName, height: float = 0.0, width: float = 0.0) -> Nod
 	return holder
 
 
+## Size of prop `id` scaled to `height` the way `make` does it (Vector3.ZERO until the model was
+## made once, or when it has no model).
+static func scaled_size(id: StringName, height: float) -> Vector3:
+	var b: AABB = _bounds.get(id, AABB())
+	return b.size * (height / b.size.y) if b.size.y > 0.0 else Vector3.ZERO
+
+
 ## Hides a greybox solid's own mesh (keeping its collision) and puts prop `id` in its place;
 ## the solid's origin is its centre, so the model is dropped by `half_height`.
 static func dress(solid: Node3D, id: StringName, half_height: float, height: float = 0.0, width: float = 0.0) -> Node3D:

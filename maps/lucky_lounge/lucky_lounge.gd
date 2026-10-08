@@ -432,8 +432,6 @@ func _build_props() -> void:
 	add_child(props_parent)
 	for i: int in 5:
 		_stool(Vector3(BAR_X - BAR_W * 0.5 + 0.3 + i * 1.5, 0.0, 3.6))
-	for p: Vector3 in [Vector3(-3, 0, 1), Vector3(3, 0, 1), Vector3(14, 0, -9), Vector3(-19, 0, 2)]:
-		_chip_stack(p)
 
 
 func _stool(pos: Vector3) -> RigidBody3D:
@@ -463,39 +461,6 @@ func _stool(pos: Vector3) -> RigidBody3D:
 	cs.shape = sh
 	body.add_child(cs)
 	body.position = pos + Vector3(0, 0.3, 0)
-	props_parent.add_child(body)
-	return body
-
-
-func _chip_stack(pos: Vector3) -> RigidBody3D:
-	var body := RigidBody3D.new()
-	body.name = "ChipStack"
-	body.mass = 1.0
-	body.collision_layer = 8
-	body.collision_mask = 1 | 2 | 4 | 8
-	body.add_to_group(&"props")
-	body.set_meta(&"prop", &"chip_stack")
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.12
-	mesh.bottom_radius = 0.12
-	mesh.height = 0.3
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = GreyboxKit.material(Palette.CASINO_RED)
-	mi.visible = false
-	body.add_child(mi)
-	for i: int in 12:
-		var chip: Node3D = PropModels.make(&"poker_chip", 0.0, 0.24)
-		chip.position = Vector3(randf_range(-0.01, 0.01), -0.15 + i * 0.025, randf_range(-0.01, 0.01))
-		chip.rotation.y = randf() * TAU
-		body.add_child(chip)
-	var cs := CollisionShape3D.new()
-	var sh := CylinderShape3D.new()
-	sh.radius = 0.12
-	sh.height = 0.3
-	cs.shape = sh
-	body.add_child(cs)
-	body.position = pos + Vector3(0, 0.15, 0)
 	props_parent.add_child(body)
 	return body
 

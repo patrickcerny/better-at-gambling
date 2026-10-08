@@ -1,6 +1,7 @@
 class_name RouletteStation
 extends StationBase
-## Roulette table: long red layout, Patrick's wheel model at one end, 6 stools around it.
+## Roulette table: long red layout, Patrick's wheel model in a well at one end (fully on the
+## table), 6 stools around it; the croupier stands on the north long side beside the wheel.
 
 
 func _build_visuals() -> void:
@@ -8,9 +9,13 @@ func _build_visuals() -> void:
 	seat_count = 6
 	hot_center = Vector3(0.5, 0, 0)
 	_rug(Vector2(7.0, 5.0), Palette.CASINO_RED.darkened(0.55))
-	GreyboxKit.box(self, Vector3(4.2, 0.9, 1.8), Vector3(0.6, 0.45, 0), Color("#3A2A1E"), "Body")
+	# Body x −2.5..2.7: the wheel (1.6 m across, centred at WHEEL_X) rests in its well entirely on
+	# the table, the layout fills the other end.
+	GreyboxKit.box(self, Vector3(5.2, 0.9, 1.8), Vector3(0.1, 0.45, 0), Color("#3A2A1E"), "Body")
+	GreyboxKit.box(self, Vector3(1.74, 0.03, 1.7), Vector3(WHEEL_X, 0.915, 0), Color("#2A1C14"), "WheelWell", false)
+	GreyboxKit.box(self, Vector3(0.05, 0.035, 1.7), Vector3(WHEEL_X + 0.9, 0.918, 0), Palette.WARM_GOLD, "WellTrim", false)
 	GreyboxKit.box(self, Vector3(2.6, 0.04, 1.5), Vector3(1.2, 0.92, 0), Palette.FELT_GREEN, "Layout", false)
-	_add_wheel_model(Vector3(-1.3, 0.9, 0))
+	_add_wheel_model(Vector3(WHEEL_X, 0.9, 0))
 	if Vfx.enabled():
 		_print_layout()
 	var spots: Array[Vector3] = [Vector3(-0.2, 0, 1.5), Vector3(1.0, 0, 1.5), Vector3(2.2, 0, 1.5), Vector3(-0.2, 0, -1.5), Vector3(1.0, 0, -1.5), Vector3(2.2, 0, -1.5)]
@@ -25,6 +30,8 @@ func _build_visuals() -> void:
 
 
 const WHEEL_MODEL: String = "res://assets/casino/roulette_table.fbx"
+## Centre of the wheel along the table (the body ends at x −2.5, so the 0.8 m radius stays on it).
+const WHEEL_X: float = -1.5
 
 
 ## Patrick's roulette wheel (native 4 m across with its own floor plane, camera and lights,

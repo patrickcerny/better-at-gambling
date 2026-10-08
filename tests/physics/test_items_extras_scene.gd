@@ -167,8 +167,8 @@ func test_roulette_panel_leaves_the_table_visible() -> void:
 		return Vector2((clip.x / clip.w + 1.0) * 0.5 * frame.x, (1.0 - clip.y / clip.w) * 0.5 * frame.y)
 	var panel_left: float = rect.position.x - (view.x - frame.x)
 	var points: Dictionary = {
-		"wheel's left rim": Vector3(-2.05, RouletteStation.FELT_Y, 0),
-		"wheel": Vector3(-1.3, RouletteStation.FELT_Y, 0),
+		"wheel's left rim": Vector3(RouletteStation.WHEEL_X - 0.75, RouletteStation.FELT_Y, 0),
+		"wheel": Vector3(RouletteStation.WHEEL_X, RouletteStation.FELT_Y, 0),
 		"felt": RouletteStation.bet_spot(&"straight", 17),
 		"column bets": RouletteStation.bet_spot(&"column", 2),
 	}
