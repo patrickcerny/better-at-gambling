@@ -206,7 +206,7 @@ func _refresh() -> void:
 		return
 	var code: String = str(Net.room.get("room_code", ""))
 	_title.text = "PARTY LOBBY" + ("   ·   CODE %s" % code if code != "" else "")
-	_countdown_label.text = "Doors open in %d…" % ceili(state.countdown) if state.countdown > 0.0 else "Stand on your colored READY pad (or press READY)."
+	_countdown_label.text = "Doors open in %d…" % ceili(state.countdown) if state.countdown > 0.0 else "Step up on the pedestal with your name (or press READY)."
 	var ids: Array = state.players.keys()
 	ids.sort()
 	for i: int in _rows.size():

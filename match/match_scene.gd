@@ -97,6 +97,7 @@ var _door_angle: float = 0.0
 var _owns_server: bool = false
 var _plinko_seen: Dictionary[String, bool] = {}  # "station:drop_id" (ids count per board)
 var _pad_timer: float = 0.0
+var _pedestal_timer: float = 0.0
 var _countdown_shown: int = -1
 var _match_over: bool = false
 ## Predicted local actions awaiting the server: intent type → give-up time.
@@ -270,7 +271,7 @@ func _ready() -> void:
 	if view.state.phase == Phase.Id.LOBBY and view.state.room_mode:
 		map.set_lobby_open(false)
 		if local != null:
-			hud.toast("Welcome! Stand on your READY pad. TAB: lobby panel", 4.0)
+			hud.toast("Welcome! Step up on your pedestal to be ready. TAB: lobby panel", 4.0)
 	_spawn_guards()
 	casino_floor = CasinoFloor.new()
 	casino_floor.name = "CasinoFloor"
@@ -628,6 +629,10 @@ func _physics_process(delta: float) -> void:
 	_check_vip_gate()
 	_check_pickups()
 	_update_guards()
+	_pedestal_timer += delta
+	if _pedestal_timer >= 0.25:
+		_pedestal_timer = 0.0
+		_refresh_pedestals()
 	if _owns_server:
 		_report_simulated_positions()
 		_pad_timer += delta
@@ -673,7 +678,23 @@ func _check_ready_pads() -> void:
 		var a: PlayerAvatar = avatars[pid]
 		var pad: Vector3 = map.ready_pad(p.color_index)
 		var flat: float = Vector2(a.global_position.x - pad.x, a.global_position.z - pad.z).length()
-		server.report_on_pad(pid, a.is_standing() and p.connected and flat <= LuckyLounge.PAD_RADIUS)
+		var up: bool = a.global_position.y >= pad.y + LuckyLounge.PEDESTAL_TOP - 0.12  # on the pedestal, not beside it
+		server.report_on_pad(pid, a.is_standing() and p.connected and flat <= LuckyLounge.PAD_RADIUS and up)
+
+
+## Everyone: the pedestals carry the name of the player in that colour and light up while they are
+## ready (from the shared state, so online clients see it too).
+func _refresh_pedestals() -> void:
+	if map == null or view == null:
+		return
+	var by_color: Dictionary = {}
+	for pid: Variant in view.state.players:
+		var p: Dictionary = view.state.players[pid]
+		if bool(p.get("connected", true)):
+			by_color[int(p.get("color", -1))] = p
+	for i: int in LuckyLounge.PEDESTALS.size():
+		var p: Dictionary = by_color.get(i, {})
+		map.set_pedestal(i, str(p.get("name", "")), bool(p.get("ready", false)))
 
 
 ## SERVER: a client's own avatar moved.

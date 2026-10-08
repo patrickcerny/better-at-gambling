@@ -24,9 +24,9 @@ const STATIONS: Dictionary = {
 	&"vip_blackjack_1": [&"blackjack", Vector3(-4.5, MEZZ_Y, -4), 0], &"vip_roulette_1": [&"roulette", Vector3(3.5, MEZZ_Y, -4), 0],
 	&"vip_slot_1": [&"slots", Vector3(-6.5, MEZZ_Y, -7.5), 0], &"vip_slot_2": [&"slots", Vector3(6.5, MEZZ_Y, -7.5), 0],
 }
-const SPAWNS: Array[Vector3] = [
-	Vector3(-6, 0, 12.5), Vector3(-4, 0, 13.5), Vector3(-2, 0, 12.5), Vector3(2, 0, 12.5),
-	Vector3(4, 0, 13.5), Vector3(6, 0, 12.5), Vector3(-3, 0, 14.5), Vector3(3, 0, 14.5),
+const SPAWNS: Array[Vector3] = [  # hall spots: in front of the pedestal stairs (z ≥ 12.95)
+	Vector3(-6, 0, 12.3), Vector3(-4, 0, 11.8), Vector3(-2, 0, 12.3), Vector3(2, 0, 12.3),
+	Vector3(4, 0, 11.8), Vector3(6, 0, 12.3), Vector3(-8, 0, 12.3), Vector3(8, 0, 12.3),
 ]
 const GUARD_ROUTES: Array = [
 	[Vector3(-12, 0, 0), Vector3(-12, 0, -11), Vector3(0, 0, -11), Vector3(0, 0, 0)],
@@ -56,11 +56,27 @@ const BAR_X: float = 17.7
 const BAR_W: float = 7.0
 const MIRROR_POS: Vector3 = Vector3(-21.3, 0, 12.0)
 const SETTINGS_BOARD_POS: Vector3 = Vector3(12.5, 0, 14.6)
-## Radius around a ready pad's centre that counts as standing on it.
+## Radius around a ready pedestal's centre that counts as standing on it, and how high its top is
+## (you have to be up on it, not beside it).
 const PAD_RADIUS: float = 0.75
+const PEDESTAL_TOP: float = 0.8
+## The ready pedestals (0.8.15, Patrick: "Podeste"): Greek marble column pedestals along the
+## south wall of the entrance hall, one per player colour, nearest the door first, each with a
+## marble stair up to its top. The revolving door gap runs x −2..2; the reception desk moved
+## west (x −16..−12) to leave the stairs room.
+const PEDESTALS: Array[Vector3] = [
+	Vector3(-3.0, 0, 15.1), Vector3(3.0, 0, 15.1), Vector3(-5.2, 0, 15.1), Vector3(5.2, 0, 15.1),
+	Vector3(-7.4, 0, 15.1), Vector3(7.4, 0, 15.1), Vector3(-9.6, 0, 15.1), Vector3(9.6, 0, 15.1),
+]
+const MARBLE: Color = Color("#E6DFD2")
+const MARBLE_DARK: Color = Color("#B9AE9C")
 const LOBBY_DOORS_Z: float = 8.2
 
 var stations: Dictionary[StringName, StationBase] = {}
+## Per ready pedestal: its name sign on the wall and the top slab (lit gold while its player is ready).
+var pedestal_labels: Array[Label3D] = []
+var pedestal_tops: Array[MeshInstance3D] = []
+var _pedestal_state: Array = []
 var fountain_area: Area3D
 var vip_gate_area: Area3D
 var revolving_door: Node3D
@@ -126,9 +142,29 @@ func lobby_spawn(player_id: int) -> Vector3:
 	return LOBBY_SPAWNS[(player_id - 1) % LOBBY_SPAWNS.size()]
 
 
-## Centre of the ready pad in a player colour.
+## Centre (floor level) of the ready pedestal in a player colour.
 func ready_pad(color_index: int) -> Vector3:
-	return SPAWNS[clampi(color_index, 0, SPAWNS.size() - 1)]
+	return PEDESTALS[clampi(color_index, 0, PEDESTALS.size() - 1)]
+
+
+## Writes the player's name on the pedestal's wall sign and lights the top while they are ready
+## ("" = nobody has this colour: the sign goes blank).
+func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
+	if color_index < 0 or color_index >= pedestal_labels.size():
+		return
+	var state: Array = [player_name, ready]
+	if _pedestal_state[color_index] == state:
+		return
+	_pedestal_state[color_index] = state
+	var label: Label3D = pedestal_labels[color_index]
+	label.text = player_name.to_upper()
+	label.modulate = Palette.player_color(color_index).lightened(0.25) if player_name != "" else Palette.CREAM
+	var top: MeshInstance3D = pedestal_tops[color_index]
+	var mat: StandardMaterial3D = top.material_override as StandardMaterial3D
+	mat.emission_enabled = ready
+	mat.emission = Palette.WARM_GOLD
+	mat.emission_energy_multiplier = 1.2
+	mat.albedo_color = Palette.WARM_GOLD.lerp(MARBLE, 0.35) if ready else MARBLE
 
 
 ## Opens (casino reachable) or closes the lobby doors. Opening slides them into the floor.
@@ -198,8 +234,8 @@ func _build_lobby() -> void:
 	fountain_area.set_meta(&"hazard", &"fountain")
 	add_child(fountain_area)
 	# Reception desk and velvet ropes.
-	GreyboxKit.box(self, Vector3(4.0, 1.1, 1.0), Vector3(-9.5, 0.55, 14.0), Color("#3A2A1E"), "Reception")
-	GreyboxKit.box(self, Vector3(4.0, 0.08, 1.1), Vector3(-9.5, 1.14, 14.0), Palette.WARM_GOLD, "ReceptionTop", false)
+	GreyboxKit.box(self, Vector3(4.0, 1.1, 1.0), Vector3(-14.0, 0.55, 14.0), Color("#3A2A1E"), "Reception")
+	GreyboxKit.box(self, Vector3(4.0, 0.08, 1.1), Vector3(-14.0, 1.14, 14.0), Palette.WARM_GOLD, "ReceptionTop", false)
 	for i: int in 5:
 		var x: float = -7.0 + i * 3.5
 		var post: Node3D = GreyboxKit.cylinder(self, 0.06, 1.0, Vector3(x, 0.5, 8.6), Palette.WARM_GOLD, "RopePost", true, 0.8)
@@ -208,10 +244,9 @@ func _build_lobby() -> void:
 			GreyboxKit.box(self, Vector3(3.3, 0.08, 0.08), Vector3(x + 1.75, 0.85, 8.6), Palette.CASINO_RED, "Rope", false)
 	# Casino sign above the entrance (inside).
 	GreyboxKit.box(self, Vector3(7.0, 1.2, 0.2), Vector3(0, 5.0, SIZE_Z * 0.5 - 0.5), Palette.CASINO_RED, "Sign", false)
-	# Ready pads for the physical lobby (M3 uses them; placed now for layout).
-	for i: int in SPAWNS.size():
-		var pad: Node3D = GreyboxKit.cylinder(self, 0.6, 0.06, SPAWNS[i] + Vector3(0, 0.03, 0), Palette.player_color(i).darkened(0.2), "ReadyPad%d" % i, false)
-		pad.add_to_group(&"ready_pads")
+	# Ready pedestals along the south wall: stand on yours and you're ready.
+	for i: int in PEDESTALS.size():
+		_build_pedestal(i, PEDESTALS[i])
 	# Wardrobe mirror: pick a skin in the lobby.
 	GreyboxKit.box(self, Vector3(0.2, 2.4, 1.6), Vector3(-SIZE_X * 0.5 + 0.6, 1.2, 12.0), Color("#9AC4D8"), "Mirror")
 	GreyboxKit.box(self, Vector3(0.3, 2.7, 1.9), Vector3(-SIZE_X * 0.5 + 0.45, 1.3, 12.0), Palette.WARM_GOLD, "MirrorFrame", false)
@@ -343,6 +378,58 @@ func _build_lobby_doors() -> void:
 	lobby_doors.visible = false
 	cs.disabled = true
 	add_child(lobby_doors)
+
+
+## A Greek marble column pedestal (plinth, fluted drum with a band in the player's colour,
+## echinus and abacus, 0.8 m high) with a four-step marble stair in front of it. The stair's
+## collision is one smooth wedge (no step lips to catch on); the column is a plain block.
+func _build_pedestal(i: int, pos: Vector3) -> void:
+	var root := Node3D.new()
+	root.name = "Pedestal%d" % i
+	root.position = pos
+	root.add_to_group(&"ready_pads")
+	add_child(root)
+	var marble: StandardMaterial3D = GreyboxKit.material(MARBLE, 0.0, 0.45)
+	var marble_dark: StandardMaterial3D = GreyboxKit.material(MARBLE_DARK, 0.0, 0.5)
+	# The block you stand on (collision only; the column's looks are the visuals below).
+	var body := StaticBody3D.new()
+	body.name = "Block"
+	body.add_to_group(&"navsource")
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(0.9, PEDESTAL_TOP, 0.9)
+	var cs := CollisionShape3D.new()
+	cs.shape = bs
+	cs.position.y = PEDESTAL_TOP * 0.5
+	body.add_child(cs)
+	root.add_child(body)
+	# Plinth, drum with 16 flutes, colour band, echinus and abacus.
+	(GreyboxKit.box(root, Vector3(1.0, 0.16, 1.0), Vector3(0, 0.08, 0), MARBLE, "Plinth", false).get_node("Mesh") as MeshInstance3D).material_override = marble
+	GreyboxKit.cylinder(root, 0.40, 0.03, Vector3(0, 0.175, 0), Palette.player_color(i), "Band", false)
+	(GreyboxKit.cylinder(root, 0.36, 0.5, Vector3(0, 0.44, 0), MARBLE, "Drum", false).get_node("Mesh") as MeshInstance3D).material_override = marble
+	for f: int in 16:
+		var a: float = TAU * f / 16.0
+		var flute: Node3D = GreyboxKit.box(root, Vector3(0.05, 0.46, 0.04), Vector3(cos(a) * 0.36, 0.44, sin(a) * 0.36), MARBLE_DARK, "Flute%d" % f, false)
+		flute.rotation.y = -a
+		(flute.get_node("Mesh") as MeshInstance3D).material_override = marble_dark
+	(GreyboxKit.cylinder(root, 0.44, 0.05, Vector3(0, 0.715, 0), MARBLE_DARK, "Echinus", false).get_node("Mesh") as MeshInstance3D).material_override = marble_dark
+	GreyboxKit.box(root, Vector3(0.94, 0.012, 0.94), Vector3(0, 0.745, 0), Palette.WARM_GOLD, "Trim", false)
+	var top: Node3D = GreyboxKit.box(root, Vector3(0.9, 0.06, 0.9), Vector3(0, PEDESTAL_TOP - 0.03, 0), MARBLE, "Abacus", false)
+	var top_mesh: MeshInstance3D = top.get_node("Mesh") as MeshInstance3D
+	top_mesh.material_override = GreyboxKit.material(MARBLE, 0.0, 0.45)
+	# Stair up from the room side (−z): a smooth wedge to walk on, dressed as four marble steps.
+	var stair_len: float = 1.7
+	GreyboxKit.ramp(root, Vector3(0, 0, -0.45 - stair_len), Vector3(0, PEDESTAL_TOP, -0.45), 0.9, MARBLE, "Stair")
+	for k: int in 4:
+		var rise: float = PEDESTAL_TOP / 4.0
+		var run: float = stair_len / 4.0
+		var step: Node3D = GreyboxKit.box(root, Vector3(0.96, rise, run), Vector3(0, rise * (k + 0.5), -0.45 - stair_len + run * (3.5 - k)), MARBLE if k % 2 == 0 else MARBLE_DARK, "Step%d" % k, false)
+		(step.get_node("Mesh") as MeshInstance3D).material_override = marble if k % 2 == 0 else marble_dark
+	# Name on the wall above, facing the room.
+	var label: Label3D = _sign_label(Vector3(pos.x, 2.2, SIZE_Z * 0.5 - 0.3), PI, "", 64)
+	label.text = ""
+	pedestal_labels.append(label)
+	pedestal_tops.append(top_mesh)
+	_pedestal_state.append(["", false])
 
 
 func _sign_label(pos: Vector3, yaw: float, text: String, size: int) -> Label3D:
