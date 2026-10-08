@@ -52,7 +52,8 @@ var current_ui: StationUi = null
 var nearest_station: StationBase = null
 ## Results podium (also the "no other menu while results show" flag).
 var results_panel: ResultsStage = null
-var settings_panel: SettingsPanel = null
+## The Escape menu (RESUME / LEAVE / QUIT GAME, settings behind its gear); built on first use.
+var pause_menu: PauseMenu = null
 var _shown_jackpot: int = -1
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
@@ -1477,8 +1478,8 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 		emote_wheel.visible = false
 		lobby_panel.close()
 		shop_panel.close_panel()
-		if settings_panel != null and settings_panel.visible:
-			settings_panel.close()
+		if pause_menu != null and pause_menu.visible:
+			pause_menu.close()
 		hud.visible = false
 		if local != null:
 			local.auto_target = Vector3.INF
@@ -1807,19 +1808,28 @@ func _expire_predictions() -> void:
 
 func _on_pause() -> void:
 	if results_panel != null or router.mode == InputRouter.Mode.STAGE:
-		return  # the settings live on the HUD, which a minigame hides
-	if settings_panel != null and settings_panel.visible:
-		settings_panel.close()
+		return  # the pause menu lives on the HUD, which a minigame hides
+	if pause_menu != null and pause_menu.visible:
+		pause_menu.back()  # settings → pause menu → play
 	elif router.mode == InputRouter.Mode.MENU:
 		_resume_play()
 	else:
-		if settings_panel == null:
-			settings_panel = SettingsPanel.new()
-			settings_panel.closed.connect(_resume_play)
-			settings_panel.leave_requested.connect(_leave_to_menu)
-			hud.add_child(settings_panel)
+		if pause_menu == null:
+			pause_menu = PauseMenu.new()
+			pause_menu.name = "PauseMenu"
+			pause_menu.resumed.connect(_resume_play)
+			pause_menu.leave_requested.connect(_leave_to_menu)
+			pause_menu.quit_requested.connect(_quit_game)
+			hud.add_child(pause_menu)
 		router.set_mode(InputRouter.Mode.MENU)
-		settings_panel.open(true)
+		pause_menu.open()
+
+
+## QUIT GAME in the pause menu: say goodbye to the room server, then close the game.
+func _quit_game() -> void:
+	if role == Role.CLIENT:
+		Net.stop()
+	get_tree().quit()
 
 
 func _resume_play() -> void:

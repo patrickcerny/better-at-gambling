@@ -1,11 +1,13 @@
 extends Control
-## Main menu: Play Online (create a party, join by code or address, rejoin), Practice, Quit.
-## Connection errors from the last online attempt are shown here when we return.
+## Main menu, centred under the 3D logo (Patrick: "the main menu centered"): Play Online (create a
+## party, join by code or address), Practice, Tutorial (how to play), Quit, and a small gear in the
+## bottom-right corner for the settings. Connection errors from the last online attempt are shown
+## here when we return.
 
 @onready var _play_online: Button = %PlayOnline
 @onready var _practice: Button = %Practice
+@onready var _tutorial: Button = %Tutorial
 @onready var _quit: Button = %Quit
-@onready var _settings_button: Button = %Settings
 @onready var _main_box: VBoxContainer = %VBox
 @onready var _column: VBoxContainer = %Column
 
@@ -13,10 +15,11 @@ var _online_box: VBoxContainer
 var _name_edit: LineEdit
 var _code_edit: LineEdit
 var _ip_edit: LineEdit
-var _rejoin: Button
 var _status: Label
 var _busy: bool = false
 var _settings: SettingsPanel
+var _settings_button: GearButton
+var _how_to_play: HowToPlayPanel
 
 
 func _ready() -> void:
@@ -34,10 +37,12 @@ func _ready() -> void:
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	var grad := Gradient.new()
-	grad.set_color(0, Color(Palette.CASINO_BLACK, 0.92))
-	grad.set_color(1, Color(Palette.CASINO_BLACK, 0.0))
-	grad.add_point(0.38, Color(Palette.CASINO_BLACK, 0.7))
+	var grad := Gradient.new()  # darkest down the middle, where the column sits
+	grad.set_color(0, Color(Palette.CASINO_BLACK, 0.15))
+	grad.set_color(1, Color(Palette.CASINO_BLACK, 0.15))
+	grad.add_point(0.25, Color(Palette.CASINO_BLACK, 0.6))
+	grad.add_point(0.5, Color(Palette.CASINO_BLACK, 0.85))
+	grad.add_point(0.75, Color(Palette.CASINO_BLACK, 0.6))
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.width = 256
@@ -50,10 +55,26 @@ func _ready() -> void:
 	_quit.pressed.connect(_on_quit_pressed)
 	_practice.pressed.connect(func() -> void: SceneRouter.goto(SceneRouter.MATCH))
 	_play_online.pressed.connect(_show_online)
+	_tutorial.pressed.connect(_show_tutorial)
+	_settings_button = GearButton.new()
+	_settings_button.name = "SettingsButton"
+	_settings_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_settings_button.offset_left = -32.0 - GearButton.SIZE
+	_settings_button.offset_top = -32.0 - GearButton.SIZE
+	_settings_button.offset_right = -32.0
+	_settings_button.offset_bottom = -32.0
+	_settings_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_settings_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(_settings_button)
 	_settings = SettingsPanel.new()
 	add_child(_settings)
 	_settings.closed.connect(func() -> void: _settings_button.grab_focus())
 	_settings_button.pressed.connect(func() -> void: _settings.open(false))
+	_how_to_play = HowToPlayPanel.new()
+	_how_to_play.name = "HowToPlay"
+	_how_to_play.visible = false
+	_column.add_child(_how_to_play)
+	_how_to_play.closed.connect(_show_main)
 	_build_online()
 	_practice.grab_focus()
 	Audio.set_mood(&"menu")
@@ -71,7 +92,7 @@ func _build_online() -> void:
 	_online_box = VBoxContainer.new()
 	_online_box.name = "Online"
 	_online_box.custom_minimum_size = Vector2(540, 0)
-	_online_box.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_online_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_online_box.add_theme_constant_override(&"separation", 12)
 	_online_box.visible = false
 	_column.add_child(_online_box)
@@ -106,9 +127,6 @@ func _build_online() -> void:
 	_ip_edit.text_submitted.connect(func(_t: String) -> void: _join_ip())
 	ip_row.add_child(_ip_edit)
 	ip_row.add_child(_button("Connect", _join_ip, 140))
-	_online_box.add_child(_button("Host on This PC (LAN / port %d)" % Protocol.DEFAULT_PORT, _host_local))
-	_rejoin = _button("Rejoin Last Party", _rejoin_last)
-	_online_box.add_child(_rejoin)
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.custom_minimum_size = Vector2(540, 0)
@@ -137,20 +155,35 @@ func _show_online() -> void:
 	_main_box.visible = false
 	_set_logo_visible(false)
 	_online_box.visible = true
-	var last: Dictionary = Net.online.last_room()
-	_rejoin.visible = str(last.get("room_id", "")) != ""
-	_rejoin.text = "Rejoin Last Party (%s)" % last.get("room_code", "") if _rejoin.visible else ""
 	_status.text = ""
 	_online_box.get_child(2).grab_focus()  # Create Party
+
+
+## TUTORIAL: for now the how-to-play pages. Placeholder for the later interactive tutorial (see
+## `HowToPlayPanel`).
+func _show_tutorial() -> void:
+	_main_box.visible = false
+	_set_logo_visible(false)
+	_how_to_play.visible = true
+	_how_to_play.show_page(0)
 
 
 func _show_main() -> void:
 	if _busy:
 		return
+	var from_tutorial: bool = _how_to_play.visible
 	_online_box.visible = false
+	_how_to_play.visible = false
 	_set_logo_visible(true)
 	_main_box.visible = true
-	_play_online.grab_focus()
+	(_tutorial if from_tutorial else _play_online).grab_focus()
+
+
+## Esc steps back out of the online form or the tutorial (the settings panel handles its own).
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"ui_cancel") and (_online_box.visible or _how_to_play.visible):
+		get_viewport().set_input_as_handled()
+		_show_main()
 
 
 ## The online form is tall: the big logo steps aside while it is open.
@@ -188,11 +221,6 @@ func _join_code() -> void:
 	await _via_orchestrator(func(n: String) -> Dictionary: return await Net.online.join_party(n, code), "Joining %s…" % code)
 
 
-func _rejoin_last() -> void:
-	var last: Dictionary = Net.online.last_room()
-	await _via_orchestrator(func(n: String) -> Dictionary: return await Net.online.join_party(n, "", str(last.get("room_id", ""))), "Rejoining…")
-
-
 func _via_orchestrator(call: Callable, busy_text: String) -> void:
 	if _busy:
 		return
@@ -218,28 +246,6 @@ func _join_ip() -> void:
 	var hello: Dictionary = SceneRouter.profile_cosmetics()
 	hello["name"] = _display_name()
 	_connect(func() -> Error: return Net.join_server(host, port, hello))
-
-
-## Starts a dedicated server process on this machine (closes itself once everyone has left) and
-## joins it. Friends connect with this PC's address; the UDP port must be reachable for them.
-func _host_local() -> void:
-	if _busy:
-		return
-	var args: PackedStringArray = []
-	if OS.has_feature("editor"):
-		args.append_array(["--path", ProjectSettings.globalize_path("res://")])
-	args.append_array(["--headless", "--audio-driver", "Dummy", "--", "--server", "--port", str(Protocol.DEFAULT_PORT), "--empty-timeout", "30"])
-	var pid: int = OS.create_process(OS.get_executable_path(), args)
-	if pid <= 0:
-		_set_status("Could not start a server on this PC.", true)
-		return
-	Log.info(&"menu", "started local server (pid %d)" % pid)
-	_busy = true
-	_set_status("Starting a server on this PC…")
-	await get_tree().create_timer(2.5).timeout
-	var hello: Dictionary = SceneRouter.profile_cosmetics()
-	hello["name"] = _display_name()
-	_connect(func() -> Error: return Net.join_server("127.0.0.1", Protocol.DEFAULT_PORT, hello))
 
 
 ## Starts the UDP connection; the match scene loads once the server welcomes us.

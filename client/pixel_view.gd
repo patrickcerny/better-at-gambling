@@ -1,20 +1,20 @@
 class_name PixelView
 extends Node
 ## The "pixel look" (Patrick: "this pixelated blur effect the game Yap Yap has ... a bit of 8-bit
-## style"): the 3D casino renders at 1/2, 1/3 or 1/4 of the window's resolution and is blown back
-## up with hard, nearest-neighbour pixels, while every Control (HUD, menus, station overlays, the
-## quiz and results 2D) stays at full resolution on top. No dithering, no palette.
+## style"): the 3D casino renders at 1/3 of the window's resolution and is blown back up with
+## hard, nearest-neighbour pixels, while every Control (HUD, menus, station overlays, the quiz and
+## results 2D) stays at full resolution on top. No dithering, no palette.
 ##
 ## The 3D world (`world`) lives inside a `SubViewport` that shares the window's `World3D`, so
 ## physics, navigation, the environment and 3D audio are untouched; only the camera and the
-## pixels move. The container is sized in window pixels (not canvas units), so "Off" renders
-## exactly the window's pixels, as the bare window would. The setting (`video/pixel_scale`, the
-## shrink factor 1..4) applies live through `Settings.changed`. The dedicated server never builds
-## the viewport: `setup(true)` leaves a plain Node3D.
+## pixels move. The container is sized in window pixels (not canvas units), so a shrink of 1
+## renders exactly the window's pixels, as the bare window would. The shrink is fixed for every
+## player (`Settings.pixel_scale()`, 3; Patrick: "pixel look cannot be set"); only developer tools
+## override it (`Settings.set_pixel_override`), live through `Settings.changed`. The dedicated
+## server never builds the viewport: `setup(true)` leaves a plain Node3D.
 
-## Shrink factor for each setting entry, in the order the settings panel lists them.
+## Shrink factors the view supports (1 = off); players always get `Settings.PIXEL_SCALE`.
 const SCALES: Array[int] = [1, 2, 3, 4]
-const LABELS: Array[String] = ["Off", "Light (1/2)", "Retro (1/3)", "Chunky (1/4)"]
 ## Window-level render settings the sub viewport copies so Off looks exactly like the bare window.
 const COPIED_SETTINGS: Array[StringName] = [
 	&"msaa_3d", &"screen_space_aa", &"use_taa", &"use_debanding", &"use_occlusion_culling", &"mesh_lod_threshold",

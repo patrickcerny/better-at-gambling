@@ -1,18 +1,18 @@
 extends GutTest
-## Pixel look (Patrick: "this pixelated blur effect the game Yap Yap has"): the setting maps
-## Off / Light / Retro / Chunky to a shrink of 1 / 2 / 3 / 4, applies live to the world's sub
-## viewport, keeps the UI outside it, sizes itself in window pixels, and is never built on the
-## dedicated server.
+## Pixel look (Patrick: "this pixelated blur effect the game Yap Yap has"): fixed at 1/3 for every
+## player ("pixel look cannot be set"), whatever an old settings file says; the developer override
+## (1..4) applies live to the world's sub viewport, the UI stays outside it, it sizes itself in
+## window pixels, and it is never built on the dedicated server.
 
 var _old_scale: int
 
 
 func before_each() -> void:
-	_old_scale = Settings.pixel_scale()
+	_old_scale = Settings.pixel_scale_override
 
 
 func after_each() -> void:
-	Settings.change("video", "pixel_scale", _old_scale)
+	Settings.set_pixel_override(_old_scale)
 
 
 func _view(dedicated: bool = false) -> PixelView:
@@ -22,10 +22,16 @@ func _view(dedicated: bool = false) -> PixelView:
 	return pv
 
 
-func test_labels_map_to_shrink_factors() -> void:
-	assert_eq(PixelView.LABELS, ["Off", "Light (1/2)", "Retro (1/3)", "Chunky (1/4)"] as Array[String])
+func test_everyone_gets_one_third_whatever_was_saved() -> void:
 	assert_eq(PixelView.SCALES, [1, 2, 3, 4] as Array[int])
-	assert_eq(int((Settings.DEFAULTS["video"] as Dictionary)["pixel_scale"]), 3, "Retro by default")
+	assert_eq(Settings.PIXEL_SCALE, 3)
+	assert_false((Settings.DEFAULTS["video"] as Dictionary).has("pixel_scale"), "no longer a setting")
+	Settings.set_pixel_override(0)
+	Settings.set_value("video", "pixel_scale", 1)  # an old settings file that picked Off
+	assert_eq(Settings.pixel_scale(), 3, "the saved choice is ignored")
+	var pv: PixelView = _view()
+	assert_eq(pv.shrink(), 3, "the world renders at 1/3")
+	Settings._cfg.erase_section_key("video", "pixel_scale")
 
 
 func test_setting_changes_the_shrink_live() -> void:
@@ -36,13 +42,13 @@ func test_setting_changes_the_shrink_live() -> void:
 	assert_true(pv.viewport.audio_listener_enable_3d, "its camera positions 3D audio")
 	assert_eq(pv.container.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST, "hard pixels")
 	for s: int in PixelView.SCALES:
-		Settings.change("video", "pixel_scale", s)
+		Settings.set_pixel_override(s)
 		assert_eq(pv.shrink(), s, "shrink %d" % s)
 		assert_eq(pv.container.stretch_shrink, s)
 		await wait_process_frames(1)
 		var want: Vector2i = Vector2i(get_tree().root.size) / s
 		assert_eq(pv.viewport.size, want, "viewport is the window's pixels / %d" % s)
-	Settings.change("video", "pixel_scale", 9)
+	Settings.set_pixel_override(9)
 	assert_eq(pv.shrink(), 4, "clamped to the offered steps")
 
 
@@ -63,12 +69,12 @@ func test_dedicated_server_has_no_viewport() -> void:
 	assert_eq(pv.world.get_parent(), pv)
 	assert_eq(pv.shrink(), 1)
 	assert_eq(pv.world_viewport(), get_viewport())
-	Settings.change("video", "pixel_scale", 4)
+	Settings.set_pixel_override(4)
 	assert_eq(pv.shrink(), 1, "the server ignores the setting")
 
 
 func test_to_canvas_scales_viewport_points_onto_the_window() -> void:
-	Settings.change("video", "pixel_scale", 3)
+	Settings.set_pixel_override(3)
 	var pv: PixelView = _view()
 	var cam := Camera3D.new()
 	pv.world.add_child(cam)
@@ -86,16 +92,13 @@ func test_to_canvas_scales_viewport_points_onto_the_window() -> void:
 	assert_eq(PixelView.shrink_of(ui), 1)
 
 
-func test_settings_panel_offers_the_four_looks() -> void:
-	Settings.change("video", "pixel_scale", 2)
+func test_settings_panel_has_no_pixel_look_option() -> void:
 	var panel := SettingsPanel.new()
 	add_child_autofree(panel)
 	await wait_process_frames(1)
-	assert_eq(panel._pixel.item_count, 4)
-	assert_eq(panel._pixel.get_item_text(2), "Retro (1/3)")
-	assert_eq(panel._pixel.selected, 1, "shows the saved Light")
-	panel._pixel.item_selected.emit(3)
-	assert_eq(Settings.pixel_scale(), 4, "picking Chunky applies at once")
+	assert_false("_pixel" in panel, "no pixel look picker")
+	for l: Node in panel.find_children("*", "Label", true, false):
+		assert_false((l as Label).text.to_lower().contains("pixel"), "no pixel look row: %s" % (l as Label).text)
 
 
 func test_name_tags_stay_readable_when_shrunk() -> void:
