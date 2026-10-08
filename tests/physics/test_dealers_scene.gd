@@ -22,8 +22,10 @@ func test_every_dealer_stands_clear_of_its_table_and_faces_it() -> void:
 		var local: Vector3 = station.to_local(dealer.global_position)
 		match station.game_id:
 			&"roulette":
-				assert_lt(local.x, -2.2, "%s: past the wheel end (body ends at x −1.5, wheel at −2.1)" % sid)
-				assert_almost_eq(local.z, 0.0, 0.05, "%s: centred on the short side" % sid)
+				assert_almost_eq(local.x, RouletteStation.WHEEL_X, 0.05, "%s: level with the wheel" % sid)
+				assert_lt(local.z, -1.3, "%s: outside the 1.8 m deep body (and its 0.42 m radius clear of it)" % sid)
+				assert_gt(local.z, -1.6, "%s: close to the table, not out on the floor" % sid)
+				assert_almost_eq(local.y, 0.5, 0.05, "%s: standing on the floor" % sid)
 			&"blackjack":
 				assert_almost_eq(local.z, -1.2, 0.05, "%s: on the straight north edge" % sid)
 				assert_almost_eq(local.x, 0.0, 0.05)

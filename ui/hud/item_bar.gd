@@ -1,9 +1,9 @@
 class_name ItemBar
 extends Control
 ## Bottom-centre item HUD (0.8.6): three inventory slots with a selection the mouse wheel moves
-## (the slot under it is highlighted, "I: info" appears on the right and I opens a card with the
-## item's name, rarity and what it does), the half-ring luck gauge, running effects with their
-## timers, the target picker line and the "inventory full" discard choice. Pure display:
+## (the slot under it is highlighted, "Press i for info" appears on the right and i opens a card
+## with the item's name, rarity and what it does), the half-ring luck gauge, running effects with
+## their timers, the target picker line and the "inventory full" discard choice. Pure display:
 ## ItemController feeds it.
 
 const SLOTS: int = 3
@@ -266,7 +266,7 @@ func _build() -> void:
 	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info_label.custom_minimum_size = Vector2(420, 0)
 	info_panel.add_child(info_label)
-	# Inventory slots: three, the selected one highlighted, "I: info" to its right.
+	# Inventory slots: three, the selected one highlighted, "Press i for info" to its right.
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override(&"separation", 14)
@@ -293,7 +293,7 @@ func _build() -> void:
 		slot_names.append(n)
 	info_hint = Label.new()
 	info_hint.theme_type_variation = &"SmallLabel"
-	info_hint.text = "I: info"
+	info_hint.text = "Press i for info"
 	info_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	info_hint.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
 	info_hint.visible = false

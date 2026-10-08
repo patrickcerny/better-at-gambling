@@ -9,13 +9,15 @@ extends RefCounted
 const ATTACK_RANGE: float = 2.2
 
 ## Where the dealer stands in the table's own frame, per game (the scene's `Dealer` node uses
-## the same offsets): blackjack on the straight north edge, roulette just past the wheel end
-## (the table body runs from x −1.5 to 2.7, the wheel sits around x −1.3). The table's yaw turns
-## these, so a mirrored table (roulette_2 at 180°) keeps its dealer at the wheel.
-const OFFSETS: Dictionary = {&"blackjack": Vector3(0.0, 0.5, -1.2), &"roulette": Vector3(-2.5, 0.5, 0.0)}
+## the same offsets): blackjack on the straight north edge; roulette on the north long side next
+## to the wheel (the body runs from x −2.5 to 2.7 and is 1.8 m deep, the wheel is centred at
+## x −1.5, the nearest stool is at x −0.2), flush against the table on the floor. The table's yaw
+## turns these, so a mirrored table (roulette_2 at 180°) keeps its dealer by the wheel.
+const OFFSETS: Dictionary = {&"blackjack": Vector3(0.0, 0.5, -1.2), &"roulette": Vector3(-1.5, 0.5, -1.4)}
 ## Which way the dealer faces in the table's frame: at the players (blackjack: +z, the stools;
-## roulette: +x, along the layout). Yaw 0 looks down −z, like every avatar.
-const FACINGS: Dictionary = {&"blackjack": PI, &"roulette": -PI * 0.5}
+## roulette: diagonally across the wheel towards the layout, +x +z). Yaw 0 looks down −z, like
+## every avatar.
+const FACINGS: Dictionary = {&"blackjack": PI, &"roulette": -PI * 0.75}
 
 var station_id: StringName
 var players: Dictionary
