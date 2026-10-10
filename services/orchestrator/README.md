@@ -89,7 +89,7 @@ Body `{"ticket": str, "build": str, "display_name"?: str}` →
 | 401 | `bad_ticket` / `wrong_app` | ticket rejected (Steam error 102 = `wrong_app`) |
 | 403 | `banned` | Steam reports `publisherbanned` |
 | 409 | `already_owns_room` | caller owns a live room; body also has `room_code`, `room_id` |
-| 426 | `version_mismatch` | `build != BUILD_ID` ("Update required — restart Steam to update"); body has `server_build` |
+| 426 | `version_mismatch` | `build != BUILD_ID` ("Update required: download the latest version"); body has `server_build` |
 | 500 | `spawn_failed` | process could not be started |
 | 503 | `capacity` / `no_ports` / `auth_unavailable` | room cap / port pool exhausted / Steam unreachable, timed out or rejected our key |
 

@@ -534,7 +534,7 @@ The game is an **online Steam game**. All online matches run on **dedicated head
   - `POST /v1/internal/verify` (localhost only, called by game servers) → verifies a player's `join_token` + Steam identity, returns `{steam_id, display_name}`.
   - `POST /v1/internal/heartbeat` (localhost only) → room phase, player count; rooms without a heartbeat for 30 s are killed; rooms empty for 120 s shut themselves down; orchestrator reaps zombie processes and frees ports.
   - `GET /v1/status` → build version accepted, room count (public); `GET /healthz`.
-  - Rejects clients whose build version does not match the deployed server build ("Update required — restart Steam to update").
+  - Rejects clients whose build version does not match the deployed server build ("Update required: download the latest version").
   - Rate limits per Steam ID and per IP; structured JSON logs; no database needed in V1 (in-memory state; a restart kills rooms, which is acceptable and documented).
 - **Room codes:** every room also gets a 5-character code (no ambiguous letters, e.g. `KX7PQ`). Shown in the lobby; "Join by code" in the main menu works for friends who prefer it, and for testing without Steam.
 - **Steam authentication:** the client calls `getAuthTicketForWebApi("better-at-gambling")` (GodotSteam) and sends the ticket to the orchestrator, which calls the Steam Web API `ISteamUserAuth/AuthenticateUserTicket` with the **publisher Web API key** (secret, stored only in `/etc/better-at-gambling/orchestrator.env` on the VPS, never in the repo or the client). The verified SteamID64 becomes the `player_uid`. **Dev mode:** `AUTH_MODE=dev` accepts `dev:<name>` tickets so tests and non-Steam builds work; the orchestrator **refuses to start in dev mode when `ENV=production`**.

@@ -130,7 +130,7 @@ def create_app(
         """Rate-limit by IP, check build, authenticate, rate-limit by identity."""
         limit(f"ip:{client_ip(request)}")
         if body.build != cfg.build_id:
-            raise ApiError(426, "version_mismatch", "Update required — restart Steam to update.",
+            raise ApiError(426, "version_mismatch", "Update required: download the latest version.",
                            server_build=cfg.build_id)
         ident = await authenticator.authenticate(body.ticket, body.display_name)
         limit(f"uid:{ident.player_uid}")
@@ -167,7 +167,7 @@ def create_app(
         if public != 1:
             raise ApiError(400, "bad_request", "Only public parties can be listed (public=1).")
         if build is not None and build != cfg.build_id:
-            raise ApiError(426, "version_mismatch", "Update required — restart Steam to update.",
+            raise ApiError(426, "version_mismatch", "Update required: download the latest version.",
                            server_build=cfg.build_id)
         return {"rooms": manager.public_rooms(), "max_players": cfg.max_players}
 
