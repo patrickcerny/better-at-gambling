@@ -4,7 +4,9 @@ extends Node3D
 ## Spawns the waiter on his route once the navmesh is ready, spawns dealers at blackjack and
 ## roulette tables, keeps the server's `WaiterLogic` and `DealerLogic` told where their bodies are
 ## (on the process that simulates the world), shows puddles and the megaphone from the replicated
-## state, and plays their sounds. All decisions come from the server.
+## state, and plays their sounds. All decisions come from the server. The start room's door rule
+## and the jail (carrying jailed players to the cell, locking them in, letting them out) live in
+## its `SecurityView` child.
 
 ## Service loop: from the bar's service end out across the floor and back (navmesh points).
 const WAITER_ROUTE: Array[Vector3] = [
@@ -17,6 +19,8 @@ var scene: MatchScene
 var waiter: Waiter = null
 ## Dealers at each blackjack and roulette table (v0.8.4): station_id → Dealer node.
 var dealers: Dictionary[StringName, Dealer] = {}
+## Start room and jail (0.8.19).
+var security: SecurityView = null
 var puddle_nodes: Dictionary[int, Node3D] = {}
 var stand: Node3D = null
 ## The megaphone model (on the stand, or in the holder's hand).
@@ -33,6 +37,9 @@ func setup(p_scene: MatchScene) -> void:
 		_build_stand()
 	scene.view.state.floor_changed.connect(_sync)
 	_sync()
+	security = SecurityView.new()
+	add_child(security)
+	security.setup(scene)
 	_spawn_waiter()
 	_spawn_dealers()
 
@@ -136,6 +143,8 @@ func prompt() -> String:
 
 ## Server events for the waiter, puddles and megaphone (called from MatchScene._on_event).
 func on_event(ev: Dictionary) -> void:
+	if security != null:
+		security.on_event(ev)
 	match StringName(ev["type"]):
 		&"waiter_tripped":
 			if waiter != null:

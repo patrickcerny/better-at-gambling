@@ -10,8 +10,14 @@ extends CharacterBody3D
 ## simulation (server, Practice) the guard does the toss itself; online clients show the same carry
 ## on the streamed guard and hand the body to the server's streamed ragdoll once the guard's state
 ## leaves CARRY. Money and the respawn clock are untouched: they stay with the server's event.
+##
+## Jail (0.8.19): on `player_jailed` the nearest guard carries the player the same way to the jail
+## cell's gate (`carry(a, door, true)`) and, instead of tossing them, sets them down there and
+## emits `delivered`; the scene locks them in.
 
 signal caught(player_id: int)
+## A jail carry is over: the player is back on their feet at the cell gate (the scene locks them in).
+signal delivered(player_id: int)
 
 enum State { PATROL, CHASE, RETURN, CARRY }
 
@@ -32,6 +38,10 @@ const TOSS_UP: float = 4.5
 const TOSS_RAGDOLL_SECONDS: float = 1.6
 ## Where the guard's hands go while carrying (local to its visuals).
 const CARRY_HANDS: Vector3 = Vector3(0.0, 2.2, -0.25)
+## Jail carry: the longest walk to the cell before the guard hands the player over anyway (the
+## scene then puts them in), and how close to the gate counts as there.
+const JAIL_CARRY_SECONDS: float = 3.0
+const JAIL_REACH: float = 1.2
 
 var guard_id: StringName = &"guard"
 var route: Array[Vector3] = []
@@ -55,6 +65,8 @@ var carrying: PlayerAvatar = null
 var _carry_time: float = 0.0
 var _carry_door: Vector3 = Vector3.ZERO
 var _net_carry_seen: bool = false
+## True while the carry ends at the jail (set down, `delivered`) rather than in a toss.
+var carry_to_jail: bool = false
 
 
 func _ready() -> void:
@@ -122,8 +134,8 @@ func stop_chase() -> void:
 
 ## Lifts `a` overhead and heads for `door`. False (and nothing happens) when the player can't be
 ## carried right now (already flying, held, away) or is out of reach; the caller tosses them the
-## old way then.
-func carry(a: PlayerAvatar, door: Vector3) -> bool:
+## old way then. `to_jail`: `door` is the jail gate, where the player is set down, not tossed.
+func carry(a: PlayerAvatar, door: Vector3, to_jail: bool = false) -> bool:
 	if a == null or carrying != null:
 		return false
 	if not (a.state == PlayerAvatar.State.STANDING or a.state == PlayerAvatar.State.STUNNED):
@@ -133,6 +145,7 @@ func carry(a: PlayerAvatar, door: Vector3) -> bool:
 	carrying = a
 	_carry_time = 0.0
 	_carry_door = door
+	carry_to_jail = to_jail
 	_net_carry_seen = false
 	target_id = -1
 	if not puppet:
@@ -162,6 +175,19 @@ func _toss() -> void:
 	a.start_ragdoll(dir * TOSS_SPEED + Vector3.UP * TOSS_UP, TOSS_RAGDOLL_SECONDS, false)
 	visuals.react(&"win")
 	Audio.play_at(&"whoosh", a, -6.0)
+
+
+## Owner side, jail carry: sets the player down at the cell gate; the scene locks them in.
+func _deliver() -> void:
+	var a: PlayerAvatar = carrying
+	_end_carry()
+	carry_to_jail = false
+	state = State.RETURN
+	if a == null or not is_instance_valid(a) or a.carrier != self:
+		return
+	a.release_held()
+	visuals.react(&"win")
+	delivered.emit(a.player_id)
 
 
 ## Puppet side: the server tossed them; the streamed ragdoll takes the body from here.
@@ -242,7 +268,12 @@ func _physics_process(delta: float) -> void:
 				return
 			goal = _carry_door
 			speed = CARRY_SPEED
-			if _carry_time >= CARRY_SECONDS or Vector2(goal.x - global_position.x, goal.z - global_position.z).length() < 2.5:
+			var to_door: float = Vector2(goal.x - global_position.x, goal.z - global_position.z).length()
+			if carry_to_jail:
+				if _carry_time >= JAIL_CARRY_SECONDS or to_door < JAIL_REACH:
+					_deliver()
+					return
+			elif _carry_time >= CARRY_SECONDS or to_door < 2.5:
 				_toss()
 				return
 		State.RETURN:

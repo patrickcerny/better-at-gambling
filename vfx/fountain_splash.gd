@@ -1,12 +1,12 @@
 class_name FountainSplash
 extends Node3D
-## Water splash where someone hits the fountain: droplets thrown up and out, a white spray column
-## (big splashes only) and a ripple ring spreading on the water. Frees itself. Purely visual:
-## `spawn` returns null and creates nothing headless.
+## Water splash: droplets thrown up and out, a white spray column (big splashes only) and a ripple
+## ring spreading on the water. Frees itself. Purely visual: `spawn` returns null and creates
+## nothing headless. (The lobby fountain is gone since the start room, 0.8.19; the bean showcase
+## shot still uses the splash.)
 
-## The lobby fountain's water surface (LuckyLounge basin top) and basin radius.
+## Water surface height of the showcase basin.
 const WATER_Y: float = 0.74
-const BASIN_RADIUS: float = 2.2
 const LIFETIME: float = 1.8
 const WATER: Color = Color("#8FCBE0")
 const FOAM: Color = Color("#F2F6F4")
@@ -16,15 +16,6 @@ var big: bool = false
 var _ring: MeshInstance3D
 var _ring_mat: StandardMaterial3D
 var _t: float = 0.0
-
-
-## Splash on the lobby fountain's water at `pos` (snapped onto the surface, inside the basin).
-static func at_fountain(parent: Node, pos: Vector3, p_big: bool) -> FountainSplash:
-	var c: Vector3 = LuckyLounge.FOUNTAIN_POS
-	var flat: Vector2 = Vector2(pos.x - c.x, pos.z - c.z)
-	if flat.length() > BASIN_RADIUS:
-		flat = flat.normalized() * BASIN_RADIUS
-	return spawn(parent, Vector3(c.x + flat.x, WATER_Y, c.z + flat.y), p_big)
 
 
 ## A splash at `pos` (the water surface point). Null headless.

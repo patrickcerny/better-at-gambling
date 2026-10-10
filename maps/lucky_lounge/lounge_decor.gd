@@ -2,11 +2,11 @@ class_name LoungeDecor
 extends Node3D
 ## Client-only dressing for the Lucky Lounge (docs/ART_DIRECTION.md): CC0 surface textures on the
 ## greybox (wine-red casino carpet, checker marble entrance, herringbone parquet in the bar and
-## the VIP lounge, damask wallpaper over mahogany wainscoting with a brass rail, black marble
-## counters and pillar bases, red velvet, coffered wood ceiling), classical columns, arched
-## windows with velvet curtains, double doors, a baroque mirror, paintings, a bust and a horse
-## statue in the VIP lounge, balusters on every railing, brass stair nosings, crystal chandeliers,
-## sconces, marquee bulbs and a warm haze + glow on the WorldEnvironment.
+## the VIP lounge, damask wallpaper over mahogany wainscoting with a brass rail (gold damask in
+## the VIP lounge), black marble counters and pillar bases, red velvet, coffered wood ceiling),
+## classical columns, arched windows with velvet curtains, double doors, a baroque mirror,
+## paintings, a bust and a horse statue in the VIP lounge, crystal chandeliers, sconces, marquee
+## bulbs and a warm haze + glow on the WorldEnvironment.
 ##
 ## Nothing here collides or touches gameplay. `LuckyLounge` adds it only when `Vfx.enabled()`
 ## (never on the headless server). Big surfaces use world-space triplanar materials (one material
@@ -18,27 +18,29 @@ const TEX_DIR: String = "res://assets/textures/"
 ## Where the chandeliers hang (the map's room lamps sit at the same points).
 const CHANDELIERS: Array[Vector3] = [
 	Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11),
-	Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, LuckyLounge.MEZZ_Y + 2.5, -5),
+	Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, 5.8, -21), Vector3(-13, 6.0, 12),
+	Vector3(13, 6.0, 12),
 ]
 const BULB_COLOR: Color = Color(1.0, 0.82, 0.52)
 const GLASS_GLOW: Color = Color(0.45, 0.42, 0.62)
-## Arched windows: [centre on the wall, inward normal, height]. The VIP back wall gets shorter
-## ones above the mezzanine floor; the Plinko wall and the mirror/board walls stay free.
+## Arched windows: [centre on the wall, inward normal, height]. Two in the VIP lounge's back wall;
+## the Plinko wall and the mirror/board walls stay free.
 const WINDOWS: Array = [
 	[Vector3(-21.75, 3.5, -11.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, -4.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, 3.0), Vector3(1, 0, 0), 3.2],
 	[Vector3(21.75, 3.5, -11.0), Vector3(-1, 0, 0), 3.2], [Vector3(21.75, 3.5, -4.0), Vector3(-1, 0, 0), 3.2], [Vector3(21.75, 3.5, 3.0), Vector3(-1, 0, 0), 3.2],
 	[Vector3(-16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2], [Vector3(16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2],
 	[Vector3(-19.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2], [Vector3(-11.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2],
-	[Vector3(-6.0, 5.4, -15.75), Vector3(0, 0, 1), 2.3], [Vector3(6.0, 5.4, -15.75), Vector3(0, 0, 1), 2.3],
+	[Vector3(-3.2, 3.5, -25.75), Vector3(0, 0, 1), 3.2], [Vector3(3.2, 3.5, -25.75), Vector3(0, 0, 1), 3.2],
 ]
-## Double doors: [centre on the wall, inward normal, height]: staff door by the slots, a closed
-## back door in the middle of the north wall (it used to be the VIP lounge's private door at
-## mezzanine height, floating 4 m up over the pit since the balcony ends 6 m short of that wall),
-## the street door seen through the entrance.
+## Double doors: [centre on the wall, inward normal, height]: staff door by the slots and the
+## street door seen through the entrance. (The middle of the north wall is the VIP lounge's open
+## doorway now; the lobby doors are the map's own.)
 const DOORS: Array = [
-	[Vector3(-13.75, 0.0, -15.75), Vector3(0, 0, 1), 2.7], [Vector3(0.0, 0.0, -15.75), Vector3(0, 0, 1), 2.7],
+	[Vector3(-13.75, 0.0, -15.75), Vector3(0, 0, 1), 2.7],
 	[Vector3(0.0, 0.0, 20.75), Vector3(0, 0, -1), 2.9],
 ]
+## Open doorways (floor centre): the VIP door and the lobby doors. No frames or sconces there.
+const OPENINGS: Array[Vector3] = [Vector3(0.0, 0.0, -16.0), Vector3(0.0, 0.0, LuckyLounge.LOBBY_DOORS_Z)]
 
 ## Size of the entrance logo against the 13.6 m model (about 6.8 m wide in the room).
 const SIGN_SCALE: float = 0.5
@@ -88,8 +90,7 @@ func _ready() -> void:
 	_walls()
 	_ceiling()
 	_pillars()
-	_mezzanine()
-	_stairs()
+	_vip_lounge()
 	_furniture()
 	_windows()
 	_doors()
@@ -151,10 +152,8 @@ func _floors() -> void:
 	_area_rug("RouletteRug", Palette.CASINO_RED.darkened(0.3), Palette.CASINO_RED.darkened(0.5))
 	_area_rug("SlotsRug", Palette.WARM_GOLD.darkened(0.5), Palette.WARM_GOLD.darkened(0.66))
 	_area_rug("PlinkoRug", Palette.VIP_BURGUNDY.darkened(0.15), Palette.VIP_BURGUNDY.darkened(0.38))
-	# The stair treads are red carpet, the landing blocks too.
-	var stair_carpet: StandardMaterial3D = _tex("casino_carpet", 1.1, Palette.CASINO_RED.darkened(0.1), 0.3, 0.95)
-	for n: String in ["Stairs1", "Stairs2", "Landing"]:
-		_retexture_solid(n, stair_carpet)
+	# The jail cell stands on cold grey stone.
+	_retexture("JailFloor", _tex("black_marble", 1.4, Color(0.62, 0.6, 0.58), 0.3, 0.6))
 
 
 ## Patterned carpet on the greybox area rug `node_name`, with a brass strip around its edge.
@@ -216,22 +215,45 @@ static func _carpet(base: Color, alt: Color, tile: float) -> ShaderMaterial:
 func _walls() -> void:
 	var hx: float = LuckyLounge.SIZE_X * 0.5 - 0.25
 	var hz: float = LuckyLounge.SIZE_Z * 0.5 - 0.25
-	# Damask wallpaper on every wall (wine on wine), gold on black behind the VIP lounge.
+	# Damask wallpaper on every wall (wine on wine), gold on black in the VIP lounge.
 	var damask: StandardMaterial3D = _tex("damask_wallpaper", 2.0, Color(0.95, 0.9, 0.9), 0.0, 0.85)
-	for n: String in ["WallN", "WallW", "WallE", "WallS1", "WallS2", "WallSTop", "PorchWall", "PorchSide"]:
+	for n: String in ["WallN", "WallW", "WallE", "WallS1", "WallS2", "WallSTop", "WallLobby", "PorchWall", "PorchSide"]:
 		_retexture_solid(n, damask)
 	var vip_damask: StandardMaterial3D = _tex("damask_wallpaper", 1.6, Color(0.95, 0.92, 0.85), 0.0, 0.8, 0.0, "albedo_gold.jpg")
-	_box(Vector3(22.0, LuckyLounge.WALL_H - LuckyLounge.MEZZ_Y - 0.3, 0.04), Vector3(2.0, (LuckyLounge.WALL_H + LuckyLounge.MEZZ_Y) * 0.5 - 0.1, -hz + 0.025), vip_damask, "vipwall")
+	_retexture_solid("WallVip", vip_damask)
+	# The VIP side of the casino's north wall (either side of the door and over it) in gold too.
+	var vx: float = LuckyLounge.VIP_X
+	var door: float = LuckyLounge.VIP_DOOR_HALF
+	var back_z: float = -hz - 0.5 - 0.025
+	for sx: float in [-1.0, 1.0]:
+		_box(Vector3(vx - door, LuckyLounge.WALL_H, 0.04), Vector3(sx * (door + vx) * 0.5, LuckyLounge.WALL_H * 0.5, back_z), vip_damask, "vipwall")
+	_box(Vector3(door * 2.0, LuckyLounge.WALL_H - LuckyLounge.VIP_DOOR_H, 0.04), Vector3(0, (LuckyLounge.WALL_H + LuckyLounge.VIP_DOOR_H) * 0.5, back_z), vip_damask, "vipwall")
 	# The map's low gold trim strips sit where the chair rail goes now.
 	for solid: Node3D in _solids("Trim"):
 		solid.visible = false
-	# North and east/west walls run full length; the south wall has the entrance gap.
-	var runs: Array = [  # [start, end, inward normal]
-		[Vector3(-hx, 0, -hz), Vector3(hx, 0, -hz), Vector3(0, 0, 1)],
+	# Wainscot runs: [start, end, inward normal]. Doorways split the walls they are in.
+	var lz: float = LuckyLounge.LOBBY_DOORS_Z
+	var lt: float = LuckyLounge.LOBBY_WALL_T * 0.5
+	var ld: float = LuckyLounge.LOBBY_DOOR_HALF + 0.2
+	var vz: float = LuckyLounge.VIP_Z_FAR
+	var runs: Array = [
+		[Vector3(-hx, 0, -hz), Vector3(-door - 0.2, 0, -hz), Vector3(0, 0, 1)],
+		[Vector3(door + 0.2, 0, -hz), Vector3(hx, 0, -hz), Vector3(0, 0, 1)],
 		[Vector3(-hx, 0, -hz), Vector3(-hx, 0, hz), Vector3(1, 0, 0)],
 		[Vector3(hx, 0, -hz), Vector3(hx, 0, hz), Vector3(-1, 0, 0)],
 		[Vector3(-hx, 0, hz), Vector3(-2.3, 0, hz), Vector3(0, 0, -1)],
 		[Vector3(2.3, 0, hz), Vector3(hx, 0, hz), Vector3(0, 0, -1)],
+		# The start-room wall, casino face and start-room face.
+		[Vector3(-hx, 0, lz - lt), Vector3(-ld, 0, lz - lt), Vector3(0, 0, -1)],
+		[Vector3(ld, 0, lz - lt), Vector3(hx, 0, lz - lt), Vector3(0, 0, -1)],
+		[Vector3(-hx, 0, lz + lt), Vector3(-ld, 0, lz + lt), Vector3(0, 0, 1)],
+		[Vector3(ld, 0, lz + lt), Vector3(hx, 0, lz + lt), Vector3(0, 0, 1)],
+		# The VIP lounge.
+		[Vector3(-vx, 0, vz), Vector3(-vx, 0, -hz - 0.5), Vector3(1, 0, 0)],
+		[Vector3(vx, 0, vz), Vector3(vx, 0, -hz - 0.5), Vector3(-1, 0, 0)],
+		[Vector3(-vx, 0, vz), Vector3(vx, 0, vz), Vector3(0, 0, 1)],
+		[Vector3(-vx, 0, -hz - 0.5), Vector3(-door - 0.2, 0, -hz - 0.5), Vector3(0, 0, -1)],
+		[Vector3(door + 0.2, 0, -hz - 0.5), Vector3(vx, 0, -hz - 0.5), Vector3(0, 0, -1)],
 	]
 	for run: Array in runs:
 		var a: Vector3 = run[0]
@@ -247,21 +269,20 @@ func _walls() -> void:
 		_box_b(Vector3(length, 0.09, 0.1), mid + n * 0.06 + Vector3(0, 1.08, 0), basis, _brass_mat, "brass")
 		_box_b(Vector3(length, 0.22, 0.14), mid + n * 0.07 + Vector3(0, LuckyLounge.WALL_H - 0.2, 0), basis, _gold_mat, "gold")
 		# Gold mouldings frame the wallpaper between the rail and the ceiling, except where a
-		# window or door sits; the VIP back wall (behind the mezzanine) is handled on its own.
+		# window, door or doorway sits.
 		var count: int = maxi(1, int(length / 3.6))
 		var step: float = length / count
 		for i: int in count:
 			var c: Vector3 = a + dir * (step * (i + 0.5))
-			if _near_opening(c, 2.7) or (n.z > 0.5 and absf(c.x) < 10.0):
+			if step < 1.6 or _near_opening(c, 2.7):
 				continue
 			_box_b(Vector3(step - 0.7, 3.9, 0.04), c + n * 0.02 + Vector3(0, 3.6, 0), basis, _gold_mat, "gold")
 			_box_b(Vector3(step - 0.86, 3.74, 0.05), c + n * 0.035 + Vector3(0, 3.6, 0), basis, _velvet_mat, "velvet")
-	# VIP back wall: mouldings between the windows, above the mezzanine floor.
-	for x: float in [-9.0, 0.0, 9.0]:
-		if x == 0.0:
-			continue
-		_box(Vector3(2.4, 2.4, 0.04), Vector3(x, 5.4, -hz + 0.065), _gold_mat, "gold")
-		_box(Vector3(2.24, 2.24, 0.05), Vector3(x, 5.4, -hz + 0.08), _velvet_mat, "velvet")
+	# The crown moulding carries on over both doorways, on both faces.
+	for spec: Array in [[-hz, door], [-hz - 0.5, door], [lz - lt, ld], [lz + lt, ld]]:
+		var z: float = spec[0]
+		var n_z: float = 1.0 if (z == -hz or z == lz + lt) else -1.0
+		_box(Vector3(float(spec[1]) * 2.0, 0.22, 0.14), Vector3(0, LuckyLounge.WALL_H - 0.2, z + n_z * 0.07), _gold_mat, "gold")
 
 
 func _near_opening(p: Vector3, radius: float) -> bool:
@@ -273,6 +294,9 @@ func _near_opening(p: Vector3, radius: float) -> bool:
 		var c: Vector3 = d[0]
 		if Vector2(c.x, c.z).distance_to(Vector2(p.x, p.z)) < radius and absf(c.y - 1.0) < 2.0:
 			return true
+	for c: Vector3 in OPENINGS:
+		if Vector2(c.x, c.z).distance_to(Vector2(p.x, p.z)) < radius + 1.0:
+			return true
 	return false
 
 
@@ -281,7 +305,7 @@ func _ceiling() -> void:
 	_retexture_solid("Ceiling", _tex("coffered_ceiling", 2.6, Color(0.95, 0.88, 0.8), 0.5, 0.75))
 
 
-# --- Columns, mezzanine, stairs ---------------------------------------------------------------
+# --- Columns, VIP lounge ----------------------------------------------------------------------
 
 func _pillars() -> void:
 	# Classical round columns (Quaternius) on black marble plinths replace the plain cylinders;
@@ -301,65 +325,16 @@ func _pillars() -> void:
 		_box(Vector3(1.6, 0.06, 1.6), foot + Vector3(0, 0.53, 0), _brass_mat, "brass")
 
 
-func _mezzanine() -> void:
-	# Soffit and brass edge under the VIP floor, so the slab reads as a built balcony from the pit.
-	var y: float = LuckyLounge.MEZZ_Y
-	_box(Vector3(17.9, 0.02, 9.9), Vector3(0, y - 0.41, -5.0), _tex("coffered_ceiling", 2.0, Color(0.9, 0.84, 0.78), 0.4, 0.8), "soffit")
-	_box(Vector3(4.5, 0.02, 2.9), Vector3(11.0, y - 0.41, -3.0), _wood_mat, "wood")
-	_box(Vector3(18.1, 0.44, 0.06), Vector3(0, y - 0.2, 0.03), _wood_mat, "wood")
-	_box(Vector3(18.1, 0.1, 0.1), Vector3(0, y - 0.02, 0.05), _brass_mat, "brass")
-	_box(Vector3(0.06, 0.44, 3.1), Vector3(13.33, y - 0.2, -3.0), _wood_mat, "wood")
-	_box(Vector3(0.06, 0.44, 10.1), Vector3(-9.03, y - 0.2, -5.0), _wood_mat, "wood")
-	_box(Vector3(0.06, 0.44, 5.6), Vector3(9.03, y - 0.2, -7.25), _wood_mat, "wood")
-	_box(Vector3(0.06, 0.44, 1.6), Vector3(9.03, y - 0.2, -0.75), _wood_mat, "wood")
-	# Balusters under every handrail (the map's rails are an invisible guard + a gold bar).
-	var baluster := CylinderMesh.new()
-	baluster.top_radius = 0.025
-	baluster.bottom_radius = 0.025
-	baluster.height = 1.0
-	baluster.radial_segments = 6
-	for rail: Node3D in _solids("MezzRail") + _solids("LandingRail") + _solids("StairGuard"):
-		if not _kit_name(rail).ends_with("Bar"):
-			_balusters(rail, baluster)
-	# The VIP floor gets its own lamps: the single ceiling lamp left it dim.
-	for x: float in [-6.0, 6.0]:
-		var l: OmniLight3D = GreyboxKit.lamp(self, Vector3(x, y + 2.6, -5.0), 1.4, 8.0)
+func _vip_lounge() -> void:
+	# The VIP lounge gets its own lamps (the chandelier alone left its corners dim) and a red
+	# carpet runner from the door down the aisle between the tables.
+	for x: float in [-5.5, 5.5]:
+		var l: OmniLight3D = GreyboxKit.lamp(self, Vector3(x, 4.8, -21.0), 1.4, 9.0)
 		l.name = "VipLamp"
-	# Velvet rope across the two gate posts is not wanted (the bouncer handles entry); a red
-	# carpet runner leads from the gate to the tables instead.
-	var runner := _plane(Vector2(2.4, 7.0), Vector3(5.6, y + 0.013, -4.0), _carpet(Palette.VIP_BURGUNDY.lightened(0.05), Palette.VIP_BURGUNDY.darkened(0.2), 0.8))
+	var runner := _plane(Vector2(2.0, 6.4), Vector3(-0.4, 0.016, -19.4), _carpet(Palette.VIP_BURGUNDY.lightened(0.05), Palette.VIP_BURGUNDY.darkened(0.2), 0.8))
 	runner.name = "VipRunner"
-	runner.rotation.y = PI * 0.5
-
-
-## Vertical balusters every 0.3 m along a GreyboxKit beam (its local z runs along the rail).
-func _balusters(rail: Node3D, mesh: Mesh) -> void:
-	var shape: CollisionShape3D = null
-	for c: Node in rail.get_children():
-		if c is CollisionShape3D:
-			shape = c
-	if shape == null or not (shape.shape is BoxShape3D):
-		return
-	var size: Vector3 = (shape.shape as BoxShape3D).size
-	var count: int = maxi(1, int(size.z / 0.3))
-	for i: int in count + 1:
-		var local := Vector3(0, 0, -size.z * 0.5 + size.z * i / count)
-		var world: Vector3 = rail.to_global(local)
-		var bottom: float = world.y - size.y * 0.5
-		# Stair guards slope: drop the baluster to the step under it.
-		var height: float = size.y - 0.08
-		_add(&"baluster", mesh, _brass_mat, Transform3D(Basis().scaled(Vector3(1, height, 1)), Vector3(world.x, bottom + height * 0.5, world.z)))
-
-
-func _stairs() -> void:
-	# Brass nosings every 25 cm of rise read as steps on the carpeted slopes.
-	for flight: Array in LuckyLounge.STAIR_FLIGHTS:
-		var a: Vector3 = flight[0]
-		var b: Vector3 = flight[1]
-		var steps: int = int(round((b.y - a.y) / 0.25))
-		for i: int in range(1, steps + 1):
-			var p: Vector3 = a.lerp(b, float(i) / steps)
-			_box(Vector3(LuckyLounge.STAIRS_W, 0.03, 0.08), p + Vector3(0, 0.012, 0), _brass_mat, "brass")
+	for x: float in [-1.44, 0.64]:
+		_box(Vector3(0.1, 0.008, 6.4), Vector3(x, 0.018, -19.4), _brass_mat, "brass")
 
 
 # --- Furniture and props ----------------------------------------------------------------------
@@ -370,13 +345,11 @@ func _furniture() -> void:
 	_retexture_solid("ShopCounter", _marble_mat)
 	_retexture_solid("Bar", _velvet_mat)
 	_retexture_solid("BackBar", _wood_mat)
-	_retexture_solid("MezzFloor", _wood_mat)
-	_retexture_solid("MezzLanding", _wood_mat)
+	_retexture_solid("JailBench", _wood_mat)
 	_retexture_solid("Plinth", _marble_mat)
 	_retexture_solid("Rope", _velvet_mat)
-	# Marble bust and horse statue on short columns in the VIP corners.
-	var y: float = LuckyLounge.MEZZ_Y
-	for spec: Array in [[Vector3(-8.0, y, -9.0), &"bust", 0.9], [Vector3(8.0, y, -9.0), &"horse", 1.0]]:
+	# Marble bust and horse statue on short columns against the VIP lounge's side walls.
+	for spec: Array in [[Vector3(-8.2, 0.0, -21.0), &"bust", 0.9], [Vector3(8.2, 0.0, -21.0), &"horse", 1.0]]:
 		var pedestal: Node3D = PropModels.make(&"pedestal", 1.0)
 		pedestal.scale = Vector3(0.55, 1.0, 0.55)
 		pedestal.position = spec[0]
@@ -384,7 +357,7 @@ func _furniture() -> void:
 		add_child(pedestal)
 		var statue: Node3D = PropModels.make(spec[1], spec[2])
 		statue.position = spec[0] + Vector3(0, 1.0, 0)
-		statue.rotation.y = PI * 0.25 * (1.0 if spec[0].x < 0.0 else -1.0)
+		statue.rotation.y = PI * 0.5 * (1.0 if spec[0].x < 0.0 else -1.0)
 		add_child(statue)
 
 
@@ -443,7 +416,11 @@ func _art() -> void:
 		mirror.position = Vector3(x, 1.4, 15.62)
 		mirror.rotation.y = PI
 		add_child(mirror)
-	for spec: Array in [[Vector3(-21.75, 3.5, -7.5), Vector3(1, 0, 0)], [Vector3(-21.75, 3.5, 7.0), Vector3(1, 0, 0)], [Vector3(21.75, 3.5, -7.5), Vector3(-1, 0, 0)], [Vector3(21.75, 3.5, 11.0), Vector3(-1, 0, 0)]]:
+	for spec: Array in [
+		[Vector3(-21.75, 3.5, -7.5), Vector3(1, 0, 0)], [Vector3(-21.75, 3.6, 9.8), Vector3(1, 0, 0)],
+		[Vector3(21.75, 3.5, -7.5), Vector3(-1, 0, 0)], [Vector3(21.75, 3.5, 11.0), Vector3(-1, 0, 0)],
+		[Vector3(-8.75, 3.6, -18.4), Vector3(1, 0, 0)], [Vector3(8.75, 3.6, -18.4), Vector3(-1, 0, 0)],
+	]:
 		var n: Vector3 = spec[1]
 		var pic: Node3D = PropModels.make(&"picture", 0.0, 1.6)
 		pic.position = spec[0] + n * 0.1 - Vector3(0, 0.6, 0)
@@ -531,6 +508,10 @@ func _sconces() -> void:
 		var z: float = -hz + 3.0 + i * (2.0 * hz - 6.0) / 3.0
 		spots.append([Vector3(-hx, y, z), Vector3(1, 0, 0)])
 		spots.append([Vector3(hx, y, z), Vector3(-1, 0, 0)])
+	# The VIP lounge's side walls.
+	for z: float in [-23.6, -18.4]:
+		spots.append([Vector3(-LuckyLounge.VIP_X + 0.05, y, z), Vector3(1, 0, 0)])
+		spots.append([Vector3(LuckyLounge.VIP_X - 0.05, y, z), Vector3(-1, 0, 0)])
 	for s: Array in spots:
 		var p: Vector3 = s[0]
 		var n: Vector3 = s[1]

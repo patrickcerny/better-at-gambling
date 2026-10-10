@@ -216,8 +216,7 @@ func test_reactions_are_wired_to_results_and_slips() -> void:
 
 
 func test_fountain_splash_is_display_only() -> void:
-	assert_null(FountainSplash.spawn(scene.world_root, LuckyLounge.FOUNTAIN_POS, true), "no splash headless")
-	assert_null(FountainSplash.at_fountain(scene.world_root, Vector3(50, 0, 50), false))
+	assert_null(FountainSplash.spawn(scene.world_root, Vector3(0, FountainSplash.WATER_Y, 10), true), "no splash headless")
 	assert_eq(scene.world_root.find_children("FountainSplash*", "", true, false).size(), 0)
 
 

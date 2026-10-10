@@ -8,9 +8,10 @@ extends Control
 ## the same 1/2..1/4 of the window as the match and is upscaled with hard pixels, the blur kept
 ## narrow so the pixels stay pixels. Nothing is built when headless.
 
-## Camera loop over the casino floor (x, y, z), visited in order and wrapped.
+## Camera loop over the casino floor (x, y, z), visited in order and wrapped. It leaves and enters
+## the start room through the lobby doorway (x −2.75..2.75, under 4 m).
 const PATH: Array[Vector3] = [
-	Vector3(-8, 3.2, 12.5), Vector3(-1, 3.0, 6.5), Vector3(-16, 3.0, 7.0), Vector3(-19, 3.2, -3.0),
+	Vector3(-2, 3.2, 12.5), Vector3(-1, 3.0, 6.5), Vector3(-16, 3.0, 7.0), Vector3(-19, 3.2, -3.0),
 	Vector3(-14, 3.6, -11.0), Vector3(0, 3.2, -13.0), Vector3(14, 3.0, -12.0), Vector3(6, 2.6, 3.0),
 ]
 ## Seconds for one leg between two path points.
