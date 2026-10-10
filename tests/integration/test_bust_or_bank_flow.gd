@@ -1,7 +1,8 @@
 extends GutTest
 ## Bust or Bank through the real match server and intent schema: HIT / STAND go through
-## `bust_or_bank_action`, the snapshot carries the table, idle players are stood by the 20 s turn
-## timer, and the final hands reach the minigame ranking.
+## `bust_or_bank_action`, the snapshot carries the table (round, survivors, who is out), idle
+## players are stood by the 20 s turn timer, the elimination rounds play out and the placement
+## ranking (points = players outlasted) reaches the minigame ranking.
 
 var fx: ServerFixture
 
@@ -58,14 +59,28 @@ func test_hit_and_stand_through_the_intent_schema() -> void:
 	assert_gt(fx.of_type(&"bust_or_bank_turn").size(), 1)
 
 
-func test_idle_table_ends_by_timeouts_and_ranks_everyone() -> void:
+func test_idle_table_plays_elimination_rounds_and_ranks_everyone() -> void:
 	_start(0.0)
-	fx.run(BustOrBankLogic.INTRO_TIME + 3.0 * BustOrBankLogic.TURN_TIME + BustOrBankLogic.RESULT_TIME + 1.0)
-	assert_eq(fx.of_type(&"bust_or_bank_player_stood").size(), 3, "everyone auto-stood once")
-	assert_eq(fx.of_type(&"bust_or_bank_round_end").size(), 1)
+	var logic: BustOrBankLogic = _logic()
+	var waited: float = 0.0
+	while fx.of_type(&"minigame_finished").is_empty() and waited < BustOrBankLogic.GAME_CAP + 30.0:
+		fx.run(1.0)
+		waited += 1.0
+		if logic.round_no == 2 and logic.state == BustOrBankLogic.State.TURN and not logic.out_round.is_empty():
+			var mg: Dictionary = fx.server.get_snapshot()["minigame"]
+			assert_eq(int(mg["round"]), 2, "the snapshot knows the round")
+			assert_eq((mg["survivors"] as Array).size(), logic.alive.size())
+			assert_eq((mg["out"] as Dictionary).size(), logic.out_round.size(), "and who is out")
+			assert_false(mg.has("next_card"))
 	var done: Array[Dictionary] = fx.of_type(&"minigame_finished")
 	assert_eq(done.size(), 1)
+	var ends: Array[Dictionary] = fx.of_type(&"bust_or_bank_round_end")
+	assert_between(ends.size(), 1, 2, "3 players: at most 2 rounds")
+	assert_true(bool(ends.back()["final"]))
+	assert_eq(fx.of_type(&"bust_or_bank_finished").size(), 1)
 	var ranking: Array = done[0]["ranking"]
 	assert_eq(ranking.size(), 3)
 	assert_eq(int(ranking[0]["rank"]), 1)
+	assert_lte(int(ranking[0]["points"]), 2, "placement points: players outlasted")
+	assert_eq(int(ranking[2]["points"]), 0, "last place outlasted nobody")
 	assert_eq(Log.error_count, 0)

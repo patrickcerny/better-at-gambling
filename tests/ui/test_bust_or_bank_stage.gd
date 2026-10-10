@@ -1,7 +1,8 @@
 extends GutTest
 ## Bust or Bank stage fed by the real logic's events and snapshots (the schema contract): the table
 ## with everyone's seat, the current player highlighted with a countdown, HIT / STAND only on your
-## own turn, and the result view with the winner(s).
+## own turn, the round counter and who is out after each round (their seat dimmed, marked OUT),
+## and the final result with the winner(s) and the full order.
 
 var logic: BustOrBankLogic
 var stage: BustOrBankStage
@@ -173,33 +174,130 @@ func test_timeout_stand_is_announced() -> void:
 	assert_eq(stage.current, 2)
 
 
-func test_result_shows_every_hand_and_the_winner() -> void:
+## Ends the pause between rounds: the next round's intro.
+func _next_round() -> void:
+	logic.tick(BustOrBankLogic.RESULT_TIME + 0.01, 0.0)
+	_pump()
+
+
+func test_lowest_hand_is_announced_out_and_the_seat_dims() -> void:
 	_open([10, 5, 7, 9, 5])
 	_act(1, "hit")  # 19
 	_act(2, "hit")  # 10
 	_act(3, "stand")  # 7
 	_act(1, "stand")
 	_act(2, "stand")
-	assert_true(stage.over)
-	assert_eq(stage.winners, [1] as Array[int])
-	assert_eq(_seat_status(1), "WINNER")
-	assert_eq(_seat_status(2), "STOOD")
-	assert_eq((stage.seats[1]["style"] as StyleBoxFlat).border_color, Palette.VIP_GOLD)
-	assert_string_contains(stage.turn_label.text, "You win with 19")
-	assert_true(stage.result_grid.visible)
-	assert_eq(stage.result_grid.get_child_count(), 3, "every hand is listed")
-	assert_false(stage.countdown_label.visible)
+	assert_false(stage.over, "two are left: the game goes on")
+	assert_eq(stage.phase, BustOrBankLogic.State.RESULT)
+	assert_eq(stage.banner.text, "Lowest hand (7): Cy is out")
+	assert_eq(stage.turn_label.text, "Cy is out!")
+	assert_eq(_seat_status(3), "OUT · R1")
+	assert_lt((stage.seats[3]["panel"] as Control).modulate.a, 0.6, "dimmed")
+	assert_eq(stage.round_label.text, "ROUND 1 · 2 left")
+	assert_eq(stage.survivors, [1, 2] as Array[int])
+	assert_string_contains(stage.prompt_label.text, "still in")
 	assert_true(stage.hit_button.disabled)
-	assert_string_contains(stage.prompt_label.text, "#1")
-	assert_eq(_faces(stage.seats[2]["cards"]), _cards([5, 5]))
+	_next_round()
+	assert_eq(stage.round_label.text, "ROUND 2 · 2 left")
+	assert_eq(stage.phase, BustOrBankLogic.State.INTRO)
+	assert_string_contains(stage.banner.text, "Round 2")
+	assert_eq(_faces(stage.seats[1]["cards"]), [] as Array[int], "fresh hands")
+	assert_eq(_faces(stage.seats[3]["cards"]), _cards([7]), "the eliminated hand stays on show")
+	assert_eq(_seat_status(3), "OUT · R1")
 
 
-func test_tied_winners_share() -> void:
-	_open([10, 10, 5])
+func test_a_bust_is_announced_out() -> void:
+	_open([10, 5, 7, 10, 10])
+	_act(1, "hit")  # 20
+	_act(2, "hit")  # 15
+	_act(3, "stand")  # 7
+	logic.shoe.stack_top(_cards([5, 2]))
+	_act(1, "hit")  # 25: bust
+	_act(2, "hit")  # 17
+	_act(2, "stand")
+	assert_eq(stage.turn_label.text, "You are out!")
+	assert_string_contains(stage.banner.text, "Bust")
+	assert_eq(_seat_status(1), "OUT · R1")
+	assert_string_contains(stage.prompt_label.text, "You're out (round 1)")
+
+
+func test_a_tie_for_everyone_is_replayed() -> void:
+	_open([10, 10, 10])
 	_act(1, "stand")
 	_act(2, "stand")
 	_act(3, "stand")
-	assert_eq(stage.winners, [1, 2] as Array[int])
+	assert_false(stage.over)
+	assert_eq(stage.banner.text, "Everyone tied: play again!")
+	assert_eq(stage.turn_label.text, "Nobody is out!")
+	assert_eq(stage.round_label.text, "ROUND 1 · 3 left")
+	for p: int in [1, 2, 3]:
+		assert_ne(_seat_status(p), "OUT · R1")
+
+
+func test_an_eliminated_player_watches_the_next_round() -> void:
+	_open([5, 10, 9])
+	_act(1, "stand")
+	_act(2, "stand")
+	_act(3, "stand")  # 1 is out (5)
+	_next_round()
+	logic.shoe.stack_top(_cards([10, 9]))
+	logic.tick(BustOrBankLogic.INTRO_TIME, 0.0)
+	_pump()
+	assert_eq(stage.current, 2, "round 2 starts one seat further")
+	assert_eq(stage.turn_label.text, "BO'S TURN")
+	assert_false(stage.can_act())
+	assert_true(stage.hit_button.disabled)
+	stage.hit_button.pressed.emit()
+	assert_eq(sent.size(), 0, "spectators can't act")
+	assert_string_contains(stage.prompt_label.text, "You're out (round 1)")
+	assert_eq(_seat_status(1), "OUT · R1")
+	assert_eq(_seat_status(2), "TURN")
+	assert_eq(stage.round_label.text, "ROUND 2 · 2 left")
+
+
+func test_final_result_shows_the_winner_and_the_full_order() -> void:
+	_open([10, 5, 7])
+	_act(1, "stand")
+	_act(2, "stand")
+	_act(3, "stand")  # 2 out (5)
+	_next_round()
+	logic.shoe.stack_top(_cards([9, 10]))  # round 2 deals 3 then 1
+	logic.tick(BustOrBankLogic.INTRO_TIME, 0.0)
+	_pump()
+	_act(3, "stand")
+	_act(1, "stand")  # 3 out (9)
+	assert_true(stage.over)
+	assert_eq(stage.winners, [1] as Array[int])
+	assert_eq(stage.turn_label.text, "You win!")
+	assert_eq(stage.banner.text, "You win Bust or Bank!")
+	assert_eq(stage.round_label.text, "FINAL")
+	assert_eq(_seat_status(1), "WINNER")
+	assert_eq(_seat_status(2), "OUT · R1")
+	assert_eq(_seat_status(3), "OUT · R2")
+	assert_eq((stage.seats[1]["style"] as StyleBoxFlat).border_color, Palette.VIP_GOLD)
+	assert_true(stage.result_grid.visible)
+	assert_eq(stage.result_grid.get_child_count(), 3, "everyone is listed")
+	var rows: Array[String] = []
+	for l: Node in stage.result_grid.get_children():
+		rows.append((l as Label).text)
+	assert_eq(rows, ["#1  You  WINNER", "#2  Cy  OUT R2", "#3  Bo  OUT R1"] as Array[String])
+	assert_false(stage.countdown_label.visible)
+	assert_true(stage.hit_button.disabled)
+	assert_string_contains(stage.prompt_label.text, "#1")
+
+
+func test_tied_survivors_share_the_win_at_the_round_limit() -> void:
+	_open([10, 10, 10])
+	for p: int in [1, 2, 3]:
+		_act(p, "stand")
+	_next_round()
+	logic.shoe.stack_top(_cards([9, 9, 9]))
+	logic.tick(BustOrBankLogic.INTRO_TIME, 0.0)
+	_pump()
+	for p: int in [2, 3, 1]:
+		_act(p, "stand")
+	assert_true(stage.over)
+	assert_eq(stage.winners, [1, 2, 3] as Array[int])
 	assert_eq(_seat_status(2), "WINNER")
 	assert_string_contains(stage.turn_label.text, "share the win")
 
@@ -250,3 +348,56 @@ func test_a_player_leaving_mid_turn_loses_their_seat() -> void:
 	assert_false((stage.seats[2]["panel"] as Control).visible)
 	assert_eq(stage.current, 3)
 	assert_eq(stage.turn_label.text, "CY'S TURN")
+
+
+func test_snapshot_catches_up_in_a_later_round_with_spectators() -> void:
+	_open([10, 5, 7])
+	for p: int in [1, 2, 3]:
+		_act(p, "stand")  # 2 out (5)
+	_next_round()
+	logic.shoe.stack_top(_cards([9, 10]))
+	logic.tick(BustOrBankLogic.INTRO_TIME + 2.0, 0.0)
+	_pump()
+	var late: BustOrBankStage = BustOrBankStage.new()
+	late.send_intent = func(_i: Dictionary) -> Dictionary: return {"ok": true}
+	add_child_autofree(late)
+	var st := ClientMatchState.new()
+	st.players = {1: {"id": 1, "name": "Me", "color": 0}, 2: {"id": 2, "name": "Bo", "color": 1}, 3: {"id": 3, "name": "Cy", "color": 2}}
+	late.begin(st, 2, {"minigame": &"bust_or_bank", "players": [1, 2, 3]}, logic.get_public_state())
+	assert_eq(late.round_no, 2)
+	assert_eq(late.survivors, [1, 3] as Array[int])
+	assert_eq(late.out_round, {2: 1})
+	assert_eq(late.round_label.text, "ROUND 2 · 2 left")
+	assert_eq(late.current, 3)
+	assert_false(late.can_act(), "out: watching")
+	assert_string_contains(late.prompt_label.text, "You're out (round 1)")
+	assert_eq(str((late.seats[2]["panel"] as Control).get_meta("status", "")), "OUT · R1")
+	assert_eq(_faces(late.seats[2]["cards"]), _cards([5]), "their last hand")
+	assert_eq(_faces(late.seats[3]["cards"]), _cards([9]))
+
+
+func test_snapshot_between_rounds_and_after_the_end() -> void:
+	_open([10, 5, 7])
+	for p: int in [1, 2, 3]:
+		_act(p, "stand")  # 2 out (5)
+	var mid: BustOrBankStage = BustOrBankStage.new()
+	add_child_autofree(mid)
+	var st := ClientMatchState.new()
+	st.players = {1: {"id": 1, "name": "Me", "color": 0}, 2: {"id": 2, "name": "Bo", "color": 1}, 3: {"id": 3, "name": "Cy", "color": 2}}
+	mid.begin(st, 1, {"minigame": &"bust_or_bank", "players": [1, 2, 3]}, logic.get_public_state())
+	assert_false(mid.over)
+	assert_eq(mid.turn_label.text, "Bo is out!")
+	assert_eq(mid.round_label.text, "ROUND 1 · 2 left")
+	_next_round()
+	logic.shoe.stack_top(_cards([9, 10]))
+	logic.tick(BustOrBankLogic.INTRO_TIME, 0.0)
+	_pump()
+	_act(3, "stand")
+	_act(1, "stand")
+	var done: BustOrBankStage = BustOrBankStage.new()
+	add_child_autofree(done)
+	done.begin(st, 3, {"minigame": &"bust_or_bank", "players": [1, 2, 3]}, logic.get_public_state())
+	assert_true(done.over)
+	assert_eq(done.winners, [1] as Array[int])
+	assert_eq(done.result_grid.get_child_count(), 3)
+	assert_eq(done.prompt_label.text, "You finished #2")
