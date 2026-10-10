@@ -232,11 +232,8 @@ func _released(ev: Dictionary) -> void:
 	if pid != scene.local_id or busy or scene.curtain_left == null:
 		_walk_out(pid, out)
 		return
-	var tw: Tween = scene.create_tween()
-	scene.curtain_tween = tw
-	tw.tween_method(scene._set_curtain, scene.curtain_open, 0.0, MatchScene.CURTAIN_TIME * scene.curtain_open)
-	tw.tween_callback(_walk_out.bind(pid, out))
-	tw.tween_method(scene._set_curtain, 0.0, 1.0, MatchScene.CURTAIN_TIME)
+	# Same close / hold / open sequence as the minigame curtain, titled for the release.
+	scene._curtain_sequence("Released", "JAIL", 0.0, _walk_out.bind(pid, out))
 
 
 func _walk_out(pid: int, out: Vector3) -> void:
