@@ -46,6 +46,27 @@ func test_four_tabs_and_one_page_at_a_time() -> void:
 			assert_eq(panel.tab_buttons[j].button_pressed, i == j)
 
 
+## Patrick: "the selected tab should look lit, not darker".
+func test_the_selected_tab_looks_lit() -> void:
+	panel.open(false)
+	panel.select_tab(1)
+	await wait_process_frames(1)
+	var b: Button = panel.tab_buttons[1]
+	var lit: StyleBoxFlat = b.get_theme_stylebox(&"pressed") as StyleBoxFlat
+	var dim: StyleBoxFlat = b.get_theme_stylebox(&"normal") as StyleBoxFlat
+	assert_not_null(lit)
+	assert_not_null(dim)
+	if lit == null or dim == null:
+		return
+	assert_gt(lit.bg_color.get_luminance(), dim.bg_color.get_luminance() + 0.05, "selected is brighter than the others")
+	assert_gt(lit.shadow_size, 0, "with a glow")
+	assert_eq(b.get_theme_color(&"font_pressed_color"), Palette.VIP_GOLD, "gold text when selected")
+	assert_lt(b.get_theme_color(&"font_color").a, 1.0, "the other tabs' text is dimmed")
+	assert_eq(b.get_theme_stylebox(&"hover_pressed"), lit, "hovering the selected tab keeps it lit")
+	for other: Button in panel.tab_buttons:
+		assert_eq(other.get_theme_stylebox(&"pressed"), other.get_theme_stylebox(&"hover_pressed"))
+
+
 func test_back_and_resume_sit_at_the_bottom() -> void:
 	panel.open(false)
 	await wait_process_frames(1)

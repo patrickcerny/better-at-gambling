@@ -20,6 +20,9 @@ var last_call_announced: bool = false
 var waiting_external: bool = false
 ## Seconds everyone waits in the entrance hall after the rewards (`BalanceConfig.regroup_time`).
 var regroup_seconds: float = 5.0
+## `MatchMode.MINIGAMES`: no casino. INTRO and each REGROUP lead straight into the next minigame,
+## the last REGROUP into RESULTS; casino time never advances.
+var minigames_only: bool = false
 
 
 func _init(p_schedule: MatchSchedule, p_regroup_seconds: float = 5.0) -> void:
@@ -41,7 +44,10 @@ func advance(delta: float) -> Array[StringName]:
 		Phase.Id.INTRO:
 			phase_timer -= delta
 			if phase_timer <= 0.0:
-				_go(Phase.Id.CASINO)
+				if minigames_only:
+					_next_minigame_or_results(out)
+				else:
+					_go(Phase.Id.CASINO)
 		Phase.Id.CASINO:
 			casino_time += delta
 			if not last_call_announced and schedule.is_last_call(casino_time):
@@ -69,7 +75,10 @@ func advance(delta: float) -> Array[StringName]:
 		Phase.Id.REGROUP:
 			phase_timer -= delta
 			if phase_timer <= 0.0:
-				_go(Phase.Id.CASINO)
+				if minigames_only:
+					_next_minigame_or_results(out)
+				else:
+					_go(Phase.Id.CASINO)
 		Phase.Id.MINIGAME, Phase.Id.REWARDS:
 			pass  # waits for minigame_finished / rewards_finished
 	return out
@@ -107,6 +116,18 @@ func next_minigame_in() -> float:
 	if minigames_done >= schedule.minigames:
 		return INF
 	return maxf(schedule.minigame_times()[minigames_done] - casino_time, 0.0)
+
+
+## Minigames only: straight into the next minigame, or the results once all were played.
+func _next_minigame_or_results(out: Array[StringName]) -> void:
+	if minigames_done >= schedule.minigames:
+		_go(Phase.Id.RESULTS)
+		out.append(&"match_over")
+		return
+	_go(Phase.Id.MINIGAME)
+	waiting_external = true
+	out.append(&"segment_ended")
+	out.append(&"minigame_started")
 
 
 func _go(to: Phase.Id) -> void:

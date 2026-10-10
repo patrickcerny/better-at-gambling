@@ -5,8 +5,13 @@ extends NetTransport
 ## countable and lets tests wrap the pipe with `DelayedTransport`.
 
 const CHANNELS: int = 4
-## Peer timeout (§2.12: 10 s).
+## Peer timeout in a match (§2.12: 10 s).
 const TIMEOUT_MS: int = 10000
+## Peer timeout while a client is still loading the match (Patrick: "Slow PCs can get kicked
+## while loading"): a slow PC can block its main thread, and with it ENet, for well over 10 s while
+## the casino builds. Every new peer starts with this; `set_peer_timeout` tightens it to
+## `TIMEOUT_MS` once the client says it has loaded (`Protocol.Msg.LOADED`).
+const LOADING_TIMEOUT_MS: int = 30000
 
 var peer: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
 var _server: bool = false
@@ -105,8 +110,16 @@ func peer_rtt_ms(id: int) -> float:
 	return pp.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME) if pp != null else 0.0
 
 
+func set_peer_timeout(id: int, timeout_ms: int) -> void:
+	if peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+		return
+	var p: ENetPacketPeer = peer.get_peer(id)
+	if p != null and p.get_state() == ENetPacketPeer.STATE_CONNECTED:
+		p.set_timeout(32, timeout_ms / 2, timeout_ms)
+
+
 func _on_peer_connected(id: int) -> void:
 	var p: ENetPacketPeer = peer.get_peer(id)
 	if p != null:
-		p.set_timeout(32, TIMEOUT_MS / 2, TIMEOUT_MS)
+		p.set_timeout(32, LOADING_TIMEOUT_MS / 2, LOADING_TIMEOUT_MS)
 	peer_connected.emit(id)

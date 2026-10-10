@@ -28,7 +28,8 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
 | `--practice`, `--autoplay [--autoplay-variant 1 \| --autoplay-script thrower\|victim]` | practice match / scripted local player |
 | `--server --port P [--dummies N --minigames N --gamble-minutes M --gamble-seconds S --seed N --timescale X --min-players N --empty-timeout S]` | headless dedicated room server (dev mode trusts client names) |
 | `… --room-id ID --room-code CODE --room-secret S --orchestrator URL --build B` | added by the orchestrator: verify join tokens, heartbeats, close when empty |
-| `--connect host:port --name N [--uid U --color C --hat H --build B]` | join a server directly (dev/tests) |
+| `--connect host:port --name N [--uid U --color C --hat H --build B]` | join a server directly (dev/tests only; the menu has no join-by-address) |
+| `--mode casino\|minigames` | match mode for `--server` rooms (the lobby leader can change it) and Practice |
 | `--orchestrator URL --create-room \| --join-code CODE` | create/join a party through the orchestrator |
 | `--net-latency MS --net-loss P [--net-seed N]` | wrap the client transport in `DelayedTransport` |
 | `--quit-after-results`, `--quit-on-disconnect` | scripted clients exit instead of returning to the menu |
@@ -66,11 +67,25 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
   `REACH + LAG_SLACK`. Own chip pickups are predicted (chips fly in, "+$X") and drop back after
   1.5 s without `chips_collected`; the host alone decides pickups and money.
 * **Lobby:** `LobbyController` on the server: leader = longest-connected human, ready = own pad or
-  the panel toggle, everyone ready and ≥ 2 participants → 3 s countdown → `start_match`.
+  the panel toggle, everyone ready and ≥ 2 participants → 3 s countdown → `start_match`. Leader-only
+  settings: minigames, gambling minutes, items, `mode` (`MatchMode`: casino / minigames only) and
+  `public` (listed in the server browser through the heartbeat's `public`/`name`/`mode`).
+* **Kick:** the leader's `kick_player {target}` → `player_kicked {player, by}`, `RoomHost.kick_player`
+  sends `REJECT kicked` ("You were kicked by the host") and drops the peer; in the lobby the player is
+  removed (`player_removed`), in a match they stay away. The room refuses that uid for
+  `Protocol.KICK_REJOIN_SECONDS` (60 s, `REJECT kick_cooldown`); the orchestrator knows nothing of kicks.
+* **Late join:** new players are admitted in the lobby and in a running match (only RESULTS refuses,
+  `room_in_progress`; the orchestrator mirrors it). A late joiner gets the start money, spawns in the
+  entrance hall with spawn protection, gets the full snapshot in WELCOME, sits out a minigame already
+  running ("Joining next round") and plays the next one.
+* **Loading timeout:** ENet peers start with a 30 s timeout (`LOADING_TIMEOUT_MS`) so a slow PC can
+  build the casino; the client sends `LOADED` when its match scene is ready and both ends drop to the
+  normal 10 s. `CONNECT_TIMEOUT` (connect → WELCOME) is 30 s too.
 
 ## Match flow, minigames and rewards (M4)
 * **Phases:** `PhaseMachine` (LOBBY → INTRO → CASINO ⇄ PRE_MINIGAME → MINIGAME → REWARDS → … →
-  RESULTS). Casino time only advances in CASINO and PRE_MINIGAME, so quizzes land exactly on the
+  RESULTS). Minigames-only mode: LOBBY → INTRO → (MINIGAME → REWARDS → REGROUP) × N → RESULTS, no
+  casino time, items off. Casino time only advances in CASINO and PRE_MINIGAME, so quizzes land exactly on the
   `MatchSchedule` (5 min: 1:40 and 3:20). Last Call ×1.5 is the stations' global multiplier for the
   final 60 s.
 * **Casino rules on the server:** `HotTableDirector` (a random station ×1.25 for 30 s every 45–60 s

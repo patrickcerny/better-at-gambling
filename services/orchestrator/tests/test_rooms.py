@@ -69,13 +69,16 @@ def test_room_full_counts_heartbeat_players_and_pending_tokens(make_harness) -> 
     assert h.join("dave", room_code=room["room_code"]).status_code == 200
 
 
-def test_room_in_progress_rejects_new_but_admits_reconnecting_member(h: Harness) -> None:
+def test_running_match_admits_late_joiners_results_screen_does_not(h: Harness) -> None:
     room = h.create().json()
     rid = room["room_id"]
     bob = h.join("bob", room_code=room["room_code"]).json()
     assert h.verify(rid, bob["join_token"]).status_code == 200  # bob becomes a member
     h.heartbeat(rid, phase="match", players=2)
     r = h.join("carol", room_code=room["room_code"])
+    assert r.status_code == 200, "a running match is joinable by code (late join)"
+    h.heartbeat(rid, phase="results", players=2)
+    r = h.join("dave", room_code=room["room_code"])
     assert r.status_code == 409 and r.json()["error"] == "room_in_progress"
     r = h.join("bob", room_code=room["room_code"])
     assert r.status_code == 200, r.text
@@ -90,7 +93,7 @@ def test_reconnecting_member_admitted_even_when_full(make_harness) -> None:
     h.verify(room["room_id"], room["join_token"])
     h.heartbeat(room["room_id"], phase="match", players=1, player_uids=["dev:alice"])
     assert h.join("alice", room_code=room["room_code"]).status_code == 200
-    assert h.join("bob", room_code=room["room_code"]).json()["error"] == "room_in_progress"
+    assert h.join("bob", room_code=room["room_code"]).json()["error"] == "room_full"
 
 
 def test_closing_room_not_joinable_even_for_members(h: Harness) -> None:

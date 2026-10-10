@@ -2,6 +2,8 @@ extends GutTest
 ## Main menu (Patrick's playtest notes): the logo and entries are centred; PLAY ONLINE, PRACTICE,
 ## TUTORIAL, QUIT; the settings sit behind a small gear in the bottom-right corner; no "Host on
 ## this PC" or "Rejoin last party"; TUTORIAL opens the how-to-play pages and BACK returns.
+## PLAY ONLINE has no join-by-address and a server browser (Browse Parties); PRACTICE offers a
+## casino match or MINIGAMES ONLY with a note on the minigames a solo player can't play.
 
 var menu: Control
 
@@ -68,6 +70,64 @@ func test_no_host_on_this_pc_or_rejoin() -> void:
 	assert_false(menu.has_method(&"_host_local"))
 	assert_false(menu.has_method(&"_rejoin_last"))
 	assert_true("Create Party" in _texts(menu), "the online form is still there")
+
+
+func test_no_join_by_ip_and_port() -> void:
+	menu.call(&"_show_online")
+	await wait_process_frames(1)
+	for e: Node in menu.find_children("*", "LineEdit", true, false):
+		var hint: String = (e as LineEdit).placeholder_text.to_lower()
+		assert_false(hint.contains("host") or hint.contains("port") or hint.contains(":"), "no address field: %s" % hint)
+	for t: String in _texts(menu):
+		assert_ne(t, "Connect", "no direct Connect button")
+	assert_false(menu.has_method(&"_join_ip"))
+
+
+func test_browse_parties_lists_name_players_phase_and_join() -> void:
+	menu.call(&"_show_online")
+	var browse: Button = menu.find_child("BrowseParties", true, false) as Button
+	assert_not_null(browse, "Browse Parties under PLAY ONLINE")
+	if browse == null:
+		return
+	browse.pressed.emit()
+	await wait_process_frames(1)
+	assert_true(menu.browser_box.visible)
+	menu.fill_browser([
+		{"room_id": "r1", "room_code": "ABCDE", "name": "Patrick's party", "players": 3, "max_players": 8, "phase": "match", "mode": "casino", "joinable": true},
+		{"room_id": "r2", "room_code": "FGHJK", "name": "Chip's party", "players": 2, "max_players": 8, "phase": "results", "mode": "minigames", "joinable": false},
+	])
+	await wait_process_frames(1)
+	assert_eq(menu.browser_list.get_child_count(), 2)
+	var first: Node = menu.browser_list.get_node("PartyABCDE")
+	var labels: PackedStringArray = []
+	for l: Node in first.find_children("*", "Label", true, false):
+		labels.append((l as Label).text)
+	assert_true("Patrick's party" in labels, str(labels))
+	assert_true("3/8" in labels, str(labels))
+	assert_true("PLAYING" in labels, "running matches are listed (late join)")
+	assert_false((first.find_child("Join", true, false) as Button).disabled)
+	var second: Node = menu.browser_list.get_node("PartyFGHJK")
+	assert_true((second.find_child("Join", true, false) as Button).disabled, "results screen: not joinable")
+	assert_string_contains((second.find_child("Phase", true, false) as Label).text, "MINIGAMES")
+	menu.fill_browser([])
+	await wait_process_frames(1)
+	assert_eq(menu.browser_list.get_child_count(), 0)
+	assert_string_contains(menu.browser_status.text, "No public parties")
+
+
+func test_practice_offers_casino_or_minigames_only() -> void:
+	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
+	await wait_process_frames(1)
+	assert_true(menu.practice_box.visible, "PRACTICE opens its choice")
+	assert_false((menu.get_node("Center/Column/VBox") as Control).visible)
+	assert_not_null(menu.practice_box.find_child("CasinoMatch", true, false))
+	assert_not_null(menu.practice_box.find_child("MinigamesOnly", true, false))
+	var note: String = menu.call(&"practice_note")
+	assert_string_contains(note, "Casino Quiz", "what a solo player gets")
+	assert_string_contains(note, "Bust or Bank (2+)", "the 2+ player minigames get a note")
+	var before: int = menu.practice_count
+	menu.call(&"_step_practice_count", 1)
+	assert_eq(menu.practice_count, mini(before + 1, Registry.presets.max_minigames))
 
 
 func test_tutorial_pages_and_back() -> void:

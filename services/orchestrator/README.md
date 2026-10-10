@@ -96,11 +96,27 @@ Body `{"ticket": str, "build": str, "display_name"?: str}` →
 ### `POST /v1/rooms/join`
 Body `{"ticket", "build", "display_name"?, "room_code"? | "room_id"?}` (code is case-insensitive) →
 `200 {"room_id", "room_code", "host", "port", "join_token"}`.
-Errors: `404 room_not_found` (unknown, closing or dying), `409 room_full`, `409 room_in_progress`,
-plus the auth/version/rate errors above. A room still `starting` is joinable (the client retries the UDP connect).
+Errors: `404 room_not_found` (unknown, closing or dying), `409 room_full`, `409 room_in_progress`
+(the room is on its **results** screen; lobbies and running matches take new players, who join the match
+late and play from the next minigame), plus the auth/version/rate errors above. A room still `starting`
+is joinable (the client retries the UDP connect).
 A **reconnecting member** (uid previously verified in this room, or listed in a heartbeat's `player_uids`)
 is always admitted while the room is `starting`/`running`, regardless of phase or fullness.
 Fullness = heartbeat `players` + unexpired join tokens of players not in `player_uids`.
+
+### `GET /v1/rooms?public=1[&build=<BUILD_ID>]` (server browser)
+`200 {"rooms": [{"room_id", "room_code", "name", "players", "max_players", "phase", "mode", "joinable"}], "max_players"}`:
+running rooms whose leader switched **PUBLIC** on in the lobby (reported by heartbeat), joinable ones first,
+then fuller ones. `phase` is `lobby`/`match`/`results`; `mode` is `casino` or `minigames`; `joinable` is false
+on the results screen or when full. Join one with `POST /v1/rooms/join {"room_id"}`. Without `public=1` →
+`400 bad_request` (private rooms are never listed); a `build` other than `BUILD_ID` → `426 version_mismatch`.
+Rate-limited per IP like the other public calls. Room secrets and join tokens never appear here.
+
+### Kicks
+The party leader can kick a player from the lobby panel. The **room** enforces the 60 s rejoin block
+(`MatchServer.kick_blocked_for`, checked when the client says hello): the orchestrator still issues the
+kicked player a join token (they are a room member), the game server refuses it with
+`REJECT kick_cooldown`. Nothing about kicks is stored here.
 
 ### `GET /v1/status` → `{"build", "rooms", "max_rooms", "auth_mode"}` · `GET /healthz` → `{"ok": true}`
 
@@ -128,7 +144,7 @@ know the room, e.g. it restarted — **the game server must shut down**), `400 b
 | Call | Body | Response |
 |---|---|---|
 | `POST /v1/internal/verify` — on **every** client connect (from `hello`) | `{"room_id", "room_secret", "join_token"}` | `200 {"player_uid", "steam_id", "display_name"}` (`steam_id` == `player_uid`); `403 bad_token` if unknown, used, expired or for another room. Tokens are single-use; success records the uid as a room member (for reconnects). |
-| `POST /v1/internal/heartbeat` — **every 5 s**, first one as soon as the ENet port is listening | `{"room_id", "room_secret", "phase": "lobby"\|"match"\|"results", "players": int, "player_uids"?: [str]}` | `200 {"ok": true}`. First heartbeat: `starting → running`. `phase != "lobby"` blocks new (non-member) joins. |
+| `POST /v1/internal/heartbeat` — **every 5 s** (and right after the leader changes a lobby setting), first one as soon as the ENet port is listening | `{"room_id", "room_secret", "phase": "lobby"\|"match"\|"results", "players": int, "player_uids"?: [str], "public"?: bool, "name"?: str, "mode"?: "casino"\|"minigames"}` | `200 {"ok": true}`. First heartbeat: `starting → running`. `phase == "results"` blocks new (non-member) joins. `public`/`name`/`mode` feed the server browser (`name` is cleaned to 40 printable chars). |
 | `POST /v1/internal/closing` — before exiting on its own (e.g. empty for 120 s) | `{"room_id", "room_secret", "reason": str}` | `200 {"ok": true}`; room becomes `closing` (not joinable) and is reaped when the process exits. |
 
 Timeouts: no first heartbeat within `STARTUP_TIMEOUT` (20 s) or no heartbeat for `HEARTBEAT_TIMEOUT`

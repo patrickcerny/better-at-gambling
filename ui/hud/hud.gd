@@ -190,7 +190,8 @@ func _update_countdowns() -> void:
 	var regroup: bool = state.phase == Phase.Id.REGROUP and state.regroup_in >= 0.0
 	minigame_warning.visible = warn or regroup
 	if regroup:
-		minigame_warning.text = "Everyone back in the hall!  Doors open in %d…" % maxi(ceili(state.regroup_in), 1)
+		var next: String = "Next minigame in %d…" if MatchMode.is_minigames_only(state.lobby_settings) else "Everyone back in the hall!  Doors open in %d…"
+		minigame_warning.text = next % maxi(ceili(state.regroup_in), 1)
 	elif warn:
 		var sec: int = ceili(maxf(nm, 0.0))
 		minigame_warning.text = "MINIGAME in %d…  Tables closing!" % sec

@@ -1,6 +1,7 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|shop|rewards|settings|controls|pause|tutorial|online` over the blurred casino panorama:
+## `--panel lobby|shop|rewards|settings|controls|pause|tutorial|online|browser|practice|joining`
+## over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Big Wendy", "Snake Eyes"]
@@ -63,6 +64,23 @@ func _ready() -> void:
 			add_child(menu)
 			menu.call(&"_show_online")
 			menu.call(&"_set_status", "Room codes have 5 letters.", true)
+		"browser":
+			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
+			add_child(menu)
+			menu.call(&"_hide_boxes")
+			menu.browser_box.visible = true
+			menu.call(&"fill_browser", [
+				{"room_id": "a", "room_code": "KX7PQ", "name": "Patrick's party", "players": 5, "max_players": 8, "phase": "match", "mode": "casino", "joinable": true},
+				{"room_id": "b", "room_code": "HN4TW", "name": "Big Wendy's party", "players": 2, "max_players": 8, "phase": "lobby", "mode": "minigames", "joinable": true},
+				{"room_id": "c", "room_code": "M2RZD", "name": "Snake Eyes's party", "players": 8, "max_players": 8, "phase": "lobby", "mode": "casino", "joinable": false},
+				{"room_id": "d", "room_code": "Q8VCE", "name": "Chip's party", "players": 3, "max_players": 8, "phase": "results", "mode": "casino", "joinable": false},
+			])
+		"practice":
+			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
+			add_child(menu)
+			menu.call(&"_show_practice")
+		"joining":
+			Loading.begin("JOINING KX7PQ")
 
 
 func _state() -> ClientMatchState:
@@ -70,7 +88,7 @@ func _state() -> ClientMatchState:
 	st.room_mode = true
 	st.leader = 1
 	st.countdown = -1.0
-	st.lobby_settings = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true}
+	st.lobby_settings = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "mode": &"casino", "public": true}
 	for i: int in NAMES.size():
 		var pid: int = i + 1
 		st.players[pid] = {"id": pid, "name": NAMES[i], "color": i, "ready": i % 2 == 0, "skin": "bean", "connected": i != 3, "inventory": []}

@@ -12,6 +12,10 @@ signal resumed
 signal leave_requested
 signal quit_requested
 
+## In-game settings panel bottom, from the screen centre (1080-high canvas: ends 230 px above the
+## bottom edge, above the HUD's item bar).
+const SETTINGS_BOTTOM: float = 310.0
+
 var panel: PanelContainer
 var settings: SettingsPanel
 var resume_button: Button
@@ -66,6 +70,10 @@ func _ready() -> void:
 	settings = SettingsPanel.new()
 	settings.name = "Settings"
 	add_child(settings)
+	# Patrick: "the settings panel touches the item bar". In game it sits higher and a little
+	# shorter, so its bottom edge stays clear of the item slots at the bottom of the HUD.
+	settings.offset_top = -470
+	settings.offset_bottom = SETTINGS_BOTTOM
 	settings.closed.connect(_on_settings_closed)
 	settings.resume_requested.connect(resume)
 

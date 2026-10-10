@@ -7,8 +7,10 @@ extends RefCounted
 const COUNTDOWN_SECONDS: float = 3.0
 
 ## Host settings shown on the board and the 2D panel: match length as a number of minigames and
-## the gambling minutes before each one (Patrick's note #12), items on/off, quiz category.
-var settings: Dictionary = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "quiz_category": &"all"}
+## the gambling minutes before each one (Patrick's note #12), items on/off, quiz category, the
+## party mode (`MatchMode`: casino or minigames only) and whether the party is listed in the
+## server browser (`public`).
+var settings: Dictionary = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "quiz_category": &"all", "mode": MatchMode.CASINO, "public": false}
 ## Defaults and bounds for the match length (data/balance/match_presets.tres).
 var presets: MatchPresets = MatchPresets.new()
 ## Seconds left on the start countdown (-1 when not counting).
@@ -120,6 +122,14 @@ func set_setting(player: int, key: String, value: Variant) -> StringName:
 			settings["items_enabled"] = bool(value)
 		"quiz_category":
 			settings["quiz_category"] = StringName(value)
+		"mode":
+			if not MatchMode.is_valid(value):
+				return &"bad_value"
+			settings["mode"] = StringName(value)
+		"public":
+			if typeof(value) != TYPE_BOOL:
+				return &"bad_value"
+			settings["public"] = value
 		_:
 			return &"bad_key"
 	return &""

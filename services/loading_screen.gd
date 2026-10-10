@@ -1,8 +1,12 @@
 extends CanvasLayer
-## `Loading` autoload: the loading screen between the menu and a match (M6). The live casino
-## panorama (`CasinoPanorama`, blurred and gently tilting) with the logo, a tip and "Loading…".
-## `SceneRouter.goto` calls `begin` before it swaps to the match and the match scene calls
-## `finish` once its world is built. Nothing shows when headless.
+## `Loading` autoload: the loading screen between the menu and a match (M6), and the joining
+## screen while an online connection is made. The live casino panorama (`CasinoPanorama`, blurred
+## and gently tilting) with the 3D logo (`Logo3DView`, the same one the main menu shows: Patrick,
+## "Use the Better at gambling logo"), a tip and "LOADING…" (or "JOINING ABCDE…").
+## The main menu calls `begin("JOINING …")` when it starts connecting and `cancel` if that fails;
+## `SceneRouter.goto` calls `begin` before it swaps to the match (switching an open joining screen
+## to "LOADING") and the match scene calls `finish` once its world is built. Nothing shows when
+## headless.
 
 ## Shortest time the screen stays up, so it never just flashes.
 const MIN_SECONDS: float = 1.6
@@ -22,9 +26,14 @@ const TIPS: Array[String] = [
 	"Last Call: in the final minute every table pays ×1.5.",
 ]
 
+## Logo size on this screen (the main menu's is 660 × 300).
+const LOGO_SIZE: Vector2 = Vector2(760, 345)
+
 var _root: Control
 var _shown_at: float = 0.0
 var _finishing: bool = false
+## Status word the dots animate after ("LOADING", "JOINING ABCDE").
+var _status: String = "LOADING"
 
 
 func _ready() -> void:
@@ -37,8 +46,15 @@ func is_showing() -> bool:
 	return _root != null
 
 
-## Puts the screen up (no-op headless or when already showing).
-func begin() -> void:
+## The status line without its dots.
+func status() -> String:
+	return _status
+
+
+## Puts the screen up with `status` ("LOADING", or "JOINING ABCDE" from the menu). Already up:
+## only the status changes (the joining screen becomes the loading screen). No-op headless.
+func begin(status_text: String = "LOADING") -> void:
+	_status = status_text
 	if _root != null or DisplayServer.get_name() == "headless":
 		return
 	_finishing = false
@@ -63,17 +79,7 @@ func begin() -> void:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override(&"separation", 18)
 	_root.add_child(box)
-	var logo := VBoxContainer.new()
-	logo.add_theme_constant_override(&"separation", -24)
-	box.add_child(logo)
-	for line: Array in [["BETTER", 92, Palette.CREAM], ["AT", 52, Palette.CASINO_RED], ["GAMBLING", 136, Palette.VIP_GOLD]]:
-		var l := Label.new()
-		l.theme_type_variation = &"LogoLabel"
-		l.text = line[0]
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		l.add_theme_font_size_override(&"font_size", line[1])
-		l.add_theme_color_override(&"font_color", line[2])
-		logo.add_child(l)
+	box.add_child(Logo3DView.make(LOGO_SIZE))
 	var rule := ColorRect.new()
 	rule.color = Palette.WARM_GOLD
 	rule.custom_minimum_size = Vector2(360, 3)
@@ -81,7 +87,7 @@ func begin() -> void:
 	box.add_child(rule)
 	var loading := Label.new()
 	loading.name = "Loading"
-	loading.text = "LOADING"
+	loading.text = _status
 	loading.theme_type_variation = &"HeadingLabel"
 	loading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	loading.add_theme_font_size_override(&"font_size", 40)
@@ -123,7 +129,16 @@ func _process(_delta: float) -> void:
 	if _root == null or _finishing:
 		return
 	var dots: int = int(Time.get_ticks_msec() / 400.0) % 4
-	(_root.find_child("Loading", true, false) as Label).text = "LOADING" + ".".repeat(dots)
+	(_root.find_child("Loading", true, false) as Label).text = _status + ".".repeat(dots)
+
+
+## Takes the screen down at once (joining failed: back to the menu, which shows why).
+func cancel() -> void:
+	if _root != null:
+		_root.queue_free()
+		_root = null
+	_finishing = false
+	_status = "LOADING"
 
 
 ## Fades the screen out (after `MIN_SECONDS`) and frees it.
@@ -143,3 +158,4 @@ func finish() -> void:
 		_root.queue_free()
 		_root = null
 	_finishing = false
+	_status = "LOADING"

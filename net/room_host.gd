@@ -4,6 +4,14 @@ extends Node
 ## protocol/build and verifying their join token with the orchestrator, maps peers to players
 ## (recognising reconnecting identities), reports heartbeats, and shuts the room down once it has
 ## been empty for `empty_timeout` seconds. Lives under `Net` in SERVER mode only.
+##
+## Joining: new players are admitted in the lobby and in a running match (late join: they spawn
+## in the entrance hall and play from the next minigame on); only the results screen turns new
+## faces away (`room_in_progress`). Kicks: the party leader's `kick_player` makes the MatchServer
+## call `kick_player` here, which sends the kicked client `REJECT {code: kicked}` ("You were kicked
+## by the host") and drops it. The 60 s rejoin block lives in this room (`MatchServer.kick_blocked_for`,
+## checked in `_admit`), not in the orchestrator: the room is the one that knows who was kicked,
+## and a kicked player's join token is still accepted by the orchestrator but refused here.
 
 const HEARTBEAT_INTERVAL: float = 5.0
 ## Seconds a fresh room waits for its first player before the empty timeout applies.
@@ -73,6 +81,7 @@ func peer_of(player: int) -> int:
 
 func on_server_attached(p_server: MatchServer) -> void:
 	server = p_server
+	server.kick_handler = kick_player
 	var queued: Array[Dictionary] = _pending.duplicate()
 	_pending.clear()
 	for h: Dictionary in queued:
@@ -109,6 +118,11 @@ func on_hello(peer: int, hello: Variant) -> void:
 
 
 func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> void:
+	var blocked: float = server.kick_blocked_for(uid)
+	if blocked > 0.0:
+		Log.info(&"room", "peer %d (%s) refused: kicked %.0f s ago" % [peer, display_name, Protocol.KICK_REJOIN_SECONDS - blocked])
+		_reject(peer, &"kick_cooldown", "You were kicked from this party. Try again in %d s." % ceili(blocked))
+		return
 	var pid: int = server.player_by_uid(uid)
 	if pid >= 0:
 		var old_peer: int = peer_of(pid)
@@ -119,7 +133,7 @@ func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> 
 		server.player_reconnected(pid)
 		Log.info(&"room", "%s rejoined as player %d (peer %d)" % [display_name, pid, peer])
 	else:
-		if server.phases.phase != Phase.Id.LOBBY:
+		if server.phases.phase == Phase.Id.RESULTS:
 			_reject(peer, &"room_in_progress")
 			return
 		if server.occupied_slots() >= Protocol.MAX_PLAYERS:
@@ -137,8 +151,24 @@ func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> 
 	_ever_joined = true
 
 
-func _reject(peer: int, code: StringName) -> void:
-	Net.send_to(peer, Protocol.CHANNEL_EVENTS, true, Protocol.Msg.REJECT, {"code": code, "message": Protocol.REJECT_TEXT.get(code, "Refused by the server.")})
+## The MatchServer kicked `player`: tell their client why and drop the connection.
+func kick_player(player: int) -> void:
+	var peer: int = peer_of(player)
+	if peer < 0:
+		return
+	_players.erase(peer)
+	Log.info(&"room", "player %d kicked (peer %d)" % [player, peer])
+	_reject(peer, &"kicked")
+
+
+## SERVER: the client finished loading the match: back to the normal in-match timeout.
+func on_loaded(peer: int) -> void:
+	if _players.has(peer) and Net.transport != null:
+		Net.transport.set_peer_timeout(peer, ENetTransport.TIMEOUT_MS)
+
+
+func _reject(peer: int, code: StringName, message: String = "") -> void:
+	Net.send_to(peer, Protocol.CHANNEL_EVENTS, true, Protocol.Msg.REJECT, {"code": code, "message": message if message != "" else Protocol.REJECT_TEXT.get(code, "Refused by the server.")})
 	# Give ENet a moment to deliver the reason before dropping the peer.
 	get_tree().create_timer(0.5).timeout.connect(func() -> void:
 		if Net.transport != null:
@@ -187,12 +217,33 @@ func _heartbeat() -> void:
 	if server != null:
 		for peer: int in _players:
 			uids.append(server.state.players[_players[peer]].uid)
-	var res: Dictionary = await http.post(orchestrator.path_join("v1/internal/heartbeat"), {"room_id": room_id, "room_secret": room_secret, "phase": _phase_name(), "players": _players.size(), "player_uids": uids})
+	var res: Dictionary = await http.post(orchestrator.path_join("v1/internal/heartbeat"), {
+		"room_id": room_id, "room_secret": room_secret, "phase": _phase_name(), "players": _players.size(), "player_uids": uids,
+		"public": is_public(), "name": party_name(), "mode": String(server.lobby.settings.get("mode", MatchMode.CASINO)) if server != null else "casino",
+	})
 	if res["status"] == 404 and not _closing:
 		Log.warn(&"room", "orchestrator no longer knows this room; shutting down")
 		_quit(0)
 	elif res["status"] != 200:
 		Log.warn(&"room", "heartbeat failed (%d)" % res["status"])
+
+
+## The leader's PUBLIC toggle: listed in the server browser (`GET /v1/rooms?public=1`).
+func is_public() -> bool:
+	return server != null and bool(server.lobby.settings.get("public", false))
+
+
+## Name shown in the server browser: "<leader>'s party".
+func party_name() -> String:
+	if server == null or not server.state.players.has(server.lobby.leader()):
+		return "Party %s" % room_code
+	return "%s's party" % server.state.players[server.lobby.leader()].display_name
+
+
+## Sends a heartbeat now (the PUBLIC toggle shows up in the browser without waiting 5 s).
+func heartbeat_soon() -> void:
+	if orchestrator != "" and not _closing:
+		_heartbeat_timer = HEARTBEAT_INTERVAL
 
 
 func _close(reason: String) -> void:

@@ -27,7 +27,9 @@ func has_minigames() -> bool:
 func pick(rng: SeededRng, player_count: int = 2) -> MinigameDefinition:
 	if defs.is_empty():
 		return null
-	var pool: Array[MinigameDefinition] = defs.filter(func(d: MinigameDefinition) -> bool: return (d.id != _last_id or defs.size() == 1) and player_count >= d.min_players)
+	var playable: Array[MinigameDefinition] = defs.filter(func(d: MinigameDefinition) -> bool: return player_count >= d.min_players)
+	# No immediate repeat, unless it is the only one this many players can play (solo practice).
+	var pool: Array[MinigameDefinition] = playable.filter(func(d: MinigameDefinition) -> bool: return d.id != _last_id or playable.size() == 1)
 	if pool.is_empty():
 		return null
 	var weights: Array = []

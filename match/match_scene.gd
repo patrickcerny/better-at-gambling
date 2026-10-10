@@ -128,6 +128,9 @@ var _down_until: Dictionary[int, float] = {}
 var _pile_sync_timer: float = 0.0
 ## `--quit-after-results`: scripted clients exit once the digest is logged (network tests).
 var cmd_quit_after_results: bool = false
+## Late join (Patrick: "Let players join running rounds"): "Joining next round" while the minigame
+## (and its rewards) that started before we arrived plays out without us.
+var sitting_out_label: Label
 
 
 func _ready() -> void:
@@ -214,6 +217,17 @@ func _ready() -> void:
 	connection_label.offset_top = 90
 	connection_label.visible = false
 	ui_layer.add_child(connection_label)
+	sitting_out_label = Label.new()
+	sitting_out_label.name = "JoiningNextRound"
+	sitting_out_label.theme_type_variation = &"HeadingLabel"
+	sitting_out_label.text = "Joining next round: this minigame started before you arrived"
+	sitting_out_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	sitting_out_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sitting_out_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	sitting_out_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	sitting_out_label.offset_top = 140
+	sitting_out_label.visible = false
+	ui_layer.add_child(sitting_out_label)
 	match Net.mode:
 		Net.Mode.NONE:
 			_start_local(cmd)
@@ -279,6 +293,7 @@ func _ready() -> void:
 	casino_floor.setup(self)
 	event_sfx = EventSfx.new(self)
 	Loading.finish()
+	Net.notify_loaded()  # online: the 30 s loading timeout drops back to the normal 10 s
 	if cmd.has_flag("autoplay"):
 		var driver: Script = load("res://client/autoplay_driver.gd")
 		autoplay = driver.new()
@@ -295,6 +310,7 @@ func _ready() -> void:
 	if cmd.has_flag("pause-menu"):
 		_on_pause.call_deferred()
 	_catch_up_phase()
+	_apply_mode_hud()
 	Log.info(&"match", "match scene ready: %d players, local=%d" % [avatars.size(), local_id])
 
 
@@ -367,6 +383,7 @@ func _length_settings(cmd: Cmdline) -> Dictionary:
 		"minigame_pool": cmd.get_string("minigame-pool", ""),
 		"minigame_briefing": maxf(cmd.get_float("minigame-briefing", test_briefing if test_briefing >= 0.0 else 30.0), 0.0),
 		"items_enabled": true,
+		"mode": MatchMode.normalize(cmd.get_string("mode", MatchMode.CASINO)),
 	}
 
 
@@ -384,6 +401,8 @@ func _start_local(cmd: Cmdline) -> void:
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
 	var settings: Dictionary = _length_settings(cmd)
+	# The main menu's practice choice (casino or minigames only, and how many minigames).
+	settings.merge(SceneRouter.practice_settings, true)
 	settings["seed"] = cmd.get_int("seed", randi() % 1000000)
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
 	server.world.obstacle_callback = _obstacle_between
@@ -835,8 +854,15 @@ func _on_event(ev: Dictionary) -> void:
 					hud.toast("Back inside. Behave.", 2.0)
 			if net_world != null:
 				net_world.reset_player(pid)
+		&"player_kicked":
+			if int(ev["player"]) != local_id:
+				hud.toast("%s was kicked by the host" % view.state.player_name(int(ev["player"])), 3.0)
 		&"match_started":
-			_hint(&"sit", "Walk up to a table and press {interact} to sit.  {grab} grabs, {shove} shoves.", 5.0)
+			_apply_mode_hud()
+			if MatchMode.normalize(ev.get("mode", MatchMode.CASINO)) == MatchMode.MINIGAMES:
+				hud.toast("MINIGAMES ONLY: %d minigames back to back" % int(ev.get("minigames", 0)), 3.0)
+			else:
+				_hint(&"sit", "Walk up to a table and press {interact} to sit.  {grab} grabs, {shove} shoves.", 5.0)
 		&"player_shoved":
 			_on_shoved(ev)
 		&"player_knocked_down":
@@ -962,6 +988,8 @@ func _on_event(ev: Dictionary) -> void:
 			var phase: Phase.Id = int(ev["phase"]) as Phase.Id
 			if phase != Phase.Id.LOBBY and lobby_panel.visible:
 				lobby_panel.close()
+			if phase != Phase.Id.MINIGAME and phase != Phase.Id.REWARDS:
+				_set_sitting_out(false)
 			# The hall doors open when the casino does (after the intro and after each regroup).
 			if phase in [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME, Phase.Id.RESULTS]:
 				map.set_lobby_open(true)
@@ -976,6 +1004,7 @@ func _on_event(ev: Dictionary) -> void:
 			elif phase == Phase.Id.PRE_MINIGAME:
 				Audio.play(&"countdown_beep", &"SFX", -4.0, 0.8)
 		&"minigame_started":
+			_set_sitting_out(false)
 			_open_stage(ev, {})
 		&"rewards_started":
 			if role != Role.SERVER:
@@ -1552,9 +1581,15 @@ func _catch_up_phase() -> void:
 	match st.phase:
 		Phase.Id.MINIGAME:
 			if not st.minigame.is_empty():
-				_open_stage({"minigame": st.minigame.get("minigame", &"quiz"), "players": st.minigame.get("players", [])}, st.minigame)
+				var playing: Array = st.minigame.get("players", [])
+				if role != Role.SERVER and not _in_minigame_roster(playing):
+					_set_sitting_out(true)  # joined late: this one plays out without us
+				else:
+					_open_stage({"minigame": st.minigame.get("minigame", &"quiz"), "players": playing}, st.minigame)
 		Phase.Id.REWARDS:
 			if role != Role.SERVER:
+				if not _in_minigame_roster(st.rewards.map(func(r: Variant) -> int: return int((r as Dictionary).get("player", -1)) if r is Dictionary else -1)):
+					_set_sitting_out(true)
 				reward_panel.open(st.rewards, Registry.balance.reward_reveal_time, true)
 				hud.visible = false
 				router.set_mode(InputRouter.Mode.MENU)
@@ -1563,6 +1598,30 @@ func _catch_up_phase() -> void:
 		Phase.Id.RESULTS:
 			_match_over = true
 			_show_results(st.standings)
+
+
+## Minigames-only party (`MatchMode.MINIGAMES`): no casino clock on the HUD.
+func _minigames_only() -> bool:
+	return MatchMode.is_minigames_only(view.state.lobby_settings) if view != null else false
+
+
+func _apply_mode_hud() -> void:
+	if hud != null and hud.timer_label != null:
+		hud.timer_label.visible = not _minigames_only() or view.state.phase == Phase.Id.LOBBY
+
+
+## Late join: true if we were in the minigame running (or just played) when we arrived. The
+## server's snapshot names who it started with (`minigame_roster`, which also covers a reconnect
+## after dropping out of it); `fallback` (its players / reward rows) for older snapshots.
+func _in_minigame_roster(fallback: Array) -> bool:
+	var roster: Variant = Net.request_snapshot().get("minigame_roster", null)
+	return (roster as Array).has(local_id) if roster is Array else fallback.has(local_id)
+
+
+## Late join: shows or hides the "Joining next round" line (never on the dedicated server).
+func _set_sitting_out(on: bool) -> void:
+	if sitting_out_label != null:
+		sitting_out_label.visible = on and role != Role.SERVER
 
 
 ## Everyone back to their entrance-hall spot with the lobby doors shut: the lobby after a match,
@@ -1612,7 +1671,10 @@ func _regroup() -> void:
 		local.cam.activate()
 		hud.set_crosshair_visible(true)
 	router.set_mode(InputRouter.Mode.WALK)
-	hud.toast("Back in the hall! The doors open in %d…" % int(cfg.regroup_time), 2.5)
+	if _minigames_only():
+		hud.toast("Next minigame coming up…", 2.5)
+	else:
+		hud.toast("Back in the hall! The doors open in %d…" % int(cfg.regroup_time), 2.5)
 
 
 ## Online room went back to its lobby for another match ("play again in the same room").
@@ -1637,6 +1699,8 @@ func _on_match_reset() -> void:
 		return
 	hud.visible = true
 	hud.reset_match()
+	if hud.timer_label != null:
+		hud.timer_label.visible = true  # back in the lobby: the next match may be a casino one
 	if local != null:
 		local.cam.activate()
 	router.set_mode(InputRouter.Mode.WALK)

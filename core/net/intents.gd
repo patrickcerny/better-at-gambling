@@ -23,6 +23,7 @@ const SCHEMA: Dictionary = {
 	&"lobby_setting": ["key", "value"],
 	&"set_skin": ["skin"],
 	&"return_to_lobby": [],
+	&"kick_player": ["target"],
 	&"emote": ["id"],
 	&"move": ["pos", "yaw"],
 	&"grab": ["target"],

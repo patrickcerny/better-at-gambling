@@ -58,10 +58,20 @@ class Room:
     members: set[str] = field(default_factory=set)
     last_heartbeat: float | None = None
     kill_requested_at: float | None = None
+    # Server browser (from heartbeats): listed only while ``public``.
+    public: bool = False
+    name: str = ""
+    mode: str = "casino"
 
     @property
     def joinable(self) -> bool:
         return self.state in (STARTING, RUNNING)
+
+
+def _clean_name(raw: str) -> str:
+    """Party names come from player display names: printable, one line, at most 40 chars."""
+    text = "".join(ch for ch in raw if ch.isprintable()).strip()
+    return text[:40]
 
 
 class RoomManager:
@@ -150,8 +160,10 @@ class RoomManager:
         if room is None or not room.joinable:
             raise ApiError(404, "room_not_found", "That room does not exist or has closed.")
         if ident.player_uid not in room.members:
-            if room.phase != "lobby":
-                raise ApiError(409, "room_in_progress", "That match is already in progress.")
+            # New players may join in the lobby and during a running match (they play from the next
+            # minigame); only the results screen turns them away until the room is back in its lobby.
+            if room.phase == "results":
+                raise ApiError(409, "room_in_progress", "That party is on its results screen. Try again in a minute.")
             if self.occupancy(room, now, ident.player_uid) >= self.config.max_players:
                 raise ApiError(409, "room_full", "That room is full.")
         token = self._issue_token(room, ident, now)
@@ -192,12 +204,33 @@ class RoomManager:
         log("player_verified", room_id=room.room_id, player=jt.identity.player_uid)
         return jt.identity
 
-    def heartbeat(self, room: Room, phase: str, players: int, player_uids: list[str] | None) -> None:
+    def public_rooms(self) -> list[dict[str, object]]:
+        """Server browser rows: running rooms whose leader switched PUBLIC on, fullest first."""
+        rows = []
+        for r in self.rooms.values():
+            if not r.public or r.state != RUNNING:
+                continue
+            full = r.players >= self.config.max_players
+            rows.append({
+                "room_id": r.room_id, "room_code": r.code, "name": r.name or f"Party {r.code}",
+                "players": r.players, "max_players": self.config.max_players, "phase": r.phase,
+                "mode": r.mode, "joinable": r.phase != "results" and not full,
+            })
+        rows.sort(key=lambda row: (not row["joinable"], -int(row["players"]), str(row["name"])))
+        return rows
+
+    def heartbeat(self, room: Room, phase: str, players: int, player_uids: list[str] | None,
+                  public: bool = False, name: str | None = None, mode: str | None = None) -> None:
         """Record a heartbeat; the first one moves the room to ``running``."""
         now = self.clock()
         room.last_heartbeat = now
         room.phase = phase
         room.players = players
+        room.public = public
+        if name is not None:
+            room.name = _clean_name(name)
+        if mode is not None:
+            room.mode = mode
         if player_uids is not None:
             room.player_uids = list(player_uids)
             room.members.update(player_uids)

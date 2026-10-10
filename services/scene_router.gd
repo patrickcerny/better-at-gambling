@@ -10,6 +10,9 @@ const MATCH: String = "res://match/match_scene.tscn"
 
 ## Parsed user arguments for this process.
 var cmdline: Cmdline
+## Practice match settings picked on the main menu, merged over the command line's by the match
+## scene: {mode: MatchMode.CASINO | MatchMode.MINIGAMES, minigames: N}. Kept for PLAY AGAIN.
+var practice_settings: Dictionary = {}
 
 var _smoke_frames_left: int = -1
 var _smoke_seconds_left: float = -1.0
@@ -84,12 +87,14 @@ func _boot_server() -> void:
 	goto(MATCH)
 
 
-## `--connect host:port` (direct, dev), `--join-code CODE` or `--create-room` (orchestrator).
+## `--connect host:port` (direct, dev and the network tests only: players join through the
+## orchestrator, by code or from the server browser), `--join-code CODE` or `--create-room`.
 func _boot_client() -> void:
 	var display: String = profile_name()
 	var err: Error = OK
 	Net.connected.connect(_on_boot_connected, CONNECT_ONE_SHOT)
 	Net.disconnected.connect(_on_boot_failed, CONNECT_ONE_SHOT)
+	Loading.begin("JOINING")  # the joining screen (nothing when headless)
 	if cmdline.has("connect"):
 		var parts: PackedStringArray = cmdline.get_string("connect").rsplit(":", true, 1)
 		var host: String = parts[0] if parts[0] != "" else "127.0.0.1"
@@ -163,7 +168,7 @@ func _process(delta: float) -> void:
 ## first (the match scene takes it down when its world is built).
 func goto(path: String) -> void:
 	if path == MATCH and DisplayServer.get_name() != "headless" and not cmdline.has("capture"):
-		Loading.begin()
+		Loading.begin()  # already up when joining online: it just switches to "LOADING"
 		# Let the loading screen draw before the match scene blocks the main thread.
 		await get_tree().process_frame
 		await get_tree().process_frame
