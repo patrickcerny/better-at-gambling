@@ -76,6 +76,8 @@ var _logic_scripts: Dictionary = {}
 var _server_owned: Dictionary[int, bool] = {}
 ## Real seconds since the server started (lobby ordering, network clock).
 var _uptime: float = 0.0
+## Simulated seconds ever stepped (never reset, unlike `match_time`).
+var _stepped: float = 0.0
 var _leader: int = -1
 ## player → casino segment in which they got the House Comp (once per segment).
 var _comped: Dictionary[int, int] = {}
@@ -358,9 +360,16 @@ func start_match() -> void:
 	_flush()
 
 
+## Clock for the intent rate limit. Not `match_time`: that stands still in the lobby and on the
+## results screen (the bucket never refilled there) and goes back to 0 on Play Again (a debt of
+## the whole last match, every click ignored for as long). Both counters here only ever grow.
+func _intent_clock() -> float:
+	return maxf(_uptime, _stepped)
+
+
 ## Handles one client intent. Returns {ok, error}.
 func submit_intent(player: int, intent: Dictionary) -> Dictionary:
-	var why: StringName = validator.check(player, intent, phases.phase, match_time, state.players.has(player))
+	var why: StringName = validator.check(player, intent, phases.phase, _intent_clock(), state.players.has(player))
 	if why == &"" and _jail_blocks(player, intent):
 		why = &"jailed"
 	if why != &"":
@@ -449,6 +458,7 @@ func run_to_end(max_seconds: float = 36000.0) -> void:
 ## Game-time step.
 func _step(delta: float) -> void:
 	match_time += delta
+	_stepped += delta
 	var notes: Array[StringName] = phases.advance(delta)
 	for n: StringName in notes:
 		_on_phase_note(n)

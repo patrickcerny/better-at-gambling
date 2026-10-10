@@ -37,6 +37,8 @@ var _bets: Dictionary[String, Array] = {}
 var _shown_at: Dictionary[StringName, int] = {}
 ## "sid:pid" -> {net, stake}: results waiting for their table to finish showing.
 var _pending: Dictionary[String, Dictionary] = {}
+## Slot machines whose reels are already landing on the line their next result pays for.
+var _landing: Array[StringName] = []
 
 
 func setup(p_stations: Dictionary, p_avatar_of: Callable, p_local_id: int, p_juice: ScreenJuice, p_world: Node3D, p_color_of: Callable = Callable(), p_min_bet_of: Callable = Callable()) -> void:
@@ -67,6 +69,14 @@ func on_event(ev: Dictionary) -> void:
 			var rs: RouletteStation = stations.get(sid, null) as RouletteStation
 			if rs != null:
 				_shown_at[sid] = Time.get_ticks_msec() + int(rs.land(int(ev["number"])) * 1000.0)
+		&"slots_landing":
+			# The spin ended: the reels land on the line now; the payout (`round_result`) follows
+			# once the last one has stopped.
+			var sid: StringName = StringName(ev["station"])
+			var ss: SlotsStation = stations.get(sid, null) as SlotsStation
+			if ss != null:
+				_landing.append(sid)
+				_shown_at[sid] = Time.get_ticks_msec() + int(ss.stop_on(ev["line"], int(ev["player"]) == local_id) * 1000.0)
 		&"round_result":
 			_on_result(ev)
 		&"bets_refunded":
@@ -99,11 +109,20 @@ func _on_bet(ev: Dictionary) -> void:
 	var target: Vector3 = _bet_spot(st, seat, type, value) + _jitter(pid)
 	var key: String = _key(sid, pid)
 	var list: Array = _bets.get(key, [])
-	for b: Dictionary in list:  # stacking on the same spot again: nudge it over
-		if b["type"] == type and int(b["value"]) == value:
-			target += Vector3(ChipStack.CHIP_RADIUS * 1.6, 0, 0)
 	var color: Color = color_of.call(pid) if color_of.is_valid() else ChipStack.NO_COLOR
 	var unit: int = int(min_bet_of.call(sid)) if min_bet_of.is_valid() else 0
+	var chips: int = ChipStack.chip_count(int(ev["amount"]), unit)
+	if st is RouletteStation:
+		# On its printed spot and nowhere else: a second column is centred on the spot (it used to
+		# trail onto the next row), and another bet on the same spot stacks on top of the chips
+		# already there (it used to be nudged sideways onto the neighbouring number).
+		target = _bet_spot(st, seat, type, value)  # no jitter: stacks share a spot by going up
+		target.z += (ChipStack.columns(chips) - 1) * ChipStack.CHIP_RADIUS * 2.05 * 0.5
+		target.y += _height_on_spot(sid, type, value)
+	else:
+		for b: Dictionary in list:  # stacking on the same spot again: nudge it over
+			if b["type"] == type and int(b["value"]) == value:
+				target += Vector3(ChipStack.CHIP_RADIUS * 1.6, 0, 0)
 	var stack: ChipStack = ChipStack.make(int(ev["amount"]), color, unit)
 	st.add_child(stack)
 	stack.position = start
@@ -113,6 +132,19 @@ func _on_bet(ev: Dictionary) -> void:
 	Audio.play_at(&"chip_clack", stack, -10.0, randf_range(0.95, 1.1))
 
 
+## Height of the chips already on a roulette spot (every player's), so the next stack goes on top.
+func _height_on_spot(sid: StringName, type: StringName, value: int) -> float:
+	var h: float = 0.0
+	for key: String in _bets:
+		if not key.begins_with(String(sid) + ":"):
+			continue
+		for b: Dictionary in _bets[key]:
+			var s: ChipStack = b["stack"]
+			if is_instance_valid(s) and b["type"] == type and int(b["value"]) == value:
+				h += mini(ChipStack.chip_count(s.amount, s.unit), ChipStack.COLUMN_CHIPS) * ChipStack.CHIP_HEIGHT
+	return h
+
+
 func _on_result(ev: Dictionary) -> void:
 	var sid: StringName = StringName(ev["station"])
 	var st: StationBase = stations.get(sid, null)
@@ -120,7 +152,9 @@ func _on_result(ev: Dictionary) -> void:
 	var net: int = int(ev["net"])
 	var stake: int = int(ev["stake"])
 	var details: Dictionary = ev.get("details", {})
-	if st is SlotsStation and details.has("line"):
+	if st is SlotsStation and _landing.has(sid):
+		_landing.erase(sid)  # the reels landed on this line already (`slots_landing`)
+	elif st is SlotsStation and details.has("line"):  # joined after the landing started
 		var t: float = (st as SlotsStation).stop_on(details["line"], pid == local_id)
 		_shown_at[sid] = Time.get_ticks_msec() + int(t * 1000.0)
 	elif st is PlinkoStation:
@@ -222,6 +256,7 @@ func _return_chips(sid: StringName, pid: int) -> void:
 func _reset_table(sid: StringName) -> void:
 	var st: StationBase = stations.get(sid, null)
 	_shown_at.erase(sid)
+	_landing.erase(sid)
 	for key: String in _bets.keys():
 		if not key.begins_with(String(sid) + ":"):
 			continue

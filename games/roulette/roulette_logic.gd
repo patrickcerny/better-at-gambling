@@ -1,8 +1,9 @@
 class_name RouletteLogic
 extends StationLogicBase
 ## European single-zero roulette table with a shared spin cycle (§2.5):
-## BETTING (`roulette_betting_time`) → SPINNING (`roulette_spin_time`) → RESULT → BETTING.
-## The table only cycles while someone stands at it.
+## BETTING (`roulette_betting_time`) → SPINNING (`roulette_spin_time`, then `LAND_TIME` while the
+## ball drops into the announced number) → RESULT → BETTING. Bets pay only once the ball rests in
+## its pocket, so the money never spoils the number. The table only cycles while someone stands at it.
 
 enum State { IDLE, BETTING, SPINNING, RESULT }
 
@@ -13,6 +14,9 @@ const RATIOS: Dictionary = {
 	&"straight": 35, &"red": 1, &"black": 1, &"odd": 1, &"even": 1, &"low": 1, &"high": 1, &"dozen": 2, &"column": 2,
 }
 const EVEN_MONEY: Array[StringName] = [&"red", &"black", &"odd", &"even", &"low", &"high"]
+## Seconds from `roulette_result` (the ball starts dropping) until the bets pay: the ball's drop
+## into its pocket on the wheel (`RouletteWheelFx.DROP_TIME`).
+const LAND_TIME: float = 2.0
 
 var spots: int = 6
 var players: Array[int] = []
@@ -25,6 +29,8 @@ var result: int = -1
 var spins_played: int = 0
 
 var _pending_result: int = -1
+## True while the ball drops into `result` (announced, not paid yet).
+var _landing: bool = false
 
 
 func _on_setup() -> void:
@@ -117,7 +123,10 @@ func tick(delta: float) -> void:
 		State.SPINNING:
 			timer -= delta
 			if timer <= 0.0:
-				_resolve()
+				if _landing:
+					_resolve()
+				else:
+					_drop_ball()
 		State.RESULT:
 			timer -= delta
 			if timer <= 0.0:
@@ -128,7 +137,7 @@ func tick(delta: float) -> void:
 
 
 func round_seconds() -> float:
-	return (timer if state == State.BETTING else balance.roulette_betting_time) + balance.roulette_spin_time
+	return (timer if state == State.BETTING else balance.roulette_betting_time) + balance.roulette_spin_time + LAND_TIME
 
 
 func has_stake(p: int) -> bool:
@@ -153,6 +162,7 @@ func refund_all() -> void:
 			_refund(int(b["player"]), int(b["amount"]), int(b.get("covered", 0)), totals)
 	bets.clear()
 	_pending_result = -1
+	_landing = false
 	state = State.IDLE
 	timer = 0.0
 	_emit_refunds(totals)
@@ -176,10 +186,20 @@ func _start_spin() -> void:
 	events.append(GameEvents.make(&"roulette_spin_started", {"station": station_id}))
 
 
-func _resolve() -> void:
+## The spin ends: the number is announced and the ball drops into it; the bets pay in `_resolve`.
+func _drop_ball() -> void:
 	result = _pending_result
+	_landing = true
+	timer = LAND_TIME
+	events.append(GameEvents.make(&"roulette_result", {"station": station_id, "number": result, "seconds": LAND_TIME}))
+
+
+## The ball rests in its pocket: every bet settles.
+func _resolve() -> void:
+	if not _landing:
+		_drop_ball()  # resolved at once (match end): announce the number first
+	_landing = false
 	spins_played += 1
-	events.append(GameEvents.make(&"roulette_result", {"station": station_id, "number": result}))
 	var played: Dictionary[int, bool] = {}
 	for b: Dictionary in bets:
 		_settle_bet(b)

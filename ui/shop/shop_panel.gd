@@ -3,7 +3,9 @@ extends PanelContainer
 ## The Gift Shop counter: this round's four offers (name, rarity, what it does in a readable
 ## line, price). One buy
 ## per player per casino round. Keys 1–4 or a click buy, Esc closes. Sends `shop_buy`; the server
-## checks the price, the distance and the one-per-round rule.
+## checks the price, the distance and the one-per-round rule. Online the answer is a round trip
+## away: the window stays open ("Buying…") until the server confirms (`shop_bought`) or refuses
+## (`intent_rejected`), so a refused buy is shown where it was made.
 
 signal closed
 
@@ -14,6 +16,8 @@ var _rows: VBoxContainer
 var _note: Label
 var _close: Button
 var _bought: bool = false
+## Waiting for the server's answer to a buy (online).
+var _pending: bool = false
 
 
 func _ready() -> void:
@@ -58,10 +62,18 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	state.players_changed.connect(func() -> void:
 		if visible:
 			_refresh())
+	if not Net.event_received.is_connected(_on_event):
+		Net.event_received.connect(_on_event)
+
+
+func _exit_tree() -> void:
+	if Net.event_received.is_connected(_on_event):
+		Net.event_received.disconnect(_on_event)
 
 
 func open() -> void:
 	visible = true
+	_pending = false
 	_close.text = "Close %s" % InputGlyphs.hint(&"ui_cancel")
 	_refresh()
 	if _rows.get_child_count() > 0:
@@ -90,17 +102,48 @@ func _unhandled_input(event: InputEvent) -> void:
 func buy(index: int) -> void:
 	if state == null or index >= state.shop_offers.size():
 		return
+	if _pending:
+		return
 	var res: Dictionary = Net.send_intent(Intents.make(&"shop_buy", {"index": index}))
-	if res["ok"]:
+	if res["ok"] and bool(res.get("pending", false)):
+		_pending = true  # online: wait for the server's word before closing
+		_note.text = "Buying…"
+		_set_buttons_enabled(false)
+	elif res["ok"]:
 		_bought = true
 		close_panel()
 	else:
 		_note.text = ItemController.rejection_text(res["error"])
 
 
+## The server's answer to a pending buy: bought closes the window, a refusal says why.
+func _on_event(ev: Dictionary) -> void:
+	if not _pending or int(ev.get("player", -1)) != local_id:
+		return
+	match StringName(ev.get("type", &"")):
+		&"shop_bought":
+			_pending = false
+			_bought = true
+			close_panel()
+		&"intent_rejected":
+			if StringName(ev.get("intent", &"")) != &"shop_buy":
+				return
+			_pending = false
+			_refresh()
+			_note.text = ItemController.rejection_text(StringName(ev.get("error", &"")))
+
+
+func _set_buttons_enabled(on: bool) -> void:
+	for c: Node in _rows.get_children():
+		if c is Button:
+			(c as Button).disabled = not on
+
+
 func _refresh() -> void:
 	if state == null or _rows == null:
 		return
+	if _pending:
+		return  # keep "Buying…" until the server answers
 	_bought = bool(Net.request_private_snapshot().get("items", {}).get("shop_bought", false))
 	var money: int = state.balance(local_id)
 	_note.text = "You already bought something this round. New stock after the next minigame." if _bought else "One item per round  ·  you have $%s" % Hud._thousands(money)

@@ -2,7 +2,9 @@ class_name SlotsLogic
 extends StationLogicBase
 ## One slot machine: 3 reels × 1 payline, one player (§2.5).
 ## Spin flow: `place_bet({amount})` takes the stake and decides the line (luck-rerolled by payout),
-## the reels "spin" for `slots_spin_time` (or until `stop` after `slots_skip_after`), then it pays.
+## the reels "spin" for `slots_spin_time` (or until `stop` after `slots_skip_after`), then they land
+## one by one on the line (`slots_landing`, `slots_settle_time`), and only once the last reel has
+## stopped does it pay (`round_result`): the money never spoils the result before the reels show it.
 
 enum Sym { CHERRY, LEMON, BELL, BAR, SEVEN, CLOVER, DIAMOND }
 const SYMBOL_NAMES: Array[StringName] = [&"cherry", &"lemon", &"bell", &"bar", &"seven", &"clover", &"diamond"]
@@ -14,8 +16,11 @@ var stake: int = 0
 ## Part of `stake` Fake Cash paid for.
 var stake_covered: int = 0
 var spin_elapsed: float = 0.0
-## Seconds the reels are still settling after a spin; no new pull until it hits 0.
+## Seconds the reels are still landing after a spin; no new pull until it hits 0, and the line
+## pays when it does.
 var settle_left: float = 0.0
+## True while the line is known but not paid yet (the reels are landing).
+var landing: bool = false
 var spins_played: int = 0
 
 
@@ -37,8 +42,7 @@ func join(p: int) -> Dictionary:
 func leave(p: int) -> void:
 	if p != player:
 		return
-	if spinning:
-		_finish_spin()
+	auto_resolve()  # walking away settles the spin at once (it was decided at the pull)
 	player = -1
 
 
@@ -84,7 +88,7 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 	if action == &"stop":
 		if not spinning or spin_elapsed < balance.slots_skip_after:
 			return fail(&"too_early")
-		_finish_spin()
+		_land()
 		return OK_RESULT
 	return fail(&"unknown_action")
 
@@ -93,32 +97,39 @@ func tick(delta: float) -> void:
 	if spinning:
 		spin_elapsed += delta
 		if spin_elapsed >= balance.slots_spin_time:
-			_finish_spin()
+			_land()
 	elif settle_left > 0.0:
 		settle_left = maxf(settle_left - delta, 0.0)
+		if settle_left <= 0.0 and landing:
+			_pay()
 
 
+## The spin and the landing: the stake pays when the last reel has stopped.
 func round_seconds() -> float:
-	return balance.slots_spin_time
+	return balance.slots_spin_time + balance.slots_settle_time
 
 
 func has_stake(p: int) -> bool:
-	return spinning and player == p
+	return (spinning or landing) and player == p
 
 
 func auto_resolve() -> void:
 	if spinning:
-		_finish_spin()
+		_land()
+	if landing:
+		_pay()
 	settle_left = 0.0  # resolved for good (leaving, match end, simulations): nothing left to land
 
 
 ## The spinning stake comes back (the jackpot keeps its feed: that was house money).
 func refund_all() -> void:
-	if not spinning:
+	if not spinning and not landing:
 		return
 	var totals: Dictionary = {}
 	_refund(player, stake, stake_covered, totals)
 	spinning = false
+	landing = false
+	settle_left = 0.0
 	line.clear()
 	stake = 0
 	stake_covered = 0
@@ -129,9 +140,17 @@ func get_public_state() -> Dictionary:
 	return {"game": game_id, "player": player, "spinning": spinning, "settling": settle_left > 0.0, "line": line.duplicate() if not spinning else [], "stake": stake}
 
 
-func _finish_spin() -> void:
+## The spin ends: the reels start landing on the line; nothing is paid yet.
+func _land() -> void:
 	spinning = false
+	landing = true
 	settle_left = balance.slots_settle_time
+	events.append(GameEvents.make(&"slots_landing", {"station": station_id, "player": player, "line": line.duplicate(), "seconds": settle_left}))
+
+
+## The last reel has stopped: the line pays (and the jackpot, on three Diamonds).
+func _pay() -> void:
+	landing = false
 	spins_played += 1
 	var mult: int = payout_multiplier(line, balance)
 	var details: Dictionary = {"line": line.duplicate(), "multiplier_base": mult}

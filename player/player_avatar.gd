@@ -20,6 +20,8 @@ const MASK: int = 1 | 2 | 8
 const MOVE_SEND_INTERVAL: float = 1.0 / 20.0
 const GRAVITY: float = 18.0
 const REMOTE_LERP: float = 10.0
+## Fastest a simulated body chases its server position, as a multiple of the sprint speed.
+const REMOTE_CATCH_UP: float = 1.25
 const PUPPET_LERP: float = 18.0
 const HELD_OFFSET: Vector3 = Vector3(0.0, 1.0, -0.9)
 ## Height of a carried bean's feet line above the guard's feet (lying across the guard's head).
@@ -516,7 +518,9 @@ func _remote_move(delta: float) -> void:
 		global_position = target_position
 		velocity = Vector3.ZERO
 	else:
-		var desired: Vector3 = flat * REMOTE_LERP
+		# Catch up with the server, but never faster than a sprint: a far-off target is a stale
+		# one, and chasing it at ten times its distance per second flung the body across the room.
+		var desired: Vector3 = (flat * REMOTE_LERP).limit_length(cfg.sprint_speed * REMOTE_CATCH_UP)
 		velocity.x = desired.x + push_velocity.x
 		velocity.z = desired.z + push_velocity.z
 		if not is_on_floor():

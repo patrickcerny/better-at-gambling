@@ -397,3 +397,35 @@ func test_a_full_idle_game_ends_by_timeouts() -> void:
 	assert_eq(_of(&"bust_or_bank_turn").size(), 4, "everyone gets one turn, then auto-stands")
 	assert_eq(_of(&"bust_or_bank_player_stood").size(), 4)
 	assert_eq(logic.ranking().size(), 4)
+
+
+func test_an_idle_table_of_eight_stops_at_the_round_cap() -> void:
+	# Patrick: an idle table of 8 ran 170 s. After `ROUND_CAP` seconds of turns everyone still
+	# undecided stands and the round ends.
+	var logic := _game([1, 2, 3, 4, 5, 6, 7, 8] as Array[int])
+	_open(logic, [2, 3, 4, 5, 6, 7, 8, 9] as Array[int])
+	assert_gt(8 * BustOrBankLogic.TURN_TIME, BustOrBankLogic.ROUND_CAP, "the cap matters for a full table")
+	var waited: float = 0.0
+	while logic.state == BustOrBankLogic.State.TURN and waited < 200.0:
+		_tick(logic, 0.5)
+		waited += 0.5
+	assert_eq(logic.state, BustOrBankLogic.State.RESULT, "the round ended")
+	assert_almost_eq(waited, BustOrBankLogic.ROUND_CAP, 0.51, "after the cap, not after 8 full turns")
+	var capped: Array[Dictionary] = _of(&"bust_or_bank_player_stood").filter(func(e: Dictionary) -> bool: return e["reason"] == &"round_cap")
+	assert_eq(capped.size(), 8 - int(BustOrBankLogic.ROUND_CAP / BustOrBankLogic.TURN_TIME), "everyone who never got to decide stands")
+	for p: int in logic.order:
+		assert_true(logic.standing[p], "player %d stands" % p)
+	assert_eq(_of(&"bust_or_bank_round_end").size(), 1)
+	assert_eq(logic.ranking().size(), 8)
+	_tick(logic, BustOrBankLogic.RESULT_TIME + 0.1)
+	assert_true(logic.is_finished())
+
+
+func test_the_cap_spares_a_quick_table() -> void:
+	var logic := _game([1, 2] as Array[int])
+	_open(logic, [10, 9, 2, 3] as Array[int])
+	_stand(logic, 1)
+	_tick(logic, 15.0)
+	_hit(logic, 2)
+	assert_true(logic.round_time < BustOrBankLogic.ROUND_CAP)
+	assert_eq(_of(&"bust_or_bank_player_stood").filter(func(e: Dictionary) -> bool: return e["reason"] == &"round_cap").size(), 0, "a normal round never hits the cap")
