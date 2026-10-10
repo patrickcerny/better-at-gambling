@@ -1016,7 +1016,7 @@ func _on_event(ev: Dictionary) -> void:
 				_curtain_back_to_casino(float(ev["seconds"]))
 				for row: Dictionary in ev["rewards"]:
 					if int(row["player"]) == local_id and StringName(row.get("item", &"")) != &"":
-						_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it, scroll to select and i for info.", float(ev["seconds"]))
+						_hint(&"items", "New item! Scroll or press {item_1}, {item_2}, {item_3} to hold it, click or E to use, i for info.", float(ev["seconds"]))
 		&"regroup_started":
 			_regroup()
 			var spot: Variant = (ev.get("positions", {}) as Dictionary).get(local_id, null)
