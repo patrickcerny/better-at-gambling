@@ -99,6 +99,8 @@ func on_hello(peer: int, hello: Variant) -> void:
 		return
 	_verifying[peer] = true
 	var res: Dictionary = await http.post(orchestrator.path_join("v1/internal/verify"), {"room_id": room_id, "room_secret": room_secret, "join_token": str(h.get("join_token", ""))})
+	if not _verifying.has(peer):
+		return  # gone while the orchestrator checked the token: admitting it now would leave a ghost
 	_verifying.erase(peer)
 	if res["status"] != 200:
 		Log.info(&"room", "peer %d: join token refused (%d %s)" % [peer, res["status"], res["body"].get("error", "")])
@@ -147,6 +149,8 @@ func _reject(peer: int, code: StringName) -> void:
 
 func on_peer_disconnected(peer: int) -> void:
 	_verifying.erase(peer)
+	# A hello still waiting for the match scene must not be admitted once its peer is gone.
+	_pending = _pending.filter(func(h: Dictionary) -> bool: return int(h["peer"]) != peer)
 	if not _players.has(peer):
 		return
 	var pid: int = _players[peer]

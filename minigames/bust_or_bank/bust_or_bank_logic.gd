@@ -28,12 +28,17 @@ const INTRO_TIME: float = 3.0
 const TURN_TIME: float = 20.0
 ## Seconds the final hands are shown before the minigame ends.
 const RESULT_TIME: float = 5.0
+## Most seconds the turns may take in all: an idle table of 8 would otherwise run 8 × `TURN_TIME`
+## (170 s with the intro and result). When it runs out, everyone still undecided stands.
+const ROUND_CAP: float = 90.0
 const SHOE_DECKS: int = 2
 const BLACKJACK: int = 21
 
 var state: State = State.INTRO
 ## Seconds left in the current state (intro, the current turn, the result).
 var timer: float = 0.0
+## Seconds the turns have taken so far (see `ROUND_CAP`).
+var round_time: float = 0.0
 var shoe: Shoe
 ## Seat order: the circle the turns go round. Players who left are removed.
 var order: Array[int] = []
@@ -81,6 +86,14 @@ func _on_setup(_context: Dictionary) -> void:
 func tick(delta: float, _now: float) -> void:
 	if finished:
 		return
+	if state == State.TURN:
+		round_time += delta
+		if round_time >= ROUND_CAP:
+			for p: int in order:
+				if not standing[p] and not busted[p]:
+					_stand(p, &"round_cap")
+			_end_round()
+			return
 	timer -= delta
 	if timer > 0.0:
 		return

@@ -72,7 +72,22 @@ func test_cycle_and_payouts_per_type() -> void:
 	assert_eq(rl.state, RouletteLogic.State.SPINNING)
 	assert_eq(rl.place_bet(1, {"type": &"red", "amount": 10})["error"], &"betting_closed")
 	rl._pending_result = 17  # 17: black, odd, low, 2nd dozen, 2nd column
+	rl.drain_events()
 	rl.tick(4.0)
+	# Patrick: the payout spoiled the result. The number is announced (the ball starts dropping)
+	# but no money moves until it rests in its pocket.
+	var evs: Array[Dictionary] = rl.drain_events()
+	assert_eq(evs.filter(func(e: Dictionary) -> bool: return e["type"] == &"roulette_result").size(), 1, "the ball drops into 17")
+	assert_eq(evs.filter(func(e: Dictionary) -> bool: return e["type"] == &"round_result").size(), 0, "nothing settled while it drops")
+	assert_eq(fx.economy.balance(1), 940, "no money while the ball is still dropping")
+	assert_eq(rl.state, RouletteLogic.State.SPINNING)
+	assert_eq(int(rl.get_public_state()["result"]), -1, "the panel does not show the number before the wheel does")
+	assert_true(rl.has_stake(1))
+	assert_gte(RouletteLogic.LAND_TIME, RouletteWheelFx.DROP_TIME, "pays only once the ball rests on the wheel")
+	rl.tick(RouletteLogic.LAND_TIME - 0.05)
+	assert_eq(fx.economy.balance(1), 940, "still dropping")
+	rl.tick(0.1)
+	assert_eq(rl.drain_events().filter(func(e: Dictionary) -> bool: return e["type"] == &"round_result").size(), 6, "every bet settles as the ball lands")
 	assert_eq(rl.state, RouletteLogic.State.RESULT)
 	assert_eq(rl.result, 17)
 	# straight 360 + black 20 + odd 20 + low 20 + dozen 30 + column 30
@@ -94,6 +109,7 @@ func test_table_idles_without_players() -> void:
 	rl.leave(1)
 	rl.tick(15.0)
 	rl.tick(4.0)
+	rl.tick(RouletteLogic.LAND_TIME)  # the ball drops
 	rl.tick(3.0)
 	assert_eq(rl.state, RouletteLogic.State.IDLE)
 
@@ -123,6 +139,7 @@ func test_lucky_neighbor_and_jinx() -> void:
 	rl.tick(15.0)
 	rl._pending_result = 0  # 0 sits next to 32
 	rl.tick(4.0)
+	rl.tick(RouletteLogic.LAND_TIME)
 	assert_eq(fx.economy.balance(1), 990 + 60)
 	rl.tick(3.0)
 	var fx2 := TableFixture.new(2, [1], 1000)
@@ -134,4 +151,5 @@ func test_lucky_neighbor_and_jinx() -> void:
 	r2.tick(15.0)
 	r2._pending_result = 1
 	r2.tick(4.0)
+	r2.tick(RouletteLogic.LAND_TIME)
 	assert_eq(fx2.economy.balance(1), 900 + 190)

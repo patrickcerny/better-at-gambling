@@ -22,6 +22,19 @@ const T_PLACE: Array[float] = [3.6, 1.9, 0.9]  # 1st, 2nd, 3rd
 const T_ANNOUNCE: float = 2.0
 const T_AWARDS: float = 4.6
 const AWARD_GAP: float = 0.4
+## Everyone below the top three stands on the floor beside the podium, alternating sides: the first
+## pair `FLOOR_X0` m out (clear of the 2nd / 3rd place tags), then every `FLOOR_GAP` m (a name tag
+## wide, so tags never pile up). A big party (7–8) needs a third column: the camera then stands
+## back far enough to keep the whole crowd in shot (`_fit_camera`).
+const FLOOR_X0: float = 4.0
+const FLOOR_GAP: float = 1.95
+## Half a name tag plus a margin: how far past the outermost bean the shot must reach (m).
+const FLOOR_MARGIN: float = 1.3
+## The shot's aspect (the game renders 16:9) and the closest the camera ends up (m from the podium).
+const SHOT_ASPECT: float = 16.0 / 9.0
+const CAM_NEAR_Z: float = 9.0
+## More rows than this: the standings list gets compact so it ends above the floor crowd's tags.
+const COMPACT_ROWS: int = 6
 
 var state: ClientMatchState
 var local_id: int = -1
@@ -150,6 +163,7 @@ func _build_set() -> void:
 	title.position = Vector3(0, 6.15, -3.8)  # clear of the name tags over a tied top step
 	add_child(title)
 	var standings: Array = state.standings
+	_fit_camera(standings.filter(func(r: Variant) -> bool: return int(r["rank"]) > 3).size())
 	var on_floor: int = 0
 	var last_rank: int = int(standings[-1]["rank"]) if not standings.is_empty() else 0
 	for row: Variant in standings:
@@ -171,7 +185,7 @@ func _build_set() -> void:
 		else:
 			# Everyone else cheers from the floor beside the podium, alternating sides.
 			var side: float = -1.0 if on_floor % 2 == 0 else 1.0
-			base = Vector3(side * (3.7 + floorf(on_floor / 2.0) * 1.3), 0, 0.6)
+			base = Vector3(side * (FLOOR_X0 + floorf(on_floor / 2.0) * FLOOR_GAP), 0, 0.6)
 			at = T_FLOOR + on_floor * 0.15
 			on_floor += 1
 		var bean := AvatarVisuals.new()
@@ -207,6 +221,18 @@ func _build_set() -> void:
 	add_child(camera)
 	camera.position = _cam_from
 	camera.look_at(global_position + Vector3(0, 2.0, 0))
+
+
+## Stands the camera back until `floor_count` beans beside the podium (and their tags) fit the shot.
+func _fit_camera(floor_count: int) -> void:
+	var cols: int = ceili(floor_count / 2.0)
+	if cols <= 0:
+		return
+	var reach: float = FLOOR_X0 + (cols - 1) * FLOOR_GAP + FLOOR_MARGIN
+	var tan_half_w: float = tan(deg_to_rad(52.0 * 0.5)) * SHOT_ASPECT
+	var z: float = maxf(CAM_NEAR_Z, reach / tan_half_w + 0.6)
+	_cam_from.z += z - _cam_to.z
+	_cam_to.z = z
 
 
 ## A podium block that rises out of the floor at its place's cue.
@@ -354,9 +380,14 @@ func _build_ui() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override(&"separation", 4)
 	panel.add_child(v)
+	# A big party gets a compact list, so it ends above the name tags of the crowd on the floor.
+	var compact: bool = state.standings.size() > COMPACT_ROWS
+	var row_font: int = 22 if compact else 30
+	if compact:
+		v.add_theme_constant_override(&"separation", -2)
 	var t := Label.new()
 	t.theme_type_variation = &"TitleLabel"
-	t.add_theme_font_size_override(&"font_size", 56)
+	t.add_theme_font_size_override(&"font_size", 40 if compact else 56)
 	t.text = "RESULTS"
 	v.add_child(t)
 	for row: Variant in state.standings:
@@ -365,7 +396,7 @@ func _build_ui() -> void:
 		var r := Label.new()
 		r.text = Hud._ordinal(int(row["rank"]))
 		r.custom_minimum_size = Vector2(56, 0)
-		r.add_theme_font_size_override(&"font_size", 30)
+		r.add_theme_font_size_override(&"font_size", row_font)
 		h.add_child(r)
 		var dot := ColorRect.new()
 		dot.custom_minimum_size = Vector2(18, 18)
@@ -377,10 +408,10 @@ func _build_ui() -> void:
 		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		n.clip_text = true
 		n.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		n.add_theme_font_size_override(&"font_size", 30)
+		n.add_theme_font_size_override(&"font_size", row_font)
 		h.add_child(n)
 		var m := Label.new()
-		m.add_theme_font_size_override(&"font_size", 34)
+		m.add_theme_font_size_override(&"font_size", row_font + 2 if compact else 34)
 		m.text = "$%s" % Hud._thousands(int(row["money"]))
 		m.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if int(row["rank"]) == 1 else Palette.CREAM)
 		h.add_child(m)
@@ -409,7 +440,7 @@ func _build_ui() -> void:
 	gt.text = "MONEY OVER TIME"
 	gv.add_child(gt)
 	graph = MoneyGraph.new()
-	graph.custom_minimum_size = Vector2(560, 280)
+	graph.custom_minimum_size = Vector2(560, 210 if state.standings.size() > COMPACT_ROWS else 280)  # big party: clear of the crowd's tags
 	graph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gv.add_child(graph)
 	var start: int = 0

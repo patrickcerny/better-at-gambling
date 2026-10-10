@@ -564,7 +564,9 @@ func _process(delta: float) -> void:
 	_update_look_lock()
 	if _owns_server and server != null:
 		server.advance(ScreenJuice.unscaled(delta))  # a hit-stop slows the client, not the server
-	# Simulated bodies (dummies) follow the server's last known position.
+	# Simulated bodies (dummies) follow the server's position: the live one when this process runs
+	# the server (the mirror's copy is up to a status refresh old, and a body chasing it after a
+	# move got yanked metres back across the floor when shoved), else the last snapshot's.
 	for pid: int in avatars:
 		if pid == local_id:
 			continue
@@ -576,6 +578,8 @@ func _process(delta: float) -> void:
 				# (otherwise the dummy rubber-bands straight back to where it stood).
 				a.target_position = a.global_position
 				_report_position(pid)
+			elif _owns_server and server != null and server.state.players.has(pid):
+				a.target_position = (server.state.players[pid] as PlayerState).position
 			else:
 				a.target_position = Serializer.to_vec3(p["pos"])
 	if role == Role.CLIENT:

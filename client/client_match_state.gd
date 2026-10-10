@@ -69,6 +69,13 @@ var shop_offers: Array = []
 ## the Megaphone (-1: on its stand).
 var puddles: Dictionary[int, Dictionary] = {}
 var megaphone_holder: int = -1
+## Highest event sequence number ever applied. A resync (someone sits down, a gap) re-applies a
+## cached snapshot and replays the events after it; the ones at or below this were already shown,
+## so they rebuild the state without popping their money and feed lines again (Patrick: "a lot of
+## plus and minus at the same time", "feed messages and money popups appear twice").
+var seen_seq: int = 0
+## True while `apply_event` replays an event that was already shown.
+var _replaying: bool = false
 
 
 ## Replaces everything from a snapshot.
@@ -144,6 +151,14 @@ func apply_event(ev: Dictionary) -> bool:
 	var seq: int = int(ev.get("seq", last_seq))
 	var gap: bool = seq > last_seq + 1 and last_seq > 0
 	last_seq = maxi(last_seq, seq)
+	_replaying = ev.has("seq") and seq <= seen_seq
+	seen_seq = maxi(seen_seq, seq)
+	_apply(ev)
+	_replaying = false
+	return not gap
+
+
+func _apply(ev: Dictionary) -> void:
 	var type: StringName = ev["type"]
 	match type:
 		&"player_joined":
@@ -159,10 +174,11 @@ func apply_event(ev: Dictionary) -> bool:
 			phase_changed.emit(phase)
 		&"last_call":
 			last_call = true
-			feed_message.emit("LAST CALL! All winnings ×%.1f" % float(ev["multiplier"]), &"last_call")
+			_feed("LAST CALL! All winnings ×%.1f" % float(ev["multiplier"]), &"last_call")
 		&"money_changed":
 			balances[int(ev["player"])] = int(ev["balance"])
-			money_changed.emit(int(ev["player"]), int(ev["amount"]), int(ev["balance"]), StringName(ev["reason"]))
+			if not _replaying:
+				money_changed.emit(int(ev["player"]), int(ev["amount"]), int(ev["balance"]), StringName(ev["reason"]))
 		&"player_sat":
 			seat_of[int(ev["player"])] = StringName(ev["station"])
 			if players.has(int(ev["player"])):
@@ -174,9 +190,9 @@ func apply_event(ev: Dictionary) -> bool:
 		&"round_result":
 			var net: int = int(ev["net"])
 			if net != 0:
-				feed_message.emit("%s %s$%d at %s" % [player_name(int(ev["player"])), "+" if net > 0 else "−", absi(net), station_label(StringName(ev["station"]))], &"win" if net > 0 else &"loss")
+				_feed("%s %s$%d at %s" % [player_name(int(ev["player"])), "+" if net > 0 else "−", absi(net), station_label(StringName(ev["station"]))], &"win" if net > 0 else &"loss")
 		&"jackpot_won":
-			feed_message.emit("%s hit the JACKPOT for $%d!" % [player_name(int(ev["player"])), int(ev["amount"])], &"jackpot")
+			_feed("%s hit the JACKPOT for $%d!" % [player_name(int(ev["player"])), int(ev["amount"])], &"jackpot")
 		&"jackpot_changed":
 			jackpot = int(ev["amount"])
 		&"chips_dropped":
@@ -184,11 +200,11 @@ func apply_event(ev: Dictionary) -> bool:
 		&"chips_collected", &"pickup_expired":
 			piles.erase(int(ev["pile"]))
 		&"player_knocked_out":
-			feed_message.emit("%s got knocked out!" % player_name(int(ev["target"])), &"chaos")
+			_feed("%s got knocked out!" % player_name(int(ev["target"])), &"chaos")
 		&"chips_shaken_out":
-			feed_message.emit("%s shook $%d out of %s" % [player_name(int(ev["attacker"])), int(ev["amount"]), player_name(int(ev["target"]))], &"chaos")
+			_feed("%s shook $%d out of %s" % [player_name(int(ev["attacker"])), int(ev["amount"]), player_name(int(ev["target"]))], &"chaos")
 		&"player_thrown_out":
-			feed_message.emit("Security threw %s out!" % player_name(int(ev["target"])), &"chaos")
+			_feed("Security threw %s out!" % player_name(int(ev["target"])), &"chaos")
 		&"player_ready":
 			if players.has(int(ev["player"])):
 				players[int(ev["player"])]["ready"] = bool(ev["ready"])
@@ -215,7 +231,7 @@ func apply_event(ev: Dictionary) -> bool:
 				players[int(ev["player"])]["connected"] = ev["type"] == &"player_rejoined"
 				if ev["type"] == &"player_left":
 					players[int(ev["player"])]["ready"] = false
-			feed_message.emit("%s %s" % [player_name(int(ev["player"])), "lost connection" if ev["type"] == &"player_left" else "is back"], &"info")
+			_feed("%s %s" % [player_name(int(ev["player"])), "lost connection" if ev["type"] == &"player_left" else "is back"], &"info")
 			players_changed.emit()
 			lobby_changed.emit()
 		&"player_removed":
@@ -240,14 +256,14 @@ func apply_event(ev: Dictionary) -> bool:
 		&"hot_table":
 			hot_station = StringName(ev["station"])
 			hot_left = float(ev["seconds"])
-			feed_message.emit("%s is HOT! Winnings ×%.2f for %ds" % [station_label(hot_station), float(ev["multiplier"]), int(ev["seconds"])], &"hot")
+			_feed("%s is HOT! Winnings ×%.2f for %ds" % [station_label(hot_station), float(ev["multiplier"]), int(ev["seconds"])], &"hot")
 			hot_table_changed.emit(hot_station)
 		&"hot_table_ended":
 			if hot_station == StringName(ev["station"]):
 				hot_station = &""
 				hot_table_changed.emit(hot_station)
 		&"house_comp":
-			feed_message.emit("The house feels sorry for %s: +$%d" % [player_name(int(ev["player"])), int(ev["amount"])], &"comp")
+			_feed("The house feels sorry for %s: +$%d" % [player_name(int(ev["player"])), int(ev["amount"])], &"comp")
 		&"minigame_started":
 			minigame = {"minigame": ev["minigame"], "state": 0}
 		&"minigame_finished":
@@ -262,7 +278,7 @@ func apply_event(ev: Dictionary) -> bool:
 					players[int(pid)]["pos"] = ev["positions"][pid]
 		&"bets_refunded":
 			if int(ev.get("amount", 0)) > 0:
-				feed_message.emit("%s got $%d back from %s" % [player_name(int(ev["player"])), int(ev["amount"]), station_label(StringName(ev["station"]))], &"info")
+				_feed("%s got $%d back from %s" % [player_name(int(ev["player"])), int(ev["amount"]), station_label(StringName(ev["station"]))], &"info")
 		&"inventory_changed":
 			var pid: int = int(ev["player"])
 			if players.has(pid):
@@ -284,13 +300,13 @@ func apply_event(ev: Dictionary) -> bool:
 			effects[to].append(StringName(ev["item"]))
 			effects_changed.emit(from)
 			effects_changed.emit(to)
-			feed_message.emit("%s passed the Bad Luck Monkey to %s" % [player_name(from), player_name(to)], &"chaos")
+			_feed("%s passed the Bad Luck Monkey to %s" % [player_name(from), player_name(to)], &"chaos")
 		&"fake_cash_caught":
-			feed_message.emit("The bouncer caught %s with fake cash (−$%d)" % [player_name(int(ev["player"])), int(ev["fine"])], &"chaos")
+			_feed("The bouncer caught %s with fake cash (−$%d)" % [player_name(int(ev["player"])), int(ev["fine"])], &"chaos")
 		&"credit_repaid":
-			feed_message.emit("The bank collected $%d from %s" % [int(ev["amount"]), player_name(int(ev["player"]))], &"loss")
+			_feed("The bank collected $%d from %s" % [int(ev["amount"]), player_name(int(ev["player"]))], &"loss")
 		&"bodyguard_saved":
-			feed_message.emit("%s's Bodyguard stepped in!" % player_name(int(ev["player"])), &"chaos")
+			_feed("%s's Bodyguard stepped in!" % player_name(int(ev["player"])), &"chaos")
 		&"banana_placed":
 			peels[int(ev["peel"])] = ev
 			peels_changed.emit()
@@ -301,40 +317,40 @@ func apply_event(ev: Dictionary) -> bool:
 			var victim: int = int(ev["victim"])
 			match StringName(ev["result"]):
 				&"blocked":
-					feed_message.emit("%s's Bodyguard kicked a banana peel away" % player_name(int(ev["player"])), &"chaos")
+					_feed("%s's Bodyguard kicked a banana peel away" % player_name(int(ev["player"])), &"chaos")
 				&"reflected":
-					feed_message.emit("%s's Mirror sent the banana back: %s slipped (−$%d)" % [player_name(int(ev["player"])), player_name(victim), int(ev["amount"])], &"chaos")
+					_feed("%s's Mirror sent the banana back: %s slipped (−$%d)" % [player_name(int(ev["player"])), player_name(victim), int(ev["amount"])], &"chaos")
 				_:
-					feed_message.emit("%s slipped on a banana (−$%d)" % [player_name(victim), int(ev["amount"])], &"chaos")
+					_feed("%s slipped on a banana (−$%d)" % [player_name(victim), int(ev["amount"])], &"chaos")
 		&"shop_restocked":
 			shop_offers = (ev["offers"] as Array).duplicate(true)
 			shop_changed.emit()
 		&"shop_bought":
-			feed_message.emit("%s bought %s at the Gift Shop" % [player_name(int(ev["player"])), RewardPanel.item_name(StringName(ev["item"]))], &"item")
+			_feed("%s bought %s at the Gift Shop" % [player_name(int(ev["player"])), RewardPanel.item_name(StringName(ev["item"]))], &"item")
 		&"rps_result":
 			if not bool(ev["replay"]):
 				var w: int = int(ev["winner"])
 				if w < 0:
-					feed_message.emit("%s and %s tied at Rock Paper Scissors twice: no money changed hands" % [player_name(int(ev["a"])), player_name(int(ev["b"]))], &"item")
+					_feed("%s and %s tied at Rock Paper Scissors twice: no money changed hands" % [player_name(int(ev["a"])), player_name(int(ev["b"]))], &"item")
 				else:
 					var l: int = int(ev["b"]) if w == int(ev["a"]) else int(ev["a"])
-					feed_message.emit("%s beat %s at Rock Paper Scissors (+$%d)" % [player_name(w), player_name(l), int(ev["amount"])], &"chaos")
+					_feed("%s beat %s at Rock Paper Scissors (+$%d)" % [player_name(w), player_name(l), int(ev["amount"])], &"chaos")
 		&"waiter_tripped":
 			puddles[int(ev["puddle"])] = {"puddle": ev["puddle"], "pos": ev["puddle_pos"], "seconds": ev["seconds"]}
 			floor_changed.emit()
 			if int(ev["player"]) >= 0:
-				feed_message.emit("%s knocked the waiter over. Wet floor!" % player_name(int(ev["player"])), &"chaos")
+				_feed("%s knocked the waiter over. Wet floor!" % player_name(int(ev["player"])), &"chaos")
 			else:
-				feed_message.emit("The waiter tripped. Wet floor!", &"chaos")
+				_feed("The waiter tripped. Wet floor!", &"chaos")
 		&"puddle_removed":
 			puddles.erase(int(ev["puddle"]))
 			floor_changed.emit()
 		&"puddle_slip":
-			feed_message.emit("%s slipped in a puddle" % player_name(int(ev["player"])), &"chaos")
+			_feed("%s slipped in a puddle" % player_name(int(ev["player"])), &"chaos")
 		&"megaphone_taken":
 			megaphone_holder = int(ev["player"])
 			floor_changed.emit()
-			feed_message.emit("%s grabbed the megaphone!" % player_name(megaphone_holder), &"chaos")
+			_feed("%s grabbed the megaphone!" % player_name(megaphone_holder), &"chaos")
 		&"megaphone_dropped":
 			megaphone_holder = -1
 			floor_changed.emit()
@@ -357,7 +373,12 @@ func apply_event(ev: Dictionary) -> bool:
 			phase_changed.emit(phase)
 	if ev.has("station") and stations.has(ev["station"]):
 		station_changed.emit(StringName(ev["station"]))
-	return not gap
+
+
+## A feed line, unless the event is a replay of one already shown.
+func _feed(text: String, kind: StringName) -> void:
+	if not _replaying:
+		feed_message.emit(text, kind)
 
 
 func _on_item_used(ev: Dictionary) -> void:
@@ -400,7 +421,7 @@ func _on_item_used(ev: Dictionary) -> void:
 				text += ", but got caught and paid $%d" % int(ev.get("paid", 0))
 			elif ev.has("amount") and int(ev["amount"]) > 0:
 				text += " (−$%d)" % int(ev["amount"])
-	feed_message.emit(text, &"item")
+	_feed(text, &"item")
 
 
 ## "Blackjack 2" from "blackjack_2".

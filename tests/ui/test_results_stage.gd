@@ -69,3 +69,74 @@ func test_name_tags_clamp_their_screen_size() -> void:
 	assert_almost_eq(mid, 1.0, 0.001, "world size in between")
 	var px_near: float = 0.19 * near / (2.0 * 1.0 * tan(deg_to_rad(35.0))) * 1080.0
 	assert_almost_eq(px_near, NameTag.MAX_PX, 0.01)
+
+
+## Screen rect (0..1 of the view) a name tag covers, from its text box in the world.
+func _tag_rect(tag: Label3D) -> Rect2:
+	var box: AABB = tag.get_aabb()
+	var cam: Camera3D = stage.camera
+	var view: Vector2 = stage.get_viewport().get_visible_rect().size
+	var rect := Rect2()
+	var first: bool = true
+	for i: int in 8:
+		var corner: Vector3 = tag.global_transform * box.get_endpoint(i)
+		var p: Vector2 = cam.unproject_position(corner) / view
+		if first:
+			rect = Rect2(p, Vector2.ZERO)
+			first = false
+		else:
+			rect = rect.expand(p)
+	return rect
+
+
+## Screen rect (0..1) of a 2D panel.
+func _panel_rect(c: Control) -> Rect2:
+	var canvas: Vector2 = (stage.standings_panel.get_parent() as Control).size
+	var r: Rect2 = c.get_global_rect()
+	return Rect2(r.position / canvas, r.size / canvas)
+
+
+func _tags() -> Array[Label3D]:
+	var out: Array[Label3D] = []
+	for c: Node in stage.get_children():
+		if c is Label3D and (c as Label3D).billboard == BaseMaterial3D.BILLBOARD_ENABLED and (c as Label3D).text.contains("$"):
+			out.append(c)
+	return out
+
+
+func test_a_full_party_of_eight_fits_the_screen() -> void:
+	# Old fix batch: "results screen with 7-8 players": the beans beside the podium ran off under the
+	# standings and the graph, and their name tags piled up on each other.
+	for n: int in [7, 8]:
+		# A 1920×1080 view, like the game's (the headless window is square).
+		var view := SubViewport.new()
+		view.size = Vector2i(1920, 1080)
+		add_child_autofree(view)
+		var st: ClientMatchState = _state(n)
+		for row: Variant in st.standings:
+			(row as Dictionary)["name"] = "Player %d long" % int(row["player"])
+		stage = ResultsStage.new()
+		view.add_child(stage)
+		stage.setup(st, 1, true)
+		stage.finish_show()
+		await wait_process_frames(3)
+		var tags: Array[Label3D] = _tags()
+		assert_eq(tags.size(), n, "%d name tags" % n)
+		var panels: Array[Rect2] = [_panel_rect(stage.standings_panel), _panel_rect(stage.graph_panel)]
+		var rects: Array[Rect2] = []
+		for t: Label3D in tags:
+			var r: Rect2 = _tag_rect(t)
+			rects.append(r)
+			assert_true(r.position.x >= 0.0 and r.end.x <= 1.0 and r.position.y >= 0.0 and r.end.y <= 1.0, "%d players: %s on screen (%s)" % [n, t.text.get_slice("\n", 0), r])
+			for pr: Rect2 in panels:
+				assert_false(r.intersects(pr), "%d players: %s clear of the panels (%s vs %s)" % [n, t.text.get_slice("\n", 0), r, pr])
+		for i: int in rects.size():
+			for j: int in range(i + 1, rects.size()):
+				assert_false(rects[i].intersects(rects[j]), "%d players: tags %s and %s do not overlap" % [n, tags[i].text.get_slice("\n", 0), tags[j].text.get_slice("\n", 0)])
+		for pid: int in stage.beans:
+			var feet: Vector2 = stage.camera.unproject_position(stage.beans[pid].global_position) / stage.get_viewport().get_visible_rect().size
+			assert_between(feet.x, 0.02, 0.98, "%d players: bean %d in shot" % [n, pid])
+		var standings_bottom: float = _panel_rect(stage.standings_panel).end.y
+		assert_lt(standings_bottom, _panel_rect(stage.award_cards[0].get_parent() as Control).position.y, "%d players: the standings end above the awards" % n)
+		view.queue_free()
+		await wait_process_frames(1)

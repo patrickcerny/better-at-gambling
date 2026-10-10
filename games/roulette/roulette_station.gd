@@ -86,19 +86,19 @@ func _print_layout() -> void:
 	root.name = "LayoutPrint"
 	add_child(root)
 	var top: float = 0.941
-	_tile(root, Vector3(0.04, top, 0.0), Vector2(0.2, 0.86), Palette.FELT_GREEN.lightened(0.25), "0", 56)
+	_tile(root, Vector3(0.04, top, bet_spot(&"straight", 0).z), Vector2(0.2, 0.86), Palette.FELT_GREEN.lightened(0.25), "0", 56)
 	for n: int in range(1, 37):
 		var c: Color = Palette.CASINO_RED if n in RouletteLogic.RED else Palette.CASINO_BLACK
 		_tile(root, Vector3(bet_spot(&"straight", n).x, top, bet_spot(&"straight", n).z), Vector2(0.165, 0.28), c, str(n), 44)
 	var dozens: Array[String] = ["1st 12", "2nd 12", "3rd 12"]
 	for d: int in 3:
-		_tile(root, Vector3(bet_spot(&"dozen", d + 1).x, top, 0.56), Vector2(0.705, 0.18), Palette.FELT_GREEN.darkened(0.25), dozens[d], 40)
+		_tile(root, Vector3(bet_spot(&"dozen", d + 1).x, top, bet_spot(&"dozen", d + 1).z), Vector2(0.705, 0.18), Palette.FELT_GREEN.darkened(0.25), dozens[d], 40)
 	for c: int in 3:
 		_tile(root, Vector3(2.4, top, bet_spot(&"column", c + 1).z), Vector2(0.13, 0.28), Palette.FELT_GREEN.darkened(0.25), "2:1", 30)
 	var outside: Dictionary = {&"low": "1-18", &"even": "EVEN", &"red": "RED", &"black": "BLACK", &"odd": "ODD", &"high": "19-36"}
 	for t: StringName in OUTSIDE_BETS:
 		var col: Color = Palette.CASINO_RED if t == &"red" else (Palette.CASINO_BLACK if t == &"black" else Palette.FELT_GREEN.darkened(0.25))
-		_tile(root, Vector3(bet_spot(t, 0).x, top, -0.56), Vector2(0.345, 0.18), col, outside[t], 36)
+		_tile(root, Vector3(bet_spot(t, 0).x, top, bet_spot(t, 0).z), Vector2(0.345, 0.18), col, outside[t], 36)
 
 
 func _tile(parent: Node3D, pos: Vector3, size: Vector2, color: Color, text: String, font_size: int) -> void:
@@ -122,18 +122,42 @@ func _tile(parent: Node3D, pos: Vector3, size: Vector2, color: Color, text: Stri
 	parent.add_child(l)
 
 
-## Local spot on the layout where a bet of `type` / `value` goes: numbers in a 12 × 3 grid, the
-## zero by the wheel, dozens along the near edge, columns at the far end, even-money bets along
-## the other edge.
+## Depth (z) of the number row holding 1, 4, 7 … (the one nearest the betting side, +z); the
+## next rows (2, 5 … and 3, 6 …) lie `ROW_STEP` further away.
+const ROW_Z0: float = 0.1
+const ROW_STEP: float = 0.3
+## Depth of the dozens and of the even-money boxes: both on the betting side, the even-money bets
+## outermost.
+const DOZEN_Z: float = 0.36
+const EVEN_Z: float = 0.58
+
+
+## Local spot on the layout where a bet of `type` / `value` goes. Laid out like the betting panel
+## turned a quarter to the left, as the seated player sees the felt from the south side: the zero
+## by the wheel (the panel's top), the numbers running away from it 1-2-3, 4-5-6 … with 1 nearest
+## the player (the panel's left), the columns' 2:1 at the far end (the panel's bottom), and the
+## dozens then the even-money bets along the player's edge (the panel's outside columns).
 static func bet_spot(type: StringName, value: int) -> Vector3:
 	match type:
 		&"straight":
 			if value <= 0:
-				return Vector3(0.05, FELT_Y, 0.0)
-			return Vector3(0.25 + ((value - 1) / 3) * 0.18, FELT_Y, ((value - 1) % 3 - 1) * 0.3)
+				return Vector3(0.05, FELT_Y, ROW_Z0 - ROW_STEP)
+			return Vector3(0.25 + ((value - 1) / 3) * 0.18, FELT_Y, ROW_Z0 - ((value - 1) % 3) * ROW_STEP)
 		&"dozen":
-			return Vector3(0.25 + ((value - 1) * 4 + 1.5) * 0.18, FELT_Y, 0.56)
+			return Vector3(0.25 + ((value - 1) * 4 + 1.5) * 0.18, FELT_Y, DOZEN_Z)
 		&"column":
-			return Vector3(2.4, FELT_Y, (value - 2) * 0.3)
+			return Vector3(2.4, FELT_Y, ROW_Z0 - (value - 1) * ROW_STEP)
 	var i: int = maxi(OUTSIDE_BETS.find(type), 0)
-	return Vector3(0.34 + i * 0.36, FELT_Y, -0.56)
+	return Vector3(0.34 + i * 0.36, FELT_Y, EVEN_Z)
+
+
+## Half size (x, z) of the printed tile a bet of `type` sits on: chips stay inside it.
+static func spot_half_size(type: StringName) -> Vector2:
+	match type:
+		&"straight":
+			return Vector2(0.0825, 0.14)
+		&"column":
+			return Vector2(0.065, 0.14)
+		&"dozen":
+			return Vector2(0.35, 0.09)
+	return Vector2(0.17, 0.09)
