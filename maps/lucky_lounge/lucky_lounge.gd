@@ -80,6 +80,10 @@ var stations: Dictionary[StringName, StationBase] = {}
 var pedestal_labels: Array[Label3D] = []
 var pedestal_tops: Array[MeshInstance3D] = []
 var _pedestal_state: Array = []
+## Bobbing arrow over the local player's own pedestal (built on first use, client only).
+var pedestal_marker: Node3D
+var _marker_base_y: float = 0.0
+var _marker_time: float = 0.0
 var fountain_area: Area3D
 var vip_gate_area: Area3D
 var nav_region: NavigationRegion3D
@@ -167,6 +171,60 @@ func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
 	mat.emission = Palette.WARM_GOLD
 	mat.emission_energy_multiplier = 1.2
 	mat.albedo_color = Palette.WARM_GOLD.lerp(MARBLE, 0.35) if ready else MARBLE
+
+
+## Shows (or hides) the arrow that points the local player to their own pedestal, in their colour.
+## Hidden again once they are ready. One marker: it follows whichever colour is passed.
+func set_pedestal_marker(color_index: int, shown: bool) -> void:
+	if not shown or color_index < 0 or color_index >= PEDESTALS.size():
+		if pedestal_marker != null:
+			pedestal_marker.visible = false
+		set_process(false)
+		return
+	if pedestal_marker == null:
+		pedestal_marker = Node3D.new()
+		pedestal_marker.name = "PedestalMarker"
+		add_child(pedestal_marker)
+		# Downward cone with a short shaft: reads as an arrow from every side.
+		var head := MeshInstance3D.new()
+		head.name = "Head"
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.28
+		cone.bottom_radius = 0.0
+		cone.height = 0.4
+		cone.radial_segments = 8
+		head.mesh = cone
+		head.position.y = 0.2
+		pedestal_marker.add_child(head)
+		var shaft := MeshInstance3D.new()
+		shaft.name = "Shaft"
+		var bar := BoxMesh.new()
+		bar.size = Vector3(0.16, 0.3, 0.16)
+		shaft.mesh = bar
+		shaft.position.y = 0.55
+		pedestal_marker.add_child(shaft)
+	var color: Color = Palette.player_color(color_index)
+	var mat := StandardMaterial3D.new()  # own material: the kit caches one per colour
+	mat.albedo_color = color
+	mat.roughness = 0.5
+	mat.emission_enabled = true
+	mat.emission = color
+	mat.emission_energy_multiplier = 0.9
+	for child: Node in pedestal_marker.get_children():
+		(child as MeshInstance3D).material_override = mat
+	var pos: Vector3 = PEDESTALS[color_index]
+	_marker_base_y = PEDESTAL_TOP + 1.3
+	pedestal_marker.position = Vector3(pos.x, _marker_base_y, pos.z)
+	pedestal_marker.visible = true
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	if pedestal_marker == null or not pedestal_marker.visible:
+		return
+	_marker_time += delta
+	pedestal_marker.position.y = _marker_base_y + sin(_marker_time * 3.0) * 0.12
+	pedestal_marker.rotation.y = _marker_time * 1.2
 
 
 ## Opens (casino reachable) or closes the lobby doors. Opening slides them into the floor.

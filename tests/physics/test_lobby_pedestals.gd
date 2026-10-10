@@ -43,6 +43,27 @@ func test_names_and_ready_state_follow_the_shared_state() -> void:
 	assert_true((scene.map.pedestal_tops[colour].material_override as StandardMaterial3D).emission_enabled)
 
 
+func test_an_arrow_marks_my_pedestal_until_i_am_ready() -> void:
+	var me: int = scene.local_id
+	var colour: int = int(scene.view.state.players[me]["color"])
+	await wait_seconds(0.4)
+	var marker: Node3D = scene.map.pedestal_marker
+	assert_not_null(marker, "marker built for the local player")
+	assert_true(marker.visible, "shown while not ready")
+	var pad: Vector3 = scene.map.ready_pad(colour)
+	assert_almost_eq(marker.position.x, pad.x, 0.01, "over my pedestal")
+	assert_almost_eq(marker.position.z, pad.z, 0.01)
+	assert_gt(marker.position.y, LuckyLounge.PEDESTAL_TOP + 0.8, "floats above the column")
+	var head: MeshInstance3D = marker.get_node("Head") as MeshInstance3D
+	assert_eq((head.material_override as StandardMaterial3D).albedo_color, Palette.player_color(colour), "in my colour")
+	scene.view.state.players[me]["ready"] = true
+	await wait_seconds(0.4)
+	assert_false(marker.visible, "hidden once ready")
+	scene.view.state.players[me]["ready"] = false
+	await wait_seconds(0.4)
+	assert_true(marker.visible, "back when not ready")
+
+
 func test_a_player_walks_up_onto_the_pedestal() -> void:
 	var pad: Vector3 = LuckyLounge.PEDESTALS[0]
 	var start: Vector3 = pad + Vector3(0, 0, -3.4)

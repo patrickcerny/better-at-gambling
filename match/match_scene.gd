@@ -694,6 +694,9 @@ func _refresh_pedestals() -> void:
 	for i: int in LuckyLounge.PEDESTALS.size():
 		var p: Dictionary = by_color.get(i, {})
 		map.set_pedestal(i, str(p.get("name", "")), bool(p.get("ready", false)))
+	# Arrow over the local player's own pedestal until they are ready.
+	var mine: Dictionary = view.state.players.get(local_id, {})
+	map.set_pedestal_marker(int(mine.get("color", -1)), not mine.is_empty() and not bool(mine.get("ready", false)))
 
 
 ## SERVER: a client's own avatar moved.
