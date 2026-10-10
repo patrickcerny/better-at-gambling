@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"bust_or_bank"
 display_name = "Bust or Bank"
-rules_text = "One shared shoe deals a card to everyone still drawing, and everyone can see the NEXT card face up. STAND any time to bank your total. Over 21 = bust, you're out on the spot. When the round ends, the worst standing hand is out too (ties all go). Fresh count each round, last player standing wins. If everyone busts, the round is replayed."
+rules_text = "Blackjack round the table. Everyone gets one card, then it goes turn by turn: you have 20 s to HIT (take one card, the next player goes) or STAND (your hand is locked). Everyone sees the NEXT card face up. Over 21 = bust. When everyone has stood or busted, the highest hand wins."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2

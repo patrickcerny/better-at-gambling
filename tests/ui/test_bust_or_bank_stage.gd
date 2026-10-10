@@ -1,17 +1,24 @@
 extends GutTest
-## Bust or Bank stage fed by the real logic's events and snapshots (the schema contract): points
-## update from round results, busts show immediately, replays and the final ranking display.
+## Bust or Bank stage fed by the real logic's events and snapshots (the schema contract): the table
+## with everyone's seat, the current player highlighted with a countdown, HIT / STAND only on your
+## own turn, and the result view with the winner(s).
 
 var logic: BustOrBankLogic
 var stage: BustOrBankStage
+## Intents the stage sent (instead of the network).
+var sent: Array[Dictionary] = []
 
 
 func before_each() -> void:
+	sent.clear()
 	var st := ClientMatchState.new()
 	st.players = {1: {"id": 1, "name": "Me", "color": 0}, 2: {"id": 2, "name": "Bo", "color": 1}, 3: {"id": 3, "name": "Cy", "color": 2}}
 	logic = BustOrBankLogic.new()
 	logic.setup([1, 2, 3] as Array[int], SeededRng.new(3), BalanceConfig.new(), {}, {})
 	stage = BustOrBankStage.new()
+	stage.send_intent = func(i: Dictionary) -> Dictionary:
+		sent.append(i)
+		return logic.submit(1, i, 0.0)
 	add_child_autofree(stage)
 	stage.begin(st, 1, {"minigame": &"bust_or_bank", "players": [1, 2, 3]}, {})
 	_pump()
@@ -23,32 +30,27 @@ func _pump() -> void:
 		stage.on_event(ev)
 
 
-func _open(ranks: Array[int]) -> void:
+func _cards(ranks: Array[int]) -> Array[int]:
 	var cards: Array[int] = []
 	for r: int in ranks:
 		cards.append(Card.make(r))
-	logic.shoe.stack_top(cards)
+	return cards
+
+
+## Stacks the shoe and plays the intro: one card each, then player 1's turn.
+func _open(ranks: Array[int]) -> void:
+	logic.shoe.stack_top(_cards(ranks))
 	logic.tick(BustOrBankLogic.INTRO_TIME, 0.0)
 	_pump()
 
 
-func _next_card() -> void:
-	logic.tick(BustOrBankLogic.DEAL_INTERVAL, 0.0)
+func _act(p: int, action: String) -> void:
+	assert_true(logic.submit(p, {"action": action}, 0.0)["ok"], "%d %s" % [p, action])
 	_pump()
 
 
-func _stand(p: int) -> void:
-	assert_true(logic.submit(p, {"action": "stand"}, 0.0)["ok"])
-	_pump()
-
-
-func _row(p: int) -> Label:
-	for row: Node in stage.board.get_children():
-		if row.is_queued_for_deletion():
-			continue
-		if int(row.get_meta("player", -1)) == p:
-			return stage.board_rows[p]["label"] as Label
-	return null
+func _seat_status(p: int) -> String:
+	return str((stage.seats[p]["panel"] as Control).get_meta("status", ""))
 
 
 ## The cards a row of `CardFace`s shows, in order.
@@ -60,133 +62,191 @@ func _faces(row: HBoxContainer) -> Array[int]:
 	return out
 
 
-func test_cards_and_totals_follow_the_shared_shoe() -> void:
-	_open([10, 5])
-	assert_eq(stage.hands[1]["total"], 15)
-	assert_eq(stage.hands[3]["total"], 15)
-	assert_eq(stage.my_total_label.text, "15")
-	assert_eq(stage.dealt_face.card, Card.make(5))
-	assert_true(stage.dealt_face.is_face_up())
-	assert_eq(_faces(stage.my_hand_row), [Card.make(10), Card.make(5)] as Array[int], "real card faces in your hand")
-	assert_eq(_faces(stage.board_rows[2]["cards"]), [Card.make(10), Card.make(5)] as Array[int])
-	assert_eq((stage.board_rows[2]["total"] as Label).text, "Total 15", "total under each hand")
-	assert_false(stage.stand_button.disabled, "can stand while cards are coming")
+func _key(action: StringName) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = true
+	stage._unhandled_input(ev)
 
 
-func test_next_card_is_shown_face_up_and_then_dealt() -> void:
-	_open([10, 2, 5, 3])
-	assert_eq(stage.next_card, Card.make(5))
-	assert_eq(stage.next_face.card, Card.make(5))
-	assert_true(stage.next_face.is_face_up(), "everyone sees the next card")
-	assert_eq(stage.next_face.text(), "5♠")
-	_next_card()
-	assert_eq(stage.dealt_face.card, Card.make(5), "the shown card is the one dealt")
-	assert_eq(stage.next_face.card, Card.make(3), "and the one after it is revealed")
-	assert_eq(_faces(stage.my_hand_row).back(), Card.make(5))
+func test_a_seat_for_everyone_round_the_table() -> void:
+	assert_eq(stage.seats.size(), 3)
+	assert_not_null(stage.table)
+	assert_eq(stage._seat_order(), [1, 2, 3] as Array[int], "you sit at the bottom, then the circle")
+	for p: int in [1, 2, 3]:
+		assert_eq(_seat_status(p), "WAITING")
+	assert_string_contains((stage.seats[1]["name"] as Label).text, "Me")
+	assert_string_contains((stage.seats[2]["name"] as Label).text, "Bo")
+	assert_true(stage.hit_button.disabled, "no buttons during the intro")
+	assert_almost_eq(stage.time_left, BustOrBankLogic.INTRO_TIME, 0.001, "intro countdown from round_started")
 
 
-func test_deal_bar_follows_the_event_timings() -> void:
-	assert_almost_eq(stage.deal_left, BustOrBankLogic.INTRO_TIME, 0.001, "intro countdown from round_started")
-	assert_string_contains(stage.deal_time_label.text, "Dealing in")
-	_open([10, 2, 5])
-	assert_almost_eq(stage.deal_left, BustOrBankLogic.DEAL_INTERVAL, 0.001, "next_in from the card event")
-	assert_almost_eq(stage.deal_span, BustOrBankLogic.DEAL_INTERVAL, 0.001)
-	assert_string_contains(stage.deal_time_label.text, "Next card in 3.2")
-	stage.on_event({"type": &"bust_or_bank_card", "card": Card.make(5), "next_card": Card.make(6), "receivers": [1, 2, 3], "totals": {1: 17, 2: 17, 3: 17}, "next_in": 7.5})
-	assert_almost_eq(stage.deal_span, 7.5, 0.001, "uses the server's value, not a local constant")
-	stage._process(2.5)
-	assert_almost_eq(stage.deal_bar.value, 2.5 / 7.5, 0.001)
+func test_opening_deal_one_card_each() -> void:
+	_open([10, 5, 7, 3])
+	assert_eq(_faces(stage.seats[1]["cards"]), _cards([10]))
+	assert_eq(_faces(stage.seats[2]["cards"]), _cards([5]))
+	assert_eq(_faces(stage.seats[3]["cards"]), _cards([7]))
+	assert_eq((stage.seats[2]["total"] as Label).text, "5")
+	assert_eq(stage.next_face.card, Card.make(3), "the next card is shown face up")
+	assert_true(stage.next_face.is_face_up())
 
 
-func test_points_update_from_round_end() -> void:
-	_open([10, 2, 5, 3])
-	_stand(2)  # 12: worst
-	_next_card()
-	_stand(1)  # 17
-	_next_card()
-	_stand(3)  # 20
-	assert_eq(stage.points, {1: 1, 2: 0, 3: 1})
-	assert_string_contains(stage.points_label.text, "1")
-	assert_string_contains(_row(2).text, "OUT")
-	assert_eq(stage.in_game, [1, 3] as Array[int])
-	assert_string_contains(stage.banner.text, "Bo")
+func test_own_turn_highlight_countdown_and_buttons() -> void:
+	_open([10, 5, 7, 3])
+	assert_eq(stage.current, 1)
+	assert_true(stage.can_act())
+	assert_false(stage.hit_button.disabled)
+	assert_false(stage.stand_button.disabled)
+	assert_eq(stage.turn_label.text, "YOUR TURN")
+	assert_eq(_seat_status(1), "YOUR TURN")
+	assert_true((stage.seats[1]["bar"] as ProgressBar).visible, "the current seat has a countdown bar")
+	assert_false((stage.seats[2]["bar"] as ProgressBar).visible)
+	assert_eq((stage.seats[1]["style"] as StyleBoxFlat).border_color, Palette.VIP_GOLD, "highlighted")
+	assert_almost_eq(stage.time_left, BustOrBankLogic.TURN_TIME, 0.001)
+	assert_eq(stage.countdown_label.text, "20")
+	stage._process(5.5)
+	assert_eq(stage.countdown_label.text, "15")
+	assert_almost_eq(stage.countdown_bar.value, 14.5 / 20.0, 0.001)
+	assert_string_contains(stage.prompt_label.text, "3♠", "asks about the next card")
 
 
-func test_points_are_set_not_accumulated() -> void:
-	_open([10, 2, 5, 3])
-	_stand(2)
-	_next_card()
-	_stand(1)
-	_next_card()
-	_stand(3)
-	var ev: Dictionary = {"type": &"bust_or_bank_round_end", "points": {1: 1, 2: 0, 3: 1}, "remaining": [1, 3], "replay": false, "busted": [], "worst": [2]}
-	stage.on_event(ev)  # same absolute values again (e.g. a resend) must not double
-	assert_eq(int(stage.points[1]), 1)
-
-
-func test_bust_shows_immediately_before_the_round_ends() -> void:
-	_open([10, 2, 10])
-	_stand(2)
-	_stand(3)
-	logic.shoe.stack_top([Card.make(10)] as Array[int])
-	# Feed only the card + bust events, not the round end yet.
-	logic.tick(BustOrBankLogic.DEAL_INTERVAL, 0.0)
-	for ev: Dictionary in logic.drain_events():
-		if ev["type"] == &"bust_or_bank_round_end":
-			break
-		stage.on_event(ev)
-	assert_true(stage.hands[1]["busted"])
-	assert_eq(stage.status_label.text, "BUST!")
-	assert_string_contains(_row(1).text, "BUST")
-	assert_true(stage.stand_button.disabled)
-
-
-func test_everyone_busting_shows_a_replay_not_an_elimination() -> void:
-	_open([10, 2, 10])
-	_next_card()  # all 22
-	assert_string_contains(stage.banner.text, "Replay")
-	assert_eq(stage.in_game, [1, 2, 3] as Array[int])
-	assert_string_contains(_row(2).text, "replay")
-	logic.tick(BustOrBankLogic.RESULT_TIME, 0.0)
+func test_hit_button_sends_hit_and_passes_the_turn() -> void:
+	_open([10, 5, 7, 3])
+	stage.hit_button.pressed.emit()
+	assert_eq(sent.size(), 1)
+	assert_eq(sent[0]["type"], &"bust_or_bank_action")
+	assert_eq(sent[0]["action"], "hit")
 	_pump()
-	assert_true(stage.replay)
-	assert_eq(stage.hands[1]["total"], 0, "fresh count")
-	assert_eq(_faces(stage.my_hand_row), [] as Array[int], "hands cleared for the new round")
-	assert_eq(stage.next_face.card, logic.next_card, "the new round reveals its first card")
-	assert_string_contains(stage.round_label.text, "replay")
+	assert_eq(_faces(stage.seats[1]["cards"]), _cards([10, 3]))
+	assert_eq((stage.seats[1]["total"] as Label).text, "13")
+	assert_eq(stage.current, 2)
+	assert_true(stage.hit_button.disabled, "not your turn any more")
+	assert_eq(_seat_status(1), "WAITING")
 
 
-func test_finish_names_the_winner() -> void:
-	_open([10, 2, 5, 10])
-	_stand(2)  # 12
-	_next_card()
-	_stand(1)  # 17
-	_next_card()  # 3 busts → 1 wins, 2 second, 3 third
+func test_keys_hit_and_stand() -> void:
+	_open([10, 5, 7, 3])
+	_key(&"bj_stand")
+	assert_eq(sent.size(), 1)
+	assert_eq(sent[0]["action"], "stand")
+	_pump()
+	assert_eq(_seat_status(1), "STOOD")
+	_key(&"bj_hit")
+	assert_eq(sent.size(), 1, "keys do nothing when it is not your turn")
+
+
+func test_other_players_turn_disables_buttons() -> void:
+	_open([10, 5, 7, 3])
+	_act(1, "stand")
+	assert_eq(stage.current, 2)
+	assert_false(stage.can_act())
+	assert_true(stage.hit_button.disabled)
+	assert_true(stage.stand_button.disabled)
+	assert_eq(stage.turn_label.text, "BO'S TURN")
+	assert_eq(_seat_status(2), "TURN")
+	assert_true((stage.seats[2]["bar"] as ProgressBar).visible)
+	assert_true(stage.countdown_label.visible, "the countdown is always shown")
+	assert_eq((stage.seats[2]["style"] as StyleBoxFlat).border_color, Palette.VIP_GOLD)
+	stage.hit_button.pressed.emit()
+	assert_eq(sent.size(), 0)
+
+
+func test_bust_shows_on_the_seat() -> void:
+	_open([10, 5, 7, 10, 10])
+	_act(1, "hit")  # 20
+	_act(2, "hit")  # 15
+	_act(3, "stand")
+	logic.shoe.stack_top(_cards([5]))
+	_act(1, "hit")  # 25
+	assert_true(stage.hands[1]["busted"])
+	assert_eq(_seat_status(1), "BUST")
+	assert_string_contains(stage.banner.text, "BUST")
+	assert_string_contains(stage.prompt_label.text, "Bust")
+
+
+func test_timeout_stand_is_announced() -> void:
+	_open([10, 5, 7])
+	logic.tick(BustOrBankLogic.TURN_TIME, 0.0)
+	_pump()
+	assert_eq(_seat_status(1), "STOOD")
+	assert_string_contains(stage.banner.text, "Time's up")
+	assert_eq(stage.current, 2)
+
+
+func test_result_shows_every_hand_and_the_winner() -> void:
+	_open([10, 5, 7, 9, 5])
+	_act(1, "hit")  # 19
+	_act(2, "hit")  # 10
+	_act(3, "stand")  # 7
+	_act(1, "stand")
+	_act(2, "stand")
 	assert_true(stage.over)
-	assert_string_contains(stage.banner.text, "You are the last one standing")
-	assert_eq(stage.points, {1: 2, 2: 1, 3: 0})
+	assert_eq(stage.winners, [1] as Array[int])
+	assert_eq(_seat_status(1), "WINNER")
+	assert_eq(_seat_status(2), "STOOD")
+	assert_eq((stage.seats[1]["style"] as StyleBoxFlat).border_color, Palette.VIP_GOLD)
+	assert_string_contains(stage.turn_label.text, "You win with 19")
+	assert_true(stage.result_grid.visible)
+	assert_eq(stage.result_grid.get_child_count(), 3, "every hand is listed")
+	assert_false(stage.countdown_label.visible)
+	assert_true(stage.hit_button.disabled)
+	assert_string_contains(stage.prompt_label.text, "#1")
+	assert_eq(_faces(stage.seats[2]["cards"]), _cards([5, 5]))
 
 
-func test_snapshot_catches_up_mid_round() -> void:
-	_open([10, 2, 5, 3])
-	_stand(2)
-	_next_card()
+func test_tied_winners_share() -> void:
+	_open([10, 10, 5])
+	_act(1, "stand")
+	_act(2, "stand")
+	_act(3, "stand")
+	assert_eq(stage.winners, [1, 2] as Array[int])
+	assert_eq(_seat_status(2), "WINNER")
+	assert_string_contains(stage.turn_label.text, "share the win")
+
+
+func test_snapshot_catches_up_mid_turn() -> void:
+	_open([10, 5, 7, 3])
+	_act(1, "hit")
+	logic.tick(4.0, 0.0)
 	var late: BustOrBankStage = BustOrBankStage.new()
+	late.send_intent = func(_i: Dictionary) -> Dictionary: return {"ok": true}
 	add_child_autofree(late)
 	var st := ClientMatchState.new()
-	late.begin(st, 3, {"minigame": &"bust_or_bank", "players": [1, 2, 3]}, logic.get_public_state())
-	assert_eq(late.hands[3]["total"], 17)
-	assert_true(late.hands[2]["stood"])
-	assert_eq(late.next_face.card, Card.make(3), "late joiners see the next card")
-	assert_eq(late.dealt_face.card, Card.make(5))
-	assert_eq(_faces(late.my_hand_row), [Card.make(10), Card.make(2), Card.make(5)] as Array[int])
-	assert_true(late.dealing)
-	assert_false(late.stand_button.disabled)
+	late.begin(st, 2, {"minigame": &"bust_or_bank", "players": [1, 2, 3]}, logic.get_public_state())
+	assert_eq(late.current, 2)
+	assert_true(late.can_act(), "it's the late joiner's turn")
+	assert_almost_eq(late.time_left, BustOrBankLogic.TURN_TIME - 4.0, 0.01)
+	assert_eq(_faces(late.seats[1]["cards"]), _cards([10, 3]))
+	assert_eq(late.next_face.card, logic.next_card, "late joiners see the next card")
+	assert_eq(late._seat_order(), [2, 3, 1] as Array[int], "their own seat at the bottom")
 
 
-func test_space_does_nothing_once_out() -> void:
-	_open([10, 2, 10])
-	_stand(2)
-	_stand(3)
-	_next_card()  # 1 busts and is out
-	assert_false(stage.can_stand())
+func test_eight_seats_do_not_overlap() -> void:
+	var st := ClientMatchState.new()
+	var ids: Array = []
+	for i: int in 8:
+		st.players[i + 1] = {"id": i + 1, "name": "Player %d" % (i + 1), "color": i}
+		ids.append(i + 1)
+	var big: BustOrBankStage = BustOrBankStage.new()
+	add_child_autofree(big)
+	big.begin(st, 1, {"minigame": &"bust_or_bank", "players": ids}, {})
+	big.arena.size = Vector2(1856, 860)
+	big._layout()
+	var rects: Array[Rect2] = []
+	for p: Variant in big.seats:
+		var c: Control = big.seats[p]["panel"]
+		rects.append(Rect2(c.position, c.size))
+	for i: int in rects.size():
+		for j: int in range(i + 1, rects.size()):
+			assert_false(rects[i].intersects(rects[j]), "seats %d and %d overlap" % [i, j])
+
+
+func test_a_player_leaving_mid_turn_loses_their_seat() -> void:
+	_open([10, 5, 7, 3])
+	_act(1, "hit")
+	logic.remove_player(2)
+	_pump()
+	assert_eq(stage.players, [1, 3] as Array[int])
+	assert_false((stage.seats[2]["panel"] as Control).visible)
+	assert_eq(stage.current, 3)
+	assert_eq(stage.turn_label.text, "CY'S TURN")

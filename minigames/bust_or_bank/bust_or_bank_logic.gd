@@ -1,76 +1,81 @@
 class_name BustOrBankLogic
 extends MinigameLogicBase
-## "Bust or Bank" minigame: last player standing at a shared blackjack shoe.
+## "Bust or Bank" minigame: one hand of turn-based blackjack around a shared table.
 ##
-## Each round one shared shoe deals a card every `DEAL_INTERVAL` seconds to everyone still in play
-## at once; each player adds it to their own total and may STAND (bank) at any moment. Going over
-## 21 busts you on the spot. The upcoming card is no secret: `next_card` (the shoe's top card) is
-## shown face up to everyone in every `bust_or_bank_card` / `bust_or_bank_round_started` event and in
-## the snapshot, so the decision is "do I want THAT card?". When nobody is still drawing, the round ends: busted players and the
-## worst standing hand(s) are thrown out (ties for worst all go). Survivors play again with a fresh
-## count until one player is left.
+## Everyone gets ONE face-up card from a shared shoe (seat order: the order the minigame was set up
+## with). Then the turns go round the table in a circle: on your turn you have `TURN_TIME` seconds
+## to HIT (take exactly one card, then the turn passes on) or STAND (your hand is locked and you are
+## done for the round). No decision in time = STAND. Over 21 busts you on the spot; hitting to 21
+## stands you automatically (you can't do better). The circle skips players who stood or busted, so
+## a lone player still in keeps taking turns until they stand or bust.
 ##
-## Ranking is elimination order: later out = better. Players thrown out in the same round share a
-## rank, and busted players rank below that round's worst standing hand. If everyone in a round
-## busts, nobody is thrown out and the round is replayed. If every standing hand ties for worst,
-## nobody is thrown out for the tie either (there would be nobody left).
+## The upcoming card is no secret: `next_card` (the shoe's top card) is shown face up to everyone in
+## every event and in the snapshot, so the decision is "do I want THAT card?".
 ##
-## "Points" are the number of players you have outlasted so far; they're sent with every
-## `bust_or_bank_round_end` event (absolute values, not deltas) and end up in the ranking.
+## The round ends when nobody is left drawing. Highest total wins (21 best, a two-card blackjack is
+## just 21); equal totals share a rank; busted players rank below every standing hand and share one
+## rank. Points = hand total for standing players, 0 for busted ones.
+##
+## Events: `bust_or_bank_started`, `bust_or_bank_round_started` (opening deal in `deal_in` s),
+## `bust_or_bank_card` (one per card dealt, the opening cards too), `bust_or_bank_turn`,
+## `bust_or_bank_player_stood`, `bust_or_bank_player_left`, `bust_or_bank_round_end` (hands, ranking, points, winners).
 
-enum State { INTRO, DEALING, RESULT, DONE }
+enum State { INTRO, TURN, RESULT, DONE }
 
-## Seconds before the first cards of a round (players read the next card and get ready).
-const INTRO_TIME: float = 4.0
-## Seconds between shared cards while players are still drawing: the stand-decision window.
-const DEAL_INTERVAL: float = 3.2
-## Seconds the round result is shown before the next round (or the end).
+## Seconds the empty table is shown before the opening cards land and the first turn starts.
+const INTRO_TIME: float = 3.0
+## Seconds a player has to HIT or STAND; then they stand automatically.
+const TURN_TIME: float = 20.0
+## Seconds the final hands are shown before the minigame ends.
 const RESULT_TIME: float = 5.0
-## Cards dealt at the start of a round (blackjack-style two-card start).
-const OPENING_CARDS: int = 2
-## Safety cap (counts replays): survivors after `max_rounds` rounds share first place. It's the
-## player count + `SPARE_ROUNDS` (one knock-out per round plus a few replays), capped at
-## `MAX_ROUNDS`, so a table of idle players (everyone busts, every round) still ends quickly.
-const SPARE_ROUNDS: int = 3
-const MAX_ROUNDS: int = 12
 const SHOE_DECKS: int = 2
 const BLACKJACK: int = 21
 
 var state: State = State.INTRO
+## Seconds left in the current state (intro, the current turn, the result).
 var timer: float = 0.0
-## Round number, 0-based, counting replays.
-var round: int = 0
 var shoe: Shoe
-## Players still in the game (not thrown out).
-var in_round: Array[int] = []
-var hands: Dictionary[int, Array] = {}  # player → Array[int] of cards this round
+## Seat order: the circle the turns go round. Players who left are removed.
+var order: Array[int] = []
+var hands: Dictionary[int, Array] = {}  # player → Array[int] of cards
 var standing: Dictionary[int, bool] = {}
 var busted: Dictionary[int, bool] = {}
-## Thrown-out groups, worst first: each entry is the players who share one rank.
-var elim_groups: Array[Array] = []
+## Whose turn it is (-1 outside TURN).
+var current: int = -1
+## Turns started so far (0 before the first).
+var turn: int = 0
 var last_card: int = -1
-## The card the shoe deals next, shown face up to everyone (-1 while the game is over). It is the
-## shoe's top card, so `shoe.stack_top` still decides the order (tests and tutorial scripting).
-var next_card: int = -1
-var max_rounds: int = MAX_ROUNDS
-## The round that just ended was an everyone-busted replay (the next one replays it).
-var _last_was_replay: bool = false
+## The card the shoe deals next, shown face up to everyone (-1 once the round is over). It is
+## always the shoe's top card, so `shoe.stack_top` decides the order (tests and tutorial scripting).
+var next_card: int:
+	get:
+		if shoe == null or state == State.RESULT or state == State.DONE:
+			return -1
+		return shoe.peek()
 
 
 func _on_setup(_context: Dictionary) -> void:
 	shoe = Shoe.new(rng, SHOE_DECKS)
-	in_round = players.duplicate()
-	in_round.sort()
-	max_rounds = mini(in_round.size() + SPARE_ROUNDS, MAX_ROUNDS)
+	order = players.duplicate()
+	for p: int in order:
+		hands[p] = [] as Array[int]
+		standing[p] = false
+		busted[p] = false
 	events.append(GameEvents.make(&"bust_or_bank_started", {
-		"players": in_round.duplicate(),
-		"deal_interval": DEAL_INTERVAL,
-		"max_rounds": max_rounds,
+		"players": order.duplicate(),
+		"turn_time": TURN_TIME,
 	}))
-	if in_round.size() <= 1:
+	if order.is_empty():
 		_finish()
 		return
-	_begin_round(false)
+	state = State.INTRO
+	timer = INTRO_TIME
+	events.append(GameEvents.make(&"bust_or_bank_round_started", {
+		"players": order.duplicate(),
+		"deal_in": INTRO_TIME,
+		"turn_time": TURN_TIME,
+		"next_card": next_card,
+	}))
 
 
 func tick(delta: float, _now: float) -> void:
@@ -81,201 +86,170 @@ func tick(delta: float, _now: float) -> void:
 		return
 	match state:
 		State.INTRO:
-			state = State.DEALING
-			for i: int in OPENING_CARDS:
-				if state == State.DEALING:
-					# The opening cards land together: only the last one waits a full interval.
-					_deal(DEAL_INTERVAL if i == OPENING_CARDS - 1 else 0.0)
-			if state == State.DEALING:
-				timer = DEAL_INTERVAL
-		State.DEALING:
-			_deal(DEAL_INTERVAL)
-			if state == State.DEALING:
-				timer = DEAL_INTERVAL
-		State.RESULT:
-			if _game_over():
-				finished = true
-				state = State.DONE
-			else:
-				_begin_round(_last_was_replay)
-		State.DONE:
+			_opening_deal()
+		State.TURN:
+			var p: int = current
+			_stand(p, &"timeout")
+			_pass_turn(p)
+		State.RESULT, State.DONE:
+			state = State.DONE
 			finished = true
 
 
-## Only action: STAND (bank your total). Cards come from the shared shoe on their own.
+## HIT (one card, then the next player's turn) or STAND (locked for the round), on your turn only.
 func submit(player: int, intent: Dictionary, _now: float) -> Dictionary:
-	if player not in in_round:
+	if player not in order:
 		return StationLogicBase.fail(&"not_in_game")
-	if finished or state == State.DONE:
+	if finished or state == State.RESULT or state == State.DONE:
 		return StationLogicBase.fail(&"game_over")
 	var action: String = str(intent.get("action", "")).to_lower()
-	if action != "stand":
+	if action != "hit" and action != "stand":
 		return StationLogicBase.fail(&"invalid_action")
-	if state != State.DEALING:
-		return StationLogicBase.fail(&"not_dealing")
 	if busted[player]:
 		return StationLogicBase.fail(&"already_busted")
 	if standing[player]:
 		return StationLogicBase.fail(&"already_stood")
-	_stand(player, false)
-	if _active().is_empty():
-		_end_round()
+	if state != State.TURN or player != current:
+		return StationLogicBase.fail(&"not_your_turn")
+	if action == "stand":
+		_stand(player, &"choice")
+	else:
+		_deal(player)
+		if not busted[player] and _total(player) == BLACKJACK:
+			_stand(player, &"21")  # can't do better than 21
+	_pass_turn(player)
 	return StationLogicBase.OK_RESULT
 
 
+## A player who leaves is dropped from the table and the ranking (like the other minigames); on
+## their turn, the turn passes to the next player still in.
 func remove_player(player: int) -> void:
+	if player not in order:
+		super.remove_player(player)
+		return
+	var was_current: bool = state == State.TURN and player == current
+	var next_p: int = _next_active_after(player, true) if was_current else -1
 	super.remove_player(player)
-	in_round.erase(player)
+	order.erase(player)
 	hands.erase(player)
 	standing.erase(player)
 	busted.erase(player)
-	for group: Array in elim_groups:
-		group.erase(player)
-	elim_groups.assign(elim_groups.filter(func(g: Array) -> bool: return not g.is_empty()))
-	if finished or state == State.DONE:
+	if finished or state == State.RESULT or state == State.DONE:
 		return
-	if in_round.size() <= 1:
+	events.append(GameEvents.make(&"bust_or_bank_player_left", {"player": player, "players": order.duplicate()}))
+	if order.is_empty():
 		_finish()
-	elif state == State.DEALING and _active().is_empty():
-		_end_round()
+	elif order.size() == 1 and state != State.INTRO:
+		_end_round()  # nobody left to play against: the last one at the table wins
+	elif was_current:
+		if next_p == -1:
+			_end_round()
+		else:
+			_start_turn(next_p)
 
 
 # --- Round flow --------------------------------------------------------------------------------
 
-func _begin_round(replay: bool) -> void:
-	if shoe.needs_reshuffle():
-		shoe.reshuffle()
-	for p: int in in_round:
-		hands[p] = [] as Array[int]
-		standing[p] = false
-		busted[p] = false
-	last_card = -1
-	next_card = shoe.peek()
-	state = State.INTRO
-	timer = INTRO_TIME
-	events.append(GameEvents.make(&"bust_or_bank_round_started", {
-		"round": round,
-		"players": in_round.duplicate(),
-		"replay": replay,
-		"deal_in": INTRO_TIME,
-		"next_card": next_card,
-	}))
-
-
-## Players still drawing this round.
-func _active() -> Array[int]:
-	var out: Array[int] = []
-	for p: int in in_round:
-		if not standing[p] and not busted[p]:
-			out.append(p)
-	return out
-
-
-## One card from the shared shoe to everyone still drawing; the one after it is revealed as
-## `next_card`. `next_in` is the seconds until that next card (0 between the opening cards).
-func _deal(next_in: float) -> void:
-	var receivers: Array[int] = _active()
-	if receivers.is_empty():
+## One face-up card to everyone in seat order, then the first turn.
+func _opening_deal() -> void:
+	for p: int in order:
+		_deal(p, true)
+	if order.size() <= 1:
 		_end_round()
 		return
+	_start_turn(order[0])
+
+
+func _start_turn(player: int) -> void:
+	state = State.TURN
+	current = player
+	timer = TURN_TIME
+	turn += 1
+	events.append(GameEvents.make(&"bust_or_bank_turn", {
+		"player": player,
+		"time": TURN_TIME,
+		"turn": turn,
+		"total": _total(player),
+		"next_card": next_card,
+	}))
+
+
+## The turn after `player`'s: the next player in the circle still drawing (may be `player` again
+## when they are the only one left), or the end of the round.
+func _pass_turn(player: int) -> void:
+	var nxt: int = _next_active_after(player, false)
+	if nxt == -1:
+		_end_round()
+	else:
+		_start_turn(nxt)
+
+
+## The first player after `player` (going round the seat order) who has neither stood nor busted;
+## `player` itself counts last unless `exclude_self`. -1 if nobody is left drawing.
+func _next_active_after(player: int, exclude_self: bool) -> int:
+	var n: int = order.size()
+	var start: int = order.find(player)
+	if start == -1 or n == 0:
+		return -1
+	for step: int in range(1, n + 1):
+		var p: int = order[(start + step) % n]
+		if exclude_self and p == player:
+			continue
+		if not standing[p] and not busted[p]:
+			return p
+	return -1
+
+
+## One card from the shared shoe to `player`.
+func _deal(player: int, opening: bool = false) -> void:
 	var card: int = shoe.draw()
 	last_card = card
-	next_card = shoe.peek()
-	var totals: Dictionary[int, int] = {}
-	for p: int in receivers:
-		(hands[p] as Array).append(card)
-		totals[p] = _total(p)
+	(hands[player] as Array).append(card)
+	var t: int = _total(player)
+	if t > BLACKJACK:
+		busted[player] = true
 	events.append(GameEvents.make(&"bust_or_bank_card", {
-		"round": round,
+		"player": player,
 		"card": card,
-		"receivers": receivers.duplicate(),
-		"totals": totals.duplicate(),
+		"total": t,
+		"busted": busted[player],
+		"opening": opening,
 		"next_card": next_card,
-		"next_in": next_in,
 	}))
-	for p: int in receivers:
-		var t: int = totals[p]
-		if t > BLACKJACK:
-			busted[p] = true
-			events.append(GameEvents.make(&"bust_or_bank_player_bust", {"player": p, "total": t, "round": round}))
-		elif t == BLACKJACK:
-			_stand(p, true)  # can't do better than 21
-	if _active().is_empty():
-		_end_round()
 
 
-func _stand(player: int, auto: bool) -> void:
+## `reason`: &"choice", &"timeout" (no decision in time) or &"21" (hit to 21).
+func _stand(player: int, reason: StringName) -> void:
 	standing[player] = true
-	events.append(GameEvents.make(&"bust_or_bank_player_stood", {"player": player, "total": _total(player), "auto": auto, "round": round}))
+	events.append(GameEvents.make(&"bust_or_bank_player_stood", {
+		"player": player,
+		"total": _total(player),
+		"auto": reason != &"choice",
+		"reason": reason,
+	}))
 
 
 func _end_round() -> void:
-	# in_round is kept sorted, so these lists are too.
-	var busts: Array[int] = []
-	var stood: Array[int] = []
-	for p: int in in_round:
-		if busted[p]:
-			busts.append(p)
-		else:
-			stood.append(p)
-
-	var worst: Array[int] = []
-	var replay: bool = stood.is_empty()  # everyone busted: replay the round for all of them
-	if not replay:
-		var worst_total: int = BLACKJACK + 1
-		var best_total: int = -1
-		for p: int in stood:
-			worst_total = mini(worst_total, _total(p))
-			best_total = maxi(best_total, _total(p))
-		if worst_total < best_total:  # someone strictly better survives
-			for p: int in stood:
-				if _total(p) == worst_total:
-					worst.append(p)
-		# Worst first: this round's busts rank below this round's worst standing hand(s).
-		if not busts.is_empty():
-			elim_groups.append(busts.duplicate())
-		if not worst.is_empty():
-			elim_groups.append(worst.duplicate())
-		for p: int in busts + worst:
-			in_round.erase(p)
-	var eliminated: Array[int] = []
-	if not replay:
-		eliminated.append_array(busts)
-		eliminated.append_array(worst)
-
-	var hands_out: Dictionary[int, Dictionary] = {}
-	for p: int in busts + stood:
-		hands_out[p] = {"cards": (hands[p] as Array).duplicate(), "total": _total(p), "busted": busted.get(p, false)}
-
-	_last_was_replay = replay
-	next_card = -1  # revealed again when the next round starts (the shoe may reshuffle first)
-	events.append(GameEvents.make(&"bust_or_bank_round_end", {
-		"round": round,
-		"hands": hands_out,
-		"busted": busts.duplicate(),
-		"worst": worst.duplicate(),
-		"eliminated": eliminated,
-		"replay": replay,
-		"remaining": in_round.duplicate(),
-		"points": points(),
-	}))
-	round += 1
 	state = State.RESULT
 	timer = RESULT_TIME
-	if _game_over():
-		events.append(GameEvents.make(&"bust_or_bank_finished", {"ranking": ranking().duplicate(true), "points": points()}))
+	current = -1
+	var rk: Array[Dictionary] = ranking()
+	events.append(GameEvents.make(&"bust_or_bank_round_end", {
+		"hands": _hands_public(),
+		"ranking": rk.duplicate(true),
+		"points": points(),
+		"winners": winners(),
+	}))
 
 
-func _game_over() -> bool:
-	return in_round.size() <= 1 or round >= max_rounds
-
-
-## Ends right away (not enough players left to play on).
+## Ends right away (nobody at the table).
 func _finish() -> void:
 	state = State.DONE
 	finished = true
-	next_card = -1
-	events.append(GameEvents.make(&"bust_or_bank_finished", {"ranking": ranking().duplicate(true), "points": points()}))
+	current = -1
+	events.append(GameEvents.make(&"bust_or_bank_round_end", {
+		"hands": {}, "ranking": [], "points": {}, "winners": [],
+	}))
 
 
 func _total(player: int) -> int:
@@ -286,71 +260,85 @@ func _total(player: int) -> int:
 
 # --- Scoring -----------------------------------------------------------------------------------
 
-## Players outlasted so far, for everyone still in the game or thrown out (absolute values).
+## Hand total for standing (or still drawing) players, 0 for busted ones.
 func points() -> Dictionary[int, int]:
 	var out: Dictionary[int, int] = {}
-	var below: int = 0
-	for group: Array in elim_groups:  # worst first
-		for p: Variant in group:
-			out[int(p)] = below
-		below += group.size()
-	for p: int in in_round:
-		out[p] = below
+	for p: int in order:
+		out[p] = 0 if busted[p] else _total(p)
 	return out
 
 
-## [{player, rank, points, out_round}] best first. Survivors share rank 1; each thrown-out group
-## shares one rank (standard competition ranking: 1, 2, 2, 4 …).
+## Best-hand score: the total, or -1 for a bust (below every standing hand).
+func _score(player: int) -> int:
+	return -1 if busted[player] else _total(player)
+
+
+## [{player, rank, points, total, busted}] best first: highest total first, equal totals share a
+## rank, busted players share the last rank (standard competition ranking: 1, 2, 2, 4 …). Ties
+## are listed in seat order.
 func ranking() -> Array[Dictionary]:
-	var pts: Dictionary[int, int] = points()
-	var ranked: Array[Dictionary] = []
-	var rank: int = 1
-	var top: Array[int] = in_round.duplicate()
-	top.sort()
-	for p: int in top:
-		ranked.append({"player": p, "rank": rank, "points": pts[p], "out": false})
-	rank += top.size()
-	for i: int in range(elim_groups.size() - 1, -1, -1):
-		var group: Array = elim_groups[i].duplicate()
-		group.sort()
-		for p: Variant in group:
-			ranked.append({"player": int(p), "rank": rank, "points": pts[int(p)], "out": true})
-		rank += group.size()
-	return ranked
+	var sorted: Array[int] = order.duplicate()
+	var seat: Dictionary[int, int] = {}
+	for i: int in order.size():
+		seat[order[i]] = i
+	sorted.sort_custom(func(a: int, b: int) -> bool:
+		var sa: int = _score(a)
+		var sb: int = _score(b)
+		return sa > sb if sa != sb else seat[a] < seat[b])
+	var out: Array[Dictionary] = []
+	var rank: int = 0
+	var prev: int = -2
+	for i: int in sorted.size():
+		var p: int = sorted[i]
+		var s: int = _score(p)
+		if s != prev:
+			rank = i + 1
+			prev = s
+		out.append({"player": p, "rank": rank, "points": 0 if busted[p] else _total(p), "total": _total(p), "busted": busted[p]})
+	return out
+
+
+## Everyone sharing rank 1 (empty while nobody is at the table).
+func winners() -> Array[int]:
+	var out: Array[int] = []
+	for row: Dictionary in ranking():
+		if int(row["rank"]) == 1:
+			out.append(int(row["player"]))
+	return out
 
 
 # --- Snapshots ---------------------------------------------------------------------------------
 
-func get_public_state() -> Dictionary:
-	var hands_public: Dictionary[int, Dictionary] = {}
-	for p: int in in_round:
-		hands_public[p] = {
+func _hands_public() -> Dictionary[int, Dictionary]:
+	var out: Dictionary[int, Dictionary] = {}
+	for p: int in order:
+		out[p] = {
 			"cards": (hands.get(p, []) as Array).duplicate(),
 			"total": _total(p),
 			"busted": busted.get(p, false),
 			"stood": standing.get(p, false),
 		}
-	var out_players: Array[int] = []
-	for group: Array in elim_groups:
-		for p: Variant in group:
-			out_players.append(int(p))
+	return out
+
+
+func get_public_state() -> Dictionary:
 	var st: Dictionary = {
 		"state": state,
 		"timer": snappedf(maxf(timer, 0.0), 0.01),
-		"round": round,
-		"players": players.duplicate(),
-		"in_round": in_round.duplicate(),
-		"out": out_players,
-		"hands": hands_public,
+		"turn_time": TURN_TIME,
+		"players": order.duplicate(),
+		"current": current,
+		"turn": turn,
+		"hands": _hands_public(),
 		"last_card": last_card,
 		"next_card": next_card,
 		"points": points(),
-		"deal_interval": DEAL_INTERVAL,
 	}
-	if state == State.DONE or (state == State.RESULT and _game_over()):
+	if state == State.RESULT or state == State.DONE:
 		st["ranking"] = ranking().duplicate(true)
+		st["winners"] = winners()
 	return st
 
 
 func private_state(player: int) -> Dictionary:
-	return {"can_stand": state == State.DEALING and player in in_round and not standing.get(player, true) and not busted.get(player, true)}
+	return {"my_turn": state == State.TURN and player == current}

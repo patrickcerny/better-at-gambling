@@ -1,7 +1,8 @@
 extends GutTest
-## Bust or Bank minigame logic: one shared shoe, stand any time, bust = out on the spot, worst
-## standing hand(s) out each round, last player standing wins. Cards are stacked on the shoe so
-## every scenario is deterministic.
+## Bust or Bank minigame logic (0.8.18 rules): one round of turn-based blackjack. Everyone gets one
+## face-up card, then the turns go round the table in seat order: HIT takes exactly one card and
+## passes the turn, STAND locks you, 20 s without a decision = STAND, over 21 = bust. Highest total
+## wins. Cards are stacked on the shoe so every scenario is deterministic.
 
 var cfg: BalanceConfig
 var events: Array[Dictionary] = []
@@ -24,23 +25,33 @@ func _tick(logic: BustOrBankLogic, seconds: float) -> void:
 	events.append_array(logic.drain_events())
 
 
-## Stacks `ranks` (no aces unless asked) and plays the round's intro: the first two are dealt.
-func _open(logic: BustOrBankLogic, ranks: Array[int]) -> void:
+func _cards(ranks: Array[int]) -> Array[int]:
 	var cards: Array[int] = []
 	for r: int in ranks:
 		cards.append(Card.make(r))
-	logic.shoe.stack_top(cards)
+	return cards
+
+
+## Stacks `ranks` on the shoe and plays the intro: the first cards go one each in seat order.
+func _open(logic: BustOrBankLogic, ranks: Array[int]) -> void:
+	logic.shoe.stack_top(_cards(ranks))
 	_tick(logic, BustOrBankLogic.INTRO_TIME)
 
 
-func _next_card(logic: BustOrBankLogic) -> void:
-	_tick(logic, BustOrBankLogic.DEAL_INTERVAL)
-
-
-func _stand(logic: BustOrBankLogic, p: int) -> Dictionary:
-	var r: Dictionary = logic.submit(p, {"action": "stand"}, 0.0)
+func _act(logic: BustOrBankLogic, p: int, action: String) -> Dictionary:
+	var r: Dictionary = logic.submit(p, {"action": action}, 0.0)
 	events.append_array(logic.drain_events())
 	return r
+
+
+func _hit(logic: BustOrBankLogic, p: int) -> void:
+	var r: Dictionary = _act(logic, p, "hit")
+	assert_true(r["ok"], "hit by %d: %s" % [p, str(r)])
+
+
+func _stand(logic: BustOrBankLogic, p: int) -> void:
+	var r: Dictionary = _act(logic, p, "stand")
+	assert_true(r["ok"], "stand by %d: %s" % [p, str(r)])
 
 
 func _of(type: StringName) -> Array[Dictionary]:
@@ -58,344 +69,331 @@ func _rank_of(logic: BustOrBankLogic, p: int) -> int:
 	return -1
 
 
-# --- Setup & dealing ---------------------------------------------------------------------------
+func _turn_players() -> Array[int]:
+	var out: Array[int] = []
+	for e: Dictionary in _of(&"bust_or_bank_turn"):
+		out.append(int(e["player"]))
+	return out
 
-func test_setup_starts_round_zero_with_everyone() -> void:
-	var logic := _game([1, 2, 3])
-	assert_false(logic.is_finished())
-	assert_eq(logic.round, 0)
+
+# --- Start -------------------------------------------------------------------------------------
+
+func test_intro_then_one_card_each_in_seat_order() -> void:
+	var logic := _game([3, 1, 2] as Array[int])
 	assert_eq(logic.state, BustOrBankLogic.State.INTRO)
-	assert_eq(_of(&"bust_or_bank_started").size(), 1)
-	var rs: Array[Dictionary] = _of(&"bust_or_bank_round_started")
-	assert_eq(rs.size(), 1)
-	assert_eq(rs[0]["players"], [1, 2, 3])
-	assert_false(rs[0]["replay"])
+	assert_eq(_of(&"bust_or_bank_round_started").size(), 1)
+	assert_almost_eq(float(_of(&"bust_or_bank_round_started")[0]["deal_in"]), BustOrBankLogic.INTRO_TIME, 0.001)
+	assert_eq(logic.hands[3].size(), 0, "no cards during the intro")
+	_open(logic, [10, 5, 7])
+	assert_eq(logic.hands[3], [Card.make(10)], "seat order: the order the minigame was set up with")
+	assert_eq(logic.hands[1], [Card.make(5)])
+	assert_eq(logic.hands[2], [Card.make(7)])
+	var cards: Array[Dictionary] = _of(&"bust_or_bank_card")
+	assert_eq(cards.size(), 3, "exactly one card each")
+	assert_true(bool(cards[0]["opening"]))
+	assert_eq(int(cards[1]["player"]), 1)
+	assert_eq(int(cards[1]["total"]), 5)
+	assert_eq(logic.state, BustOrBankLogic.State.TURN)
+	assert_eq(logic.current, 3, "the first seat starts")
+	assert_eq(_turn_players(), [3] as Array[int])
+	assert_almost_eq(float(_of(&"bust_or_bank_turn")[0]["time"]), BustOrBankLogic.TURN_TIME, 0.001)
 
 
-func test_shared_shoe_deals_the_same_cards_to_everyone_at_once() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 5])
-	var dealt: Array[Dictionary] = _of(&"bust_or_bank_card")
-	assert_eq(dealt.size(), 2, "two opening cards")
-	for e: Dictionary in dealt:
-		assert_eq(e["receivers"], [1, 2, 3], "one card goes to everyone")
-	for p: int in [1, 2, 3]:
-		assert_eq(logic._total(p), 15)
-	assert_eq(logic.state, BustOrBankLogic.State.DEALING)
-	assert_eq(int(dealt[0]["next_card"]), int(dealt[1]["card"]), "the revealed next card is the one dealt")
-
-
-func test_pacing_is_slow_enough_to_decide() -> void:
-	assert_eq(BustOrBankLogic.INTRO_TIME, 4.0)
-	assert_eq(BustOrBankLogic.DEAL_INTERVAL, 3.2)
-	assert_eq(BustOrBankLogic.RESULT_TIME, 5.0)
-	var logic := _game([1, 2])
-	assert_eq(float(_of(&"bust_or_bank_started")[0]["deal_interval"]), BustOrBankLogic.DEAL_INTERVAL)
-	assert_eq(float(_of(&"bust_or_bank_round_started")[0]["deal_in"]), BustOrBankLogic.INTRO_TIME)
-	_tick(logic, BustOrBankLogic.INTRO_TIME - 0.1)
-	assert_eq(_of(&"bust_or_bank_card").size(), 0, "no cards during the intro")
-	logic.shoe.stack_top([Card.make(2), Card.make(3), Card.make(4)] as Array[int])
-	_tick(logic, 0.2)
-	var dealt: Array[Dictionary] = _of(&"bust_or_bank_card")
-	assert_eq(dealt.size(), 2)
-	assert_eq(float(dealt[0]["next_in"]), 0.0, "the opening cards land together")
-	assert_eq(float(dealt[1]["next_in"]), BustOrBankLogic.DEAL_INTERVAL)
-	_tick(logic, BustOrBankLogic.DEAL_INTERVAL - 0.1)
-	assert_eq(_of(&"bust_or_bank_card").size(), 2, "a full decision window before the next card")
-	_tick(logic, 0.2)
-	assert_eq(_of(&"bust_or_bank_card").size(), 3)
-	assert_eq(float(_of(&"bust_or_bank_card")[2]["next_in"]), BustOrBankLogic.DEAL_INTERVAL)
-
-
-func test_next_card_is_shown_face_up_and_then_dealt() -> void:
-	var logic := _game([1, 2])
-	_open(logic, [10, 2, 5, 3, 4])
-	assert_eq(logic.next_card, Card.make(5), "the third stacked card is up next")
-	assert_eq(int(_of(&"bust_or_bank_card").back()["next_card"]), Card.make(5))
-	assert_eq(int(logic.get_public_state()["next_card"]), Card.make(5), "late joiners see it too")
-	_next_card(logic)
-	_next_card(logic)
-	var dealt: Array[Dictionary] = _of(&"bust_or_bank_card")
-	assert_eq(dealt.size(), 4)
-	for i: int in dealt.size() - 1:
-		assert_eq(int(dealt[i]["next_card"]), int(dealt[i + 1]["card"]), "card %d announced the following card" % i)
-	assert_eq(int(dealt[2]["card"]), Card.make(5))
-	assert_eq(int(dealt[3]["card"]), Card.make(3))
-	assert_eq(logic.next_card, Card.make(4), "the one after becomes the next card")
+func test_next_card_is_the_shoes_top_card() -> void:
+	var logic := _game([1, 2] as Array[int])
+	logic.shoe.stack_top(_cards([10, 5, 7, 3]))
+	assert_eq(logic.next_card, Card.make(10), "shown before the opening deal")
+	_tick(logic, BustOrBankLogic.INTRO_TIME)
+	assert_eq(logic.next_card, Card.make(7))
+	assert_eq(int(_of(&"bust_or_bank_turn")[0]["next_card"]), Card.make(7), "the turn event shows it")
+	assert_eq(int(logic.get_public_state()["next_card"]), Card.make(7))
+	_hit(logic, 1)
+	assert_eq(logic.hands[1].back(), Card.make(7), "the shown card is the one dealt")
+	assert_eq(int(_of(&"bust_or_bank_card").back()["next_card"]), Card.make(3), "and the next one is revealed")
 	assert_eq(logic.next_card, logic.shoe.peek())
 
 
-func test_round_started_reveals_the_first_card() -> void:
-	var logic := _game([1, 2])
-	assert_eq(int(_of(&"bust_or_bank_round_started")[0]["next_card"]), logic.shoe.peek())
-	_open(logic, [10, 7])
+# --- Turns -------------------------------------------------------------------------------------
+
+func test_hit_deals_exactly_one_card_and_passes_the_turn() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [2, 3, 4, 5])
+	_hit(logic, 1)
+	assert_eq(logic.hands[1], _cards([2, 5]))
+	assert_eq(logic.hands[2].size(), 1, "nobody else got a card")
+	assert_eq(logic.current, 2, "next player's turn")
+	assert_false(logic.standing[1], "still in after a hit")
+	var last: Dictionary = _of(&"bust_or_bank_card").back()
+	assert_eq(int(last["player"]), 1)
+	assert_eq(int(last["total"]), 7)
+	assert_false(bool(last["busted"]))
+
+
+func test_only_the_current_player_may_act() -> void:
+	var logic := _game([1, 2] as Array[int])
+	assert_eq(_act(logic, 1, "hit")["error"], &"not_your_turn", "not during the intro")
+	_open(logic, [2, 3, 4])
+	assert_eq(_act(logic, 2, "hit")["error"], &"not_your_turn")
+	assert_eq(_act(logic, 2, "stand")["error"], &"not_your_turn")
+	assert_eq(_act(logic, 1, "double")["error"], &"invalid_action")
+	assert_eq(_act(logic, 9, "hit")["error"], &"not_in_game")
+	assert_eq(logic.hands[2].size(), 1)
+	_hit(logic, 1)
+	assert_eq(_act(logic, 1, "hit")["error"], &"not_your_turn", "one card per turn")
+
+
+func test_turns_go_round_in_a_circle() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [2, 2, 2, 2, 2, 2, 2, 2, 2])
+	_hit(logic, 1)
+	_hit(logic, 2)
+	_hit(logic, 3)
+	_hit(logic, 1)
+	assert_eq(_turn_players(), [1, 2, 3, 1, 2] as Array[int])
+
+
+func test_stand_locks_the_player_and_the_circle_skips_them() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [2, 2, 2, 2, 2, 2, 2, 2])
 	_stand(logic, 1)
-	_stand(logic, 2)  # tie: they play again
-	assert_eq(logic.next_card, -1, "hidden while the result shows")
-	logic.shoe.stack_top([Card.make(9), Card.make(8)] as Array[int])
-	_tick(logic, BustOrBankLogic.RESULT_TIME)
-	var rs: Dictionary = _of(&"bust_or_bank_round_started").back()
-	assert_eq(int(rs["next_card"]), Card.make(9))
-	_tick(logic, BustOrBankLogic.INTRO_TIME)
-	var dealt: Array[Dictionary] = _of(&"bust_or_bank_card")
-	assert_eq(int(dealt[dealt.size() - 2]["card"]), Card.make(9), "the revealed card opens the round")
-	assert_eq(int(dealt.back()["card"]), Card.make(8))
+	assert_true(logic.standing[1])
+	assert_eq(logic.current, 2)
+	var stood: Dictionary = _of(&"bust_or_bank_player_stood")[0]
+	assert_eq(int(stood["player"]), 1)
+	assert_false(bool(stood["auto"]))
+	_hit(logic, 2)
+	_hit(logic, 3)
+	assert_eq(logic.current, 2, "1 stood: skipped")
+	assert_eq(logic.hands[1].size(), 1, "a standing hand never changes")
+	assert_eq(_act(logic, 1, "hit")["error"], &"already_stood")
+	assert_eq(_turn_players(), [1, 2, 3, 2] as Array[int])
 
 
-func test_standing_stops_your_cards_but_not_the_others() -> void:
-	var logic := _game([1, 2])
-	_open(logic, [10, 5, 3])
-	assert_true(_stand(logic, 1)["ok"])
-	var before: Dictionary = _of(&"bust_or_bank_card").back()
-	_next_card(logic)
-	assert_eq(logic._total(1), 15, "stood: keeps 15")
-	assert_eq(logic._total(2), 18)
-	assert_eq(_of(&"bust_or_bank_card").back()["receivers"], [2])
-	assert_eq(int(before["next_card"]), int(_of(&"bust_or_bank_card").back()["card"]), "the shown next card arrived")
+func test_bust_ends_participation_and_is_skipped() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [10, 2, 2, 10, 2, 5])
+	_hit(logic, 1)  # 20
+	_hit(logic, 2)  # 4
+	_hit(logic, 3)  # 7
+	_open_more(logic, [10])
+	_hit(logic, 1)  # 30: bust
+	assert_true(logic.busted[1])
+	var last: Dictionary = _of(&"bust_or_bank_card").back()
+	assert_true(bool(last["busted"]))
+	assert_eq(int(last["total"]), 30)
+	assert_eq(logic.current, 2)
+	assert_eq(_act(logic, 1, "stand")["error"], &"already_busted")
+	_hit(logic, 2)
+	_hit(logic, 3)
+	assert_eq(logic.current, 2, "the busted player is skipped")
 
 
-func test_cards_keep_coming_on_a_timer() -> void:
-	var logic := _game([1, 2])
-	_open(logic, [2, 2, 2, 2])
-	_tick(logic, BustOrBankLogic.DEAL_INTERVAL * 0.5)
-	assert_eq(logic._total(1), 4, "not yet")
-	_tick(logic, BustOrBankLogic.DEAL_INTERVAL * 0.5)
-	assert_eq(logic._total(1), 6)
+func _open_more(logic: BustOrBankLogic, ranks: Array[int]) -> void:
+	logic.shoe.stack_top(_cards(ranks))
 
 
-func test_bust_is_announced_immediately_and_player_cannot_stand() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2, 10])
-	_stand(logic, 1)  # 12
-	_next_card(logic)  # 2 and 3 reach 22
-	var busts: Array[Dictionary] = _of(&"bust_or_bank_player_bust")
-	assert_eq(busts.size(), 2)
-	assert_eq(int(busts[0]["total"]), 22)
-	assert_false(logic.private_state(2)["can_stand"])
-	# Before the round result in the same batch: clients can show the bust right away.
-	var types: Array = events.map(func(e: Dictionary) -> StringName: return e["type"])
-	assert_lt(types.find(&"bust_or_bank_player_bust"), types.find(&"bust_or_bank_round_end"))
+func test_hitting_to_21_stands_automatically() -> void:
+	var logic := _game([1, 2] as Array[int])
+	_open(logic, [10, 2, 1])  # 1: 10, then an ace = 21
+	_hit(logic, 1)
+	assert_eq(logic._total(1), 21)
+	assert_true(logic.standing[1], "can't do better than 21")
+	assert_eq(StringName(_of(&"bust_or_bank_player_stood")[0]["reason"]), &"21")
+	assert_eq(logic.current, 2)
 
 
-func test_exact_21_stands_automatically() -> void:
-	var logic := _game([1, 2])
-	_open(logic, [10, 1])  # A + 10 = 21
-	var stood: Array[Dictionary] = _of(&"bust_or_bank_player_stood")
-	assert_eq(stood.size(), 2)
-	assert_true(stood[0]["auto"])
+func test_timeout_auto_stands_and_passes_the_turn() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [5, 6, 7])
+	_tick(logic, BustOrBankLogic.TURN_TIME - 0.5)
+	assert_eq(logic.current, 1, "still deciding")
+	assert_almost_eq(float(logic.get_public_state()["timer"]), 0.5, 0.01)
+	_tick(logic, 0.6)
+	assert_true(logic.standing[1], "no decision in 20 s = stand")
+	var stood: Dictionary = _of(&"bust_or_bank_player_stood")[0]
+	assert_true(bool(stood["auto"]))
+	assert_eq(StringName(stood["reason"]), &"timeout")
+	assert_eq(logic.current, 2)
+	assert_almost_eq(logic.timer, BustOrBankLogic.TURN_TIME, 0.001, "a fresh 20 s for the next player")
 
 
-func test_invalid_actions_are_rejected() -> void:
-	var logic := _game([1, 2])
-	assert_eq(logic.submit(1, {"action": "stand"}, 0.0)["error"], &"not_dealing", "no standing before the cards")
-	_open(logic, [10, 5])
-	assert_eq(logic.submit(1, {"action": "hit"}, 0.0)["error"], &"invalid_action", "the shoe deals, nobody hits")
-	assert_eq(logic.submit(9, {"action": "stand"}, 0.0)["error"], &"not_in_game")
+func test_a_lone_remaining_player_keeps_taking_turns() -> void:
+	var logic := _game([1, 2] as Array[int])
+	_open(logic, [2, 3, 2, 2, 2])
 	_stand(logic, 1)
-	assert_eq(logic.submit(1, {"action": "stand"}, 0.0)["error"], &"already_stood")
-
-
-# --- Round end & elimination -------------------------------------------------------------------
-
-func test_worst_standing_hand_is_thrown_out() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2, 5, 3])
-	_stand(logic, 1)  # 12
-	_next_card(logic)  # 17
+	assert_eq(logic.current, 2)
+	_hit(logic, 2)
+	assert_eq(logic.current, 2, "only 2 is still drawing: their turn again")
+	_hit(logic, 2)
+	assert_eq(logic.state, BustOrBankLogic.State.TURN)
+	assert_eq(logic.hands[2].size(), 3)
 	_stand(logic, 2)
-	_next_card(logic)  # 20
+	assert_eq(logic.state, BustOrBankLogic.State.RESULT)
+
+
+func test_round_ends_when_everyone_is_done_then_the_minigame_finishes() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [10, 9, 2, 10])
+	_stand(logic, 1)  # 10
+	_stand(logic, 2)  # 9
+	assert_eq(logic.state, BustOrBankLogic.State.TURN)
+	_hit(logic, 3)  # 12
+	assert_eq(logic.current, 3)
 	_stand(logic, 3)
-	var ends: Array[Dictionary] = _of(&"bust_or_bank_round_end")
-	assert_eq(ends.size(), 1)
-	assert_eq(ends[0]["eliminated"], [1])
-	assert_eq(ends[0]["worst"], [1])
-	assert_eq(ends[0]["remaining"], [2, 3])
-	assert_eq(logic.in_round, [2, 3] as Array[int])
-
-
-func test_ties_for_worst_all_go() -> void:
-	var logic := _game([1, 2, 3, 4])
-	_open(logic, [10, 2, 5])
-	_stand(logic, 1)
-	_stand(logic, 2)  # both 12
-	_next_card(logic)  # 17
-	_stand(logic, 3)
-	_stand(logic, 4)
-	var end: Dictionary = _of(&"bust_or_bank_round_end")[0]
-	assert_eq(end["eliminated"], [1, 2])
-	assert_eq(logic.in_round, [3, 4] as Array[int])
-	assert_eq(_rank_of(logic, 1), _rank_of(logic, 2), "same round, same rank")
-
-
-func test_everyone_tied_standing_means_nobody_is_out() -> void:
-	var logic := _game([1, 2])
-	_open(logic, [10, 7])
-	_stand(logic, 1)
-	_stand(logic, 2)
-	var end: Dictionary = _of(&"bust_or_bank_round_end")[0]
-	assert_eq(end["eliminated"], [])
-	assert_eq(logic.in_round, [1, 2] as Array[int])
-	_tick(logic, BustOrBankLogic.RESULT_TIME)
-	assert_eq(_of(&"bust_or_bank_round_started").size(), 2, "they play again")
-
-
-func test_busted_players_rank_below_the_worst_standing_hand() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2, 5, 10])
-	_stand(logic, 1)  # 12: worst standing hand
-	_next_card(logic)  # 17
-	_stand(logic, 2)
-	_next_card(logic)  # 3 busts at 27
-	var end: Dictionary = _of(&"bust_or_bank_round_end")[0]
-	assert_eq(end["busted"], [3])
-	assert_eq(end["worst"], [1])
-	assert_eq(_rank_of(logic, 2), 1)
-	assert_eq(_rank_of(logic, 1), 2, "worst hand above the bust")
-	assert_eq(_rank_of(logic, 3), 3)
-
-
-func test_bust_is_out_even_if_standing_hands_tie() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2, 10])
-	_stand(logic, 1)
-	_stand(logic, 2)  # 12 and 12: nobody strictly better, so no worst-hand cut
-	_next_card(logic)  # 3 busts
-	var end: Dictionary = _of(&"bust_or_bank_round_end")[0]
-	assert_eq(end["eliminated"], [3])
-	assert_eq(logic.in_round, [1, 2] as Array[int])
-
-
-func test_everyone_busting_replays_the_round() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2, 10])
-	_next_card(logic)  # all at 22
-	var end: Dictionary = _of(&"bust_or_bank_round_end")[0]
-	assert_true(end["replay"])
-	assert_eq(end["eliminated"], [])
-	assert_eq(end["busted"], [1, 2, 3])
-	assert_eq(logic.in_round, [1, 2, 3] as Array[int])
-	_tick(logic, BustOrBankLogic.RESULT_TIME)
-	var rs: Array[Dictionary] = _of(&"bust_or_bank_round_started")
-	assert_eq(rs.size(), 2)
-	assert_true(rs[1]["replay"])
-	assert_eq(rs[1]["players"], [1, 2, 3])
-	for p: int in [1, 2, 3]:
-		assert_eq(logic._total(p), 0, "fresh count")
-		assert_false(logic.busted[p])
-
-
-func test_replay_only_includes_players_still_in() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2, 5])
-	_stand(logic, 1)
-	_next_card(logic)
-	_stand(logic, 2)
-	_stand(logic, 3)  # tie 17 vs 12: 1 out
-	_tick(logic, BustOrBankLogic.RESULT_TIME)
-	_open(logic, [10, 2, 10])
-	_next_card(logic)  # 2 and 3 both bust
-	_tick(logic, BustOrBankLogic.RESULT_TIME)
-	var rs: Array[Dictionary] = _of(&"bust_or_bank_round_started")
-	assert_eq(rs.back()["players"], [2, 3])
-	assert_true(rs.back()["replay"])
-
-
-# --- Points & ranking --------------------------------------------------------------------------
-
-func test_round_end_carries_absolute_points_for_every_player() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2, 5, 3])
-	_stand(logic, 1)
-	_next_card(logic)
-	_stand(logic, 2)
-	_next_card(logic)
-	_stand(logic, 3)
-	var pts: Dictionary = _of(&"bust_or_bank_round_end")[0]["points"]
-	assert_eq(pts.size(), 3, "every player, not just a winner")
-	assert_eq(int(pts[1]), 0)
-	assert_eq(int(pts[2]), 1)
-	assert_eq(int(pts[3]), 1)
-	assert_eq(logic.get_public_state()["points"], pts)
-
-
-func test_full_game_to_one_survivor() -> void:
-	var logic := _game([1, 2, 3])
-	# Round 1: 1 out.
-	_open(logic, [10, 2, 5, 3])
-	_stand(logic, 1)
-	_next_card(logic)
-	_stand(logic, 2)
-	_next_card(logic)
-	_stand(logic, 3)
-	_tick(logic, BustOrBankLogic.RESULT_TIME)
-	# Round 2: 3 busts.
-	_open(logic, [10, 6, 9])
-	_stand(logic, 2)  # 16
-	_next_card(logic)  # 3 → 25
-	assert_eq(_of(&"bust_or_bank_finished").size(), 1, "announced with the last result")
+	assert_eq(logic.state, BustOrBankLogic.State.RESULT)
+	assert_eq(logic.current, -1)
+	assert_eq(logic.next_card, -1, "nothing more to deal")
+	var end: Array[Dictionary] = _of(&"bust_or_bank_round_end")
+	assert_eq(end.size(), 1, "one single round")
+	assert_eq(end[0]["winners"], [3])
+	assert_eq(int((end[0]["hands"] as Dictionary)[3]["total"]), 12)
+	assert_eq(_act(logic, 3, "hit")["error"], &"game_over")
 	assert_false(logic.is_finished(), "the result is shown first")
 	_tick(logic, BustOrBankLogic.RESULT_TIME)
 	assert_true(logic.is_finished())
-	var ranking: Array[Dictionary] = logic.ranking()
-	assert_eq(ranking.map(func(r: Dictionary) -> int: return r["player"]), [2, 3, 1])
-	assert_eq(ranking.map(func(r: Dictionary) -> int: return r["rank"]), [1, 2, 3])
-	assert_eq(ranking.map(func(r: Dictionary) -> int: return r["points"]), [2, 1, 0])
-	assert_eq(_of(&"bust_or_bank_round_end").back()["points"], {1: 0, 2: 2, 3: 1})
+	assert_eq(_of(&"bust_or_bank_round_started").size(), 1, "no further rounds")
 
 
-func test_shared_ranks_skip_like_competition_ranking() -> void:
-	var logic := _game([1, 2, 3, 4])
-	_open(logic, [10, 2, 5, 3])
-	_stand(logic, 1)
-	_stand(logic, 2)  # 12, 12
-	_next_card(logic)
-	_stand(logic, 3)  # 17
-	_next_card(logic)
-	_stand(logic, 4)  # 20; 1 and 2 out together
-	_tick(logic, BustOrBankLogic.RESULT_TIME)
-	_open(logic, [10, 7, 2])
-	_stand(logic, 3)  # 17
-	_next_card(logic)
-	_stand(logic, 4)  # 19
-	_tick(logic, BustOrBankLogic.RESULT_TIME)
-	assert_true(logic.is_finished())
-	var ranks: Dictionary = {}
-	for r: Dictionary in logic.ranking():
-		ranks[r["player"]] = r["rank"]
-	assert_eq(ranks, {4: 1, 3: 2, 1: 3, 2: 3})
+# --- Ranking -----------------------------------------------------------------------------------
+
+func test_ranking_highest_total_wins_ties_share_busts_last() -> void:
+	var logic := _game([1, 2, 3, 4, 5] as Array[int])
+	_open(logic, [10, 10, 9, 10, 10, 9, 9, 9, 10, 2])
+	_hit(logic, 1)  # 19
+	_hit(logic, 2)  # 19
+	_hit(logic, 3)  # 18
+	_hit(logic, 4)  # 20
+	_hit(logic, 5)  # 12
+	_open_more(logic, [10, 10])
+	_hit(logic, 1)  # 29 bust
+	_stand(logic, 2)
+	_stand(logic, 3)
+	_stand(logic, 4)
+	_hit(logic, 5)  # 22 bust
+	assert_eq(logic.state, BustOrBankLogic.State.RESULT)
+	assert_eq(_rank_of(logic, 4), 1)
+	assert_eq(_rank_of(logic, 2), 2)
+	assert_eq(_rank_of(logic, 3), 3)
+	assert_eq(_rank_of(logic, 1), 4, "busts below every standing hand")
+	assert_eq(_rank_of(logic, 5), 4, "busts share one rank")
+	assert_eq(logic.points(), {1: 0, 2: 19, 3: 18, 4: 20, 5: 0})
+	var rk: Array[Dictionary] = logic.ranking()
+	assert_eq(int(rk[0]["player"]), 4)
+	assert_eq(int(rk[0]["points"]), 20)
+	assert_true(bool(rk[4]["busted"]))
+	assert_eq(logic.winners(), [4] as Array[int])
 
 
-func test_idle_players_still_finish() -> void:
-	var logic := _game([1, 2, 3])
-	var t: float = 0.0
-	while not logic.is_finished() and t < 900.0:
-		_tick(logic, 0.1)
-		t += 0.1
-	assert_true(logic.is_finished(), "nobody pressing anything can't stall the match")
-	assert_lte(logic.round, logic.max_rounds)
-	assert_eq(logic.max_rounds, 3 + BustOrBankLogic.SPARE_ROUNDS)
-	# Bound scaled with the slower pacing (intro 4 s, 3.2 s per card, 5 s result: about 2x the old).
-	assert_lt(t, 180.0, "idle table ends well inside a minigame slot")
-	assert_eq(logic.ranking().size(), 3)
-
-
-func test_disconnect_drops_the_player_and_can_end_the_game() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2])
-	logic.remove_player(3)
-	assert_eq(logic.in_round, [1, 2] as Array[int])
-	logic.remove_player(2)
-	events.append_array(logic.drain_events())
-	assert_true(logic.is_finished())
-	assert_eq(logic.ranking().size(), 1)
-	assert_eq(int(logic.ranking()[0]["player"]), 1)
-
-
-func test_disconnect_of_the_last_drawer_ends_the_round() -> void:
-	var logic := _game([1, 2, 3])
-	_open(logic, [10, 2, 5])
+func test_equal_totals_share_first_place() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [10, 10, 5])
 	_stand(logic, 1)
 	_stand(logic, 2)
+	_stand(logic, 3)
+	assert_eq(_rank_of(logic, 1), 1)
+	assert_eq(_rank_of(logic, 2), 1)
+	assert_eq(_rank_of(logic, 3), 3)
+	assert_eq(logic.winners(), [1, 2] as Array[int])
+
+
+func test_blackjack_counts_as_21() -> void:
+	var logic := _game([1, 2] as Array[int])
+	_open(logic, [1, 10, 13])  # 1: A then K = blackjack
+	_hit(logic, 1)
+	assert_eq(logic._total(1), 21)
+	assert_true(logic.standing[1])
+	_stand(logic, 2)
+	assert_eq(int(logic.ranking()[0]["points"]), 21, "no bonus: just 21")
+	assert_eq(logic.winners(), [1] as Array[int])
+
+
+func test_everyone_busting_shares_last_place() -> void:
+	var logic := _game([1, 2] as Array[int])
+	_open(logic, [10, 10, 10, 10, 10, 10])
+	_hit(logic, 1)  # 20
+	_hit(logic, 2)  # 20
+	_hit(logic, 1)  # bust
+	_hit(logic, 2)  # bust
+	assert_eq(logic.state, BustOrBankLogic.State.RESULT)
+	assert_eq(_rank_of(logic, 1), 1)
+	assert_eq(_rank_of(logic, 2), 1)
+	assert_eq(logic.points(), {1: 0, 2: 0})
+
+
+# --- Leaving -----------------------------------------------------------------------------------
+
+func test_remove_player_mid_turn_passes_the_turn() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [5, 6, 7])
+	_hit(logic, 1)
+	assert_eq(logic.current, 2)
+	logic.remove_player(2)
+	events.append_array(logic.drain_events())
+	assert_eq(logic.current, 3, "the turn passes on")
+	assert_eq(int(_of(&"bust_or_bank_player_left")[0]["player"]), 2)
+	assert_eq(_turn_players().back(), 3)
+	assert_almost_eq(logic.timer, BustOrBankLogic.TURN_TIME, 0.001)
+	assert_false(logic.order.has(2))
+	assert_eq(logic.ranking().size(), 2, "dropped from the ranking")
+	_hit(logic, 3)
+	assert_eq(logic.current, 1, "the circle closes without them")
+
+
+func test_remove_other_player_keeps_the_current_turn() -> void:
+	var logic := _game([1, 2, 3] as Array[int])
+	_open(logic, [5, 6, 7])
 	logic.remove_player(3)
 	events.append_array(logic.drain_events())
-	assert_eq(_of(&"bust_or_bank_round_end").size(), 1)
+	assert_eq(logic.current, 1)
+	_stand(logic, 1)
+	assert_eq(logic.current, 2)
+	_stand(logic, 2)
+	assert_eq(logic.state, BustOrBankLogic.State.RESULT)
+
+
+func test_last_player_at_the_table_wins_when_the_rest_leave() -> void:
+	var logic := _game([1, 2] as Array[int])
+	_open(logic, [5, 6])
+	logic.remove_player(1)
+	events.append_array(logic.drain_events())
+	assert_eq(logic.state, BustOrBankLogic.State.RESULT)
+	assert_eq(logic.winners(), [2] as Array[int])
+	logic.remove_player(2)
+	_tick(logic, BustOrBankLogic.RESULT_TIME)
+	assert_true(logic.is_finished())
+
+
+# --- Snapshots ---------------------------------------------------------------------------------
+
+func test_public_and_private_state() -> void:
+	var logic := _game([1, 2] as Array[int])
+	_open(logic, [5, 6, 7])
+	_tick(logic, 4.0)
+	var st: Dictionary = logic.get_public_state()
+	assert_eq(int(st["state"]), BustOrBankLogic.State.TURN)
+	assert_eq(int(st["current"]), 1)
+	assert_almost_eq(float(st["timer"]), BustOrBankLogic.TURN_TIME - 4.0, 0.01)
+	assert_almost_eq(float(st["turn_time"]), BustOrBankLogic.TURN_TIME, 0.001)
+	assert_eq(st["players"], [1, 2])
+	assert_eq((st["hands"] as Dictionary)[2]["cards"], [Card.make(6)], "every hand is public")
+	assert_eq(int(st["next_card"]), Card.make(7))
+	assert_false(st.has("ranking"))
+	assert_true(bool(logic.private_state(1)["my_turn"]))
+	assert_false(bool(logic.private_state(2)["my_turn"]))
+	_stand(logic, 1)
+	_stand(logic, 2)
+	st = logic.get_public_state()
+	assert_true(st.has("ranking"))
+	assert_eq(st["winners"], [2])
+
+
+func test_a_full_idle_game_ends_by_timeouts() -> void:
+	var logic := _game([1, 2, 3, 4] as Array[int])
+	var guard: int = 0
+	while not logic.is_finished() and guard < 1000:
+		guard += 1
+		_tick(logic, 0.5)
+	assert_true(logic.is_finished())
+	assert_eq(_of(&"bust_or_bank_turn").size(), 4, "everyone gets one turn, then auto-stands")
+	assert_eq(_of(&"bust_or_bank_player_stood").size(), 4)
+	assert_eq(logic.ranking().size(), 4)
