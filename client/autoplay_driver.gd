@@ -215,10 +215,24 @@ func _use_items(delta: float) -> void:
 		return
 	var slot: int = randi() % inv.size()
 	Log.info(&"autoplay", "item key %d (%s)" % [slot + 1, inv[slot]])
-	scene.items_ctl.on_slot(slot)
-	if scene.items_ctl.picking_slot >= 0:
-		scene.items_ctl.cycle(1)
-		scene.items_ctl.confirm()
+	# Hold-and-aim bar: face the nearest other player so aimed items find a target, hold the slot,
+	# use it, and take the first button of any two-button choice.
+	var me: Vector3 = scene.local.global_position
+	var best: PlayerAvatar = null
+	for pid: int in scene.avatars:
+		if pid == scene.local_id:
+			continue
+		var a: PlayerAvatar = scene.avatars[pid]
+		if best == null or a.global_position.distance_to(me) < best.global_position.distance_to(me):
+			best = a
+	if best != null and scene.local.cam != null:
+		var to: Vector3 = best.global_position - me
+		scene.local.cam.yaw = atan2(-to.x, -to.z)
+		scene.local.yaw = scene.local.cam.yaw
+	scene.items_ctl.hold(slot)
+	scene.items_ctl.use_held()
+	if not scene.items_ctl.pending.is_empty():
+		scene.items_ctl._confirm_choice(0)
 
 
 func _st(id: StringName) -> StringName:
