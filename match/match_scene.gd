@@ -343,6 +343,7 @@ func _start_room_server(cmd: Cmdline) -> void:
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
+	LuckyLounge.describe_rooms(def)
 	var settings: Dictionary = _length_settings(cmd)
 	settings["seed"] = cmd.get_int("seed", 0)
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
@@ -383,6 +384,7 @@ func _start_local(cmd: Cmdline) -> void:
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
+	LuckyLounge.describe_rooms(def)
 	var settings: Dictionary = _length_settings(cmd)
 	settings["seed"] = cmd.get_int("seed", randi() % 1000000)
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
@@ -397,7 +399,8 @@ func _start_local(cmd: Cmdline) -> void:
 		# Dev/screenshots: `--dummy-skins` dresses the dummies in the character skins.
 		var skin: StringName = Cosmetics.SKINS[(i + 1) % Cosmetics.SKINS.size()] if cmd.has_flag("dummy-skins") else &"bean"
 		var did: int = _add_dummy(i, skin)
-		server.set_server_position(did, def.spawn_points[(i + 1) % def.spawn_points.size()] + Vector3(0, 0, -3.0))
+		# A step ahead of the spawn, still in the start room (clear of its north wall at z 8.4).
+		server.set_server_position(did, def.spawn_points[(i + 1) % def.spawn_points.size()] + Vector3(0, 0, -1.5))
 
 
 ## Test/screenshot dummy: a ready player with no client that only stands where it is put (or
@@ -476,6 +479,7 @@ func _on_lobby_changed() -> void:
 	var cd: int = ceili(view.state.countdown) if view.state.countdown > 0.0 else -1
 	if cd != _countdown_shown:
 		_countdown_shown = cd
+		map.set_door_countdown(view.state.countdown if cd > 0 else -1.0)  # 3-2-1 on the lobby doors
 		if cd > 0 and local != null:
 			hud.toast("Everyone's ready! Doors open in %d…" % cd, 3.2)
 			Audio.play(&"countdown_beep", &"SFX", -6.0)
@@ -624,7 +628,6 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	_check_fountain()
 	_check_vip_gate()
 	_check_pickups()
 	_update_guards()
@@ -962,8 +965,9 @@ func _on_event(ev: Dictionary) -> void:
 			var phase: Phase.Id = int(ev["phase"]) as Phase.Id
 			if phase != Phase.Id.LOBBY and lobby_panel.visible:
 				lobby_panel.close()
-			# The hall doors open when the casino does (after the intro and after each regroup).
-			if phase in [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME, Phase.Id.RESULTS]:
+			# The hall doors open when the match starts (the lobby countdown ran out on them) and
+			# after each regroup.
+			if phase in [Phase.Id.INTRO, Phase.Id.CASINO, Phase.Id.PRE_MINIGAME, Phase.Id.RESULTS]:
 				map.set_lobby_open(true)
 			elif phase == Phase.Id.REGROUP:
 				map.set_lobby_open(false)
@@ -1375,8 +1379,6 @@ func _knock_out(target: int, attacker: int, cause: StringName) -> void:
 	if t.ragdoll != null:
 		t.ragdoll.max_time = cfg.knockout_time + 1.0
 	t.visuals.set_knocked_out(true)
-	if cause == &"fountain":
-		FountainSplash.at_fountain(world_root, t.global_position, true)
 	Audio.play_at(&"bonk", t, -2.0, 0.8)
 	if target == local_id:
 		hud.toast("KNOCKED OUT" if cause != &"fountain" else "SPLASH! Knocked out", 2.0)
@@ -1613,6 +1615,7 @@ func _regroup() -> void:
 		hud.set_crosshair_visible(true)
 	router.set_mode(InputRouter.Mode.WALK)
 	hud.toast("Back in the hall! The doors open in %d…" % int(cfg.regroup_time), 2.5)
+	map.set_door_countdown(cfg.regroup_time)
 
 
 ## Online room went back to its lobby for another match ("play again in the same room").
@@ -1933,25 +1936,6 @@ func _near_shop() -> bool:
 	return Vector2(p.x - LuckyLounge.SHOP_POS.x, p.z - LuckyLounge.SHOP_POS.z).length() < 2.2 and absf(p.y - LuckyLounge.SHOP_POS.y) < 1.5
 
 
-func _check_fountain() -> void:
-	for body: Node3D in map.fountain_area.get_overlapping_bodies():
-		if body is PlayerAvatar:
-			var a: PlayerAvatar = body
-			if not a.is_soaked():
-				Audio.play_at(&"splash", a, -6.0)
-				FountainSplash.at_fountain(world_root, a.global_position, false)
-			a.soak()
-			if a.is_standing() and a.global_position.y < 0.9 and a.velocity.y < -2.0 and _owns_server:
-				server.report_knockout(a.player_id, _ragdoll_attacker.get(a.player_id, -1), &"fountain")
-		elif body is RigidBody3D and body.has_meta(&"ragdoll"):
-			var rb: RagdollBody = body.get_meta(&"ragdoll")
-			var pid: int = rb.player_id
-			if _owns_server and not _ko_until.has(pid) and avatars.has(pid):
-				if server.report_knockout(pid, _ragdoll_attacker.get(pid, -1), &"fountain"):
-					Audio.play_at(&"splash", rb, -2.0)
-					avatars[pid].soak()
-
-
 func _check_vip_gate() -> void:
 	var threshold: int = _vip_threshold()
 	for body: Node3D in map.vip_gate_area.get_overlapping_bodies():
@@ -1959,8 +1943,8 @@ func _check_vip_gate() -> void:
 			var a: PlayerAvatar = body
 			if view.state.balance(a.player_id) >= threshold or (view.state.effects.get(a.player_id, []) as Array).has(&"vip_pass"):
 				continue
-			# Bouncer pushes them back toward the stairs (+x) with a buzzer.
-			a.knockback(Vector3(1.0, 0.0, 0.0), 7.0)
+			# Bouncer pushes them back out of the VIP door onto the casino floor, with a buzzer.
+			a.knockback(LuckyLounge.VIP_GATE_PUSH, 7.0)
 			a.stun(0.4)
 			if a.player_id == local_id and _clock - _vip_toast_at > 1.0:
 				_vip_toast_at = _clock

@@ -165,9 +165,10 @@ func test_seated_player_is_immune() -> void:
 	assert_eq(grab["error"], &"seated")
 
 
-func test_grab_throw_ragdolls_and_fountain_knocks_out_and_soaks() -> void:
-	var fountain: Vector3 = LuckyLounge.FOUNTAIN_POS
-	_face_off(fountain + Vector3(0, 0, 4.4), 1.6)
+func test_grab_and_throw_ragdolls() -> void:
+	# In the start room, throwing towards the open lobby doors (the fountain that used to stand
+	# here is gone since 0.8.19).
+	_face_off(Vector3(0, 0, 14.4), 1.6)
 	await wait_seconds(0.2)
 	var grab: Dictionary = Net.send_intent(Intents.make(&"grab", {"target": bot}))
 	assert_true(grab["ok"], "grab: %s" % grab)
@@ -179,27 +180,7 @@ func test_grab_throw_ragdolls_and_fountain_knocks_out_and_soaks() -> void:
 	await wait_physics_frames(2)
 	assert_eq(_of(&"player_thrown").size(), 1)
 	assert_eq(b.state, PlayerAvatar.State.RAGDOLL, "thrown players ragdoll")
-	# Whatever the arc did, dunk the ragdoll in the water: the hazard must knock out and soak.
-	b.ragdoll.torso.global_position = fountain + Vector3(0.9, 1.1, 0.0)
-	b.ragdoll.torso.linear_velocity = Vector3.ZERO
-	await wait_physics_frames(4)
-	var kos: Array[Dictionary] = _of(&"player_knocked_out")
-	assert_eq(kos.size(), 1, "fountain knockout reported once")
-	if not kos.is_empty():
-		assert_eq(kos[0]["cause"], &"fountain")
-		assert_eq(int(kos[0]["attacker"]), scene.local_id, "credited to the thrower")
-	assert_true(b.is_soaked(), "soaked after the dunk")
-
-
-func test_walking_into_the_fountain_slows_the_player() -> void:
-	scene.local.teleport(LuckyLounge.FOUNTAIN_POS + Vector3(0, 0.75, 0))
-	await wait_physics_frames(3)
-	assert_true(scene.local.is_soaked(), "soaked in the water")
-	scene.local.teleport(Vector3(0, 0, 14))
-	await wait_physics_frames(2)
-	assert_true(scene.local.is_soaked(), "stays soaked for a while after leaving")
-	await wait_seconds(Registry.balance.soaked_seconds + 0.2)
-	assert_false(scene.local.is_soaked(), "dries off")
+	assert_lt(b.ragdoll.torso.linear_velocity.z, -1.0, "flying where the thrower aimed")
 
 
 func test_guard_chases_an_attacker_in_sight_but_not_behind_a_wall() -> void:

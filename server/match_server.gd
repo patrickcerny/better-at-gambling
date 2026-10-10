@@ -291,6 +291,8 @@ func start_match() -> void:
 ## Handles one client intent. Returns {ok, error}.
 func submit_intent(player: int, intent: Dictionary) -> Dictionary:
 	var why: StringName = validator.check(player, intent, phases.phase, match_time, state.players.has(player))
+	if why == &"" and _jail_blocks(player, intent):
+		why = &"jailed"
 	if why != &"":
 		if why != &"rate_limited":
 			Log.debug(&"server", "intent rejected (%s): %s" % [why, intent])
@@ -407,6 +409,7 @@ func _step(delta: float) -> void:
 
 
 func _tick_lobby(delta: float) -> void:
+	_keep_out_of_casino()
 	match lobby.tick(delta):
 		&"countdown_started":
 			_emit(GameEvents.make(&"lobby_countdown", {"seconds": LobbyController.COUNTDOWN_SECONDS}))
@@ -670,6 +673,11 @@ func return_to_lobby() -> void:
 		p.jail_fine = 0
 		lobby.set_on_pad(id, false)
 		lobby.set_panel_ready(id, false)
+		# Everyone is back in the start room (the scene moves the bodies on `match_reset`), so the
+		# shut doors don't count them as stragglers in the casino.
+		var spot: Vector3 = map_def.lobby_spawn(id) if map_def != null else Vector3.INF
+		if spot.is_finite():
+			set_server_position(id, spot)
 	_server_owned.clear()
 	_accumulator = 0.0
 	match_time = 0.0
@@ -735,7 +743,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"move":
 			if not can_move(player):
 				return StationLogicBase.fail(&"not_standing")
-			world.set_transform(player, Serializer.to_vec3(intent["pos"]), float(intent["yaw"]), bool(intent.get("airborne", false)))
+			world.set_transform(player, _jail_clamp(player, Serializer.to_vec3(intent["pos"])), float(intent["yaw"]), bool(intent.get("airborne", false)))
 			state.players[player].position = world.get_position(player)
 			return StationLogicBase.OK_RESULT
 		&"grab":
@@ -892,6 +900,10 @@ func can_move(player: int) -> bool:
 func apply_move(player: int, pos: Vector3, yaw: float, airborne: bool) -> bool:
 	if not state.players.has(player) or not can_move(player):
 		return true  # ignored, not a cheat: the server owns the body right now
+	var held: Vector3 = _jail_clamp(player, pos)
+	if held != pos:  # walked out of the jail cell (or never went in): snapped back inside
+		set_server_position(player, held)
+		return false
 	if not sanity.check(player, pos, _uptime):
 		return false
 	world.set_transform(player, pos, yaw, airborne)
@@ -1164,7 +1176,13 @@ func put_in_jail(player: int) -> void:
 	p.jail_time_remaining = JAIL_TIMES[level]
 	p.jail_fine = JAIL_FINES[level]
 	p.catch_count += 1
-	_emit(GameEvents.make(&"player_jailed", {"player": player, "time": snappedf(p.jail_time_remaining, 0.01), "fine": p.jail_fine, "catch_count": p.catch_count}))
+	var ev: Dictionary = {"player": player, "time": snappedf(p.jail_time_remaining, 0.01), "fine": p.jail_fine, "catch_count": p.catch_count}
+	if map_def != null and map_def.has_jail():
+		# Locked in the cell: the scene shows the bouncer bringing them (or a knockout).
+		_server_owned.erase(player)
+		set_server_position(player, map_def.jail_spot(player))
+		ev["pos"] = Serializer.vec3(map_def.jail_spot(player))
+	_emit(GameEvents.make(&"player_jailed", ev))
 
 
 ## Release a jailed player and deduct the fine from their balance (never below $0); the Get Out of
@@ -1177,7 +1195,12 @@ func release_from_jail(player: int, with_fine: bool = true) -> void:
 	p.jail_time_remaining = 0.0
 	p.jail_fine = 0
 	var deducted: int = economy.take_up_to(player, fine, &"jail_fine") if fine > 0 else 0
-	_emit(GameEvents.make(&"player_released_from_jail", {"player": player, "fine": deducted}))
+	var ev: Dictionary = {"player": player, "fine": deducted}
+	if map_def != null and map_def.has_jail() and map_def.jail_exit(player) != Vector3.INF:
+		# Out of the cell at the lobby doors (the client plays the curtain over the move).
+		set_server_position(player, map_def.jail_exit(player))
+		ev["pos"] = Serializer.vec3(map_def.jail_exit(player))
+	_emit(GameEvents.make(&"player_released_from_jail", ev))
 
 
 ## Reset a player's catch count to 0 (used by Get Out of Jail Free item).
@@ -1200,3 +1223,53 @@ func _tick_jail(delta: float) -> void:
 			release_from_jail(id)  # while still "in jail", so the release takes the fine
 		else:
 			p.jail_time_remaining -= delta
+			var at: Vector3 = world.get_position(id)
+			if not _server_owned.get(id, false) and _jail_clamp(id, at) != at:
+				set_server_position(id, _jail_clamp(id, at))
+
+
+## Intents a jailed player can't use from the cell (the bars hold the body; this holds the hands),
+## and nobody grabs a prisoner through the bars. Only with a physical cell on the map.
+const JAIL_BLOCKED: Array[StringName] = [&"sit", &"grab", &"shove", &"megaphone"]
+
+
+func _is_jailed(player: int) -> bool:
+	return map_def != null and map_def.has_jail() and state.players.has(player) and state.players[player].jail_time_remaining > 0.0
+
+
+func _jail_blocks(player: int, intent: Dictionary) -> bool:
+	var type: StringName = StringName(intent.get("type", &""))
+	if type in JAIL_BLOCKED and _is_jailed(player):
+		return true
+	return type == &"grab" and _is_jailed(int(intent.get("target", -1)))
+
+
+## Where a jailed player's reported position may be: inside the cell (a step against the bars is
+## clamped, anything further is their spot in the cell). Everyone else: `pos` unchanged.
+func _jail_clamp(player: int, pos: Vector3) -> Vector3:
+	if not _is_jailed(player) or map_def.in_jail(pos):
+		return pos
+	var inside: Vector3 = map_def.clamp_to_jail(pos)
+	return inside if inside.distance_to(pos) < 1.5 else map_def.jail_spot(player)
+
+
+# --- Start room (online lobby) ---
+
+
+## LOBBY: the casino is shut. Anyone the server finds past the lobby doors (thrown through, a
+## physics glitch) goes straight back to their spot in the start room; the scene puts the body
+## there on `player_sent_back`.
+func _keep_out_of_casino() -> void:
+	if map_def == null:
+		return
+	for id: int in state.players:
+		if not world.positions.has(id):
+			continue  # no body in the world yet
+		var pos: Vector3 = world.get_position(id)
+		var spot: Vector3 = map_def.lobby_spawn(id)
+		if spot == Vector3.INF or not map_def.past_lobby_doors(pos):
+			continue
+		_server_owned.erase(id)
+		set_server_position(id, spot)
+		Log.info(&"server", "player %d was past the lobby doors at %s: back to %s" % [id, pos, spot])
+		_emit(GameEvents.make(&"player_sent_back", {"player": id, "pos": Serializer.vec3(spot)}))

@@ -67,6 +67,10 @@ func _of(type: StringName) -> Array[Dictionary]:
 func _place(pid: int, pos: Vector3, yaw: float = 0.0) -> void:
 	scene.avatars[pid].teleport(pos, yaw)
 	scene.server.set_server_position(pid, pos)
+	# The view's copy too, or a dummy follows its stale position back for a frame before the
+	# next snapshot (to its start spot in the start room, against the wall).
+	if scene.view.state.players.has(pid):
+		scene.view.state.players[pid]["pos"] = Serializer.vec3(pos)
 
 
 ## Local player at `pos` facing -z (yaw 0), the dummy `dist` m ahead facing us.

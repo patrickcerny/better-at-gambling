@@ -7,8 +7,9 @@ extends RefCounted
 var max_speed: float = 16.0
 ## Distance always allowed per report regardless of time (jitter, small corrections), m.
 var slack: float = 1.5
-## Playable volume (the casino, lobby and porch with some margin).
-var bounds: AABB = AABB(Vector3(-23.5, -3.0, -17.0), Vector3(47.0, 13.0, 39.0))
+## Playable volume (the casino, the start room, the porch and the VIP lounge behind the north
+## wall, with some margin).
+var bounds: AABB = AABB(Vector3(-23.5, -3.0, -27.5), Vector3(47.0, 13.0, 49.5))
 
 var _last_pos: Dictionary[int, Vector3] = {}
 var _last_time: Dictionary[int, float] = {}
