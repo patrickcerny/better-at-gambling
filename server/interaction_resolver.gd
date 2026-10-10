@@ -185,15 +185,21 @@ func recent_offences(now: float, window: float = 3.0) -> Array[Dictionary]:
 	return out
 
 
-## A guard caught the attacker: thrown out through the front door (no money loss).
-func report_thrown_out(attacker: int, guard: StringName, now: float) -> void:
+## A guard caught the attacker: every hold ends, their offences are forgotten and they are safe
+## from shoves for a moment. The MatchServer puts them in jail (`report_caught`).
+func report_caught(attacker: int, now: float) -> void:
 	if holding.has(attacker):
 		_end_hold(attacker, holding[attacker])
 	if held_by.has(attacker):
 		_end_hold(int(held_by[attacker]["holder"]), attacker)
 	offences = offences.filter(func(o: Dictionary) -> bool: return int(o["attacker"]) != attacker)
-	events.append(GameEvents.make(&"player_thrown_out", {"target": attacker, "guard": guard}))
 	rules.protect(attacker, now + 4.0)
+
+
+## The bouncer throws the attacker out through the front door (fake cash; no money loss).
+func report_thrown_out(attacker: int, guard: StringName, now: float) -> void:
+	report_caught(attacker, now)
+	events.append(GameEvents.make(&"player_thrown_out", {"target": attacker, "guard": guard}))
 
 
 ## Regroup after the rewards (Patrick's note #10): every hold ends (`player_released`), knockouts and

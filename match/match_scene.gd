@@ -2260,7 +2260,7 @@ func _guard_sees(g: Guard, pos: Vector3) -> bool:
 
 func _on_guard_caught(g: Guard, pid: int) -> void:
 	if _owns_server and avatars.has(pid) and avatars[pid].state != PlayerAvatar.State.AWAY:
-		server.report_thrown_out(pid, g.guard_id)
+		server.report_caught(pid, g.guard_id)
 
 
 func _on_landed(pid: int, drop: float) -> void:

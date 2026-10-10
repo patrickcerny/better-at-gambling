@@ -156,7 +156,9 @@ func _jailed(ev: Dictionary) -> void:
 		a.stand()
 	# The bouncer carries them over where this process simulates both of them.
 	if _is_host() and _owns_body(a) and a.is_standing():
-		var g: Guard = _nearest_guard(a)
+		var g: Guard = _guard_named(StringName(ev.get("guard", &"")))
+		if g == null or g.carrying != null:
+			g = _nearest_guard(a)
 		if g != null and g.carry(a, LuckyLounge.JAIL_DOOR, true):
 			if not g.delivered.is_connected(_on_delivered):
 				g.delivered.connect(_on_delivered)
@@ -167,6 +169,15 @@ func _jailed(ev: Dictionary) -> void:
 		a.visuals.set_knocked_out(true)
 		a.stun(KNOCKOUT_SECONDS)
 	_deliver_at[pid] = _clock + KNOCKOUT_SECONDS
+
+
+func _guard_named(id: StringName) -> Guard:
+	if id == &"":
+		return null
+	for g: Guard in scene.guards:
+		if is_instance_valid(g) and not g.puppet and g.guard_id == id:
+			return g
+	return null
 
 
 func _nearest_guard(a: PlayerAvatar) -> Guard:

@@ -213,11 +213,12 @@ func test_guard_chases_an_attacker_in_sight_but_not_behind_a_wall() -> void:
 	assert_eq(g.target_id, scene.local_id)
 	assert_eq(g2.state, Guard.State.PATROL, "no line of sight, no chase")
 	await wait_seconds(2.0)
-	assert_eq(_of(&"player_thrown_out").size(), 1, "and the chase ends with a throw-out")
+	assert_eq(_of(&"player_jailed").size(), 1, "and the chase ends in jail")
+	assert_eq(_of(&"player_thrown_out").size(), 0)
 	assert_eq(g2.state, Guard.State.PATROL, "guard 2 never saw a thing")
 
 
-func test_guard_catching_throws_out_and_respawns_at_the_door() -> void:
+func test_guard_catching_puts_you_in_the_cell() -> void:
 	var g: Guard = scene.guards[0]
 	g.route = [Vector3(-12, 0, -6)]
 	g.global_position = Vector3(-12, 0, -6)
@@ -231,11 +232,13 @@ func test_guard_catching_throws_out_and_respawns_at_the_door() -> void:
 		await wait_seconds(1.3)
 	var money: int = scene.server.economy.balance(scene.local_id)
 	await wait_seconds(3.0)
-	assert_eq(_of(&"player_thrown_out").size(), 1, "guard reached the attacker and threw them out")
-	assert_eq(scene.server.economy.balance(scene.local_id), money, "no money lost on a throw-out")
-	await wait_seconds(Registry.balance.throw_out_respawn_seconds + 2.5)
+	assert_eq(_of(&"player_jailed").size(), 1, "guard reached the attacker and jailed them")
+	assert_eq(_of(&"player_thrown_out").size(), 0, "no throw-out any more")
+	assert_eq(scene.server.economy.balance(scene.local_id), money, "the fine comes on release")
+	await wait_seconds(Guard.JAIL_CARRY_SECONDS + 1.5)
 	assert_eq(scene.local.state, PlayerAvatar.State.STANDING)
-	assert_lt(scene.local.global_position.distance_to(LuckyLounge.RESPAWN_POS), 1.5, "back at the entrance")
+	assert_true(LuckyLounge.JAIL_AREA.has_point(scene.local.global_position), "in the cell")
+	assert_true(scene.server.map_def.in_jail(scene.server.world.get_position(scene.local_id)), "the server holds them there too")
 
 
 func test_sit_bet_and_leave_mid_round_through_the_scene() -> void:

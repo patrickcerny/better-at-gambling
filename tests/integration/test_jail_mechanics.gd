@@ -73,6 +73,27 @@ func test_jail_events_emitted() -> void:
 	assert_eq(released_events[-1]["fine"], 100)
 
 
+## Patrick 2026-10-10 ("the security doesnt put you in jail"): a guard catching you went through
+## the old throw-out. Now the catch itself is the jailing, with the guard named for the carry.
+func test_a_guard_catch_puts_you_in_jail_not_out_the_door() -> void:
+	_start()
+	var p: int = fx.player_ids[0]
+	var money: int = fx.server.economy.balance(p)
+	fx.server.interactions.offences.append({"attacker": p, "victim": fx.player_ids[1], "time": fx.server.match_time, "kind": &"shove"})
+	fx.server.report_caught(p, &"guard_1")
+	var jailed: Array[Dictionary] = fx.of_type(&"player_jailed")
+	assert_eq(jailed.size(), 1, "the catch jails them")
+	assert_eq(int(jailed[0]["player"]), p)
+	assert_eq(StringName(jailed[0]["guard"]), &"guard_1", "the catching guard carries them")
+	assert_eq(jailed[0].has("pos"), fx.server.map_def.has_jail(), "into the cell when the map has one")
+	assert_gt(fx.server.state.players[p].jail_time_remaining, 0.0)
+	assert_eq(fx.of_type(&"player_thrown_out").size(), 0, "no throw-out any more")
+	assert_eq(fx.server.interactions.recent_offences(fx.server.match_time, 3.0).size(), 0, "offences forgotten")
+	assert_eq(fx.server.economy.balance(p), money, "the fine comes on release, not at the catch")
+	fx.server.report_caught(p, &"guard_2")
+	assert_eq(fx.of_type(&"player_jailed").size(), 1, "already in jail: nothing more")
+
+
 func test_money_never_goes_negative() -> void:
 	_start()
 	var p: int = fx.player_ids[0]

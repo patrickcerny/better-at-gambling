@@ -1082,6 +1082,17 @@ func report_thrown_out(attacker: int, guard: StringName) -> void:
 	_flush()
 
 
+## SCENE: a guard caught `attacker` (Patrick 2026-10-10: security puts you in jail, no more
+## throw-outs): their offences are forgotten and they go to jail (`player_jailed` names the guard,
+## the scene has that bouncer carry them to the cell).
+func report_caught(attacker: int, guard: StringName) -> void:
+	if not state.players.has(attacker):
+		return
+	interactions.report_caught(attacker, match_time)
+	put_in_jail(attacker, guard)
+	_flush()
+
+
 ## Sets a player's position from the server side (ragdoll settled, respawn).
 func set_server_position(player: int, pos: Vector3) -> void:
 	world.set_transform(player, pos, world.get_yaw(player))
@@ -1276,7 +1287,7 @@ const JAIL_FINES: Array[int] = [100, 200, 400, 800]
 
 
 ## The guard catches a player and puts them in jail. Increases catch count and applies jail timer/fine.
-func put_in_jail(player: int) -> void:
+func put_in_jail(player: int, guard: StringName = &"") -> void:
 	if not state.players.has(player) or state.players[player].jail_time_remaining > 0.0:
 		return  # already in jail
 	var p: PlayerState = state.players[player]
@@ -1291,6 +1302,8 @@ func put_in_jail(player: int) -> void:
 	p.jail_fine = JAIL_FINES[level]
 	p.catch_count += 1
 	var ev: Dictionary = {"player": player, "time": snappedf(p.jail_time_remaining, 0.01), "fine": p.jail_fine, "catch_count": p.catch_count}
+	if guard != &"":
+		ev["guard"] = guard
 	if map_def != null and map_def.has_jail():
 		# Locked in the cell: the scene shows the bouncer bringing them (or a knockout).
 		_server_owned.erase(player)
