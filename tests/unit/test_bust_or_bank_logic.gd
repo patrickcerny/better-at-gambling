@@ -99,17 +99,17 @@ func test_intro_then_one_card_each_in_seat_order() -> void:
 	assert_almost_eq(float(_of(&"bust_or_bank_turn")[0]["time"]), BustOrBankLogic.TURN_TIME, 0.001)
 
 
-func test_next_card_is_the_shoes_top_card() -> void:
+func test_the_next_card_is_the_shoes_top_card_and_stays_secret() -> void:
 	var logic := _game([1, 2] as Array[int])
 	logic.shoe.stack_top(_cards([10, 5, 7, 3]))
-	assert_eq(logic.next_card, Card.make(10), "shown before the opening deal")
+	assert_eq(logic.next_card, Card.make(10), "server-side, before the opening deal")
 	_tick(logic, BustOrBankLogic.INTRO_TIME)
 	assert_eq(logic.next_card, Card.make(7))
-	assert_eq(int(_of(&"bust_or_bank_turn")[0]["next_card"]), Card.make(7), "the turn event shows it")
-	assert_eq(int(logic.get_public_state()["next_card"]), Card.make(7))
+	assert_false(_of(&"bust_or_bank_turn")[0].has("next_card"), "the turn event doesn't show it")
+	assert_false(logic.get_public_state().has("next_card"), "nor does the snapshot")
 	_hit(logic, 1)
-	assert_eq(logic.hands[1].back(), Card.make(7), "the shown card is the one dealt")
-	assert_eq(int(_of(&"bust_or_bank_card").back()["next_card"]), Card.make(3), "and the next one is revealed")
+	assert_eq(logic.hands[1].back(), Card.make(7), "the top card is the one dealt")
+	assert_false(_of(&"bust_or_bank_card").back().has("next_card"), "and the next one stays a gamble")
 	assert_eq(logic.next_card, logic.shoe.peek())
 
 
@@ -376,7 +376,7 @@ func test_public_and_private_state() -> void:
 	assert_almost_eq(float(st["turn_time"]), BustOrBankLogic.TURN_TIME, 0.001)
 	assert_eq(st["players"], [1, 2])
 	assert_eq((st["hands"] as Dictionary)[2]["cards"], [Card.make(6)], "every hand is public")
-	assert_eq(int(st["next_card"]), Card.make(7))
+	assert_false(st.has("next_card"), "the next card is nobody's business")
 	assert_false(st.has("ranking"))
 	assert_true(bool(logic.private_state(1)["my_turn"]))
 	assert_false(bool(logic.private_state(2)["my_turn"]))

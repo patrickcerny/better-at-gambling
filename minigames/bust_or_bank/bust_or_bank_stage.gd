@@ -3,7 +3,7 @@ extends MinigameStage
 ## Client presentation for Bust or Bank: a green felt table in the middle with everyone's hand
 ## seated round it (you at the bottom, the others clockwise in turn order). One player at a time
 ## decides: the current seat glows gold with a countdown bar, and the table centre shows whose turn
-## it is, the seconds left and the NEXT card face up ("do I want THAT card?"). On your own turn the
+## it is, the seconds left and the deck face down (the next card is a gamble). On your own turn the
 ## big HIT / STAND buttons light up (keys: the blackjack bindings `bj_hit` / `bj_stand`, H / S by
 ## default). The result shows every final hand with the winner(s) highlighted.
 ##
@@ -12,7 +12,7 @@ extends MinigameStage
 ## `bust_or_bank_action` intent ("hit" / "stand").
 
 const State := BustOrBankLogic.State
-## Card heights (px): the shared next card in the table centre, the cards in each seat.
+## Card heights (px): the face-down deck in the table centre, the cards in each seat.
 const NEXT_CARD_H: float = 150.0
 const SEAT_CARD_H: float = 66.0
 const SEAT_SIZE: Vector2 = Vector2(330, 146)
@@ -56,7 +56,6 @@ var time_left: float = 0.0
 var time_span: float = BustOrBankLogic.TURN_TIME
 var turn_time: float = BustOrBankLogic.TURN_TIME
 ## The shared upcoming card (-1 = none, drawn face down) and the card dealt last.
-var next_card: int = -1
 var last_card: int = -1
 var ranking: Array = []
 var winners: Array[int] = []
@@ -153,7 +152,7 @@ func _build_ui() -> void:
 	felt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	arena.add_child(felt_label)
 
-	# Table centre: the next card and whose turn it is.
+	# Table centre: the deck (always face down: the next card is a gamble) and whose turn it is.
 	centre = VBoxContainer.new()
 	centre.alignment = BoxContainer.ALIGNMENT_CENTER
 	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -165,7 +164,7 @@ func _build_ui() -> void:
 	next_col = VBoxContainer.new()
 	next_col.add_theme_constant_override(&"separation", 6)
 	mid.add_child(next_col)
-	next_title = _label("NEXT CARD", 22, Palette.WARM_GOLD)
+	next_title = _label("DECK", 22, Palette.WARM_GOLD)
 	next_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	next_col.add_child(next_title)
 	next_face = CardFace.make(-1, NEXT_CARD_H)
@@ -411,8 +410,6 @@ func apply_state(st: Dictionary) -> void:
 	current = int(st.get("current", -1))
 	time_left = float(st.get("timer", 0.0))
 	time_span = turn_time if phase == State.TURN else maxf(time_left, 0.01)
-	next_card = int(st.get("next_card", -1))
-	next_face.card = next_card
 	last_card = int(st.get("last_card", -1))
 	if st.has("ranking"):
 		_show_result(st["ranking"], st.get("winners", []))
@@ -435,7 +432,6 @@ func on_event(ev: Dictionary) -> void:
 			turn_time = float(ev.get("turn_time", turn_time))
 			time_left = float(ev.get("deal_in", 0.0))
 			time_span = maxf(time_left, 0.01)
-			_show_next(int(ev.get("next_card", -1)))
 			banner.text = "One card each, then it's turn by turn."
 
 		&"bust_or_bank_card":
@@ -448,7 +444,7 @@ func on_event(ev: Dictionary) -> void:
 			(h["cards"] as Array).append(card)
 			h["total"] = int(ev.get("total", h["total"]))
 			h["busted"] = bool(ev.get("busted", false))
-			_show_next(int(ev.get("next_card", -1)))
+			next_face.flip_in()  # the deck "deals": the drawn card lands in the seat
 			if not bool(ev.get("opening", false)):
 				if pid == local_id:
 					action_sent = false
@@ -463,7 +459,6 @@ func on_event(ev: Dictionary) -> void:
 			action_sent = false
 			time_left = float(ev.get("time", turn_time))
 			time_span = maxf(time_left, 0.01)
-			_show_next(int(ev.get("next_card", next_card)))
 
 		&"bust_or_bank_player_stood":
 			var pid: int = int(ev.get("player", -1))
@@ -514,15 +509,6 @@ func _hand_from(h: Dictionary) -> Dictionary:
 		"busted": bool(h.get("busted", false)), "stood": bool(h.get("stood", false))}
 
 
-## Shows the shared next card face up, flipping it in when it changed.
-func _show_next(card: int) -> void:
-	var changed: bool = card != next_card
-	next_card = card
-	next_face.card = card
-	if changed and card >= 0:
-		next_face.flip_in()
-
-
 func _show_result(p_ranking: Array, p_winners: Array) -> void:
 	over = true
 	phase = State.RESULT
@@ -537,8 +523,6 @@ func _show_result(p_ranking: Array, p_winners: Array) -> void:
 		for row: Variant in ranking:
 			if int((row as Dictionary).get("rank", 0)) == 1:
 				winners.append(int(row["player"]))
-	next_card = -1
-	next_face.card = -1
 	banner.text = "Final hands"
 
 
@@ -613,7 +597,7 @@ func _refresh() -> void:
 	elif mine and action_sent:
 		prompt_label.text = "..."
 	elif mine:
-		prompt_label.text = "You have %d. Take the %s?" % [int(my_hand["total"]), _card_text(next_card)]
+		prompt_label.text = "You have %d. Hit or stand?" % int(my_hand["total"])
 	elif phase == State.INTRO:
 		prompt_label.text = "Get ready"
 	else:

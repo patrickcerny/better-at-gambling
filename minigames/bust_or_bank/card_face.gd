@@ -75,7 +75,7 @@ func deal_in(delay: float = 0.0) -> void:
 	_tween.tween_property(self, "deal_t", 1.0, 0.4).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-## A card-flip (squash and stretch on x) when the card changes in place (the shared next card).
+## A card-flip (squash and stretch on x) when the card changes in place (the deck when it deals).
 func flip_in() -> void:
 	if not is_inside_tree():
 		return

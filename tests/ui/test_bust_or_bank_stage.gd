@@ -87,8 +87,7 @@ func test_opening_deal_one_card_each() -> void:
 	assert_eq(_faces(stage.seats[2]["cards"]), _cards([5]))
 	assert_eq(_faces(stage.seats[3]["cards"]), _cards([7]))
 	assert_eq((stage.seats[2]["total"] as Label).text, "5")
-	assert_eq(stage.next_face.card, Card.make(3), "the next card is shown face up")
-	assert_true(stage.next_face.is_face_up())
+	assert_false(stage.next_face.is_face_up(), "the deck stays face down: the next card is a gamble")
 
 
 func test_own_turn_highlight_countdown_and_buttons() -> void:
@@ -107,7 +106,8 @@ func test_own_turn_highlight_countdown_and_buttons() -> void:
 	stage._process(5.5)
 	assert_eq(stage.countdown_label.text, "15")
 	assert_almost_eq(stage.countdown_bar.value, 14.5 / 20.0, 0.001)
-	assert_string_contains(stage.prompt_label.text, "3♠", "asks about the next card")
+	assert_string_contains(stage.prompt_label.text, "Hit or stand?", "asks without naming the next card")
+	assert_false(stage.next_face.is_face_up(), "no peek at the next card")
 
 
 func test_hit_button_sends_hit_and_passes_the_turn() -> void:
@@ -217,7 +217,7 @@ func test_snapshot_catches_up_mid_turn() -> void:
 	assert_true(late.can_act(), "it's the late joiner's turn")
 	assert_almost_eq(late.time_left, BustOrBankLogic.TURN_TIME - 4.0, 0.01)
 	assert_eq(_faces(late.seats[1]["cards"]), _cards([10, 3]))
-	assert_eq(late.next_face.card, logic.next_card, "late joiners see the next card")
+	assert_false(late.next_face.is_face_up(), "the deck stays face down for late joiners too")
 	assert_eq(late._seat_order(), [2, 3, 1] as Array[int], "their own seat at the bottom")
 
 

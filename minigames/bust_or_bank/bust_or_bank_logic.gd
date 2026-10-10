@@ -9,8 +9,9 @@ extends MinigameLogicBase
 ## stands you automatically (you can't do better). The circle skips players who stood or busted, so
 ## a lone player still in keeps taking turns until they stand or bust.
 ##
-## The upcoming card is no secret: `next_card` (the shoe's top card) is shown face up to everyone in
-## every event and in the snapshot, so the decision is "do I want THAT card?".
+## The upcoming card is a secret (Patrick 2026-10-10: "it should be a gamble"): nothing about the
+## shoe's top card goes into events or the public snapshot. `next_card` stays server-side for
+## tests and tutorial scripting.
 ##
 ## The round ends when nobody is left drawing. Highest total wins (21 best, a two-card blackjack is
 ## just 21); equal totals share a rank; busted players rank below every standing hand and share one
@@ -50,8 +51,8 @@ var current: int = -1
 ## Turns started so far (0 before the first).
 var turn: int = 0
 var last_card: int = -1
-## The card the shoe deals next, shown face up to everyone (-1 once the round is over). It is
-## always the shoe's top card, so `shoe.stack_top` decides the order (tests and tutorial scripting).
+## The card the shoe deals next, server-side only (-1 once the round is over). It is always the
+## shoe's top card, so `shoe.stack_top` decides the order (tests and tutorial scripting).
 var next_card: int:
 	get:
 		if shoe == null or state == State.RESULT or state == State.DONE:
@@ -79,7 +80,6 @@ func _on_setup(_context: Dictionary) -> void:
 		"players": order.duplicate(),
 		"deal_in": INTRO_TIME,
 		"turn_time": TURN_TIME,
-		"next_card": next_card,
 	}))
 
 
@@ -183,7 +183,6 @@ func _start_turn(player: int) -> void:
 		"time": TURN_TIME,
 		"turn": turn,
 		"total": _total(player),
-		"next_card": next_card,
 	}))
 
 
@@ -227,7 +226,6 @@ func _deal(player: int, opening: bool = false) -> void:
 		"total": t,
 		"busted": busted[player],
 		"opening": opening,
-		"next_card": next_card,
 	}))
 
 
@@ -344,7 +342,6 @@ func get_public_state() -> Dictionary:
 		"turn": turn,
 		"hands": _hands_public(),
 		"last_card": last_card,
-		"next_card": next_card,
 		"points": points(),
 	}
 	if state == State.RESULT or state == State.DONE:

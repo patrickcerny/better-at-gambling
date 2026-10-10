@@ -42,7 +42,7 @@ func test_hit_and_stand_through_the_intent_schema() -> void:
 	var mg: Dictionary = snap["minigame"]
 	assert_eq(int(mg["current"]), first)
 	assert_true((mg["hands"] as Dictionary).size() == logic.order.size(), "every hand is public")
-	assert_true(mg.has("next_card"))
+	assert_false(mg.has("next_card"), "the next card never reaches clients")
 	var other: int = logic.order[1]
 	assert_eq(fx.intent(other, &"bust_or_bank_action", {"action": "hit"})["error"], &"not_your_turn")
 	# The exact payload the stage sends.
