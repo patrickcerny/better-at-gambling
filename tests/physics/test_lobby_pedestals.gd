@@ -27,6 +27,11 @@ func test_one_pedestal_per_colour_with_signs_on_the_wall() -> void:
 	scene.map.set_pedestal(2, "Patrick", true)
 	assert_eq(scene.map.pedestal_labels[2].text, "PATRICK")
 	assert_true((scene.map.pedestal_tops[2].material_override as StandardMaterial3D).emission_enabled, "lit while ready")
+	for i: int in 8:
+		if i != 2:
+			var other: StandardMaterial3D = scene.map.pedestal_tops[i].material_override as StandardMaterial3D
+			assert_false(other.emission_enabled, "only the ready pedestal lights up (%d)" % i)
+			assert_eq(other.albedo_color, LuckyLounge.MARBLE, "the others stay marble (%d)" % i)
 	scene.map.set_pedestal(2, "Patrick", false)
 	assert_false((scene.map.pedestal_tops[2].material_override as StandardMaterial3D).emission_enabled)
 	scene.map.set_pedestal(2, "", false)

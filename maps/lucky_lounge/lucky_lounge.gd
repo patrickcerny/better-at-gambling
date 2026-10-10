@@ -516,7 +516,9 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	GreyboxKit.box(root, Vector3(0.94, 0.012, 0.94), Vector3(0, 0.745, 0), Palette.WARM_GOLD, "Trim", false)
 	var top: Node3D = GreyboxKit.box(root, Vector3(0.9, 0.06, 0.9), Vector3(0, PEDESTAL_TOP - 0.03, 0), MARBLE, "Abacus", false)
 	var top_mesh: MeshInstance3D = top.get_node("Mesh") as MeshInstance3D
-	top_mesh.material_override = GreyboxKit.material(MARBLE, 0.0, 0.45)
+	# Own material per top: GreyboxKit.material caches per colour, so a shared one would light every
+	# pedestal when one player readies up.
+	top_mesh.material_override = GreyboxKit.material(MARBLE, 0.0, 0.45).duplicate()
 	# Stair up from the room side (−z): a smooth wedge to walk on, dressed as four marble steps.
 	var stair_len: float = 1.7
 	GreyboxKit.ramp(root, Vector3(0, 0, -0.45 - stair_len), Vector3(0, PEDESTAL_TOP, -0.45), 0.9, MARBLE, "Stair")
