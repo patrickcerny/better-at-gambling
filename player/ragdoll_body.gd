@@ -18,6 +18,8 @@ const SETTLE_SPEED: float = 0.35
 const SETTLE_TIME: float = 0.4
 const MIN_TIME: float = 0.8
 const IMPACT_THRESHOLD: float = 4.5
+## Eye height on the torso (its centre is where the bean's body centre is when standing).
+const EYE_UP: float = AvatarVisuals.EYE_Y - AvatarVisuals.BODY_BOTTOM - AvatarVisuals.BODY_HEIGHT * 0.5
 
 var torso: RigidBody3D
 var head: RigidBody3D
@@ -149,14 +151,27 @@ func _build() -> void:
 		_pin(torso, hand_l, Vector3(-0.45, 1.1, 0))
 		_pin(torso, hand_r, Vector3(0.45, 1.1, 0))
 		_pin(torso, hips, Vector3(0, 0.4, 0))
-	# Dot eyes on the head so it still reads as a face while flopping.
+	# The bean look (AvatarVisuals): the jelly-bean body rides the torso and the head is only a
+	# weight; big googly eyes on the face so it still reads as the same bean while flopping.
+	var torso_mesh: MeshInstance3D = torso.get_child(0) as MeshInstance3D
+	torso_mesh.mesh = AvatarVisuals.bean_mesh()
+	torso_mesh.material_override = ToonMaterial.make(color, 0.4)
+	(head.get_child(0) as MeshInstance3D).visible = false
+	(hips.get_child(0) as MeshInstance3D).visible = false
 	var dark: StandardMaterial3D = GreyboxKit.material(Palette.CASINO_BLACK)
-	for x: float in [-0.1, 0.1]:
+	var white: StandardMaterial3D = GreyboxKit.material(Color("#FFFDF7"))
+	for x: float in [-AvatarVisuals.EYE_SPREAD, AvatarVisuals.EYE_SPREAD]:
 		var e := MeshInstance3D.new()
-		e.mesh = _sphere(0.04)
-		e.material_override = dark
-		e.position = Vector3(x, 0.05, -0.27)
-		head.add_child(e)
+		e.mesh = _sphere(AvatarVisuals.EYE_RADIUS)
+		e.material_override = white
+		e.position = Vector3(x, EYE_UP, AvatarVisuals.face_z(EYE_UP, x) + AvatarVisuals.EYE_RADIUS * 0.45)
+		torso.add_child(e)
+		var pupil := MeshInstance3D.new()
+		pupil.mesh = _sphere(AvatarVisuals.EYE_RADIUS * 0.6)
+		pupil.material_override = dark
+		pupil.scale = Vector3(1.0, 1.0, 0.5)
+		pupil.position = Vector3(0.0, 0.0, -AvatarVisuals.EYE_RADIUS * 0.82)
+		e.add_child(pupil)
 		_eyes.append(e)
 	_skinned = _wear_skin()
 	if not _skinned and DisplayServer.get_name() != "headless":
@@ -204,16 +219,16 @@ func _build_flail(mat: Material, dark: Material) -> void:
 		leg.position = Vector3(0.0, -0.12, 0.0)
 		pivot.add_child(leg)
 		_leg_pivots.append(pivot)
-	for x: float in [-0.1, 0.1]:
+	for x: float in [-AvatarVisuals.EYE_SPREAD, AvatarVisuals.EYE_SPREAD]:
 		var cross := Node3D.new()
 		cross.name = "XEye"
-		cross.position = Vector3(x, 0.05, -0.27)
+		cross.position = Vector3(x, EYE_UP, AvatarVisuals.face_z(EYE_UP, x) - 0.01)
 		cross.visible = false
-		head.add_child(cross)
+		torso.add_child(cross)
 		for a: float in [PI * 0.25, -PI * 0.25]:
 			var bar := MeshInstance3D.new()
 			var bm := BoxMesh.new()
-			bm.size = Vector3(0.11, 0.025, 0.025)
+			bm.size = Vector3(0.17, 0.04, 0.03)
 			bar.mesh = bm
 			bar.material_override = dark
 			bar.rotation.z = a

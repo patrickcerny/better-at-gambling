@@ -52,12 +52,12 @@ func test_casino_quiz_and_results_under_every_look() -> void:
 		scene._set_curtain(1.0)
 		# Quiz: the stage's set is pixelated, its UI is not, and a number key still answers.
 		scene._open_stage({"minigame": &"quiz", "players": _players()}, {})
-		await wait_seconds(MatchScene.CURTAIN_TIME + 0.3)  # curtain closes, then the stage is created behind it
+		await wait_seconds(MatchScene.curtain_times().x + 0.3)  # curtain closes, then the stage is created behind it
 		var stage: QuizStage = scene.stage as QuizStage
 		assert_not_null(stage, "quiz stage opened")
 		if stage == null:
 			continue
-		await wait_seconds(MatchScene.CURTAIN_TIME + 0.3)
+		await wait_seconds(MatchScene.curtain_times().y + MatchScene.curtain_times().z + 0.3)  # holds on the name, opens
 		assert_true(scene.curtain_left.get_global_rect().end.x <= 0.0, "curtain opened again on the stage")
 		assert_true(pv.viewport.is_ancestor_of(stage), "stage set inside the pixel viewport")
 		assert_eq(stage.ui.get_parent(), scene, "stage UI hosted on the sharp window")
