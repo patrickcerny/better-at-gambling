@@ -783,6 +783,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				return StationLogicBase.fail(&"unknown_emote")
 			_emit(GameEvents.make(&"emote", {"player": player, "id": StringName(intent["id"])}))
 			return StationLogicBase.OK_RESULT
+		&"play_emote":
+			return _play_emote(player, intent)
 		&"minigame_ready":
 			if not in_briefing() or not minigame.players.has(player):
 				return StationLogicBase.fail(&"too_late")
@@ -864,6 +866,18 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			_emit(GameEvents.make(&"lobby_settings", {"settings": lobby.settings.duplicate()}))
 			return StationLogicBase.OK_RESULT
 	return StationLogicBase.fail(&"not_implemented")
+
+
+## Number-key emote (`play_emote {emote}`): a known animated emote is shown to everyone as
+## `player_emote {player, emote}`; knocked-down players can't emote.
+func _play_emote(player: int, intent: Dictionary) -> Dictionary:
+	var v: Variant = intent["emote"]
+	if not (v is StringName or v is String) or not Emotes.is_animated(StringName(v)):
+		return StationLogicBase.fail(&"unknown_emote")
+	if rules.is_knocked_down(player, match_time):
+		return StationLogicBase.fail(&"not_standing")
+	_emit(GameEvents.make(&"player_emote", {"player": player, "emote": StringName(v)}))
+	return StationLogicBase.OK_RESULT
 
 
 ## Gets a seated player off their seat, exactly like their own "leave" (a round in play is settled

@@ -143,7 +143,7 @@ func test_minigame_keeps_the_cursor_when_you_are_stood_up() -> void:
 	# Jump the clock to just before the first minigame.
 	var ph: PhaseMachine = scene.server.phases
 	ph.casino_time = ph.schedule.minigame_times()[0] - 0.3
-	await wait_seconds(1.0)
+	await wait_seconds(0.7 + MatchScene.curtain_times().x)  # the stage is built once the curtain is closed
 	assert_eq(ph.phase, Phase.Id.MINIGAME)
 	assert_not_null(scene.stage, "minigame stage open")
 	assert_eq(router.mode, InputRouter.Mode.STAGE)

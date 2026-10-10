@@ -18,7 +18,11 @@ const CLIPS: Dictionary = {
 	&"walk": ["|Walk", "_Walk"],
 	&"run": ["|Run", "_Run"],
 	&"sit": ["_Sitting"],
+	# Emotes on skins with clips (thumbs up and the dance): a wave, or clapping.
+	&"wave": ["|Wave", "_Clapping"],
 }
+## Right-hand bones, tried in order (for `right_hand`).
+const RIGHT_HAND_BONES: Array[StringName] = [&"Wrist.R", &"Palm.R", &"DEF-HAND.R"]
 
 
 static func has_model(id: StringName) -> bool:
@@ -89,3 +93,61 @@ static func relax_pose(root: Node3D) -> void:
 		var parent: int = skel.get_bone_parent(b)
 		var pg: Basis = skel.get_bone_global_pose(parent).basis if parent >= 0 else Basis.IDENTITY
 		skel.set_bone_pose_rotation(b, (pg.inverse() * swung).get_rotation_quaternion())
+
+
+## A BoneAttachment3D following the skin's right hand (made once per skin model), or null when the
+## model has no hand bone.
+static func right_hand(root: Node3D) -> BoneAttachment3D:
+	var found: Array[Node] = root.find_children("*", "Skeleton3D", true, false)
+	if found.is_empty():
+		return null
+	var skel: Skeleton3D = found[0]
+	var existing: Node = skel.get_node_or_null("RightHand")
+	if existing != null:
+		return existing as BoneAttachment3D
+	for bone_name: StringName in RIGHT_HAND_BONES:
+		if skel.find_bone(bone_name) >= 0:
+			var ba := BoneAttachment3D.new()
+			ba.name = "RightHand"
+			ba.bone_name = bone_name
+			skel.add_child(ba)
+			return ba
+	return null
+
+
+## Emotes on skins without clips that have arm bones (`lower_arms`): lifts each arm from hanging
+## (`lift` 0) through pointing forward (1) to straight up (2). 0, 0 is the relaxed pose again.
+static func pose_arms(root: Node3D, lift_l: float, lift_r: float) -> void:
+	var arms: Array = root.get_meta(&"lower_arms", [])
+	if arms.size() < 2:
+		return
+	var found: Array[Node] = root.find_children("*", "Skeleton3D", true, false)
+	if found.is_empty():
+		return
+	var skel: Skeleton3D = found[0]
+	if lift_l <= 0.001 and lift_r <= 0.001:
+		relax_pose(root)
+		return
+	var xf := Transform3D.IDENTITY
+	var n: Node = skel
+	while n != null and n != root:
+		if n is Node3D:
+			xf = (n as Node3D).transform * xf
+		n = n.get_parent()
+	var inv: Basis = xf.basis.inverse()
+	var down: Vector3 = (inv * Vector3.DOWN).normalized()
+	var fwd: Vector3 = (inv * Vector3.FORWARD).normalized()
+	var up: Vector3 = (inv * Vector3.UP).normalized()
+	for i: int in 2:
+		var b: int = skel.find_bone(StringName(arms[i]))
+		if b < 0 or skel.get_bone_children(b).is_empty():
+			continue
+		var lift: float = lift_l if i == 0 else lift_r
+		var target: Vector3 = down.slerp(fwd, clampf(lift, 0.0, 1.0)) if lift <= 1.0 else fwd.slerp(up, clampf(lift - 1.0, 0.0, 1.0))
+		var parent: int = skel.get_bone_parent(b)
+		var pg: Transform3D = skel.get_bone_global_pose(parent) if parent >= 0 else Transform3D.IDENTITY
+		var rest: Transform3D = pg * skel.get_bone_rest(b)
+		var tip: Vector3 = rest * skel.get_bone_rest(skel.get_bone_children(b)[0]).origin
+		var dir: Vector3 = (tip - rest.origin).normalized()
+		var swung := Basis(Quaternion(dir, target.normalized())) * rest.basis
+		skel.set_bone_pose_rotation(b, (pg.basis.inverse() * swung).get_rotation_quaternion())

@@ -25,6 +25,11 @@ const ACTIONS: Array = [
 	["item_1", 0.5, ["key:1", "joy:13"]],
 	["item_2", 0.5, ["key:2", "joy:11"]],
 	["item_3", 0.5, ["key:3", "joy:14"]],
+	# Number-key emotes (Emotes.ANIMATED): 67, thumbs up, thumbs down, default dance.
+	["emote_1", 0.5, ["key:4"]],
+	["emote_2", 0.5, ["key:5"]],
+	["emote_3", 0.5, ["key:6"]],
+	["emote_4", 0.5, ["key:7"]],
 	["leaderboard", 0.5, ["key:Tab", "joy:3"]],
 	["pause", 0.5, ["key:Escape", "joy:6"]],
 	["push_to_talk", 0.5, ["key:T", "key:CapsLock", "joy:9"]],

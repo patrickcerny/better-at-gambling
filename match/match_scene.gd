@@ -24,6 +24,8 @@ const DUMMY_NAMES: Array[String] = ["Chip", "Lucky", "Dice", "Ace", "Penny", "Bl
 static var test_dummies: int = 0
 ## Tests: seconds of the pre-minigame rules briefing (−1 = the normal 30 s, or `--minigame-briefing`).
 static var test_briefing: float = -1.0
+## Tests: the minigame curtain closes, holds and opens in a blink (see `curtain_times`).
+static var test_curtain_fast: bool = false
 
 var map: LuckyLounge
 var server: MatchServer = null
@@ -79,13 +81,26 @@ var effect_tags: Dictionary[int, Label3D] = {}
 ## Beer: full-screen wobble/blur under the HUD, and the money we had when we got drunk.
 var drunk_overlay: ColorRect
 var _drunk_money: int = -1
-## Curtain transition for minigames: left and right panels that slide in and out.
+## Curtain transition for minigames: two pleated velvet panels (ui/effects/curtain.gdshader) that
+## close over the screen, hold with the minigame's name (or "Back to the casino") in the middle,
+## then open: gathered to the sides by gold tiebacks, then pulled off both edges.
 var curtain_left: ColorRect = null
 var curtain_right: ColorRect = null
+## Scalloped velvet valance across the top while the curtain is in.
+var curtain_valance: ColorRect = null
+## The name shown on the closed curtain, and the small line above it, on a gold-rimmed plaque.
+var curtain_title: Label = null
+var curtain_kicker: Label = null
+var curtain_plaque: PanelContainer = null
 ## 1.0 = curtain fully open (panels off screen), 0.0 = closed (panels cover the screen).
 var curtain_open: float = 1.0
 var curtain_tween: Tween = null
-const CURTAIN_TIME: float = 0.45
+## Seconds the curtain takes to close, stays closed showing the name, and takes to open.
+const CURTAIN_CLOSE_TIME: float = 0.6
+const CURTAIN_HOLD_TIME: float = 1.5
+const CURTAIN_OPEN_TIME: float = 0.8
+## Share of the opening spent gathering the fabric to the tiebacks (the rest pulls it off screen).
+const CURTAIN_GATHER: float = 0.7
 ## Gold crown over the money leader (not on the dedicated server).
 var crown: LeaderCrown = null
 
@@ -159,23 +174,7 @@ func _ready() -> void:
 	drunk_overlay.material = drunk_mat
 	drunk_overlay.visible = false
 	ui_layer.add_child(drunk_overlay)
-	# Minigame curtain: two half-screen panels positioned by anchors, so they close and open the
-	# same way at any window size. They start fully open (parked off both edges).
-	curtain_left = ColorRect.new()
-	curtain_left.name = "CurtainLeft"
-	curtain_left.color = Color("#2B1A1A")
-	curtain_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	curtain_left.anchor_top = 0.0
-	curtain_left.anchor_bottom = 1.0
-	ui_layer.add_child(curtain_left)
-	curtain_right = ColorRect.new()
-	curtain_right.name = "CurtainRight"
-	curtain_right.color = Color("#2B1A1A")
-	curtain_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	curtain_right.anchor_top = 0.0
-	curtain_right.anchor_bottom = 1.0
-	ui_layer.add_child(curtain_right)
-	_set_curtain(1.0)
+	_build_curtain()
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
@@ -535,6 +534,7 @@ func _connect_router() -> void:
 			emote_wheel.open()
 		else:
 			emote_wheel.close_and_pick())
+	router.emote_key.connect(func(i: int) -> void: Net.send_intent(Intents.make(&"play_emote", {"emote": Emotes.ANIMATED[i]})))
 	router.leaderboard_toggled.connect(func(shown: bool) -> void:
 		if view.state.phase == Phase.Id.LOBBY and view.state.room_mode:
 			if shown:
@@ -922,6 +922,10 @@ func _on_event(ev: Dictionary) -> void:
 			_throw_out(int(ev["target"]), String(ev.get("guard", "guard")))
 		&"emote":
 			EmoteWheel.present(avatars.get(int(ev["player"]), null), StringName(ev["id"]))
+		&"player_emote":
+			var emoter: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if emoter != null:
+				emoter.play_emote(StringName(ev["emote"]))
 		&"intent_rejected":
 			if int(ev["player"]) == local_id:
 				_end_prediction(StringName(ev.get("intent", &"")), true)
@@ -980,6 +984,7 @@ func _on_event(ev: Dictionary) -> void:
 		&"rewards_started":
 			if role != Role.SERVER:
 				reward_panel.open(ev["rewards"], float(ev["seconds"]))
+				_curtain_back_to_casino(float(ev["seconds"]))
 				for row: Dictionary in ev["rewards"]:
 					if int(row["player"]) == local_id and StringName(row.get("item", &"")) != &"":
 						_hint(&"items", "New item! Press {item_1}, {item_2} or {item_3} to use it, scroll to select and i for info.", float(ev["seconds"]))
@@ -1477,12 +1482,8 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 	if def == null or def.stage_script == null:
 		Log.warn(&"match", "no stage for minigame %s" % start.get("minigame", "?"))
 		return
-	# One sequential tween: close the curtain, build the stage behind it, open it again.
-	if curtain_tween != null and curtain_tween.is_valid():
-		curtain_tween.kill()
-	curtain_tween = create_tween()
-	curtain_tween.tween_method(_set_curtain, curtain_open, 0.0, CURTAIN_TIME * curtain_open)
-	curtain_tween.tween_callback(func() -> void:
+	# One sequential tween: close the curtain, build the stage behind it, hold, open it again.
+	_curtain_sequence(def.display_name if def.display_name != "" else String(def.id).capitalize(), "MINIGAME", 0.0, func() -> void:
 		stage = def.stage_script.new() as MinigameStage
 		stage.name = "MinigameStage"
 		stage.ui_host = self  # its 2D stays sharp outside the pixelated world
@@ -1509,17 +1510,158 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 			local.auto_target = Vector3.INF
 		Audio.play(&"whoosh", &"SFX", -4.0)
 	)
-	curtain_tween.tween_method(_set_curtain, 0.0, 1.0, CURTAIN_TIME)
 
 
-## Moves both curtain panels: `amount` 1.0 parks them off screen, 0.0 covers the screen.
+## Curtain timings (close, hold, open) in seconds; tiny with `test_curtain_fast`.
+static func curtain_times() -> Vector3:
+	if test_curtain_fast:
+		return Vector3(0.05, 0.1, 0.05)
+	return Vector3(CURTAIN_CLOSE_TIME, CURTAIN_HOLD_TIME, CURTAIN_OPEN_TIME)
+
+
+## Builds the curtain on its own layer above the HUD, menus and the minigame UI. It starts fully
+## open (parked off both edges); panels are positioned by anchors, so it works at any window size.
+func _build_curtain() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "CurtainLayer"
+	layer.layer = 90
+	add_child(layer)
+	var shader: Shader = load("res://ui/effects/curtain.gdshader")
+	var panels: Array[ColorRect] = []
+	for i: int in 3:
+		var r := ColorRect.new()
+		r.name = ["CurtainLeft", "CurtainRight", "CurtainValance"][i]
+		r.color = Palette.VIP_BURGUNDY
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var m := ShaderMaterial.new()
+		m.shader = shader
+		m.set_shader_parameter(&"mirrored", 1.0 if i == 1 else 0.0)
+		m.set_shader_parameter(&"mode", 1.0 if i == 2 else 0.0)
+		r.material = m
+		r.anchor_top = 0.0
+		r.anchor_bottom = 1.0
+		layer.add_child(r)
+		panels.append(r)
+	curtain_left = panels[0]
+	curtain_right = panels[1]
+	curtain_valance = panels[2]
+	curtain_valance.anchor_left = 0.0
+	curtain_valance.anchor_right = 1.0
+	curtain_plaque = PanelContainer.new()
+	curtain_plaque.name = "CurtainPlaque"
+	curtain_plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.09, 0.03, 0.045, 0.92)
+	sb.border_color = Palette.WARM_GOLD
+	sb.set_border_width_all(5)
+	sb.set_corner_radius_all(22)
+	sb.shadow_color = Color(0, 0, 0, 0.5)
+	sb.shadow_size = 18
+	sb.content_margin_left = 64
+	sb.content_margin_right = 64
+	sb.content_margin_top = 14
+	sb.content_margin_bottom = 22
+	curtain_plaque.add_theme_stylebox_override(&"panel", sb)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override(&"separation", -8)
+	curtain_plaque.add_child(box)
+	curtain_kicker = _curtain_label(34, Palette.WARM_GOLD)
+	curtain_title = _curtain_label(112, Palette.VIP_GOLD)
+	box.add_child(curtain_kicker)
+	box.add_child(curtain_title)
+	layer.add_child(curtain_plaque)
+	curtain_plaque.resized.connect(_center_curtain_plaque)
+	curtain_plaque.modulate.a = 0.0
+	get_viewport().size_changed.connect(_on_curtain_resized)
+	_set_curtain(1.0)
+
+
+func _curtain_label(size: int, c: Color) -> Label:
+	var l := Label.new()
+	l.name = "CurtainKicker" if size < 50 else "CurtainTitle"
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.add_theme_font_override(&"font", load("res://assets/fonts/BarlowCondensed-Black.ttf") as Font)
+	l.add_theme_font_size_override(&"font_size", size)
+	l.add_theme_color_override(&"font_color", c)
+	l.add_theme_color_override(&"font_outline_color", Palette.CASINO_BLACK)
+	l.add_theme_constant_override(&"outline_size", 14 if size >= 50 else 8)
+	l.add_theme_color_override(&"font_shadow_color", Color(0, 0, 0, 0.55))
+	l.add_theme_constant_override(&"shadow_offset_y", 6)
+	return l
+
+
+## Keeps the plaque in the middle of the screen whatever the text's size.
+func _center_curtain_plaque() -> void:
+	var size: Vector2 = curtain_plaque.get_combined_minimum_size()
+	curtain_plaque.anchor_left = 0.5
+	curtain_plaque.anchor_right = 0.5
+	curtain_plaque.anchor_top = 0.5
+	curtain_plaque.anchor_bottom = 0.5
+	curtain_plaque.offset_left = -size.x * 0.5
+	curtain_plaque.offset_right = size.x * 0.5
+	curtain_plaque.offset_top = -size.y * 0.5
+	curtain_plaque.offset_bottom = size.y * 0.5
+
+
+## Close the curtain (from wherever it is), call `on_closed` behind it, hold with `title` (and the
+## small `kicker` line) showing, then open. `delay` waits that long before closing.
+func _curtain_sequence(title: String, kicker: String, delay: float, on_closed: Callable) -> void:
+	if curtain_tween != null and curtain_tween.is_valid():
+		curtain_tween.kill()
+	var times: Vector3 = curtain_times()
+	curtain_title.text = title.to_upper()
+	curtain_kicker.text = kicker
+	curtain_kicker.visible = kicker != ""
+	curtain_plaque.reset_size()
+	_center_curtain_plaque()
+	curtain_tween = create_tween()
+	if delay > 0.0:
+		curtain_tween.tween_interval(delay)
+	curtain_tween.tween_method(_set_curtain, curtain_open, 0.0, maxf(times.x * curtain_open, 0.01))
+	if on_closed.is_valid():
+		curtain_tween.tween_callback(on_closed)
+	curtain_tween.tween_interval(times.y)
+	curtain_tween.tween_method(_set_curtain, 0.0, 1.0, times.z)
+
+
+## The way back after a minigame: the curtain closes as the round's rewards end (`seconds` from
+## `rewards_started`), holds on "Back to the casino" while everyone is moved to the hall, opens.
+func _curtain_back_to_casino(seconds: float) -> void:
+	_curtain_sequence("Back to the casino", "", maxf(seconds - curtain_times().x, 0.0), Callable())
+
+
+## Moves both curtain panels: `amount` 1.0 parks them off screen, 0.0 covers the screen. The first
+## part of opening gathers the fabric into the tiebacks, the rest pulls the panels off the edges.
 func _set_curtain(amount: float) -> void:
 	curtain_open = clampf(amount, 0.0, 1.0)
-	var shift: float = 0.5 * curtain_open
+	var gather: float = smoothstep(0.0, CURTAIN_GATHER, curtain_open)
+	var slide: float = smoothstep(CURTAIN_GATHER * 0.8, 1.0, curtain_open)
+	# Closing slides the panels in; opening gathers first. Both are the same curve read backwards,
+	# so a half-open curtain is the same picture either way.
+	var shift: float = 0.5 * slide
 	curtain_left.anchor_left = -shift
 	curtain_left.anchor_right = 0.5 - shift
 	curtain_right.anchor_right = 1.0 + shift
 	curtain_right.anchor_left = 0.5 + shift
+	for r: ColorRect in [curtain_left, curtain_right]:
+		(r.material as ShaderMaterial).set_shader_parameter(&"gather", gather)
+	curtain_valance.anchor_top = -0.16 * slide
+	curtain_valance.anchor_bottom = 0.16 - 0.16 * slide
+	curtain_valance.visible = curtain_open < 1.0
+	curtain_plaque.modulate.a = 1.0 - smoothstep(0.0, 0.18, curtain_open)
+	curtain_plaque.visible = curtain_plaque.modulate.a > 0.0
+	_on_curtain_resized()
+
+
+## Keeps the fabric's fringe and rope round when the window's shape changes.
+func _on_curtain_resized() -> void:
+	if curtain_left == null:
+		return
+	var size: Vector2 = get_viewport().get_visible_rect().size
+	for r: ColorRect in [curtain_left, curtain_right]:
+		(r.material as ShaderMaterial).set_shader_parameter(&"aspect", size.y / maxf(size.x * 0.5, 1.0))
 
 
 func _close_stage() -> void:

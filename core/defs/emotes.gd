@@ -12,6 +12,14 @@ const LIST: Array[Array] = [
 	[&"dance", "🕺", "DANCE", &"jump"],
 	[&"gg", "🤝", "GG", &"coin"],
 ]
+## Animated emotes on number keys 4-7 (`play_emote` intent → `player_emote` event): the bean (or
+## skin) acts them out for `AvatarVisuals.EMOTE_SECONDS`. Order = keys emote_1..emote_4.
+const ANIMATED: Array[StringName] = [&"six_seven", &"thumbs_up", &"thumbs_down", &"default_dance"]
+
+
+## True for the animated (key) emotes.
+static func is_animated(id: StringName) -> bool:
+	return ANIMATED.has(id)
 
 
 static func has(id: StringName) -> bool:

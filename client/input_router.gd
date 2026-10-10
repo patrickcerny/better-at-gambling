@@ -17,6 +17,8 @@ signal shake
 signal jump
 signal toggle_camera
 signal emote_wheel_toggled(open: bool)
+## A number-key emote (0-3 = actions emote_1..emote_4, `Emotes.ANIMATED`), walking only.
+signal emote_key(index: int)
 signal item_used(slot: int)
 signal leaderboard_toggled(shown: bool)
 signal pause
@@ -187,6 +189,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mode == Mode.EMOTE:
 			set_mode(_mode_before_emote)
 			emote_wheel_toggled.emit(false)
+	elif mode == Mode.WALK and _emote_index(event) >= 0:
+		emote_key.emit(_emote_index(event))
 	elif mode == Mode.WALK:
 		if event.is_action_pressed(&"interact"):
 			interact.emit()
@@ -202,6 +206,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			jump.emit()
 		elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and capture_mouse:
 			set_mode(Mode.WALK)  # click to recapture after alt-tab
+
+
+## Number-key emote (0-3) for an event, -1 if none.
+func _emote_index(event: InputEvent) -> int:
+	for i: int in 4:
+		if event.is_action_pressed(StringName("emote_%d" % (i + 1))):
+			return i
+	return -1
 
 
 ## Item key slot (0–2) for an event, -1 if none. Seated players' plain number keys pick chips,

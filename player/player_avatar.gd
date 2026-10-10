@@ -215,6 +215,14 @@ func say(text: String, seconds: float = 2.0) -> void:
 	_bubble_until = _clock + seconds
 
 
+## Acts out a number-key emote (`Emotes.ANIMATED`) on the bean or skin; "67" also gets a bubble.
+func play_emote(id: StringName) -> void:
+	if visuals == null or not is_standing() and state != State.SEATED:
+		return
+	if visuals.emote(id) and id == &"six_seven":
+		say("6 7", 2.0)
+
+
 ## Swaps the body for a ragdoll launched with `velocity`. Returns the ragdoll (parented to our parent).
 ## `puppet`: the server simulates the body and streams its pose (online clients).
 func start_ragdoll(velocity: Vector3, max_time: float = 2.5, puppet: bool = false) -> RagdollBody:
@@ -431,6 +439,7 @@ func _physics_process(delta: float) -> void:
 		cam.update_camera(Vector3(velocity.x, 0, velocity.z).length(), is_on_floor(), false, delta)
 		# First person: the bean would fill the view, so only show it in third person.
 		visuals.visible = cam.mode == PlayerCamera.Mode.THIRD
+		visuals.gaze = cam.aim()  # our bean's eyes look where the camera looks
 
 
 func _local_move(delta: float) -> void:
