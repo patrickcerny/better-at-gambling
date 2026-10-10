@@ -1149,12 +1149,9 @@ func _point_at_hot_table() -> void:
 	hud.set_hot_pointer(true, centre + dir * t, dir.angle())
 
 
-## The item's model (when it has one) pops up in front of the user for a moment.
+## The item's model (ItemModels) pops up in front of the user for a moment.
 func _hold_up_prop(u: PlayerAvatar, item: StringName) -> void:
-	var id: StringName = PropModels.ITEM_PROPS.get(item, &"")
-	if id == &"":
-		return
-	var prop: Node3D = PropModels.make(id, 0.3)
+	var prop: Node3D = ItemModels.make(item, 0.3)
 	prop.position = Vector3(0.3, 1.25, -0.45)
 	u.add_child(prop)
 	var t: Tween = prop.create_tween()

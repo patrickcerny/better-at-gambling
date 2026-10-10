@@ -53,3 +53,36 @@ knockouts and falls keep the plain respawn.
    repayment), Dog Collar (win split), Fake Cash, Scissors, Greedy Pickpocket.
 3. Bigger features: Shop, Beer (screen effects + hidden money), Rock Paper Scissors (consent UI),
    Russian Roulette, Game Disabler.
+
+## 0.8.19: held items, forced duels, tip jar and the last six items (Patrick, 2026-10-10)
+- **Hold it in your hand:** the wheel or 1/2/3 put a slot's item in the bean's hand (its 3D model,
+  `ItemModels`; first person shows it at the bottom right of the view). Picking a slot flashes the
+  name and the first sentence of the description over the bar for 2 s; **I** still opens the full
+  card. **Left click / E** uses it (pressing the held slot's key again does too), **right click**
+  puts it away. Items aimed at a player hit whoever you look at: the nearest other player inside a
+  30° cone (half-angle) and the item's reach (15 m for items without a range); a gold ring and an
+  outline mark them, "No one in reach" otherwise. No target picker, no cycling, no timer.
+  Seated: Shift+1/2/3 picks, the same key again uses. Gamepad: d-pad picks, shoulder buttons switch
+  while holding, **X** (interact) uses, **B** puts away (A stays jump).
+- **Choices before the use:** Pickpocket (SAFE 12% / GREEDY 20% at 65%) and Rock Paper Scissors
+  (LOW 5% / HIGH 15% stake) ask with two buttons on the item bar: left click or E for the first,
+  right click or R for the second. The very greedy 30% tier and the 10% stake are no longer offered
+  from the client (the server still accepts them).
+- **Rock Paper Scissors is forced:** no accept step; both players are pulled straight into a duel
+  screen (stake, countdown, ROCK/PAPER/SCISSORS buttons or keys 1–3, result). 8 s to pick, no pick
+  = random, one tie replays.
+- **Sunglasses** did work on the server when used before sitting down (the effect waits for the
+  next blackjack hand), but the client only wrote the peeked card into a hidden label. The hole card
+  now shows through its back in a green x-ray look for the wearer.
+- **Tip jar:** TIP button on the blackjack and roulette panels: $25 to the house for +1 luck at
+  that game for the next 3 rounds (BalanceConfig `tip_amount`, `tip_luck`, `tip_rounds`).
+- **Bouncer** (rare): aim at a seated player; they are stood up at once (open bets handled as if
+  they left) and can't sit anywhere for 12 s. Simplest reading: no NPC walk-up, a 1 s knockdown.
+- **Robin Hood** (legendary): 8% of the richest other player's money (max $800) split equally among
+  everyone else, you included; refused when you lead. Leftover dollars stay with the leader.
+- **Jackpot Magnet** (legendary): for 30 s every other player's win pays you 10% of their profit,
+  paid by the house.
+- **Wild Card** (common): turns into a random item (60/30/10 common/rare/legendary, never itself).
+- **Butter Fingers** (`grease`, common, 6 m): for 20 s the target drops anyone they grab, and the
+  next time they're shaken for chips the same amount spills again.
+- **Bribe the Guard** (rare): for 30 s your knockouts, throws and shakes never reach security.

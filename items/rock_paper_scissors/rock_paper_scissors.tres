@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"rock_paper_scissors"
 display_name = "Rock Paper Scissors"
-description = "Challenge a player to Rock Paper Scissors for 5/10/15% of the poorer one's money. They must accept."
+description = "Pull the player you aim at into a Rock Paper Scissors duel for 5/10/15% of the poorer one's money."
 rarity = 0
 target_mode = 1
 requires_proximity = false

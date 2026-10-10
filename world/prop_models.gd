@@ -27,8 +27,9 @@ const PATHS: Dictionary = {
 	&"bust": "res://assets/models/polyhaven/marble_bust_01/marble_bust_01_1k.gltf",
 	&"horse": "res://assets/models/polyhaven/horse_statue_01/horse_statue_01_1k.gltf",
 }
-## Item → prop the user holds up when they use it. Items without their own model show nothing yet.
-const ITEM_PROPS: Dictionary = {&"beer": &"beer"}
+## Item → prop of this table that stands for it (ItemModels reads it; items with a model file
+## of their own are listed in ItemModels.MODELS).
+const ITEM_PROPS: Dictionary = {&"empty_bottle": &"beer"}
 
 ## Model-space bounds per prop, measured once.
 static var _bounds: Dictionary = {}

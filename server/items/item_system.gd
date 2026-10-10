@@ -230,7 +230,14 @@ static func targets_player(def: ItemDefinition) -> bool:
 func resolve_target(player: int, def: ItemDefinition, target: int, now: float) -> Dictionary:
 	if not targets_player(def):
 		return {"target": player, "error": &""}
-	if def.target_mode != ItemDefinition.TargetMode.ANY_PLAYER and def.target_mode != ItemDefinition.TargetMode.NEAR_PLAYER:
+	if def.target_mode == ItemDefinition.TargetMode.LEADER:
+		# Robin Hood: always the richest other player, whatever the client aimed at.
+		target = leader_other_than(player)
+		if target < 0:
+			return {"target": -1, "error": &"no_target"}
+		if economy.balance(player) >= economy.balance(target):
+			return {"target": -1, "error": &"you_lead"}
+	elif def.target_mode != ItemDefinition.TargetMode.ANY_PLAYER and def.target_mode != ItemDefinition.TargetMode.NEAR_PLAYER:
 		return {"target": -1, "error": &"not_supported"}
 	if target < 0:
 		var cands: Array[int] = candidates(player, def)
@@ -250,6 +257,19 @@ func resolve_target(player: int, def: ItemDefinition, target: int, now: float) -
 	if def.target_mode == ItemDefinition.TargetMode.NEAR_PLAYER and not in_range(player, target, def.range_m):
 		return {"target": -1, "error": &"out_of_range"}
 	return {"target": target, "error": &""}
+
+
+## The richest present player other than `player` (lowest id on a tie; -1 = nobody).
+func leader_other_than(player: int) -> int:
+	var best: int = -1
+	var ids: Array = players.keys()
+	ids.sort()
+	for id: int in ids:
+		if id == player or not _present(id):
+			continue
+		if best < 0 or economy.balance(id) > economy.balance(best):
+			best = id
+	return best
 
 
 ## Other players an item could be aimed at (present, and in range for proximity items).
@@ -305,6 +325,71 @@ func shield_knockout(target: int, attacker: int, now: float) -> bool:
 	return true
 
 
+## Tip jar (Patrick, 0.8.19): a seated player tips the dealer `tip_amount` (to the house) for
+## +`tip_luck` at that game for the next `tip_rounds` rounds. Blackjack and roulette only.
+const TIP_ID: StringName = &"tip_jar"
+const TIP_GAMES: Array[StringName] = [&"blackjack", &"roulette"]
+
+
+func tip(player: int, game: StringName, station: StringName, now: float) -> Dictionary:
+	_now = now
+	if not players.has(player):
+		return StationLogicBase.fail(&"unknown_player")
+	if not game in TIP_GAMES:
+		return StationLogicBase.fail(&"no_tips_here")
+	if economy.balance(player) < balance.tip_amount:
+		return StationLogicBase.fail(&"insufficient_funds")
+	economy.apply(player, -balance.tip_amount, &"tip_dealer", station)
+	var m := Modifier.new()
+	m.id = TIP_ID
+	m.source_player = player
+	m.game_id = game
+	m.luck = balance.tip_luck
+	m.rounds_left = balance.tip_rounds
+	m.flags[&"segment_end"] = true
+	modifiers.add(player, m)
+	events.append(GameEvents.make(&"dealer_tipped", {"player": player, "station": station, "game": game, "amount": balance.tip_amount, "luck": m.luck, "rounds": m.rounds_left}))
+	return StationLogicBase.OK_RESULT
+
+
+## Every server event passes through here once (MatchServer._flush): Jackpot Magnet holders get a
+## house-paid share of other players' wins, and a greasy player who gets shaken drops double.
+func observe(ev: Dictionary, now: float) -> void:
+	_now = now
+	match ev["type"]:
+		&"round_result":
+			var winner: int = int(ev.get("player", -1))
+			var net: int = int(ev.get("net", 0))
+			if net <= 0:
+				return
+			var ids: Array = players.keys()
+			ids.sort()
+			for pid: int in ids:
+				if pid == winner:
+					continue
+				for m: Modifier in modifiers.get_mods(pid):
+					if not m.flags.get(&"magnet", false):
+						continue
+					var share: int = int(floor(net * float(m.flags.get(&"magnet_share", 0.1))))
+					if share > 0:
+						economy.apply(pid, share, &"item_jackpot_magnet", StringName(str(ev.get("station", ""))))
+						events.append(GameEvents.make(&"magnet_bonus", {"player": pid, "from": winner, "amount": share, "station": ev.get("station", &"")}))
+					break
+		&"chips_shaken_out":
+			var target: int = int(ev.get("target", -1))
+			var amount: int = int(ev.get("amount", 0))
+			if target < 0 or amount <= 0 or not modifiers.has_flag(target, &"grease_double"):
+				return
+			for m: Modifier in modifiers.get_mods(target):
+				if m.flags.get(&"grease_double", false):
+					m.flags.erase(&"grease_double")  # only the next shake drops double
+					break
+			var extra: int = mini(amount, economy.balance(target))
+			if extra > 0:
+				var piles: Array[int] = pickups.drop_from(target, extra, world.get_position(target), 3, rng, &"grease_shaken", now, 1.5)
+				events.append(GameEvents.make(&"grease_spill", {"player": target, "attacker": ev.get("attacker", -1), "amount": extra, "piles": piles}))
+
+
 ## The casino segment ended: segment-long items (Hot Hands, Loaded Reels) run out.
 func end_segment() -> void:
 	modifiers.expire_flag(&"segment_end")
@@ -321,6 +406,21 @@ func tick(now: float, casino_open: bool) -> void:
 	if casino_open:
 		_tick_peels(now)
 		duels.tick(now)
+	_tick_grease_and_bribes(now)
+
+
+## Butter Fingers: a greasy player can't keep hold of anyone. Bribe the Guard: security forgets
+## what a bribed player just did (their offences never reach the guards).
+func _tick_grease_and_bribes(now: float) -> void:
+	if interactions == null:
+		return
+	for holder: int in interactions.holding.keys():
+		if modifiers.has_flag(holder, &"greasy"):
+			var victim: int = interactions.holding[holder]
+			interactions.release(holder, false, Vector3.ZERO, now)
+			events.append(GameEvents.make(&"grease_slipped", {"player": holder, "target": victim}))
+	if not interactions.offences.is_empty():
+		interactions.offences = interactions.offences.filter(func(o: Dictionary) -> bool: return not modifiers.has_flag(int(o["attacker"]), &"bribe"))
 
 
 func _on_modifier_removed(player: int, mod: Modifier, reason: StringName) -> void:
@@ -481,7 +581,7 @@ func peels_wire() -> Array:
 func private_state(player: int, now: float) -> Dictionary:
 	var effects: Array = []
 	for m: Modifier in modifiers.get_mods(player):
-		if not defs.has(m.id):
+		if not defs.has(m.id) and m.id != TIP_ID:
 			continue
 		effects.append({"item": m.id, "luck": m.luck, "game": m.game_id, "left": snappedf(m.expires_at - now, 0.1) if m.expires_at != INF else -1.0, "uses": m.rounds_left})
 	var out: Dictionary = {"luck": modifiers.get_luck(player), "effects": effects}

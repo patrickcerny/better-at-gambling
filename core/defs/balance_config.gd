@@ -147,6 +147,11 @@ extends Resource
 ## Banana peel: trigger radius and how long the slip stuns.
 @export var banana_radius: float = 0.9
 @export var banana_stun: float = 1.2
+## Tip jar (station UI button at blackjack and roulette): what one tip costs, and the luck it buys
+## at that game for that many rounds.
+@export var tip_amount: int = 25
+@export var tip_luck: int = 1
+@export var tip_rounds: int = 3
 
 @export_group("Results")
 ## Seconds the results screen stays up before an online room returns to its lobby on its own.

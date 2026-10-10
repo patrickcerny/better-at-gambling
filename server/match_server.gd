@@ -794,6 +794,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				return StationLogicBase.fail(&"too_far")
 			if stations.vip.get(sid, false) and economy.balance(player) < vip_threshold() and not modifiers.has_flag(player, &"vip_pass"):
 				return StationLogicBase.fail(&"vip_denied")
+			if modifiers.has_flag(player, &"bounced"):
+				return StationLogicBase.fail(&"bounced")  # Bouncer item: no seat for a while
 			var res: Dictionary = stations.sit(player, sid)
 			if res["ok"]:
 				rules.status(player).seated = true
@@ -906,10 +908,13 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			return items.use(player, int(intent["slot"]), int(intent.get("target", -1)), match_time, opts)
 		&"discard_item":
 			return items.discard(player, int(intent["slot"]), match_time)
-		&"rps_answer":
-			return items.duels.answer(player, int(intent["duel"]), bool(intent["accept"]), match_time)
 		&"rps_pick":
 			return items.duels.pick(player, int(intent["duel"]), int(intent["pick"]), match_time)
+		&"tip_dealer":
+			var tip_sid: StringName = stations.station_of(player)
+			if tip_sid == &"" or tip_sid != StringName(intent["station"]):
+				return StationLogicBase.fail(&"not_seated")
+			return items.tip(player, stations.game_of.get(tip_sid, &""), tip_sid, match_time)
 		&"shop_buy":
 			var shop_pos: Vector3 = map_def.shop_position
 			if shop_pos.is_finite() and world.get_position(player).distance_to(shop_pos) > map_def.interact_range:
@@ -1099,11 +1104,12 @@ func _flush() -> void:
 	for ev: Dictionary in batch:
 		_track_stats(ev)
 		_emit(ev)
+		items.observe(ev, match_time)  # Jackpot Magnet, Butter Fingers react to wins and shakes
 		if ev["type"] == &"fake_cash_used" and bool(ev["caught"]):
 			caught.append(ev)
 	for ev: Dictionary in caught:
 		_fake_cash_caught(int(ev["player"]), int(ev["amount"]))
-	if not caught.is_empty():
+	if not caught.is_empty() or not items.events.is_empty():
 		_flush()
 
 

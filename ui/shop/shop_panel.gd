@@ -1,6 +1,7 @@
 class_name ShopPanel
 extends PanelContainer
-## The Gift Shop counter: this round's four offers (name, rarity, what it does, price). One buy
+## The Gift Shop counter: this round's four offers (name, rarity, what it does in a readable
+## line, price). One buy
 ## per player per casino round. Keys 1–4 or a click buy, Esc closes. Sends `shop_buy`; the server
 ## checks the price, the distance and the one-per-round rule.
 
@@ -23,8 +24,8 @@ func _ready() -> void:
 	anchor_bottom = 0.5
 	offset_left = -430
 	offset_right = 430
-	offset_top = -310
-	offset_bottom = 310
+	offset_top = -320
+	offset_bottom = 320
 	grow_horizontal = Control.GROW_DIRECTION_BOTH
 	grow_vertical = Control.GROW_DIRECTION_BOTH
 	visible = false
@@ -111,7 +112,7 @@ func _refresh() -> void:
 		var price: int = int(o["price"])
 		var rarity: int = clampi(int(o.get("rarity", 0)), 0, 2)
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(0, 96)
+		b.custom_minimum_size = Vector2(0, 100)
 		b.disabled = _bought or money < price
 		b.pressed.connect(buy.bind(i))
 		var row := HBoxContainer.new()
@@ -148,11 +149,14 @@ func _refresh() -> void:
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		tag.add_theme_color_override(&"font_color", RewardPanel.RARITY_COLORS[rarity])
 		head.add_child(tag)
+		# What the item does, readable at a glance (Patrick: "item descriptions also in the shop").
 		var d := Label.new()
+		d.name = "Description"
 		d.text = RewardPanel.item_description(id)
-		d.theme_type_variation = &"MutedLabel"
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		d.custom_minimum_size = Vector2(560, 0)
+		d.add_theme_font_size_override(&"font_size", 21)
+		d.add_theme_color_override(&"font_color", Palette.CREAM)
 		info.add_child(d)
 		var cost := Label.new()
 		cost.text = "$%s" % Hud._thousands(price)
