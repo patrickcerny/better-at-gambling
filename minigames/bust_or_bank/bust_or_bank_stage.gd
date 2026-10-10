@@ -5,7 +5,9 @@ extends MinigameStage
 ## decides: the current seat glows gold with a countdown bar, and the table centre shows whose turn
 ## it is, the seconds left and the deck face down (the next card is a gamble). On your own turn the
 ## big HIT / STAND buttons light up (keys: the blackjack bindings `bj_hit` / `bj_stand`, H / S by
-## default). The result shows every final hand with the winner(s) highlighted.
+## default). The game runs in elimination rounds: the top bar counts them ("ROUND 2 · 5 left"),
+## between rounds the table announces who is out, and eliminated players keep watching with their
+## seat dimmed and marked OUT (with the round). The final result shows the winner and the full order.
 ##
 ## Everything shown comes from server events / snapshots; timings come from the events' `deal_in`
 ## / `time` and the snapshot `timer`, never from local constants. The only input is the
@@ -23,6 +25,8 @@ const RAIL: Color = Color("#3A2418")  # dark wood rail round the felt
 var root: Control
 var title_label: Label
 var banner: Label
+## "ROUND 2 · 5 left".
+var round_label: Label
 ## Holds the table and the seats; laid out from its size (`_layout`).
 var arena: Control
 var table: Panel
@@ -44,8 +48,17 @@ var stand_button: Button
 ## player → {panel, style, dot, name, state, cards, total, bar} (built once, updated in place).
 var seats: Dictionary = {}
 
-## Seat order (the turn circle), straight from the server.
+## Seat order (everyone at the table, in or out), straight from the server.
 var players: Array[int] = []
+## The players still in, in seat order: the turn circle.
+var survivors: Array[int] = []
+## player → the round they went out in (eliminated players only).
+var out_round: Dictionary = {}
+## Current round (0 before the first) and the most rounds there can be.
+var round_no: int = 0
+var max_rounds: int = 1
+## What the table centre says between rounds ("Bo is out!").
+var round_msg: String = ""
 ## player → {cards: Array, total: int, busted: bool, stood: bool}.
 var hands: Dictionary = {}
 var phase: int = State.INTRO
@@ -59,6 +72,7 @@ var turn_time: float = BustOrBankLogic.TURN_TIME
 var last_card: int = -1
 var ranking: Array = []
 var winners: Array[int] = []
+## The game is decided: the final result is showing.
 var over: bool = false
 ## Sent HIT / STAND and waiting for the server's answer.
 var action_sent: bool = false
@@ -69,6 +83,7 @@ var send_intent: Callable = func(i: Dictionary) -> Dictionary: return Net.send_i
 func _build(start: Dictionary) -> void:
 	for p: Variant in start.get("players", []):
 		players.append(int(p))
+	survivors = players.duplicate()
 	for p: int in players:
 		hands[p] = _empty_hand()
 	time_left = BustOrBankLogic.INTRO_TIME
@@ -114,6 +129,9 @@ func _build_ui() -> void:
 	title_label.theme_type_variation = &"HeadingLabel"
 	title_label.add_theme_font_size_override(&"font_size", 44)
 	top.add_child(title_label)
+	round_label = _label("", 28, Palette.WARM_GOLD)
+	round_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	top.add_child(round_label)
 	banner = _label("", 28, Palette.CREAM)
 	banner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -148,7 +166,7 @@ func _build_ui() -> void:
 	ring.anti_aliasing = true
 	table_ring.add_theme_stylebox_override(&"panel", ring)
 	arena.add_child(table_ring)
-	felt_label = _label("HIGHEST HAND WINS  ·  OVER 21 BUSTS", 20, Color(Palette.WARM_GOLD, 0.6))
+	felt_label = _label("BUST = OUT  ·  ELSE THE LOWEST HAND IS OUT", 20, Color(Palette.WARM_GOLD, 0.6))
 	felt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	arena.add_child(felt_label)
 
@@ -402,6 +420,17 @@ func apply_state(st: Dictionary) -> void:
 		players.clear()
 		for p: Variant in st["players"]:
 			players.append(int(p))
+	if st.has("survivors"):
+		survivors.clear()
+		for p: Variant in st["survivors"]:
+			survivors.append(int(p))
+	if st.has("out"):
+		out_round.clear()
+		var outs: Dictionary = st["out"]
+		for p: Variant in outs:
+			out_round[int(p)] = int(outs[p])
+	round_no = int(st.get("round", round_no))
+	max_rounds = int(st.get("max_rounds", max_rounds))
 	var hs: Dictionary = st.get("hands", {})
 	for p: Variant in hs:
 		hands[int(p)] = _hand_from(hs[p])
@@ -411,7 +440,9 @@ func apply_state(st: Dictionary) -> void:
 	time_left = float(st.get("timer", 0.0))
 	time_span = turn_time if phase == State.TURN else maxf(time_left, 0.01)
 	last_card = int(st.get("last_card", -1))
-	if st.has("ranking"):
+	if phase == State.RESULT and st.has("why"):
+		_announce_round(st.get("last_out", []), StringName(str(st["why"])), -1)
+	if bool(st.get("final", false)) and st.has("ranking"):
 		_show_result(st["ranking"], st.get("winners", []))
 	_refresh()
 
@@ -420,19 +451,31 @@ func on_event(ev: Dictionary) -> void:
 	match ev["type"]:
 		&"bust_or_bank_started":
 			turn_time = float(ev.get("turn_time", turn_time))
+			max_rounds = int(ev.get("max_rounds", max_rounds))
 			_set_players(ev.get("players", []))
+			survivors = players.duplicate()
 
 		&"bust_or_bank_round_started":
 			_set_players(ev.get("players", []))
-			for p: int in players:
-				hands[p] = _empty_hand()
+			if ev.has("survivors"):
+				survivors.clear()
+				for p: Variant in ev["survivors"]:
+					survivors.append(int(p))
+			round_no = int(ev.get("round", round_no + 1))
+			max_rounds = int(ev.get("max_rounds", max_rounds))
+			for p: int in survivors:
+				hands[p] = _empty_hand()  # fresh hands; the eliminated keep showing their last one
 			phase = State.INTRO
 			current = -1
 			action_sent = false
+			round_msg = ""
 			turn_time = float(ev.get("turn_time", turn_time))
 			time_left = float(ev.get("deal_in", 0.0))
 			time_span = maxf(time_left, 0.01)
-			banner.text = "One card each, then it's turn by turn."
+			if round_no <= 1:
+				banner.text = "One card each, then it's turn by turn."
+			else:
+				banner.text = "Round %d: fresh hands for the %d left" % [round_no, survivors.size()]
 
 		&"bust_or_bank_card":
 			var pid: int = int(ev.get("player", -1))
@@ -472,6 +515,8 @@ func on_event(ev: Dictionary) -> void:
 					banner.text = "Time's up: %s %s on %d" % [_name(pid), _verb(pid, "stand"), int(ev.get("total", 0))]
 				&"21":
 					banner.text = "21! %s %s automatically" % [_name(pid), _verb(pid, "stand")]
+				&"round_cap", &"game_cap":
+					banner.text = "Time's up for the round"
 				_:
 					banner.text = "%s %s on %d" % [_name(pid), _verb(pid, "stand"), int(ev.get("total", 0))]
 
@@ -480,9 +525,28 @@ func on_event(ev: Dictionary) -> void:
 			if pid in players:
 				banner.text = "%s left the table" % _name(pid)
 			players.erase(pid)
+			survivors.erase(pid)
+			out_round.erase(pid)
 			hands.erase(pid)
 
 		&"bust_or_bank_round_end":
+			var hs: Dictionary = ev.get("hands", {})
+			for p: Variant in hs:
+				hands[int(p)] = _hand_from(hs[p])
+			round_no = int(ev.get("round", round_no))
+			for p: Variant in ev.get("out", []):
+				out_round[int(p)] = round_no
+			if ev.has("survivors"):
+				survivors.clear()
+				for p: Variant in ev["survivors"]:
+					survivors.append(int(p))
+			phase = State.RESULT
+			current = -1
+			action_sent = false
+			time_left = 0.0
+			_announce_round(ev.get("out", []), StringName(str(ev.get("why", ""))), int(ev.get("lowest", -1)))
+
+		&"bust_or_bank_finished":
 			var hs: Dictionary = ev.get("hands", {})
 			for p: Variant in hs:
 				hands[int(p)] = _hand_from(hs[p])
@@ -509,6 +573,30 @@ func _hand_from(h: Dictionary) -> Dictionary:
 		"busted": bool(h.get("busted", false)), "stood": bool(h.get("stood", false))}
 
 
+## The verdict of a round: who is out and why, in the banner and the table centre.
+func _announce_round(p_out: Array, why: StringName, lowest: int) -> void:
+	var ids: Array[int] = []
+	for p: Variant in p_out:
+		ids.append(int(p))
+	var verb: String = "are" if ids.size() > 1 or (ids.size() == 1 and ids[0] == local_id) else "is"
+	match why:
+		&"busted":
+			round_msg = "%s %s out!" % [_names(ids), verb]
+			banner.text = "Bust: %s %s out" % [_names(ids), verb]
+		&"lowest":
+			round_msg = "%s %s out!" % [_names(ids), verb]
+			banner.text = ("Lowest hand (%d): %s %s out" % [lowest, _names(ids), verb]) if lowest >= 0 else ("Lowest hand: %s %s out" % [_names(ids), verb])
+		&"replay":
+			var all_bust: bool = true
+			for p: int in survivors:
+				if not bool(hands.get(p, _empty_hand())["busted"]):
+					all_bust = false
+			round_msg = "Nobody is out!"
+			banner.text = "Everyone busted: play again!" if all_bust else "Everyone tied: play again!"
+		_:
+			round_msg = ""
+
+
 func _show_result(p_ranking: Array, p_winners: Array) -> void:
 	over = true
 	phase = State.RESULT
@@ -523,7 +611,12 @@ func _show_result(p_ranking: Array, p_winners: Array) -> void:
 		for row: Variant in ranking:
 			if int((row as Dictionary).get("rank", 0)) == 1:
 				winners.append(int(row["player"]))
-	banner.text = "Final hands"
+	if winners.size() == 1:
+		banner.text = "%s %s Bust or Bank!" % [_name(winners[0]), _verb(winners[0], "win")]
+	elif not winners.is_empty():
+		banner.text = "%s share the win" % _names(winners)
+	else:
+		banner.text = "Final result"
 
 
 func _name(pid: int) -> String:
@@ -559,18 +652,18 @@ func _names(ids: Array[int]) -> String:
 func _refresh() -> void:
 	var mine: bool = current == local_id and current >= 0
 	if over:
-		var best: int = int(hands.get(winners[0], _empty_hand())["total"]) if not winners.is_empty() else 0
 		if winners.is_empty():
 			turn_label.text = "Nobody at the table"
-		elif bool(hands.get(winners[0], _empty_hand())["busted"]):
-			turn_label.text = "Everyone busted!"
 		elif winners.size() == 1:
-			turn_label.text = "%s %s with %d!" % [_name(winners[0]), "win" if winners[0] == local_id else "wins", best]
+			turn_label.text = "%s %s!" % [_name(winners[0]), "win" if winners[0] == local_id else "wins"]
 		else:
-			turn_label.text = "%s share the win with %d!" % [_names(winners), best]
+			turn_label.text = "%s share the win!" % _names(winners)
 		turn_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	elif phase == State.RESULT:
+		turn_label.text = round_msg
+		turn_label.add_theme_color_override(&"font_color", Palette.LOSS_RED if local_id in out_round and out_round[local_id] == round_no else Palette.CREAM)
 	elif phase == State.INTRO:
-		turn_label.text = "Dealing..."
+		turn_label.text = "Round %d: dealing..." % round_no if round_no > 1 else "Dealing..."
 		turn_label.add_theme_color_override(&"font_color", Palette.CREAM)
 	elif mine:
 		turn_label.text = "YOUR TURN"
@@ -581,6 +674,12 @@ func _refresh() -> void:
 	else:
 		turn_label.text = ""
 	next_col.visible = not over
+	if over:
+		round_label.text = "FINAL"
+	elif round_no > 0:
+		round_label.text = "ROUND %d · %d left" % [round_no, survivors.size()]
+	else:
+		round_label.text = ""
 	_update_result_grid()
 
 	hit_button.disabled = not can_act()
@@ -588,8 +687,12 @@ func _refresh() -> void:
 	var my_hand: Dictionary = hands.get(local_id, _empty_hand())
 	if over:
 		prompt_label.text = _my_result()
+	elif local_id in out_round:
+		prompt_label.text = "You're out (round %d). Watch the rest play out." % int(out_round[local_id])
 	elif local_id not in players:
 		prompt_label.text = "Watching"
+	elif phase == State.RESULT:
+		prompt_label.text = "You're still in! Next round soon." if local_id in survivors else "Watching"
 	elif bool(my_hand["busted"]):
 		prompt_label.text = "Bust! Watch the rest play out."
 	elif bool(my_hand["stood"]):
@@ -616,9 +719,16 @@ func _update_result_grid() -> void:
 	for row: Variant in ranking:
 		var r: Dictionary = row
 		var p: int = int(r.get("player", -1))
-		var h: Dictionary = hands.get(p, _empty_hand())
-		var total: String = "BUST" if bool(h["busted"]) else str(int(h["total"]))
-		var l := _label("#%d  %s  %s" % [int(r.get("rank", 0)), _name(p), total], 24, Palette.VIP_GOLD if p in winners else Palette.CREAM)
+		var gone: int = int(r.get("out_round", out_round.get(p, 0)))
+		var how: String
+		if p in winners:
+			how = "WINNER"
+		elif gone > 0:
+			how = "OUT R%d" % gone
+		else:
+			var h: Dictionary = hands.get(p, _empty_hand())
+			how = "BUST" if bool(h["busted"]) else str(int(h["total"]))
+		var l := _label("#%d  %s  %s" % [int(r.get("rank", 0)), _name(p), how], 24, Palette.VIP_GOLD if p in winners else Palette.CREAM)
 		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		l.custom_minimum_size = Vector2(200, 0)
 		result_grid.add_child(l)
@@ -647,11 +757,15 @@ func _update_seat(p: int) -> void:
 	var h: Dictionary = hands.get(p, _empty_hand())
 	var is_turn: bool = p == current and not over and phase == State.TURN
 	var won: bool = over and p in winners
+	var is_out: bool = out_round.has(p)
 	var status: String
 	var color: Color = Palette.CREAM
 	if won:
 		status = "WINNER"
 		color = Palette.VIP_GOLD
+	elif is_out:
+		status = "OUT · R%d" % int(out_round[p])
+		color = Palette.LOSS_RED
 	elif bool(h["busted"]):
 		status = "BUST"
 		color = Palette.LOSS_RED
@@ -661,7 +775,7 @@ func _update_seat(p: int) -> void:
 	elif is_turn:
 		status = "YOUR TURN" if p == local_id else "TURN"
 		color = Palette.VIP_GOLD
-	elif over:
+	elif over or phase == State.RESULT:
 		status = ""
 	else:
 		status = "WAITING"
@@ -675,7 +789,7 @@ func _update_seat(p: int) -> void:
 	total.text = str(int(h["total"])) if not (h["cards"] as Array).is_empty() else ""
 	total.add_theme_color_override(&"font_color", Palette.LOSS_RED if bool(h["busted"]) else Palette.CREAM)
 	(seat["bar"] as ProgressBar).visible = is_turn
-	_sync_faces(seat["cards"], h["cards"], SEAT_CARD_H, bool(h["busted"]))
+	_sync_faces(seat["cards"], h["cards"], SEAT_CARD_H, bool(h["busted"]) or is_out)
 
 	var sb: StyleBoxFlat = seat["style"]
 	var pc: Color = _player_color(p)
@@ -691,7 +805,14 @@ func _update_seat(p: int) -> void:
 		sb.shadow_color = Color(0, 0, 0, 0.4)
 		sb.shadow_size = 8
 		sb.bg_color = SEAT_BG
-	(seat["panel"] as Control).modulate = Color(1, 1, 1, 0.7) if bool(h["busted"]) and not won else Color.WHITE
+	var dim: float = 1.0
+	if won:
+		dim = 1.0
+	elif is_out:
+		dim = 0.45
+	elif bool(h["busted"]):
+		dim = 0.7
+	(seat["panel"] as Control).modulate = Color(1, 1, 1, dim)
 	(seat["panel"] as Control).set_meta("status", status)
 
 
