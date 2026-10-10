@@ -295,3 +295,15 @@ func test_leaving_down_to_two_racers_ends_game() -> void:
 	logic.remove_player(3)
 	assert_true(logic.is_finished())
 	assert_eq(logic.ranking().size(), 2)
+
+
+## The server side of "the first vote doesn't work": round 1 is open straight after setup and
+## takes the very first vote (the bug was the stage missing the opening events, see
+## tests/ui/test_vote_race_stage.gd).
+func test_first_vote_of_the_first_round_counts() -> void:
+	var logic: VoteRaceLogic = _vote_race([1, 2, 3, 4])
+	assert_true(logic.private_state(1)["can_vote"], "round 1 is open from the start")
+	assert_true(logic.submit(1, {"target": 2}, now)["ok"])
+	assert_eq(logic.votes[1], 2)
+	assert_eq(logic.private_state(1)["voted_for"], 2)
+	assert_eq(int(logic.get_public_state()["votes_cast"]), 1)

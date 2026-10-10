@@ -1020,6 +1020,7 @@ func _on_event(ev: Dictionary) -> void:
 			_open_stage(ev, {})
 		&"rewards_started":
 			if role != Role.SERVER:
+				_hide_stage_ui()  # the stage's full-screen UI sits above the HUD layer: off it goes
 				reward_panel.open(ev["rewards"], float(ev["seconds"]))
 				_curtain_back_to_casino(float(ev["seconds"]))
 				for row: Dictionary in ev["rewards"]:
@@ -1696,6 +1697,13 @@ func _on_curtain_resized() -> void:
 		(r.material as ShaderMaterial).set_shader_parameter(&"aspect", size.y / maxf(size.x * 0.5, 1.0))
 
 
+## The minigame is over: its screen gives way to the round's rewards (the item cards, the discard
+## choice) underneath; the stage itself goes at the regroup, behind the curtain.
+func _hide_stage_ui() -> void:
+	if stage != null and is_instance_valid(stage.ui):
+		stage.ui.visible = false
+
+
 func _close_stage() -> void:
 	if stage != null:
 		stage.queue_free()
@@ -1735,6 +1743,7 @@ func _catch_up_phase() -> void:
 			if role != Role.SERVER:
 				if not _in_minigame_roster(st.rewards.map(func(r: Variant) -> int: return int((r as Dictionary).get("player", -1)) if r is Dictionary else -1)):
 					_set_sitting_out(true)
+				_hide_stage_ui()
 				reward_panel.open(st.rewards, Registry.balance.reward_reveal_time, true)
 				hud.visible = false
 				router.set_mode(InputRouter.Mode.MENU)
