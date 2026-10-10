@@ -1,6 +1,6 @@
 extends GutTest
 ## Rock Paper Scissors wagers and the Gift Shop: duels only move money between the two players,
-## ties replay once, silence declines; the shop sells each player one item per segment.
+## the challenged player is pulled straight in, ties replay once; the shop sells each player one item per segment.
 
 var cfg: BalanceConfig = BalanceConfig.new()
 var players: Dictionary[int, PlayerState] = {}
@@ -47,18 +47,18 @@ func test_outcome_table() -> void:
 	assert_eq(RpsDuels.outcome(1, 1), 0)
 
 
-func test_item_challenges_and_winner_takes_the_stake() -> void:
+func test_item_pulls_the_target_straight_into_the_duel_and_winner_takes_the_stake() -> void:
 	sys.give(1, &"rock_paper_scissors", now)
 	var r: Dictionary = sys.use(1, 0, 2, now, {"option": 1})
 	assert_true(r["ok"], str(r))
-	var invite: Array = _of(&"rps_invite")
-	assert_eq(invite.size(), 1)
-	assert_eq(int(invite[0]["stake"]), 100, "10% of the poorer player's $1000")
-	var duel: int = int(invite[0]["duel"])
-	assert_false(sys.duels.pick(1, duel, 0, now)["ok"], "no picks before the answer")
-	assert_true(sys.duels.answer(2, duel, true, now)["ok"])
+	var start: Array = _of(&"rps_start")
+	assert_eq(start.size(), 1, "no invite: the duel starts at once")
+	assert_eq(int(start[0]["stake"]), 100, "10% of the poorer player's $1000")
+	var duel: int = int(start[0]["duel"])
+	assert_eq(sys.private_state(2, now)["duel"]["state"], &"pick", "the target is in the duel without answering")
 	assert_true(sys.duels.pick(1, duel, 0, now)["ok"])
 	assert_false(sys.duels.pick(1, duel, 1, now)["ok"], "one pick each")
+	assert_false(sys.duels.pick(3, duel, 1, now)["ok"], "outsiders can't pick")
 	assert_true(sys.duels.pick(2, duel, 2, now)["ok"])
 	var res: Array = _of(&"rps_result")
 	assert_eq(int(res[0]["winner"]), 1)
@@ -67,21 +67,13 @@ func test_item_challenges_and_winner_takes_the_stake() -> void:
 	assert_false(sys.duels.busy(1))
 
 
-func test_decline_and_silence_cost_nothing() -> void:
-	var a: int = sys.duels.challenge(1, 2, 0, now)
-	assert_false(sys.duels.answer(3, a, true, now)["ok"], "only the challenged player answers")
-	assert_true(sys.duels.answer(2, a, false, now)["ok"])
-	var b: int = sys.duels.challenge(1, 3, 0, now)
-	sys.duels.tick(now + RpsDuels.ANSWER_TIME + 0.1)
-	var cancelled: Array = _of(&"rps_cancelled")
-	assert_eq(cancelled.map(func(e: Dictionary) -> StringName: return e["reason"]), [&"declined", &"no_answer"])
-	assert_eq(int(cancelled[1]["duel"]), b)
-	assert_eq(_total(), 3000)
+func test_answer_step_is_gone() -> void:
+	assert_false(Intents.SCHEMA.has(&"rps_answer"), "no accept intent any more")
+	assert_false(sys.duels.has_method(&"answer"))
 
 
 func test_one_tie_replays_then_a_second_calls_it_off() -> void:
 	var d: int = sys.duels.challenge(1, 2, 2, now)
-	sys.duels.answer(2, d, true, now)
 	sys.duels.pick(1, d, 1, now)
 	sys.duels.pick(2, d, 1, now)
 	var first: Array = _of(&"rps_result")
@@ -98,7 +90,6 @@ func test_one_tie_replays_then_a_second_calls_it_off() -> void:
 
 func test_missed_pick_is_random_and_money_is_conserved() -> void:
 	var d: int = sys.duels.challenge(1, 2, 2, now)
-	sys.duels.answer(2, d, true, now)
 	sys.duels.pick(1, d, 0, now)
 	sys.duels.tick(now + RpsDuels.PICK_TIME + 0.1)
 	sys.duels.tick(now + 2 * RpsDuels.PICK_TIME + 0.2)  # a tie replays once
@@ -106,10 +97,11 @@ func test_missed_pick_is_random_and_money_is_conserved() -> void:
 	assert_eq(_total(), 3000)
 
 
-func test_unanswered_invites_lapse_and_missing_picks_are_random() -> void:
-	var lapsed: int = sys.duels.challenge(1, 2, 0, now)
+func test_nobody_picking_still_settles() -> void:
+	var d: int = sys.duels.challenge(1, 2, 0, now)
 	sys.duels.tick(now + 60.0)
-	assert_false(sys.duels.duels.has(lapsed), "nobody accepted")
+	sys.duels.tick(now + 120.0)
+	assert_false(sys.duels.duels.has(d), "random picks for both, at most one replay")
 	assert_eq(_total(), 3000)
 
 

@@ -1,5 +1,5 @@
 extends GutTest
-## Gift Shop kiosk, Rock Paper Scissors prompts and the Out of Order sign in the real match scene.
+## Gift Shop kiosk, the Rock Paper Scissors duel screen and the Out of Order sign in the real match scene.
 
 var scene: MatchScene
 var events: Array[Dictionary] = []
@@ -78,32 +78,42 @@ func test_gift_shop_kiosk_prompt_panel_and_buy() -> void:
 	scene.shop_panel.close_panel()
 
 
-func test_duel_prompt_accept_and_pick_with_keys() -> void:
+func test_duel_pulls_the_target_in_and_picks_with_keys() -> void:
 	var bot: int = _bot()
-	scene.server.items.duels.challenge(bot, scene.local_id, 1, scene.server.match_time)
+	var id: int = scene.server.items.duels.challenge(bot, scene.local_id, 1, scene.server.match_time)
 	await wait_seconds(0.5)
-	assert_true(scene.hud.items.duel_panel.visible, "challenge prompt")
-	assert_string_contains(scene.hud.items.duel_label.text, "[Y] Accept")
-	await _key(KEY_Y)
-	await wait_seconds(0.5)
-	assert_string_contains(scene.hud.items.duel_label.text, "[1] Rock")
+	var panel: RpsDuelPanel = scene.items_ctl.duel_panel
+	assert_true(panel.visible, "pulled straight into the duel, no accept step")
+	assert_eq(scene.router.mode, InputRouter.Mode.MENU, "free cursor, no walking away")
+	assert_string_contains(panel.vs_label.text, scene.view.state.player_name(bot))
+	assert_string_contains(panel.buttons[0].text, "ROCK")
 	await _key(KEY_2)
+	await wait_seconds(0.3)
+	assert_true(panel.buttons[1].disabled, "picked")
+	scene.server.items.duels.pick(bot, id, 0, scene.server.match_time)  # rock: paper wins
+	await wait_seconds(0.4)
+	var results: Array[Dictionary] = _of(&"rps_result")
+	assert_eq(results.size(), 1)
+	assert_eq(results[0]["pick_b"], &"paper", "the local player picked paper with key 2")
+	assert_eq(int(results[0]["winner"]), scene.local_id)
+	assert_string_contains(panel.status_label.text, "WIN")
+	await wait_seconds(RpsDuelPanel.RESULT_SECONDS + 0.5)
+	assert_false(panel.visible, "screen gone after the duel")
+	assert_eq(scene.router.mode, InputRouter.Mode.WALK, "back to walking")
+
+
+func test_duel_buttons_pick_and_silence_picks_at_random() -> void:
+	var bot: int = _bot()
+	scene.server.items.duels.challenge(scene.local_id, bot, 0, scene.server.match_time)
+	await wait_seconds(0.5)
+	var panel: RpsDuelPanel = scene.items_ctl.duel_panel
+	assert_true(panel.visible, "the challenger plays too")
+	panel.buttons[2].pressed.emit()
 	await wait_seconds(RpsDuels.PICK_TIME * 2 + 1.0)
 	var results: Array[Dictionary] = _of(&"rps_result")
 	assert_gt(results.size(), 0)
-	assert_eq(results[0]["pick_b"], &"paper", "the local player picked paper with key 2")
+	assert_eq(results[0]["pick_a"], &"scissors", "the button picked")
 	assert_false(results.back()["replay"])
-	assert_false(scene.hud.items.duel_panel.visible, "prompt gone after the duel")
-
-
-func test_declining_with_n() -> void:
-	var bot: int = _bot()
-	scene.server.items.duels.challenge(bot, scene.local_id, 0, scene.server.match_time)
-	await wait_seconds(0.5)
-	await _key(KEY_N)
-	await wait_seconds(0.3)
-	assert_eq(_of(&"rps_cancelled").size(), 1)
-	assert_eq(_of(&"rps_cancelled")[0]["reason"], &"declined")
 
 
 func test_out_of_order_sign_shows_on_the_table() -> void:
@@ -113,7 +123,8 @@ func test_out_of_order_sign_shows_on_the_table() -> void:
 	scene.server.set_server_position(scene.local_id, node.global_position + Vector3(0, 0, 1.6))
 	scene.server.items.give(scene.local_id, &"out_of_order", scene.server.match_time)
 	await wait_process_frames(2)
-	scene.items_ctl.on_slot(0)
+	scene.items_ctl.on_slot(0)  # into the hand
+	scene.items_ctl.on_slot(0)  # and use it
 	await wait_seconds(1.0)
 	assert_eq(_of(&"item_used").size(), 1)
 	assert_eq(StringName(_of(&"item_used")[0]["station"]), sid)

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/item_definition.gd" id="1"]
+[ext_resource type="Script" path="res://items/robin_hood/robin_hood_effect.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"robin_hood"
+display_name = "Robin Hood"
+description = "Take 8% of the leader's money (max $800) and split it among everyone else, you included."
+rarity = 2
+target_mode = 4
+requires_proximity = false
+range_m = 0.0
+is_negative = true
+duration = 0.0
+params = {"pct": 0.08, "max": 800}
+effect_script = ExtResource("2")
+in_loot = true

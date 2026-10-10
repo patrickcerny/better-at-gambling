@@ -499,6 +499,10 @@ func _build_gift_shop() -> void:
 	for i: int in 4:
 		GreyboxKit.box(self, Vector3(0.3, 0.3, 0.3), c + Vector3(0.1, 1.33, -0.75 + i * 0.5), [Palette.FELT_GREEN, Palette.WARM_GOLD, Palette.CASINO_RED, Palette.CREAM][i], "ShopGoods", false)
 	_sign_label(c + Vector3(-0.56, 2.15, 0), -PI / 2.0, "GIFT SHOP", 64)
+	var kiosk: Node3D = ItemModels.make_kiosk(1.9)  # Patrick's ATM next to the counter
+	kiosk.position = c + Vector3(0.1, 0, 1.75)
+	kiosk.rotation.y = -PI / 2.0
+	add_child(kiosk)
 
 
 func _build_mezzanine() -> void:

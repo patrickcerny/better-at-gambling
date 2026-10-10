@@ -1,18 +1,17 @@
 class_name RpsDuels
 extends RefCounted
-## Rock Paper Scissors wagers (item): the user challenges a player for a stake; the target has
-## `ANSWER_TIME` s to accept (silence = decline), then both pick within `PICK_TIME` s (no pick = a
-## random one). The loser pays the stake (as far as they can); one tie is replayed, a second tie
-## calls it off. Money only moves between the two players.
+## Rock Paper Scissors wagers (item): the user challenges a player for a stake and both are pulled
+## straight into the duel (Patrick, 0.8.19: "forced, no accepting needed"); both pick within
+## `PICK_TIME` s (no pick = a random one). The loser pays the stake (as far as they can); one tie is
+## replayed, a second tie calls it off. Money only moves between the two players.
 
-const ANSWER_TIME: float = 6.0
-const PICK_TIME: float = 6.0
+const PICK_TIME: float = 8.0
 ## Stake tiers (share of the poorer player's money) and the bounds.
 const STAKES: Array[float] = [0.05, 0.10, 0.15]
 const MIN_STAKE: int = 10
 const PICKS: Array[StringName] = [&"rock", &"paper", &"scissors"]
 
-## duel id → {duel, a, b, stake, state: &"invite"|&"pick", deadline, picks: {player: int}, ties}
+## duel id → {duel, a, b, stake, state: &"pick", deadline, picks: {player: int}, ties}
 var duels: Dictionary[int, Dictionary] = {}
 var economy: Economy
 var rng: SeededRng
@@ -39,25 +38,14 @@ func stake_for(a: int, b: int, tier: int) -> int:
 	return maxi(int(floor(poorer * STAKES[clampi(tier, 0, STAKES.size() - 1)])), MIN_STAKE)
 
 
-## Opens a challenge. Returns the duel id.
+## Opens a duel: both players are in it at once, picking. Returns the duel id.
 func challenge(a: int, b: int, tier: int, now: float) -> int:
 	var id: int = _next
 	_next += 1
 	var stake: int = stake_for(a, b, tier)
-	duels[id] = {"duel": id, "a": a, "b": b, "stake": stake, "state": &"invite", "deadline": now + ANSWER_TIME, "picks": {}, "ties": 0}
-	events.append(GameEvents.make(&"rps_invite", {"duel": id, "from": a, "to": b, "stake": stake, "seconds": ANSWER_TIME}))
+	duels[id] = {"duel": id, "a": a, "b": b, "stake": stake, "state": &"pick", "deadline": now + PICK_TIME, "picks": {}, "ties": 0}
+	_start_round(duels[id], now)
 	return id
-
-
-func answer(player: int, duel: int, accept: bool, now: float) -> Dictionary:
-	var d: Dictionary = duels.get(duel, {})
-	if d.is_empty() or int(d["b"]) != player or d["state"] != &"invite":
-		return StationLogicBase.fail(&"no_duel")
-	if not accept:
-		_cancel(duel, &"declined")
-		return StationLogicBase.OK_RESULT
-	_start_round(d, now)
-	return StationLogicBase.OK_RESULT
 
 
 func pick(player: int, duel: int, choice: int, now: float) -> Dictionary:
@@ -75,15 +63,11 @@ func pick(player: int, duel: int, choice: int, now: float) -> Dictionary:
 	return StationLogicBase.OK_RESULT
 
 
-## Timeouts: an unanswered invite lapses, a missing pick is made at random.
+## Timeouts: a missing pick is made at random.
 func tick(now: float) -> void:
 	for id: int in duels.keys():
 		var d: Dictionary = duels.get(id, {})
 		if d.is_empty():
-			continue
-		if d["state"] == &"invite":
-			if now >= float(d["deadline"]):
-				_cancel(id, &"no_answer")
 			continue
 		if now >= float(d["deadline"]):
 			for p: int in [int(d["a"]), int(d["b"])]:

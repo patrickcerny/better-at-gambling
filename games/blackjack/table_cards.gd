@@ -16,6 +16,8 @@ const BACK_TINT: Color = Color("#C83D3D")
 ## Card faces are a touch grey so a white card under a spotlight stays below the room's bloom
 ## threshold (LoungeDecor glow_hdr_threshold 1.1) and never smears over its neighbours.
 const FACE_TINT: Color = Color(0.85, 0.85, 0.85)
+## Sunglasses x-ray: the hole card's face seen through its back, scan green.
+const XRAY_TINT: Color = Color(0.45, 1.0, 0.55, 0.85)
 ## How far cards lean up from the felt towards their reader (0 = flat, PI/2 = upright).
 const HAND_TILT: float = deg_to_rad(28.0)
 const DEALER_TILT: float = deg_to_rad(68.0)
@@ -41,6 +43,8 @@ var dealer_rack: MeshInstance3D
 var _piles: Dictionary[int, Dictionary] = {}
 
 var _textures: Dictionary[int, Texture2D] = {}
+## Hole card shown through its back for the local Sunglasses wearer (-1 = none).
+var _xray: int = -1
 var _mesh: QuadMesh
 
 
@@ -163,6 +167,45 @@ func set_viewer(local_eye: Vector3) -> void:
 		var n: Node3D = nodes[i]
 		n.position = card_position(-1, i)
 		n.rotation = card_rotation(-1, int(ids[i]) != FACE_DOWN)
+
+
+## Sunglasses (client only): the dealer's face-down card shows `card` through its back with a
+## green x-ray tint for the wearer (-1 turns it back into a plain red back).
+func set_xray(card: int) -> void:
+	_xray = card
+	if not _piles.has(-1):
+		return
+	var nodes: Array = _piles[-1]["nodes"]
+	var ids: Array = _piles[-1]["ids"]
+	for i: int in nodes.size():
+		var back: MeshInstance3D = (nodes[i] as Node3D).get_node_or_null(^"Back")
+		if back == null:
+			continue
+		var want: int = card if int(ids[i]) == FACE_DOWN and card >= 0 else FACE_DOWN
+		if int(back.get_meta(&"xray", FACE_DOWN)) == want:
+			continue
+		back.set_meta(&"xray", want)
+		back.material_override = _material(_texture(FACE_DOWN), BACK_TINT) if want == FACE_DOWN else _xray_material(_texture(want))
+
+
+## The card currently x-rayed on the dealer's hole card (-1 = none).
+func xray_card() -> int:
+	return _xray
+
+
+## See-through scan look: the face in green, glowing a little, slightly transparent.
+static func _xray_material(tex: Texture2D) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tex
+	m.albedo_color = XRAY_TINT
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.emission_enabled = true
+	m.emission = Color(0.1, 0.9, 0.35)
+	m.emission_energy_multiplier = 0.35
+	m.emission_texture = tex
+	m.roughness = 0.3
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	return m
 
 
 func _yaw(key: int) -> float:

@@ -1,13 +1,19 @@
 class_name ItemBar
 extends Control
-## Bottom-centre item HUD (0.8.6): three inventory slots with a selection the mouse wheel moves
-## (the slot under it is highlighted, "Press i for info" appears on the right and i opens a card
-## with the item's name, rarity and what it does), the half-ring luck gauge, running effects with
-## their timers, the target picker line and the "inventory full" discard choice. Pure display:
-## ItemController feeds it.
+## Bottom-centre item HUD (0.8.19, "hold it in your hand"): three inventory slots, the one in your
+## hand highlighted (nothing highlighted = hands empty). Picking a slot flashes the item's name
+## with a one-line description above the slots for `SELECTION_SECONDS`; I opens the longer info
+## card. Above them: the half-ring luck gauge, running effects with their timers, the aim line
+## ("Black Cat → Anna" / "No one in reach"), the two-button choice some items ask before they go
+## out (Pickpocket's greed, the duel stake) and the "inventory full" discard choice.
+## Pure display apart from the choice buttons: ItemController feeds it.
+
+## A choice button was pressed (0 = first, 1 = second).
+signal choice_made(index: int)
 
 const SLOTS: int = 3
 const LUCK_MAX: int = 3
+const SELECTION_SECONDS: float = 2.0
 
 var slots: Array[PanelContainer] = []
 var slot_names: Array[Label] = []
@@ -18,23 +24,39 @@ var effects_label: Label
 var target_label: Label
 var discard_panel: PanelContainer
 var discard_label: Label
-var duel_panel: PanelContainer
-var duel_label: Label
 var info_hint: Label
+## "[LMB / E] use   [RMB] put away" while something is in your hand.
+var keys_label: Label
 var info_panel: PanelContainer
 var info_label: Label
-## The highlighted slot (0–2); the wheel moves it.
-var selected: int = 0
+## The name + one-line description shown for a moment after picking a slot.
+var selection_panel: PanelContainer
+var selection_name: Label
+var selection_desc: Label
+## Two-button choice before a use goes out.
+var choice_panel: PanelContainer
+var choice_title: Label
+var choice_buttons: Array[Button] = []
+## The slot in your hand (0–2), -1 = nothing held.
+var selected: int = -1
 
 var inventory: Array = []
 var luck: int = 0
 var seated: bool = false
+var _selection_left: float = 0.0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build()
 	set_inventory([])
+
+
+func _process(delta: float) -> void:
+	if _selection_left > 0.0:
+		_selection_left -= delta
+		if _selection_left <= 0.0:
+			selection_panel.visible = false
 
 
 ## Shows the inventory (item ids, oldest first) in the three slots.
@@ -45,10 +67,14 @@ func set_inventory(inv: Array) -> void:
 		slot_names[i].text = RewardPanel.item_name(StringName(inventory[i])) if has else "—"
 		slot_names[i].modulate.a = 1.0 if has else 0.45
 		var border: Color = _rarity_color(StringName(inventory[i])) if has else Palette.WARM_CHARCOAL
-		slots[i].add_theme_stylebox_override(&"panel", _slot_style(border, i == selected))
+		slots[i].add_theme_stylebox_override(&"panel", _slot_style(border, i == selected and has))
 	_refresh_keys()
 	var item: StringName = selected_item()
 	info_hint.visible = item != &""
+	keys_label.visible = item != &""
+	keys_label.text = hint_text()
+	if item == &"":
+		selection_panel.visible = false
 	if info_panel.visible:
 		if item == &"":
 			info_panel.visible = false
@@ -56,18 +82,43 @@ func set_inventory(inv: Array) -> void:
 			_fill_info(item)
 
 
-## Moves the selection by `step` slots (wheel down = right), wrapping around.
-func select(step: int) -> void:
-	selected = posmod(selected + step, SLOTS)
+## Puts slot `slot` in your hand (-1 = hands empty) and flashes its name and description.
+func set_held(slot: int) -> void:
+	var changed: bool = slot != selected
+	selected = slot if slot >= 0 and slot < SLOTS else -1
 	set_inventory(inventory)
+	if changed and selected_item() != &"":
+		flash_selection()
 
 
-## The item in the selected slot (&"" when it is empty).
+## The item in your hand (&"" when nothing is held or the slot is empty).
 func selected_item() -> StringName:
-	return StringName(inventory[selected]) if selected < inventory.size() else &""
+	return StringName(inventory[selected]) if selected >= 0 and selected < inventory.size() else &""
 
 
-## I toggles the info card for the selected item; nothing happens on an empty slot.
+## Name and one-line description of the held item for SELECTION_SECONDS.
+func flash_selection() -> void:
+	var item: StringName = selected_item()
+	if item == &"":
+		selection_panel.visible = false
+		return
+	selection_name.text = RewardPanel.item_name(item)
+	selection_desc.text = short_description(item)
+	selection_panel.add_theme_stylebox_override(&"panel", _slot_style(_rarity_color(item)))
+	selection_panel.visible = not info_panel.visible
+	_selection_left = SELECTION_SECONDS
+
+
+## The first sentence of an item's description (the info card has all of it).
+static func short_description(item: StringName) -> String:
+	var desc: String = RewardPanel.item_description(item)
+	if desc == "":
+		return ""
+	var cut: int = desc.find(". ")
+	return desc.substr(0, cut + 1) if cut > 0 else desc
+
+
+## I toggles the info card for the held item; nothing happens with empty hands.
 func toggle_info() -> void:
 	if info_panel.visible:
 		info_panel.visible = false
@@ -77,10 +128,20 @@ func toggle_info() -> void:
 		return
 	_fill_info(item)
 	info_panel.visible = true
+	selection_panel.visible = false
 
 
 func hide_info() -> void:
 	info_panel.visible = false
+
+
+## The key line next to the slots while you hold something.
+func hint_text() -> String:
+	if InputGlyphs.gamepad:
+		return InputGlyphs.fill("[{interact}] use   [{leave_station}] put away   [{bet_chip_prev} / {bet_chip_next}] switch")
+	if seated:
+		return "[Shift+%d] again: use" % (selected + 1)
+	return InputGlyphs.fill("[LMB / {interact}] use   [RMB] put away   [wheel] switch")
 
 
 func _fill_info(item: StringName) -> void:
@@ -107,6 +168,9 @@ func set_seated(v: bool) -> void:
 	if v != seated:
 		seated = v
 		_refresh_keys()
+		keys_label.text = hint_text()
+		if seated:
+			selection_panel.visible = false
 
 
 ## Fraction of the item cooldown still to run (0 = ready).
@@ -121,7 +185,6 @@ func set_private(priv: Dictionary) -> void:
 	luck = int(priv.get("luck", 0))
 	luck_label.text = "LUCK %s%d" % ["+" if luck > 0 else "", luck]
 	luck_label.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if luck > 0 else (Palette.LOSS_RED if luck < 0 else Palette.CREAM))
-	# Update dial gauge: needle position based on luck (−3…+3 mapped to 0…1)
 	_update_luck_dial()
 	var lines: PackedStringArray = []
 	for e: Dictionary in priv.get("effects", []):
@@ -138,9 +201,10 @@ func set_private(priv: Dictionary) -> void:
 		discard_label.text = "\n".join(parts)
 
 
-## "Lucky Clover 0:32", "Double Trouble (next win)", "Spring Glove ×2".
+## "Lucky Clover 0:32", "Double Trouble (next win)", "Spring Glove ×2", "Dealer tip ×3".
 static func effect_text(e: Dictionary) -> String:
-	var name: String = RewardPanel.item_name(StringName(e.get("item", "")))
+	var id: StringName = StringName(e.get("item", ""))
+	var name: String = "Dealer tip" if id == ItemSystem.TIP_ID else RewardPanel.item_name(id)
 	var left: float = float(e.get("left", -1.0))
 	var uses: int = int(e.get("uses", -1))
 	if left >= 0.0:
@@ -153,24 +217,32 @@ static func effect_text(e: Dictionary) -> String:
 	return name
 
 
-## The Rock Paper Scissors prompt ("" hides it).
-func show_duel(text: String) -> void:
-	duel_label.text = text
-	duel_panel.visible = text != ""
-
-
-## The target picker line ("" hides it).
+## The aim line ("" hides it).
 func show_target(text: String) -> void:
 	target_label.text = text
 	target_label.visible = text != ""
 
 
-## Update the dial gauge based on current luck value.
+## Opens the two-button choice (`labels` = two button texts with their keys).
+func show_choice(title: String, labels: Array[String]) -> void:
+	choice_title.text = title
+	for i: int in choice_buttons.size():
+		choice_buttons[i].text = labels[i] if i < labels.size() else ""
+	choice_panel.visible = true
+	selection_panel.visible = false
+
+
+func hide_choice() -> void:
+	choice_panel.visible = false
+
+
+func is_choice_open() -> bool:
+	return choice_panel.visible
+
+
 func _update_luck_dial() -> void:
-	if luck_dial == null:
-		return
-	# Redraw the dial with updated needle position
-	luck_dial.queue_redraw()
+	if luck_dial != null:
+		luck_dial.queue_redraw()
 
 
 func _refresh_keys() -> void:
@@ -204,6 +276,24 @@ static func _slot_style(border: Color, highlighted: bool = false) -> StyleBoxFla
 	return sb
 
 
+func _panel(border: Color) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override(&"panel", _slot_style(border))
+	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.visible = false
+	return p
+
+
+func _label(variation: StringName, color: Color = Palette.CREAM) -> Label:
+	var l := Label.new()
+	l.theme_type_variation = variation
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_color_override(&"font_color", color)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
 func _build() -> void:
 	var col := VBoxContainer.new()
 	col.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -211,64 +301,78 @@ func _build() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_theme_constant_override(&"separation", 6)
 	add_child(col)
-	discard_panel = PanelContainer.new()
-	discard_panel.add_theme_stylebox_override(&"panel", _slot_style(Palette.LOSS_RED))
-	discard_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	discard_panel.visible = false
+	discard_panel = _panel(Palette.LOSS_RED)
 	col.add_child(discard_panel)
-	discard_label = Label.new()
-	discard_label.theme_type_variation = &"SmallLabel"
-	discard_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	discard_label = _label(&"SmallLabel")
 	discard_panel.add_child(discard_label)
-	duel_panel = PanelContainer.new()
-	duel_panel.add_theme_stylebox_override(&"panel", _slot_style(Palette.VIP_GOLD))
-	duel_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	duel_panel.visible = false
-	col.add_child(duel_panel)
-	duel_label = Label.new()
-	duel_label.theme_type_variation = &"HeadingLabel"
-	duel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	duel_panel.add_child(duel_label)
-	target_label = Label.new()
-	target_label.theme_type_variation = &"HeadingLabel"
-	target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	target_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	# Two-button choice (Pickpocket greed, duel stake).
+	choice_panel = _panel(Palette.VIP_GOLD)
+	col.add_child(choice_panel)
+	var cv := VBoxContainer.new()
+	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cv.add_theme_constant_override(&"separation", 6)
+	choice_panel.add_child(cv)
+	choice_title = _label(&"HeadingLabel", Palette.VIP_GOLD)
+	cv.add_child(choice_title)
+	var ch := HBoxContainer.new()
+	ch.alignment = BoxContainer.ALIGNMENT_CENTER
+	ch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ch.add_theme_constant_override(&"separation", 12)
+	cv.add_child(ch)
+	for i: int in 2:
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(230, 44)
+		b.focus_mode = Control.FOCUS_NONE
+		b.pressed.connect(func() -> void: choice_made.emit(i))
+		ch.add_child(b)
+		choice_buttons.append(b)
+	target_label = _label(&"HeadingLabel", Palette.VIP_GOLD)
 	target_label.visible = false
 	col.add_child(target_label)
-	effects_label = Label.new()
-	effects_label.theme_type_variation = &"SmallLabel"
-	effects_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	effects_label.add_theme_color_override(&"font_color", Palette.CREAM)
+	keys_label = _label(&"SmallLabel", Palette.WARM_GOLD)
+	keys_label.add_theme_font_size_override(&"font_size", 18)
+	keys_label.visible = false
+	col.add_child(keys_label)
+	effects_label = _label(&"SmallLabel")
 	effects_label.visible = false
 	col.add_child(effects_label)
 	# Luck dial gauge: "LUCK +2" with dial meter (red to green, swinging needle).
 	var luck_row := HBoxContainer.new()
 	luck_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	luck_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	luck_row.add_theme_constant_override(&"separation", 12)
 	col.add_child(luck_row)
-	luck_label = Label.new()
-	luck_label.theme_type_variation = &"SmallLabel"
+	luck_label = _label(&"SmallLabel")
 	luck_label.text = "LUCK 0"
 	luck_label.custom_minimum_size = Vector2(80, 0)
 	luck_row.add_child(luck_label)
 	luck_dial = _create_luck_dial()
 	luck_dial.custom_minimum_size = Vector2(150, 78)
 	luck_row.add_child(luck_dial)
-	# Item info card (I on the selected slot).
-	info_panel = PanelContainer.new()
-	info_panel.add_theme_stylebox_override(&"panel", _slot_style(Palette.WARM_GOLD))
-	info_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	info_panel.visible = false
+	# Item info card (I on the held item).
+	info_panel = _panel(Palette.WARM_GOLD)
 	col.add_child(info_panel)
-	info_label = Label.new()
-	info_label.theme_type_variation = &"SmallLabel"
-	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	info_label = _label(&"SmallLabel")
 	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info_label.custom_minimum_size = Vector2(420, 0)
 	info_panel.add_child(info_label)
-	# Inventory slots: three, the selected one highlighted, "Press i for info" to its right.
+	# What you just picked: name, and a line on what it does.
+	selection_panel = _panel(Palette.WARM_GOLD)
+	col.add_child(selection_panel)
+	var sv := VBoxContainer.new()
+	sv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sv.add_theme_constant_override(&"separation", 0)
+	selection_panel.add_child(sv)
+	selection_name = _label(&"HeadingLabel", Palette.VIP_GOLD)
+	sv.add_child(selection_name)
+	selection_desc = _label(&"SmallLabel")
+	selection_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	selection_desc.custom_minimum_size = Vector2(600, 0)
+	sv.add_child(selection_desc)
+	# Inventory slots: three, the held one highlighted, the key line to their right.
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override(&"separation", 14)
 	col.add_child(row)
 	for i: int in SLOTS:
@@ -277,28 +381,25 @@ func _build() -> void:
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(p)
 		var h := HBoxContainer.new()
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		h.add_theme_constant_override(&"separation", 10)
 		p.add_child(h)
-		var k := Label.new()
-		k.theme_type_variation = &"HeadingLabel"
-		k.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+		var k := _label(&"HeadingLabel", Palette.WARM_GOLD)
 		h.add_child(k)
-		var n := Label.new()
-		n.theme_type_variation = &"SmallLabel"
+		var n := _label(&"SmallLabel")
+		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		n.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		h.add_child(n)
 		slots.append(p)
 		slot_keys.append(k)
 		slot_names.append(n)
-	info_hint = Label.new()
-	info_hint.theme_type_variation = &"SmallLabel"
+	info_hint = _label(&"SmallLabel", Palette.WARM_GOLD)
 	info_hint.text = "Press i for info"
 	info_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	info_hint.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
 	info_hint.visible = false
 	row.add_child(info_hint)
-	for l: Label in [discard_label, duel_label, target_label, effects_label, luck_label, info_label, info_hint]:
+	for l: Label in [discard_label, choice_title, target_label, keys_label, effects_label, luck_label, info_label, selection_name, selection_desc, info_hint]:
 		_outline(l)
 	set_private({})
 
