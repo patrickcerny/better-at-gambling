@@ -69,6 +69,7 @@ func _ready() -> void:
 		b.toggle_mode = true
 		b.button_group = group
 		b.custom_minimum_size = Vector2(170, 48)
+		style_tab(b)
 		b.pressed.connect(select_tab.bind(i))
 		tabs.add_child(b)
 		tab_buttons.append(b)
@@ -192,6 +193,39 @@ func close() -> void:
 
 
 ## Shows tab `i` (`TABS` order).
+## Tab look (Patrick: "the selected tab should look lit, not darker"): the tabs you are not on
+## sit back as dim plaques; the selected one lights up, bright red with a gold rim, a warm glow
+## and gold text. Hover brightens a dim tab a little.
+static func style_tab(b: Button) -> void:
+	var dim := _tab_box(Color("#3A2424"), Color(Palette.WARM_GOLD, 0.35), 2)
+	var hover := _tab_box(Color("#5A2C2C"), Color(Palette.WARM_GOLD, 0.8), 2)
+	var lit := _tab_box(Palette.CASINO_RED.lightened(0.12), Palette.VIP_GOLD, 3)
+	lit.shadow_color = Color(Palette.VIP_GOLD, 0.45)
+	lit.shadow_size = 10
+	b.add_theme_stylebox_override(&"normal", dim)
+	b.add_theme_stylebox_override(&"hover", hover)
+	b.add_theme_stylebox_override(&"pressed", lit)
+	b.add_theme_stylebox_override(&"hover_pressed", lit)
+	b.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.6))
+	b.add_theme_color_override(&"font_hover_color", Palette.CREAM)
+	b.add_theme_color_override(&"font_pressed_color", Palette.VIP_GOLD)
+	b.add_theme_color_override(&"font_hover_pressed_color", Palette.VIP_GOLD)
+	b.add_theme_color_override(&"font_focus_color", Palette.CREAM)
+
+
+static func _tab_box(fill: Color, border: Color, width: int) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = fill
+	sb.border_color = border
+	sb.set_border_width_all(width)
+	sb.set_corner_radius_all(32)
+	sb.content_margin_left = 6
+	sb.content_margin_right = 6
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	return sb
+
+
 func select_tab(i: int) -> void:
 	cancel_capture()
 	current_tab = clampi(i, 0, TABS.size() - 1)

@@ -4,9 +4,20 @@ extends TextureRect
 ## SubViewport and, like the casino behind it, goes through the pixel look: under
 ## `Settings.pixel_scale()` 2..4 it renders at that fraction of its on-screen pixels and is blown
 ## back up with hard pixels. Nothing 3D is built when headless; the Control keeps its size.
+## The one way the game shows its logo: the main menu (main_menu.tscn), the loading screen and the
+## joining screen (`Loading`) all use this view; build one in code with `make`.
 
 var logo: Logo3D
 var _viewport: SubViewport
+
+
+## A centred logo of `min_size` (canvas units) for a container.
+static func make(min_size: Vector2 = Vector2(660, 300)) -> Logo3DView:
+	var v := Logo3DView.new()
+	v.name = "Logo"
+	v.custom_minimum_size = min_size
+	v.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	return v
 
 
 func _ready() -> void:

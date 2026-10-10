@@ -55,6 +55,10 @@ func flush() -> void:
 	inner.flush()
 
 
+func set_peer_timeout(peer: int, timeout_ms: int) -> void:
+	inner.set_peer_timeout(peer, timeout_ms)
+
+
 func close() -> void:
 	inner.close()
 	for sig: StringName in [&"peer_connected", &"peer_disconnected", &"connection_failed"]:

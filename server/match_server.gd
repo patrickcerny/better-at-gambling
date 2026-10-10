@@ -47,6 +47,8 @@ var waiter: WaiterLogic
 var megaphone: MegaphoneLogic
 ## Dealers at blackjack and roulette tables (v0.8.4, npc/): station_id → DealerLogic.
 var dealers: Dictionary[StringName, DealerLogic] = {}
+## Online room: drops a kicked player's connection (`RoomHost.kick_player`; tests leave it unset).
+var kick_handler: Callable
 ## Smoothed half round-trip time of a player in seconds (set by the network layer; 0 offline).
 var half_rtt_provider: Callable = func(_p: int) -> float: return 0.0
 ## Per-player match stats for awards and dynamic quiz questions.
@@ -78,6 +80,11 @@ var _leader: int = -1
 ## player → casino segment in which they got the House Comp (once per segment).
 var _comped: Dictionary[int, int] = {}
 var _logic_rng: SeededRng
+## Kicked uids → server uptime until which they may not come back (Protocol.KICK_REJOIN_SECONDS).
+var _kicked: Dictionary[String, float] = {}
+## Who the current/last minigame started with (late joiners are not in it; the snapshot tells
+## them to sit it out). Kept through its rewards.
+var _minigame_roster: Array[int] = []
 
 
 ## Wires balance/presets/registry data. Call before `add_player`/`start_match`.
@@ -88,6 +95,8 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	map_def = p_map
 	_logic_scripts = logic_scripts
 	lobby.presets = presets
+	settings["mode"] = MatchMode.normalize(settings.get("mode", MatchMode.CASINO))
+	lobby.settings["mode"] = settings["mode"]
 	lobby.settings["minigames"] = int(settings.get("minigames", presets.default_minigames))
 	lobby.settings["gamble_minutes"] = int(settings.get("gamble_minutes", presets.default_gamble_minutes))
 	_apply_length()
@@ -104,6 +113,8 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 			rarities[id] = Registry.items[id].rarity
 	loot = LootTables.new(Registry.loot, rarities)
 	lobby.settings["items_enabled"] = bool(settings.get("items_enabled", true))
+	if MatchMode.is_minigames_only(settings):
+		settings["items_enabled"] = false  # no casino to use them in
 	_build_match_systems(int(settings.get("seed", 0)))
 	Log.info(&"server", "configured: %d minigames, %.0f s gambling between, seed %d, %d stations" % [state.minigames, state.gamble_s, state.match_seed, stations.logics.size()])
 
@@ -112,6 +123,8 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 ## `settings.gamble_seconds` (Patrick's note #12).
 func _apply_length() -> void:
 	state.minigames = int(lobby.settings.get("minigames", presets.default_minigames))
+	if MatchMode.is_minigames_only(settings):
+		state.minigames = maxi(state.minigames, 1)
 	var override_s: float = float(settings.get("gamble_seconds", 0.0))
 	state.gamble_s = override_s if override_s > 0.0 else int(lobby.settings.get("gamble_minutes", presets.default_gamble_minutes)) * 60.0
 	state.duration_s = state.gamble_s * (state.minigames + 1)
@@ -175,6 +188,7 @@ func _build_match_systems(seed_value: int) -> void:
 func _build_schedule() -> void:
 	schedule = MatchSchedule.new(state.minigames, state.gamble_s, balance.last_call_seconds)
 	phases = PhaseMachine.new(schedule, balance.regroup_time)
+	phases.minigames_only = MatchMode.is_minigames_only(settings)
 	phases.phase_changed.connect(_on_phase_changed)
 
 
@@ -201,7 +215,17 @@ func add_player(uid: String, display_name: String, color_index: int = -1, skin: 
 	money_history.add_player(p.id, balance.start_money)
 	world.set_transform(p.id, Vector3.ZERO, 0.0)
 	lobby.join(p.id, _uptime + p.id * 0.001)
-	_emit(GameEvents.make(&"player_joined", {"player": p.to_wire()}))
+	var late: bool = room_mode and phases.phase != Phase.Id.LOBBY
+	if late:
+		# Joining a running match (Patrick: "Let players join running rounds"): normal starting cash
+		# (above), in at the entrance hall by the lobby doors with spawn protection, and in the
+		# next minigame (the one running, if any, has its players already).
+		var spot: Vector3 = map_def.lobby_spawn(p.id) if map_def != null else Vector3.INF
+		if spot.is_finite():
+			set_server_position(p.id, spot)
+		rules.protect(p.id, match_time)
+		Log.info(&"server", "%s joined the running match (phase %s)" % [display_name, Phase.name_of(phases.phase)])
+	_emit(GameEvents.make(&"player_joined", {"player": p.to_wire(), "late": late}))
 	_check_leader()
 	return p.id
 
@@ -229,6 +253,51 @@ func player_disconnected(player: int) -> void:
 	_emit(GameEvents.make(&"player_left", {"player": player}))
 	_check_leader()
 	_flush()
+
+
+## Removes a lobby participant for good (kicked before the match): no avatar, no slot, no money.
+func remove_player(player: int) -> void:
+	if not state.players.has(player):
+		return
+	if stations.is_seated(player):
+		stand_up(player)
+	state.players.erase(player)
+	economy.remove_player(player)
+	lobby.remove(player)
+	stats.erase(player)
+	_server_owned.erase(player)
+	_emit(GameEvents.make(&"player_removed", {"player": player}))
+	_check_leader()
+	_flush()
+
+
+## The party leader kicks `target` (Patrick: "Give the party lead the right to kick players"):
+## `player_kicked {player, by}` goes out, the room drops their connection with the reason
+## (`kick_handler`), and they can't rejoin for `Protocol.KICK_REJOIN_SECONDS`. In the lobby they
+## are removed outright; in a running match they stay as "away" like any disconnected player.
+func kick(target: int, by: int) -> void:
+	if not state.players.has(target):
+		return
+	_kicked[state.players[target].uid] = _uptime + Protocol.KICK_REJOIN_SECONDS
+	Log.info(&"server", "player %d kicked by the party leader (player %d)" % [target, by])
+	_emit(GameEvents.make(&"player_kicked", {"player": target, "by": by}))
+	if kick_handler.is_valid():
+		kick_handler.call(target)
+	if phases.phase == Phase.Id.LOBBY:
+		remove_player(target)
+	elif state.players[target].connected:
+		player_disconnected(target)
+
+
+## Seconds before a kicked identity may join this party again (0 = welcome).
+func kick_blocked_for(uid: String) -> float:
+	if not _kicked.has(uid):
+		return 0.0
+	var left: float = _kicked[uid] - _uptime
+	if left <= 0.0:
+		_kicked.erase(uid)
+		return 0.0
+	return left
 
 
 ## The same identity came back.
@@ -272,10 +341,11 @@ func start_match() -> void:
 	if running:
 		return
 	if room_mode:
-		# Lobby settings apply now: the match length rebuilds the schedule.
-		settings["items_enabled"] = bool(lobby.settings["items_enabled"])
+		# Lobby settings apply now: the mode and match length rebuild the schedule.
+		settings["mode"] = MatchMode.normalize(lobby.settings.get("mode", MatchMode.CASINO))
+		settings["items_enabled"] = bool(lobby.settings["items_enabled"]) and not MatchMode.is_minigames_only(settings)
 		_apply_length()
-		if schedule.minigames != state.minigames or not is_equal_approx(schedule.segment_s, state.gamble_s):
+		if schedule.minigames != state.minigames or not is_equal_approx(schedule.segment_s, state.gamble_s) or phases.minigames_only != MatchMode.is_minigames_only(settings):
 			_build_schedule()
 	running = true
 	match_time = 0.0
@@ -284,7 +354,7 @@ func start_match() -> void:
 	stations.set_limits_multiplier(balance.limits_multiplier(0))
 	for id: int in state.players:
 		rules.protect(id, match_time)
-	_emit(GameEvents.make(&"match_started", {"seed": state.match_seed, "minigames": schedule.minigames, "gamble_s": schedule.segment_s, "duration_s": schedule.duration_s, "segment_s": schedule.segment_s}))
+	_emit(GameEvents.make(&"match_started", {"seed": state.match_seed, "minigames": schedule.minigames, "gamble_s": schedule.segment_s, "duration_s": schedule.duration_s, "segment_s": schedule.segment_s, "mode": settings["mode"]}))
 	_flush()
 
 
@@ -313,6 +383,7 @@ func get_snapshot() -> Dictionary:
 	snap["piles"] = _piles_wire()
 	snap["lobby"] = lobby.to_wire()
 	snap["room"] = room_mode
+	snap["mode"] = settings.get("mode", MatchMode.CASINO)
 	snap["effects"] = items.public_effects()
 	snap["peels"] = items.peels_wire()
 	snap["floor"] = {"puddles": waiter.wire(), "megaphone": megaphone.wire()}
@@ -322,6 +393,8 @@ func get_snapshot() -> Dictionary:
 		snap["minigame"] = minigame.get_public_state().duplicate()
 		if briefing_left > 0.0:
 			snap["minigame"]["briefing"] = {"left": snappedf(briefing_left, 0.01), "ready": ready_players.keys()}
+	if phases.phase == Phase.Id.MINIGAME or phases.phase == Phase.Id.REWARDS:
+		snap["minigame_roster"] = _minigame_roster.duplicate()
 	if phases.phase == Phase.Id.REWARDS:
 		snap["rewards"] = rewards.get_public_state()
 	if phases.phase == Phase.Id.REGROUP:
@@ -517,6 +590,7 @@ func _start_minigame() -> void:
 		return
 	briefing_left = maxf(float(settings.get("minigame_briefing", 30.0)), 0.0)
 	ready_players = {}
+	_minigame_roster = players.duplicate()
 	_emit(GameEvents.make(&"minigame_started", {"minigame": minigames.current_def.id, "name": minigames.current_def.display_name, "rules": minigames.current_def.rules_text, "players": players, "briefing": briefing_left}))
 	_flush()
 
@@ -847,6 +921,16 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if not room_mode:
 				return StationLogicBase.fail(&"not_room")
 			return_to_lobby()
+			return StationLogicBase.OK_RESULT
+		&"kick_player":
+			if not room_mode:
+				return StationLogicBase.fail(&"not_room")
+			if player != lobby.leader():
+				return StationLogicBase.fail(&"not_leader")
+			var t: Variant = intent["target"]
+			if not (typeof(t) in [TYPE_INT, TYPE_FLOAT]) or int(t) == player or not state.players.has(int(t)):
+				return StationLogicBase.fail(&"bad_target")
+			kick(int(t), player)
 			return StationLogicBase.OK_RESULT
 		&"set_ready":
 			lobby.set_panel_ready(player, bool(intent["ready"]))

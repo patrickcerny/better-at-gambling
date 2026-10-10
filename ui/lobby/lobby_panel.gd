@@ -2,8 +2,10 @@ class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
 ## accessibility: the 8 slots (name, color, skin, ready, leader), the ready toggle, your skin
-## and — for the party leader — match length (minigames, gambling minutes between them) and items. Every
-## button sends an intent; the panel only redraws from the ClientMatchState mirror.
+## and — for the party leader — the mode (casino or minigames only), match length (minigames,
+## gambling minutes between them), items, PUBLIC (listed in the server browser) and a KICK button
+## next to every other player (press twice: KICK → SURE?). Every button sends an intent; the panel
+## only redraws from the ClientMatchState mirror.
 
 signal closed
 signal leave_requested
@@ -20,11 +22,17 @@ var _countdown_label: Label
 ## Match length steppers (Patrick's note #12): setting key → {minus, plus, value: Label}.
 var _steppers: Dictionary[String, Dictionary] = {}
 var _items_button: Button
+## Leader-only toggles: party mode (`MatchMode`) and server-browser listing.
+var mode_button: Button
+var public_button: Button
+## Player id whose KICK was pressed once (the second press kicks), and when it disarms.
+var _kick_armed: int = -1
+var _kick_armed_until: float = 0.0
 var _length_note: Label
 var _skin_label: Label
 var _skin_next: Button
 ## The 8 slot rows, built once and updated in place (rebuilding them made the panel, and the
-## READY button with it, jump on every snapshot, so clicks missed). Each: {frame, swatch, name, ready, empty}.
+## READY button with it, jump on every snapshot, so clicks missed). Each: {frame, swatch, name, ready, kick, empty}.
 var _rows: Array[Dictionary] = []
 ## Frame the panel was opened on: the Tab press that opened it must not close it again.
 var _opened_frame: int = -1
@@ -145,6 +153,23 @@ func _build() -> void:
 	right.add_child(_settings_note)
 	_settings_box = VBoxContainer.new()
 	right.add_child(_settings_box)
+	var toggles := HBoxContainer.new()
+	toggles.add_theme_constant_override(&"separation", 8)
+	_settings_box.add_child(toggles)
+	mode_button = Button.new()
+	mode_button.name = "Mode"
+	mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mode_button.pressed.connect(func() -> void:
+		var now: StringName = MatchMode.normalize(state.lobby_settings.get("mode", MatchMode.CASINO))
+		Net.send_intent(Intents.make(&"lobby_setting", {"key": "mode", "value": MatchMode.MINIGAMES if now == MatchMode.CASINO else MatchMode.CASINO})))
+	toggles.add_child(mode_button)
+	public_button = Button.new()
+	public_button.name = "Public"
+	public_button.toggle_mode = true
+	public_button.custom_minimum_size = Vector2(170, 0)
+	public_button.pressed.connect(func() -> void:
+		Net.send_intent(Intents.make(&"lobby_setting", {"key": "public", "value": not bool(state.lobby_settings.get("public", false))})))
+	toggles.add_child(public_button)
 	_add_stepper("minigames", "MINIGAMES")
 	_add_stepper("gamble_minutes", "GAMBLING BETWEEN")
 	_items_button = Button.new()
@@ -191,7 +216,17 @@ func _make_row() -> Dictionary:
 	ready.theme_type_variation = &"SmallLabel"
 	ready.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ready)
-	return {"frame": framed, "swatch": sw, "name": label, "ready": ready, "empty": empty}
+	var kick := Button.new()
+	kick.name = "Kick"
+	kick.text = "KICK"
+	kick.theme_type_variation = &"ChipButton"
+	kick.add_theme_font_size_override(&"font_size", 16)
+	kick.custom_minimum_size = Vector2(76, 34)
+	kick.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	kick.visible = false
+	kick.pressed.connect(_on_kick_pressed.bind(_rows.size()))
+	row.add_child(kick)
+	return {"frame": framed, "swatch": sw, "name": label, "ready": ready, "kick": kick, "empty": empty}
 
 
 func _heading(text: String) -> Label:
@@ -217,9 +252,15 @@ func _refresh() -> void:
 		(r["swatch"] as ColorRect).visible = taken
 		(r["name"] as Label).visible = taken
 		(r["ready"] as Label).visible = taken
+		var kick: Button = r["kick"]
+		kick.visible = taken and local_id == state.leader and ids[i] != local_id
 		if not taken:
+			r["pid"] = -1
 			continue
 		var pid: int = ids[i]
+		r["pid"] = pid
+		kick.text = "SURE?" if _kick_armed == pid and _now() < _kick_armed_until else "KICK"
+		kick.tooltip_text = "Kick %s from the party (they can't rejoin for %d s)" % [str(state.players[pid].get("name", "?")), int(Protocol.KICK_REJOIN_SECONDS)]
 		var p: Dictionary = state.players[pid]
 		(r["swatch"] as ColorRect).color = Palette.player_color(int(p.get("color", 0)))
 		var tags: PackedStringArray = []
@@ -246,8 +287,16 @@ func _refresh() -> void:
 	var mg: int = int(state.lobby_settings.get("minigames", presets.default_minigames))
 	var gm: int = int(state.lobby_settings.get("gamble_minutes", presets.default_gamble_minutes))
 	_set_stepper("minigames", "%d" % mg, leader and mg > presets.min_minigames, leader and mg < presets.max_minigames)
-	_set_stepper("gamble_minutes", "%d MIN" % gm, leader and gm > presets.min_gamble_minutes, leader and gm < presets.max_gamble_minutes)
-	_length_note.text = "About %d min of gambling in all" % (gm * (mg + 1))
+	var minigames_only: bool = MatchMode.is_minigames_only(state.lobby_settings)
+	_set_stepper("gamble_minutes", "%d MIN" % gm if not minigames_only else "—", leader and not minigames_only and gm > presets.min_gamble_minutes, leader and not minigames_only and gm < presets.max_gamble_minutes)
+	_length_note.text = "%d minigames back to back, no casino" % mg if minigames_only else "About %d min of gambling in all" % (gm * (mg + 1))
+	mode_button.text = "MODE: %s" % MatchMode.label(state.lobby_settings.get("mode", MatchMode.CASINO))
+	mode_button.disabled = not leader
+	var public: bool = bool(state.lobby_settings.get("public", false))
+	public_button.text = "PUBLIC" if public else "PRIVATE"
+	public_button.set_pressed_no_signal(public)
+	public_button.disabled = not leader
+	public_button.tooltip_text = "Listed in the server browser" if public else "Only people with the code can join"
 	_items_button.text = "ITEMS: %s" % ("ON" if bool(state.lobby_settings.get("items_enabled", true)) else "OFF")
 	_items_button.button_pressed = bool(state.lobby_settings.get("items_enabled", true))
 	_items_button.disabled = not leader
@@ -310,6 +359,27 @@ func _cycle_skin(step: int) -> void:
 	Settings.set_value("profile", "skin", String(skin))
 	Settings.save()
 	Net.send_intent(Intents.make(&"set_skin", {"skin": skin}))
+
+
+## KICK on slot `slot`: the first press arms it ("SURE?" for 3 s), the second kicks.
+func _on_kick_pressed(slot: int) -> void:
+	if state == null or local_id != state.leader:
+		return
+	var pid: int = int(_rows[slot].get("pid", -1))
+	if pid < 0 or pid == local_id:
+		return
+	if _kick_armed == pid and _now() < _kick_armed_until:
+		_kick_armed = -1
+		Net.send_intent(Intents.make(&"kick_player", {"target": pid}))
+	else:
+		_kick_armed = pid
+		_kick_armed_until = _now() + 3.0
+		get_tree().create_timer(3.05).timeout.connect(_refresh)
+	_refresh()
+
+
+func _now() -> float:
+	return Time.get_ticks_msec() / 1000.0
 
 
 func _my_ready() -> bool:

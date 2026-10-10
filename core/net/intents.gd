@@ -23,6 +23,7 @@ const SCHEMA: Dictionary = {
 	&"lobby_setting": ["key", "value"],
 	&"set_skin": ["skin"],
 	&"return_to_lobby": [],
+	&"kick_player": ["target"],
 	&"emote": ["id"],
 	## Number-key emotes acted out by the bean (`Emotes.ANIMATED`): {"emote": StringName}.
 	&"play_emote": ["emote"],

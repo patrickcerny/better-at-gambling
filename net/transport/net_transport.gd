@@ -52,6 +52,11 @@ func local_id() -> int:
 	return 0
 
 
+## Sets how long a silent peer may go before it counts as disconnected (milliseconds).
+func set_peer_timeout(_peer: int, _timeout_ms: int) -> void:
+	pass
+
+
 ## Smoothed round-trip time to a peer in milliseconds (0 = unknown).
 func peer_rtt_ms(_peer: int) -> float:
 	return 0.0

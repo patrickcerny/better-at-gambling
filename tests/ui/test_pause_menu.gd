@@ -39,6 +39,20 @@ func test_buttons_in_order_with_the_gear_bottom_right() -> void:
 	assert_false(menu.settings.visible, "Escape does not open the settings directly")
 
 
+## Patrick: "the settings panel touches the item bar": in game it ends well above the bottom of
+## the screen, where the HUD's item slots sit.
+func test_settings_stay_clear_of_the_item_bar() -> void:
+	menu.open()
+	menu.open_settings()
+	await wait_process_frames(2)
+	var vp: Vector2 = menu.get_viewport_rect().size
+	var r: Rect2 = menu.settings.get_global_rect()
+	assert_lt(r.end.y, vp.y - 200.0, "bottom edge %.0f clear of the item bar" % r.end.y)
+	assert_gt(r.position.y, 0.0, "still on screen at the top")
+	assert_gt(r.size.y, 600.0, "still roomy")
+	assert_true(menu.settings._resume.get_global_rect().end.y <= r.end.y + 0.5, "RESUME inside the panel")
+
+
 func test_escape_resumes() -> void:
 	menu.open()
 	watch_signals(menu)

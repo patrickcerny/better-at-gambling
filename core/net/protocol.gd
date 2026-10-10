@@ -2,7 +2,7 @@ class_name Protocol
 extends RefCounted
 ## Network protocol constants (§4.1). Bump PROTOCOL_VERSION on any wire change.
 
-const PROTOCOL_VERSION: int = 6
+const PROTOCOL_VERSION: int = 7
 ## Build string clients and servers must share exactly (the orchestrator checks it too).
 const BUILD_ID: String = "0.8.18"
 const DEFAULT_PORT: int = 24680
@@ -37,14 +37,21 @@ enum Msg {
 	PONG,  ## S→C {t, server_time}
 	FORCE_POSITION,  ## S→C {pos, yaw}: movement sanity snap-back
 	BYE,  ## C→S leaving on purpose
+	LOADED,  ## C→S {}: the match scene is built; the server tightens this peer's timeout
 }
+
+## A player the party leader kicked can't come back into that party for this long (the room
+## enforces it: `MatchServer.kick_blocked_for`).
+const KICK_REJOIN_SECONDS: float = 60.0
 
 ## Rejection codes (REJECT.code) with player-facing text.
 const REJECT_TEXT: Dictionary = {
 	&"version_mismatch": "The server is on a different version. Update the game and try again.",
 	&"bad_token": "Could not verify your invitation. Try joining again.",
 	&"room_full": "This party is full.",
-	&"room_in_progress": "The match already started. Only players who were in it can rejoin.",
+	&"room_in_progress": "This party is on its results screen. Try again in a minute.",
+	&"kicked": "You were kicked by the host.",
+	&"kick_cooldown": "You were kicked from this party. Try again in a minute.",
 	&"server_error": "Server error. Returning to the menu.",
 	&"timeout": "Could not reach the server.",
 }

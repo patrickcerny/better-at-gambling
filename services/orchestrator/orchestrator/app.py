@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 from typing import AsyncIterator, Callable, Literal
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -47,6 +47,10 @@ class HeartbeatBody(InternalBody):
     phase: Literal["lobby", "match", "results"]
     players: int = Field(ge=0, le=1000)
     player_uids: list[str] | None = Field(default=None, max_length=1000)
+    # Server browser: the leader's PUBLIC toggle, the party's name and mode (older servers omit them).
+    public: bool = False
+    name: str | None = Field(default=None, max_length=128)
+    mode: Literal["casino", "minigames"] | None = None
 
 
 class ClosingBody(InternalBody):
@@ -155,6 +159,18 @@ def create_app(
         return {"build": cfg.build_id, "rooms": len(manager.rooms), "max_rooms": cfg.max_rooms,
                 "auth_mode": cfg.auth_mode}
 
+    @app.get("/v1/rooms")
+    async def list_rooms(request: Request, public: int = Query(default=0),
+                         build: str | None = Query(default=None, max_length=128)) -> dict[str, object]:
+        """Server browser: parties whose leader switched PUBLIC on (only ``public=1`` is offered)."""
+        limit(f"ip:{client_ip(request)}")
+        if public != 1:
+            raise ApiError(400, "bad_request", "Only public parties can be listed (public=1).")
+        if build is not None and build != cfg.build_id:
+            raise ApiError(426, "version_mismatch", "Update required — restart Steam to update.",
+                           server_build=cfg.build_id)
+        return {"rooms": manager.public_rooms(), "max_players": cfg.max_players}
+
     @app.post("/v1/rooms")
     async def create_room(body: CreateRoomBody, request: Request) -> dict[str, object]:
         ident = await admit(request, body)
@@ -177,7 +193,8 @@ def create_app(
     @app.post("/v1/internal/heartbeat")
     async def heartbeat(body: HeartbeatBody, request: Request) -> dict[str, bool]:
         room = internal(request, body)
-        manager.heartbeat(room, body.phase, body.players, body.player_uids)
+        manager.heartbeat(room, body.phase, body.players, body.player_uids,
+                          public=body.public, name=body.name, mode=body.mode)
         return {"ok": True}
 
     @app.post("/v1/internal/closing")

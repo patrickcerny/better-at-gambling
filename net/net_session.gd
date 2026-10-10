@@ -31,7 +31,10 @@ enum Mode { NONE, LOCAL, CLIENT, SERVER }
 const PING_INTERVAL: float = 1.0
 const STATUS_INTERVAL: float = 0.25
 const WORLD_INTERVAL: float = 1.0 / Protocol.SERVER_TICK_HZ
-const CONNECT_TIMEOUT: float = 10.0
+## Seconds from the connect attempt to WELCOME. A fresh party's server may still be booting and
+## the server verifies the join token with the orchestrator first, so this is generous (30 s, like
+## the loading timeout in `ENetTransport.LOADING_TIMEOUT_MS`).
+const CONNECT_TIMEOUT: float = 30.0
 ## Most latency credited to a quiz answer (half a 500 ms round trip).
 const MAX_HALF_RTT: float = 0.25
 ## Silence after which the UI shows "Connection lost — reconnecting…" (§2.12).
@@ -104,6 +107,15 @@ func start_local(server: MatchServer, display_name: String) -> int:
 	local_player_id = server.add_player("local", display_name, -1, StringName(Settings.get_value("profile", "skin", "bean")))
 	connected.emit()
 	return local_player_id
+
+
+## CLIENT: the match scene is built. Until now both ends allowed a 30 s silence (a slow PC can
+## stall for a long time while the casino loads); from here on the normal 10 s timeout applies.
+func notify_loaded() -> void:
+	if mode != Mode.CLIENT or not _welcomed or transport == null:
+		return
+	_send(NetTransport.SERVER_PEER, Protocol.CHANNEL_STATE, true, Protocol.Msg.LOADED, {})
+	transport.set_peer_timeout(NetTransport.SERVER_PEER, ENetTransport.TIMEOUT_MS)
 
 
 ## Leaves the current session (says goodbye to a server first).
@@ -371,7 +383,9 @@ func send_to(peer: int, channel: int, reliable: bool, type: int, payload: Varian
 
 
 func _on_server_event(ev: Dictionary) -> void:
-	event_received.emit(ev)  # the server's own match scene reacts too (ragdolls, guards, piles)
+	event_received.emit(ev)
+	if ev.get("type", &"") == &"lobby_settings" and room_host != null:
+		room_host.heartbeat_soon()  # PUBLIC on/off reaches the server browser right away  # the server's own match scene reacts too (ragdolls, guards, piles)
 	var bytes: PackedByteArray = Wire.encode(Protocol.Msg.EVENT, ev)
 	for peer: int in room_host.welcomed_peers():
 		transport.send(peer, Protocol.CHANNEL_EVENTS, true, bytes)
@@ -408,6 +422,8 @@ func _server_packet(peer: int, type: int, payload: Variant) -> void:
 			_send(peer, Protocol.CHANNEL_EVENTS, true, Protocol.Msg.SNAPSHOT, local_server.get_snapshot())
 		Protocol.Msg.PING:
 			_send(peer, Protocol.CHANNEL_STATE, true, Protocol.Msg.PONG, {"t": payload.get("t", 0.0), "server_time": server_time()})
+		Protocol.Msg.LOADED:
+			room_host.on_loaded(peer)
 		Protocol.Msg.BYE:
 			# Leaving on purpose: free the slot (and hand over leadership) now, not after ENet notices.
 			if room_host != null:

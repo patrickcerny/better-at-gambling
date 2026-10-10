@@ -1,7 +1,7 @@
 class_name OnlineService
 extends Node
-## Client side of the room orchestrator (§4.0.1): create a party, join by room code, rejoin the
-## last room. Hands the resulting {host, port, join_token} to `Net.join_server`. Tickets are
+## Client side of the room orchestrator (§4.0.1): create a party, join by room code, list the
+## public parties for the server browser (`list_parties`), rejoin the last room. Hands the resulting {host, port, join_token} to `Net.join_server`. Tickets are
 ## `dev:<name>` until Steam auth lands (M8). The last room is kept in `user://last_room.cfg`.
 
 const LAST_ROOM_PATH: String = "user://last_room.cfg"
@@ -42,6 +42,23 @@ func join_party(display_name: String, room_code: String = "", room_id: String = 
 		body["room_code"] = room_code.strip_edges().to_upper()
 	var res: Dictionary = await http.post(orchestrator_url().path_join("v1/rooms/join"), body)
 	return _room_or_error(res)
+
+
+## Server browser: the public parties ([{room_id, room_code, name, players, max_players, phase,
+## mode, joinable}]), or [] with `last_error` set when the orchestrator could not be asked.
+func list_parties() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var res: Dictionary = await http.fetch(orchestrator_url().path_join("v1/rooms") + "?public=1&build=%s" % Protocol.BUILD_ID.uri_encode())
+	if res["status"] != 200:
+		_room_or_error(res)
+		return out
+	last_error = ""
+	var rooms: Variant = (res["body"] as Dictionary).get("rooms", [])
+	if rooms is Array:
+		for r: Variant in rooms:
+			if r is Dictionary:
+				out.append(r)
+	return out
 
 
 ## Connects to a room returned by `create_party`/`join_party`.
