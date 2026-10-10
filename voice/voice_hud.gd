@@ -1,7 +1,7 @@
 class_name VoiceHud
 extends VBoxContainer
 ## Voice indicator on the left edge (online only): our own mic state ("Hold T to talk",
-## "TALKING", "Open mic", "Voice off") and below it everyone we can hear right now, in their
+## "TALKING", "Open mic", "Voice off", "No microphone") and below it everyone we can hear right now, in their
 ## player colour.
 
 var channel: VoiceChannel = null
@@ -51,6 +51,9 @@ func _process(delta: float) -> void:
 	if not channel.is_active():
 		_self_icon.texture = _icon_off
 		_self_label.text = "Voice off"
+	elif channel.mic_missing():
+		_self_icon.texture = _icon_off
+		_self_label.text = "No microphone (Settings > Audio)"
 	elif channel.capture.transmitting:
 		_self_icon.texture = _icon_live
 		_self_label.text = "TALKING"

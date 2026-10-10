@@ -185,3 +185,58 @@ func test_saved_bindings_apply_to_the_input_map() -> void:
 	Settings.set_value(Settings.KEYBIND_SECTION, "jump", "garbage")
 	Settings.apply_keybinds()
 	assert_true(InputMap.event_is_action(_key(KEY_SPACE), &"jump"), "a broken entry falls back to the default")
+
+
+## Patrick: "Input device selector in settings (use default microphone normally but can select in
+## settings)".
+func test_audio_tab_lists_microphones_with_default_first_and_saves_the_choice() -> void:
+	var old: String = str(Settings.get_value("voice", "input_device"))
+	panel.open(false)
+	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
+	assert_true(panel.input_device.is_visible_in_tree(), "on the AUDIO tab")
+	assert_true(panel.voice_mode.is_visible_in_tree(), "next to the voice mode")
+	assert_eq(panel.input_devices[0], "Default")
+	assert_eq(panel.input_device.get_item_text(0), "System default")
+	panel.refresh_devices(PackedStringArray(["Default", "USB Headset", "Webcam Mic"]))
+	assert_eq(panel.input_device.item_count, 3)
+	assert_eq(panel.input_device.selected, 0, "Default unless the player picked another")
+	panel.input_device.select(1)
+	panel.input_device.item_selected.emit(1)
+	assert_eq(str(Settings.get_value("voice", "input_device")), "USB Headset", "saved in settings.cfg")
+	panel.refresh_devices(PackedStringArray(["Default", "Webcam Mic", "USB Headset"]))
+	assert_eq(panel.input_devices[panel.input_device.selected], "USB Headset", "the saved one stays selected")
+	panel.refresh_devices(PackedStringArray(["Default", "Webcam Mic"]))
+	assert_eq(panel.input_device.selected, 0, "unplugged: Default")
+	Settings.change("voice", "input_device", old)
+
+
+func test_voice_mode_option_writes_the_key_the_voice_channel_reads() -> void:
+	var old: String = str(Settings.get_value("voice", "mode"))
+	panel.open(false)
+	for i: int in VoiceChannel.MODE_KEYS.size():
+		panel.voice_mode.select(i)
+		panel.voice_mode.item_selected.emit(i)
+		assert_eq(str(Settings.get_value("voice", "mode")), VoiceChannel.MODE_KEYS[i])
+	Settings.change("voice", "mode", old)
+
+
+func test_mic_meter_tests_the_microphone_while_the_audio_tab_shows() -> void:
+	panel.open(false)
+	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
+	await wait_process_frames(2)
+	assert_not_null(panel.mic_test, "outside a match the panel opens the mic itself")
+	assert_eq(panel.meter_capture(), panel.mic_test)
+	assert_true(panel.mic_meter.is_visible_in_tree())
+	assert_true(panel.mic_status.text.begins_with("No microphone"), "headless: says why (%s)" % panel.mic_status.text)
+	assert_eq(panel.mic_meter.value, 0.0)
+	# A microphone that hears something moves the bar.
+	panel.mic_test.feed_mono(VoiceWav.tone(300.0, 0.2, 48000, 0.3), 48000)
+	await wait_process_frames(1)
+	assert_gt(panel.mic_meter.value, 0.5, "speech level fills most of the bar")
+	panel.select_tab(0)
+	assert_null(panel.mic_test, "leaving the tab closes the microphone")
+	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
+	await wait_process_frames(1)
+	assert_not_null(panel.mic_test)
+	panel.close()
+	assert_null(panel.mic_test, "closing the panel closes it too")

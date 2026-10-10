@@ -255,3 +255,20 @@ its time so it touches down after `plinko_flight_time`, as the server settles; a
 `round_result` still plays a quick fall. Still no RigidBody chip: the slot is fixed first and money
 never depends on the physics. The bucket plates show the multipliers of the row the seated player
 picked; a landing chip pops its own row's multiplier over the slot.
+
+## 2026-10-10 — Voice reads the microphone straight from the driver; microphone picker in Settings
+
+Patrick on 0.9.0 (Windows): "fix the proximity chat. It doesnt work." The network half was fine
+(a headless server + two clients relay and play a looped WAV: `tests/net/test_net_match.py -k
+voice`), so the fault sat in the microphone half, which the cloud cannot exercise. Capture no
+longer plays an `AudioStreamMicrophone` into a muted `Mic` bus to read it back through an
+`AudioEffectCapture` (output mixer in the loop, resampled to the output rate and back, drifting
+against the device clock, silent when the stream stopped "playing"); `VoiceMicSource` reads
+`AudioServer.get_input_frames()` at `get_input_mix_rate()`. It also clears Godot's sticky "input
+active" flag when opening the device fails (otherwise every retry answers OK and stays silent),
+skips stale audio after a hitch, and the failure reason reaches the voice HUD ("No microphone"),
+the settings panel and the log (as does a device that only ever sends silence).
+Settings → Audio gets a microphone picker (`voice/input_device`, "Default" = the system's; a
+saved device that is unplugged falls back to Default but stays saved) and a live level meter
+(the voice channel's capture in a match, its own mic test elsewhere). Push to talk is remappable
+in the Controls tab. The unused `Mic` bus stays in the bus layout for now.

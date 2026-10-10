@@ -13,8 +13,9 @@ const PATH: String = "user://settings.cfg"
 const BASE_MOUSE: float = 0.0025
 const DEFAULTS: Dictionary = {
 	"audio": {"master": 0.8, "music": 0.6, "sfx": 0.8, "ui": 0.7, "voice": 0.9},
-	## Voice chat: "push_to_talk", "open_mic" or "off" (see `VoiceChannel.MODE_KEYS`).
-	"voice": {"mode": "push_to_talk"},
+	## Voice chat: "push_to_talk", "open_mic" or "off" (see `VoiceChannel.MODE_KEYS`), and the
+	## microphone: a name from `AudioServer.get_input_device_list()` ("Default": the system's).
+	"voice": {"mode": "push_to_talk", "input_device": "Default"},
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false},
 	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
 }
@@ -32,7 +33,7 @@ const KEYBINDS: Dictionary[StringName, String] = {
 	&"item_1": "Item 1", &"item_2": "Item 2", &"item_3": "Item 3", &"emote_wheel": "Emote wheel",
 	&"emote_1": "Emote: 67", &"emote_2": "Emote: thumbs up", &"emote_3": "Emote: thumbs down", &"emote_4": "Emote: default dance",
 	&"leaderboard": "Leaderboard", &"ping": "Ping", &"toggle_camera": "Toggle camera",
-	&"leave_station": "Leave station", &"pause": "Pause menu",
+	&"leave_station": "Leave station", &"pause": "Pause menu", &"push_to_talk": "Push to talk",
 }
 
 ## Developer override for the pixel look (screenshot tool, pixel tests); 0 = the fixed look. Never saved.
@@ -40,6 +41,8 @@ var pixel_scale_override: int = 0
 var _cfg: ConfigFile = ConfigFile.new()
 ## Each remappable action's InputMap events as the project defines them (before any remap).
 var _default_events: Dictionary[StringName, Array] = {}
+## The microphone `apply()` last chose (listing devices is slow on Windows: only when it changes).
+var _applied_input_device: String = ""
 
 
 func _ready() -> void:
@@ -223,6 +226,7 @@ func apply() -> void:
 			var v: float = clampf(float(get_value("audio", pair[1])), 0.0, 1.0)
 			AudioServer.set_bus_mute(idx, v <= 0.001)
 			AudioServer.set_bus_volume_db(idx, slider_db(v))
+	apply_input_device()
 	Engine.max_fps = int(get_value("video", "max_fps"))
 	if DisplayServer.get_name() == "headless":
 		return
@@ -233,3 +237,23 @@ func apply() -> void:
 	elif not fs and mode == DisplayServer.WINDOW_MODE_FULLSCREEN:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if bool(get_value("video", "vsync")) else DisplayServer.VSYNC_DISABLED)
+
+
+## The input device to use: the saved one while it is plugged in, else the system default.
+static func pick_input_device(saved: String, available: PackedStringArray) -> String:
+	return saved if saved != "" and saved in available else VoiceMicSource.DEFAULT_DEVICE
+
+
+## Points the audio driver at the saved microphone (Default when it is gone; the choice stays
+## saved, so it comes back when the device is plugged in again).
+func apply_input_device(force: bool = false) -> void:
+	var saved: String = str(get_value("voice", "input_device"))
+	if saved == _applied_input_device and not force:
+		return
+	_applied_input_device = saved
+	var device: String = pick_input_device(saved, AudioServer.get_input_device_list())
+	if device != saved:
+		Log.warn(&"settings", "microphone \"%s\" not found, using the default one" % saved)
+	if AudioServer.input_device != device:
+		AudioServer.input_device = device
+		Log.info(&"settings", "microphone: %s" % device)

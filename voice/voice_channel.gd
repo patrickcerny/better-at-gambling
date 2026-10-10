@@ -5,8 +5,9 @@ extends Node
 ## (created under their avatar on first use), drives everyone's mouth from their voice and keeps
 ## the per-player mute list (client-side, for this match).
 ##
-## Settings: `audio/voice` (Voice bus volume), `voice/mode` (`MODE_KEYS`). Push-to-talk is the
-## `push_to_talk` action (T / Caps Lock / gamepad). `--voice-test <wav>` loops a WAV into the
+## Settings: `audio/voice` (Voice bus volume), `voice/mode` (`MODE_KEYS`), `voice/input_device`
+## (the microphone, applied by `Settings`). Push-to-talk is the `push_to_talk` action (T / Caps
+## Lock / gamepad; remappable in the Controls tab). `--voice-test <wav>` loops a WAV into the
 ## capture path in open-mic mode instead of the microphone.
 
 const MODE_KEYS: Array[String] = ["push_to_talk", "open_mic", "off"]
@@ -33,6 +34,7 @@ var _mode: String = "push_to_talk"
 var _test_samples: PackedFloat32Array = PackedFloat32Array()
 var _test_rate: int = 0
 var _test_pos: float = 0.0
+var _played_at_start: int = 0
 
 
 ## Wires the channel up before it enters the tree. `ui_parent` gets the voice HUD (may be null).
@@ -50,6 +52,7 @@ func setup(p_state: ClientMatchState, p_local_id: int, p_avatar_of: Callable, ui
 
 func _ready() -> void:
 	current = self
+	_played_at_start = VoicePlayback.total_frames_played
 	capture = VoiceCapture.new()
 	capture.name = "Capture"
 	add_child(capture)
@@ -72,7 +75,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	if online:
-		Log.info(&"voice", "sent %d frames (%d bytes), played %d frames from %d speakers" % [capture.frames_sent, capture.bytes_sent, received_packets, playbacks.size()])
+		Log.info(&"voice", "sent %d frames (%d bytes), received %d frames from %d speakers, played %d frames" % [capture.frames_sent, capture.bytes_sent, received_packets, playbacks.size(), VoicePlayback.total_frames_played - _played_at_start])
 	if current == self:
 		current = null
 	if Net.voice_received.is_connected(_on_voice):
@@ -109,6 +112,12 @@ func mode_key() -> String:
 ## True while voice is on (online and not switched off).
 func is_active() -> bool:
 	return online and _mode != "off"
+
+
+## True when voice is on but the microphone would not start (see `capture.mic_error`); never
+## while `--voice-test` feeds a WAV instead.
+func mic_missing() -> bool:
+	return is_active() and _test_samples.is_empty() and not capture.mic_active and capture.mic_error != ""
 
 
 func _process(delta: float) -> void:
