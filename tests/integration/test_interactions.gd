@@ -221,3 +221,21 @@ func test_items_knock_a_seated_player_off_their_seat_with_the_bet_settled() -> v
 	assert_true(r2["ok"], str(r2))
 	assert_false(fx.server.stations.is_seated(c))
 	assert_true(fx.server.rules.is_knocked_down(c, fx.server.match_time))
+
+
+## Patrick 2026-10-10: "when you sit on a table and the endscreen comes, the blackjack ui stays".
+func test_everyone_stands_up_before_the_match_ends() -> void:
+	fx.server.free()
+	fx = ServerFixture.new(3, {"minigames": 0, "gamble_seconds": 30.0})  # no minigame stands them up first
+	fx.server.start_match()
+	fx.run(3.1)
+	fx.place_all()
+	var b: int = fx.player_ids[1]
+	assert_true(fx.intent(b, &"sit", {"station": &"blackjack_1"})["ok"])
+	fx.server.run_to_end()
+	assert_false(fx.server.stations.is_seated(b), "nobody is seated on the end screen")
+	var stood: Array[Dictionary] = fx.of_type(&"player_stood").filter(func(e: Dictionary) -> bool: return int(e["player"]) == b)
+	assert_eq(stood.size(), 1, "stood up once, by the match end")
+	assert_eq(StringName(stood[0].get("reason", &"")), &"match_over")
+	assert_lt(int(stood[0]["seq"]), int(fx.of_type(&"match_ended")[0]["seq"]), "before match_ended")
+

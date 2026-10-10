@@ -577,6 +577,11 @@ func _finish_match() -> void:
 	running = false
 	hot_tables.stop()
 	stations.set_global_multiplier(1.0)
+	# The end screen takes over: nobody stays at a table (the open rounds were resolved at
+	# `segment_ended`), so every table panel closes with a `player_stood` before `match_ended`.
+	for id: int in state.players:
+		if stations.is_seated(id):
+			stand_up(id, &"match_over")
 	money_history.finish(_balances())
 	var standings: Array[Dictionary] = get_standings()
 	if room_mode:
