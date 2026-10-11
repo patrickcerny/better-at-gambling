@@ -74,6 +74,12 @@ func blocked_intents() -> Array[StringName]:
 	return []
 
 
+## Subclass: true while `player` can't be shoved or grabbed (Last Seat: seated on a stool). The
+## server treats them like a casino-seated player for those intents.
+func is_untouchable(_player: int) -> bool:
+	return false
+
+
 func blocks_intent(type: StringName) -> bool:
 	return type in BLOCKED_INTENTS or type in blocked_intents()
 

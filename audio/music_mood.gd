@@ -6,6 +6,9 @@ extends Node
 ## late joins and "play again" land on the right mood without extra event wiring.
 
 var state: ClientMatchState = null
+## A minigame stage that plays its own music (Last Seat's floor music, which has to stop dead on
+## cue) sets this while it is up: the mood music fades out during the minigame.
+static var stage_music: bool = false
 
 
 func setup(p_state: ClientMatchState) -> void:
@@ -31,4 +34,5 @@ func _process(_delta: float) -> void:
 
 func _apply() -> void:
 	if state != null:
-		Audio.set_mood(mood_for(state.phase, state.last_call))
+		var mood: StringName = mood_for(state.phase, state.last_call)
+		Audio.set_mood(&"" if stage_music and state.phase == Phase.Id.MINIGAME else mood)

@@ -569,6 +569,10 @@ func _refund_and_stand_everyone() -> void:
 ## ragdolls and knockouts are over, bodies go to their hall spot and the doors stay shut for
 ## `regroup_time` seconds. `regroup_started {seconds, positions: {player: [x, y, z]}}`.
 func _start_regroup() -> void:
+	if _room != null:
+		for id: int in _room.roster:
+			if state.players.has(id) and not stations.is_seated(id):
+				rules.status(id).seated = false
 	_room = null  # the walkable room (if any) closes: everyone goes back to the hall below
 	sanity.close_room()
 	interactions.regroup()
@@ -1455,6 +1459,9 @@ func _tick_room() -> void:
 		if state.players.has(p) and rules.knock_down(p, match_time, float(kd["seconds"])):
 			_emit(GameEvents.make(&"player_knocked_down", {"target": p, "attacker": int(kd.get("attacker", -1)), "seconds": kd["seconds"], "cause": kd.get("cause", &"minigame")}))
 	_room.pending_knockdowns.clear()
+	for id: int in _room.roster:
+		if state.players.has(id) and not stations.is_seated(id):
+			rules.status(id).seated = _room.is_untouchable(id)  # shove/grab immunity (Last Seat stools)
 	for id: int in _room.roster:
 		if not state.players.has(id) or _server_owned.get(id, false) or rules.is_knocked_down(id, match_time):
 			continue  # a ragdoll in flight: once it is up, it is moved/clamped
