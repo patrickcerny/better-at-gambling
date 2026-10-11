@@ -430,7 +430,12 @@ func _server_packet(peer: int, type: int, payload: Variant) -> void:
 				move_received.emit(pid, pos, yaw, bool(m.get("airborne", false)))
 			else:
 				var good: Vector3 = local_server.sanity.last_good(pid)
-				Log.warn(&"net", "player %d moved implausibly to %s, snapping back to %s (phase %s, t=%.2f)" % [pid, pos, good, Phase.name_of(local_server.phases.phase), local_server.uptime()])
+				if local_server.sanity.in_teleport_grace(pid, local_server.uptime()):
+					# The server just moved this player (jail, respawn, a room): reports from before
+					# the client saw that are one round trip stale, not implausible.
+					Log.info(&"net", "player %d snapped to %s after a server move (was reporting %s)" % [pid, good, pos])
+				else:
+					Log.warn(&"net", "player %d moved implausibly to %s, snapping back to %s (phase %s, t=%.2f)" % [pid, pos, good, Phase.name_of(local_server.phases.phase), local_server.uptime()])
 				_send(peer, Protocol.CHANNEL_STATE, true, Protocol.Msg.FORCE_POSITION, {"pos": Serializer.vec3(good), "yaw": yaw})
 		Protocol.Msg.SNAPSHOT_REQ:
 			_send(peer, Protocol.CHANNEL_EVENTS, true, Protocol.Msg.SNAPSHOT, local_server.get_snapshot())

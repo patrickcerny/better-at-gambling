@@ -62,6 +62,12 @@ func allow_teleport(player: int, pos: Vector3, now: float, seconds: float = 1.0)
 	_grace_until[player] = now + seconds
 
 
+## True while a server move (`allow_teleport`) is fresh: a report from before the client saw it is
+## expected, not a cheat (one round trip of lag), so the snap-back is logged quietly.
+func in_teleport_grace(player: int, now: float) -> bool:
+	return now < _grace_until.get(player, -INF)
+
+
 ## Last accepted position (Vector3.INF if none).
 func last_good(player: int) -> Vector3:
 	return _last_pos.get(player, Vector3.INF)
