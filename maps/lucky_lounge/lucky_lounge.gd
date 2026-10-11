@@ -60,6 +60,10 @@ const LOBBY_SPAWNS: Array[Vector3] = [
 ]
 ## Where players stand to shop at the Gift Shop kiosk (east wall, next to the bar).
 const SHOP_POS: Vector3 = Vector3(19.6, 0, 1.5)
+## The Odd Jobs cabinet (button smash for broke players) against the east wall on the Gift Shop's
+## north side, away from the bar: its centre, and where players stand to use it.
+const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -0.95)
+const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -0.95)
 const BAR_X: float = 17.7
 const BAR_W: float = 7.0
 const MIRROR_POS: Vector3 = Vector3(-21.3, 0, 12.0)
@@ -118,6 +122,8 @@ var _marker_time: float = 0.0
 var vip_gate_area: Area3D
 var nav_region: NavigationRegion3D
 var props_parent: Node3D
+## The Odd Jobs cabinet's red button cap (dips on the local player's presses).
+var odd_jobs_button: Node3D
 var navmesh_ready: bool = false
 ## The lobby doors between the start room and the casino (§2.2): a solid barrier filling the
 ## doorway while shut, two swinging leaves to look at, the sign above and the countdown on them.
@@ -565,8 +571,9 @@ func _build_floor_areas() -> void:
 	for i: int in 6:
 		GreyboxKit.box(self, Vector3(0.25, 0.4, 0.25), Vector3(BAR_X - BAR_W * 0.5 + 0.5 + i * 1.3, 1.6, 6.9), [Palette.CASINO_RED, Palette.WARM_GOLD, Palette.FELT_GREEN][i % 3], "Bottle", false)
 	_build_gift_shop()
+	_build_odd_jobs()
 	# Plants and a few obstacles for lanes.
-	for p: Vector3 in [Vector3(-20, 0, 14), Vector3(20, 0, 14), Vector3(-20, 0, -1), Vector3(20, 0, -1)]:
+	for p: Vector3 in [Vector3(-20, 0, 14), Vector3(20, 0, 14), Vector3(-20, 0, -1), Vector3(21.2, 0, -2.5)]:
 		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, p + Vector3(0, 0.3, 0), Color("#5A3A22"), "Pot")
 		var plant: Node3D = PropModels.dress(pot, [&"plant_1", &"plant_2", &"plant_3"][absi(int(p.x + p.z)) % 3], 0.3, 1.7)
 		plant.rotation.y = p.x * 0.7
@@ -588,6 +595,31 @@ func _build_gift_shop() -> void:
 	kiosk.position = c + Vector3(0.1, 0, 1.75)
 	kiosk.rotation.y = -PI / 2.0
 	add_child(kiosk)
+
+
+## The Odd Jobs cabinet: a low wooden arcade cabinet with one big red button on its deck and an
+## "ODD JOBS" marquee, its front to the room (−x). Solid like the shop counter.
+func _build_odd_jobs() -> void:
+	var c: Vector3 = ODD_JOBS_CABINET
+	var wood := Color("#3A2A1E")
+	GreyboxKit.box(self, Vector3(0.7, 1.0, 0.9), c + Vector3(0, 0.5, 0), wood, "OddJobsCabinet")
+	GreyboxKit.box(self, Vector3(0.04, 0.6, 0.7), c + Vector3(-0.37, 0.5, 0), Palette.VIP_BURGUNDY, "OddJobsPanel", false)
+	GreyboxKit.box(self, Vector3(0.05, 0.05, 0.92), c + Vector3(-0.36, 0.98, 0), Palette.WARM_GOLD, "OddJobsTrim", false)
+	GreyboxKit.box(self, Vector3(0.05, 0.05, 0.92), c + Vector3(-0.36, 0.06, 0), Palette.WARM_GOLD, "OddJobsTrim", false)
+	GreyboxKit.box(self, Vector3(0.78, 0.08, 0.98), c + Vector3(-0.02, 1.04, 0), Palette.CASINO_BLACK, "OddJobsDeck", false)
+	# The button: gold bezel, red cap (the cap dips when the local player smashes it).
+	GreyboxKit.cylinder(self, 0.24, 0.06, c + Vector3(-0.08, 1.11, 0), Palette.WARM_GOLD, "OddJobsBezel", false, 0.8)
+	odd_jobs_button = GreyboxKit.cylinder(self, 0.19, 0.12, c + Vector3(-0.08, 1.17, 0), Palette.CASINO_RED, "OddJobsButton", false)
+	# Marquee on the back, with its sign facing the room.
+	GreyboxKit.box(self, Vector3(0.16, 1.2, 0.9), c + Vector3(0.24, 1.68, 0), wood, "OddJobsBack")
+	GreyboxKit.box(self, Vector3(0.04, 0.5, 0.84), c + Vector3(0.14, 1.95, 0), Palette.VIP_BURGUNDY, "OddJobsMarquee", false)
+	for y: float in [1.69, 2.21]:
+		GreyboxKit.box(self, Vector3(0.05, 0.04, 0.9), c + Vector3(0.13, y, 0), Palette.WARM_GOLD, "OddJobsTrim", false)
+	for i: int in 5:
+		GreyboxKit.sphere(self, 0.035, c + Vector3(0.12, 2.28, -0.36 + i * 0.18), Palette.CREAM, "OddJobsBulb")
+	var l: Label3D = _sign_label(c + Vector3(0.11, 2.0, 0), -PI / 2.0, "ODD JOBS", 32)
+	l.modulate = Palette.VIP_GOLD
+	_sign_label(c + Vector3(0.11, 1.8, 0), -PI / 2.0, "$50 A BAR", 22)
 
 
 ## The VIP lounge: its own room behind the north door, on the casino's floor level. Parquet,

@@ -22,6 +22,8 @@ extends Resource
 @export var lobby_spawns: Array[Vector3] = []
 ## Gift Shop counter (filled by the map scene; INF = no distance check, e.g. in tests).
 @export var shop_position: Vector3 = Vector3.INF
+## Where players stand at the Odd Jobs cabinet (filled by the map scene; INF = no distance check).
+@export var odd_jobs_position: Vector3 = Vector3.INF
 ## Max distance from a station's interaction point to sit down.
 @export var interact_range: float = 3.5
 ## The line of the lobby doors between the start room (z above it) and the casino (z below it):
