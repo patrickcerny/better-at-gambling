@@ -546,6 +546,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
 		var b: MouseButton = (event as InputEventMouseButton).button_index
+		if (b == MOUSE_BUTTON_WHEEL_UP or b == MOUSE_BUTTON_WHEEL_DOWN) and walking and scene.stage is WalkableStage:
+			return  # a walkable minigame room has no items; the stage may use the wheel (Grab Your Hand)
 		if (b == MOUSE_BUTTON_WHEEL_UP or b == MOUSE_BUTTON_WHEEL_DOWN) and walking:
 			cycle(1 if b == MOUSE_BUTTON_WHEEL_DOWN else -1)
 			get_viewport().set_input_as_handled()

@@ -151,6 +151,12 @@ func on_player_got_up(_player: int) -> void:
 	pass
 
 
+## A shove by `attacker` landed on `target` (`MatchServer` calls this once the shove resolves,
+## from its own positions). Subclass hook (Grab Your Hand: the target drops a card).
+func on_shoved(_target: int, _attacker: int) -> void:
+	pass
+
+
 ## Subclass: the action button. {ok, error} (StationLogicBase.OK_RESULT / fail).
 func _on_action(_player: int, _kind: StringName, _hint: int, _now: float) -> Dictionary:
 	return StationLogicBase.fail(&"not_implemented")

@@ -868,6 +868,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				modifiers.consume_round(player, &"spring_glove")
 			if shoved["ok"]:
 				items.pass_monkey(player, int(shoved["target"]), match_time)
+				if _room != null and minigame == _room:
+					_room.on_shoved(int(shoved["target"]), player)  # e.g. Grab Your Hand: drop a card
 			elif shoved["error"] == &"no_target":
 				# Try waiter or dealer
 				if waiter.shove(player, Serializer.to_vec3(intent["aim"]), match_time):

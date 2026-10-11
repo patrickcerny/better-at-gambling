@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/grab_your_hand/grab_your_hand_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/grab_your_hand/grab_your_hand_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"grab_your_hand"
+display_name = "Grab Your Hand"
+rules_text = "Walk over the giant cards to pick them up (5 max), use the action button to drop one you don't want. Shove someone and they drop a card! Best poker hand after 50 seconds wins."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 2
+weight = 1.0
