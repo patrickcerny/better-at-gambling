@@ -856,7 +856,11 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				return StationLogicBase.fail(&"not_standing")
 			return interactions.grab(player, int(intent["target"]), match_time)
 		&"release":
-			return interactions.release(player, bool(intent["throw"]), Serializer.to_vec3(intent.get("aim", [])), match_time)
+			var thrown: int = int(interactions.holding.get(player, -1))
+			var released: Dictionary = interactions.release(player, bool(intent["throw"]), Serializer.to_vec3(intent.get("aim", [])), match_time)
+			if released["ok"] and bool(intent["throw"]) and _room != null and minigame == _room:
+				_room.on_thrown(thrown, player)  # e.g. Bat Heist: a thrown bean lands knocked down
+			return released
 		&"shove":
 			if stations.is_seated(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player):
 				return StationLogicBase.fail(&"not_standing")

@@ -543,7 +543,7 @@ func _connect_router() -> void:
 			return
 		if _local_holding() >= 0:
 			_throw_held()
-		else:
+		elif not (stage is WalkableStage and (stage as WalkableStage).on_shove_pressed()):
 			_local_shove())
 	router.shake.connect(func() -> void:
 		var res: Dictionary = Net.send_intent(Intents.make(&"shake"))
@@ -1952,6 +1952,13 @@ func _on_grab() -> void:
 	if local != null and _local_holding() >= 0:
 		_throw_held()
 		return
+	if stage is WalkableStage and (stage as WalkableStage).on_grab_pressed():
+		return  # a walkable minigame's own use of the click (Bat Heist: the bat)
+	grab_in_front()
+
+
+## Grabs whoever stands in front of the local bean (the casino's grab).
+func grab_in_front() -> void:
 	if local == null or not local.is_standing():
 		return
 	var target: int = _reach_target(true)
@@ -2060,6 +2067,10 @@ func _impact_effects(attacker: int, target: int, dir: Vector3, heavy: bool) -> v
 ## knockdown ends. The host simulates it (and owns the body); clients show the streamed pose.
 func _knock_down(pid: int, attacker: int, seconds: float) -> void:
 	var t: PlayerAvatar = avatars.get(pid, null)
+	if t != null and t.state == PlayerAvatar.State.RAGDOLL and _owns_server:
+		# Already flying (a throw the room counts as a knockdown): it stays down until then.
+		_down_until[pid] = maxf(float(_down_until.get(pid, 0.0)), _clock + seconds)
+		return
 	if t == null or not (t.is_standing() or t.state == PlayerAvatar.State.SEATED or t.state == PlayerAvatar.State.HELD):
 		return
 	var dir: Vector3 = _impact_dir.get(pid, Vector3.ZERO)

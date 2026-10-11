@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"bat_heist"
 display_name = "Bat Heist"
-rules_text = "Everyone has 10 coins and a bat: swing to knock a bean flat, then hold the button over them to steal coins until they get up. Most coins after 60 s wins."
+rules_text = "Everyone has 10 coins and a bat: click to bonk a bean flat, or grab one and throw them, then click fast over them to steal a coin per click until they get up. Most coins after 60 s wins."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2

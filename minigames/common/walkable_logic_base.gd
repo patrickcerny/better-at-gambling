@@ -157,6 +157,12 @@ func on_shoved(_target: int, _attacker: int) -> void:
 	pass
 
 
+## A throw by `attacker` launched `target` (the casino's grab and throw, `MatchServer` calls this
+## once the release resolves). Subclass hook (Bat Heist: the thrown bean is knocked down).
+func on_thrown(_target: int, _attacker: int) -> void:
+	pass
+
+
 ## Subclass: the action button. {ok, error} (StationLogicBase.OK_RESULT / fail).
 func _on_action(_player: int, _kind: StringName, _hint: int, _now: float) -> Dictionary:
 	return StationLogicBase.fail(&"not_implemented")

@@ -10,6 +10,9 @@ extends RefCounted
 ## coordinates around `WalkableLogicBase.ROOM_ORIGIN`); `build(parent)` makes the nodes for the
 ## client stage (and the dedicated server, so ragdolls have a floor). Local axes: -z is the vault
 ## door, +z the gallery.
+##
+## Both take a size factor `k` (1 = the standard vault, Pass the Bomb): the floor, its props, lamps
+## and spawn ring spread by `k` in x and z (floor area × k²); heights and the gallery's depth stay.
 
 ## Inner half width (x) of the room, the vault door wall (z) and the gallery's back wall (z).
 const HALF_X: float = 9.0
@@ -37,8 +40,33 @@ const LAMP: Color = Color(1.0, 0.82, 0.55)
 const TEX_DIR: String = "res://assets/textures/"
 
 
+static func half_x(k: float) -> float:
+	return HALF_X * k
+
+
+static func door_z(k: float) -> float:
+	return DOOR_Z * k
+
+
+static func gallery_z(k: float) -> float:
+	return GALLERY_Z * k
+
+
+static func back_z(k: float) -> float:
+	return GALLERY_Z * k + (BACK_Z - GALLERY_Z)
+
+
+## `v` spread by `k` on the floor plane (y stays).
+static func flat(v: Vector3, k: float) -> Vector3:
+	return Vector3(v.x * k, v.y, v.z * k)
+
+
 ## World-space description for the server (and the stage's overlay hints).
-static func layout() -> Dictionary:
+static func layout(k: float = 1.0) -> Dictionary:
+	var hx: float = half_x(k)
+	var dz: float = door_z(k)
+	var gz: float = gallery_z(k)
+	var bz: float = back_z(k)
 	var o: Vector3 = WalkableLogicBase.ROOM_ORIGIN
 	var spawns: Array[Vector3] = []
 	var yaws: Array[float] = []
@@ -46,23 +74,23 @@ static func layout() -> Dictionary:
 		# Fill the ring evenly for any count: alternate across the circle (0, 4, 2, 6, 1, 5, 3, 7).
 		var slot: int = [0, 4, 2, 6, 1, 5, 3, 7][i]
 		var a: float = TAU * (float(slot) + 0.5) / float(MAX_SPOTS)
-		var local := Vector3(sin(a) * SPAWN_RADIUS, 0.0, cos(a) * SPAWN_RADIUS)
+		var local := Vector3(sin(a), 0.0, cos(a)) * SPAWN_RADIUS * k
 		spawns.append(o + local)
 		yaws.append(atan2(local.x, local.z))  # facing the middle (yaw 0 faces -z)
 	var spots: Array[Vector3] = []
 	for i: int in MAX_SPOTS:
-		var x: float = -6.3 + 12.6 * float(i) / float(MAX_SPOTS - 1)
-		spots.append(o + Vector3(x, GALLERY_H, GALLERY_Z + 1.3 + (0.35 if i % 2 == 1 else 0.0)))
+		var x: float = (-6.3 + 12.6 * float(i) / float(MAX_SPOTS - 1)) * k
+		spots.append(o + Vector3(x, GALLERY_H, gz + 1.3 + (0.35 if i % 2 == 1 else 0.0)))
 	# Bounds a little past where a bean's centre can physically go (walls stop the body first), so
 	# only a real escape is clamped; y spans a jump and a ragdoll's bounce.
-	var arena := AABB(o + Vector3(-HALF_X + 0.2, -1.0, DOOR_Z + 0.2), Vector3((HALF_X - 0.2) * 2.0, 5.0, GALLERY_Z - DOOR_Z - 0.2))
-	var gallery := AABB(o + Vector3(-HALF_X + 0.2, GALLERY_H - 0.6, GALLERY_Z + 0.2), Vector3((HALF_X - 0.2) * 2.0, 4.5, BACK_Z - GALLERY_Z - 0.4))
+	var arena := AABB(o + Vector3(-hx + 0.2, -1.0, dz + 0.2), Vector3((hx - 0.2) * 2.0, 5.0, gz - dz - 0.2))
+	var gallery := AABB(o + Vector3(-hx + 0.2, GALLERY_H - 0.6, gz + 0.2), Vector3((hx - 0.2) * 2.0, 4.5, bz - gz - 0.4))
 	return {"arena": arena, "gallery": gallery, "spawns": spawns, "spawn_yaws": yaws, "gallery_spots": spots}
 
 
 ## Builds the vault under `parent` (placed at the world origin) at `WalkableLogicBase.ROOM_ORIGIN`;
 ## returns the room's root.
-static func build(parent: Node3D) -> Node3D:
+static func build(parent: Node3D, k: float = 1.0) -> Node3D:
 	var root := Node3D.new()
 	root.name = "VaultArena"
 	parent.add_child(root)
@@ -71,59 +99,62 @@ static func build(parent: Node3D) -> Node3D:
 	var steel_dark: StandardMaterial3D = _metal(STEEL_DARK, 0.7, 0.5)
 	var brass: StandardMaterial3D = _tex("brass", 1.2, Color(1.0, 0.86, 0.6), 0.85, 0.32)
 	var marble: StandardMaterial3D = _tex("black_marble", 2.2, Color(0.82, 0.78, 0.74), 0.25, 0.22)
-	_shell(root, steel, steel_dark, brass, marble)
-	_floor_inlay(root, brass)
-	_vault_door(root, steel, steel_dark, brass)
-	_deposit_walls(root, steel_dark, brass)
-	_pillars(root, brass)
-	_crates(root, brass)
-	_gallery(root, brass)
-	_lamps(root, brass)
+	_shell(root, steel, steel_dark, brass, marble, k)
+	_floor_inlay(root, brass, k)
+	_vault_door(root, steel, steel_dark, brass, k)
+	_deposit_walls(root, steel_dark, brass, k)
+	_pillars(root, brass, k)
+	_crates(root, brass, k)
+	_gallery(root, brass, k)
+	_lamps(root, brass, k)
 	return root
 
 
 # --- Shell ------------------------------------------------------------------------------------
 
-static func _shell(root: Node3D, steel: Material, steel_dark: Material, brass: Material, marble: Material) -> void:
-	var len_z: float = BACK_Z - DOOR_Z
-	var mid_z: float = (BACK_Z + DOOR_Z) * 0.5
+static func _shell(root: Node3D, steel: Material, steel_dark: Material, brass: Material, marble: Material, k: float) -> void:
+	var hx: float = half_x(k)
+	var dz: float = door_z(k)
+	var bz: float = back_z(k)
+	var len_z: float = bz - dz
+	var mid_z: float = (bz + dz) * 0.5
 	# Floor slab (top at y = 0) and ceiling.
-	_solid(root, Vector3(HALF_X * 2.0 + 1.0, 0.4, len_z + 1.0), Vector3(0, -0.2, mid_z), marble, "Floor")
-	_solid(root, Vector3(HALF_X * 2.0 + 1.0, 0.4, len_z + 1.0), Vector3(0, WALL_H + 0.2, mid_z), steel_dark, "Ceiling")
-	# Walls (inner faces at ±HALF_X, DOOR_Z, BACK_Z).
-	_solid(root, Vector3(WALL_T, WALL_H, len_z + 1.0), Vector3(-HALF_X - WALL_T * 0.5, WALL_H * 0.5, mid_z), steel, "WallW")
-	_solid(root, Vector3(WALL_T, WALL_H, len_z + 1.0), Vector3(HALF_X + WALL_T * 0.5, WALL_H * 0.5, mid_z), steel, "WallE")
-	_solid(root, Vector3(HALF_X * 2.0, WALL_H, WALL_T), Vector3(0, WALL_H * 0.5, DOOR_Z - WALL_T * 0.5), steel, "WallDoor")
-	_solid(root, Vector3(HALF_X * 2.0, WALL_H, WALL_T), Vector3(0, WALL_H * 0.5, BACK_Z + WALL_T * 0.5), steel, "WallBack")
+	_solid(root, Vector3(hx * 2.0 + 1.0, 0.4, len_z + 1.0), Vector3(0, -0.2, mid_z), marble, "Floor")
+	_solid(root, Vector3(hx * 2.0 + 1.0, 0.4, len_z + 1.0), Vector3(0, WALL_H + 0.2, mid_z), steel_dark, "Ceiling")
+	# Walls (inner faces at ±hx, dz, bz).
+	_solid(root, Vector3(WALL_T, WALL_H, len_z + 1.0), Vector3(-hx - WALL_T * 0.5, WALL_H * 0.5, mid_z), steel, "WallW")
+	_solid(root, Vector3(WALL_T, WALL_H, len_z + 1.0), Vector3(hx + WALL_T * 0.5, WALL_H * 0.5, mid_z), steel, "WallE")
+	_solid(root, Vector3(hx * 2.0, WALL_H, WALL_T), Vector3(0, WALL_H * 0.5, dz - WALL_T * 0.5), steel, "WallDoor")
+	_solid(root, Vector3(hx * 2.0, WALL_H, WALL_T), Vector3(0, WALL_H * 0.5, bz + WALL_T * 0.5), steel, "WallBack")
 	# Riveted panel seams and two brass bands round the room, a dark steel skirting.
 	for side: float in [-1.0, 1.0]:
-		var x: float = side * (HALF_X - 0.03)
-		var z: float = DOOR_Z + 1.5
-		while z < BACK_Z:
+		var x: float = side * (hx - 0.03)
+		var z: float = dz + 1.5
+		while z < bz:
 			_vis(root, Vector3(0.06, WALL_H - 0.4, 0.08), Vector3(x, WALL_H * 0.5, z), steel_dark)
 			z += 2.2
 		for y: float in [1.05, 4.6]:
-			_vis(root, Vector3(0.08, 0.12, BACK_Z - DOOR_Z), Vector3(side * (HALF_X - 0.04), y, mid_z), brass)
-		_vis(root, Vector3(0.1, 0.3, BACK_Z - DOOR_Z), Vector3(side * (HALF_X - 0.05), 0.15, mid_z), steel_dark)
-	for z_wall: float in [DOOR_Z + 0.04, BACK_Z - 0.04]:
+			_vis(root, Vector3(0.08, 0.12, bz - dz), Vector3(side * (hx - 0.04), y, mid_z), brass)
+		_vis(root, Vector3(0.1, 0.3, bz - dz), Vector3(side * (hx - 0.05), 0.15, mid_z), steel_dark)
+	for z_wall: float in [dz + 0.04, bz - 0.04]:
 		for y: float in [1.05, 4.6]:
-			_vis(root, Vector3(HALF_X * 2.0, 0.12, 0.08), Vector3(0, y, z_wall), brass)
-		_vis(root, Vector3(HALF_X * 2.0, 0.3, 0.1), Vector3(0, 0.15, z_wall + (0.01 if z_wall < 0.0 else -0.01)), steel_dark)
+			_vis(root, Vector3(hx * 2.0, 0.12, 0.08), Vector3(0, y, z_wall), brass)
+		_vis(root, Vector3(hx * 2.0, 0.3, 0.1), Vector3(0, 0.15, z_wall + (0.01 if z_wall < 0.0 else -0.01)), steel_dark)
 	# Ceiling: steel girders across, brass bolts where they meet the walls.
-	var z2: float = DOOR_Z + 1.8
-	while z2 < BACK_Z:
-		_vis(root, Vector3(HALF_X * 2.0, 0.35, 0.3), Vector3(0, WALL_H - 0.18, z2), steel_dark)
+	var z2: float = dz + 1.8
+	while z2 < bz:
+		_vis(root, Vector3(hx * 2.0, 0.35, 0.3), Vector3(0, WALL_H - 0.18, z2), steel_dark)
 		z2 += 3.0
 
 
 ## A gold circle in the marble with a darker band inside and a brass star of eight rays.
-static func _floor_inlay(root: Node3D, brass: Material) -> void:
+static func _floor_inlay(root: Node3D, brass: Material, k: float) -> void:
 	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
-	_ring(root, GOLD_RING_RADIUS, 0.14, 0.012, gold)
-	_ring(root, GOLD_RING_RADIUS - 0.35, 0.05, 0.012, gold)
+	_ring(root, GOLD_RING_RADIUS * k, 0.14, 0.012, gold)
+	_ring(root, GOLD_RING_RADIUS * k - 0.35, 0.05, 0.012, gold)
 	var inner := MeshInstance3D.new()
 	var disc := CylinderMesh.new()
-	disc.top_radius = GOLD_RING_RADIUS - 0.42
+	disc.top_radius = GOLD_RING_RADIUS * k - 0.42
 	disc.bottom_radius = disc.top_radius
 	disc.height = 0.01
 	disc.radial_segments = 48
@@ -146,10 +177,11 @@ static func _floor_inlay(root: Node3D, brass: Material) -> void:
 
 # --- Vault door -------------------------------------------------------------------------------
 
-static func _vault_door(root: Node3D, steel: Material, steel_dark: Material, brass: Material) -> void:
+static func _vault_door(root: Node3D, steel: Material, steel_dark: Material, brass: Material, k: float) -> void:
+	var dz: float = door_z(k)
 	var door := Node3D.new()
 	door.name = "VaultDoor"
-	door.position = Vector3(0, 2.9, DOOR_Z)
+	door.position = Vector3(0, 2.9, dz)
 	root.add_child(door)
 	# Square brass-edged frame set into the wall, then the round door standing proud of it.
 	_vis(door, Vector3(6.2, 5.6, 0.1), Vector3(0, -0.1, 0.05), steel_dark)
@@ -198,14 +230,16 @@ static func _vault_door(root: Node3D, steel: Material, steel_dark: Material, bra
 
 
 ## Rows of safe-deposit boxes on both long walls, between the door and the pillars.
-static func _deposit_walls(root: Node3D, steel_dark: Material, brass: Material) -> void:
+static func _deposit_walls(root: Node3D, steel_dark: Material, brass: Material, k: float) -> void:
+	var hx: float = half_x(k)
+	var dz: float = door_z(k)
 	var face: StandardMaterial3D = _metal(STEEL_LIGHT, 0.8, 0.35)
 	for side: float in [-1.0, 1.0]:
-		var x: float = side * (HALF_X - 0.12)
-		_vis(root, Vector3(0.16, 2.9, 5.0), Vector3(x + side * 0.02, 2.6, -4.3), steel_dark)
+		var x: float = side * (hx - 0.12)
+		_vis(root, Vector3(0.16, 2.9, 5.0), Vector3(x + side * 0.02, 2.6, dz + 3.2), steel_dark)
 		for row: int in 5:
 			for col: int in 8:
-				var z: float = -6.5 + 0.58 * float(col)
+				var z: float = dz + 1.0 + 0.58 * float(col)
 				var y: float = 1.45 + 0.54 * float(row)
 				_vis(root, Vector3(0.06, 0.46, 0.5), Vector3(x - side * 0.08, y, z), face)
 				_vis(root, Vector3(0.05, 0.06, 0.14), Vector3(x - side * 0.13, y, z + 0.12), brass)
@@ -213,9 +247,10 @@ static func _deposit_walls(root: Node3D, steel_dark: Material, brass: Material) 
 
 # --- Pillars, crates, gallery, lamps ------------------------------------------------------------
 
-static func _pillars(root: Node3D, brass: Material) -> void:
+static func _pillars(root: Node3D, brass: Material, k: float) -> void:
 	var marble: StandardMaterial3D = GreyboxKit.material(MARBLE.darkened(0.08), 0.0, 0.5)
-	for p: Vector3 in PILLARS:
+	for p0: Vector3 in PILLARS:
+		var p: Vector3 = flat(p0, k)
 		var solid: Node3D = GreyboxKit.cylinder(root, 0.42, WALL_H, p + Vector3(0, WALL_H * 0.5, 0), MARBLE, "Pillar")
 		(solid.get_node(^"Mesh") as MeshInstance3D).material_override = marble
 		if PropModels.has(&"column"):
@@ -232,11 +267,11 @@ static func _pillars(root: Node3D, brass: Material) -> void:
 
 
 ## Wooden crates banded in brass with gold bars stacked on top.
-static func _crates(root: Node3D, brass: Material) -> void:
+static func _crates(root: Node3D, brass: Material, k: float) -> void:
 	var wood: StandardMaterial3D = GreyboxKit.material(WOOD, 0.0, 0.8)
 	var bar: StandardMaterial3D = GreyboxKit.material(Color("#E8B84A"), 0.9, 0.25)
 	for c: Array in CRATES:
-		var at: Vector3 = c[0]
+		var at: Vector3 = flat(c[0], k)
 		var size: Vector3 = c[1]
 		var body: Node3D = GreyboxKit.box(root, size, at + Vector3(0, size.y * 0.5, 0), WOOD, "Crate")
 		(body.get_node(^"Mesh") as MeshInstance3D).material_override = wood
@@ -260,40 +295,43 @@ static func _crates(root: Node3D, brass: Material) -> void:
 				root.add_child(b)
 
 
-static func _gallery(root: Node3D, brass: Material) -> void:
-	var depth: float = BACK_Z - GALLERY_Z
-	var mid: float = GALLERY_Z + depth * 0.5
+static func _gallery(root: Node3D, brass: Material, k: float) -> void:
+	var hx: float = half_x(k)
+	var bz: float = back_z(k)
+	var gz: float = gallery_z(k)
+	var depth: float = bz - gz
+	var mid: float = gz + depth * 0.5
 	var carpet: StandardMaterial3D = _tex("velvet", 1.5, Palette.VIP_BURGUNDY.lightened(0.15), 0.4, 0.9)
-	_solid(root, Vector3(HALF_X * 2.0, GALLERY_H, depth), Vector3(0, GALLERY_H * 0.5, mid), GreyboxKit.material(STEEL_DARK, 0.6, 0.45), "Gallery")
+	_solid(root, Vector3(hx * 2.0, GALLERY_H, depth), Vector3(0, GALLERY_H * 0.5, mid), GreyboxKit.material(STEEL_DARK, 0.6, 0.45), "Gallery")
 	var rug := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(HALF_X * 2.0 - 0.6, depth - 0.5)
+	pm.size = Vector2(hx * 2.0 - 0.6, depth - 0.5)
 	rug.mesh = pm
 	rug.material_override = carpet
 	rug.position = Vector3(0, GALLERY_H + 0.012, mid + 0.1)
 	root.add_child(rug)
 	# Brass railing on the lip; an invisible wall up to head height keeps the two groups apart.
-	_vis(root, Vector3(HALF_X * 2.0, 0.08, 0.08), Vector3(0, GALLERY_H + 1.0, GALLERY_Z + 0.08), brass)
-	_vis(root, Vector3(HALF_X * 2.0, 0.05, 0.05), Vector3(0, GALLERY_H + 0.5, GALLERY_Z + 0.08), brass)
-	var x: float = -HALF_X + 0.4
-	while x < HALF_X:
-		_vis(root, Vector3(0.06, 1.0, 0.06), Vector3(x, GALLERY_H + 0.5, GALLERY_Z + 0.08), brass)
+	_vis(root, Vector3(hx * 2.0, 0.08, 0.08), Vector3(0, GALLERY_H + 1.0, gz + 0.08), brass)
+	_vis(root, Vector3(hx * 2.0, 0.05, 0.05), Vector3(0, GALLERY_H + 0.5, gz + 0.08), brass)
+	var x: float = -hx + 0.4
+	while x < hx:
+		_vis(root, Vector3(0.06, 1.0, 0.06), Vector3(x, GALLERY_H + 0.5, gz + 0.08), brass)
 		x += 0.8
-	_vis(root, Vector3(HALF_X * 2.0, 0.1, 0.12), Vector3(0, GALLERY_H - 0.05, GALLERY_Z + 0.02), brass)
+	_vis(root, Vector3(hx * 2.0, 0.1, 0.12), Vector3(0, GALLERY_H - 0.05, gz + 0.02), brass)
 	var wall := StaticBody3D.new()
 	wall.name = "GalleryBarrier"
 	var cs := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
-	shape.size = Vector3(HALF_X * 2.0, 3.6, 0.3)
+	shape.size = Vector3(hx * 2.0, 3.6, 0.3)
 	cs.shape = shape
 	wall.add_child(cs)
-	wall.position = Vector3(0, 1.8, GALLERY_Z)
+	wall.position = Vector3(0, 1.8, gz)
 	root.add_child(wall)
 	# Velvet couches against the back wall for the ones who are out.
 	if PropModels.has(&"couch"):
 		for cx: float in [-5.0, 0.0, 5.0]:
 			var couch: Node3D = PropModels.make(&"couch", 0.0, 2.4)
-			couch.position = Vector3(cx, GALLERY_H, BACK_Z - 0.75)
+			couch.position = Vector3(cx * k, GALLERY_H, bz - 0.75)
 			couch.rotation.y = PI
 			root.add_child(couch)
 	var sign := Label3D.new()
@@ -304,15 +342,18 @@ static func _gallery(root: Node3D, brass: Material) -> void:
 	sign.modulate = Palette.CREAM
 	sign.outline_size = 0
 	sign.shaded = true
-	sign.position = Vector3(0, GALLERY_H + 2.6, BACK_Z - 0.02)
+	sign.position = Vector3(0, GALLERY_H + 2.6, bz - 0.02)
 	sign.rotation.y = PI
 	root.add_child(sign)
 
 
 ## Warm brass pendant lamps over the floor and the gallery, sconces by the door.
-static func _lamps(root: Node3D, brass: Material) -> void:
+static func _lamps(root: Node3D, brass: Material, k: float) -> void:
+	var dz: float = door_z(k)
+	var bz: float = back_z(k)
 	var glow: StandardMaterial3D = Vfx.glow_material(Color(1.0, 0.85, 0.55))
-	for p: Vector3 in [Vector3(-4.0, 0, -3.0), Vector3(4.0, 0, -3.0), Vector3(-4.0, 0, 3.0), Vector3(4.0, 0, 3.0), Vector3(0, 0, 0)]:
+	for p0: Vector3 in [Vector3(-4.0, 0, -3.0), Vector3(4.0, 0, -3.0), Vector3(-4.0, 0, 3.0), Vector3(4.0, 0, 3.0), Vector3(0, 0, 0)]:
+		var p: Vector3 = flat(p0, k)
 		var y: float = 4.4 if p != Vector3.ZERO else 4.9
 		_vis(root, Vector3(0.03, WALL_H - y, 0.03), Vector3(p.x, (WALL_H + y) * 0.5, p.z), brass)
 		var shade := MeshInstance3D.new()
@@ -330,18 +371,18 @@ static func _lamps(root: Node3D, brass: Material) -> void:
 		var l: OmniLight3D = GreyboxKit.lamp(root, Vector3(p.x, y - 0.5, p.z), 2.2 if p != Vector3.ZERO else 2.8, 11.0, LAMP)
 		l.name = "VaultLamp"
 	for sx: float in [-4.2, 4.2]:
-		_vis(root, Vector3(0.3, 0.5, 0.15), Vector3(sx, 3.4, DOOR_Z + 0.08), brass)
-		var s := _sphere(root, 0.13, Vector3(sx, 3.75, DOOR_Z + 0.2), null)
+		_vis(root, Vector3(0.3, 0.5, 0.15), Vector3(sx, 3.4, dz + 0.08), brass)
+		var s := _sphere(root, 0.13, Vector3(sx, 3.75, dz + 0.2), null)
 		s.material_override = glow
-		GreyboxKit.lamp(root, Vector3(sx, 3.6, DOOR_Z + 0.8), 1.0, 6.0, LAMP)
+		GreyboxKit.lamp(root, Vector3(sx, 3.6, dz + 0.8), 1.0, 6.0, LAMP)
 	for gx: float in [-5.0, 0.0, 5.0]:
-		GreyboxKit.lamp(root, Vector3(gx, 4.2, BACK_Z - 1.5), 0.9, 7.0, LAMP)
+		GreyboxKit.lamp(root, Vector3(gx, 4.2, bz - 1.5), 0.9, 7.0, LAMP)
 	# A soft fill so the steel never goes black.
 	var fill := OmniLight3D.new()
-	fill.position = Vector3(0, 5.5, 1.5)
+	fill.position = Vector3(0, 5.5, 1.5 * k)
 	fill.light_color = Color(1.0, 0.9, 0.75)
 	fill.light_energy = 0.8
-	fill.omni_range = 20.0
+	fill.omni_range = 20.0 * k
 	root.add_child(fill)
 
 

@@ -1,16 +1,18 @@
 class_name BatHeistStage
 extends WalkableStage
-## Client presentation of Bat Heist in the vault arena (a `WalkableStage`: real avatars, the normal
-## camera). Every bean carries the casino's baseball bat in the right hand; E swings it (the server
-## decides the hit) and, held over a downed bean, steals their coins one by one, each coin flying
-## from the body to the thief. A coin badge (the casino's gold coin and the count) floats over every
-## other bean and drops onto the body with a pulsing "STEAL!" while they can be robbed. A brass
-## shimmer ring marks the immunity after getting up. The overlay shows the clock, our coins on a
-## plaque, the standings, a feed of hits and steals and a context prompt (swing / hold to steal).
+## Client presentation of Bat Heist in the big vault arena (a `WalkableStage`: real avatars, the
+## normal camera). Every bean carries the casino's baseball bat in the right hand; a left click
+## swings it (the server decides the hit; E does the same). Right click grabs the bean in front
+## (the casino's grab) and the next click throws them: they land knocked down like a bonk. Every
+## left click over a downed bean steals one coin, each coin flying from the body to the thief with
+## a cha-ching. A coin badge (the casino's gold coin and the count) floats over every other bean
+## and drops onto the body with a pulsing "STEAL!" while they can be robbed. A brass shimmer ring
+## marks the immunity after getting up. The overlay shows the clock, our coins on a plaque, the
+## standings, a feed of hits and steals and a context prompt (swing / grab / throw / click to steal).
 ##
-## Steal input: pressing E over a downed bean (or keeping E held when one comes into reach, e.g.
-## right after our own hit) sends `minigame_action {kind: "steal", target}` once; releasing E sends
-## `{kind: "steal_stop"}`. The server moves every coin (see `BatHeistLogic`).
+## Steal input: each click over a downed bean in reach sends `minigame_action {kind: "steal",
+## target}` (at most `STEAL_RATE` a second, the server's limit too). The server moves every coin
+## (see `BatHeistLogic`).
 
 const BAT_REACH: float = BatHeistLogic.BAT_REACH
 const STEAL_REACH: float = BatHeistLogic.STEAL_REACH
@@ -19,15 +21,12 @@ const GAME_SECONDS: float = BatHeistLogic.GAME_SECONDS
 ## Height of the coin badge over a standing bean, and over a body on the floor.
 const BADGE_UP: float = 2.62
 const BADGE_DOWN: float = 1.15
-## Don't resend a steal start more often than this while E stays held.
-const STEAL_RETRY: float = 0.3
+const STEAL_RATE: int = BatHeistLogic.STEAL_RATE
 
 var coins: Dictionary[int, int] = {}
 ## pid → seconds left down / immune (client estimates, corrected by the state).
 var down_left: Dictionary[int, float] = {}
 var immune_left: Dictionary[int, float] = {}
-## thief → target for the steals running now.
-var steals: Dictionary[int, int] = {}
 var clock: float = 0.0
 var done: bool = false
 var bats: Dictionary[int, Node3D] = {}
@@ -35,8 +34,8 @@ var badges: Dictionary[int, CoinBadge] = {}
 var shimmers: Dictionary[int, ImmunityShimmer] = {}
 var coin_plaque: PanelContainer = null
 var coin_label: Label = null
-var _holding: bool = false
-var _retry_in: float = 0.0
+## Our steal clicks in the last second (sent ones only: the server's limit, mirrored).
+var _steal_clicks: Array[float] = []
 var _cooldown: float = 0.0
 ## Our own swings shown at once: the server's echo then doesn't swing again.
 var _predicted_swing: float = -1.0
@@ -69,10 +68,6 @@ func apply_state(st: Dictionary) -> void:
 	var im: Dictionary = st.get("immune", {})
 	for k: Variant in im:
 		_set_immune(int(k), float(im[k]))
-	steals.clear()
-	var s: Dictionary = st.get("steals", {})
-	for k: Variant in s:
-		steals[int(k)] = int(s[k])
 	_refresh_status()
 
 
@@ -90,11 +85,35 @@ func can_act() -> bool:
 
 # --- Input --------------------------------------------------------------------------------------
 
-## E: steal from a downed bean in reach, else swing the bat. Holding is tracked in `_process`.
+## The big vault (`BatHeistLogic.ARENA_SCALE`), matching the server's layout.
+func _build_room() -> Node3D:
+	return VaultArena.build(self, BatHeistLogic.ARENA_SCALE)
+
+
+## E: the same as a left click.
 func on_action_pressed() -> bool:
+	return _click()
+
+
+## Left click: steal from a downed bean in reach, else swing the bat.
+func on_grab_pressed() -> bool:
+	return _click()
+
+
+## Right click: the casino's grab (the next click throws).
+func on_shove_pressed() -> bool:
 	if not can_act():
 		return going and not over
-	_holding = true
+	if scene != null:
+		scene.grab_in_front()
+	return true
+
+
+func _click() -> bool:
+	if holding():
+		return false  # the match scene throws the bean we hold
+	if not can_act():
+		return going and not over
 	var victim: int = steal_target()
 	if victim >= 0:
 		_send_steal(victim)
@@ -112,25 +131,22 @@ func on_action_pressed() -> bool:
 	return true
 
 
+## True while the local bean holds someone (the next click throws them).
+func holding() -> bool:
+	return scene != null and scene.local != null and scene._local_holding() >= 0
+
+
+## One steal click (dropped past `STEAL_RATE` a second: the server would refuse it anyway).
 func _send_steal(victim: int) -> void:
-	_retry_in = STEAL_RETRY
+	var now: float = Time.get_ticks_msec() / 1000.0
+	_steal_clicks = _steal_clicks.filter(func(t: float) -> bool: return t > now - 1.0)
+	if _steal_clicks.size() >= STEAL_RATE:
+		return
+	_steal_clicks.append(now)
+	var me: PlayerAvatar = local_avatar()
+	if me != null:
+		me.visuals.react(&"grab")
 	Net.send_intent(Intents.make(&"minigame_action", {"kind": &"steal", "target": victim}))
-
-
-func _poll_hold(delta: float) -> void:
-	if not _holding:
-		return
-	_retry_in -= delta
-	var held: bool = Input.is_action_pressed(&"interact") and can_act()
-	if not held:
-		_holding = false
-		if steals.has(local_id):
-			Net.send_intent(Intents.make(&"minigame_action", {"kind": &"steal_stop"}))
-		return
-	if not steals.has(local_id) and _retry_in <= 0.0:
-		var victim: int = steal_target()
-		if victim >= 0:
-			_send_steal(victim)
 
 
 ## The downed, non-immune bean nearest to us within steal reach (any direction), or -1.
@@ -192,21 +208,11 @@ func on_event(ev: Dictionary) -> void:
 				if who == local_id:
 					set_prompt("")
 		&"bat_heist_hit":
-			_on_hit(int(ev["player"]), int(ev["target"]), float(ev.get("seconds", BatHeistLogic.KNOCK_SECONDS)))
+			_on_hit(int(ev["player"]), int(ev["target"]), float(ev.get("seconds", BatHeistLogic.KNOCK_SECONDS)), StringName(ev.get("cause", &"bat")))
 		&"bat_heist_up":
 			var p: int = int(ev["player"])
 			down_left.erase(p)
-			_end_steals_on(p)
 			_set_immune(p, float(ev.get("immune", BatHeistLogic.IMMUNE_SECONDS)))
-		&"bat_heist_steal_start":
-			steals[int(ev["player"])] = int(ev["target"])
-			var thief: PlayerAvatar = avatar(int(ev["player"]))
-			if thief != null:
-				thief.visuals.react(&"grab")
-			if int(ev["target"]) == local_id:
-				banner("THEY'RE ROBBING YOU!", Palette.LOSS_RED, 0.9)
-		&"bat_heist_steal_end":
-			steals.erase(int(ev["player"]))
 		&"bat_heist_stole":
 			_on_stole(int(ev["player"]), int(ev["target"]), ev.get("coins", {}))
 		&"minigame_eliminated":
@@ -215,8 +221,6 @@ func on_event(ev: Dictionary) -> void:
 				_drop_player(int(p))
 		&"bat_heist_over":
 			done = true
-			_holding = false
-			steals.clear()
 			var c: Dictionary = ev.get("coins", {})
 			for k: Variant in c:
 				_set_coins(int(k), int(c[k]))
@@ -224,12 +228,18 @@ func on_event(ev: Dictionary) -> void:
 	_refresh_status()
 
 
-func _on_hit(by: int, target: int, seconds: float) -> void:
+func _on_hit(by: int, target: int, seconds: float, cause: StringName = &"bat") -> void:
 	down_left[target] = seconds
 	immune_left.erase(target)
-	_end_steals_on(target)
 	var ta: PlayerAvatar = avatar(target)
 	var ba: PlayerAvatar = avatar(by)
+	if cause == &"throw":
+		feed("%s  threw  %s" % [player_name(by), player_name(target)], player_color(by))
+		if target == local_id:
+			banner("THROWN! GET UP!", Palette.LOSS_RED, 1.0)
+		elif by == local_id:
+			banner("DOWN! CLICK FAST TO STEAL!", Palette.MONEY_GREEN, 1.0)
+		return
 	if ta != null:
 		var at: Vector3 = ta.global_position + Vector3(0, 1.1, 0)
 		HitPop.at(self, at, 1.4)
@@ -243,7 +253,7 @@ func _on_hit(by: int, target: int, seconds: float) -> void:
 		if scene != null:
 			scene._juice(0.05, 0.4)
 	elif by == local_id:
-		banner("BONK! HOLD %s TO STEAL" % InputGlyphs.fill("{interact}"), Palette.MONEY_GREEN, 1.0)
+		banner("BONK! CLICK FAST TO STEAL!", Palette.MONEY_GREEN, 1.0)
 		if scene != null:
 			scene._juice(0.04, 0.15)
 
@@ -256,6 +266,10 @@ func _on_stole(thief: int, victim: int, now: Dictionary) -> void:
 	_fly_coin(from, ta)
 	if ta != null:
 		Audio.play_at(&"coin", ta, -4.0 if thief == local_id or victim == local_id else -10.0, randf_range(1.0, 1.25))
+		if thief == local_id:
+			Audio.play(&"cash_register", &"SFX", -9.0, randf_range(1.05, 1.3))  # cha-ching
+		elif victim == local_id:
+			banner("THEY'RE ROBBING YOU!", Palette.LOSS_RED, 0.6)
 		Vfx.floating_text(self, ta.global_position + Vector3(0, 2.0, 0), "+1", Palette.MONEY_GREEN, 80, 0.7, 0.8)
 	Vfx.floating_text(self, from + Vector3(0, 0.4, 0), "-1", Palette.LOSS_RED, 70, 0.6, 0.8)
 	if thief == local_id or victim == local_id:
@@ -314,7 +328,6 @@ func _process(delta: float) -> void:
 		immune_left[p] -= delta
 		if immune_left[p] <= 0.0:
 			immune_left.erase(p)
-	_poll_hold(delta)
 	_update_props()
 	_update_view_bat()
 	_update_plaque(delta)
@@ -330,16 +343,18 @@ func _update_prompt() -> void:
 	if down_left.has(local_id):
 		set_prompt("")
 		return
-	if steals.has(local_id):
-		set_prompt("STEALING FROM %s!  KEEP HOLDING [{interact}]" % player_name(steals[local_id]).to_upper())
+	if holding():
+		set_prompt("[{grab}] THROW!")
 		return
 	var victim: int = steal_target()
 	if victim >= 0:
-		set_prompt("HOLD [{interact}] TO STEAL FROM %s" % player_name(victim).to_upper())
+		set_prompt("CLICK FAST TO STEAL!  [{grab}]")
 		return
 	var t: int = swing_target()
 	if t >= 0 and _cooldown <= 0.0:
-		set_prompt("SWING AT %s!  [{interact}]" % player_name(t).to_upper())
+		set_prompt("[{grab}] SWING AT %s   [{shove}] GRAB" % player_name(t).to_upper())
+	elif t >= 0:
+		set_prompt("[{shove}] GRAB %s" % player_name(t).to_upper())
 	else:
 		set_prompt("")
 
@@ -426,18 +441,10 @@ func _set_coins(p: int, c: int) -> void:
 		badges[p].set_count(c)
 
 
-func _end_steals_on(target: int) -> void:
-	for thief: int in steals.keys():
-		if steals[thief] == target:
-			steals.erase(thief)
-
-
 func _drop_player(p: int) -> void:
 	coins.erase(p)
 	down_left.erase(p)
 	immune_left.erase(p)
-	steals.erase(p)
-	_end_steals_on(p)
 	for d: Dictionary in [badges, shimmers]:
 		if d.has(p) and is_instance_valid(d[p]):
 			(d[p] as Node).queue_free()

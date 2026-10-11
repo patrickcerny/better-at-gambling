@@ -19,7 +19,7 @@ const CARD_Z: float = 0.0
 ## How far the two cards of a swap bow apart (one towards the camera, one away).
 const SWAP_ARC: float = 0.3
 const SWAP_LIFT: float = 0.03
-const DEAL_SLIDE: float = 0.32
+const DEAL_SLIDE: float = 0.24
 ## A pick the server never confirmed (refused on the way) is given back after this long.
 const PICK_CONFIRM_TIMEOUT: float = 1.5
 const MAX_CHIPS_PER_COLUMN: int = 4
@@ -203,16 +203,16 @@ func _deal_round(n: int, lady: int, animate: bool) -> void:
 	var turn_down: float = 0.0
 	for c: TableCard3D in cards:
 		if c.face_up_t > 0.01:
-			turn_down = 0.24
-			_deal_tween.tween_property(c, ^"face_up_t", 0.0, 0.24)
+			turn_down = 0.16
+			_deal_tween.tween_property(c, ^"face_up_t", 0.0, 0.16)
 	_deal_tween.chain().tween_callback(_set_faces.bind(lady))
 	for i: int in n:
 		var from_dealer: bool = i >= was
-		var delay: float = 0.08 * float(i) + (0.15 if from_dealer else 0.0)
+		var delay: float = 0.05 * float(i) + (0.1 if from_dealer else 0.0)
 		_deal_tween.tween_property(cards[i], ^"position", slot_point(i), DEAL_SLIDE).set_delay(delay).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_deal_tween.chain().tween_interval(0.05)
 	for i: int in n:
-		_deal_tween.tween_property(cards[i], ^"face_up_t", 1.0, 0.3).set_delay(0.09 * float(i))
+		_deal_tween.tween_property(cards[i], ^"face_up_t", 1.0, 0.2).set_delay(0.05 * float(i))
 	_deal_tween.chain().tween_callback(func() -> void:
 		if lady < cards.size():
 			cards[lady].set_glow(0.9)

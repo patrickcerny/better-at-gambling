@@ -21,18 +21,18 @@ const ROUNDS: int = 5
 const FOURTH_CARD_ROUND: int = 3
 ## Lucky greets the table before the first round (the stage only exists once the curtain
 ## closed, so round 1 must not start in the same tick as setup).
-const INTRO_TIME: float = 1.2
-const SHOW_TIME: float = 2.4
+const INTRO_TIME: float = 0.8
+const SHOW_TIME: float = 1.5
 ## Turning the cards face down before the first swap.
 const FLIP_TIME: float = 0.6
 ## A beat after the last swap before the pick window opens.
 const SETTLE_TIME: float = 0.35
-const REVEAL_TIME: float = 3.6
-const OUTRO_TIME: float = 3.0
+const REVEAL_TIME: float = 2.4
+const OUTRO_TIME: float = 2.0
 ## Per round: number of swaps, seconds per swap and the pick window (all getting tighter).
-const SWAP_COUNTS: Array[int] = [5, 7, 9, 11, 13]
-const SWAP_TIMES: Array[float] = [0.5, 0.42, 0.34, 0.28, 0.23]
-const PICK_TIMES: Array[float] = [7.0, 6.5, 6.0, 5.5, 5.0]
+const SWAP_COUNTS: Array[int] = [6, 8, 10, 12, 15]
+const SWAP_TIMES: Array[float] = [0.36, 0.3, 0.25, 0.21, 0.17]
+const PICK_TIMES: Array[float] = [5.0, 4.5, 4.0, 3.5, 3.0]
 const BASE_POINTS: int = 500
 const SPEED_POINTS: int = 500
 ## Share of swaps that move the Queen (the rest are decoys between the other cards).
