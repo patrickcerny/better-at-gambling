@@ -10,6 +10,10 @@ var slack: float = 1.5
 ## Playable volume (the casino, the start room, the porch and the VIP lounge behind the north
 ## wall, with some margin).
 var bounds: AABB = AABB(Vector3(-23.5, -3.0, -27.5), Vector3(47.0, 13.0, 49.5))
+## Extra playable volumes while they are open: a walkable minigame room far from the casino
+## (`WalkableLogicBase.ROOM_ORIGIN`). Without it every move in the room was "off the map" and the
+## client snapped back to its spawn (0.9.2: stuck at the start of Pass the Bomb).
+var extra_bounds: Array[AABB] = []
 
 var _last_pos: Dictionary[int, Vector3] = {}
 var _last_time: Dictionary[int, float] = {}
@@ -18,7 +22,7 @@ var _grace_until: Dictionary[int, float] = {}
 
 ## Accepts or rejects a reported position at server time `now`. Returns true if accepted.
 func check(player: int, pos: Vector3, now: float) -> bool:
-	if not bounds.has_point(pos) or not pos.is_finite():
+	if not pos.is_finite() or not in_bounds(pos):
 		return false
 	if not _last_pos.has(player) or now < _grace_until.get(player, -INF):
 		_accept(player, pos, now)
@@ -31,6 +35,25 @@ func check(player: int, pos: Vector3, now: float) -> bool:
 		return false
 	_accept(player, pos, now)
 	return true
+
+
+## True if `pos` is inside the casino volume or an open extra volume (a minigame room).
+func in_bounds(pos: Vector3) -> bool:
+	if bounds.has_point(pos):
+		return true
+	for box: AABB in extra_bounds:
+		if box.has_point(pos):
+			return true
+	return false
+
+
+## A walkable minigame room opened: moves inside `box` are plausible until `close_room`.
+func open_room(box: AABB) -> void:
+	extra_bounds = [box]
+
+
+func close_room() -> void:
+	extra_bounds.clear()
 
 
 ## The server moved the player itself (respawn, seat, got up): accept anything for `seconds`.

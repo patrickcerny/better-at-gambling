@@ -45,6 +45,19 @@ func test_everyone_is_teleported_to_their_spawn_in_the_room() -> void:
 	assert_true(fx.server.get_snapshot()["minigame"].has("room"), "late joiners get the room too")
 
 
+## Online moves run through the move sanity check, whose map volume is the casino. The room is
+## 200 m away: before 0.9.3 every step there was "off the map" and the client snapped back to its
+## spawn (Patrick: "can't move in Pass the Bomb").
+func test_walking_inside_the_room_is_a_normal_move_online() -> void:
+	var g: PassTheBombLogic = _to_minigame()
+	var p: int = fx.player_ids[0]
+	var step: Vector3 = g.spawn_for(p) + Vector3(0.3, 0.0, 0.2)
+	assert_true(g.arena.has_point(step), "a step inside the arena")
+	assert_true(fx.server.sanity.in_bounds(step), "the room is on the map while it is open")
+	assert_true(fx.server.apply_move(p, step, 0.0, false), "the step is accepted")
+	assert_eq(fx.server.world.get_position(p), step)
+
+
 func test_positions_are_clamped_to_the_arena() -> void:
 	var g: PassTheBombLogic = _to_minigame()
 	var p: int = fx.player_ids[0]
@@ -142,4 +155,5 @@ func test_everyone_is_back_in_the_hall_after_the_game() -> void:
 	var p0: int = fx.player_ids[0]
 	var hall: Vector3 = fx.server.map_def.lobby_spawn(p0)
 	assert_true(fx.server.apply_move(p0, hall + Vector3(0.3, 0, 0), 0.0, false), "free to walk in the hall")
+	assert_false(fx.server.sanity.in_bounds(g.spawn_for(p0)), "the room is off the map again")
 	assert_ne(fx.intent(p0, &"megaphone")["error"], &"minigame")

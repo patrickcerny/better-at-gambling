@@ -1,8 +1,9 @@
 class_name MinigameDirector
 extends RefCounted
 ## Picks and runs the minigame between casino segments (§2.9): weighted random among the
-## registered minigames without an immediate repeat (V1: only the quiz is registered), feeds it
-## the server clock and intents, and hands its ranking to the reward phase.
+## registered minigames as a shuffled bag: no game comes a second time before every other game
+## this many players can play has come once (Patrick, 0.9.2 playtest), and never twice in a row.
+## Feeds it the server clock and intents, and hands its ranking to the reward phase.
 
 var defs: Array[MinigameDefinition] = []
 var bank: QuestionBank
@@ -11,6 +12,8 @@ var used_questions: Dictionary = {}
 var current: MinigameLogicBase = null
 var current_def: MinigameDefinition = null
 var _last_id: StringName = &""
+## Games played since the bag was last refilled.
+var _played: Dictionary[StringName, bool] = {}
 
 
 func _init(p_defs: Array[MinigameDefinition], p_bank: QuestionBank) -> void:
@@ -28,10 +31,17 @@ func pick(rng: SeededRng, player_count: int = 2) -> MinigameDefinition:
 	if defs.is_empty():
 		return null
 	var playable: Array[MinigameDefinition] = defs.filter(func(d: MinigameDefinition) -> bool: return player_count >= d.min_players)
-	# No immediate repeat, unless it is the only one this many players can play (solo practice).
-	var pool: Array[MinigameDefinition] = playable.filter(func(d: MinigameDefinition) -> bool: return d.id != _last_id or playable.size() == 1)
-	if pool.is_empty():
+	if playable.is_empty():
 		return null
+	# The bag: games not played since the last refill. Empty (everyone has come) -> refill.
+	var pool: Array[MinigameDefinition] = playable.filter(func(d: MinigameDefinition) -> bool: return not _played.has(d.id))
+	if pool.is_empty():
+		_played.clear()
+		pool = playable
+	# Never the same game twice in a row (a fresh bag could start with the one just played), unless
+	# it is the only one this many players can play (solo practice).
+	if pool.size() > 1:
+		pool = pool.filter(func(d: MinigameDefinition) -> bool: return d.id != _last_id)
 	var weights: Array = []
 	for d: MinigameDefinition in pool:
 		weights.append(maxf(d.weight, 0.0))
@@ -44,11 +54,17 @@ func begin(players: Array[int], rng: SeededRng, balance: BalanceConfig, stats: D
 	current_def = pick(rng, players.size())
 	if current_def == null or current_def.logic_script == null:
 		return null
-	_last_id = current_def.id
+	record(current_def)
 	current = current_def.logic_script.new() as MinigameLogicBase
 	current.half_rtt = half_rtt
 	current.setup(players, rng, balance, current_def.params, {"bank": bank, "used": used_questions, "stats": stats})
 	return current
+
+
+## Remembers `def` as played: out of the bag until every other playable game has come.
+func record(def: MinigameDefinition) -> void:
+	_last_id = def.id
+	_played[def.id] = true
 
 
 ## Ends the current minigame.
@@ -62,3 +78,4 @@ func reset() -> void:
 	current = null
 	current_def = null
 	_last_id = &""
+	_played.clear()

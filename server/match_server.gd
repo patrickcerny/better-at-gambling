@@ -183,6 +183,7 @@ func _build_match_systems(seed_value: int) -> void:
 	minigames.reset()
 	minigame = null
 	_room = null
+	sanity.close_room()
 	rewards = RewardDirector.new()
 	_comped.clear()
 	results_return_in = -1.0
@@ -569,6 +570,7 @@ func _refund_and_stand_everyone() -> void:
 ## `regroup_time` seconds. `regroup_started {seconds, positions: {player: [x, y, z]}}`.
 func _start_regroup() -> void:
 	_room = null  # the walkable room (if any) closes: everyone goes back to the hall below
+	sanity.close_room()
 	interactions.regroup()
 	_flush()
 	var positions: Dictionary = {}
@@ -1433,6 +1435,7 @@ func _clamp_position(player: int, pos: Vector3) -> Vector3:
 func _open_room(wl: WalkableLogicBase) -> Dictionary:
 	_room = wl
 	wl.world = world
+	sanity.open_room(wl.arena.merge(wl.gallery).grow(2.0))  # moves in the room are on the map
 	interactions.regroup()
 	for id: int in wl.players:
 		_server_owned.erase(id)
