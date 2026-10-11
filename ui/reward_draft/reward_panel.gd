@@ -180,6 +180,7 @@ func _build_row(row: Dictionary) -> Dictionary:
 	rarity.theme_type_variation = &"SmallLabel"
 	rarity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cv.add_child(rarity)
+	card_box.visible = shows_items(state.lobby_settings if state != null else {})
 	h.add_child(card_box)
 	var comp := Label.new()
 	comp.theme_type_variation = &"SmallLabel"
@@ -190,6 +191,12 @@ func _build_row(row: Dictionary) -> Dictionary:
 	h.add_child(comp)
 	rows_box.add_child(framed)
 	return {"data": row, "card": card, "rarity": rarity, "cash": cash, "comp": comp, "flip_at": 0.0, "flipped": false}
+
+
+## False when the match hands out no items (Minigames Only, or items off): the rows then show
+## only the cash, without an empty item card.
+static func shows_items(settings: Dictionary) -> bool:
+	return not MatchMode.is_minigames_only(settings) and bool(settings.get("items_enabled", true))
 
 
 static func item_name(id: StringName) -> String:

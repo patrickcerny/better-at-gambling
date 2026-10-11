@@ -1809,6 +1809,8 @@ func _minigames_only() -> bool:
 func _apply_mode_hud() -> void:
 	if hud != null and hud.timer_label != null:
 		hud.timer_label.visible = not _minigames_only() or view.state.phase == Phase.Id.LOBBY
+	if hud != null and hud.items != null:
+		hud.items.visible = not _minigames_only()  # no items in this mode: no empty slots
 
 
 ## Late join: true if we were in the minigame running (or just played) when we arrived. The
