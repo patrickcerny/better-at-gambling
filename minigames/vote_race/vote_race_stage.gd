@@ -2,11 +2,14 @@ class_name VoteRaceStage
 extends MinigameStage
 ## Client presentation for Vote Race as a lit game-show set: a bulb marquee with the question, a
 ## cream candidate card per racer (their steps as pips; the leader under a warm spotlight), a
-## countdown bar and the race to the cashier along the bottom. You vote by clicking a card or
-## pressing its number. While a round is voting only THAT someone voted shows ("VOTED" badges);
-## who voted for whom appears at the server's reveal (`vote_race_reveal`): every voter's name chip
-## in their colour flies from their own card onto the card they picked (0.1 s apart, yours ringed
-## in gold), the tallies count up, then the cards with zero votes pop and step forward.
+## countdown bar, and under them the race itself in 3D (`VoteRaceTrack`): a red-carpet runway
+## with a lane per racer, a puppet bean per player on their step and the CASHIER window at step 5.
+## You vote by clicking a card or pressing its number; the card you picked gets a check badge.
+## While a round is voting only THAT someone voted shows ("VOTED" badges); who voted for whom
+## appears at the server's reveal (`vote_race_reveal`): every voter's name chip in their colour
+## flies from their own card onto the card they picked (0.1 s apart, yours ringed in gold) while
+## an arc of beads runs between their beans on the track and the camera pushes in; then the
+## zero-vote cards pop and their beans hop a plate forward.
 ##
 ## The stage is built behind the minigame curtain, after the server already sent
 ## `vote_race_started` / the first `vote_race_round`, so it starts in round 1's vote on its own
@@ -20,6 +23,7 @@ const VOTE_CONFIRM_TIMEOUT: float = 1.5
 const CARD_MIN_W: float = 170.0
 const CARD_MAX_W: float = 290.0
 const CARD_GAP: float = 22.0
+const CARD_H: float = 300.0
 
 const BLACK_FONT: Font = preload("res://assets/fonts/BarlowCondensed-Black.ttf")
 const BOLD_FONT: Font = preload("res://assets/fonts/BarlowCondensed-ExtraBold.ttf")
@@ -61,6 +65,7 @@ var _reveal_tween: Tween = null
 var _reveal_paid: bool = true
 var _vote_sent_at: float = -1.0
 var _clock: float = 0.0
+var _track_key: String = ""
 ## How intents leave (tests swap it).
 var send_intent: Callable = func(i: Dictionary) -> Dictionary: return Net.send_intent(i)
 
@@ -73,6 +78,12 @@ func _build(start: Dictionary) -> void:
 	voting = true
 	var hold: Variant = start.get("briefing", 0.0)
 	held = (hold is Dictionary) or float(hold) > 0.0
+	track = VoteRaceTrack.new()
+	track.name = "Track"
+	track.track_length = TRACK_LENGTH
+	track.local_id = local_id
+	add_child(track)
+	camera = track.camera
 	_build_ui()
 	_rebuild_cards()
 	if state != null and state.minigame.has("racing") and state.minigame.has("track"):
@@ -144,16 +155,17 @@ func _build_ui() -> void:
 
 	cards_row = HBoxContainer.new()
 	cards_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	cards_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cards_row.custom_minimum_size = Vector2(0, CARD_H)
 	cards_row.add_theme_constant_override(&"separation", int(CARD_GAP))
 	cards_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cards_row.resized.connect(_size_cards)
 	col.add_child(cards_row)
 
-	track = VoteRaceTrack.new()
-	track.track_length = TRACK_LENGTH
-	track.local_id = local_id
-	col.add_child(track)
+	# The 3D runway shows through here.
+	var gap := Control.new()
+	gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(gap)
 
 	status_label = _label("", BOLD_FONT, 32, Palette.CREAM)
 	status_label.add_theme_color_override(&"font_shadow_color", Color(0, 0, 0, 0.6))
@@ -221,9 +233,8 @@ func _rebuild_cards() -> void:
 		card.chip_landed.connect(_on_chip_landed)
 		cards_row.add_child(card)
 		cards[p] = card
-		var nm: String = _name(p)
-		track.set_racer(p, display_steps.get(p, 0), _color(p), nm.left(1).to_upper() if nm != "" else "?")
 	_size_cards()
+	_sync_track()
 
 
 ## Card width from the room there is: 2 to 8 cards always fit in one row.
@@ -232,7 +243,7 @@ func _size_cards() -> void:
 	var avail: float = cards_row.size.x if cards_row.size.x > 0.0 else 1824.0
 	var w: float = clampf((avail - CARD_GAP * float(n - 1)) / float(n), CARD_MIN_W, CARD_MAX_W)
 	for c: VoteRaceCard in cards.values():
-		c.custom_minimum_size = Vector2(w, 0)
+		c.custom_minimum_size = Vector2(w, CARD_H)
 	_update_spots.call_deferred()
 
 
@@ -258,7 +269,7 @@ func _refresh() -> void:
 		card.finished_place = finish_place.get(p, 0) if display_steps.get(p, 0) >= TRACK_LENGTH or over else 0
 		card.key_hint = str(targets.find(p) + 1) if p in targets and targets.find(p) < 9 else ""
 		card.refresh()
-		track.set_racer(p, display_steps.get(p, 0), _color(p), track.racers.get(p, {}).get("initial", "?"))
+	_sync_track()
 	round_label.text = "ROUND %d" % (round_num + 1)
 	voted_label.text = "%d/%d VOTED" % [voted_count, racing.size()] if voting else ""
 	_update_marquee()
@@ -308,7 +319,7 @@ func _update_status() -> void:
 		elif held:
 			text = "Get ready - the vote opens when everyone is ready."
 		elif my_vote >= 0:
-			text = "You secretly voted for %s" % _name(my_vote)
+			text = ""  # the ✓ on the card you picked says it
 		else:
 			text = "Click a card or press 1-%d: who should NOT step forward?" % vote_targets().size()
 	elif not reveal.is_empty() and _reveal_paid:
@@ -355,6 +366,37 @@ func _update_spots() -> void:
 		if cards[p].spotlit != lit_now:
 			cards[p].spotlit = lit_now
 			cards[p].refresh()
+
+
+## Lanes for everyone in the race (racing, at the cashier, or all of them once it is over); the
+## rest of the table (out of the race, watching) sits on the couch.
+func _sync_track() -> void:
+	if track == null:
+		return
+	var lanes: Array[int] = []
+	var bench: Array[int] = []
+	for p: int in players_list:
+		if over or p in racing or finish_place.has(p) or display_steps.get(p, 0) >= TRACK_LENGTH:
+			lanes.append(p)
+		else:
+			bench.append(p)
+	if state != null:
+		var rest: Array[int] = _ints(state.players.keys())
+		rest.sort()
+		for p: int in rest:
+			if p not in players_list:
+				bench.append(p)
+	var key: String = "%s|%s|%s" % [lanes, bench, display_steps]
+	if key == _track_key:
+		return
+	_track_key = key
+	var info: Dictionary = {}
+	for p: int in lanes + bench:
+		var skin: String = "bean"
+		if state != null and state.players.has(p):
+			skin = String(state.players[p].get("skin", "bean"))
+		info[p] = {"name": _name(p), "color": _color(p), "skin": skin, "steps": display_steps.get(p, 0)}
+	track.set_racers(lanes, bench, info)
 
 
 func _winner() -> int:
@@ -542,6 +584,9 @@ func _clear_reveal() -> void:
 	_reveal_tween = null
 	reveal = {}
 	_reveal_paid = true
+	if track != null:
+		track.clear_votes()
+		track.push_in(false)
 	for c: VoteRaceCard in cards.values():
 		c.clear_chips()
 		c.stamp_text = ""
@@ -573,9 +618,11 @@ func _show_reveal(rev: Dictionary, instant: bool) -> void:
 		var label: String = "YOU" if voter == local_id else _name(voter)
 		target.add_chip(label, _color(voter), voter == local_id, from, CHIP_STAGGER * float(i), instant)
 		i += 1
+	track.show_votes(cast, CHIP_STAGGER, instant)
 	if instant:
 		_reveal_payoff(false)
 		return
+	track.push_in(true)
 	_reveal_tween = create_tween()
 	_reveal_tween.tween_interval(CHIP_STAGGER * float(maxi(i - 1, 0)) + VoteRaceCard.FLIGHT_TIME + 0.2)
 	_reveal_tween.tween_callback(_reveal_payoff.bind(true))
@@ -609,6 +656,7 @@ func _reveal_payoff(animate: bool) -> void:
 	var done: Array[int] = _ints(reveal.get("finished", []))
 	for p: int in moved:
 		display_steps[p] = positions.get(p, display_steps.get(p, 0))
+		track.set_step(p, display_steps[p], animate)
 		var card: VoteRaceCard = cards.get(p, null)
 		if card == null:
 			continue
@@ -631,6 +679,7 @@ func _reveal_payoff(animate: bool) -> void:
 
 
 ## The final ranking on the cards: a place stamp on everyone, the winner pops in the spotlight.
+## On the track the winner cheers by the cashier and the last two slump.
 func _show_result() -> void:
 	for row: Variant in ranking:
 		var r: Dictionary = row
@@ -644,6 +693,8 @@ func _show_result() -> void:
 		card.stamp_text = "WINNER" if rank == 1 else "#%d" % rank
 		card.stamp_color = Palette.WARM_GOLD.darkened(0.35) if rank == 1 else Palette.WARM_CHARCOAL
 	_refresh()
+	track.land_all()
+	track.show_result(ranking)
 	var top: VoteRaceCard = cards.get(_winner(), null)
 	if top != null:
 		top.pop(0.16)

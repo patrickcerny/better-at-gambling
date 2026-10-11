@@ -22,6 +22,18 @@ func _ready() -> void:
 	logic = VoteRaceLogic.new()
 	logic.setup(ids, SeededRng.new(1), BalanceConfig.new(), {}, {})
 	logic.drain_events()
+	var env := WorldEnvironment.new()  # the casino's environment, roughly
+	var e := Environment.new()
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Palette.CASINO_BLACK
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	e.ambient_light_color = Color(1.0, 0.85, 0.65)
+	e.ambient_light_energy = 0.35
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.glow_enabled = true
+	e.glow_intensity = 0.4
+	env.environment = e
+	add_child(env)
 	stage = VoteRaceStage.new()
 	stage.send_intent = func(i: Dictionary) -> Dictionary: return logic.submit(1, i, 0.0)
 	add_child(stage)

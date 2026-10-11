@@ -2,7 +2,8 @@ extends GutTest
 ## Vote Race stage fed by the real logic's events and private state (the schema contract), built
 ## the way the match scene builds it: AFTER the opening events (`vote_race_started`, the first
 ## `vote_race_round`) already went out behind the curtain. The first vote must still count; the
-## reveal shows every voter's name chip on the card they picked; the result names the winner.
+## reveal shows every voter's name chip on the card they picked and a vote arc between the beans on
+## the 3D track; zero-vote beans hop a plate forward; the result names the winner.
 
 var logic: VoteRaceLogic
 var stage: VoteRaceStage
@@ -98,7 +99,9 @@ func test_first_click_counts() -> void:
 	assert_eq(stage.my_vote, 3)
 	assert_false(stage.can_act(), "one vote per round")
 	assert_true((stage.cards[3] as VoteRaceCard).is_my_vote)
-	assert_string_contains(stage.status_label.text, "Cy")
+	assert_true((stage.cards[3] as VoteRaceCard).check_badge.visible, "a check on the card you picked")
+	assert_false((stage.cards[2] as VoteRaceCard).check_badge.visible)
+	assert_eq(stage.status_label.text, "", "no floating 'you voted for' line")
 
 
 func test_first_key_counts() -> void:
@@ -279,3 +282,121 @@ func test_eight_cards_fit_side_by_side() -> void:
 		assert_gt(rects[i].size.x, 150.0)
 		for j: int in range(i + 1, rects.size()):
 			assert_false(rects[i].intersects(rects[j]), "cards %d and %d overlap" % [i, j])
+
+
+# --- The 3D track ------------------------------------------------------------------------------
+
+func _bean_x(p: int) -> float:
+	return (stage.track.beans[p]["root"] as Node3D).position.x
+
+
+func _on_step(p: int, step: int) -> void:
+	var tr: VoteRaceTrack = stage.track
+	assert_eq(int(tr.beans[p]["step"]), step, "bean %d on step %d" % [p, step])
+	var want: float = tr.step_x(step) - (0.55 if step == 0 else 0.0)
+	assert_almost_eq(_bean_x(p), want, 0.01, "bean %d stands on plate %d" % [p, step])
+
+
+func test_track_has_a_bean_per_racer_on_the_start() -> void:
+	var tr: VoteRaceTrack = stage.track
+	assert_eq(stage.camera, tr.camera, "the stage films the track")
+	assert_eq(tr.lanes, [1, 2, 3, 4, 5] as Array[int])
+	assert_true(tr.benched.is_empty())
+	var zs: Array[float] = []
+	for p: int in [1, 2, 3, 4, 5]:
+		_on_step(p, 0)
+		var bean: AvatarVisuals = tr.beans[p]["bean"]
+		assert_not_null(bean.get_node_or_null("Puppet"), "a puppet bean")
+		var z: float = (tr.beans[p]["root"] as Node3D).position.z
+		assert_false(z in zs, "own lane")
+		zs.append(z)
+	assert_eq((tr.beans[1]["tag"] as Label3D).text, "YOU")
+	assert_eq((tr.beans[2]["tag"] as Label3D).text, "BO")
+	assert_false(tr.cashier_lit)
+
+
+func test_step_forward_hops_the_zero_vote_beans() -> void:
+	(stage.cards[2] as VoteRaceCard).pressed.emit()
+	_others_vote({2: 3, 3: 2, 4: 5, 5: 2})
+	for p: int in [1, 2, 3, 4, 5]:
+		_on_step(p, 0)  # nothing moves before the chips land
+	await wait_seconds(1.2 + VoteRaceTrack.HOP_TIME)
+	for p: int in [1, 4]:
+		_on_step(p, 1)
+	for p: int in [2, 3, 5]:
+		_on_step(p, 0)
+
+
+func test_skipping_the_reveal_puts_beans_in_place() -> void:
+	(stage.cards[2] as VoteRaceCard).pressed.emit()
+	_others_vote({2: 3, 3: 2, 4: 5, 5: 2})
+	stage.skip_reveal()
+	stage.track.land_all()
+	_on_step(1, 1)
+	_on_step(4, 1)
+	_on_step(2, 0)
+
+
+func test_reveal_draws_who_voted_for_whom() -> void:
+	(stage.cards[2] as VoteRaceCard).pressed.emit()
+	_others_vote({2: 3, 3: 2, 4: 5, 5: 2})
+	var pairs: Array = []
+	for a: Dictionary in stage.track.vote_arcs:
+		pairs.append([a["voter"], a["target"]])
+		assert_true(is_instance_valid(a["node"]))
+	assert_eq(pairs, [[1, 2], [2, 3], [3, 2], [4, 5], [5, 2]])
+	logic.tick(VoteRaceLogic.REVEAL_TIME + 0.01, 0.0)
+	_pump()
+	assert_eq(stage.track.vote_arcs.size(), 0, "the next round clears the arcs")
+
+
+func test_reaching_the_cashier_is_a_win_pose() -> void:
+	_make(4, {})
+	for i: int in VoteRaceLogic.TRACK_LENGTH:
+		_others_vote({1: 2, 2: 4, 3: 2, 4: 3})
+		logic.tick(VoteRaceLogic.REVEAL_TIME + 0.01, 0.0)
+		_pump()
+	var tr: VoteRaceTrack = stage.track
+	tr.land_all()
+	_on_step(1, VoteRaceLogic.TRACK_LENGTH)
+	assert_eq((tr.beans[1]["puppet"] as BeanPuppet).mood, BeanPuppet.Mood.CHEER, "cheering at the cashier")
+	assert_true(tr.cashier_lit, "the window lights up")
+	assert_eq((tr.beans[2]["puppet"] as BeanPuppet).mood, BeanPuppet.Mood.IDLE)
+	assert_true(1 in tr.lanes, "still in their lane, at the window")
+
+
+func test_two_racers_get_two_lanes() -> void:
+	_make(2, {})
+	var tr: VoteRaceTrack = stage.track
+	assert_eq(tr.lanes.size(), 2)
+	assert_ne((tr.beans[1]["root"] as Node3D).position.z, (tr.beans[2]["root"] as Node3D).position.z)
+
+
+func test_eight_racers_get_eight_lanes_on_the_carpet() -> void:
+	_make(8, {})
+	var tr: VoteRaceTrack = stage.track
+	assert_eq(tr.lanes.size(), 8)
+	var half: float = 8.0 * VoteRaceTrack.LANE_W * 0.5
+	var zs: Dictionary = {}
+	for p: int in tr.lanes:
+		var z: float = (tr.beans[p]["root"] as Node3D).position.z
+		assert_lt(absf(z), half, "lane %d on the carpet" % p)
+		zs[snappedf(z, 0.01)] = true
+	assert_eq(zs.size(), 8, "eight different lanes")
+
+
+func test_players_out_of_the_race_sit_on_the_bench() -> void:
+	st.players[6] = {"id": 6, "name": "Gus", "color": 6}  # at the table, not in this race
+	logic.remove_player(5)
+	logic.tick(VoteRaceLogic.VOTE_TIME + 0.01, 0.0)
+	logic.tick(VoteRaceLogic.REVEAL_TIME + 0.01, 0.0)
+	_pump()
+	stage.skip_reveal()
+	var tr: VoteRaceTrack = stage.track
+	assert_false(5 in tr.lanes, "Ed left the race")
+	assert_true(5 in tr.benched, "Ed is on the couch")
+	assert_true(6 in tr.benched, "so is the spectator")
+	var bench_root: Node = (tr.beans[5]["root"] as Node3D).get_parent()
+	assert_eq(bench_root.name, "Bench")
+	assert_true((bench_root as Node3D).visible)
+	assert_eq(tr.lanes, [1, 2, 3, 4] as Array[int])
