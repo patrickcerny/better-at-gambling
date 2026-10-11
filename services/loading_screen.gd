@@ -26,8 +26,8 @@ const TIPS: Array[String] = [
 	"Last Call: in the final minute every table pays ×1.5.",
 ]
 
-## Logo size on this screen (the main menu's is 660 × 300).
-const LOGO_SIZE: Vector2 = Vector2(760, 345)
+## Logo size on this screen (the main menu's is 640 × 516; the coin sign is about 1.24:1).
+const LOGO_SIZE: Vector2 = Vector2(680, 548)
 
 var _root: Control
 var _shown_at: float = 0.0

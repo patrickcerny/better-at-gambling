@@ -38,7 +38,7 @@ alignment = 1
 theme_override_constants/separation = 18
 
 [node name="Logo" type="TextureRect" parent="Center/Column"]
-custom_minimum_size = Vector2(660, 300)
+custom_minimum_size = Vector2(640, 516)
 layout_mode = 2
 size_flags_horizontal = 4
 script = ExtResource("2")

@@ -42,8 +42,9 @@ const DOORS: Array = [
 ## Open doorways (floor centre): the VIP door and the lobby doors. No frames or sconces there.
 const OPENINGS: Array[Vector3] = [Vector3(0.0, 0.0, -16.0), Vector3(0.0, 0.0, LuckyLounge.LOBBY_DOORS_Z)]
 
-## Size of the entrance logo against the 13.6 m model (about 6.8 m wide in the room).
-const SIGN_SCALE: float = 0.5
+## Size of the entrance logo against the 13.9 x 11.2 m model (about 4.0 x 3.25 m in the room: the
+## chip fills the wall between the door opening, 3.2 m, and the gold cornice under the ceiling).
+const SIGN_SCALE: float = 0.29
 
 var map: LuckyLounge
 ## Batches filled while building, turned into MultiMeshes at the end: key → [mesh, material, transforms].
@@ -527,8 +528,8 @@ func _signs() -> void:
 	var sign: Node3D = Logo3D.build_model()
 	sign.scale = Vector3.ONE * SIGN_SCALE
 	sign.rotation.y = PI
-	# The sign bends back towards the wall at its ends (~1.7 m deep at full size).
-	sign.position = Vector3(0.0, 4.95, LuckyLounge.SIZE_Z * 0.5 - 0.25 - 1.8 * SIGN_SCALE)
+	# The chip's back sits 1.7 m behind the model's origin at full size: flush with the wall.
+	sign.position = Vector3(0.0, 4.95, LuckyLounge.SIZE_Z * 0.5 - 0.27 - 1.7 * SIGN_SCALE)
 	add_child(sign)
 
 

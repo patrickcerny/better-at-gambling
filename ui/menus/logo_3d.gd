@@ -1,9 +1,11 @@
 class_name Logo3D
 extends Node3D
-## The 3D "BETTER AT GAMBLING" sign (mesh from tools/logo/build_logo3d.py) with its own camera,
-## warm lights and a lighting-only environment, so it renders on a transparent background inside
-## a SubViewport (see `Logo3DView`). Sways slowly when `sway` is on. `build_model()` gives just the
-## sign, for placing it in the casino.
+## The 3D "BETTER AT GAMBLING" sign (mesh from tools/logo/build_logo3d.py): the flat banner with
+## its letters in front of a big casino chip (Patrick: "the 3d model but flat in front of a Casino
+## coin"), with its own camera, warm lights and a lighting-only environment, so it renders on a
+## transparent background inside a SubViewport (see `Logo3DView`). The camera frames the whole
+## sign for any aspect. Sways gently when `sway` is on. `build_model()` gives just the sign, for
+## placing it in the casino.
 
 const MODEL: PackedScene = preload("res://assets/models/logo/logo_3d.glb")
 ## Per-material look, keyed by the material names the generator writes.
@@ -12,7 +14,13 @@ const LOOK: Dictionary = {
 	&"LogoOutline": {"metallic": 0.0, "roughness": 0.7, "specular": 0.3},
 	&"LogoBanner": {"metallic": 0.0, "roughness": 0.72, "specular": 0.35},
 	&"LogoTrim": {"metallic": 0.6, "roughness": 0.3, "specular": 0.7},
+	&"LogoCoinGold": {"metallic": 0.6, "roughness": 0.34, "specular": 0.7},
+	&"LogoCoinEdge": {"metallic": 0.0, "roughness": 0.6, "specular": 0.4},
 }
+## Size of the sign (m, at full scale) and the camera's distance; the camera fits SIZE * FRAME.
+const SIZE: Vector2 = Vector2(13.9, 11.2)
+const FRAME: float = 1.08
+const CAMERA_DIST: float = 24.0
 
 @export var sway: bool = true
 ## Yaw/pitch in degrees applied on top of the sway (used for the preview angles).
@@ -30,13 +38,22 @@ func _ready() -> void:
 	add_child(_pivot)
 	_pivot.add_child(build_model())
 	camera = Camera3D.new()
-	camera.keep_aspect = Camera3D.KEEP_WIDTH  # the sign always fills the width, any aspect
-	camera.fov = 54.0
-	camera.position = Vector3(0, 0, 14.8)
+	camera.position = Vector3(0, 0, CAMERA_DIST)
 	camera.current = true
 	add_child(camera)
 	_add_lights()
 	_apply_pose()
+	get_viewport().size_changed.connect(_frame)
+	_frame()
+
+
+## Fits the whole sign: by width in narrow views, by height in wide ones.
+func _frame() -> void:
+	var vp: Vector2 = Vector2(get_viewport().get_visible_rect().size)
+	var wide: bool = vp.y > 0.0 and vp.x / vp.y > SIZE.x / SIZE.y
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT if wide else Camera3D.KEEP_WIDTH
+	var span: float = (SIZE.y if wide else SIZE.x) * FRAME
+	camera.fov = rad_to_deg(2.0 * atan(span * 0.5 / CAMERA_DIST))
 
 
 func _process(delta: float) -> void:
@@ -49,11 +66,13 @@ func _process(delta: float) -> void:
 func _apply_pose() -> void:
 	var s: float = sin(_t * 0.6) if sway else 0.0
 	var c: float = sin(_t * 0.45 + 1.3) if sway else 0.0
-	_pivot.rotation = Vector3(deg_to_rad(pitch_deg + c * 2.0), deg_to_rad(yaw_deg + s * 7.0), deg_to_rad(s * -0.8))
-	_pivot.position.y = sin(_t * 0.9) * 0.08 if sway else 0.0
+	# Gentle: it must still read as a flat coin sign.
+	_pivot.rotation = Vector3(deg_to_rad(pitch_deg + c * 1.5), deg_to_rad(yaw_deg + s * 5.0), deg_to_rad(s * -0.6))
+	_pivot.position.y = sin(_t * 0.9) * 0.06 if sway else 0.0
 
 
-## The sign alone (about 13.6 x 6 m, facing +Z, centred on the origin), materials applied.
+## The sign alone (about 13.9 x 11.2 x 2.3 m, facing +Z, centred on the origin, the banner's front
+## at z ~0.6 and the chip's back at z ~-1.7), materials applied.
 static func build_model() -> Node3D:
 	var model: Node3D = MODEL.instantiate()
 	model.name = "LogoSign"

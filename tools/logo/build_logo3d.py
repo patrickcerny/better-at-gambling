@@ -3,8 +3,10 @@
 
 The layout follows Patrick's pixel-art reference: gold chunky letters with a dark outline, on an
 arched burgundy banner with a raised, bevelled gold trim and rivets. Letters and banner are real
-extruded geometry with chamfered fronts, and the whole sign is bent around a vertical cylinder so
-the ends fall back slightly.
+extruded geometry with chamfered fronts. The sign is flat (front-facing) and hangs in front of a big
+casino chip (Patrick: "the 3d model but flat in front of a Casino coin"): a thick coin with a
+striped wine/cream edge and cream inserts, a raised gold rim, a recessed gold face with an embossed
+ring, three stars above the banner and "$" between two stars below it.
 
 Units while building are reference-image pixels (the reference is 1536x1024, centred on 768,512,
 y up, z toward the viewer); the .glb is written at 1/100 of that (about 13.5 m wide).
@@ -33,7 +35,13 @@ ROOT = Path(__file__).resolve().parents[2]
 FONT = ROOT / "assets/fonts/LuckiestGuy-Regular.ttf"
 OUT = ROOT / "assets/models/logo/logo_3d.glb"
 SCALE = 0.01
-BEND_RADIUS = 1800.0
+
+# The chip behind the sign (design px): centred on the banner, facing +z, entirely behind the
+# banner's back (z -44) so nothing intersects.
+COIN_CY = 51.0
+COIN_R = 560.0  # outer edge
+COIN_SEGS = 96  # 3.75 degrees per segment; the edge stripes are 4 segments wide
+COIN_STRIPES = 12
 
 
 def hexcol(h: str) -> tuple[float, float, float]:
@@ -54,6 +62,14 @@ BANNER = hexcol("#86131F")
 BANNER_DARK = hexcol("#560B17")
 TRIM = hexcol("#F5C445")
 TRIM_SIDE = hexcol("#C98A26")
+COIN_GOLD_HI = hexcol("#F6CF6A")
+COIN_GOLD = hexcol("#E3B04E")
+COIN_GOLD_LO = hexcol("#CC9539")
+COIN_SIDE = hexcol("#9A6424")
+CHIP_WINE = hexcol("#7A1A27")
+CHIP_WINE_DARK = hexcol("#4E0E18")
+CHIP_CREAM = hexcol("#F2E6C9")
+CHIP_CREAM_SIDE = hexcol("#CDBB98")
 
 
 class Mesh:
@@ -140,8 +156,9 @@ def _wall(mesh: Mesh, ring, z0: float, z1: float, color):
 		# Outward = right of the edge direction for CCW exteriors / CW holes.
 		d = (b[0] - a[0], b[1] - a[1])
 		out = np.array([d[1], -d[0], 0.0])
-		_add_oriented(mesh, (p0, p1, p2), (color,) * 3, want_dir=out)
-		_add_oriented(mesh, (p0, p2, p3), (color,) * 3, want_dir=out)
+		c = color((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) if callable(color) else color
+		_add_oriented(mesh, (p0, p1, p2), (c,) * 3, want_dir=out)
+		_add_oriented(mesh, (p0, p2, p3), (c,) * 3, want_dir=out)
 
 
 def _arclen(ring):
@@ -186,7 +203,7 @@ def _polys(geom):
 def extrude(mesh: Mesh, geom, z0: float, z1: float, *, bevel: float = 0.0, bevel_h: float = 0.0,
 		front=None, chamfer=None, side=(0.5, 0.5, 0.5), back=True):
 	"""Extrudes polygons from z0 to z1; with `bevel`, the front edge is chamfered inward."""
-	front = front or (lambda x, y: side)
+	front = front or (side if callable(side) else (lambda x, y: side))
 	chamfer = chamfer or front
 	for poly in _polys(geom):
 		poly = orient(poly.simplify(0.4), 1.0)
@@ -217,7 +234,7 @@ def extrude(mesh: Mesh, geom, z0: float, z1: float, *, bevel: float = 0.0, bevel
 		else:
 			_cap(mesh, poly, z1, front, up=True)
 		if back:
-			_cap(mesh, poly, z0, lambda x, y: side, up=False)
+			_cap(mesh, poly, z0, side if callable(side) else (lambda x, y: side), up=False)
 
 
 def dome(mesh: Mesh, cx: float, cy: float, z: float, r: float, h: float, color, side):
@@ -433,16 +450,102 @@ def build() -> list[Mesh]:
 	m_letters = letter_mesh(big, 222.0, z_outline, z_letters, 8.0, 9.0)
 	m_letters.extend(letter_mesh(small, 108.0, z_outline, z_letters - 10.0, 5.0, 6.0))
 
-	return [m_letters, m_outline, m_banner, m_trim]
+	m_coin_gold, m_coin_edge = coin(font)
+	return [m_letters, m_outline, m_banner, m_trim, m_coin_gold, m_coin_edge]
+
+
+# ---------------------------------------------------------------- coin
+
+def circle(cx: float, cy: float, r: float, segs: int = COIN_SEGS, start_deg: float = 0.0) -> Polygon:
+	return Polygon([(cx + r * math.cos(math.radians(start_deg + 360.0 * i / segs)),
+		cy + r * math.sin(math.radians(start_deg + 360.0 * i / segs))) for i in range(segs)])
+
+
+def annulus(r0: float, r1: float, segs: int = COIN_SEGS, start_deg: float = 0.0) -> Polygon:
+	return circle(0.0, COIN_CY, r1, segs, start_deg).difference(circle(0.0, COIN_CY, r0, segs, start_deg))
+
+
+def star(cx: float, cy: float, r: float) -> Polygon:
+	pts = []
+	for i in range(10):
+		a = math.radians(90.0 + 36.0 * i)
+		rr = r if i % 2 == 0 else r * 0.45
+		pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
+	return Polygon(pts)
+
+
+STRIPE_DEG = 360.0 / COIN_STRIPES
+# Vertices sit every 3.75 degrees starting at 7.5, so each 15-degree stripe centred on 90 + k*30
+# begins and ends exactly on a vertex.
+COIN_START = 7.5
+
+
+def _is_stripe(x: float, y: float) -> bool:
+	a = (math.degrees(math.atan2(y - COIN_CY, x)) - 90.0) % STRIPE_DEG
+	return a < 7.5 or a > STRIPE_DEG - 7.5
+
+
+def coin(font: Font) -> tuple[Mesh, Mesh]:
+	"""The casino chip behind the sign: (gold parts, wine/cream edge)."""
+	z_back, z_edge, z_face, z_rim = -170.0, -66.0, -70.0, -50.0
+	r_face, r_rim0, r_rim1 = 458.0, 452.0, 486.0
+	top = COIN_CY + COIN_R
+	bot = COIN_CY - COIN_R
+
+	def gold(x, y):  # warm light from the upper left
+		t = max(0.0, min(1.0, ((y - bot) / (top - bot)) * 0.8 + (0.5 - x / (2 * COIN_R)) * 0.2))
+		return lerp(COIN_GOLD_LO, COIN_GOLD_HI, t ** 0.9)
+
+	def edge_side(x, y):
+		return CHIP_CREAM_SIDE if _is_stripe(x, y) else CHIP_WINE_DARK
+
+	def edge_front(x, y):
+		t = (y - bot) / (top - bot)
+		return lerp(CHIP_WINE_DARK, CHIP_WINE, 0.45 + 0.55 * t)
+
+	m_edge = Mesh("CoinEdge")
+	# Chip body: the outer ring with a chamfered front, its side striped wine/cream.
+	extrude(m_edge, annulus(r_face - 2.0, COIN_R, start_deg=COIN_START), z_back, z_edge, bevel=10.0, bevel_h=10.0,
+		front=edge_front, chamfer=lambda x, y: lerp(edge_front(x, y), edge_side(x, y), 0.5), side=edge_side)
+	extrude(m_edge, circle(0.0, COIN_CY, r_face, start_deg=COIN_START), z_back, z_back + 1.0, side=CHIP_WINE_DARK)
+	# Cream inserts on the ring, lined up with the edge stripes.
+	for k in range(COIN_STRIPES):
+		a0 = 90.0 + k * STRIPE_DEG - 6.0
+		wedge = Polygon([(0.0, COIN_CY)] + [(2 * COIN_R * math.cos(math.radians(a)), COIN_CY + 2 * COIN_R * math.sin(math.radians(a)))
+			for a in np.linspace(a0, a0 + 12.0, 5)])
+		insert = annulus(r_rim1 + 12.0, COIN_R - 18.0, segs=192).intersection(wedge)
+		extrude(m_edge, insert, z_edge - 2.0, z_edge + 3.0, bevel=2.5, bevel_h=2.5,
+			front=lambda x, y: CHIP_CREAM, chamfer=lambda x, y: CHIP_CREAM_SIDE, side=CHIP_CREAM_SIDE, back=False)
+
+	m_gold = Mesh("CoinGold")
+	# Recessed gold face, raised bevelled rim around it.
+	extrude(m_gold, circle(0.0, COIN_CY, r_face, start_deg=COIN_START), z_back + 1.0, z_face, front=gold, side=COIN_SIDE, back=False)
+	extrude(m_gold, annulus(r_rim0, r_rim1, start_deg=COIN_START), z_face - 4.0, z_rim, bevel=8.0, bevel_h=9.0,
+		front=lambda x, y: lerp(gold(x, y), COIN_GOLD_HI, 0.35), chamfer=lambda x, y: lerp(gold(x, y), COIN_SIDE, 0.25),
+		side=COIN_SIDE, back=False)
+	# Embossed ring on the face.
+	extrude(m_gold, annulus(408.0, 424.0), z_face - 1.0, z_face + 7.0, bevel=4.0, bevel_h=4.0,
+		front=lambda x, y: lerp(gold(x, y), COIN_GOLD_HI, 0.2), chamfer=lambda x, y: lerp(gold(x, y), COIN_SIDE, 0.35),
+		side=COIN_SIDE, back=False)
+	# Motifs where the face shows above and below the banner.
+	motifs = []
+	for a, r in ((90.0, 40.0), (62.0, 30.0), (118.0, 30.0), (242.0, 30.0), (298.0, 30.0)):
+		rr = 352.0 if a == 90.0 else 360.0
+		motifs.append(star(rr * math.cos(math.radians(a)), COIN_CY + rr * math.sin(math.radians(a)), r))
+	dollar, _ = font.glyph("$", 120.0)
+	dminx, dminy, dmaxx, dmaxy = dollar.bounds
+	motifs.append(affinity.translate(dollar, -(dminx + dmaxx) / 2, COIN_CY - 352.0 - (dminy + dmaxy) / 2))
+	for g in motifs:
+		extrude(m_gold, g, z_face - 1.0, z_face + 10.0, bevel=4.0, bevel_h=4.0,
+			front=lambda x, y: lerp(gold(x, y), COIN_GOLD_HI, 0.45), chamfer=lambda x, y: lerp(gold(x, y), COIN_SIDE, 0.3),
+			side=COIN_SIDE, back=False)
+	return m_gold, m_edge
 
 
 # ---------------------------------------------------------------- output
 
-def bend(p):
-	x, y, z = p
-	r = BEND_RADIUS + z
-	th = x / BEND_RADIUS
-	return (r * math.sin(th) * SCALE, y * SCALE, (r * math.cos(th) - BEND_RADIUS) * SCALE)
+def flat(p):
+	return (p[0] * SCALE, p[1] * SCALE, p[2] * SCALE)
 
 
 def srgb_to_linear(c):
@@ -454,6 +557,8 @@ MATERIALS = {
 	"Outline": {"metallic": 0.0, "roughness": 0.7},
 	"Banner": {"metallic": 0.0, "roughness": 0.75},
 	"Trim": {"metallic": 0.55, "roughness": 0.32},
+	"CoinGold": {"metallic": 0.6, "roughness": 0.34},
+	"CoinEdge": {"metallic": 0.0, "roughness": 0.6},
 }
 
 
@@ -465,7 +570,7 @@ def _key(q):
 
 
 def write_glb(meshes: list[Mesh], path: Path):
-	bent = [m.transformed(bend) for m in meshes]
+	bent = [m.transformed(flat) for m in meshes]
 	allp = np.array([p for m in bent for t in m.tris for p in t[0]])
 	centre = (allp.min(axis=0) + allp.max(axis=0)) / 2
 	centre[2] = 0.0
@@ -499,9 +604,8 @@ def write_glb(meshes: list[Mesh], path: Path):
 			p = raw - centre
 			for k in range(3):
 				pos.append(p[k])
-				if smooth:  # cap faces follow the bend cylinder smoothly
-					cn = np.array([raw[k][0], 0.0, raw[k][2] + BEND_RADIUS * SCALE])
-					nrm.append(smooth * cn / np.linalg.norm(cn))
+				if smooth:  # flat caps face straight out
+					nrm.append(np.array([0.0, 0.0, smooth]))
 				else:
 					acc = sum((f for f in shared[_key(raw[k])] if np.dot(f, n) > SMOOTH_COS), np.zeros(3))
 					nrm.append(acc / (np.linalg.norm(acc) or 1.0))

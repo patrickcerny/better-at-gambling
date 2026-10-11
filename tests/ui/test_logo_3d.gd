@@ -1,7 +1,8 @@
 extends GutTest
 ## 3D title logo (Patrick, 0.8.15): it replaces the text logo in the main menu, goes through the
 ## pixel look there, hangs once above the casino entrance in place of the "LUCKY LOUNGE" signs,
-## and the revolving door is gone.
+## and the revolving door is gone. Later the sign became flat, in front of a big casino chip (Patrick:
+## "the 3d model but flat in front of a Casino coin").
 
 var _old_force: bool
 
@@ -14,7 +15,7 @@ func after_each() -> void:
 	Vfx.force_enabled = _old_force
 
 
-func test_model_has_the_four_logo_materials() -> void:
+func test_model_has_the_six_logo_materials() -> void:
 	var model: Node3D = Logo3D.build_model()
 	add_child_autofree(model)
 	var meshes: Array[Node] = model.find_children("*", "MeshInstance3D", true, false)
@@ -22,14 +23,15 @@ func test_model_has_the_four_logo_materials() -> void:
 	if meshes.size() != 1:
 		return
 	var mi: MeshInstance3D = meshes[0]
-	assert_eq(mi.mesh.get_surface_count(), 4, "letters, outline, banner, trim")
+	assert_eq(mi.mesh.get_surface_count(), 6, "letters, outline, banner, trim, coin gold, coin edge")
 	for i in mi.mesh.get_surface_count():
 		var m: StandardMaterial3D = mi.mesh.surface_get_material(i) as StandardMaterial3D
 		assert_not_null(m, "surface %d has the logo material" % i)
 		if m != null:
 			assert_true(m.vertex_color_use_as_albedo, "colours come from the mesh")
 	var aabb: AABB = mi.get_aabb()
-	assert_almost_eq(aabb.size.x, 13.6, 0.3, "about 13.6 m wide at full size")
+	assert_almost_eq(aabb.size.x, 13.9, 0.3, "about 13.9 m wide at full size")
+	assert_almost_eq(aabb.size.y, 11.2, 0.3, "the casino chip behind the banner makes it about 11.2 m tall")
 
 
 func test_main_menu_uses_the_3d_logo() -> void:

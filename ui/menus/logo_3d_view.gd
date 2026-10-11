@@ -12,7 +12,7 @@ var _viewport: SubViewport
 
 
 ## A centred logo of `min_size` (canvas units) for a container.
-static func make(min_size: Vector2 = Vector2(660, 300)) -> Logo3DView:
+static func make(min_size: Vector2 = Vector2(640, 516)) -> Logo3DView:
 	var v := Logo3DView.new()
 	v.name = "Logo"
 	v.custom_minimum_size = min_size
