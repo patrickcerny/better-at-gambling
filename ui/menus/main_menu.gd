@@ -5,7 +5,10 @@ extends Control
 ## Joining shows the joining screen (`Loading`, with the logo) until the match has loaded;
 ## connection errors from the last online attempt are shown here when we return. There is no
 ## join-by-address (Patrick: "Remove join by ip and port"): parties are reached through the
-## orchestrator only (`--connect` stays a dev/test command-line flag).
+## orchestrator, or through Steam in host mode (`--connect` stays a dev/test command-line flag).
+## Host mode (Patrick: "like Pummel Party"): HOST ON THIS PC (STEAM) runs the party on this PC and
+## friends join through Steam invites or the "Join a friend" list (`SteamParty`); without Steam
+## running the button is disabled ("Start Steam to host").
 
 @onready var _play_online: Button = %PlayOnline
 @onready var _practice: Button = %Practice
@@ -19,6 +22,10 @@ var _name_edit: LineEdit
 var _code_edit: LineEdit
 var _create_button: Button
 var _browse_button: Button
+## Host mode (Steam): host on this PC, and friends' parties to join.
+var host_button: Button
+var friends_box: VBoxContainer
+var _friends_list: VBoxContainer
 var _status: Label
 var _busy: bool = false
 var _settings: SettingsPanel
@@ -105,6 +112,9 @@ func _ready() -> void:
 		_show_online()
 		_set_status(Net.last_error, true)
 		Net.last_error = ""
+	SteamSvc.join_requested.connect(_on_steam_join_requested)
+	if SteamSvc.pending_lobby != 0:
+		_on_steam_join_requested.call_deferred(SteamSvc.pending_lobby)
 	Log.info(&"menu", "main menu ready")
 
 
@@ -152,6 +162,20 @@ func _build_online() -> void:
 	_browse_button = _button("Browse Parties", _show_browser)
 	_browse_button.name = "BrowseParties"
 	_online_box.add_child(_browse_button)
+	host_button = _button(HOST_LABEL, _host_steam)
+	host_button.name = "HostParty"
+	_online_box.add_child(host_button)
+	friends_box = VBoxContainer.new()
+	friends_box.name = "JoinFriend"
+	friends_box.add_theme_constant_override(&"separation", 6)
+	_online_box.add_child(friends_box)
+	var friends_title := Label.new()
+	friends_title.text = "JOIN A FRIEND"
+	friends_title.theme_type_variation = &"SmallLabel"
+	friends_box.add_child(friends_title)
+	_friends_list = VBoxContainer.new()
+	friends_box.add_child(_friends_list)
+	_refresh_steam_entries()
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.custom_minimum_size = Vector2(540, 0)
@@ -274,6 +298,7 @@ func _show_online() -> void:
 	_hide_boxes()
 	_online_box.visible = true
 	_status.text = ""
+	_refresh_steam_entries()
 	_create_button.grab_focus()
 
 
@@ -488,9 +513,91 @@ func _on_failed(reason: String) -> void:
 	Loading.cancel()
 	_busy = false
 	Net.last_error = ""
+	if Net.mode == Net.Mode.NONE:
+		Net.steam_party.stop_hosting()  # hosting, but our own game could not join: no orphan server
+		SteamSvc.leave_lobby()
 	if browser_box.visible:
 		_show_online()
 	_set_status(reason, true)
+
+
+# --- Host mode (Steam) -------------------------------------------------------------------------
+
+const HOST_LABEL: String = "Host on this PC (Steam)"
+const FRIENDS_REFRESH: float = 3.0
+var _friends_timer: float = 0.0
+
+
+## Host button state and the friends' parties (Steam only).
+func _refresh_steam_entries() -> void:
+	var on: bool = SteamSvc.is_available()
+	host_button.disabled = not on
+	host_button.tooltip_text = "Run the party on this PC; invite Steam friends from the lobby" if on else "Start Steam to host"
+	friends_box.visible = on
+	if not on:
+		return
+	for c: Node in _friends_list.get_children():
+		c.queue_free()
+	var parties: Array[Dictionary] = SteamSvc.friend_lobbies()
+	if parties.is_empty():
+		var none := Label.new()
+		none.text = "No friends in a party right now."
+		none.theme_type_variation = &"MutedLabel"
+		_friends_list.add_child(none)
+	for f: Dictionary in parties:
+		var lobby: int = int(f["lobby"])
+		var party: String = str(f.get("party", ""))
+		_friends_list.add_child(_button("Join %s" % (party if party != "" else "%s's party" % str(f["name"])), func() -> void: _join_steam_lobby(lobby)))
+
+
+func _process(delta: float) -> void:
+	if not _online_box.visible or not SteamSvc.is_available():
+		return
+	_friends_timer += delta
+	if _friends_timer >= FRIENDS_REFRESH and not _busy:
+		_friends_timer = 0.0
+		_refresh_steam_entries()
+
+
+## HOST ON THIS PC: start the party server here, open the Steam lobby, then join it.
+func _host_steam() -> void:
+	if _busy or not SteamSvc.is_available():
+		return
+	_busy = true
+	_set_status("Starting your party…")
+	_status.remove_theme_color_override(&"font_color")
+	var name_: String = _display_name()
+	var port: int = await Net.steam_party.start_hosting(name_)
+	if port == 0:
+		_busy = false
+		_set_status(Net.steam_party.last_error, true)
+		return
+	_connect(func() -> Error: return Net.steam_party.join_own_party(name_, SceneRouter.profile_cosmetics()), "HOSTING")
+
+
+func _on_steam_join_requested(lobby_id: int) -> void:
+	if not is_inside_tree():
+		return
+	if not _online_box.visible:
+		_show_online()
+	_join_steam_lobby(lobby_id)
+
+
+## Joins a friend's party: their Steam lobby, then their game over Steam.
+func _join_steam_lobby(lobby_id: int) -> void:
+	SteamSvc.pending_lobby = 0
+	if _busy:
+		return
+	_busy = true
+	_set_status("Joining your friend's party…")
+	_status.remove_theme_color_override(&"font_color")
+	var host_id: int = await Net.steam_party.enter_lobby(lobby_id)
+	if host_id == 0:
+		_busy = false
+		_set_status(Net.steam_party.last_error, true)
+		return
+	var name_: String = _display_name()
+	_connect(func() -> Error: return Net.steam_party.join_host(host_id, name_, SceneRouter.profile_cosmetics()), "JOINING")
 
 
 func _on_quit_pressed() -> void:

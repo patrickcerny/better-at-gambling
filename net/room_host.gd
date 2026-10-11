@@ -12,6 +12,13 @@ extends Node
 ## by the host") and drops it. The 60 s rejoin block lives in this room (`MatchServer.kick_blocked_for`,
 ## checked in `_admit`), not in the orchestrator: the room is the one that knows who was kicked,
 ## and a kicked player's join token is still accepted by the orchestrator but refused here.
+##
+## Host mode (`host_mode`, a party hosted on a player's PC, see `SteamParty`): there is no
+## orchestrator. Every connection comes over loopback, from the host's own game or from its
+## `HostBridge`, which stamps friends' hellos with the Steam ID Steam vouched for
+## ("steam:<id>"), so the hello's uid is the identity; build/protocol checks, kicks and the 60 s
+## rejoin block apply as everywhere. The room closes once the host (`host_uid`) has been gone for
+## `HOST_GONE_CLOSE` seconds (their game quit or crashed), or never showed up.
 
 const HEARTBEAT_INTERVAL: float = 5.0
 ## Seconds a fresh room waits for its first player before the empty timeout applies.
@@ -19,6 +26,8 @@ const FIRST_JOIN_GRACE: float = 60.0
 ## Once someone has played here, an empty room closes after this many seconds (Patrick: "if a room
 ## is empty, just kill it"); a few seconds so a crash-and-rejoin still finds the room.
 const LEFT_EMPTY_CLOSE: float = 5.0
+## Host mode: seconds the host may be disconnected before their room closes (a crashed game).
+const HOST_GONE_CLOSE: float = 10.0
 
 var orchestrator: String = ""
 var room_id: String = ""
@@ -26,6 +35,11 @@ var room_code: String = ""
 var room_secret: String = ""
 ## Seconds without connected players before the room closes itself (0 = never; dev servers).
 var empty_timeout: float = 120.0
+## Host mode: a party hosted on a player's PC (no orchestrator; see the class notes).
+var host_mode: bool = false
+## Host mode: the host's identity; the room closes once they are gone ("" = not watched).
+var host_uid: String = ""
+var _host_away: float = 0.0
 
 var server: MatchServer = null
 var http: HttpJson
@@ -42,13 +56,15 @@ var _closing: bool = false
 var _ever_joined: bool = false
 
 
-## Reads {orchestrator, room_id, room_code, room_secret, empty_timeout}.
+## Reads {orchestrator, room_id, room_code, room_secret, empty_timeout, host_mode, host_uid}.
 func setup(opts: Dictionary) -> void:
 	orchestrator = str(opts.get("orchestrator", ""))
 	room_id = str(opts.get("room_id", ""))
 	room_code = str(opts.get("room_code", ""))
 	room_secret = str(opts.get("room_secret", ""))
-	empty_timeout = float(opts.get("empty_timeout", 120.0 if orchestrator != "" else 0.0))
+	host_mode = bool(opts.get("host_mode", false))
+	host_uid = str(opts.get("host_uid", ""))
+	empty_timeout = float(opts.get("empty_timeout", 120.0 if orchestrator != "" or host_mode else 0.0))
 
 
 func _ready() -> void:
@@ -57,6 +73,8 @@ func _ready() -> void:
 	add_child(http)
 	if orchestrator != "":
 		_heartbeat()
+	elif host_mode:
+		Log.info(&"room", "host mode: a party on a player's PC (no orchestrator, host %s)" % host_uid)
 
 
 ## Welcomed peers (receive events and world packets).
@@ -77,6 +95,13 @@ func peer_of(player: int) -> int:
 		if _players[peer] == player:
 			return peer
 	return -1
+
+
+## Host mode: the host's own game is connected.
+func host_present() -> bool:
+	if server == null or host_uid == "":
+		return false
+	return peer_of(server.player_by_uid(host_uid)) >= 0
 
 
 func on_server_attached(p_server: MatchServer) -> void:
@@ -101,10 +126,11 @@ func on_hello(peer: int, hello: Variant) -> void:
 		_pending.append({"peer": peer, "hello": h})
 		return
 	if orchestrator == "":
-		# Dev server (--server without an orchestrator): trust the client's uid. Never used online.
+		# Host mode: the uid is the Steam ID (stamped by the host's bridge, see the class notes).
+		# Dev server (--server without an orchestrator, never used online): the client's uid.
 		var display: String = _clean_name(str(h.get("name", "Player")))
 		var uid: String = str(h.get("uid", ""))
-		_admit(peer, uid if uid != "" else "dev:%s" % display, display, h)
+		_admit(peer, uid if uid != "" else ("local:%s" if host_mode else "dev:%s") % display, display, h)
 		return
 	_verifying[peer] = true
 	var res: Dictionary = await http.post(orchestrator.path_join("v1/internal/verify"), {"room_id": room_id, "room_secret": room_secret, "join_token": str(h.get("join_token", ""))})
@@ -193,6 +219,11 @@ func on_peer_disconnected(peer: int) -> void:
 func _process(delta: float) -> void:
 	if _closing:
 		return
+	if host_uid != "":
+		_host_away = 0.0 if host_present() else _host_away + delta
+		if _host_away >= (HOST_GONE_CLOSE if _ever_joined else FIRST_JOIN_GRACE):
+			_close("the host left")
+			return
 	if orchestrator != "":
 		_heartbeat_timer += delta
 		if _heartbeat_timer >= HEARTBEAT_INTERVAL:

@@ -1,7 +1,9 @@
 extends GutTest
 ## Main menu (Patrick's playtest notes): the logo and entries are centred; PLAY ONLINE, PRACTICE,
-## TUTORIAL, QUIT; the settings sit behind a small gear in the bottom-right corner; no "Host on
-## this PC" or "Rejoin last party"; TUTORIAL opens the how-to-play pages and BACK returns.
+## TUTORIAL, QUIT; the settings sit behind a small gear in the bottom-right corner; no "Rejoin
+## last party" and no LAN/IP hosting, only HOST ON THIS PC (STEAM) (host mode, Patrick: "like
+## Pummel Party"), disabled with "Start Steam to host" when Steam isn't running (as in these
+## headless tests); TUTORIAL opens the how-to-play pages and BACK returns.
 ## PLAY ONLINE has no join-by-address and a server browser (Browse Parties); PRACTICE offers a
 ## casino match or MINIGAMES ONLY with a note on the minigames a solo player can't play.
 
@@ -61,15 +63,34 @@ func test_gear_in_the_bottom_right_opens_settings() -> void:
 	assert_true(gear.has_focus(), "focus back on the gear")
 
 
-func test_no_host_on_this_pc_or_rejoin() -> void:
+func test_only_steam_hosting_and_no_rejoin() -> void:
 	menu.call(&"_show_online")
 	await wait_process_frames(1)
 	for t: String in _texts(menu):
-		assert_false(t.to_lower().contains("host on"), "no Host on this PC: %s" % t)
+		assert_false(t.to_lower().contains("host on") and t != "Host on this PC (Steam)", "no LAN Host on this PC: %s" % t)
 		assert_false(t.to_lower().contains("rejoin"), "no Rejoin last party: %s" % t)
 	assert_false(menu.has_method(&"_host_local"))
 	assert_false(menu.has_method(&"_rejoin_last"))
 	assert_true("Create Party" in _texts(menu), "the online form is still there")
+
+
+func test_host_on_this_pc_needs_steam() -> void:
+	assert_false(SteamSvc.is_available(), "no Steam client in the headless tests")
+	menu.call(&"_show_online")
+	await wait_process_frames(1)
+	var host: Button = menu.find_child("HostParty", true, false) as Button
+	assert_not_null(host, "HOST ON THIS PC under PLAY ONLINE")
+	if host == null:
+		return
+	assert_eq(host.text, "Host on this PC (Steam)")
+	assert_true(host.disabled, "disabled without Steam")
+	assert_eq(host.tooltip_text, "Start Steam to host")
+	assert_true(host.is_visible_in_tree())
+	assert_false((menu.find_child("JoinFriend", true, false) as Control).visible, "no friends list without Steam")
+	host.pressed.emit()  # even if it fired: nothing starts, nothing breaks
+	await wait_process_frames(2)
+	assert_eq(Net.mode, Net.Mode.NONE)
+	assert_eq(Net.steam_party.server_pid, 0, "no server process started")
 
 
 func test_no_join_by_ip_and_port() -> void:

@@ -17,9 +17,11 @@ var peer: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
 var _server: bool = false
 
 
-## Starts listening. Returns OK or an error.
-func listen(port: int, max_clients: int) -> Error:
+## Starts listening. Returns OK or an error. `bind_ip` "127.0.0.1" keeps the port off the network
+## (host mode: only the host's own game and its Steam bridge connect).
+func listen(port: int, max_clients: int, bind_ip: String = "*") -> Error:
 	_server = true
+	peer.set_bind_ip(bind_ip)
 	var err: Error = peer.create_server(port, max_clients, CHANNELS)
 	if err != OK:
 		return err

@@ -18,7 +18,7 @@ Core logic    pure RefCounted classes in core/ and games/*/   deterministic give
 | `SceneRouter` | services/scene_router.gd | parses cmdline; boots `--server`, `--connect`, `--join-code`/`--create-room`, practice; profile name/cosmetics; `--capture` |
 | `Registry` | services/registry.gd | stub |
 | `Net` | net/net_session.gd | M3: LOCAL (practice), CLIENT and SERVER sessions; owns `RoomHost` (server) and `OnlineService` (`Net.online`) |
-| `SteamSvc` | services/steam_service_stub.gd | stub (M8); not `Steam`, see DECISIONS |
+| `SteamSvc` | services/steam_service.gd | GodotSteam (App 480): lobbies, invites, persona; off without a Steam client; not `Steam`, see DECISIONS |
 | `Audio` | audio/audio_director.gd | stub (M7) |
 
 ## Command line (after `--`, parsed by `core/boot/cmdline.gd`)

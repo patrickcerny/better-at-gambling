@@ -52,9 +52,12 @@ jobs:
           tools/godot/godot --headless --path . --export-release "Windows" "$PWD/build/windows/BetterAtGambling.exe"
           tools/godot/godot --headless --path . --export-release "Linux" "$PWD/build/linux/BetterAtGambling.x86_64"
           test -s build/windows/BetterAtGambling.exe && test -s build/linux/BetterAtGambling.x86_64
+          # GodotSteam (host mode over Steam): its library and the Steam API sit next to the exe.
+          test -s build/windows/steam_api64.dll && test -s build/linux/libsteam_api.so
           build/linux/BetterAtGambling.x86_64 --headless -- --smoke-test --frames 60
-          (cd build/windows && zip -q -9 ../../dist/BetterAtGambling-windows.zip BetterAtGambling.exe)
-          (cd build/linux && zip -q -9 ../../dist/BetterAtGambling-linux.zip BetterAtGambling.x86_64)
+          (cd build/windows && zip -q -9 ../../dist/BetterAtGambling-windows.zip BetterAtGambling.exe *.dll)
+          (cd build/linux && zip -q -9 ../../dist/BetterAtGambling-linux.zip BetterAtGambling.x86_64 *.so)
+          unzip -l dist/BetterAtGambling-windows.zip
           ls -la dist
 
       - name: Publish release
@@ -70,6 +73,8 @@ jobs:
             echo '**Windows:** download `BetterAtGambling-windows.zip`, unzip, run `BetterAtGambling.exe`'
             echo '(SmartScreen: "More info" → "Run anyway"). Then Play Online → Create Party and share the code.'
             echo 'Online parties run on the game server automatically, no setup needed. Older versions cannot join.'
+            echo 'Or, with Steam running, Play Online → Host on this PC (Steam) and invite friends through Steam'
+            echo '(keep the DLLs next to the exe; Steam shows the game as "Spacewar", the free test App ID).'
             echo
             echo "### Changes${prev:+ since $prev}"
             git log --no-merges --format='- %s' ${prev:+$prev..}HEAD | head -60

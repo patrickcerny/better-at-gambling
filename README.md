@@ -20,6 +20,14 @@ tools/godot/godot --headless --path . -- --smoke-test   # boots 60 frames, exit 
 scripts/screenshot.sh res://ui/menus/main_menu.tscn     # PNG under build/screenshots/ (needs xvfb-run)
 ```
 
+## Play with friends
+- **Create Party / Join by code / Browse Parties**: the party runs on our server (orchestrator).
+- **Host on this PC (Steam)**: Steam must be running before the game starts. The party runs on
+  your PC (a second, headless copy of the game is the room server) and friends join through
+  Steam: INVITE FRIENDS in the lobby, or "Join Game" on you in their friends list. Uses Steam's
+  free relay (no port forwarding) and the test App ID 480, so Steam shows the game as "Spacewar".
+  Keep `steam_api64.dll` (Windows) / `libsteam_api.so` (Linux) next to the executable.
+
 ## Export
 ```bash
 scripts/export.sh linux|windows|server

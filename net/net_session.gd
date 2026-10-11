@@ -25,6 +25,8 @@ signal position_forced(pos: Vector3, yaw: float)
 signal move_received(player: int, pos: Vector3, yaw: float, airborne: bool)
 ## CLIENT: a relayed voice frame (`VoicePacket` down packet) on the voice channel.
 signal voice_received(data: PackedByteArray)
+## A LOCAL/CLIENT/SERVER session just ended (left, lost or refused): host mode tears down.
+signal session_ended
 
 enum Mode { NONE, LOCAL, CLIENT, SERVER }
 
@@ -84,6 +86,8 @@ var _start_ticks: int = Time.get_ticks_usec()
 
 ## Orchestrator client (create/join parties by code).
 var online: OnlineService
+## Host mode: host a party on this PC, join friends through Steam.
+var steam_party: SteamParty
 
 
 func _exit_tree() -> void:
@@ -94,6 +98,9 @@ func _ready() -> void:
 	online = OnlineService.new()
 	online.name = "Online"
 	add_child(online)
+	steam_party = SteamParty.new()
+	steam_party.name = "SteamParty"
+	add_child(steam_party)
 
 
 # --- Common API --------------------------------------------------------------------------------
@@ -142,7 +149,10 @@ func stop() -> void:
 	_private = {}
 	_backlog.clear()
 	clock = NetClock.new()
+	var was: Mode = mode
 	mode = Mode.NONE
+	if was != Mode.NONE:
+		session_ended.emit()
 
 
 ## Sends an intent. LOCAL returns the server's {ok, error}; CLIENT returns {ok: true, pending: true}
@@ -342,9 +352,13 @@ func _client_packet(type: int, payload: Variant) -> void:
 # --- Server ------------------------------------------------------------------------------------
 
 ## Starts listening as the dedicated room server. `opts`: {orchestrator, room_id, room_code,
-## room_secret, empty_timeout, latency_ms, loss}. Returns OK or an error.
+## room_secret, empty_timeout, latency_ms, loss, host_mode, host_uid}. `host_mode` (the room of a
+## party hosted on a player's PC, see `SteamParty`) listens on loopback only. Returns OK or an error.
 func start_server(port: int, opts: Dictionary = {}) -> Error:
 	stop()
+	if bool(opts.get("host_mode", false)) and not opts.has("bind_ip"):
+		opts = opts.duplicate()
+		opts["bind_ip"] = "127.0.0.1"
 	transport = TransportFactory.server(port, Protocol.MAX_PLAYERS + 4, opts)
 	if transport == null:
 		Log.error(&"net", "could not listen on UDP port %d" % port)
