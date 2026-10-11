@@ -1079,6 +1079,8 @@ func report_got_up(player: int, pos: Vector3) -> void:
 	_server_owned.erase(player)
 	set_server_position(player, pos)
 	_emit(GameEvents.make(&"player_got_up", {"player": player, "pos": Serializer.vec3(pos)}))
+	if _room != null and minigame == _room:
+		_room.on_player_got_up(player)
 
 
 ## A thrown-out player walks back in at `pos`.
@@ -1448,7 +1450,7 @@ func _tick_room() -> void:
 	for kd: Dictionary in _room.pending_knockdowns:
 		var p: int = int(kd["player"])
 		if state.players.has(p) and rules.knock_down(p, match_time, float(kd["seconds"])):
-			_emit(GameEvents.make(&"player_knocked_down", {"target": p, "attacker": -1, "seconds": kd["seconds"], "cause": kd.get("cause", &"minigame")}))
+			_emit(GameEvents.make(&"player_knocked_down", {"target": p, "attacker": int(kd.get("attacker", -1)), "seconds": kd["seconds"], "cause": kd.get("cause", &"minigame")}))
 	_room.pending_knockdowns.clear()
 	for id: int in _room.roster:
 		if not state.players.has(id) or _server_owned.get(id, false) or rules.is_knocked_down(id, match_time):

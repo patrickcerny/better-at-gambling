@@ -37,7 +37,8 @@ var out_groups: Array = []
 ## Server-side requests drained by the MatchServer each tick:
 ## player → position to teleport to (the gallery after an elimination).
 var pending_moves: Dictionary[int, Vector3] = {}
-## [{player, seconds, cause}] knockdowns (ragdolls) the server applies.
+## [{player, seconds, cause, attacker?}] knockdowns (ragdolls) the server applies (`attacker`
+## only steers which way the body flies).
 var pending_knockdowns: Array[Dictionary] = []
 ## Who started (spawn index is their place in this list).
 var roster: Array[int] = []
@@ -137,6 +138,11 @@ func submit(player: int, intent: Dictionary, now: float) -> Dictionary:
 	var raw: Variant = intent.get("target", -1)
 	var hint: int = int(raw) if typeof(raw) in [TYPE_INT, TYPE_FLOAT] else -1
 	return _on_action(player, StringName(kind), hint, now)
+
+
+## The server saw `player`'s ragdoll stand up again (`MatchServer.report_got_up`). Subclass hook.
+func on_player_got_up(_player: int) -> void:
+	pass
 
 
 ## Subclass: the action button. {ok, error} (StationLogicBase.OK_RESULT / fail).

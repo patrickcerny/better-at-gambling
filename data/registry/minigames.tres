@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RegistryList" load_steps=11 format=3]
+[gd_resource type="Resource" script_class="RegistryList" load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://core/defs/registry_list.gd" id="1"]
 [ext_resource type="Resource" path="res://minigames/quiz/quiz.tres" id="2"]
@@ -11,7 +11,8 @@
 [ext_resource type="Resource" path="res://minigames/forehead_poker/forehead_poker.tres" id="forehead_poker"]
 [ext_resource type="Resource" path="res://minigames/spy/spy.tres" id="spy"]
 [ext_resource type="Resource" path="res://minigames/pass_the_bomb/pass_the_bomb.tres" id="pass_the_bomb"]
+[ext_resource type="Resource" path="res://minigames/bat_heist/bat_heist.tres" id="bat_heist"]
 
 [resource]
 script = ExtResource("1")
-entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("forehead_poker"), ExtResource("spy"), ExtResource("pass_the_bomb")])
+entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("forehead_poker"), ExtResource("spy"), ExtResource("pass_the_bomb"), ExtResource("bat_heist")])

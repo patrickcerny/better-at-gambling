@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/bat_heist/bat_heist_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/bat_heist/bat_heist_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"bat_heist"
+display_name = "Bat Heist"
+rules_text = "Everyone has 10 coins and a bat: swing to knock a bean flat, then hold the button over them to steal coins until they get up. Most coins after 60 s wins."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 2
+weight = 1.0
