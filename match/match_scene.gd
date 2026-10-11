@@ -565,7 +565,9 @@ func _connect_router() -> void:
 		else:
 			hud.show_leaderboard(shown))
 	router.pause.connect(_on_pause)
-	router.item_used.connect(items_ctl.on_slot)
+	router.item_used.connect(func(slot: int) -> void:
+		if not (stage is WalkableStage and view.state.phase == Phase.Id.MINIGAME):
+			items_ctl.on_slot(slot))  # no items in a walkable minigame room
 	router.ping.connect(func() -> void:
 		if local != null:
 			local.say("!", 1.0))
@@ -1508,6 +1510,8 @@ func _show_results(_standings: Array) -> void:
 
 ## Opens the stage for a minigame (`minigame_started`, or the snapshot when joining mid-game).
 func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
+	if _open_walkable_stage(start, snapshot_state):
+		return
 	if role == Role.SERVER:
 		return
 	_close_stage()
@@ -1527,22 +1531,62 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 			briefing = MinigameBriefing.new()
 			add_child(briefing)
 			briefing.open(start if start.has("briefing") else {"minigame": start.get("minigame", ""), "players": start.get("players", []), "briefing": hold}, view.state, local_id)
-		# The minigame owns the screen: every table panel, menu and wheel goes away, and the cursor
-		# stays put (STAGE mode ignores sit/stand/menu-closed mode changes until the stage is over).
-		router.set_mode(InputRouter.Mode.STAGE)
-		current_ui = null
-		for ui: StationUi in station_uis.values():
-			ui.close()
-		emote_wheel.visible = false
-		lobby_panel.close()
-		shop_panel.close_panel()
-		if pause_menu != null and pause_menu.visible:
-			pause_menu.close()
-		hud.visible = false
-		if local != null:
-			local.auto_target = Vector3.INF
-		Audio.play(&"whoosh", &"SFX", -4.0)
+		_stage_takes_screen(InputRouter.Mode.STAGE)
 	)
+
+
+## The minigame owns the screen: every table panel, menu and wheel goes away, and the cursor
+## stays put (STAGE mode ignores sit/stand/menu-closed mode changes until the stage is over). A
+## walkable stage asks for WALK while its game runs.
+func _stage_takes_screen(mode: InputRouter.Mode) -> void:
+	router.set_mode(mode)
+	current_ui = null
+	for ui: StationUi in station_uis.values():
+		ui.close()
+	emote_wheel.visible = false
+	lobby_panel.close()
+	shop_panel.close_panel()
+	if pause_menu != null and pause_menu.visible:
+		pause_menu.close()
+	hud.visible = false
+	if local != null:
+		local.auto_target = Vector3.INF
+	Audio.play(&"whoosh", &"SFX", -4.0)
+
+
+## Walkable minigames (W, minigames/common/walkable_stage.gd): the room is built and the bodies go
+## to their spawns at once (the server already moved them; the dedicated server builds it too so
+## ragdolls have a floor), then the usual curtain, title and rules briefing play over it. False if
+## this minigame has an ordinary stage.
+func _open_walkable_stage(start: Dictionary, snapshot_state: Dictionary) -> bool:
+	var def: MinigameDefinition = Registry.minigames.get(StringName(start.get("minigame", "")), null)
+	if def == null or def.stage_script == null:
+		return false
+	var probe: Object = def.stage_script.new()
+	if not probe is WalkableStage:
+		(probe as Node).free()
+		return false
+	_close_stage()
+	var ws: WalkableStage = probe
+	ws.name = "MinigameStage"
+	ws.scene = self
+	ws.ui_host = self
+	stage = ws
+	pixel_view.world.add_child(ws)
+	ws.begin(view.state, local_id, start, snapshot_state)
+	if role == Role.SERVER:
+		return true
+	items_ctl.put_away()  # no items in the room: empty hands
+	_curtain_sequence(def.display_name if def.display_name != "" else String(def.id).capitalize(), "MINIGAME", 0.0, func() -> void:
+		var hold: Variant = start.get("briefing", snapshot_state.get("briefing", 0.0))
+		if stage == ws and ((hold is Dictionary) or float(hold) > 0.0) and not ws.going:
+			briefing = MinigameBriefing.new()
+			add_child(briefing)
+			briefing.open(start if start.has("briefing") else {"minigame": start.get("minigame", ""), "players": start.get("players", []), "briefing": hold}, view.state, local_id)
+		if stage == ws:
+			_stage_takes_screen(ws.input_mode())
+	)
+	return true
 
 
 ## Curtain timings (close, hold, open) in seconds; tiny with `test_curtain_fast`.
@@ -1866,6 +1910,8 @@ func _on_match_reset() -> void:
 # --- Local input -------------------------------------------------------------------------------
 
 func _on_interact() -> void:
+	if stage is WalkableStage and (stage as WalkableStage).on_action_pressed():
+		return  # a walkable minigame's action button (tag, steal, ...)
 	if local != null and _local_holding() >= 0:
 		_throw_held()
 		return

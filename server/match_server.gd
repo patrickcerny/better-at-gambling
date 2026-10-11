@@ -87,6 +87,10 @@ var _kicked: Dictionary[String, float] = {}
 ## Who the current/last minigame started with (late joiners are not in it; the snapshot tells
 ## them to sit it out). Kept through its rewards.
 var _minigame_roster: Array[int] = []
+## Walkable minigame ("W", minigames/common/walkable_logic_base.gd) whose room is up: set when it
+## starts, kept through its rewards (everyone still stands in the room) and dropped at the regroup.
+## While set, positions are clamped to the room and casino intents are refused (`minigame`).
+var _room: WalkableLogicBase = null
 
 
 ## Wires balance/presets/registry data. Call before `add_player`/`start_match`.
@@ -178,6 +182,7 @@ func _build_match_systems(seed_value: int) -> void:
 			dealers[sid] = DealerLogic.new(sid, state.players, rules, world, dealer_rng, stations, map_def, DealerLogic.OFFSETS[logic.game_id])
 	minigames.reset()
 	minigame = null
+	_room = null
 	rewards = RewardDirector.new()
 	_comped.clear()
 	results_return_in = -1.0
@@ -370,6 +375,8 @@ func _intent_clock() -> float:
 ## Handles one client intent. Returns {ok, error}.
 func submit_intent(player: int, intent: Dictionary) -> Dictionary:
 	var why: StringName = validator.check(player, intent, phases.phase, _intent_clock(), state.players.has(player))
+	if _room != null and (why == &"" or why == &"wrong_phase") and _room.blocks_intent(StringName(intent.get("type", &""))):
+		why = &"minigame"  # walkable room: stations, items, shop, tips and the megaphone are off
 	if why == &"" and _jail_blocks(player, intent):
 		why = &"jailed"
 	if why != &"":
@@ -482,6 +489,8 @@ func _step(delta: float) -> void:
 		rewards.tick(delta)
 		if rewards.is_done():
 			phases.rewards_finished()
+	if _room != null:
+		_tick_room()
 	modifiers.expire(match_time)
 	items.tick(match_time, casino_open)
 	waiter.tick(match_time, casino_open)
@@ -559,6 +568,7 @@ func _refund_and_stand_everyone() -> void:
 ## ragdolls and knockouts are over, bodies go to their hall spot and the doors stay shut for
 ## `regroup_time` seconds. `regroup_started {seconds, positions: {player: [x, y, z]}}`.
 func _start_regroup() -> void:
+	_room = null  # the walkable room (if any) closes: everyone goes back to the hall below
 	interactions.regroup()
 	_flush()
 	var positions: Dictionary = {}
@@ -604,7 +614,10 @@ func _start_minigame() -> void:
 	briefing_left = maxf(float(settings.get("minigame_briefing", 30.0)), 0.0)
 	ready_players = {}
 	_minigame_roster = players.duplicate()
-	_emit(GameEvents.make(&"minigame_started", {"minigame": minigames.current_def.id, "name": minigames.current_def.display_name, "rules": minigames.current_def.rules_text, "players": players, "briefing": briefing_left}))
+	var started: Dictionary = {"minigame": minigames.current_def.id, "name": minigames.current_def.display_name, "rules": minigames.current_def.rules_text, "players": players, "briefing": briefing_left}
+	if minigame is WalkableLogicBase:
+		started["room"] = _open_room(minigame as WalkableLogicBase)
+	_emit(GameEvents.make(&"minigame_started", started))
 	_flush()
 
 
@@ -829,7 +842,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"move":
 			if not can_move(player):
 				return StationLogicBase.fail(&"not_standing")
-			world.set_transform(player, _jail_clamp(player, Serializer.to_vec3(intent["pos"])), float(intent["yaw"]), bool(intent.get("airborne", false)))
+			world.set_transform(player, _clamp_position(player, Serializer.to_vec3(intent["pos"])), float(intent["yaw"]), bool(intent.get("airborne", false)))
 			state.players[player].position = world.get_position(player)
 			return StationLogicBase.OK_RESULT
 		&"grab":
@@ -925,6 +938,14 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			return minigame.submit(player, intent, match_time)
 		&"spy_clue", &"spy_call_vote", &"spy_vote":
 			if minigame == null or not minigame is SpyLogic:
+				return StationLogicBase.fail(&"too_late")
+			if in_briefing():
+				return StationLogicBase.fail(&"too_early")
+			return minigame.submit(player, intent, match_time)
+		&"minigame_action":
+			# A walkable game's action button (tag, steal, drop...): the logic decides from the
+			# server's own positions; `target` is only a hint like a shove's.
+			if minigame == null or not minigame is WalkableLogicBase:
 				return StationLogicBase.fail(&"too_late")
 			if in_briefing():
 				return StationLogicBase.fail(&"too_early")
@@ -1031,8 +1052,8 @@ func can_move(player: int) -> bool:
 func apply_move(player: int, pos: Vector3, yaw: float, airborne: bool) -> bool:
 	if not state.players.has(player) or not can_move(player):
 		return true  # ignored, not a cheat: the server owns the body right now
-	var held: Vector3 = _jail_clamp(player, pos)
-	if held != pos:  # walked out of the jail cell (or never went in): snapped back inside
+	var held: Vector3 = _clamp_position(player, pos)
+	if held != pos:  # walked out of the jail cell or the minigame room: snapped back inside
 		set_server_position(player, held)
 		return false
 	if not sanity.check(player, pos, _uptime):
@@ -1396,6 +1417,48 @@ func _jail_clamp(player: int, pos: Vector3) -> Vector3:
 		return pos
 	var inside: Vector3 = map_def.clamp_to_jail(pos)
 	return inside if inside.distance_to(pos) < 1.5 else map_def.jail_spot(player)
+
+
+## Every reported position goes through here: the jail cell, then a walkable minigame's room.
+func _clamp_position(player: int, pos: Vector3) -> Vector3:
+	var held: Vector3 = _jail_clamp(player, pos)
+	return _room.clamp_position(player, held) if _room != null else held
+
+
+# --- Walkable minigame rooms (W) ---
+
+
+## A walkable minigame starts: holds and knockdowns end, every participant stands on their spawn in
+## the room (the scene builds it from `minigame_started.room` and teleports the bodies it owns).
+func _open_room(wl: WalkableLogicBase) -> Dictionary:
+	_room = wl
+	wl.world = world
+	interactions.regroup()
+	for id: int in wl.players:
+		_server_owned.erase(id)
+		world.set_transform(id, wl.spawn_for(id), wl.spawn_yaw_for(id))
+		set_server_position(id, wl.spawn_for(id))
+	return wl.room_wire()
+
+
+## Each tick while a room is up: the logic's knockdowns (ragdolls) and gallery moves, then the
+## clamp for bodies the server set itself (a ragdoll that got up, a throw). A body moved here goes
+## out as `minigame_player_moved {player, pos}` and the scene puts it there.
+func _tick_room() -> void:
+	for kd: Dictionary in _room.pending_knockdowns:
+		var p: int = int(kd["player"])
+		if state.players.has(p) and rules.knock_down(p, match_time, float(kd["seconds"])):
+			_emit(GameEvents.make(&"player_knocked_down", {"target": p, "attacker": -1, "seconds": kd["seconds"], "cause": kd.get("cause", &"minigame")}))
+	_room.pending_knockdowns.clear()
+	for id: int in _room.roster:
+		if not state.players.has(id) or _server_owned.get(id, false) or rules.is_knocked_down(id, match_time):
+			continue  # a ragdoll in flight: once it is up, it is moved/clamped
+		var at: Vector3 = world.get_position(id)
+		var to: Vector3 = _room.pending_moves.get(id, _room.clamp_position(id, at))
+		_room.pending_moves.erase(id)
+		if to != at:
+			set_server_position(id, to)
+			_emit(GameEvents.make(&"minigame_player_moved", {"player": id, "pos": Serializer.vec3(to)}))
 
 
 # --- Start room (online lobby) ---

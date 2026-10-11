@@ -21,6 +21,8 @@ const SCHEMA: Dictionary = {
 	&"spy_clue": ["text"], &"spy_call_vote": [], &"spy_vote": ["target"],
 	&"split_or_steal_pick": ["choice"],
 	&"lonely_number_pick": ["number"],
+	## Walkable minigames' action button (E): {kind, target?}; the logic picks the real target.
+	&"minigame_action": ["kind"],
 	&"minigame_ready": [],
 	&"set_ready": ["ready"],
 	&"lobby_setting": ["key", "value"],

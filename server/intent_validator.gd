@@ -21,6 +21,7 @@ const PHASES: Dictionary = {
 	&"forehead_poker_action": [Phase.Id.MINIGAME],
 	&"spy_clue": [Phase.Id.MINIGAME], &"spy_call_vote": [Phase.Id.MINIGAME], &"spy_vote": [Phase.Id.MINIGAME],
 	&"split_or_steal_pick": [Phase.Id.MINIGAME],
+	&"minigame_action": [Phase.Id.MINIGAME],
 	&"set_ready": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"lobby_setting": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"set_skin": [Phase.Id.LOBBY, Phase.Id.RESULTS],
