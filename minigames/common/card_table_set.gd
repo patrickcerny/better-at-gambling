@@ -283,6 +283,7 @@ func _build_seat(pid: int, i: int, n: int) -> void:
 	bean.name = "Bean"
 	bean.scale = Vector3.ONE * BEAN_SCALE
 	bean.position = Vector3(0, CHAIR_SEAT_H + 0.05, 0)
+	bean.rotation.y = PI  # a bean's face is its -Z: face the table, the chair back behind it
 	seat.add_child(bean)
 	bean.set_color(_color(pid))
 	if state != null:

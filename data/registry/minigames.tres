@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RegistryList" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="RegistryList" load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://core/defs/registry_list.gd" id="1"]
 [ext_resource type="Resource" path="res://minigames/quiz/quiz.tres" id="2"]
@@ -8,7 +8,8 @@
 [ext_resource type="Resource" path="res://minigames/bust_or_bank/bust_or_bank.tres" id="6"]
 [ext_resource type="Resource" path="res://minigames/vote_race/vote_race.tres" id="7"]
 [ext_resource type="Resource" path="res://minigames/find_the_lady/find_the_lady.tres" id="8"]
+[ext_resource type="Resource" path="res://minigames/forehead_poker/forehead_poker.tres" id="forehead_poker"]
 
 [resource]
 script = ExtResource("1")
-entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8")])
+entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("forehead_poker")])

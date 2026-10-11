@@ -917,6 +917,12 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if in_briefing():
 				return StationLogicBase.fail(&"too_early")
 			return minigame.submit(player, intent, match_time)
+		&"forehead_poker_action":
+			if minigame == null or not minigame is ForeheadPokerLogic:
+				return StationLogicBase.fail(&"too_late")
+			if in_briefing():
+				return StationLogicBase.fail(&"too_early")
+			return minigame.submit(player, intent, match_time)
 		&"lonely_number_pick":
 			if minigame == null or not minigame is LonelyNumberLogic:
 				return StationLogicBase.fail(&"too_late")
