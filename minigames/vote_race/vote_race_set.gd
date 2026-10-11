@@ -1,14 +1,10 @@
 class_name VoteRaceSet
 extends Control
-## The Vote Race game-show set behind the cards: a wine velvet backdrop with pleats, a dark stage
-## floor with a gold edge and warm spotlights falling on the cards in `spots` (the leader while
-## voting, the racers who step forward at the reveal, the winner at the end). Drawn, no assets.
+## Warm spotlights over the Vote Race cards (the 3D set behind them is `VoteRaceTrack`): a soft
+## cone from the rig onto each card in `spots` (the leader while voting, the racers who step
+## forward at the reveal, the winner at the end). Drawn, no assets.
 
-const TOP: Color = Color("#2B0D14")
-const BOTTOM: Color = Color("#150B0C")
-const FLOOR: Color = Color("#1B1210")
 const LIGHT: Color = Color("#FFE2A0")
-const PLEAT_W: float = 96.0
 
 ## Card rects in this control's coordinates that get a spotlight.
 var spots: Array[Rect2] = []
@@ -26,24 +22,8 @@ func set_spots(rects: Array[Rect2]) -> void:
 
 
 func _draw() -> void:
-	var w: float = size.x
-	var h: float = size.y
-	var floor_y: float = h * 0.8
-	# Velvet backdrop: a dark-to-darker gradient with soft vertical pleats.
-	_vgrad(Rect2(0, 0, w, floor_y), TOP, BOTTOM)
-	var x: float = 0.0
-	while x < w:
-		var pts := PackedVector2Array([Vector2(x, 0), Vector2(x + PLEAT_W * 0.5, 0), Vector2(x + PLEAT_W * 0.5, floor_y), Vector2(x, floor_y)])
-		var lit := Color(Palette.VIP_BURGUNDY, 0.28)
-		var dark := Color(0, 0, 0, 0.0)
-		draw_polygon(pts, PackedColorArray([dark, lit, lit, dark]))
-		var pts2 := PackedVector2Array([Vector2(x + PLEAT_W * 0.5, 0), Vector2(x + PLEAT_W, 0), Vector2(x + PLEAT_W, floor_y), Vector2(x + PLEAT_W * 0.5, floor_y)])
-		draw_polygon(pts2, PackedColorArray([lit, dark, dark, lit]))
-		x += PLEAT_W
-	# Stage floor with a gold lip.
-	_vgrad(Rect2(0, floor_y, w, h - floor_y), FLOOR, Palette.CASINO_BLACK)
-	draw_rect(Rect2(0, floor_y - 3, w, 4), Palette.WARM_GOLD)
-	draw_rect(Rect2(0, floor_y + 1, w, 2), Color(Palette.WARM_GOLD, 0.25))
+	# A soft shade from the top so the marquee and cards sit off the curtain behind.
+	_vgrad(Rect2(0, 0, size.x, size.y * 0.55), Color(0, 0, 0, 0.5), Color(0, 0, 0, 0.0))
 	# Spotlights: a soft cone from the rig above and a warm pool on the floor.
 	for r: Rect2 in spots:
 		var cx: float = r.get_center().x

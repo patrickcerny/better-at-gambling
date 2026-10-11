@@ -45,13 +45,15 @@ var chip_area: Control
 var tally_label: Label
 var stamp: Label
 var voted_badge: Label
+## The check on the card you voted for (your vote is secret until the reveal: only you see it).
+var check_badge: Control
 
 
 func _init() -> void:
 	text = ""
 	focus_mode = Control.FOCUS_NONE
 	clip_contents = false
-	custom_minimum_size = Vector2(170, 430)
+	custom_minimum_size = Vector2(170, 300)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_build()
@@ -123,6 +125,14 @@ func _build() -> void:
 	voted_badge.add_theme_stylebox_override(&"normal", vb)
 	voted_badge.visible = false
 	add_child(voted_badge)
+	check_badge = Control.new()
+	check_badge.name = "CheckBadge"
+	check_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	check_badge.size = Vector2(52, 52)
+	check_badge.position = Vector2(-16, -16)
+	check_badge.visible = false
+	check_badge.draw.connect(_draw_check)
+	add_child(check_badge)
 	stamp = _label("", BLACK_FONT, 34, Palette.CREAM)
 	stamp.visible = false
 	stamp.rotation = -0.12
@@ -158,6 +168,7 @@ func refresh() -> void:
 		tag_label.text = ""
 	tag_label.add_theme_color_override(&"font_color", Palette.VIP_BURGUNDY if is_my_vote or is_self else Color(CARD_DARK, 0.6))
 	voted_badge.visible = has_voted
+	check_badge.visible = is_my_vote and stamp_text == ""
 	tally_label.text = ("%d VOTE" % tally + ("" if tally == 1 else "S")) if show_tally else ""
 	if stamp_text != "":
 		stamp.text = stamp_text
@@ -253,6 +264,17 @@ func _draw_medal() -> void:
 	var fs: int = int(r * 0.95)
 	var ink: Color = CARD_DARK if player_color.get_luminance() > 0.45 else Palette.CREAM
 	chip_area.draw_string(BLACK_FONT, c + Vector2(-r, fs * 0.36), initial, HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, fs, Color(ink, a))
+
+
+## A burgundy disc in a gold rim with a cream check mark.
+func _draw_check() -> void:
+	var c: Vector2 = check_badge.size * 0.5
+	var r: float = c.x
+	check_badge.draw_circle(c + Vector2(0, 3), r, Color(0, 0, 0, 0.4), true, -1.0, true)
+	check_badge.draw_circle(c, r, Palette.VIP_GOLD, true, -1.0, true)
+	check_badge.draw_circle(c, r - 4.0, Palette.VIP_BURGUNDY, true, -1.0, true)
+	var pts := PackedVector2Array([c + Vector2(-11, 1), c + Vector2(-3, 10), c + Vector2(12, -9)])
+	check_badge.draw_polyline(pts, Palette.CREAM, 6.0, true)
 
 
 ## Five pips: filled gold for every step taken, the last one is the cashier.
