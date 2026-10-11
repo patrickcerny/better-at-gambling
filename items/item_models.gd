@@ -27,9 +27,11 @@ const SIZES: Dictionary = {
 	&"empty_bottle": 0.32,
 }
 ## How a model sits in the hand, in upright space (y up, -z forward): [offset, rotation degrees].
+## bat.glb has its barrel (thick end) at -y, so the bat is turned end over end (z ~180) to put the
+## knob in the fist and the barrel up and forward.
 const DEFAULT_GRIP: Array = [Vector3(0.0, 0.16, -0.2), Vector3.ZERO]
 const GRIPS: Dictionary = {
-	&"baseball_bat": [Vector3(0.0, 0.38, -0.12), Vector3(-25, 0, 0)],
+	&"baseball_bat": [Vector3(0.0, 0.38, -0.12), Vector3(-25, 0, 160)],
 	&"russian_roulette": [Vector3(0.0, 0.12, -0.24), Vector3(0, 90, 0)],
 	&"scratch_ticket": [Vector3(0.0, 0.2, -0.2), Vector3(75, 0, 0)],
 	&"dog_collar": [Vector3(0.0, 0.18, -0.22), Vector3(60, 0, 0)],
@@ -160,7 +162,7 @@ const VIEW_OFFSET: Vector3 = Vector3(0.3, -0.27, -0.6)
 const VIEW_SCALE: float = 0.5
 ## First-person poses where the hand pose would block the view: [offset, rotation degrees].
 const VIEW_GRIPS: Dictionary = {
-	&"baseball_bat": [Vector3(0.08, 0.02, -0.05), Vector3(-40, 0, -45)],
+	&"baseball_bat": [Vector3(0.08, 0.02, -0.05), Vector3(-40, 0, 135)],
 }
 
 

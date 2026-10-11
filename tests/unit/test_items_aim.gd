@@ -83,3 +83,56 @@ func test_item_models_have_a_model_for_every_item() -> void:
 	assert_eq(bat.get_meta(&"item"), &"baseball_bat")
 	assert_eq(bat.get_child_count(), 1)
 	bat.free()
+
+
+## The bat's two ends in `space`'s coordinates: [barrel, knob]. The barrel is the thick end of the
+## model (asserted, so a swapped model fails here rather than turning up in a hand upside down).
+func _bat_ends(holder: Node3D, space: Node3D) -> Array:
+	var pts: Array[Vector3] = []
+	for n: Node in holder.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = n
+		var xf: Transform3D = holder.global_transform.affine_inverse() * mi.global_transform
+		for p: Vector3 in mi.mesh.get_faces():
+			pts.append(xf * p)
+	var lo: float = INF
+	var hi: float = -INF
+	for p: Vector3 in pts:
+		lo = minf(lo, p.y)
+		hi = maxf(hi, p.y)
+	var r_lo: float = 0.0
+	var r_hi: float = 0.0
+	for p: Vector3 in pts:
+		var r: float = Vector2(p.x, p.z).length()
+		if p.y < lo + (hi - lo) * 0.2:
+			r_lo = maxf(r_lo, r)
+		elif p.y > hi - (hi - lo) * 0.2:
+			r_hi = maxf(r_hi, r)
+	assert_gt(r_lo, r_hi * 1.2, "the bat model's barrel (thick end) is its -y end")
+	var to_space: Transform3D = space.global_transform.affine_inverse() * holder.global_transform
+	return [to_space * Vector3(0, lo, 0), to_space * Vector3(0, hi, 0)]
+
+
+func test_held_bat_points_barrel_up_and_forward() -> void:
+	var v := AvatarVisuals.new()
+	add_child_autofree(v)
+	var held: Node3D = ItemModels.make_held(&"baseball_bat")
+	ItemModels.attach_to_hand(v, held)
+	var ends: Array = _bat_ends(held.get_child(0) as Node3D, v)
+	var barrel: Vector3 = ends[0]
+	var knob: Vector3 = ends[1]
+	var hand: Vector3 = v.global_transform.affine_inverse() * ItemModels.hand_node(v).global_position
+	assert_gt(barrel.y, knob.y + 0.5, "barrel above the grip, not the handle sticking up")
+	assert_lt(barrel.z, knob.z, "barrel forward (-z) of the grip")
+	assert_lt(knob.distance_to(hand), barrel.distance_to(hand), "the fist holds the handle end")
+
+
+func test_first_person_bat_points_barrel_up_and_away() -> void:
+	var cam := Camera3D.new()
+	add_child_autofree(cam)
+	var view: Node3D = ItemModels.make_view(&"baseball_bat")
+	cam.add_child(view)
+	var ends: Array = _bat_ends(view.get_child(0) as Node3D, cam)
+	var barrel: Vector3 = ends[0]
+	var knob: Vector3 = ends[1]
+	assert_gt(barrel.y, knob.y, "barrel above the grip in view")
+	assert_lt(barrel.z, knob.z, "barrel further from the eye than the grip")
