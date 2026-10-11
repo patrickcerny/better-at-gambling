@@ -65,6 +65,8 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if event.is_action(&"pause"):
+		return  # Escape is the pause menu's, even during the rules card
 	if event is InputEventKey:
 		var k: InputEventKey = event as InputEventKey
 		if k.pressed and not k.echo and (k.physical_keycode == KEY_SPACE or k.physical_keycode == KEY_ENTER or k.physical_keycode == KEY_KP_ENTER):

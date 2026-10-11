@@ -34,6 +34,8 @@ var hud: Hud
 var router: InputRouter
 var emote_wheel: EmoteWheel
 var ui_layer: CanvasLayer
+## The pause menu's own layer: above every stage's UI, below the curtain.
+var pause_layer: CanvasLayer = null
 ## Everything 3D sits in here (the map, `world_root`, minigame stages, the results podium): the
 ## pixel look renders it at a lower resolution while `ui_layer` stays sharp (`PixelView`).
 var pixel_view: PixelView
@@ -96,6 +98,7 @@ var curtain_plaque: PanelContainer = null
 var curtain_open: float = 1.0
 var curtain_tween: Tween = null
 ## Seconds the curtain takes to close, stays closed showing the name, and takes to open.
+const PAUSE_LAYER: int = 85
 const CURTAIN_CLOSE_TIME: float = 0.6
 const CURTAIN_HOLD_TIME: float = 1.5
 const CURTAIN_OPEN_TIME: float = 0.8
@@ -2095,9 +2098,12 @@ func _expire_predictions() -> void:
 			_end_prediction(kind, false)
 
 
+## Escape: the pause menu, in the casino and in every minigame (Patrick, 0.9.2: "can't press
+## Escape in minigames"). It lives on its own layer above the stages' UI, not on the HUD, which a
+## minigame hides.
 func _on_pause() -> void:
-	if results_panel != null or router.mode == InputRouter.Mode.STAGE:
-		return  # the pause menu lives on the HUD, which a minigame hides
+	if results_panel != null:
+		return
 	if pause_menu != null and pause_menu.visible:
 		pause_menu.back()  # settings → pause menu → play
 	elif router.mode == InputRouter.Mode.MENU:
@@ -2109,7 +2115,11 @@ func _on_pause() -> void:
 			pause_menu.resumed.connect(_resume_play)
 			pause_menu.leave_requested.connect(_leave_to_menu)
 			pause_menu.quit_requested.connect(_quit_game)
-			hud.add_child(pause_menu)
+			pause_layer = CanvasLayer.new()
+			pause_layer.name = "PauseLayer"
+			pause_layer.layer = PAUSE_LAYER
+			add_child(pause_layer)
+			pause_layer.add_child(pause_menu)
 		router.set_mode(InputRouter.Mode.MENU)
 		pause_menu.open()
 
@@ -2122,7 +2132,10 @@ func _quit_game() -> void:
 
 
 func _resume_play() -> void:
-	router.set_play_mode(InputRouter.Mode.SEATED if local != null and local.state == PlayerAvatar.State.SEATED else InputRouter.Mode.WALK)
+	if stage != null and is_instance_valid(stage):
+		router.set_mode(stage.input_mode())  # back to the minigame: its cursor, or walking in its room
+	else:
+		router.set_play_mode(InputRouter.Mode.SEATED if local != null and local.state == PlayerAvatar.State.SEATED else InputRouter.Mode.WALK)
 	hud.toast("", 0.0)
 
 

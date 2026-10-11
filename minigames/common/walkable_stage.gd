@@ -108,6 +108,8 @@ func _apply_input_mode() -> void:
 		return
 	if scene.briefing != null and is_instance_valid(scene.briefing) and not going:
 		return  # the rules card keeps its cursor until the game goes
+	if scene.pause_menu != null and scene.pause_menu.visible:
+		return  # the pause menu returns to `input_mode()` on resume
 	scene.router.set_mode(input_mode())
 
 

@@ -19,6 +19,12 @@ var ui_host: Node = null
 
 ## Sets up for the minigame described by `start` (the `minigame_started` event) and, when joining
 ## late, the public state from the snapshot.
+## The input mode the stage wants while it is up (the pause menu returns to it): a free cursor;
+## walkable stages ask for WALK while their game runs.
+func input_mode() -> InputRouter.Mode:
+	return InputRouter.Mode.STAGE
+
+
 func begin(p_state: ClientMatchState, p_local_id: int, start: Dictionary, snapshot_state: Dictionary) -> void:
 	state = p_state
 	local_id = p_local_id
