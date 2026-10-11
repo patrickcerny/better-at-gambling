@@ -144,3 +144,17 @@ func test_tab_closes_the_open_panel() -> void:
 	_key(false)
 	assert_false(panel.visible, "Tab closes the lobby panel")
 	assert_eq(closed.size(), 1)
+
+
+func test_a_steam_hosted_party_offers_invite_instead_of_public() -> void:
+	panel._refresh()
+	assert_true(panel.public_button.visible, "orchestrator party: PUBLIC toggle")
+	assert_false(panel.invite_button.visible)
+	var old_room: Dictionary = Net.room
+	Net.room = {"steam_lobby": 109775240000000001, "host_mode": true}
+	panel._refresh()
+	assert_false(panel.public_button.visible, "no server browser for a Steam party")
+	assert_true(panel.invite_button.visible, "INVITE FRIENDS opens the Steam overlay")
+	assert_string_contains(panel._title.text, "STEAM")
+	panel.invite_button.pressed.emit()  # no Steam here: nothing happens, nothing breaks
+	Net.room = old_room

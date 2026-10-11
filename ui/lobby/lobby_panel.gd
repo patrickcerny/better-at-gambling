@@ -25,6 +25,9 @@ var _items_button: Button
 ## Leader-only toggles: party mode (`MatchMode`) and server-browser listing.
 var mode_button: Button
 var public_button: Button
+## Host mode (a Steam party on someone's PC): opens the Steam overlay's invite dialog. Replaces
+## PUBLIC there (there is no server browser for Steam parties).
+var invite_button: Button
 ## Player id whose KICK was pressed once (the second press kicks), and when it disarms.
 var _kick_armed: int = -1
 var _kick_armed_until: float = 0.0
@@ -170,6 +173,14 @@ func _build() -> void:
 	public_button.pressed.connect(func() -> void:
 		Net.send_intent(Intents.make(&"lobby_setting", {"key": "public", "value": not bool(state.lobby_settings.get("public", false))})))
 	toggles.add_child(public_button)
+	invite_button = Button.new()
+	invite_button.name = "InviteFriends"
+	invite_button.text = "INVITE FRIENDS"
+	invite_button.tooltip_text = "Invite Steam friends (Steam overlay)"
+	invite_button.custom_minimum_size = Vector2(170, 0)
+	invite_button.visible = false
+	invite_button.pressed.connect(func() -> void: SteamSvc.invite_friends())
+	toggles.add_child(invite_button)
 	_add_stepper("minigames", "MINIGAMES")
 	_add_stepper("gamble_minutes", "GAMBLING BETWEEN")
 	_items_button = Button.new()
@@ -240,7 +251,10 @@ func _refresh() -> void:
 	if state == null or _title == null:
 		return
 	var code: String = str(Net.room.get("room_code", ""))
-	_title.text = "PARTY LOBBY" + ("   ·   CODE %s" % code if code != "" else "")
+	var steam_party: bool = int(Net.room.get("steam_lobby", 0)) != 0
+	_title.text = "PARTY LOBBY" + ("   ·   CODE %s" % code if code != "" else ("   ·   STEAM" if steam_party else ""))
+	public_button.visible = not steam_party
+	invite_button.visible = steam_party
 	_countdown_label.text = "Doors open in %d…" % ceili(state.countdown) if state.countdown > 0.0 else "Step up on the pedestal with your name (or press READY)."
 	var ids: Array = state.players.keys()
 	ids.sort()

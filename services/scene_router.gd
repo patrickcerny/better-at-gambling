@@ -71,7 +71,9 @@ func net_opts() -> Dictionary:
 
 
 ## `--server --port P [--room-id --room-code --room-secret --orchestrator --empty-timeout]`:
-## the headless dedicated room server.
+## the headless dedicated room server. Host mode (`SteamParty`) adds `--host-mode` (loopback only,
+## no orchestrator), `--host-uid` (the room closes once the host is gone) and `--ready-file`
+## (written once the port is open, so the host's game knows when to join).
 func _boot_server() -> void:
 	Engine.max_fps = 60
 	var opts: Dictionary = net_opts()
@@ -80,10 +82,19 @@ func _boot_server() -> void:
 			opts[key.replace("-", "_")] = cmdline.get_string(key)
 	if cmdline.has("empty-timeout"):
 		opts["empty_timeout"] = cmdline.get_float("empty-timeout", 0.0)
+	if cmdline.has_flag("host-mode"):
+		opts["host_mode"] = true
+	if cmdline.has("host-uid"):
+		opts["host_uid"] = cmdline.get_string("host-uid")
 	var port: int = cmdline.get_int("port", Protocol.DEFAULT_PORT)
 	if Net.start_server(port, opts) != OK:
 		get_tree().quit(3)
 		return
+	if cmdline.has("ready-file"):
+		var f: FileAccess = FileAccess.open(cmdline.get_string("ready-file"), FileAccess.WRITE)
+		if f != null:
+			f.store_string(str(port))
+			f.close()
 	goto(MATCH)
 
 

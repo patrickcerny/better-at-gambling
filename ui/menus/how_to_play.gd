@@ -14,6 +14,7 @@ const PAGES: Array[Array] = [
 	["THE TABLES", "Blackjack, Roulette, Slots and Plinko. Pick a chip, place your bet and confirm; the table limits rise after every minigame.\n\nThe last stretch is LAST CALL: the final 60 seconds pay winnings ×1.5. Broke? The house comps you once per stretch."],
 	["ITEMS", "You carry up to three items. Use them with [{item_1}] [{item_2}] [{item_3}] (hold Shift while seated, where the number keys pick chips).\n\nEvery player gets an item after each minigame, and the gift shop sells more. Some help you (Lucky Clover), some hurt a rival (Black Cat, Banana Peel)."],
 	["MINIGAMES", "Every few minutes the curtain closes for a minigame: a quiz, Plinko, Split or Steal and more. Open bets are refunded and everyone is stood up first.\n\nThe briefing explains each one. Placing well pays cash and a better item."],
+	["PLAYING WITH FRIENDS", "PLAY ONLINE: Create Party puts your party on our server; friends join with its 5-letter code or from Browse Parties.\n\nWith Steam running you can also Host on this PC: the party runs on your computer and friends join through Steam (INVITE FRIENDS in the lobby, or Join Game in their friends list). Everyone needs the same version of the game."],
 	["ROUGH PLAY & JAIL", "[{grab}] grabs and throws, [{shove}] shoves. Knock a rival down and [{shake}] shakes chips out of their pockets. Seated players are safe.\n\nThe security guards watch: get caught attacking someone and you go to jail, longer and with a bigger fine every time."],
 ]
 

@@ -28,7 +28,7 @@ Settings="*res://services/settings_manager.gd"
 SceneRouter="*res://services/scene_router.gd"
 Registry="*res://services/registry.gd"
 Net="*res://net/net_session.gd"
-SteamSvc="*res://services/steam_service_stub.gd"
+SteamSvc="*res://services/steam_service.gd"
 Audio="*res://audio/audio_director.gd"
 Loading="*res://services/loading_screen.gd"
 
