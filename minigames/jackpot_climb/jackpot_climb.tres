@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/jackpot_climb/jackpot_climb_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/jackpot_climb/jackpot_climb_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"jackpot_climb"
+display_name = "Jackpot Climb"
+rules_text = "Jump from chip stack to chip stack up to the JACKPOT sign. E swings your bat to knock climbers off their ledge. First to the top wins, the rest rank by height."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 2
+weight = 1.0

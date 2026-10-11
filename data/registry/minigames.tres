@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RegistryList" load_steps=16 format=3]
+[gd_resource type="Resource" script_class="RegistryList" load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://core/defs/registry_list.gd" id="1"]
 [ext_resource type="Resource" path="res://minigames/quiz/quiz.tres" id="2"]
@@ -16,7 +16,8 @@
 [ext_resource type="Resource" path="res://minigames/grab_your_hand/grab_your_hand.tres" id="grab_your_hand"]
 [ext_resource type="Resource" path="res://minigames/roulette_sumo/roulette_sumo.tres" id="roulette_sumo"]
 [ext_resource type="Resource" path="res://minigames/dodge_the_dice/dodge_the_dice.tres" id="dodge_the_dice"]
+[ext_resource type="Resource" path="res://minigames/jackpot_climb/jackpot_climb.tres" id="jackpot_climb"]
 
 [resource]
 script = ExtResource("1")
-entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("forehead_poker"), ExtResource("spy"), ExtResource("pass_the_bomb"), ExtResource("bat_heist"), ExtResource("last_seat"), ExtResource("grab_your_hand"), ExtResource("roulette_sumo"), ExtResource("dodge_the_dice")])
+entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("forehead_poker"), ExtResource("spy"), ExtResource("pass_the_bomb"), ExtResource("bat_heist"), ExtResource("last_seat"), ExtResource("grab_your_hand"), ExtResource("roulette_sumo"), ExtResource("dodge_the_dice"), ExtResource("jackpot_climb")])

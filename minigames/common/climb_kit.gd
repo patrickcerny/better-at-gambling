@@ -234,6 +234,22 @@ static func ledge(parent: Node3D, size: Vector3, pos: Vector3, mat: Material, na
 	return body
 
 
+## A round platform with collision (a chip-stack column): a cylinder `radius` wide standing on
+## `base` and `height` tall, its flat top the ledge. Invisible: the caller dresses it.
+static func column(parent: Node3D, radius: float, height: float, base: Vector3, name: String = "Column") -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = name
+	var cs := CollisionShape3D.new()
+	var shape := CylinderShape3D.new()
+	shape.radius = radius
+	shape.height = height
+	cs.shape = shape
+	body.add_child(cs)
+	body.position = base + Vector3(0, height * 0.5, 0)
+	parent.add_child(body)
+	return body
+
+
 ## An invisible wall that keeps beans on the climb.
 static func guard(parent: Node3D, size: Vector3, pos: Vector3, name: String = "Guard") -> StaticBody3D:
 	return ledge(parent, size, pos, null, name)

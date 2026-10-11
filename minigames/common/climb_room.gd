@@ -10,11 +10,10 @@ extends RefCounted
 ##   bets up the east strip, the columns' 2:1 are painted on the apron. Some fields are polished
 ##   brass slide chutes (`CHUTES`) that carry a bean back down a row. On top: a landing with a gold
 ##   WINNER rail, Lucky's podium and a brass gantry of hoppers that drop the hazards.
-## - `"towers"` (Jackpot Climb, not built yet): a documented stub. `layout("towers")` gives the
-##   shell (apron spawns, the gallery, a vertical climb axis to `TOWER_TOP_Y`, a finish box up
-##   there) and `build(parent, "towers")` builds only the shell. Jackpot Climb adds its chip-stack
-##   towers with `ClimbKit.ledge` (flat stack tops with collision) and `ClimbKit.guard`, reads
-##   heights with `progress(pos, "towers")` and ranks exactly like Dodge the Dice.
+## - `"towers"` (Jackpot Climb): a staggered spiral of giant chip stacks (`ChipTowers`) winding
+##   inward and upward round the central jackpot stack, whose gold pad (the finish box) waits at
+##   `TOWER_TOP_Y` under the JACKPOT sign. A safety net covers the floor from the apron to the far
+##   wall. The climb axis runs straight up the jackpot stack, so progress is height.
 ##
 ## `layout(variant)` is pure data for the server, `build(parent, variant)` makes the nodes, both
 ## around `WalkableLogicBase.ROOM_ORIGIN` (the centre of the board's bottom edge, on the floor).
@@ -45,8 +44,8 @@ const CHUTES: Array = [[2, 2], [3, 4], [4, 1], [5, 3], [6, 0], [7, 2], [8, 4], [
 ## The hazard gantry: hoppers over the top row.
 const HOPPER_X: Array[float] = [-5.6, -2.8, 0.0, 2.8, 5.6]
 const HOPPER_DROP: float = 3.4
-## Towers stub (Jackpot Climb): height of the tower tops.
-const TOWER_TOP_Y: float = 22.0
+## Towers (Jackpot Climb): height of the finish pad on the jackpot stack.
+const TOWER_TOP_Y: float = ChipTowers.TOP_Y
 
 const WALNUT: Color = Color("#4A2E1D")
 const WALNUT_DARK: Color = Color("#2B1A10")
@@ -78,8 +77,10 @@ static func surface_y(z: float) -> float:
 	return ClimbKit.surface_y(flight(), z)
 
 
-## Lucky's podium on the landing (local).
-static func lucky_spot() -> Vector3:
+## Lucky's podium (local): on the landing ("board"), in the apron's west corner ("towers").
+static func lucky_spot(variant: String = "board") -> Vector3:
+	if variant == "towers":
+		return Vector3(-8.3, 0.3, 3.8)
 	return Vector3(-5.4, top_y(), top_z(true) - LANDING_D + 1.6)
 
 
@@ -104,10 +105,12 @@ static func _make_layout(variant: String) -> Dictionary:
 		spots.append(o + Vector3(-7.0 + 2.0 * float(i), GALLERY_H, GALLERY_Z + 1.6 + (0.5 if i % 2 == 1 else 0.0)))
 	var gallery := AABB(o + Vector3(-HALL_HALF_X + 0.2, GALLERY_H - 0.6, GALLERY_Z + 0.2), Vector3((HALL_HALF_X - 0.2) * 2.0, 4.5, BACK_Z - GALLERY_Z - 0.4))
 	if variant == "towers":
-		var top := o + Vector3(0, TOWER_TOP_Y, -20.0)
-		return {"arena": AABB(o + Vector3(-HALL_HALF_X + 0.2, -1.0, -40.0), Vector3((HALL_HALF_X - 0.2) * 2.0, TOWER_TOP_Y + 8.0, 40.0 + GALLERY_Z - 0.2)),
-			"gallery": gallery, "spawns": spawns, "spawn_yaws": yaws, "gallery_spots": spots,
-			"axis": [o + Vector3(0, 0, -20.0), top], "finish": AABB(top + Vector3(-3, -0.4, -3), Vector3(6, 3, 6)), "finish_spots": [top]}
+		var c: Vector3 = o + ChipTowers.pad_center()
+		var far: float = o.z + ChipTowers.FAR_Z + 0.2
+		var tower_arena := AABB(Vector3(o.x - HALL_HALF_X + 0.2, o.y - 1.0, far), Vector3((HALL_HALF_X - 0.2) * 2.0, TOWER_TOP_Y + 8.0, o.z + GALLERY_Z - 0.2 - far))
+		var t_axis: Array[Vector3] = [Vector3(c.x, o.y, c.z), c]
+		return {"arena": tower_arena, "gallery": gallery, "spawns": spawns, "spawn_yaws": yaws, "gallery_spots": spots,
+			"axis": t_axis, "finish": ChipTowers.finish_box(o), "finish_spots": ChipTowers.finish_spots(o)}
 	var tz: float = top_z(true)
 	var ty: float = top_y()
 	var arena := AABB(o + Vector3(-HALF_W + 0.1, -1.0, tz - LANDING_D + 0.2), Vector3((HALF_W - 0.1) * 2.0, ty + 7.0, APRON_Z - tz + LANDING_D - 0.2))
@@ -161,8 +164,11 @@ static func build(parent: Node3D, variant: String = "board") -> Node3D:
 	var brass: StandardMaterial3D = VaultArena._tex("brass", 1.2, Color(1.0, 0.86, 0.6), 0.85, 0.32)
 	var wall_h: float = (top_y() if variant == "board" else TOWER_TOP_Y) + 9.0
 	_shell(root, brass, wall_h, variant)
-	_apron(root, brass)
+	_apron(root, brass, variant)
 	_gallery(root, brass)
+	if variant == "towers":
+		ChipTowers.build(root, brass, wall_h)
+		_tower_lucky_podium(root, brass)
 	if variant == "board":
 		_board(root, brass)
 		_landing(root, brass)
@@ -173,7 +179,7 @@ static func build(parent: Node3D, variant: String = "board") -> Node3D:
 
 
 static func _shell(root: Node3D, brass: Material, wall_h: float, variant: String) -> void:
-	var far: float = top_z(true) - LANDING_D - 0.1 if variant == "board" else -40.2
+	var far: float = top_z(true) - LANDING_D - 0.1 if variant == "board" else ChipTowers.FAR_Z - 0.1
 	var len_z: float = BACK_Z - far
 	var mid_z: float = (BACK_Z + far) * 0.5
 	var carpet: Material = VaultArena._tex("casino_carpet", 2.5, Color(0.62, 0.42, 0.4), 0.0, 0.95)
@@ -215,7 +221,7 @@ static func _shell(root: Node3D, brass: Material, wall_h: float, variant: String
 
 ## The start apron: carpet with the columns' 2:1 boxes painted in front of the board and a brass
 ## gutter grate where the hazards drop out at the bottom edge.
-static func _apron(root: Node3D, brass: Material) -> void:
+static func _apron(root: Node3D, brass: Material, variant: String = "board") -> void:
 	var felt: StandardMaterial3D = GreyboxKit.material(Palette.FELT_GREEN.lightened(0.04), 0.0, 0.95)
 	var top := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
@@ -224,6 +230,33 @@ static func _apron(root: Node3D, brass: Material) -> void:
 	top.material_override = felt
 	top.position = Vector3(0, 0.01, 2.6)
 	root.add_child(top)
+	if variant == "towers":
+		# A gold start line at the net's edge and the climb's name on the felt.
+		VaultArena._vis(root, Vector3(HALF_W * 2.0, 0.03, 0.14), Vector3(0, 0.015, 1.15), GreyboxKit.material(Palette.VIP_GOLD, 0.85, 0.25))
+		_tile(root, Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 2.5)), Vector2(6.0, 1.4), Palette.FELT_GREEN.darkened(0.25), "JACKPOT CLIMB", 90)
+	else:
+		_board_apron(root, brass)
+	# Velvet ropes keep beans off the aisles beside the board.
+	var velvet: StandardMaterial3D = VaultArena._tex("velvet", 1.0, Palette.VIP_BURGUNDY.lightened(0.1), 0.0, 0.9)
+	for side: float in [-1.0, 1.0]:
+		for px: float in [HALF_W + 0.3, HALL_HALF_X - 0.4]:
+			var p := Vector3(side * px, 0.0, 0.6)
+			ParlorRoom._cyl(root, 0.05, 0.95, p + Vector3(0, 0.475, 0), brass, 10)
+			ParlorRoom._cyl(root, 0.2, 0.05, p + Vector3(0, 0.025, 0), brass, 14)
+			VaultArena._sphere(root, 0.08, p + Vector3(0, 0.98, 0), brass)
+		VaultArena._vis(root, Vector3(HALL_HALF_X - HALF_W - 0.7, 0.06, 0.06), Vector3(side * (HALF_W + HALL_HALF_X - 0.1) * 0.5, 0.8, 0.6), velvet)
+		ClimbKit.guard(root, Vector3(HALL_HALF_X - HALF_W, 3.0, 0.4), Vector3(side * (HALF_W + HALL_HALF_X) * 0.5, 1.5, 0.6), "AisleGuard")
+
+
+## Lucky's podium in the apron's west corner (towers): walnut with a brass cap.
+static func _tower_lucky_podium(root: Node3D, brass: Material) -> void:
+	var lp: Vector3 = lucky_spot("towers")
+	VaultArena._solid(root, Vector3(1.4, 0.3, 1.3), Vector3(lp.x, 0.15, lp.z), GreyboxKit.material(WALNUT, 0.0, 0.45), "LuckyPodium")
+	VaultArena._vis(root, Vector3(1.46, 0.04, 1.36), Vector3(lp.x, 0.3, lp.z), brass)
+
+
+## The board's apron: the columns' 2:1 boxes and the gutter grate where the hazards drop out.
+static func _board_apron(root: Node3D, brass: Material) -> void:
 	for c: int in 3:
 		var x0: float = COL_X[c + 1]
 		var x1: float = COL_X[c + 2]
@@ -235,16 +268,6 @@ static func _apron(root: Node3D, brass: Material) -> void:
 		VaultArena._vis(root, Vector3(0.06, 0.05, 1.0), Vector3(x, 0.035, 0.55), brass)
 		x += 0.3
 	VaultArena._vis(root, Vector3(HALF_W * 2.0, 0.06, 0.08), Vector3(0, 0.04, 1.06), brass)
-	# Velvet ropes keep beans off the aisles beside the board.
-	var velvet: StandardMaterial3D = VaultArena._tex("velvet", 1.0, Palette.VIP_BURGUNDY.lightened(0.1), 0.0, 0.9)
-	for side: float in [-1.0, 1.0]:
-		for px: float in [HALF_W + 0.3, HALL_HALF_X - 0.4]:
-			var p := Vector3(side * px, 0.0, 0.6)
-			ParlorRoom._cyl(root, 0.05, 0.95, p + Vector3(0, 0.475, 0), brass, 10)
-			ParlorRoom._cyl(root, 0.2, 0.05, p + Vector3(0, 0.025, 0), brass, 14)
-			VaultArena._sphere(root, 0.08, p + Vector3(0, 0.98, 0), brass)
-		VaultArena._vis(root, Vector3(HALL_HALF_X - HALF_W - 0.7, 0.06, 0.06), Vector3(side * (HALF_W + HALL_HALF_X - 0.1) * 0.5, 0.8, 0.6), velvet)
-		ClimbKit.guard(root, Vector3(HALL_HALF_X - HALF_W, 3.0, 0.4), Vector3(side * (HALF_W + HALL_HALF_X) * 0.5, 1.5, 0.6), "AisleGuard")
 
 
 static func _gallery(root: Node3D, brass: Material) -> void:
