@@ -129,6 +129,18 @@ func on_action_pressed() -> bool:
 	return true
 
 
+## The grab click (LMB) pressed while not holding anyone (a held bean is thrown first). True if
+## the stage used it; false leaves the casino's grab.
+func on_grab_pressed() -> bool:
+	return false
+
+
+## The shove click (RMB) pressed while not holding anyone. True if the stage used it; false
+## leaves the casino's shove.
+func on_shove_pressed() -> bool:
+	return false
+
+
 ## Subclass: feedback when the action goes out (a swing, a sound).
 func _on_action_sent(_kind: StringName, _target: int) -> void:
 	pass

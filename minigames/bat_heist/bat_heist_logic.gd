@@ -1,23 +1,21 @@
 class_name BatHeistLogic
 extends WalkableLogicBase
-## "Bat Heist" (MINIGAME_IDEAS #10), a walkable minigame in the vault arena. Every bean starts with
-## `START_COINS` coins and holds a baseball bat the whole game. The action button swings it: a hit
-## on the bean in front knocks them flat for `KNOCK_SECONDS` (the room's knockdown ragdoll). While a
-## bean is down anyone standing over them can hold the button to steal one coin per
-## `STEAL_INTERVAL`. Once up, a bean is immune (no hit, no steal) for `IMMUNE_SECONDS`. After
-## `GAME_SECONDS` the most coins wins; equal coins share a rank. Coins are points only, never money.
+## "Bat Heist" (MINIGAME_IDEAS #10), a walkable minigame in a big vault arena (`ARENA_SCALE` ×
+## the standard vault). Every bean starts with `START_COINS` coins and holds a baseball bat the
+## whole game. Left click swings it: a hit on the bean in front knocks them flat for
+## `KNOCK_SECONDS` (the room's knockdown ragdoll). The casino's grab and throw work here too: a
+## thrown bean lands knocked down just the same (`on_thrown`). While a bean is down, every click of
+## a bean standing over them steals one coin (at most `STEAL_RATE` per second). Once up, a bean is
+## immune (no hit, no grab, no steal) for `IMMUNE_SECONDS`. After `GAME_SECONDS` the most coins
+## wins; equal coins share a rank. Coins are points only, never money.
 ##
 ## The server decides everything: hits come from its own positions and facings (`pick_target`, the
 ## client's target is only a hint), the clock, who is down and every coin.
-##
-## Stealing is a start/stop pair, not a stream of intents (one intent per coin would eat the
-## 20/s intent budget and stall on lag):
-## - `minigame_action {kind: "steal", target?}` (E pressed or still held over a downed bean) opens
-##   a steal on a downed, non-immune bean within `STEAL_REACH` of the thief (the hint first).
-## - Each tick the server adds the time the thief spent in reach (a step away pauses it) and moves
-##   one coin per full `STEAL_INTERVAL`. The steal ends by itself when the victim gets up, the thief
-##   is knocked down, swings, or either leaves; `{kind: "steal_stop"}` (E released) ends it at once.
-## - `{kind: "swing", target?}` swings the bat (cooldown `SWING_COOLDOWN`, a miss is fine).
+## - `minigame_action {kind: "swing", target?}` swings the bat (cooldown `SWING_COOLDOWN`, a miss
+##   is fine).
+## - `{kind: "steal", target?}` is one click over a downed bean: one coin from a downed,
+##   non-immune bean within `STEAL_REACH` of the thief (the hint first), refused past `STEAL_RATE`
+##   clicks in the last second (`too_fast`).
 ##
 ## Down and immunity follow the server's own clock (the knockdown it queued); the room's
 ## `on_player_got_up` (the scene's ragdoll actually standing up) ends a down early and restarts the
@@ -33,8 +31,12 @@ const SWING_COOLDOWN: float = 1.2
 const BAT_REACH: float = 2.0
 ## How long a hit bean stays down (the ragdoll), and the steal window with it.
 const KNOCK_SECONDS: float = 3.0
-## One coin per this many seconds of holding the button over a downed bean.
-const STEAL_INTERVAL: float = 0.4
+## Most steal clicks (one coin each) a thief gets per second.
+const STEAL_RATE: int = 6
+## A thrown bean stays down this long from the throw (the flight, then the knockdown).
+const THROWN_SECONDS: float = KNOCK_SECONDS + 1.0
+## The vault is this much bigger than Pass the Bomb's in x and z (floor area × 1.5).
+const ARENA_SCALE: float = 1.225
 ## Distance (any direction: you stand over a ragdoll) within which a steal runs.
 const STEAL_REACH: float = 2.2
 ## No knockdown and no steal for this long after getting up.
@@ -50,8 +52,8 @@ var coins: Dictionary[int, int] = {}
 var down_until: Dictionary[int, float] = {}
 ## player → game clock until which they are immune (after getting up).
 var immune_until: Dictionary[int, float] = {}
-## thief → {target, progress} for every steal running now.
-var steals: Dictionary[int, Dictionary] = {}
+## thief → game clock of their steal clicks in the last second (the rate limit).
+var steal_clicks: Dictionary[int, Array] = {}
 ## player → game clock of their last swing.
 var last_swing: Dictionary[int, float] = {}
 ## Fun stats for the feed and the end card.
@@ -62,7 +64,7 @@ var _announced: bool = false
 
 
 func room_layout() -> Dictionary:
-	return VaultArena.layout()
+	return VaultArena.layout(ARENA_SCALE)
 
 
 func _on_room_setup(_context: Dictionary) -> void:
@@ -86,7 +88,6 @@ func tick(delta: float, _now: float) -> void:
 			_finish()
 		return
 	clock = minf(clock + delta, GAME_SECONDS)
-	_tick_steals(delta)
 	for p: int in down_until.keys():
 		if clock >= down_until[p]:
 			_stand_up(p)
@@ -105,7 +106,7 @@ func is_immune(player: int) -> bool:
 	return immune_until.has(player) and clock < immune_until[player]
 
 
-## The action button. Kinds: "swing", "steal", "steal_stop" (see the class notes).
+## The action button. Kinds: "swing", "steal" (see the class notes).
 func _on_action(player: int, kind: StringName, hint: int, _now: float) -> Dictionary:
 	if state != State.PLAYING:
 		return StationLogicBase.fail(&"game_over")
@@ -113,10 +114,7 @@ func _on_action(player: int, kind: StringName, hint: int, _now: float) -> Dictio
 		&"swing":
 			return _swing(player, hint)
 		&"steal":
-			return _start_steal(player, hint)
-		&"steal_stop":
-			_end_steal(player, &"released")
-			return StationLogicBase.OK_RESULT
+			return _steal(player, hint)
 	return StationLogicBase.fail(&"bad_value")
 
 
@@ -126,7 +124,6 @@ func _swing(player: int, hint: int) -> Dictionary:
 	if clock < float(last_swing.get(player, -INF)) + SWING_COOLDOWN:
 		return StationLogicBase.fail(&"cooldown")
 	last_swing[player] = clock
-	_end_steal(player, &"swung")
 	# Downed and immune beans can't be hit: the swing finds the nearest one that can.
 	var exclude: Array[int] = []
 	for p: int in alive:
@@ -143,31 +140,55 @@ func _swing(player: int, hint: int) -> Dictionary:
 			result = &"miss"
 	events.append(GameEvents.make(&"bat_heist_swing", {"player": player, "target": target, "result": result}))
 	if result == &"hit":
-		_knock(target, player)
+		_knock(target, player, &"bat", KNOCK_SECONDS)
 	return {"ok": true, "error": &"", "target": target, "result": result}
 
 
-func _knock(target: int, by: int) -> void:
-	down_until[target] = clock + KNOCK_SECONDS
+func _knock(target: int, by: int, cause: StringName, seconds: float) -> void:
+	down_until[target] = clock + seconds
 	immune_until.erase(target)
 	hits[by] = hits.get(by, 0) + 1
-	_end_steal(target, &"knocked")
-	pending_knockdowns.append({"player": target, "seconds": KNOCK_SECONDS, "cause": &"bat", "attacker": by})
-	events.append(GameEvents.make(&"bat_heist_hit", {"player": by, "target": target, "seconds": KNOCK_SECONDS}))
+	pending_knockdowns.append({"player": target, "seconds": seconds, "cause": cause, "attacker": by})
+	events.append(GameEvents.make(&"bat_heist_hit", {"player": by, "target": target, "seconds": seconds, "cause": cause}))
 
 
-func _start_steal(player: int, hint: int) -> Dictionary:
+## The casino's throw landed a bean in the room: it goes down like a bat hit (an immune or already
+## downed bean can't be grabbed or stays down as it is).
+func on_thrown(target: int, attacker: int) -> void:
+	if finished or state != State.PLAYING or target not in alive or is_down(target) or is_immune(target):
+		return
+	_knock(target, attacker, &"throw", THROWN_SECONDS)
+
+
+## Grab, throw and shove stay on (throwing is half the game); shaking chips out of a bean a wall
+## throw knocked out would take real money in a points-only game.
+func blocked_intents() -> Array[StringName]:
+	return [&"shake"]
+
+
+## Immune beans can't be grabbed or shoved (the server treats them like a seated player).
+func is_untouchable(player: int) -> bool:
+	return is_immune(player)
+
+
+## One steal click: one coin from the downed bean in reach, if the thief isn't clicking too fast.
+func _steal(player: int, hint: int) -> Dictionary:
 	if is_down(player):
 		return StationLogicBase.fail(&"down")
 	var target: int = _steal_target(player, hint)
 	if target < 0:
 		return StationLogicBase.fail(&"no_target")
-	if steals.has(player) and int(steals[player]["target"]) == target:
-		return {"ok": true, "error": &"", "target": target}  # already at it (a repeat while held)
-	_end_steal(player, &"switched")
-	steals[player] = {"target": target, "progress": 0.0}
-	events.append(GameEvents.make(&"bat_heist_steal_start", {"player": player, "target": target}))
-	return {"ok": true, "error": &"", "target": target}
+	var recent: Array = []
+	for t: Variant in steal_clicks.get(player, []):
+		if float(t) > clock - 1.0:
+			recent.append(t)
+	if recent.size() >= STEAL_RATE:
+		steal_clicks[player] = recent
+		return StationLogicBase.fail(&"too_fast")
+	recent.append(clock)
+	steal_clicks[player] = recent
+	var took: bool = _take_coin(player, target)
+	return {"ok": true, "error": &"", "target": target, "stolen": 1 if took else 0}
 
 
 ## The downed, non-immune bean within `STEAL_REACH` of `player` (the hint first), else the
@@ -202,40 +223,17 @@ func _flat_distance(a: int, b: int) -> float:
 	return d.length()
 
 
-func _tick_steals(delta: float) -> void:
-	for thief: int in steals.keys():
-		var s: Dictionary = steals[thief]
-		var target: int = int(s["target"])
-		if not is_down(target) or is_down(thief) or target not in alive or thief not in alive:
-			_end_steal(thief, &"got_up")
-			continue
-		if _flat_distance(thief, target) > STEAL_REACH + InteractionRules.LAG_SLACK:
-			continue  # stepped away: the hold pauses until they're back over the body
-		var progress: float = float(s["progress"]) + delta
-		while progress >= STEAL_INTERVAL - 0.0001:  # float steps (0.05 × 8) must count as 0.4
-			progress -= STEAL_INTERVAL
-			_take_coin(thief, target)
-		s["progress"] = progress
-
-
-func _take_coin(thief: int, target: int) -> void:
+func _take_coin(thief: int, target: int) -> bool:
 	if int(coins.get(target, 0)) <= 0:
-		return  # nothing left to take: coins never go below 0
+		return false  # nothing left to take: coins never go below 0
 	coins[target] = int(coins[target]) - 1
 	coins[thief] = int(coins.get(thief, 0)) + 1
 	stolen[thief] = stolen.get(thief, 0) + 1
 	events.append(GameEvents.make(&"bat_heist_stole", {"player": thief, "target": target, "coins": {thief: coins[thief], target: coins[target]}}))
+	return true
 
 
-func _end_steal(thief: int, reason: StringName) -> void:
-	if not steals.has(thief):
-		return
-	var target: int = int(steals[thief]["target"])
-	steals.erase(thief)
-	events.append(GameEvents.make(&"bat_heist_steal_end", {"player": thief, "target": target, "reason": reason}))
-
-
-## The bean is up: its steals end and the immunity starts now.
+## The bean is up: the immunity starts now.
 func _stand_up(player: int) -> void:
 	down_until.erase(player)
 	if state != State.PLAYING or player not in alive:
@@ -257,10 +255,7 @@ func on_player_got_up(player: int) -> void:
 
 
 func remove_player(player: int) -> void:
-	_end_steal(player, &"left")
-	for thief: int in steals.keys():
-		if int(steals[thief]["target"]) == player:
-			_end_steal(thief, &"left")
+	steal_clicks.erase(player)
 	super.remove_player(player)
 	coins.erase(player)
 	down_until.erase(player)
@@ -273,8 +268,6 @@ func _end_game() -> void:
 	if state == State.DONE:
 		return
 	state = State.DONE
-	for thief: int in steals.keys():
-		_end_steal(thief, &"time")
 	wait_left = END_HOLD
 	events.append(GameEvents.make(&"bat_heist_over", {"coins": coins.duplicate(), "ranking": ranking()}))
 
@@ -318,10 +311,6 @@ func get_public_state() -> Dictionary:
 	for p: int in immune_until:
 		immune[p] = snappedf(maxf(immune_until[p] - clock, 0.0), 0.01)
 	st["immune"] = immune
-	var thieves: Dictionary = {}
-	for thief: int in steals:
-		thieves[thief] = int(steals[thief]["target"])
-	st["steals"] = thieves
 	if finished or state == State.DONE:
 		st["ranking"] = ranking()
 	return st
@@ -331,5 +320,4 @@ func private_state(player: int) -> Dictionary:
 	return {
 		"coins": int(coins.get(player, 0)),
 		"cooldown": snappedf(maxf(float(last_swing.get(player, -INF)) + SWING_COOLDOWN - clock, 0.0), 0.01),
-		"stealing": int(steals[player]["target"]) if steals.has(player) else -1,
 	}

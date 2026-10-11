@@ -1,7 +1,8 @@
 extends GutTest
 ## Bat Heist (MINIGAME_IDEAS #10): everyone starts with 10 coins, a bat swing (1.2 s cooldown, a
-## miss is fine) knocks the bean in front down, holding the steal over a downed bean in reach moves
-## 1 coin per 0.4 s, 3 s of immunity after getting up, 60 s, most coins wins with shared ranks.
+## miss is fine) knocks the bean in front down, so does the casino's throw; every steal click over
+## a downed bean in reach takes 1 coin (at most 6 per second), 3 s of immunity after getting up,
+## 60 s, most coins wins with shared ranks. The vault is bigger than Pass the Bomb's.
 
 const STEP: float = 0.05
 
@@ -66,7 +67,7 @@ func test_setup_and_announce_from_the_first_tick() -> void:
 	var evs: Array[Dictionary] = _run(g, STEP)
 	assert_eq(_of(evs, &"bat_heist_begin").size(), 1, "announced on the first tick")
 	var st: Dictionary = g.get_public_state()
-	for key: String in ["coins", "down", "immune", "steals", "clock", "room", "alive"]:
+	for key: String in ["coins", "down", "immune", "clock", "room", "alive"]:
 		assert_true(st.has(key), "state carries %s for a late stage" % key)
 	assert_eq(_of(_run(g, 1.0), &"bat_heist_begin").size(), 0, "only once")
 
@@ -114,34 +115,69 @@ func test_out_of_reach_is_a_miss() -> void:
 	assert_eq(_act(g, 1, "swing", 2)["result"], &"miss", "the client's hint doesn't stretch the bat")
 
 
-func test_steal_moves_one_coin_per_interval_while_down_and_in_reach() -> void:
+## Clicks `n` steals of `p` on `hint`; returns how many came back ok.
+func _clicks(g: BatHeistLogic, p: int, n: int, hint: int = -1) -> int:
+	var ok: int = 0
+	for i: int in n:
+		if _act(g, p, "steal", hint)["ok"]:
+			ok += 1
+	return ok
+
+
+func test_every_steal_click_takes_one_coin_while_down_and_in_reach() -> void:
 	var g: BatHeistLogic = _game([1, 2, 3])
 	_knock(g)
-	assert_true(_act(g, 1, "steal", 2)["ok"])
-	_run(g, BatHeistLogic.STEAL_INTERVAL - 0.1)
-	assert_eq(g.coins[1], 10, "no coin before the first 0.4 s")
-	_run(g, 0.15)
-	assert_eq(g.coins[1], 11)
+	g.drain_events()
+	var res: Dictionary = _act(g, 1, "steal", 2)
+	assert_true(res["ok"])
+	assert_eq(int(res["target"]), 2)
+	assert_eq(int(res["stolen"]), 1)
+	assert_eq(g.coins[1], 11, "one click, one coin")
 	assert_eq(g.coins[2], 9)
-	_run(g, 0.8)
-	assert_eq(g.coins[1], 13, "one more per 0.4 s")
-	assert_eq(g.coins[2], 7)
-	# Step away: the hold pauses.
+	assert_eq(_of(g.drain_events(), &"bat_heist_stole").size(), 1, "every coin is an event (coin pop + cha-ching)")
+	_run(g, 0.3)
+	assert_eq(g.coins[1], 11, "holding does nothing: it's the clicks")
+	assert_eq(_clicks(g, 1, 2, 2), 2)
+	assert_eq(g.coins[1], 13)
+	# Step away: clicks find nobody.
 	g.world.set_transform(1, g.world.get_position(2) + Vector3(0, 0, 4.0), 0.0)
-	_run(g, 0.8)
-	assert_eq(g.coins[1], 13, "out of reach: nothing")
+	assert_eq(_act(g, 1, "steal", 2)["error"], &"no_target", "out of reach: nothing")
 	g.world.set_transform(1, g.world.get_position(2) + Vector3(0, 0, 1.0), 0.0)
-	_run(g, 0.4)
-	assert_eq(g.coins[1], 14, "back over the body: it goes on")
-	# She gets up (3 s after the hit): the steal ends by itself.
-	var evs: Array[Dictionary] = _run(g, BatHeistLogic.KNOCK_SECONDS)
+	_run(g, 1.0)
+	assert_eq(_clicks(g, 1, 1), 1, "back over the body (no hint: the nearest downed bean)")
+	assert_eq(g.coins[1], 14)
+	# She gets up (3 s after the hit): no more coins.
+	_run(g, BatHeistLogic.KNOCK_SECONDS)
 	assert_false(g.is_down(2))
-	assert_eq(_of(evs, &"bat_heist_steal_end").size(), 1)
-	assert_true(g.steals.is_empty())
+	assert_eq(_act(g, 1, "steal", 2)["error"], &"no_target")
 	var total: int = 0
 	for p: int in g.coins:
 		total += g.coins[p]
 	assert_eq(total, 30, "coins only move between players")
+
+
+func test_steal_clicks_are_rate_limited_to_6_per_second() -> void:
+	var g: BatHeistLogic = _game([1, 2])
+	_knock(g)
+	assert_eq(_clicks(g, 1, 10, 2), BatHeistLogic.STEAL_RATE, "a burst: 6 land")
+	assert_eq(_act(g, 1, "steal", 2)["error"], &"too_fast")
+	assert_eq(g.coins[1], 16)
+	_run(g, 0.5)
+	assert_eq(_act(g, 1, "steal", 2)["error"], &"too_fast", "still inside the second")
+	_run(g, 0.55)
+	assert_eq(_clicks(g, 1, 10, 2), BatHeistLogic.STEAL_RATE, "a second later: 6 more")
+	assert_eq(g.coins[1], 20)
+	assert_eq(g.coins[2], 0)
+	# Steady clicking at 6/s keeps going (here: on another bean's coins).
+	var h: BatHeistLogic = _game([1, 2])
+	_knock(h)
+	var took: int = 0
+	for i: int in 13:  # one click per 0.2 s for 2.6 s (the down lasts 3 s)
+		var r: Dictionary = _act(h, 1, "steal", 2)
+		assert_true(r["ok"], "paced click %d lands" % i)
+		took += int(r.get("stolen", 0))
+		_run(h, 0.2)
+	assert_eq(took, 10, "her 10 coins, then nothing left")
 
 
 func test_no_steal_from_a_standing_bean_or_out_of_reach() -> void:
@@ -153,31 +189,73 @@ func test_no_steal_from_a_standing_bean_or_out_of_reach() -> void:
 	assert_eq(_act(g, 3, "steal", 2)["error"], &"no_target", "too far")
 
 
-func test_steal_stop_and_a_downed_thief_end_the_steal() -> void:
+func test_a_downed_thief_steals_nothing() -> void:
 	var g: BatHeistLogic = _game([1, 2, 3])
 	_knock(g)
-	assert_true(_act(g, 1, "steal")["ok"], "no hint: the nearest downed bean")
-	assert_true(_act(g, 1, "steal_stop")["ok"])
-	_run(g, 1.0)
-	assert_eq(g.coins[1], 10, "released: nothing taken")
-	assert_true(_act(g, 1, "steal", 2)["ok"])
-	# Player 3 bonks the thief mid-steal.
+	# Player 3 bonks the thief.
 	g.world.set_transform(3, g.world.get_position(1) + Vector3(0, 0, 1.0), 0.0)
 	assert_eq(_act(g, 3, "swing", 1)["result"], &"hit")
-	_run(g, 1.0)
+	assert_eq(_act(g, 1, "steal", 2)["error"], &"down")
 	assert_eq(g.coins[1], 10, "a downed thief steals nothing")
-	assert_false(g.steals.has(1))
 	assert_eq(_act(g, 1, "swing")["error"], &"down", "no swinging from the floor")
+
+
+func test_a_throw_knocks_down_like_a_hit() -> void:
+	var g: BatHeistLogic = _game([1, 2, 3])
+	g.on_thrown(2, 1)
+	assert_true(g.is_down(2))
+	assert_eq(g.pending_knockdowns.size(), 1)
+	assert_eq(g.pending_knockdowns[0]["cause"], &"throw")
+	assert_eq(int(g.pending_knockdowns[0]["attacker"]), 1)
+	assert_almost_eq(float(g.pending_knockdowns[0]["seconds"]), BatHeistLogic.THROWN_SECONDS, 0.001)
+	assert_eq(_of(g.drain_events(), &"bat_heist_hit").size(), 1, "the feed counts it as a hit")
+	assert_eq(g.hits[1], 1)
+	_face(g, 1, 2, 1.0)
+	assert_eq(_clicks(g, 1, 3, 2), 3, "a thrown bean is robbed like a bonked one")
+	assert_eq(g.coins[1], 13)
+	# Getting up gives the immunity; an immune bean thrown again stays up.
+	g.on_player_got_up(2)
+	assert_true(g.is_immune(2))
+	g.pending_knockdowns.clear()
+	g.on_thrown(2, 3)
+	assert_false(g.is_down(2))
+	assert_true(g.pending_knockdowns.is_empty())
+
+
+func test_grab_and_throw_are_allowed_and_only_immune_beans_are_untouchable() -> void:
+	var g: BatHeistLogic = _game([1, 2])
+	for t: StringName in [&"grab", &"release", &"shove"]:
+		assert_false(g.blocks_intent(t), "%s works in Bat Heist" % t)
+	assert_true(g.blocks_intent(&"shake"), "no shaking real chips out of a bean here")
+	assert_true(g.blocks_intent(&"use_item"))
+	assert_false(g.is_untouchable(2))
+	_knock(g)
+	_run(g, BatHeistLogic.KNOCK_SECONDS + 0.1)
+	assert_true(g.is_untouchable(2), "immune after getting up: no grab")
+	_run(g, BatHeistLogic.IMMUNE_SECONDS)
+	assert_false(g.is_untouchable(2))
+
+
+func test_the_vault_is_half_again_as_big_as_pass_the_bombs() -> void:
+	var g: BatHeistLogic = _game([1, 2])
+	var small: AABB = VaultArena.layout()["arena"]
+	var ratio: float = (g.arena.size.x * g.arena.size.z) / (small.size.x * small.size.z)
+	assert_between(ratio, 1.4, 1.6, "about 1.5× the floor")
+	var far: float = 0.0
+	for p: int in [1, 2]:
+		far = maxf(far, (g.spawn_for(p) - WalkableLogicBase.ROOM_ORIGIN).length())
+	assert_gt(far, VaultArena.SPAWN_RADIUS + 0.5, "the spawn ring spreads with it")
 
 
 func test_coins_never_go_below_zero() -> void:
 	var g: BatHeistLogic = _game([1, 2, 3])
 	g.coins[2] = 2
 	_knock(g)
-	_act(g, 1, "steal", 2)
+	assert_eq(_clicks(g, 1, 2, 2), 2)
 	g.world.set_transform(3, g.world.get_position(2) + Vector3(1, 0, 0), 0.0)
-	_act(g, 3, "steal", 2)
-	_run(g, 2.5)
+	var res: Dictionary = _act(g, 3, "steal", 2)
+	assert_true(res["ok"])
+	assert_eq(int(res["stolen"]), 0, "nothing left")
 	assert_eq(g.coins[2], 0)
 	assert_eq(g.coins[1] + g.coins[3], 22, "only the 2 coins moved")
 
@@ -250,12 +328,12 @@ func test_everyone_tied_shares_first() -> void:
 		assert_eq(int(row["points"]), 10)
 
 
-func test_a_dropout_leaves_the_ranking_and_ends_its_steals() -> void:
+func test_a_dropout_leaves_the_ranking() -> void:
 	var g: BatHeistLogic = _game([1, 2, 3])
 	_knock(g)
 	_act(g, 1, "steal", 2)
 	g.remove_player(2)
-	assert_true(g.steals.is_empty(), "the victim left: the steal ends")
+	assert_eq(_act(g, 1, "steal", 2)["error"], &"no_target", "the victim left")
 	assert_false(2 in g.players)
 	assert_false(g.coins.has(2))
 	for row: Dictionary in g.ranking():
@@ -270,7 +348,7 @@ func test_two_player_game() -> void:
 	var g: BatHeistLogic = _game([1, 2])
 	_run(g, 1.0)
 	_knock(g)
-	_act(g, 1, "steal", 2)
+	_clicks(g, 1, 5, 2)
 	_run(g, 2.0)
 	assert_eq(g.coins[1], 15)
 	assert_eq(g.coins[2], 5)
