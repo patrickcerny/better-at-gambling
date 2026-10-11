@@ -1,0 +1,18 @@
+; GodotSteam GDExtension 4.23.1 (Steamworks SDK 1.65), from
+; https://codeberg.org/godotsteam/godotsteam/releases/tag/v4.23.1 (plug-in for Godot 4.4+).
+; Trimmed to Windows x86_64 and Linux x86_64 (no macOS/32-bit/ARM/Android binaries and no updater
+; editor plug-in). The [dependencies] entries make every export copy steam_api64.dll /
+; libsteam_api.so next to the executable.
+[configuration]
+entry_symbol = "godotsteam_init"
+compatibility_minimum = "4.4"
+
+[libraries]
+linux.debug.x86_64 = "res://addons/godotsteam/linux64/libgodotsteam.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/godotsteam/linux64/libgodotsteam.linux.template_release.x86_64.so"
+windows.debug.x86_64 = "res://addons/godotsteam/win64/libgodotsteam.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://addons/godotsteam/win64/libgodotsteam.windows.template_release.x86_64.dll"
+
+[dependencies]
+linux.x86_64 = { "res://addons/godotsteam/linux64/libsteam_api.so": "" }
+windows.x86_64 = { "res://addons/godotsteam/win64/steam_api64.dll": "" }
