@@ -42,6 +42,8 @@ var rewards: RewardDirector = RewardDirector.new()
 var hot_tables: HotTableDirector
 var loot: LootTables
 var items: ItemSystem
+## The Odd Jobs button-smash cabinet next to the Gift Shop (broke players earn $50 a bar).
+var odd_jobs: OddJobs
 ## The waiter NPC's trips and drink puddles, and the Megaphone prop by the bar (M7, npc/).
 var waiter: WaiterLogic
 var megaphone: MegaphoneLogic
@@ -167,6 +169,7 @@ func _build_match_systems(seed_value: int) -> void:
 	items.on_vip_lost = _on_vip_pass_ended
 	items.loot = loot
 	items.setup_extras()
+	odd_jobs = OddJobs.new(economy)
 	items.jackpot = jackpot
 	items.find_station = _nearest_station
 	items.close_station = func(sid: StringName, seconds: float) -> void: stations.out_of_order[sid] = seconds
@@ -271,6 +274,7 @@ func remove_player(player: int) -> void:
 		stand_up(player)
 	state.players.erase(player)
 	economy.remove_player(player)
+	odd_jobs.remove_player(player)
 	lobby.remove(player)
 	stats.erase(player)
 	_server_owned.erase(player)
@@ -378,6 +382,8 @@ func submit_intent(player: int, intent: Dictionary) -> Dictionary:
 	var why: StringName = validator.check(player, intent, phases.phase, _intent_clock(), state.players.has(player))
 	if _room != null and (why == &"" or why == &"wrong_phase") and _room.blocks_intent(StringName(intent.get("type", &""))):
 		why = &"minigame"  # walkable room: stations, items, shop, tips and the megaphone are off
+	if why == &"wrong_phase" and StringName(intent.get("type", &"")) == &"odd_jobs_press" and MatchMode.is_minigames_only(settings):
+		why = &"money_off"  # no casino money to earn in minigames-only matches
 	if why == &"" and _jail_blocks(player, intent):
 		why = &"jailed"
 	if why != &"":
@@ -476,6 +482,7 @@ func _step(delta: float) -> void:
 		stations.tick(delta)
 		hot_tables.tick(delta)
 		_check_comps()
+		odd_jobs.tick(delta, match_time)
 		money_history.tick(phases.casino_time, _balances())
 	elif phases.phase == Phase.Id.MINIGAME and minigame != null:
 		if briefing_left > 0.0:
@@ -985,6 +992,15 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if shop_pos.is_finite() and world.get_position(player).distance_to(shop_pos) > map_def.interact_range:
 				return StationLogicBase.fail(&"too_far")
 			return items.buy(player, int(intent["index"]), match_time)
+		&"odd_jobs_press":
+			if MatchMode.is_minigames_only(settings):
+				return StationLogicBase.fail(&"money_off")
+			var jobs_pos: Vector3 = map_def.odd_jobs_position
+			if jobs_pos.is_finite() and world.get_position(player).distance_to(jobs_pos) > map_def.interact_range:
+				return StationLogicBase.fail(&"too_far")
+			if stations.is_seated(player) or interactions.is_held(player):
+				return StationLogicBase.fail(&"not_standing")
+			return odd_jobs.press(player, match_time)
 		&"return_to_lobby":
 			if player != lobby.leader():
 				return StationLogicBase.fail(&"not_leader")
@@ -1173,6 +1189,7 @@ func _flush() -> void:
 	batch.append_array(interactions.drain_events())
 	batch.append_array(pickups.drain_events())
 	batch.append_array(economy.drain_events())
+	batch.append_array(odd_jobs.drain_events())
 	batch.append_array(hot_tables.drain_events())
 	if minigame != null:
 		batch.append_array(minigame.drain_events())

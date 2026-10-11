@@ -30,7 +30,7 @@ func on_event(ev: Dictionary) -> void:
 				if now - _last_sting >= LOSS_STING_GAP:
 					_last_sting = now
 					Audio.play(&"loss_sting", &"SFX", -14.0)
-		&"shop_bought":
+		&"shop_bought", &"odd_jobs_payout":
 			_at(int(ev["player"]), &"cash_register", -6.0)
 		&"monkey_passed":
 			_at(int(ev["to"]), &"boing", -6.0, 1.2)

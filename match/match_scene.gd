@@ -70,6 +70,7 @@ var role: Role = Role.PRACTICE
 var net_world: NetWorld
 var lobby_panel: LobbyPanel
 var shop_panel: ShopPanel
+var odd_jobs_panel: OddJobsPanel
 var connection_label: Label
 ## Proximity voice (clients only; the dedicated server just relays in `Net`).
 var voice: VoiceChannel = null
@@ -208,6 +209,13 @@ func _ready() -> void:
 		if router.mode == InputRouter.Mode.MENU and results_panel == null:
 			router.set_play_mode(InputRouter.Mode.WALK))
 	ui_layer.add_child(shop_panel)
+	odd_jobs_panel = OddJobsPanel.new()
+	odd_jobs_panel.name = "OddJobsPanel"
+	odd_jobs_panel.closed.connect(func() -> void:
+		if router.mode == InputRouter.Mode.MENU and results_panel == null:
+			router.set_play_mode(InputRouter.Mode.WALK))
+	odd_jobs_panel.smashed.connect(_dip_odd_jobs_button)
+	ui_layer.add_child(odd_jobs_panel)
 	reward_panel = RewardPanel.new()
 	reward_panel.name = "RewardPanel"
 	ui_layer.add_child(reward_panel)
@@ -248,6 +256,7 @@ func _ready() -> void:
 	hud.bind(view.state, local_id)
 	lobby_panel.bind(view.state, local_id)
 	shop_panel.bind(view.state, local_id)
+	odd_jobs_panel.bind(view.state, local_id)
 	reward_panel.bind(view.state, local_id)
 	view.state.station_changed.connect(_on_station_state)
 	view.state.players_changed.connect(_sync_avatars)
@@ -361,6 +370,7 @@ func _start_room_server(cmd: Cmdline) -> void:
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
+	def.odd_jobs_position = LuckyLounge.ODD_JOBS_POS
 	LuckyLounge.describe_rooms(def)
 	var settings: Dictionary = _length_settings(cmd)
 	settings["seed"] = cmd.get_int("seed", 0)
@@ -403,6 +413,7 @@ func _start_local(cmd: Cmdline) -> void:
 	def.spawn_points = map.spawn_points()
 	def.lobby_spawns = LuckyLounge.LOBBY_SPAWNS.duplicate()
 	def.shop_position = LuckyLounge.SHOP_POS
+	def.odd_jobs_position = LuckyLounge.ODD_JOBS_POS
 	LuckyLounge.describe_rooms(def)
 	var settings: Dictionary = _length_settings(cmd)
 	# The main menu's practice choice (casino or minigames only, and how many minigames).
@@ -1549,6 +1560,7 @@ func _stage_takes_screen(mode: InputRouter.Mode) -> void:
 	emote_wheel.visible = false
 	lobby_panel.close()
 	shop_panel.close_panel()
+	odd_jobs_panel.close_panel()
 	if pause_menu != null and pause_menu.visible:
 		pause_menu.close()
 	hud.visible = false
@@ -1926,6 +1938,10 @@ func _on_interact() -> void:
 		return
 	if casino_floor != null and casino_floor.interact():
 		return
+	if _near_odd_jobs():
+		router.set_mode(InputRouter.Mode.MENU)
+		odd_jobs_panel.open()
+		return
 	if _near_shop():
 		router.set_mode(InputRouter.Mode.MENU)
 		shop_panel.open()
@@ -2177,6 +2193,9 @@ func _update_prompt() -> void:
 	if floor_prompt != "":
 		hud.set_prompt(floor_prompt)
 		return
+	if _near_odd_jobs():
+		hud.set_prompt(InputGlyphs.fill("ODD JOBS: {interact}"))
+		return
 	if _near_shop():
 		hud.set_prompt(InputGlyphs.fill("[{interact}] Gift Shop: one item per round"))
 		return
@@ -2209,6 +2228,29 @@ func _near_shop() -> bool:
 		return false
 	var p: Vector3 = local.global_position
 	return Vector2(p.x - LuckyLounge.SHOP_POS.x, p.z - LuckyLounge.SHOP_POS.z).length() < 2.2 and absf(p.y - LuckyLounge.SHOP_POS.y) < 1.5
+
+
+## True when the local player stands at the Odd Jobs cabinet while the casino is open.
+func _near_odd_jobs() -> bool:
+	if local == null:
+		return false
+	var ph: Phase.Id = view.state.phase
+	if ph != Phase.Id.CASINO and ph != Phase.Id.PRE_MINIGAME:
+		return false
+	var p: Vector3 = local.global_position
+	var d: float = Vector2(p.x - LuckyLounge.ODD_JOBS_POS.x, p.z - LuckyLounge.ODD_JOBS_POS.z).length()
+	var to_shop: float = Vector2(p.x - LuckyLounge.SHOP_POS.x, p.z - LuckyLounge.SHOP_POS.z).length()
+	return d < 1.6 and d < to_shop and absf(p.y - LuckyLounge.ODD_JOBS_POS.y) < 1.5  # the nearer kiosk wins
+
+
+## The cabinet's red cap dips under the local player's smash.
+func _dip_odd_jobs_button() -> void:
+	var b: Node3D = map.odd_jobs_button if map != null else null
+	if b == null:
+		return
+	var rest: float = LuckyLounge.ODD_JOBS_CABINET.y + 1.17
+	b.position.y = rest - 0.05
+	create_tween().tween_property(b, ^"position:y", rest, 0.12)
 
 
 func _check_vip_gate() -> void:
