@@ -139,3 +139,11 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-11 / 0.9.4 (playtest batch 2)
+- Vote Race: 3D game-show runway instead of the 2D strip. Bat orientation in hand fixed (model axis).
+  Item-aim outline fixed (grew in model units). Minigames-only: no item card on results, no item slots.
+  Bat Heist rework: LMB swing/throw/steal, RMB grab, click fast to steal, bigger vault. Find the Lady
+  faster. Odd Jobs button-smash cabinet next to the Gift Shop ($50 per bar, harder with money, refused
+  at $500+, server-owned).
+- Suite caught before release: the Odd Jobs panel crashed on `player_joined` on every online server;
+  a jail carry under lag was logged as an implausible move (now info within the server-move grace).
