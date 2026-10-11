@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/find_the_lady/find_the_lady_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/find_the_lady/find_the_lady_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"find_the_lady"
+display_name = "Find the Lady"
+rules_text = "Lucky shows you the Queen, flips the cards and shuffles them. Keep your eye on her, then pick her card (click or 1-4): 500 points plus up to 500 for speed. 5 rounds, each faster; round 4 adds a fourth card."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 2
+weight = 1.0
