@@ -123,3 +123,19 @@
   Haven mirror, paintings, bust and horse (~3.7 MB). `tools/import_textures.sh` regenerates the textures.
   Map shots: `scripts/map_shots.sh` (free camera via `tools/screenshot.gd --cam/--look`), copies in
   `/mnt/project-files/better-at-gambling/screenshots/polish1/map/`.
+### 2026-10-11 / 0.9.2 and 0.9.3 (host mode, ten minigames)
+- 0.9.2: host mode ("Host on this PC (Steam)": a hidden headless room server on the host's PC, friends join
+  through Steam invites / Join Game over Steam's relay, GodotSteam 4.23.1, test App ID 480), the coin logo,
+  and the first four games of the minigame round: Find the Lady, Forehead Poker, Spy, Pass the Bomb (the
+  first walkable room, W).
+- 0.9.3: Patrick's 0.9.2 playtest fixes and the other six games. Fixes: online moves inside a minigame
+  room were refused as "off the map" by the move sanity check (the room is 200 m from the casino), so
+  nobody could move in Pass the Bomb; minigames come from a shuffled bag (no repeat until every game the
+  table can play has come once); Escape opens the pause menu in every minigame (own layer above the stage
+  UI). Games: Bat Heist (vault, bats, coin stealing), Last Seat at the Table (parlor, musical chairs),
+  Grab Your Hand (card hall, poker hands), Roulette Sumo (wheel room, speeding wheel, rolling ball,
+  freezing bats), Dodge the Dice (climb room "board": tilted roulette board, falling hazards, climbing
+  kit), Jackpot Climb (climb room "towers": chip stacks up to the JACKPOT sign).
+- Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
+  climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
+  `ServerFixture` with `minigame_pool`.
