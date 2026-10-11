@@ -136,3 +136,26 @@ func test_first_person_bat_points_barrel_up_and_away() -> void:
 	var knob: Vector3 = ends[1]
 	assert_gt(barrel.y, knob.y, "barrel above the grip in view")
 	assert_lt(barrel.z, knob.z, "barrel further from the eye than the grip")
+
+
+func test_aim_outline_grows_in_world_space() -> void:
+	# The old outline was a StandardMaterial3D grow (model space): on a skin imported at scale 73.7
+	# (warrior) the 0.035 grow became 2.6 m of gold shards around whoever you aimed at.
+	var m: Material = ItemController.outline_material()
+	assert_true(m is ShaderMaterial, "not a model-space BaseMaterial3D grow")
+	var sm: ShaderMaterial = m as ShaderMaterial
+	assert_eq(float(sm.get_shader_parameter(&"width")), ItemController.OUTLINE_WIDTH)
+	assert_lt(ItemController.OUTLINE_WIDTH, 0.06, "a thin line, in metres")
+	var code: String = sm.shader.code
+	assert_true(code.contains("skip_vertex_transform"), "the vertex shader places the hull itself")
+	assert_true(code.contains("MODEL_NORMAL_MATRIX"), "normals grown in world space")
+	assert_true(code.contains("cull_front"))
+	# Every mesh of a scaled skin takes the overlay without errors.
+	var v := AvatarVisuals.new()
+	add_child_autofree(v)
+	v.set_skin(&"warrior")
+	var n: int = 0
+	for g: Node in v.find_children("*", "MeshInstance3D", true, false):
+		(g as MeshInstance3D).material_overlay = sm
+		n += 1
+	assert_gt(n, 0)

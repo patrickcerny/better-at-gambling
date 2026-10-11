@@ -47,7 +47,7 @@ var _poll: float = 0.0
 var _clock: float = 0.0
 var _discard_open: bool = false
 var _outlined: Array[GeometryInstance3D] = []
-var _outline_mat: StandardMaterial3D
+var _outline_mat: ShaderMaterial
 ## Blackjack table whose hole card is x-rayed for us (Sunglasses), &"" = none.
 var _xray_station: StringName = &""
 
@@ -74,12 +74,7 @@ func _ready() -> void:
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ring.visible = false
 	add_child(ring)
-	_outline_mat = StandardMaterial3D.new()
-	_outline_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_outline_mat.albedo_color = Palette.VIP_GOLD
-	_outline_mat.cull_mode = BaseMaterial3D.CULL_FRONT
-	_outline_mat.grow = true
-	_outline_mat.grow_amount = 0.035
+	_outline_mat = outline_material()
 	duel_panel = RpsDuelPanel.new()
 	duel_panel.picked.connect(_pick_duel)
 	add_child(duel_panel)
@@ -322,6 +317,21 @@ func _set_aimed(pid: int) -> void:
 		if g is MeshInstance3D and g.visible and g.material_overlay == null:
 			g.material_overlay = _outline_mat
 			_outlined.append(g)
+
+
+## The aim outline: a front-culled hull grown `OUTLINE_WIDTH` metres along the normals in world
+## space. (A StandardMaterial3D grow works in model space, so on character skins imported at
+## scale 0.33 to 73.7 the hull blew up into metre-long shards around the target.)
+const OUTLINE_SHADER: Shader = preload("res://client/aim_outline.gdshader")
+const OUTLINE_WIDTH: float = 0.03
+
+
+static func outline_material() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = OUTLINE_SHADER
+	m.set_shader_parameter(&"color", Palette.VIP_GOLD)
+	m.set_shader_parameter(&"width", OUTLINE_WIDTH)
+	return m
 
 
 func _clear_outline() -> void:
