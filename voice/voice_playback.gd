@@ -15,7 +15,13 @@ const HEAD_Y: float = 1.3
 ## Decoded audio kept queued in the generator (on top of the jitter buffer).
 const GENERATOR_LEAD: int = VoiceCodec.FRAME_SAMPLES * 2
 
+## Frames every playback has pulled out of its jitter buffer and played (or, headless, clocked
+## through the mouth), for the end-of-match voice log line and the tests.
+static var total_frames_played: int = 0
+
 var speaker: int = -1
+## Frames this speaker's playback has played.
+var frames_played: int = 0
 var codec: VoiceCodec = MulawCodec.new()
 var buffer: VoiceJitterBuffer = VoiceJitterBuffer.new()
 var mouth: VoiceMouth = VoiceMouth.new()
@@ -106,6 +112,7 @@ func advance(delta: float) -> void:
 			_clock -= VoiceCodec.FRAME_SECONDS
 			var f: PackedFloat32Array = buffer.pop()
 			if not f.is_empty():
+				_count_played()
 				mouth.feed(f)
 		if not buffer.is_active():
 			_clock = 0.0
@@ -114,7 +121,13 @@ func advance(delta: float) -> void:
 		icon.visible = mouth.is_talking()
 
 
+func _count_played() -> void:
+	frames_played += 1
+	total_frames_played += 1
+
+
 func _play(f: PackedFloat32Array) -> void:
+	_count_played()
 	mouth.feed(f)
 	var stereo := PackedVector2Array()
 	stereo.resize(f.size())

@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import math
 import os
+import re
+import struct
 import time
+import wave
 
 from conftest import free_port
 
@@ -169,4 +173,36 @@ def test_the_party_leader_leaves_the_lobby_and_the_next_one_starts_the_match(pro
     digests = {p.name: p.digest() for p in (server, a, b)}
     assert len(set(digests.values())) == 1, digests
     for p in (server, a, b):
+        assert p.errors() == [], (p.name, p.errors()[:5])
+
+
+def test_voice_from_one_client_is_relayed_by_the_dedicated_server_and_played_by_the_other(procs, tmp_path):
+    """Proximity voice end to end (Patrick on 0.9.0: "fix the proximity chat"): Alice loops a WAV
+    into her capture path (`--voice-test`, open mic), the headless dedicated server (Dummy audio
+    driver) relays it, Bob's VoicePlayback plays it under Alice's avatar."""
+    wav_path = tmp_path / "voice.wav"
+    with wave.open(str(wav_path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(b"".join(struct.pack("<h", int(12000 * math.sin(2 * math.pi * 300 * i / 16000))) for i in range(16000)))
+    port = free_port()
+    server = _server(procs, "voice-server", port, "--minigames", "0", "--gamble-seconds", "30", "--seed", "3")
+    server.wait_for(r"server listening", 30)
+    alice = _client(procs, "voice-alice", port, "--voice-test", str(wav_path))
+    bob = _client(procs, "voice-bob", port)
+    assert alice.wait(240) == 0, alice.log_path
+    assert bob.wait(60) == 0, bob.log_path
+    assert server.wait(60) == 0, server.log_path
+    stats = {}
+    for p in (alice, bob):
+        m = re.search(r"sent (\d+) frames \(\d+ bytes\), received (\d+) frames from (\d+) speakers, played (\d+) frames", p.log())
+        assert m, (p.name, "no voice summary", p.log_path)
+        stats[p.name] = [int(x) for x in m.groups()]
+    sent, _, _, _ = stats["voice-alice"]
+    _, received, speakers, played = stats["voice-bob"]
+    assert sent > 200, stats  # 25 frames/s while she is on the casino floor
+    assert received > 100 and speakers == 1, stats
+    assert played > 100, stats
+    for p in (server, alice, bob):
         assert p.errors() == [], (p.name, p.errors()[:5])

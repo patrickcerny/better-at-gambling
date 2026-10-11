@@ -16,6 +16,8 @@ signal resume_requested
 const PREVIEW_BUS: Dictionary = {"master": &"SFX", "sfx": &"SFX", "ui": &"UI", "voice": &"Voice"}
 const TABS: Array[String] = ["GAME", "VIDEO", "AUDIO", "CONTROLS"]
 const CAPTURE_TEXT: String = "Press a key…"
+## The mic test tries a microphone that would not open again this often.
+const MIC_RETRY_SECONDS: float = 2.0
 
 var in_game: bool = false
 ## Index into `TABS` of the page showing.
@@ -31,7 +33,18 @@ var bind_buttons: Dictionary[StringName, Button] = {}
 var _resume: Button
 var _back: Button
 var _reset_keys: Button
+## AUDIO tab: voice mode, microphone choice (`input_devices[i]` is item i) and the input level.
+var voice_mode: OptionButton
+var input_device: OptionButton
+var input_devices: PackedStringArray = PackedStringArray()
+var mic_meter: ProgressBar
+var mic_status: Label
+## The microphone the meter reads when no match is running (main menu): started while the AUDIO
+## tab shows, stopped when it closes. In a match the meter reads the voice channel's capture.
+var mic_test: VoiceCapture = null
 var _mutes: VoiceMuteList
+var _meter_fill: StyleBoxFlat
+var _mic_retry: float = 0.0
 
 
 func _ready() -> void:
@@ -135,14 +148,50 @@ func _build_audio(page: VBoxContainer) -> void:
 	_slider(page, "Menus", "audio", "ui", 0.0, 1.0, 0.05, true)
 	page.add_child(_heading("VOICE CHAT"))
 	_slider(page, "Voice volume", "audio", "voice", 0.0, 1.0, 0.05, true)
-	var voice_row := _row(page, "Microphone")
-	var voice_mode := OptionButton.new()
+	var voice_row := _row(page, "Voice chat")
+	voice_mode = OptionButton.new()
+	voice_mode.name = "VoiceMode"
 	for label: String in VoiceChannel.MODE_LABELS:
 		voice_mode.add_item(label)
 	voice_mode.selected = maxi(VoiceChannel.MODE_KEYS.find(str(Settings.get_value("voice", "mode"))), 0)
 	voice_mode.item_selected.connect(func(i: int) -> void: Settings.change("voice", "mode", VoiceChannel.MODE_KEYS[i]))
 	voice_mode.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	voice_row.add_child(voice_mode)
+	var device_row := _row(page, "Microphone")
+	input_device = OptionButton.new()
+	input_device.name = "InputDevice"
+	input_device.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	input_device.clip_text = true
+	input_device.custom_minimum_size = Vector2(200, 0)
+	input_device.item_selected.connect(func(i: int) -> void: Settings.change("voice", "input_device", input_devices[i]))
+	device_row.add_child(input_device)
+	var level_row := _row(page, "Mic level")
+	mic_meter = ProgressBar.new()
+	mic_meter.name = "MicMeter"
+	mic_meter.min_value = 0.0
+	mic_meter.max_value = 1.0
+	mic_meter.step = 0.0
+	mic_meter.show_percentage = false
+	mic_meter.custom_minimum_size = Vector2(160, 18)
+	mic_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mic_meter.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color("#2A1A1A")
+	bg.border_color = Color(Palette.WARM_GOLD, 0.35)
+	bg.set_border_width_all(2)
+	bg.set_corner_radius_all(9)
+	_meter_fill = StyleBoxFlat.new()
+	_meter_fill.bg_color = Palette.MONEY_GREEN
+	_meter_fill.set_corner_radius_all(9)
+	mic_meter.add_theme_stylebox_override(&"background", bg)
+	mic_meter.add_theme_stylebox_override(&"fill", _meter_fill)
+	level_row.add_child(mic_meter)
+	mic_status = Label.new()
+	mic_status.name = "MicStatus"
+	mic_status.theme_type_variation = &"SmallLabel"
+	mic_status.custom_minimum_size = Vector2(190, 0)
+	mic_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	level_row.add_child(mic_status)
 	_mutes = VoiceMuteList.new()
 	page.add_child(_mutes)
 
@@ -176,6 +225,8 @@ func open(p_in_game: bool = false) -> void:
 	in_game = p_in_game
 	_resume.visible = in_game
 	_mutes.refresh()
+	voice_mode.selected = maxi(VoiceChannel.MODE_KEYS.find(str(Settings.get_value("voice", "mode"))), 0)
+	refresh_devices()
 	refresh_bindings()
 	_back.text = "BACK %s" % InputGlyphs.hint(&"ui_cancel")
 	visible = true
@@ -188,6 +239,7 @@ func close() -> void:
 		return
 	cancel_capture()
 	visible = false
+	_stop_mic_test()
 	Settings.save()
 	closed.emit()
 
@@ -232,6 +284,85 @@ func select_tab(i: int) -> void:
 	for j: int in pages.size():
 		pages[j].visible = j == current_tab
 		tab_buttons[j].set_pressed_no_signal(j == current_tab)
+	if not _audio_showing():
+		_stop_mic_test()
+
+
+## Lists the microphones (`devices` defaults to the audio driver's list; "Default" always comes
+## first) and selects the saved one, or Default when it is not plugged in.
+func refresh_devices(devices: PackedStringArray = AudioServer.get_input_device_list()) -> void:
+	input_devices = PackedStringArray([VoiceMicSource.DEFAULT_DEVICE])
+	for d: String in devices:
+		if d != VoiceMicSource.DEFAULT_DEVICE and not d in input_devices:
+			input_devices.append(d)
+	input_device.clear()
+	for d: String in input_devices:
+		input_device.add_item("System default" if d == VoiceMicSource.DEFAULT_DEVICE else d)
+	var saved: String = str(Settings.get_value("voice", "input_device"))
+	input_device.selected = maxi(input_devices.find(Settings.pick_input_device(saved, input_devices)), 0)
+
+
+func _audio_showing() -> bool:
+	return visible and current_tab == TABS.find("AUDIO")
+
+
+## The live voice channel when it is reading the microphone (online, voice on), else null.
+static func _live_channel() -> VoiceChannel:
+	var ch: VoiceChannel = VoiceChannel.current
+	if ch != null and is_instance_valid(ch) and ch.is_active():
+		return ch
+	return null
+
+
+## The capture the level meter reads: the match's voice channel while voice is on, else our own
+## mic test (main menu, Practice, voice switched off).
+func meter_capture() -> VoiceCapture:
+	var ch: VoiceChannel = _live_channel()
+	return ch.capture if ch != null else mic_test
+
+
+func _process(delta: float) -> void:
+	if not _audio_showing():
+		return
+	if _live_channel() != null:
+		_stop_mic_test()
+	elif mic_test == null:
+		mic_test = VoiceCapture.new()
+		mic_test.name = "MicTest"
+		mic_test.mode = VoiceCapture.Mode.OFF  # level only, nothing is sent
+		add_child(mic_test)
+		mic_test.start_microphone()
+		_mic_retry = MIC_RETRY_SECONDS
+	elif not mic_test.mic_active:
+		_mic_retry -= delta
+		if _mic_retry <= 0.0:
+			_mic_retry = MIC_RETRY_SECONDS
+			mic_test.start_microphone()  # plugged in / another device picked since
+	var cap: VoiceCapture = meter_capture()
+	var lvl: float = cap.meter_level() if cap != null else 0.0
+	# -60 dBFS (room hiss) .. 0 dBFS on the bar: gold below the open-mic gate, green above it.
+	var db: float = linear_to_db(lvl) if lvl > 0.00001 else -100.0
+	mic_meter.value = clampf((db + 60.0) / 60.0, 0.0, 1.0)
+	_meter_fill.bg_color = Palette.MONEY_GREEN if db >= VoiceCapture.OPEN_MIC_THRESHOLD_DB else Palette.WARM_GOLD
+	mic_status.text = mic_status_text(cap)
+
+
+## The words next to the meter.
+static func mic_status_text(cap: VoiceCapture) -> String:
+	if cap == null or not cap.mic_active:
+		if cap != null and cap.mic_error != "":
+			return "No microphone: %s" % cap.mic_error
+		return "Microphone off"
+	if cap.meter_level() <= 0.0:
+		return "Listening… say something"
+	return "Microphone works"
+
+
+func _stop_mic_test() -> void:
+	if mic_test != null:
+		mic_test.stop_microphone()
+		mic_test.queue_free()
+		mic_test = null
 
 
 ## Waits for the next key or mouse button press to bind to `action`.
