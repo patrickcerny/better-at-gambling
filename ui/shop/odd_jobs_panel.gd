@@ -192,9 +192,12 @@ func _process(delta: float) -> void:
 
 
 func _on_event(ev: Dictionary) -> void:
+	var type: StringName = StringName(ev.get("type", &""))
+	if type != &"odd_jobs_bar" and type != &"odd_jobs_payout":
+		return  # other events carry "player" as a dictionary (player_joined), never int() those
 	if int(ev.get("player", -1)) != local_id:
 		return
-	match StringName(ev.get("type", &"")):
+	match type:
 		&"odd_jobs_bar":
 			_fill = float(ev["fill"])
 			_needed = int(ev["presses_needed"])

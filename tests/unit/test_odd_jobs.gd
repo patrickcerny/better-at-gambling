@@ -120,3 +120,15 @@ func test_money_never_goes_negative() -> void:
 	assert_eq(economy.balance(1), 150)
 	assert_true(economy.balance(1) >= 0)
 	assert_false(jobs.press(99, now)["ok"], "unknown player")
+
+
+## The panel sees every server event; `player_joined` carries the player as a dictionary and
+## must not be parsed as an id (0.9.4: "Nonexistent 'int' constructor" on every dedicated server).
+func test_panel_ignores_events_whose_player_is_not_an_id() -> void:
+	var panel := OddJobsPanel.new()
+	add_child_autofree(panel)
+	panel.local_id = 3
+	panel._on_event({"type": &"player_joined", "player": {"id": 3, "name": "Bob"}})
+	panel._on_event({"type": &"odd_jobs_bar", "player": 3, "fill": 0.5, "presses_needed": 20, "enough": false})
+	assert_eq(panel._needed, 20, "own bar events still land")
+	assert_eq(panel._fill, 0.5)
