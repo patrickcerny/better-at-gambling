@@ -923,6 +923,12 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if in_briefing():
 				return StationLogicBase.fail(&"too_early")
 			return minigame.submit(player, intent, match_time)
+		&"spy_clue", &"spy_call_vote", &"spy_vote":
+			if minigame == null or not minigame is SpyLogic:
+				return StationLogicBase.fail(&"too_late")
+			if in_briefing():
+				return StationLogicBase.fail(&"too_early")
+			return minigame.submit(player, intent, match_time)
 		&"lonely_number_pick":
 			if minigame == null or not minigame is LonelyNumberLogic:
 				return StationLogicBase.fail(&"too_late")

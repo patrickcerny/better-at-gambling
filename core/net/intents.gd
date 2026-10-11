@@ -18,6 +18,7 @@ const SCHEMA: Dictionary = {
 	&"vote_race_vote": ["target"],
 	&"find_the_lady_pick": ["slot"],
 	&"forehead_poker_action": ["action"],
+	&"spy_clue": ["text"], &"spy_call_vote": [], &"spy_vote": ["target"],
 	&"split_or_steal_pick": ["choice"],
 	&"lonely_number_pick": ["number"],
 	&"minigame_ready": [],
