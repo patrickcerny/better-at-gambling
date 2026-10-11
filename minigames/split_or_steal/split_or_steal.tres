@@ -7,8 +7,8 @@
 [resource]
 script = ExtResource("1")
 id = &"split_or_steal"
-display_name = "Split or Steal Tournament"
-rules_text = "Round robin: everyone plays everyone once, all pairs at the same time. Talk for 8 s, then secretly pick SPLIT or STEAL. Both SPLIT: 1 point each. STEAL vs SPLIT: stealer 3, splitter 0. Both STEAL: 0. Most points wins; ties go to whoever stole least."
+display_name = "Split or Steal"
+rules_text = "A game show: one pair at a time steps up to the podiums while everyone else watches from the audience. Talk, plead, promise, then secretly lock in SPLIT or STEAL within 15 s (keys 1 / 2). Both SPLIT: 1 point each. STEAL vs SPLIT: stealer 3, splitter 0. Both STEAL: 0. No pick counts as SPLIT. Everyone plays the same number of matches (2-4 players play more than once); with an odd count the last player gets a bonus match against a stand-in who plays for the house and scores nothing. Most points wins; ties go to whoever stole least."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2
