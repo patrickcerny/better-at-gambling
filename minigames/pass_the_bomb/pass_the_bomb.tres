@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MinigameDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/defs/minigame_definition.gd" id="1"]
+[ext_resource type="Script" path="res://minigames/pass_the_bomb/pass_the_bomb_logic.gd" id="2"]
+[ext_resource type="Script" path="res://minigames/pass_the_bomb/pass_the_bomb_stage.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"pass_the_bomb"
+display_name = "Pass the Bomb"
+rules_text = "Someone holds a lit bomb with a hidden fuse: tag the player in front of you to pass it on. When it blows, the holder is out and a new bomb starts. Last one standing wins."
+logic_script = ExtResource("2")
+stage_script = ExtResource("3")
+min_players = 2
+weight = 1.0
