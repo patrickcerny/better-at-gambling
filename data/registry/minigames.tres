@@ -8,7 +8,8 @@
 [ext_resource type="Resource" path="res://minigames/bust_or_bank/bust_or_bank.tres" id="6"]
 [ext_resource type="Resource" path="res://minigames/vote_race/vote_race.tres" id="7"]
 [ext_resource type="Resource" path="res://minigames/find_the_lady/find_the_lady.tres" id="8"]
+[ext_resource type="Resource" path="res://minigames/spy/spy.tres" id="spy"]
 
 [resource]
 script = ExtResource("1")
-entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8")])
+entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("spy")])
