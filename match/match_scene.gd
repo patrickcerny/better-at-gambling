@@ -185,7 +185,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
-	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()]]:
+	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()]]:
 		var ui: StationUi = pair[1]
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
@@ -2447,6 +2447,8 @@ func _on_station_state(sid: StringName) -> void:
 		node.set_out_of_order(float(st.get("out_of_order", 0.0)))
 		if node is BlackjackStation:
 			(node as BlackjackStation).show_round(st)
+		elif node is HorseRaceStation:
+			(node as HorseRaceStation).show_state(st)
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 	_update_look_lock()
@@ -2584,6 +2586,8 @@ func _min_bet(st: StationBase) -> int:
 			base = cfg.slots_bet_sizes[0]
 		&"plinko":
 			base = cfg.plinko_bet_sizes[0]
+		&"horse_race":
+			base = cfg.horse_min_bet
 	return int(floor(base * mult))
 
 
