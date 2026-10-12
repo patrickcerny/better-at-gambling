@@ -54,10 +54,13 @@ var winner: int = -1
 var races_played: int = 0
 
 var _plan: Dictionary = {}
+## True once this line-up has raced: the next round brings four new names.
+var _names_used: bool = true
 
 
 func _on_setup() -> void:
 	game_id = &"horse_race"
+	_new_names()  # the board shows a line-up before anyone sits down
 
 
 func can_join(p: int) -> bool:
@@ -229,8 +232,14 @@ func _start_betting() -> void:
 	race_time = 0.0
 	_plan = {}
 	progress = [0.0, 0.0, 0.0, 0.0]
-	names = draw_names(rng)
+	if _names_used:
+		_new_names()
 	events.append(GameEvents.make(&"round_started", {"station": station_id, "names": names.duplicate()}))
+
+
+func _new_names() -> void:
+	names = draw_names(rng)
+	_names_used = false
 
 
 func _go_idle() -> void:
@@ -249,6 +258,7 @@ func _start_race() -> void:
 	counting = false
 	timer = 0.0
 	race_seed = rng.range_int(1, 2_000_000_000)
+	_names_used = true
 	race_time = 0.0
 	winner = -1
 	_plan = simulate(race_seed)
