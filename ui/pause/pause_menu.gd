@@ -6,6 +6,8 @@ extends Control
 ## party) and QUIT GAME; a small gear in the panel's bottom-right corner opens the settings, whose
 ## BACK returns here and whose RESUME goes straight back to play. The match keeps running behind
 ## it (online games can't pause); the match scene owns the input mode while it is open.
+## A "?" left of the gear opens the tutorial (`HowToPlayPanel`) over the game; DONE, SKIP or Esc
+## come back here.
 
 ## RESUME, Esc, or RESUME in the settings: back to play.
 signal resumed
@@ -22,6 +24,8 @@ var resume_button: Button
 var leave_button: Button
 var quit_button: Button
 var settings_button: GearButton
+var help_button: HelpButton
+var how_to_play: HowToPlayPanel
 
 
 func _ready() -> void:
@@ -63,6 +67,10 @@ func _ready() -> void:
 	bottom.name = "Bottom"
 	bottom.alignment = BoxContainer.ALIGNMENT_END
 	v.add_child(bottom)
+	help_button = HelpButton.new()
+	help_button.name = "HelpButton"
+	help_button.pressed.connect(open_tutorial)
+	bottom.add_child(help_button)
 	settings_button = GearButton.new()
 	settings_button.name = "SettingsButton"
 	settings_button.pressed.connect(open_settings)
@@ -76,6 +84,14 @@ func _ready() -> void:
 	settings.offset_bottom = SETTINGS_BOTTOM
 	settings.closed.connect(_on_settings_closed)
 	settings.resume_requested.connect(resume)
+	how_to_play = HowToPlayPanel.new()
+	how_to_play.name = "HowToPlay"
+	how_to_play.visible = false
+	add_child(how_to_play)
+	how_to_play.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	how_to_play.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	how_to_play.grow_vertical = Control.GROW_DIRECTION_BOTH
+	how_to_play.closed.connect(_on_tutorial_closed)
 
 
 func open() -> void:
@@ -90,6 +106,7 @@ func close() -> void:
 		return
 	visible = false
 	settings.close()  # saves; `_on_settings_closed` ignores it now that we are hidden
+	how_to_play.close()
 
 
 func resume() -> void:
@@ -103,6 +120,8 @@ func back() -> void:
 		return
 	if settings.visible:
 		settings.close()
+	elif how_to_play.visible:
+		how_to_play.close()
 	else:
 		resume()
 
@@ -110,6 +129,21 @@ func back() -> void:
 func open_settings() -> void:
 	panel.visible = false
 	settings.open(true)
+
+
+## "?": the tutorial pages in place of the pause panel.
+func open_tutorial() -> void:
+	panel.visible = false
+	how_to_play.open()
+
+
+func _on_tutorial_closed() -> void:
+	Settings.set_value("tutorial", "seen", true)
+	Settings.save()
+	if not visible:
+		return
+	panel.visible = true
+	help_button.grab_focus()
 
 
 func _on_settings_closed() -> void:
@@ -120,7 +154,7 @@ func _on_settings_closed() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if visible and not settings.visible and (event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause")):
+	if visible and not settings.visible and not how_to_play.visible and (event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause")):
 		get_viewport().set_input_as_handled()
 		resume()
 
