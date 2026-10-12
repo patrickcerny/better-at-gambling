@@ -28,6 +28,9 @@ $750 after each minigame played, $900 from the fourth on (`BalanceConfig.comp_am
   min per bet, $300 per spin.
 - **Slots:** 3 reels, 1 line, wild clover, weighted symbols, target RTP ~101%.
 - **Plinko:** 13 slots, Low/Medium/High rows; server picks slot then steers a physical chip.
+- **Horse Race** (Race Hall annex): 4 horses with names drawn from a pool each round, one horse per
+  player per race, the first over the line pays 1:4. A seeded server race (~9 s, the lead changes)
+  every client replays. $10–$100.
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
@@ -87,6 +90,9 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | intent_rejected | buzzer for VIP denied; soft buzzer for other refusals with a toast |
 | round_result | money pop: chip_clack (stake), coin, big_win (≥ $200); your loss: loss_sting (muted trumpet, at most every 6 s) |
 | bet_placed | chip_clack (HUD stake) |
+| horse_race_countdown | — (the tote board counts down) |
+| horse_race_started | last_call_bell, high (the starting bell) |
+| horse_race_finished | chime when the winner's nose crosses the line on the table |
 | jackpot_won | jackpot_siren (bell arpeggio, coin shower, held chord) |
 | last_call | last_call_bell (brass hand bell ×3) + Last Call music |
 | minigame_started | whoosh + quiz music |
