@@ -9,8 +9,11 @@ const COUNTDOWN_SECONDS: float = 3.0
 ## Host settings shown on the board and the 2D panel: match length as a number of minigames and
 ## the gambling minutes before each one (Patrick's note #12), items on/off, quiz category, the
 ## party mode (`MatchMode`: casino or minigames only) and whether the party is listed in the
-## server browser (`public`).
-var settings: Dictionary = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "quiz_category": &"all", "mode": MatchMode.CASINO, "public": false}
+## server browser (`public`), and which minigames are in the rotation (`minigame_pool`: ids
+## comma-separated, "" = every registered minigame; see `normalize_pool`).
+var settings: Dictionary = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "quiz_category": &"all", "mode": MatchMode.CASINO, "public": false, "minigame_pool": ""}
+## Registered minigame ids in registry order (the server fills it); `minigame_pool` keeps only these.
+var known_minigames: PackedStringArray = []
 ## Defaults and bounds for the match length (data/balance/match_presets.tres).
 var presets: MatchPresets = MatchPresets.new()
 ## Seconds left on the start countdown (-1 when not counting).
@@ -130,6 +133,10 @@ func set_setting(player: int, key: String, value: Variant) -> StringName:
 			if typeof(value) != TYPE_BOOL:
 				return &"bad_value"
 			settings["public"] = value
+		"minigame_pool":
+			if not typeof(value) in [TYPE_STRING, TYPE_STRING_NAME, TYPE_ARRAY, TYPE_PACKED_STRING_ARRAY]:
+				return &"bad_value"
+			settings["minigame_pool"] = normalize_pool(value, known_minigames)
 		_:
 			return &"bad_key"
 	return &""
@@ -160,6 +167,26 @@ func participant_count() -> int:
 		if _members[id]["connected"]:
 			n += 1
 	return n
+
+
+## A minigame pool as stored: the known ids from `value` (a comma-separated String or an array of
+## ids) in `known` order, unknown ids and duplicates dropped. "" (= every minigame) when nothing
+## known is left or every known game is in it, so games added later join an all-on rotation.
+static func normalize_pool(value: Variant, known: PackedStringArray) -> String:
+	var wanted: PackedStringArray = []
+	if typeof(value) in [TYPE_ARRAY, TYPE_PACKED_STRING_ARRAY]:
+		for v: Variant in value:
+			wanted.append(str(v).strip_edges())
+	else:
+		for part: String in str(value).split(",", false):
+			wanted.append(part.strip_edges())
+	var kept: PackedStringArray = []
+	for id: String in known:
+		if wanted.has(id):
+			kept.append(id)
+	if kept.size() == known.size():
+		return ""
+	return ",".join(kept)
 
 
 static func _is_whole(value: Variant) -> bool:

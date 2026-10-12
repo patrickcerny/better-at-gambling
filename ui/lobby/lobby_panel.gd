@@ -3,7 +3,7 @@ extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
 ## accessibility: the 8 slots (name, color, skin, ready, leader), the ready toggle
 ## and — for the party leader — the mode (casino or minigames only), match length (minigames,
-## gambling minutes between them), items, PUBLIC (listed in the server browser) and a KICK button
+## gambling minutes between them), items, which minigames are on (MinigameSelector), PUBLIC (listed in the server browser) and a KICK button
 ## next to every other player (press twice: KICK → SURE?). Every button sends an intent; the panel
 ## only redraws from the ClientMatchState mirror.
 
@@ -28,6 +28,9 @@ var public_button: Button
 ## Host mode (a Steam party on someone's PC): opens the Steam overlay's invite dialog. Replaces
 ## PUBLIC there (there is no server browser for Steam parties).
 var invite_button: Button
+## MINIGAMES: opens the minigame selector (`minigame_pool`; read-only for everyone but the leader).
+var minigames_button: Button
+var selector: MinigameSelector
 ## Player id whose KICK was pressed once (the second press kicks), and when it disarms.
 var _kick_armed: int = -1
 var _kick_armed_until: float = 0.0
@@ -61,6 +64,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	local_id = p_local_id
 	state.lobby_changed.connect(_refresh)
 	state.players_changed.connect(_refresh)
+	selector.bind(state, local_id)
 	_refresh()
 
 
@@ -80,6 +84,7 @@ func open(focus: StringName = &"") -> void:
 func close() -> void:
 	if visible:
 		visible = false
+		selector.close()
 		closed.emit()
 
 
@@ -165,6 +170,12 @@ func _build() -> void:
 	_items_button.pressed.connect(func() -> void:
 		Net.send_intent(Intents.make(&"lobby_setting", {"key": "items_enabled", "value": not bool(state.lobby_settings.get("items_enabled", true))})))
 	_settings_box.add_child(_items_button)
+	minigames_button = Button.new()
+	minigames_button.name = "Minigames"
+	minigames_button.pressed.connect(func() -> void: selector.open())
+	_settings_box.add_child(minigames_button)
+	selector = MinigameSelector.new()
+	add_child(selector)
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override(&"separation", 20)
@@ -290,6 +301,9 @@ func _refresh() -> void:
 	_items_button.text = "ITEMS: %s" % ("ON" if bool(state.lobby_settings.get("items_enabled", true)) else "OFF")
 	_items_button.button_pressed = bool(state.lobby_settings.get("items_enabled", true))
 	_items_button.disabled = not leader
+	var on: int = selector.enabled_ids().size()
+	var all: int = Registry.minigames.size()
+	minigames_button.text = "%s: %s" % ["PICK MINIGAMES" if leader else "MINIGAMES", "ALL %d" % all if on == all else "%d OF %d" % [on, all]]
 
 
 ## One "LABEL  [−] value [+]" row; the buttons ask the server to step the setting by one.

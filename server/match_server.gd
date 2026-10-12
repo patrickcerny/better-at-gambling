@@ -108,13 +108,13 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	lobby.settings["minigames"] = int(settings.get("minigames", presets.default_minigames))
 	lobby.settings["gamble_minutes"] = int(settings.get("gamble_minutes", presets.default_gamble_minutes))
 	_apply_length()
-	# Dev/tests may pin the pool: `minigame_pool` = "quiz,vote_race" (empty = every minigame).
-	var pool: PackedStringArray = str(settings.get("minigame_pool", "")).split(",", false)
-	var defs: Array[MinigameDefinition] = []
+	# Which minigames are in the rotation: the lobby's `minigame_pool` ("quiz,vote_race"; empty =
+	# every minigame), seeded from the settings (dev/tests pin it there) and changed by the host.
+	lobby.known_minigames.clear()
 	for id: StringName in Registry.minigames:
-		if pool.is_empty() or pool.has(String(id)):
-			defs.append(Registry.minigames[id])
-	minigames = MinigameDirector.new(defs, Registry.quiz_bank)
+		lobby.known_minigames.append(String(id))
+	lobby.settings["minigame_pool"] = LobbyController.normalize_pool(settings.get("minigame_pool", ""), lobby.known_minigames)
+	minigames = MinigameDirector.new(MinigameDirector.pool_defs(Registry.minigames, lobby.settings["minigame_pool"]), Registry.quiz_bank)
 	var rarities: Dictionary[StringName, int] = {}
 	for id: StringName in Registry.items:
 		if Registry.items[id].in_loot:
@@ -1042,6 +1042,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			var err: StringName = lobby.set_setting(player, str(intent["key"]), intent["value"])
 			if err != &"":
 				return StationLogicBase.fail(err)
+			if str(intent["key"]) == "minigame_pool":
+				minigames.set_defs(MinigameDirector.pool_defs(Registry.minigames, lobby.settings["minigame_pool"]))
 			_emit(GameEvents.make(&"lobby_settings", {"settings": lobby.settings.duplicate()}))
 			return StationLogicBase.OK_RESULT
 	return StationLogicBase.fail(&"not_implemented")

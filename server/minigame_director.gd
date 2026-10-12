@@ -21,6 +21,25 @@ func _init(p_defs: Array[MinigameDefinition], p_bank: QuestionBank) -> void:
 	bank = p_bank
 
 
+## The definitions of `all` (id → definition, registry order) in `pool` (comma-separated ids as
+## LobbyController.normalize_pool stores them; "" or nothing known = every one).
+static func pool_defs(all: Dictionary, pool: String) -> Array[MinigameDefinition]:
+	var ids: PackedStringArray = pool.split(",", false)
+	var out: Array[MinigameDefinition] = []
+	for id: Variant in all:
+		if ids.has(str(id)):
+			out.append(all[id])
+	if out.is_empty():
+		for id: Variant in all:
+			out.append(all[id])
+	return out
+
+
+## Swaps the rotation (lobby `minigame_pool`); games left out simply stop being drawn.
+func set_defs(p_defs: Array[MinigameDefinition]) -> void:
+	defs = p_defs
+
+
 ## True if there is anything to play.
 func has_minigames() -> bool:
 	return not defs.is_empty()
