@@ -77,6 +77,12 @@ func _stage() -> void:
 			_scene.local.cam.pitch = -0.1
 			_scene.router.set_mode(InputRouter.Mode.MENU)
 			_scene.shop_panel.open()
+		"race":  # the Race Hall archway from the casino floor (dev check only)
+			_free_cam(Vector3(10.0, 3.2, -4.0), Vector3(24.0, 1.8, -13.2), 70.0)
+			_scene.hud.visible = false
+		"racehall":  # inside the Race Hall (dev check only)
+			_free_cam(Vector3(23.2, 2.8, -11.4), Vector3(30.0, 0.9, -19.0), 75.0)
+			_scene.hud.visible = false
 		"jail":
 			var ids: Array[int] = _others()
 			for pid: int in ids.slice(0, 2):

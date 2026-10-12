@@ -19,7 +19,7 @@ const TEX_DIR: String = "res://assets/textures/"
 const CHANDELIERS: Array[Vector3] = [
 	Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11),
 	Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, 5.8, -21), Vector3(-13, 6.0, 12),
-	Vector3(13, 6.0, 12), Vector3(25.5, 6.0, -16.0), Vector3(32.5, 6.0, -16.0),
+	Vector3(13, 6.0, 12), Vector3(25.5, 6.0, -18.5), Vector3(32.5, 6.0, -18.5),
 ]
 const BULB_COLOR: Color = Color(1.0, 0.82, 0.52)
 const GLASS_GLOW: Color = Color(0.45, 0.42, 0.62)
@@ -29,7 +29,7 @@ const GLASS_GLOW: Color = Color(0.45, 0.42, 0.62)
 const WINDOWS: Array = [
 	[Vector3(-21.75, 3.5, -11.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, -4.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, 3.0), Vector3(1, 0, 0), 3.2],
 	[Vector3(21.75, 3.5, 3.0), Vector3(-1, 0, 0), 3.2],
-	[Vector3(35.75, 3.5, -19.0), Vector3(-1, 0, 0), 3.2], [Vector3(35.75, 3.5, -13.5), Vector3(-1, 0, 0), 3.2],
+	[Vector3(35.75, 3.5, -22.5), Vector3(-1, 0, 0), 3.2], [Vector3(35.75, 3.5, -15.5), Vector3(-1, 0, 0), 3.2],
 	[Vector3(-16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2], [Vector3(16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2],
 	[Vector3(-19.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2], [Vector3(-11.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2],
 	[Vector3(-3.2, 3.5, -25.75), Vector3(0, 0, 1), 3.2], [Vector3(3.2, 3.5, -25.75), Vector3(0, 0, 1), 3.2],
@@ -270,6 +270,7 @@ func _walls() -> void:
 	var vz: float = LuckyLounge.VIP_Z_FAR
 	var ax0: float = LuckyLounge.SIZE_X * 0.5 + 0.25
 	var ax1: float = LuckyLounge.ANNEX_X1 - 0.25
+	var az0: float = LuckyLounge.ANNEX_Z0 + 0.25
 	var az1: float = LuckyLounge.ANNEX_Z1 - 0.25
 	var runs: Array = [
 		[Vector3(-hx, 0, -hz), Vector3(-door - 0.2, 0, -hz), Vector3(0, 0, 1)],
@@ -279,9 +280,10 @@ func _walls() -> void:
 		[Vector3(hx, 0, -hz), Vector3(hx, 0, LuckyLounge.ARCH_Z0 - 0.2), Vector3(-1, 0, 0)],
 		[Vector3(hx, 0, LuckyLounge.ARCH_Z1 + 0.2), Vector3(hx, 0, LuckyLounge.JAIL_AREA.position.z - 0.2), Vector3(-1, 0, 0)],
 		[Vector3(hx, 0, LuckyLounge.JAIL_AREA.end.z + 0.2), Vector3(hx, 0, hz), Vector3(-1, 0, 0)],
-		# The Race Hall: north, east and south walls.
-		[Vector3(ax0, 0, -hz), Vector3(ax1, 0, -hz), Vector3(0, 0, 1)],
-		[Vector3(ax1, 0, -hz), Vector3(ax1, 0, az1), Vector3(-1, 0, 0)],
+		# The Race Hall: north, east and south walls, and its west wall beside the VIP lounge.
+		[Vector3(ax0, 0, az0), Vector3(ax1, 0, az0), Vector3(0, 0, 1)],
+		[Vector3(ax1, 0, az0), Vector3(ax1, 0, az1), Vector3(-1, 0, 0)],
+		[Vector3(ax0, 0, az0), Vector3(ax0, 0, -hz - 0.5), Vector3(1, 0, 0)],
 		[Vector3(ax0, 0, az1), Vector3(ax1, 0, az1), Vector3(0, 0, -1)],
 		[Vector3(-hx, 0, hz), Vector3(-2.3, 0, hz), Vector3(0, 0, -1)],
 		[Vector3(2.3, 0, hz), Vector3(hx, 0, hz), Vector3(0, 0, -1)],
@@ -552,18 +554,18 @@ func _sconces() -> void:
 	var spots: Array = []
 	for i: int in 6:
 		var x: float = -hx + 3.0 + i * (2.0 * hx - 6.0) / 5.0
-		spots.append([Vector3(x, y, -hz), Vector3(0, 0, 1)])
+		spots.append([Vector3(x, y, LuckyLounge.ANNEX_Z0 + 0.3), Vector3(0, 0, 1)])
 	for i: int in 4:
 		var z: float = -hz + 3.0 + i * (2.0 * hz - 6.0) / 3.0
 		spots.append([Vector3(-hx, y, z), Vector3(1, 0, 0)])
 		spots.append([Vector3(hx, y, z), Vector3(-1, 0, 0)])
-	# The Race Hall: either side of its windows, and its back (south) wall either side of the painting.
+	# The Race Hall: either side of its windows, and its north and south walls.
 	var ax: float = LuckyLounge.ANNEX_X1 - 0.3
-	for z: float in [-15.0, -9.25, -3.5]:
+	for z: float in [-25.0, -19.0, -12.5]:
 		spots.append([Vector3(ax, y, z), Vector3(-1, 0, 0)])
 	for x: float in [25.0, 33.0]:
 		spots.append([Vector3(x, y, LuckyLounge.ANNEX_Z1 - 0.3), Vector3(0, 0, -1)])
-		spots.append([Vector3(x, y, -hz), Vector3(0, 0, 1)])
+		spots.append([Vector3(x, y, LuckyLounge.ANNEX_Z0 + 0.3), Vector3(0, 0, 1)])
 	# The VIP lounge's side walls.
 	for z: float in [-23.6, -18.4]:
 		spots.append([Vector3(-LuckyLounge.VIP_X + 0.05, y, z), Vector3(1, 0, 0)])

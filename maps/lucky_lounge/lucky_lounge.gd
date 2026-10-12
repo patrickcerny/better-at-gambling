@@ -23,7 +23,7 @@ const STATIONS: Dictionary = {
 	&"slot_11": [&"slots", Vector3(-10, 0, -8.5), 0], &"slot_12": [&"slots", Vector3(-7.5, 0, -8.5), 0],
 	&"plinko_1": [&"plinko", Vector3(11, 0, -14.5), 0], &"plinko_2": [&"plinko", Vector3(17.5, 0, -14.5), 0],
 	# The Race Hall (east annex): the long horse race table, stools on its south side.
-	&"horse_race_1": [&"horse_race", Vector3(29.0, 0, -16.5), 0],
+	&"horse_race_1": [&"horse_race", Vector3(29.0, 0, -19.0), 0],
 	&"roulette_1": [&"roulette", Vector3(-6, 0, -3), 0], &"roulette_2": [&"roulette", Vector3(6, 0, -3), 180],
 	&"blackjack_1": [&"blackjack", Vector3(-16, 0, 4), 0], &"blackjack_2": [&"blackjack", Vector3(-9, 0, 4), 0],
 	&"blackjack_3": [&"blackjack", Vector3(-2, 0, 4), 0],
@@ -51,14 +51,15 @@ const VIP_GATE_POS: Vector3 = Vector3(0.0, 0.0, -SIZE_Z * 0.5)
 ## Which way the bouncer pushes someone without access: back out onto the casino floor.
 const VIP_GATE_PUSH: Vector3 = Vector3(0.0, 0.0, 1.0)
 ## The Race Hall (Patrick: "horse race table: bigger room"): an annex east of the casino floor,
-## x 22..ANNEX_X1, z ANNEX_Z0..ANNEX_Z1 (wall centre lines), open to the floor through an archway
-## in the east wall from ARCH_Z0 to ARCH_Z1, ARCH_H high. The jail alcove, the Gift Shop and the
+## x 22..ANNEX_X1, z ANNEX_Z0..ANNEX_Z1 (wall centre lines), reaching north past the casino's
+## north wall beside the VIP lounge, open to the floor through an archway in the east wall from
+## ARCH_Z0 to ARCH_Z1, ARCH_H high (the jail alcove sits in the same wall further south). The jail alcove, the Gift Shop and the
 ## Odd Jobs cabinet sit in the same east wall south of the annex and stay where they are.
 const ANNEX_X1: float = 36.0
-const ANNEX_Z0: float = -SIZE_Z * 0.5
+const ANNEX_Z0: float = VIP_Z_FAR
 const ANNEX_Z1: float = -10.5
-const ARCH_Z0: float = -20.5
-const ARCH_Z1: float = -11.5
+const ARCH_Z0: float = -15.5
+const ARCH_Z1: float = -11.0
 const ARCH_H: float = 4.6
 ## Pillars: the west pair stands in the roulette pit, the east pair frames the casino side of the
 ## lobby doors (half set into the start-room wall).
@@ -868,6 +869,9 @@ func _build_race_hall() -> void:
 	GreyboxKit.box(self, Vector3(x1 - x0, WALL_H, 0.5), Vector3((x0 + x1) * 0.5, WALL_H * 0.5, ANNEX_Z0), wall, "WallAnnex")
 	GreyboxKit.box(self, Vector3(x1 - x0, WALL_H, 0.5), Vector3((x0 + x1) * 0.5, WALL_H * 0.5, ANNEX_Z1), wall, "WallAnnex")
 	GreyboxKit.box(self, Vector3(0.5, WALL_H, z1 - z0), Vector3(ANNEX_X1, WALL_H * 0.5, (z0 + z1) * 0.5), wall, "WallAnnex")
+	# West wall north of the casino's north wall (the casino's east wall covers the rest).
+	var wz1: float = -SIZE_Z * 0.5 - 0.25
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, wz1 - z0), Vector3(hx, WALL_H * 0.5, (z0 + wz1) * 0.5), wall, "WallAnnex")
 	GreyboxKit.box(self, Vector3(x1 - hx, 0.3, z1 - z0), Vector3((hx + x1) * 0.5, WALL_H + 0.15, (z0 + z1) * 0.5), Palette.CASINO_BLACK, "CeilingAnnex")
 	# Gold casing round the archway on both faces.
 	var mid_z: float = (ARCH_Z0 + ARCH_Z1) * 0.5
@@ -878,11 +882,11 @@ func _build_race_hall() -> void:
 		GreyboxKit.box(self, Vector3(0.08, 0.2, ARCH_Z1 - ARCH_Z0 + 0.36), Vector3(x, ARCH_H + 0.1, mid_z), Palette.WARM_GOLD, "ArchCasing", false)
 	# The sign over the arch, facing the casino floor (−x).
 	var sign_pos := Vector3(hx - 0.3, ARCH_H + 1.15, mid_z)
-	GreyboxKit.box(self, Vector3(0.08, 1.3, 5.6), sign_pos, Palette.VIP_BURGUNDY, "RaceSign", false)
+	GreyboxKit.box(self, Vector3(0.08, 1.3, ARCH_Z1 - ARCH_Z0 + 0.3), sign_pos, Palette.VIP_BURGUNDY, "RaceSign", false)
 	for dy: float in [-0.67, 0.67]:
-		GreyboxKit.box(self, Vector3(0.1, 0.08, 5.8), sign_pos + Vector3(-0.01, dy, 0), Palette.VIP_GOLD, "RaceSignTrim", false)
-	_sign_label(sign_pos + Vector3(-0.06, 0.15, 0), -PI * 0.5, "THE BEAN DERBY", 96).modulate = Palette.VIP_GOLD
-	_sign_label(sign_pos + Vector3(-0.06, -0.33, 0), -PI * 0.5, "HORSE RACING  ·  PAYS 1:4", 40)
+		GreyboxKit.box(self, Vector3(0.1, 0.08, ARCH_Z1 - ARCH_Z0 + 0.5), sign_pos + Vector3(-0.01, dy, 0), Palette.VIP_GOLD, "RaceSignTrim", false)
+	_sign_label(sign_pos + Vector3(-0.06, 0.15, 0), -PI * 0.5, "THE BEAN DERBY", 80).modulate = Palette.VIP_GOLD
+	_sign_label(sign_pos + Vector3(-0.06, -0.33, 0), -PI * 0.5, "HORSE RACING  ·  PAYS 1:4", 34)
 
 
 ## The jail cell (Patrick: "just bars where the bouncer brings you", "in the wall"): an alcove cut
@@ -1095,7 +1099,7 @@ func _build_lights() -> void:
 	add_child(env)
 	# Chandeliers (start room, centre, VIP lounge, Race Hall) and lamps over each area: warm, with dark
 	# corners between.
-	for p: Vector3 in [Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11), Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, 5.8, -21), Vector3(-13, 6.0, 12), Vector3(13, 6.0, 12), Vector3(25.5, 6.0, -16.0), Vector3(32.5, 6.0, -16.0)]:
+	for p: Vector3 in [Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11), Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, 5.8, -21), Vector3(-13, 6.0, 12), Vector3(13, 6.0, 12), Vector3(25.5, 6.0, -18.5), Vector3(32.5, 6.0, -18.5)]:
 		GreyboxKit.lamp(self, p, 3.0, 16.0)  # the chandelier itself is LoungeDecor (client only)
 	var sun := DirectionalLight3D.new()
 	sun.light_color = Color(1.0, 0.9, 0.75)
