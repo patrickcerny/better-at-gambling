@@ -1505,6 +1505,13 @@ func _show_results(_standings: Array) -> void:
 		return
 	_close_stage()
 	reward_panel.close()
+	# The end screen owns the screen: whatever table panel was open (blackjack, roulette, slots,
+	# Plinko) goes away with it, whether or not the server's `player_stood` got here first.
+	current_ui = null
+	for ui: StationUi in station_uis.values():
+		ui.close()
+	shop_panel.close_panel()
+	emote_wheel.visible = false
 	router.set_mode(InputRouter.Mode.MENU)
 	hud.visible = false
 	results_panel = ResultsStage.new()

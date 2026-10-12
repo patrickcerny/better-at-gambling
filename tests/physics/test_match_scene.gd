@@ -241,6 +241,24 @@ func test_guard_catching_puts_you_in_the_cell() -> void:
 	assert_true(scene.server.map_def.in_jail(scene.server.world.get_position(scene.local_id)), "the server holds them there too")
 
 
+func test_the_table_panel_closes_when_the_end_screen_opens() -> void:
+	var sid: StringName = &"blackjack_2"
+	var st: StationBase = scene.map.stations[sid]
+	scene.local.teleport(st.global_position + Vector3(0, 0, 2.4), 0.0)
+	await wait_physics_frames(3)
+	scene._on_interact()
+	await wait_physics_frames(2)
+	assert_eq(scene.local.state, PlayerAvatar.State.SEATED)
+	var ui: StationUi = scene.current_ui
+	assert_not_null(ui)
+	assert_true(ui.visible, "blackjack overlay opens")
+	scene._show_results([])
+	await wait_physics_frames(2)
+	assert_null(scene.current_ui, "no table panel on the end screen")
+	assert_false(ui.visible, "the blackjack overlay is gone")
+	assert_not_null(scene.results_panel)
+
+
 func test_sit_bet_and_leave_mid_round_through_the_scene() -> void:
 	var sid: StringName = &"blackjack_2"
 	var st: StationBase = scene.map.stations[sid]
