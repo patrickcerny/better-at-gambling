@@ -1,7 +1,11 @@
 extends Control
 ## Main menu, centred under the 3D logo (Patrick: "the main menu centered"): Play Online (create a
 ## party, join by code, browse public parties), Practice (a casino match or minigames only),
-## Tutorial (how to play), Quit, and a small gear in the bottom-right corner for the settings.
+## Tutorial (how to play), Quit, and small buttons in the bottom-right corner: "?" (the tutorial
+## again), the T-shirt (clothes) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
+## the tutorial first (Patrick: "The Tutorial pops up when you click practise or play for the first
+## time") and then carries on to the box the player chose; `tutorial/seen` in user://settings.cfg
+## remembers it.
 ## Joining shows the joining screen (`Loading`, with the logo) until the match has loaded;
 ## connection errors from the last online attempt are shown here when we return. There is no
 ## join-by-address (Patrick: "Remove join by ip and port"): parties are reached through the
@@ -33,7 +37,13 @@ var _settings_button: GearButton
 ## The T-shirt button next to the gear and the clothes menu it opens (skin picker).
 var clothes_button: TShirtButton
 var clothes: ClothesPanel
-var _how_to_play: HowToPlayPanel
+var how_to_play: HowToPlayPanel
+## The "?" left of the T-shirt: the tutorial any time.
+var help_button: HelpButton
+## What the tutorial opened on the first PRACTICE / PLAY ONLINE carries on to when it closes.
+var _after_tutorial: Callable = Callable()
+## Who gets the focus back when the tutorial closes to the main entries.
+var _tutorial_opener: Control
 ## Server browser (Patrick: "Server browser good"): public parties from the orchestrator.
 var browser_box: VBoxContainer
 var browser_list: VBoxContainer
@@ -80,9 +90,9 @@ func _ready() -> void:
 	move_child(shade, 2)
 	(%Footer as Label).text = "BUILD %s" % Protocol.BUILD_ID
 	_quit.pressed.connect(_on_quit_pressed)
-	_practice.pressed.connect(_show_practice)
-	_play_online.pressed.connect(_show_online)
-	_tutorial.pressed.connect(_show_tutorial)
+	_practice.pressed.connect(func() -> void: _tutorial_first(_show_practice))
+	_play_online.pressed.connect(func() -> void: _tutorial_first(_show_online))
+	_tutorial.pressed.connect(func() -> void: _show_tutorial(_tutorial))
 	_settings_button = GearButton.new()
 	_settings_button.name = "SettingsButton"
 	_settings_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -118,11 +128,29 @@ func _ready() -> void:
 	clothes_button.pressed.connect(func() -> void:
 		_settings.close()
 		clothes.open())
-	_how_to_play = HowToPlayPanel.new()
-	_how_to_play.name = "HowToPlay"
-	_how_to_play.visible = false
-	_column.add_child(_how_to_play)
-	_how_to_play.closed.connect(_show_main)
+	# The tutorial again any time: "?" left of the T-shirt.
+	help_button = HelpButton.new()
+	help_button.name = "HelpButton"
+	help_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	help_button.offset_left = -64.0 - 3.0 * GearButton.SIZE
+	help_button.offset_top = -32.0 - GearButton.SIZE
+	help_button.offset_right = -64.0 - 2.0 * GearButton.SIZE
+	help_button.offset_bottom = -32.0
+	help_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	help_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(help_button)
+	help_button.pressed.connect(func() -> void:
+		if _busy:
+			return  # joining: the online box stays up with its status
+		_settings.close()
+		clothes.close()
+		_after_tutorial = Callable()
+		_show_tutorial(help_button))
+	how_to_play = HowToPlayPanel.new()
+	how_to_play.name = "HowToPlay"
+	how_to_play.visible = false
+	_column.add_child(how_to_play)
+	how_to_play.closed.connect(_on_tutorial_closed)
 	_build_online()
 	_build_browser()
 	_build_practice()
@@ -315,7 +343,7 @@ func _hide_boxes() -> void:
 	_online_box.visible = false
 	browser_box.visible = false
 	practice_box.visible = false
-	_how_to_play.visible = false
+	how_to_play.visible = false
 
 
 func _show_online() -> void:
@@ -341,32 +369,60 @@ func _show_browser() -> void:
 	refresh_browser()
 
 
-## TUTORIAL: for now the how-to-play pages. Placeholder for the later interactive tutorial (see
-## `HowToPlayPanel`).
-func _show_tutorial() -> void:
+## Whether the player has been through the tutorial once (`tutorial/seen` in user://settings.cfg).
+static func tutorial_seen() -> bool:
+	return bool(Settings.get_value("tutorial", "seen", false))
+
+
+## PRACTICE / PLAY ONLINE: the first time ever, the tutorial comes first and `next` (the box the
+## player chose) opens when it closes; afterwards `next` straight away.
+func _tutorial_first(next: Callable) -> void:
+	if tutorial_seen():
+		next.call()
+		return
+	_after_tutorial = next
+	_show_tutorial(_tutorial)
+
+
+## TUTORIAL or "?": the tutorial pages in place of the entries. `opener` gets the focus back.
+func _show_tutorial(opener: Control) -> void:
+	_tutorial_opener = opener
 	_hide_boxes()
-	_how_to_play.visible = true
-	_how_to_play.show_page(0)
+	how_to_play.open()
+
+
+## DONE / SKIP / Esc: remembered as seen; on to the chosen box, or back to the entries.
+func _on_tutorial_closed() -> void:
+	Settings.set_value("tutorial", "seen", true)
+	Settings.save()
+	var next: Callable = _after_tutorial
+	_after_tutorial = Callable()
+	if next.is_valid():
+		next.call()
+		return
+	_show_main()
+	if _tutorial_opener != null and _tutorial_opener.is_visible_in_tree():
+		_tutorial_opener.grab_focus()
 
 
 func _show_main() -> void:
 	if _busy:
 		return
-	var back_to: Button = _tutorial if _how_to_play.visible else (_practice if practice_box.visible else _play_online)
+	var back_to: Button = _practice if practice_box.visible else _play_online
 	_hide_boxes()
 	_set_logo_visible(true)
 	_main_box.visible = true
 	back_to.grab_focus()
 
 
-## Esc steps back out of a sub-menu (the settings panel handles its own).
+## Esc steps back out of a sub-menu (the settings panel and the tutorial handle their own).
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed(&"ui_cancel"):
 		return
 	if browser_box.visible:
 		get_viewport().set_input_as_handled()
 		_show_online()
-	elif _online_box.visible or _how_to_play.visible or practice_box.visible:
+	elif _online_box.visible or practice_box.visible:
 		get_viewport().set_input_as_handled()
 		_show_main()
 

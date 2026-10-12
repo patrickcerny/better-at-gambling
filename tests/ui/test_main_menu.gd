@@ -3,17 +3,27 @@ extends GutTest
 ## TUTORIAL, QUIT; the settings sit behind a small gear in the bottom-right corner; no "Rejoin
 ## last party" and no LAN/IP hosting, only HOST ON THIS PC (STEAM) (host mode, Patrick: "like
 ## Pummel Party"), disabled with "Start Steam to host" when Steam isn't running (as in these
-## headless tests); TUTORIAL opens the how-to-play pages and BACK returns.
+## headless tests); TUTORIAL opens the how-to-play pages and DONE returns. (The first-run
+## tutorial gate is in test_tutorial.gd; here the tutorial counts as seen.)
 ## PLAY ONLINE has no join-by-address and a server browser (Browse Parties); PRACTICE offers a
 ## casino match or MINIGAMES ONLY with a note on the minigames a solo player can't play.
 
 var menu: Control
+var _old_seen: Variant
 
 
 func before_each() -> void:
+	_old_seen = Settings.get_value("tutorial", "seen", "unset")
+	Settings.set_value("tutorial", "seen", true)
 	menu = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 	add_child_autofree(menu)
 	await wait_process_frames(3)
+
+
+func after_each() -> void:
+	# Put the player's own flag back ("unset": erase the key again).
+	Settings.set_value("tutorial", "seen", null if typeof(_old_seen) == TYPE_STRING else _old_seen)
+	Settings.save()
 
 
 func _texts(root: Node) -> PackedStringArray:
@@ -151,7 +161,7 @@ func test_practice_offers_casino_or_minigames_only() -> void:
 	assert_eq(menu.practice_count, mini(before + 1, Registry.presets.max_minigames))
 
 
-func test_tutorial_pages_and_back() -> void:
+func test_tutorial_pages_and_done() -> void:
 	(menu.get_node("Center/Column/VBox/Tutorial") as Button).pressed.emit()
 	await wait_process_frames(1)
 	var how: HowToPlayPanel = menu.find_child("HowToPlay", true, false) as HowToPlayPanel
@@ -160,16 +170,17 @@ func test_tutorial_pages_and_back() -> void:
 		return
 	assert_true(how.visible)
 	assert_false((menu.get_node("Center/Column/VBox") as Control).visible, "entries step aside")
-	assert_gte(HowToPlayPanel.PAGES.size(), 5, "goal, moving, tables, items, minigames, jail")
+	assert_gte(HowToPlayPanel.PAGES.size(), 7, "goal, moving, tables, items, minigames, rough play, jail, friends")
 	assert_eq(how.page, 0)
-	assert_true(how.prev_button.disabled)
+	assert_true(how.back_button.disabled)
 	for i: int in HowToPlayPanel.PAGES.size() - 1:
 		how.next_button.pressed.emit()
 	assert_eq(how.page, HowToPlayPanel.PAGES.size() - 1)
-	assert_true(how.next_button.disabled)
-	assert_string_contains(how.heading.text, "JAIL")
+	assert_false(how.next_button.visible)
+	assert_true(how.done_button.visible)
 	assert_false(how.body.text.contains("{"), "key names filled in")
-	how.back_button.pressed.emit()
+	how.done_button.pressed.emit()
 	assert_false(how.visible)
 	assert_true((menu.get_node("Center/Column/VBox") as Control).visible)
 	assert_true((menu.get_node("Center/Column/Logo") as Control).visible)
+	assert_true((menu.get_node("Center/Column/VBox/Tutorial") as Button).has_focus(), "focus back on TUTORIAL")
