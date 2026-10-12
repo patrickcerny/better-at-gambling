@@ -1,9 +1,8 @@
 class_name LuckyLounge
 extends Node3D
 ## Greybox of "The Lucky Lounge" (§2.3, docs/ART_DIRECTION.md). Three rooms on one floor:
-## - the start room (entrance hall, south): front entrance, the ready pedestals,
-##   wardrobe mirror and the party settings board, shut off from the casino by the lobby doors
-##   until the match starts;
+## - the start room (entrance hall, south): front entrance, the ready pedestals and the party
+##   settings board, shut off from the casino by the lobby doors until the match starts;
 ## - the casino floor: blackjack lounge, roulette pit, slot rows, Plinko wall, bar, gift shop and
 ##   the barred jail cell where security locks people up;
 ## - the VIP lounge (north), its own room behind the north door, where the bouncer checks you.
@@ -66,7 +65,6 @@ const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -0.95)
 const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -0.95)
 const BAR_X: float = 17.7
 const BAR_W: float = 7.0
-const MIRROR_POS: Vector3 = Vector3(-21.3, 0, 12.0)
 const SETTINGS_BOARD_POS: Vector3 = Vector3(12.5, 0, 14.6)
 ## Radius around a ready pedestal's centre that counts as standing on it, and how high its top is
 ## (you have to be up on it, not beside it).
@@ -417,23 +415,20 @@ func _build_floor_and_walls() -> void:
 		GreyboxKit.cylinder(col, 0.55, 0.3, Vector3(0, -WALL_H * 0.5 + 0.15, 0), Palette.WARM_GOLD, "Base", false, 0.7)
 
 
-## The start room (entrance hall): checker floor, wardrobe mirror, couches, potted palms, the
+## The start room (entrance hall): checker floor, couches, potted palms, the
 ## ready pedestals along the south wall, the party settings board and the lobby doors north.
 func _build_lobby() -> void:
 	var hall_z0: float = LOBBY_DOORS_Z + LOBBY_WALL_T * 0.5
 	var hall_z1: float = SIZE_Z * 0.5 - 0.25
 	_plane(Vector2(SIZE_X - 0.5, hall_z1 - hall_z0), Vector3(0, 0.015, (hall_z0 + hall_z1) * 0.5), Palette.CASINO_RED.darkened(0.3), "LobbyCarpet")
-	# Plants either side of the doors (start-room side), and one where the reception desk stood.
-	for p: Vector3 in [Vector3(-5.4, 0, hall_z0 + 0.7), Vector3(5.4, 0, hall_z0 + 0.7), Vector3(-13.2, 0, 15.1)]:
+	# Plants either side of the doors (start-room side), one where the reception desk stood and one
+	# where the wardrobe mirror was (the skin picker lives in the main menu now).
+	for p: Vector3 in [Vector3(-5.4, 0, hall_z0 + 0.7), Vector3(5.4, 0, hall_z0 + 0.7), Vector3(-13.2, 0, 15.1), Vector3(-21.0, 0, 12.0)]:
 		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, p + Vector3(0, 0.3, 0), Color("#5A3A22"), "Pot")
 		PropModels.dress(pot, &"plant_2" if p.x < 0.0 else &"plant_1", 0.3, 1.7).rotation.y = p.x * 0.7
 	# Ready pedestals along the south wall: stand on yours and you're ready.
 	for i: int in PEDESTALS.size():
 		_build_pedestal(i, PEDESTALS[i])
-	# Wardrobe mirror: pick a skin in the lobby.
-	GreyboxKit.box(self, Vector3(0.2, 2.4, 1.6), Vector3(-SIZE_X * 0.5 + 0.6, 1.2, 12.0), Color("#9AC4D8"), "Mirror")
-	GreyboxKit.box(self, Vector3(0.3, 2.7, 1.9), Vector3(-SIZE_X * 0.5 + 0.45, 1.3, 12.0), Palette.WARM_GOLD, "MirrorFrame", false)
-	_sign_label(Vector3(-SIZE_X * 0.5 + 0.8, 2.85, 12.0), PI * 0.5, "WARDROBE", 56)
 	# Couches against the back wall of the start room, facing the doors.
 	for x: float in [-16.5, 18.0]:
 		var couch: Node3D = GreyboxKit.box(self, Vector3(2.4, 0.9, 1.0), Vector3(x, 0.45, SIZE_Z * 0.5 - 0.8), Color("#24304A"), "Couch")
