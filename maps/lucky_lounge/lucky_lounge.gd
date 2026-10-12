@@ -1,8 +1,8 @@
 class_name LuckyLounge
 extends Node3D
 ## Greybox of "The Lucky Lounge" (§2.3, docs/ART_DIRECTION.md). Three rooms on one floor:
-## - the start room (entrance hall, south): front entrance, the ready pedestals and the party
-##   settings board, shut off from the casino by the lobby doors until the match starts;
+## - the start room (entrance hall, south): front entrance, the ready pedestals and the lobby
+##   settings tablet, shut off from the casino by the lobby doors until the match starts;
 ## - the casino floor: blackjack lounge, roulette pit, slot rows, Plinko wall, bar, gift shop and
 ##   the barred jail cell where security locks people up;
 ## - the VIP lounge (north), its own room behind the north door, where the bouncer checks you.
@@ -65,7 +65,12 @@ const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -0.95)
 const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -0.95)
 const BAR_X: float = 17.7
 const BAR_W: float = 7.0
-const SETTINGS_BOARD_POS: Vector3 = Vector3(12.5, 0, 14.6)
+## The lobby settings tablet on its brass stand (0.9.4, Patrick: "settings tablet into the lobby
+## room"), west of the middle of the start room by the host's spot: walk up and press E for the
+## lobby settings. Where it stands, which way its screen faces (yaw), and how close you must be.
+const SETTINGS_TABLET_POS: Vector3 = Vector3(-10.6, 0, 9.9)
+const SETTINGS_TABLET_YAW: float = -PI * 0.6
+const SETTINGS_TABLET_RANGE: float = 1.8
 ## Radius around a ready pedestal's centre that counts as standing on it, and how high its top is
 ## (you have to be up on it, not beside it).
 const PAD_RADIUS: float = 0.75
@@ -433,18 +438,50 @@ func _build_lobby() -> void:
 	for x: float in [-16.5, 18.0]:
 		var couch: Node3D = GreyboxKit.box(self, Vector3(2.4, 0.9, 1.0), Vector3(x, 0.45, SIZE_Z * 0.5 - 0.8), Color("#24304A"), "Couch")
 		PropModels.dress(couch, &"couch", 0.45, 0.0, 2.5).rotation.y = PI
-	_build_settings_board()
+	_build_settings_tablet()
 	_build_lobby_doors()
 
 
-func _build_settings_board() -> void:
-	var p: Vector3 = SETTINGS_BOARD_POS
-	for x: float in [-1.0, 1.0]:
-		GreyboxKit.cylinder(self, 0.07, 1.6, p + Vector3(x, 0.8, 0), Palette.WARM_GOLD, "BoardPost", true, 0.8)
-	GreyboxKit.box(self, Vector3(2.4, 1.5, 0.12), p + Vector3(0, 2.2, 0), Palette.FELT_GREEN.darkened(0.3), "SettingsBoard")
-	GreyboxKit.box(self, Vector3(2.6, 0.1, 0.16), p + Vector3(0, 3.0, 0), Palette.WARM_GOLD, "BoardTrim", false)
-	_sign_label(p + Vector3(0, 2.55, -0.08), PI, "PARTY SETTINGS", 52)
-	_sign_label(p + Vector3(0, 2.05, -0.08), PI, "leader: press E", 34)
+## The lobby settings tablet: a brass pedestal stand with a tilted black tablet on top, its screen
+## lit with the lobby's colours and a "LOBBY SETTINGS / press E" title. The pole is solid.
+func _build_settings_tablet() -> void:
+	var root := Node3D.new()
+	root.name = "SettingsTablet"
+	root.position = SETTINGS_TABLET_POS
+	root.rotation.y = SETTINGS_TABLET_YAW
+	add_child(root)
+	GreyboxKit.cylinder(root, 0.26, 0.05, Vector3(0, 0.025, 0), Palette.WARM_GOLD, "TabletFoot", false, 0.85)
+	GreyboxKit.cylinder(root, 0.045, 1.0, Vector3(0, 0.5, 0), Palette.WARM_GOLD, "TabletPole", true, 0.85)
+	var head := Node3D.new()
+	head.name = "Head"
+	head.position = Vector3(0, 1.2, -0.1)
+	head.rotation.x = deg_to_rad(35.0)  # screen tilted up towards whoever stands in front (−z)
+	root.add_child(head)
+	_mesh_box(head, Vector3(0.12, 0.12, 0.08), Vector3(0, -0.12, 0.06), GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)).name = "Bracket"
+	_mesh_box(head, Vector3(0.66, 0.46, 0.04), Vector3.ZERO, GreyboxKit.material(Palette.CASINO_BLACK, 0.3, 0.4)).name = "Bezel"
+	var screen_mat := StandardMaterial3D.new()
+	screen_mat.albedo_color = Palette.FELT_GREEN.darkened(0.45)
+	screen_mat.emission_enabled = true
+	screen_mat.emission = Palette.FELT_GREEN.darkened(0.2)
+	screen_mat.emission_energy_multiplier = 0.6
+	_mesh_box(head, Vector3(0.58, 0.38, 0.01), Vector3(0, 0, -0.021), screen_mat).name = "Screen"
+	_mesh_box(head, Vector3(0.68, 0.03, 0.05), Vector3(0, -0.245, 0), GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)).name = "Lip"
+	for spec: Array in [["LOBBY SETTINGS", 30, 0.08, Palette.VIP_GOLD], ["press E", 22, -0.07, Palette.CREAM]]:
+		var l := Label3D.new()
+		l.text = spec[0]
+		l.font_size = spec[1]
+		l.pixel_size = 0.0035
+		l.modulate = spec[3]
+		l.outline_modulate = Palette.CASINO_BLACK
+		l.outline_size = 6
+		l.position = Vector3(0, spec[2], -0.03)
+		l.rotation.y = PI  # read from the screen side (−z)
+		head.add_child(l)
+
+
+## True when `pos` (feet) is close enough to the settings tablet to use it.
+static func near_settings_tablet(pos: Vector3) -> bool:
+	return Vector2(pos.x - SETTINGS_TABLET_POS.x, pos.z - SETTINGS_TABLET_POS.z).length() < SETTINGS_TABLET_RANGE
 
 
 func _build_lobby_doors() -> void:

@@ -141,12 +141,7 @@ func _floors() -> void:
 	_retexture("VipCarpet", parquet)
 	var bar_floor := _plane(Vector2(8.6, 5.6), Vector3(LuckyLounge.BAR_X, 0.014, 4.6), parquet)
 	bar_floor.name = "BarFloor"
-	# Black and cream checker marble in the entrance hall, with a red runner from the door.
-	_retexture("LobbyCarpet", _tex("checker_marble", 2.4, Color(0.95, 0.93, 0.9), 0.3, 0.25))
-	var runner := _plane(Vector2(3.2, 3.4), Vector3(0, 0.02, 14.4), _carpet(Palette.CASINO_RED.darkened(0.15), Palette.CASINO_RED.darkened(0.35), 0.8))
-	runner.name = "Runner"
-	for x: float in [-1.66, 1.66]:
-		_box(Vector3(0.12, 0.012, 3.4), Vector3(x, 0.022, 14.4), _brass_mat, "brass")
+	_lobby_floor()
 	# The game-area rugs: patterned carpet in the area colour with a brass edge, instead of the
 	# flat colour patches the greybox lays over the carpet.
 	_area_rug("BlackjackRug", Palette.FELT_GREEN.darkened(0.45), Palette.FELT_GREEN.darkened(0.62))
@@ -156,6 +151,38 @@ func _floors() -> void:
 	# The jail cell: cold grey stone floor and walls.
 	_retexture("JailFloor", _tex("black_marble", 1.4, Color(0.62, 0.6, 0.58), 0.3, 0.6))
 	_retexture_solid("JailWall", _tex("black_marble", 1.6, Color(0.55, 0.53, 0.5), 0.4, 0.8))
+
+
+## The entrance hall (0.9.4, Patrick: "better floor"): polished black and cream checker marble
+## framed by a black marble border with a brass inlay, and a red runner with brass edges all the
+## way from the front door to the lobby doors. Layers 1 cm apart: checker 0.015, border 0.025,
+## runner 0.035, brass on top.
+func _lobby_floor() -> void:
+	_retexture("LobbyCarpet", _tex("checker_marble", 1.8, Color(0.97, 0.95, 0.92), 0.3, 0.18))
+	var x1: float = LuckyLounge.SIZE_X * 0.5 - 0.25
+	var z0: float = LuckyLounge.LOBBY_DOORS_Z + LuckyLounge.LOBBY_WALL_T * 0.5
+	var z1: float = LuckyLounge.SIZE_Z * 0.5 - 0.25
+	var band: float = 0.7
+	var border: StandardMaterial3D = _tex("black_marble", 1.6, Color(0.82, 0.8, 0.78), 0.3, 0.2)
+	var y: float = 0.025
+	for z: float in [z0 + band * 0.5, z1 - band * 0.5]:
+		_plane(Vector2(x1 * 2.0, band), Vector3(0, y, z), border).name = "LobbyBorder"
+	for x: float in [-x1 + band * 0.5, x1 - band * 0.5]:
+		_plane(Vector2(band, z1 - z0 - band * 2.0), Vector3(x, y, (z0 + z1) * 0.5), border).name = "LobbyBorder"
+	# Brass inlay along the inside edge of the border.
+	var ix: float = x1 - band
+	var iz0: float = z0 + band
+	var iz1: float = z1 - band
+	for z: float in [iz0, iz1]:
+		_box(Vector3(ix * 2.0, 0.008, 0.06), Vector3(0, y + 0.006, z), _brass_mat, "brass")
+	for x: float in [-ix, ix]:
+		_box(Vector3(0.06, 0.008, iz1 - iz0), Vector3(x, y + 0.006, (iz0 + iz1) * 0.5), _brass_mat, "brass")
+	# The red runner from the front door to the lobby doors.
+	var run_len: float = z1 - z0
+	var runner := _plane(Vector2(3.2, run_len), Vector3(0, 0.035, (z0 + z1) * 0.5), _carpet(Palette.CASINO_RED.darkened(0.15), Palette.CASINO_RED.darkened(0.35), 0.8))
+	runner.name = "Runner"
+	for x: float in [-1.66, 1.66]:
+		_box(Vector3(0.12, 0.012, run_len), Vector3(x, 0.04, (z0 + z1) * 0.5), _brass_mat, "brass")
 
 
 ## Patterned carpet on the greybox area rug `node_name`, with a brass strip around its edge.

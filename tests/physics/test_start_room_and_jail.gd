@@ -119,3 +119,25 @@ func test_the_cell_is_recessed_into_the_east_wall() -> void:
 	if path.size() > 0:
 		var end: Vector3 = path[path.size() - 1]
 		assert_lt(Vector2(end.x - LuckyLounge.JAIL_DOOR.x, end.z - LuckyLounge.JAIL_DOOR.z).length(), 0.3, "the path ends at the gate (%s)" % end)
+
+
+func test_e_at_the_settings_tablet_opens_the_lobby_settings_for_the_host() -> void:
+	await _wait_in_lobby()
+	await wait_seconds(0.3)
+	scene.view.state.room_mode = true
+	scene.view.state.phase = Phase.Id.LOBBY
+	assert_eq(scene.view.state.leader, scene.local_id, "we host this lobby")
+	# Away from the tablet: E does not open the settings.
+	_put(LuckyLounge.LOBBY_SPAWNS[1], 0.0)
+	await wait_physics_frames(3)
+	scene._on_interact()
+	assert_false(scene.lobby_panel.visible, "nothing to use here")
+	# Walk up to the tablet's screen side and press E.
+	var front: Vector3 = LuckyLounge.SETTINGS_TABLET_POS + Basis(Vector3.UP, LuckyLounge.SETTINGS_TABLET_YAW) * Vector3(0, 0, -0.9)
+	_put(front, 0.0)
+	await wait_physics_frames(3)
+	assert_true(LuckyLounge.near_settings_tablet(scene.local.global_position), "at the tablet")
+	scene._update_prompt()
+	scene._on_interact()
+	assert_true(scene.lobby_panel.visible, "the lobby settings open")
+	scene.lobby_panel.close()
