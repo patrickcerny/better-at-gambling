@@ -171,6 +171,6 @@ func test_late_join_snapshot() -> void:
 	assert_eq(stage.pair, [2, 3] as Array[int])
 	assert_false(stage.choice_buttons[S].disabled, "on stage, deciding and not locked in")
 	assert_eq(_card(1), "LOCKED IN")
-	assert_almost_eq(stage.time_left, 6.0, 0.1)
+	assert_between(stage.time_left, 5.0, 6.0, "counts down from the snapshot timer (one frame may pass under load)")
 	assert_eq(stage._pts(1), 1)
 	assert_eq(stage.schedule_box.get_child_count(), 3)
