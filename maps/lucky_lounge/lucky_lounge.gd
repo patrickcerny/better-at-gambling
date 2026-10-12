@@ -83,6 +83,10 @@ const PEDESTALS: Array[Vector3] = [
 	Vector3(-3.0, 0, 15.1), Vector3(3.0, 0, 15.1), Vector3(-5.2, 0, 15.1), Vector3(5.2, 0, 15.1),
 	Vector3(-7.4, 0, 15.1), Vector3(7.4, 0, 15.1), Vector3(-9.6, 0, 15.1), Vector3(9.6, 0, 15.1),
 ]
+## The glow from above a ready pedestal: warm gold spotlight, how bright, how long it fades.
+const PEDESTAL_GLOW: Color = Color(1.0, 0.8, 0.45)
+const PEDESTAL_LIGHT_ENERGY: float = 6.0
+const PEDESTAL_GLOW_FADE: float = 0.3
 const MARBLE: Color = Color("#E6DFD2")
 const MARBLE_DARK: Color = Color("#B9AE9C")
 ## The wall between the start room and the casino (centre line) and its doorway: the lobby
@@ -113,10 +117,17 @@ const JAIL_CAM_POS: Vector3 = Vector3(21.1, 4.4, -7.5)
 const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 
 var stations: Dictionary[StringName, StationBase] = {}
-## Per ready pedestal: its name sign on the wall and the top slab (lit gold while its player is ready).
+## Per ready pedestal: its name sign on the wall, the top slab (never changes), and the warm
+## spotlight from the ceiling that comes on while its player is ready (with its light cone and the
+## pool of light on the top, `pedestal_glows`).
 var pedestal_labels: Array[Label3D] = []
 var pedestal_tops: Array[MeshInstance3D] = []
+var pedestal_lights: Array[SpotLight3D] = []
+var pedestal_glows: Array[Node3D] = []
 var _pedestal_state: Array = []
+## 0..1 per pedestal: how far its glow has faded in, and the fade under way.
+var _glow_level: Array[float] = []
+var _glow_tweens: Array[Tween] = []
 ## Bobbing arrow over the local player's own pedestal (built on first use, client only).
 var pedestal_marker: Node3D
 var _marker_base_y: float = 0.0
@@ -212,8 +223,8 @@ func ready_pad(color_index: int) -> Vector3:
 	return PEDESTALS[clampi(color_index, 0, PEDESTALS.size() - 1)]
 
 
-## Writes the player's name on the pedestal's wall sign and lights the top while they are ready
-## ("" = nobody has this colour: the sign goes blank).
+## Writes the player's name on the pedestal's wall sign ("" = nobody has this colour: the sign goes
+## blank) and fades the glow from above in while they are ready, out when they are not.
 func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
 	if color_index < 0 or color_index >= pedestal_labels.size():
 		return
@@ -224,12 +235,29 @@ func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
 	var label: Label3D = pedestal_labels[color_index]
 	label.text = player_name.to_upper()
 	label.modulate = Palette.player_color(color_index).lightened(0.25) if player_name != "" else Palette.CREAM
-	var top: MeshInstance3D = pedestal_tops[color_index]
-	var mat: StandardMaterial3D = top.material_override as StandardMaterial3D
-	mat.emission_enabled = ready
-	mat.emission = Palette.WARM_GOLD
-	mat.emission_energy_multiplier = 1.2
-	mat.albedo_color = Palette.WARM_GOLD.lerp(MARBLE, 0.35) if ready else MARBLE
+	var to: float = 1.0 if ready and player_name != "" else 0.0
+	var tw: Tween = _glow_tweens[color_index]
+	if tw != null and tw.is_valid():
+		tw.kill()
+	if not is_inside_tree():
+		_set_glow(to, color_index)
+		return
+	tw = create_tween()
+	tw.tween_method(_set_glow.bind(color_index), _glow_level[color_index], to, PEDESTAL_GLOW_FADE * absf(to - _glow_level[color_index]))
+	_glow_tweens[color_index] = tw
+
+
+## The glow over pedestal `i` at `level` (0 = off: the light is hidden, so it costs nothing).
+func _set_glow(level: float, i: int) -> void:
+	_glow_level[i] = level
+	var light: SpotLight3D = pedestal_lights[i]
+	light.visible = level > 0.001
+	light.light_energy = PEDESTAL_LIGHT_ENERGY * level
+	var glow: Node3D = pedestal_glows[i]
+	glow.visible = level > 0.001
+	for mi: MeshInstance3D in [glow.get_node(^"Cone") as MeshInstance3D, glow.get_node(^"Pool") as MeshInstance3D]:
+		var mat: StandardMaterial3D = mi.material_override as StandardMaterial3D
+		mat.albedo_color.a = float(mi.get_meta(&"alpha")) * level
 
 
 ## Shows (or hides) the arrow that points the local player to their own pedestal, in their colour.
@@ -529,9 +557,7 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	GreyboxKit.box(root, Vector3(0.94, 0.012, 0.94), Vector3(0, 0.745, 0), Palette.WARM_GOLD, "Trim", false)
 	var top: Node3D = GreyboxKit.box(root, Vector3(0.9, 0.06, 0.9), Vector3(0, PEDESTAL_TOP - 0.03, 0), MARBLE, "Abacus", false)
 	var top_mesh: MeshInstance3D = top.get_node("Mesh") as MeshInstance3D
-	# Own material per top: GreyboxKit.material caches per colour, so a shared one would light every
-	# pedestal when one player readies up.
-	top_mesh.material_override = GreyboxKit.material(MARBLE, 0.0, 0.45).duplicate()
+	top_mesh.material_override = marble
 	# Stair up from the room side (−z): a smooth wedge to walk on, dressed as four marble steps.
 	var stair_len: float = 1.7
 	GreyboxKit.ramp(root, Vector3(0, 0, -0.45 - stair_len), Vector3(0, PEDESTAL_TOP, -0.45), 0.9, MARBLE, "Stair")
@@ -546,7 +572,81 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	label.text = ""
 	pedestal_labels.append(label)
 	pedestal_tops.append(top_mesh)
+	_build_glow(root)
 	_pedestal_state.append(["", false])
+	_glow_level.append(0.0)
+	_glow_tweens.append(null)
+	_set_glow(0.0, i)
+
+
+## The glow from above (off until the pedestal's player is ready): a warm spotlight straight down
+## from a brass can in the ceiling, a faint cone of light and a soft pool on the top.
+func _build_glow(root: Node3D) -> void:
+	var ceiling_y: float = WALL_H - 0.05
+	GreyboxKit.cylinder(root, 0.16, 0.14, Vector3(0, ceiling_y - 0.07, 0), Palette.WARM_GOLD, "SpotCan", false, 0.85)
+	var light := SpotLight3D.new()
+	light.name = "Spot"
+	light.light_color = PEDESTAL_GLOW
+	light.spot_range = ceiling_y - 0.1 + 0.5
+	light.spot_angle = 6.5
+	light.spot_angle_attenuation = 2.2  # soft edge
+	light.spot_attenuation = 0.4
+	light.shadow_enabled = false
+	light.position = Vector3(0, ceiling_y - 0.15, 0)
+	light.rotation.x = -PI * 0.5  # straight down
+	root.add_child(light)
+	pedestal_lights.append(light)
+	var glow := Node3D.new()
+	glow.name = "Glow"
+	root.add_child(glow)
+	pedestal_glows.append(glow)
+	var cone_h: float = ceiling_y - 0.15 - PEDESTAL_TOP
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.1
+	cone.bottom_radius = 0.62
+	cone.height = cone_h
+	cone.radial_segments = 20
+	cone.cap_top = false
+	cone.cap_bottom = false
+	var cone_mi := MeshInstance3D.new()
+	cone_mi.name = "Cone"
+	cone_mi.mesh = cone
+	cone_mi.position.y = PEDESTAL_TOP + cone_h * 0.5
+	cone_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	cone_mi.material_override = _glow_material(null)
+	cone_mi.set_meta(&"alpha", 0.07)
+	glow.add_child(cone_mi)
+	var pool := PlaneMesh.new()
+	pool.size = Vector2(1.3, 1.3)
+	var pool_mi := MeshInstance3D.new()
+	pool_mi.name = "Pool"
+	pool_mi.mesh = pool
+	pool_mi.position.y = PEDESTAL_TOP + 0.004
+	pool_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var spot := GradientTexture2D.new()
+	spot.fill = GradientTexture2D.FILL_RADIAL
+	spot.fill_from = Vector2(0.5, 0.5)
+	spot.fill_to = Vector2(0.5, 0.0)
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	spot.gradient = g
+	pool_mi.material_override = _glow_material(spot)
+	pool_mi.set_meta(&"alpha", 0.55)
+	glow.add_child(pool_mi)
+
+
+## Own unshaded, additive material per glow piece (each pedestal fades on its own).
+static func _glow_material(tex: Texture2D) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.no_depth_test = false
+	m.albedo_color = Color(PEDESTAL_GLOW, 0.0)
+	m.albedo_texture = tex
+	return m
 
 
 func _sign_label(pos: Vector3, yaw: float, text: String, size: int) -> Label3D:
