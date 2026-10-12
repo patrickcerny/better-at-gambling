@@ -344,8 +344,7 @@ func _vip_lounge() -> void:
 # --- Furniture and props ----------------------------------------------------------------------
 
 func _furniture() -> void:
-	# Cashier desk and the shop counter in black marble, bar front in velvet, back bar in wood.
-	_retexture_solid("Reception", _marble_mat)
+	# The shop counter in black marble, bar front in velvet, back bar in wood.
 	_retexture_solid("ShopCounter", _marble_mat)
 	_retexture_solid("Bar", _velvet_mat)
 	_retexture_solid("BackBar", _wood_mat)

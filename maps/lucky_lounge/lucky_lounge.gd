@@ -1,7 +1,7 @@
 class_name LuckyLounge
 extends Node3D
 ## Greybox of "The Lucky Lounge" (§2.3, docs/ART_DIRECTION.md). Three rooms on one floor:
-## - the start room (entrance hall, south): front entrance, reception desk, the ready pedestals,
+## - the start room (entrance hall, south): front entrance, the ready pedestals,
 ##   wardrobe mirror and the party settings board, shut off from the casino by the lobby doors
 ##   until the match starts;
 ## - the casino floor: blackjack lounge, roulette pit, slot rows, Plinko wall, bar, gift shop and
@@ -77,8 +77,7 @@ const AREA_RUG_Y: float = 0.02
 const STATION_RUG_Y: float = 0.03
 ## The ready pedestals (0.8.15, Patrick: "Podeste"): Greek marble column pedestals along the
 ## south wall of the start room, one per player colour, nearest the door first, each with a
-## marble stair up to its top. The revolving door gap runs x −2..2; the reception desk stands
-## west of them (x −16..−12).
+## marble stair up to its top. The revolving door gap runs x −2..2.
 const PEDESTALS: Array[Vector3] = [
 	Vector3(-3.0, 0, 15.1), Vector3(3.0, 0, 15.1), Vector3(-5.2, 0, 15.1), Vector3(5.2, 0, 15.1),
 	Vector3(-7.4, 0, 15.1), Vector3(7.4, 0, 15.1), Vector3(-9.6, 0, 15.1), Vector3(9.6, 0, 15.1),
@@ -418,22 +417,16 @@ func _build_floor_and_walls() -> void:
 		GreyboxKit.cylinder(col, 0.55, 0.3, Vector3(0, -WALL_H * 0.5 + 0.15, 0), Palette.WARM_GOLD, "Base", false, 0.7)
 
 
-## The start room (entrance hall): checker floor, reception desk, wardrobe mirror, couches, the
+## The start room (entrance hall): checker floor, wardrobe mirror, couches, potted palms, the
 ## ready pedestals along the south wall, the party settings board and the lobby doors north.
 func _build_lobby() -> void:
 	var hall_z0: float = LOBBY_DOORS_Z + LOBBY_WALL_T * 0.5
 	var hall_z1: float = SIZE_Z * 0.5 - 0.25
 	_plane(Vector2(SIZE_X - 0.5, hall_z1 - hall_z0), Vector3(0, 0.015, (hall_z0 + hall_z1) * 0.5), Palette.CASINO_RED.darkened(0.3), "LobbyCarpet")
-	# Reception desk: a counter with a gold top and a brass bell, a sign over it.
-	GreyboxKit.box(self, Vector3(4.0, 1.1, 1.0), Vector3(-14.0, 0.55, 14.0), Color("#3A2A1E"), "Reception")
-	GreyboxKit.box(self, Vector3(4.0, 0.08, 1.1), Vector3(-14.0, 1.14, 14.0), Palette.WARM_GOLD, "ReceptionTop", false)
-	var bell: Node3D = GreyboxKit.cylinder(self, 0.09, 0.03, Vector3(-13.2, 1.195, 13.75), Palette.WARM_GOLD, "ReceptionBell", false, 0.8)
-	GreyboxKit.sphere(bell, 0.07, Vector3(0, 0.04, 0), Palette.WARM_GOLD, "Dome")
-	_sign_label(Vector3(-14.0, 2.3, SIZE_Z * 0.5 - 0.3), PI, "RECEPTION", 60)
-	# Plants either side of the doors (start-room side).
-	for x: float in [-5.4, 5.4]:
-		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, Vector3(x, 0.3, hall_z0 + 0.7), Color("#5A3A22"), "Pot")
-		PropModels.dress(pot, &"plant_2" if x < 0.0 else &"plant_1", 0.3, 1.7).rotation.y = x * 0.7
+	# Plants either side of the doors (start-room side), and one where the reception desk stood.
+	for p: Vector3 in [Vector3(-5.4, 0, hall_z0 + 0.7), Vector3(5.4, 0, hall_z0 + 0.7), Vector3(-13.2, 0, 15.1)]:
+		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, p + Vector3(0, 0.3, 0), Color("#5A3A22"), "Pot")
+		PropModels.dress(pot, &"plant_2" if p.x < 0.0 else &"plant_1", 0.3, 1.7).rotation.y = p.x * 0.7
 	# Ready pedestals along the south wall: stand on yours and you're ready.
 	for i: int in PEDESTALS.size():
 		_build_pedestal(i, PEDESTALS[i])
