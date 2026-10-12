@@ -2205,13 +2205,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 # --- World checks ------------------------------------------------------------------------------
 
-## &"settings" when the local player stands at the settings board in the lobby (skins are picked
+## &"settings" when the local player stands at the settings tablet in the lobby (skins are picked
 ## in the main menu's Clothes menu).
 func _lobby_spot() -> StringName:
 	if local == null or not view.state.room_mode or view.state.phase != Phase.Id.LOBBY:
 		return &""
 	var p: Vector3 = local.global_position
-	if Vector2(p.x - LuckyLounge.SETTINGS_BOARD_POS.x, p.z - LuckyLounge.SETTINGS_BOARD_POS.z).length() < 2.6:
+	if LuckyLounge.near_settings_tablet(p):
 		return &"settings"
 	return &""
 

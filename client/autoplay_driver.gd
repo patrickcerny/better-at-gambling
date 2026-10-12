@@ -195,7 +195,7 @@ func _build_steps() -> void:
 		["emote", &"laugh"], ["wait", 2.0],
 		["walk", LuckyLounge.VIP_GATE_POS + Vector3(0, 0, 2.5)], ["wait", 0.5],
 		["jump_to", LuckyLounge.VIP_GATE_POS + Vector3(0, 0, -1.0)], ["wait", 3.0],
-		["walk", LuckyLounge.JAIL_DOOR + Vector3(1.0, 0, 0)], ["wait", 1.0],
+		["walk", LuckyLounge.JAIL_DOOR + Vector3(-1.0, 0, 0)], ["wait", 1.0],
 		["walk", Vector3(sp[_st(&"blackjack_2")]) + Vector3(0, 0, 2.6)],
 		["sit", _st(&"blackjack_2")], ["wait", 0.5],
 		["intent", &"place_bet", {"station": _st(&"blackjack_2"), "bet": {"amount": 100}}], ["wait", 9.0],

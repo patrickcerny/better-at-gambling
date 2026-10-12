@@ -1,9 +1,8 @@
 class_name LuckyLounge
 extends Node3D
 ## Greybox of "The Lucky Lounge" (§2.3, docs/ART_DIRECTION.md). Three rooms on one floor:
-## - the start room (entrance hall, south): front entrance, reception desk, the ready pedestals,
-##   wardrobe mirror and the party settings board, shut off from the casino by the lobby doors
-##   until the match starts;
+## - the start room (entrance hall, south): front entrance, the ready pedestals and the lobby
+##   settings tablet, shut off from the casino by the lobby doors until the match starts;
 ## - the casino floor: blackjack lounge, roulette pit, slot rows, Plinko wall, bar, gift shop and
 ##   the barred jail cell where security locks people up;
 ## - the VIP lounge (north), its own room behind the north door, where the bouncer checks you.
@@ -66,8 +65,12 @@ const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -0.95)
 const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -0.95)
 const BAR_X: float = 17.7
 const BAR_W: float = 7.0
-const MIRROR_POS: Vector3 = Vector3(-21.3, 0, 12.0)
-const SETTINGS_BOARD_POS: Vector3 = Vector3(12.5, 0, 14.6)
+## The lobby settings tablet on its brass stand (0.9.4, Patrick: "settings tablet into the lobby
+## room"), west of the middle of the start room by the host's spot: walk up and press E for the
+## lobby settings. Where it stands, which way its screen faces (yaw), and how close you must be.
+const SETTINGS_TABLET_POS: Vector3 = Vector3(-10.6, 0, 9.9)
+const SETTINGS_TABLET_YAW: float = -PI * 0.6
+const SETTINGS_TABLET_RANGE: float = 1.8
 ## Radius around a ready pedestal's centre that counts as standing on it, and how high its top is
 ## (you have to be up on it, not beside it).
 const PAD_RADIUS: float = 0.75
@@ -77,12 +80,21 @@ const AREA_RUG_Y: float = 0.02
 const STATION_RUG_Y: float = 0.03
 ## The ready pedestals (0.8.15, Patrick: "Podeste"): Greek marble column pedestals along the
 ## south wall of the start room, one per player colour, nearest the door first, each with a
-## marble stair up to its top. The revolving door gap runs x −2..2; the reception desk stands
-## west of them (x −16..−12).
+## marble stair up to its top. The revolving door gap runs x −2..2.
 const PEDESTALS: Array[Vector3] = [
 	Vector3(-3.0, 0, 15.1), Vector3(3.0, 0, 15.1), Vector3(-5.2, 0, 15.1), Vector3(5.2, 0, 15.1),
 	Vector3(-7.4, 0, 15.1), Vector3(7.4, 0, 15.1), Vector3(-9.6, 0, 15.1), Vector3(9.6, 0, 15.1),
 ]
+## The glow from above a ready pedestal: warm gold spotlight, how bright, how long it fades.
+const PEDESTAL_GLOW: Color = Color(1.0, 0.8, 0.45)
+const PEDESTAL_LIGHT_ENERGY: float = 6.0
+const PEDESTAL_GLOW_FADE: float = 0.3
+## A pedestal's name plate when nobody has its colour.
+const PEDESTAL_FREE: String = "FREE"
+## How high the name plate's centre sits (on its post behind the column): above the name tag of a
+## player standing on the pedestal (feet 0.8 + tag 2.15 = 2.95), so the two never overlap.
+const PEDESTAL_PLATE_Y: float = 3.5
+const PEDESTAL_NAME_SIZE: int = 44
 const MARBLE: Color = Color("#E6DFD2")
 const MARBLE_DARK: Color = Color("#B9AE9C")
 ## The wall between the start room and the casino (centre line) and its doorway: the lobby
@@ -94,27 +106,36 @@ const LOBBY_DOOR_H: float = 4.0
 ## The barrier in the doorway while the doors are shut: thicker than the wall so a body thrown at
 ## it full speed can't tunnel through in one physics step.
 const LOBBY_BARRIER_T: float = 0.9
-## Jail (Patrick: "an own room where the security puts you", "just bars"): a gold-barred cell in
-## the casino's south-west corner, against the west wall and the start-room wall, next to the
-## reception desk on the other side. Inner volume, gate in the east bars, where the bouncer
-## delivers people (outside the gate), spots inside, and where they walk out when the time is up
-## (at the lobby doors, on the casino side).
-const JAIL_AREA: AABB = AABB(Vector3(-21.75, -1.0, 4.6), Vector3(2.75, 5.0, 3.55))
+## Jail (Patrick: "an own room where the security puts you", "just bars"; 0.9.4: "in the wall, on
+## the right side of the room"): a cell recessed into the casino's east wall (on your right as you
+## come in through the lobby doors), between the Plinko corner and the Odd Jobs cabinet. Its gold
+## bars are the front face, flush with the wall line (x = SIZE_X / 2 − 0.25); the cell itself lies
+## behind the wall plane. Inner volume, gate in the middle of the bars, where the bouncer delivers
+## people (outside the gate), spots inside, and where they walk out when the time is up (at the
+## lobby doors, on the casino side).
+const JAIL_AREA: AABB = AABB(Vector3(21.75, -1.0, -9.3), Vector3(2.75, 5.0, 3.6))
 const JAIL_H: float = 3.0
-const JAIL_GATE_Z: float = 6.4
+const JAIL_GATE_Z: float = -7.5
 const JAIL_GATE_W: float = 1.2
-const JAIL_DOOR: Vector3 = Vector3(-18.1, 0, 6.4)
-const JAIL_SPOTS: Array[Vector3] = [Vector3(-20.0, 0, 5.6), Vector3(-20.0, 0, 7.2), Vector3(-19.7, 0, 6.4), Vector3(-20.5, 0, 6.4)]
+const JAIL_DOOR: Vector3 = Vector3(20.85, 0, -7.5)
+const JAIL_SPOTS: Array[Vector3] = [Vector3(22.75, 0, -8.3), Vector3(22.75, 0, -6.7), Vector3(22.45, 0, -7.5), Vector3(23.25, 0, -7.5)]
 const JAIL_EXITS: Array[Vector3] = [Vector3(0.6, 0, 7.2), Vector3(1.4, 0, 7.2), Vector3(-0.2, 0, 7.2), Vector3(2.2, 0, 7.2)]
-## The jailed player's view: above the cage, looking out over the floor.
-const JAIL_CAM_POS: Vector3 = Vector3(-19.6, 4.4, 7.6)
-const JAIL_CAM_LOOK: Vector3 = Vector3(-3.0, 0.4, -5.0)
+## The jailed player's view: on the wall over the cell, looking out over the floor.
+const JAIL_CAM_POS: Vector3 = Vector3(21.1, 4.4, -7.5)
+const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 
 var stations: Dictionary[StringName, StationBase] = {}
-## Per ready pedestal: its name sign on the wall and the top slab (lit gold while its player is ready).
+## Per ready pedestal: the name on its brass plate, the top slab (never changes), and the warm
+## spotlight from the ceiling that comes on while its player is ready (with its light cone and the
+## pool of light on the top, `pedestal_glows`).
 var pedestal_labels: Array[Label3D] = []
 var pedestal_tops: Array[MeshInstance3D] = []
+var pedestal_lights: Array[SpotLight3D] = []
+var pedestal_glows: Array[Node3D] = []
 var _pedestal_state: Array = []
+## 0..1 per pedestal: how far its glow has faded in, and the fade under way.
+var _glow_level: Array[float] = []
+var _glow_tweens: Array[Tween] = []
 ## Bobbing arrow over the local player's own pedestal (built on first use, client only).
 var pedestal_marker: Node3D
 var _marker_base_y: float = 0.0
@@ -210,8 +231,8 @@ func ready_pad(color_index: int) -> Vector3:
 	return PEDESTALS[clampi(color_index, 0, PEDESTALS.size() - 1)]
 
 
-## Writes the player's name on the pedestal's wall sign and lights the top while they are ready
-## ("" = nobody has this colour: the sign goes blank).
+## Writes the player's name on the pedestal's brass plate ("" = nobody has this colour: the plate
+## reads FREE) and fades the glow from above in while they are ready, out when they are not.
 func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
 	if color_index < 0 or color_index >= pedestal_labels.size():
 		return
@@ -220,14 +241,32 @@ func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
 		return
 	_pedestal_state[color_index] = state
 	var label: Label3D = pedestal_labels[color_index]
-	label.text = player_name.to_upper()
-	label.modulate = Palette.player_color(color_index).lightened(0.25) if player_name != "" else Palette.CREAM
-	var top: MeshInstance3D = pedestal_tops[color_index]
-	var mat: StandardMaterial3D = top.material_override as StandardMaterial3D
-	mat.emission_enabled = ready
-	mat.emission = Palette.WARM_GOLD
-	mat.emission_energy_multiplier = 1.2
-	mat.albedo_color = Palette.WARM_GOLD.lerp(MARBLE, 0.35) if ready else MARBLE
+	label.text = player_name.to_upper() if player_name != "" else PEDESTAL_FREE
+	label.font_size = PEDESTAL_NAME_SIZE if label.text.length() <= 8 else maxi(20, PEDESTAL_NAME_SIZE * 8 / label.text.length())  # long names fit the plate
+	label.modulate = Palette.player_color(color_index).lightened(0.35) if player_name != "" else Palette.CREAM.darkened(0.35)
+	var to: float = 1.0 if ready and player_name != "" else 0.0
+	var tw: Tween = _glow_tweens[color_index]
+	if tw != null and tw.is_valid():
+		tw.kill()
+	if not is_inside_tree():
+		_set_glow(to, color_index)
+		return
+	tw = create_tween()
+	tw.tween_method(_set_glow.bind(color_index), _glow_level[color_index], to, PEDESTAL_GLOW_FADE * absf(to - _glow_level[color_index]))
+	_glow_tweens[color_index] = tw
+
+
+## The glow over pedestal `i` at `level` (0 = off: the light is hidden, so it costs nothing).
+func _set_glow(level: float, i: int) -> void:
+	_glow_level[i] = level
+	var light: SpotLight3D = pedestal_lights[i]
+	light.visible = level > 0.001
+	light.light_energy = PEDESTAL_LIGHT_ENERGY * level
+	var glow: Node3D = pedestal_glows[i]
+	glow.visible = level > 0.001
+	for mi: MeshInstance3D in [glow.get_node(^"Cone") as MeshInstance3D, glow.get_node(^"Pool") as MeshInstance3D]:
+		var mat: StandardMaterial3D = mi.material_override as StandardMaterial3D
+		mat.albedo_color.a = float(mi.get_meta(&"alpha")) * level
 
 
 ## Shows (or hides) the arrow that points the local player to their own pedestal, in their colour.
@@ -348,7 +387,12 @@ func _build_floor_and_walls() -> void:
 	GreyboxKit.box(self, Vector3(north_w, WALL_H, 0.5), Vector3(hx - north_w * 0.5, WALL_H * 0.5, -hz), wall, "WallN")
 	GreyboxKit.box(self, Vector3(VIP_DOOR_HALF * 2.0, WALL_H - VIP_DOOR_H, 0.5), Vector3(0, (WALL_H + VIP_DOOR_H) * 0.5, -hz), wall, "WallNTop")
 	GreyboxKit.box(self, Vector3(0.5, WALL_H, SIZE_Z), Vector3(-hx, WALL_H * 0.5, 0), wall, "WallW")
-	GreyboxKit.box(self, Vector3(0.5, WALL_H, SIZE_Z), Vector3(hx, WALL_H * 0.5, 0), wall, "WallE")
+	# East wall, with the jail cell's opening cut into it (the cell is `_build_jail`).
+	var jz0: float = JAIL_AREA.position.z
+	var jz1: float = JAIL_AREA.end.z
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, jz0 + hz), Vector3(hx, WALL_H * 0.5, (jz0 - hz) * 0.5), wall, "WallE")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, hz - jz1), Vector3(hx, WALL_H * 0.5, (jz1 + hz) * 0.5), wall, "WallE")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H - JAIL_H, jz1 - jz0), Vector3(hx, (WALL_H + JAIL_H) * 0.5, (jz0 + jz1) * 0.5), wall, "WallE")
 	# South wall with the entrance gap.
 	GreyboxKit.box(self, Vector3(hx - 2.0, WALL_H, 0.5), Vector3(-SIZE_X * 0.25 - 1.0, WALL_H * 0.5, hz), wall, "WallS1")
 	GreyboxKit.box(self, Vector3(hx - 2.0, WALL_H, 0.5), Vector3(SIZE_X * 0.25 + 1.0, WALL_H * 0.5, hz), wall, "WallS2")
@@ -376,45 +420,68 @@ func _build_floor_and_walls() -> void:
 		GreyboxKit.cylinder(col, 0.55, 0.3, Vector3(0, -WALL_H * 0.5 + 0.15, 0), Palette.WARM_GOLD, "Base", false, 0.7)
 
 
-## The start room (entrance hall): checker floor, reception desk, wardrobe mirror, couches, the
+## The start room (entrance hall): checker floor, couches, potted palms, the
 ## ready pedestals along the south wall, the party settings board and the lobby doors north.
 func _build_lobby() -> void:
 	var hall_z0: float = LOBBY_DOORS_Z + LOBBY_WALL_T * 0.5
 	var hall_z1: float = SIZE_Z * 0.5 - 0.25
 	_plane(Vector2(SIZE_X - 0.5, hall_z1 - hall_z0), Vector3(0, 0.015, (hall_z0 + hall_z1) * 0.5), Palette.CASINO_RED.darkened(0.3), "LobbyCarpet")
-	# Reception desk: a counter with a gold top and a brass bell, a sign over it.
-	GreyboxKit.box(self, Vector3(4.0, 1.1, 1.0), Vector3(-14.0, 0.55, 14.0), Color("#3A2A1E"), "Reception")
-	GreyboxKit.box(self, Vector3(4.0, 0.08, 1.1), Vector3(-14.0, 1.14, 14.0), Palette.WARM_GOLD, "ReceptionTop", false)
-	var bell: Node3D = GreyboxKit.cylinder(self, 0.09, 0.03, Vector3(-13.2, 1.195, 13.75), Palette.WARM_GOLD, "ReceptionBell", false, 0.8)
-	GreyboxKit.sphere(bell, 0.07, Vector3(0, 0.04, 0), Palette.WARM_GOLD, "Dome")
-	_sign_label(Vector3(-14.0, 2.3, SIZE_Z * 0.5 - 0.3), PI, "RECEPTION", 60)
-	# Plants either side of the doors (start-room side).
-	for x: float in [-5.4, 5.4]:
-		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, Vector3(x, 0.3, hall_z0 + 0.7), Color("#5A3A22"), "Pot")
-		PropModels.dress(pot, &"plant_2" if x < 0.0 else &"plant_1", 0.3, 1.7).rotation.y = x * 0.7
+	# Plants either side of the doors (start-room side), one where the reception desk stood and one
+	# where the wardrobe mirror was (the skin picker lives in the main menu now).
+	for p: Vector3 in [Vector3(-5.4, 0, hall_z0 + 0.7), Vector3(5.4, 0, hall_z0 + 0.7), Vector3(-13.2, 0, 15.1), Vector3(-21.0, 0, 12.0)]:
+		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, p + Vector3(0, 0.3, 0), Color("#5A3A22"), "Pot")
+		PropModels.dress(pot, &"plant_2" if p.x < 0.0 else &"plant_1", 0.3, 1.7).rotation.y = p.x * 0.7
 	# Ready pedestals along the south wall: stand on yours and you're ready.
 	for i: int in PEDESTALS.size():
 		_build_pedestal(i, PEDESTALS[i])
-	# Wardrobe mirror: pick a skin in the lobby.
-	GreyboxKit.box(self, Vector3(0.2, 2.4, 1.6), Vector3(-SIZE_X * 0.5 + 0.6, 1.2, 12.0), Color("#9AC4D8"), "Mirror")
-	GreyboxKit.box(self, Vector3(0.3, 2.7, 1.9), Vector3(-SIZE_X * 0.5 + 0.45, 1.3, 12.0), Palette.WARM_GOLD, "MirrorFrame", false)
-	_sign_label(Vector3(-SIZE_X * 0.5 + 0.8, 2.85, 12.0), PI * 0.5, "WARDROBE", 56)
 	# Couches against the back wall of the start room, facing the doors.
 	for x: float in [-16.5, 18.0]:
 		var couch: Node3D = GreyboxKit.box(self, Vector3(2.4, 0.9, 1.0), Vector3(x, 0.45, SIZE_Z * 0.5 - 0.8), Color("#24304A"), "Couch")
 		PropModels.dress(couch, &"couch", 0.45, 0.0, 2.5).rotation.y = PI
-	_build_settings_board()
+	_build_settings_tablet()
 	_build_lobby_doors()
 
 
-func _build_settings_board() -> void:
-	var p: Vector3 = SETTINGS_BOARD_POS
-	for x: float in [-1.0, 1.0]:
-		GreyboxKit.cylinder(self, 0.07, 1.6, p + Vector3(x, 0.8, 0), Palette.WARM_GOLD, "BoardPost", true, 0.8)
-	GreyboxKit.box(self, Vector3(2.4, 1.5, 0.12), p + Vector3(0, 2.2, 0), Palette.FELT_GREEN.darkened(0.3), "SettingsBoard")
-	GreyboxKit.box(self, Vector3(2.6, 0.1, 0.16), p + Vector3(0, 3.0, 0), Palette.WARM_GOLD, "BoardTrim", false)
-	_sign_label(p + Vector3(0, 2.55, -0.08), PI, "PARTY SETTINGS", 52)
-	_sign_label(p + Vector3(0, 2.05, -0.08), PI, "leader: press E", 34)
+## The lobby settings tablet: a brass pedestal stand with a tilted black tablet on top, its screen
+## lit with the lobby's colours and a "LOBBY SETTINGS / press E" title. The pole is solid.
+func _build_settings_tablet() -> void:
+	var root := Node3D.new()
+	root.name = "SettingsTablet"
+	root.position = SETTINGS_TABLET_POS
+	root.rotation.y = SETTINGS_TABLET_YAW
+	add_child(root)
+	GreyboxKit.cylinder(root, 0.26, 0.05, Vector3(0, 0.025, 0), Palette.WARM_GOLD, "TabletFoot", false, 0.85)
+	GreyboxKit.cylinder(root, 0.045, 1.0, Vector3(0, 0.5, 0), Palette.WARM_GOLD, "TabletPole", true, 0.85)
+	var head := Node3D.new()
+	head.name = "Head"
+	head.position = Vector3(0, 1.2, -0.1)
+	head.rotation.x = deg_to_rad(35.0)  # screen tilted up towards whoever stands in front (−z)
+	root.add_child(head)
+	_mesh_box(head, Vector3(0.12, 0.12, 0.08), Vector3(0, -0.12, 0.06), GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)).name = "Bracket"
+	_mesh_box(head, Vector3(0.66, 0.46, 0.04), Vector3.ZERO, GreyboxKit.material(Palette.CASINO_BLACK, 0.3, 0.4)).name = "Bezel"
+	var screen_mat := StandardMaterial3D.new()
+	screen_mat.albedo_color = Palette.FELT_GREEN.darkened(0.45)
+	screen_mat.emission_enabled = true
+	screen_mat.emission = Palette.FELT_GREEN.darkened(0.2)
+	screen_mat.emission_energy_multiplier = 0.6
+	_mesh_box(head, Vector3(0.58, 0.38, 0.01), Vector3(0, 0, -0.021), screen_mat).name = "Screen"
+	_mesh_box(head, Vector3(0.68, 0.03, 0.05), Vector3(0, -0.245, 0), GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)).name = "Lip"
+	for spec: Array in [["LOBBY SETTINGS", 30, 0.08, Palette.VIP_GOLD], ["press E", 22, -0.07, Palette.CREAM]]:
+		var l := Label3D.new()
+		l.text = spec[0]
+		l.font_size = spec[1]
+		l.pixel_size = 0.0035
+		l.modulate = spec[3]
+		l.outline_modulate = Palette.CASINO_BLACK
+		l.outline_size = 6
+		l.position = Vector3(0, spec[2], -0.03)
+		l.rotation.y = PI  # read from the screen side (−z)
+		head.add_child(l)
+
+
+## True when `pos` (feet) is close enough to the settings tablet to use it.
+static func near_settings_tablet(pos: Vector3) -> bool:
+	return Vector2(pos.x - SETTINGS_TABLET_POS.x, pos.z - SETTINGS_TABLET_POS.z).length() < SETTINGS_TABLET_RANGE
 
 
 func _build_lobby_doors() -> void:
@@ -522,9 +589,7 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	GreyboxKit.box(root, Vector3(0.94, 0.012, 0.94), Vector3(0, 0.745, 0), Palette.WARM_GOLD, "Trim", false)
 	var top: Node3D = GreyboxKit.box(root, Vector3(0.9, 0.06, 0.9), Vector3(0, PEDESTAL_TOP - 0.03, 0), MARBLE, "Abacus", false)
 	var top_mesh: MeshInstance3D = top.get_node("Mesh") as MeshInstance3D
-	# Own material per top: GreyboxKit.material caches per colour, so a shared one would light every
-	# pedestal when one player readies up.
-	top_mesh.material_override = GreyboxKit.material(MARBLE, 0.0, 0.45).duplicate()
+	top_mesh.material_override = marble
 	# Stair up from the room side (−z): a smooth wedge to walk on, dressed as four marble steps.
 	var stair_len: float = 1.7
 	GreyboxKit.ramp(root, Vector3(0, 0, -0.45 - stair_len), Vector3(0, PEDESTAL_TOP, -0.45), 0.9, MARBLE, "Stair")
@@ -534,12 +599,108 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 		# Step k climbs from the room side: lowest tread farthest from the column.
 		var step: Node3D = GreyboxKit.box(root, Vector3(0.96, rise, run), Vector3(0, rise * (k + 0.5), -0.45 - stair_len + run * (k + 0.5)), MARBLE if k % 2 == 0 else MARBLE_DARK, "Step%d" % k, false)
 		(step.get_node("Mesh") as MeshInstance3D).material_override = marble if k % 2 == 0 else marble_dark
-	# Name on the wall above, facing the room.
-	var label: Label3D = _sign_label(Vector3(pos.x, 2.2, SIZE_Z * 0.5 - 0.3), PI, "", 64)
-	label.text = ""
-	pedestal_labels.append(label)
+	pedestal_labels.append(_build_name_plate(root, i))
 	pedestal_tops.append(top_mesh)
+	_build_glow(root)
 	_pedestal_state.append(["", false])
+	_glow_level.append(0.0)
+	_glow_tweens.append(null)
+	_set_glow(0.0, i)
+
+
+## The brass name plate on a slim post behind the column (between it and the wall), facing the
+## room; high enough to read over the head of whoever stands on the pedestal.
+func _build_name_plate(root: Node3D, i: int) -> Label3D:
+	var brass: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
+	var back_z: float = SIZE_Z * 0.5 - 0.25 - root.position.z - 0.1  # just off the wall
+	var plate_h: float = 0.36
+	GreyboxKit.cylinder(root, 0.025, PEDESTAL_PLATE_Y, Vector3(0, PEDESTAL_PLATE_Y * 0.5, back_z), Palette.WARM_GOLD, "PlatePost", false, 0.85)
+	var plate: MeshInstance3D = _mesh_box(root, Vector3(1.0, plate_h, 0.04), Vector3(0, PEDESTAL_PLATE_Y, back_z - 0.02), brass)
+	plate.name = "NamePlate"
+	var inset: MeshInstance3D = _mesh_box(root, Vector3(0.92, plate_h - 0.08, 0.01), Vector3(0, PEDESTAL_PLATE_Y, back_z - 0.045), GreyboxKit.material(Palette.CASINO_BLACK.lightened(0.04), 0.0, 0.6))
+	inset.name = "NamePlateInset"
+	var label := Label3D.new()
+	label.name = "Name"
+	label.text = PEDESTAL_FREE
+	label.font_size = PEDESTAL_NAME_SIZE
+	label.pixel_size = 0.004
+	label.modulate = Palette.CREAM.darkened(0.35)
+	label.outline_modulate = Palette.CASINO_BLACK
+	label.outline_size = 8
+	label.position = Vector3(0, PEDESTAL_PLATE_Y, back_z - 0.055)
+	label.rotation.y = PI
+	root.add_child(label)
+	return label
+
+
+## The glow from above (off until the pedestal's player is ready): a warm spotlight straight down
+## from a brass can in the ceiling, a faint cone of light and a soft pool on the top.
+func _build_glow(root: Node3D) -> void:
+	var ceiling_y: float = WALL_H - 0.05
+	GreyboxKit.cylinder(root, 0.16, 0.14, Vector3(0, ceiling_y - 0.07, 0), Palette.WARM_GOLD, "SpotCan", false, 0.85)
+	var light := SpotLight3D.new()
+	light.name = "Spot"
+	light.light_color = PEDESTAL_GLOW
+	light.spot_range = ceiling_y - 0.1 + 0.5
+	light.spot_angle = 6.5
+	light.spot_angle_attenuation = 2.2  # soft edge
+	light.spot_attenuation = 0.4
+	light.shadow_enabled = false
+	light.position = Vector3(0, ceiling_y - 0.15, 0)
+	light.rotation.x = -PI * 0.5  # straight down
+	root.add_child(light)
+	pedestal_lights.append(light)
+	var glow := Node3D.new()
+	glow.name = "Glow"
+	root.add_child(glow)
+	pedestal_glows.append(glow)
+	var cone_h: float = ceiling_y - 0.15 - PEDESTAL_TOP
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.1
+	cone.bottom_radius = 0.62
+	cone.height = cone_h
+	cone.radial_segments = 20
+	cone.cap_top = false
+	cone.cap_bottom = false
+	var cone_mi := MeshInstance3D.new()
+	cone_mi.name = "Cone"
+	cone_mi.mesh = cone
+	cone_mi.position.y = PEDESTAL_TOP + cone_h * 0.5
+	cone_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	cone_mi.material_override = _glow_material(null)
+	cone_mi.set_meta(&"alpha", 0.07)
+	glow.add_child(cone_mi)
+	var pool := PlaneMesh.new()
+	pool.size = Vector2(1.3, 1.3)
+	var pool_mi := MeshInstance3D.new()
+	pool_mi.name = "Pool"
+	pool_mi.mesh = pool
+	pool_mi.position.y = PEDESTAL_TOP + 0.004
+	pool_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var spot := GradientTexture2D.new()
+	spot.fill = GradientTexture2D.FILL_RADIAL
+	spot.fill_from = Vector2(0.5, 0.5)
+	spot.fill_to = Vector2(0.5, 0.0)
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	spot.gradient = g
+	pool_mi.material_override = _glow_material(spot)
+	pool_mi.set_meta(&"alpha", 0.55)
+	glow.add_child(pool_mi)
+
+
+## Own unshaded, additive material per glow piece (each pedestal fades on its own).
+static func _glow_material(tex: Texture2D) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.no_depth_test = false
+	m.albedo_color = Color(PEDESTAL_GLOW, 0.0)
+	m.albedo_texture = tex
+	return m
 
 
 func _sign_label(pos: Vector3, yaw: float, text: String, size: int) -> Label3D:
@@ -560,7 +721,7 @@ func _build_floor_areas() -> void:
 	# Coloured rugs identify game areas (readable from a distance). They sit 1 cm above the
 	# carpet (0.01) and 1 cm below the station rugs (0.03): closer layers z-fight at distance.
 	# LoungeDecor turns them into patterned, brass-edged carpets on clients.
-	_plane(Vector2(16.6, 5), Vector3(-10.3, AREA_RUG_Y, 4), Palette.FELT_GREEN.darkened(0.6), "BlackjackRug")  # stops short of the jail cell
+	_plane(Vector2(16.6, 5), Vector3(-10.3, AREA_RUG_Y, 4), Palette.FELT_GREEN.darkened(0.6), "BlackjackRug")
 	_plane(Vector2(18, 8), Vector3(0, AREA_RUG_Y, -3), Palette.CASINO_RED.darkened(0.5), "RouletteRug")
 	_plane(Vector2(16, 9), Vector3(-13.5, AREA_RUG_Y, -11), Palette.WARM_GOLD.darkened(0.6), "SlotsRug")
 	_plane(Vector2(12, 5), Vector3(14, AREA_RUG_Y, -13), Palette.VIP_BURGUNDY.darkened(0.3), "PlinkoRug")
@@ -672,16 +833,29 @@ func _build_vip_room() -> void:
 		GreyboxKit.capsule(plinth, 0.3, 1.2, Vector3(0, 1.1, 0), GreyboxKit.gold(), "Statue")
 
 
-## The jail cell (Patrick: "just bars where the bouncer brings you"): gold bars on the two open
-## sides, a barred roof, a bench and a JAIL sign. The bars and the gate are solid (layer 1, like
-## the walls): nobody walks, falls or gets thrown out. The gate's collider never opens; its leaf
-## swings for show when the bouncer puts someone in or lets them out (`swing_jail_gate`).
+## The jail cell (Patrick: "just bars where the bouncer brings you", "in the wall"): an alcove cut
+## into the east wall, stone walls on three sides and a ceiling, gold bars across its open front
+## (flush with the wall line) with the gate in the middle, a bench, a caged lamp and a JAIL sign
+## over the opening. The bars and the gate are solid (layer 1, like the walls): nobody walks, falls
+## or gets thrown out. The gate's collider never opens; its leaf swings for show when the bouncer
+## puts someone in or lets them out (`swing_jail_gate`).
 func _build_jail() -> void:
 	var a: AABB = JAIL_AREA
-	var x0: float = a.position.x
-	var x1: float = a.end.x  # the east bars, with the gate
-	var z0: float = a.position.z  # the north bars
+	var x0: float = a.position.x  # the bars, with the gate (the wall's inner face)
+	var x1: float = a.end.x  # the back wall's face
+	var z0: float = a.position.z
 	var z1: float = a.end.z
+	var zc: float = (z0 + z1) * 0.5
+	var stone := Color("#4A4440")
+	# The alcove behind the wall: floor slab, side walls, back wall, ceiling.
+	var back: float = x1 + 0.5
+	var wx0: float = x0 + 0.5  # the outside face of the casino wall
+	GreyboxKit.box(self, Vector3(back - x0, 0.5, z1 - z0 + 1.0), Vector3((x0 + back) * 0.5, -0.25, zc), Color("#8C7F78"), "JailSlab")
+	for z: float in [z0 - 0.25, z1 + 0.25]:
+		GreyboxKit.box(self, Vector3(back - wx0, WALL_H, 0.5), Vector3((wx0 + back) * 0.5, WALL_H * 0.5, z), stone, "JailWall")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, z1 - z0 + 1.0), Vector3(x1 + 0.25, WALL_H * 0.5, zc), stone, "JailWall")
+	GreyboxKit.box(self, Vector3(back - wx0, WALL_H - JAIL_H, z1 - z0 + 1.0), Vector3((wx0 + back) * 0.5, (WALL_H + JAIL_H) * 0.5, zc), stone, "JailWall")
+	GreyboxKit.box(self, Vector3(x1 - x0, 0.06, z1 - z0), Vector3((x0 + x1) * 0.5, JAIL_H - 0.03, zc), Palette.CASINO_BLACK, "JailCeiling", false)
 	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.8, 0.35)
 	var bars := StaticBody3D.new()
 	bars.name = "JailCell"
@@ -692,33 +866,24 @@ func _build_jail() -> void:
 	var t: float = 0.3  # collision thickness (the bars themselves are thin)
 	var gate_z0: float = JAIL_GATE_Z - JAIL_GATE_W * 0.5
 	var gate_z1: float = JAIL_GATE_Z + JAIL_GATE_W * 0.5
-	_jail_wall(bars, Vector3(x1 - x0 + t, JAIL_H, t), Vector3((x0 + x1) * 0.5, JAIL_H * 0.5, z0))
-	_jail_wall(bars, Vector3(t, JAIL_H, gate_z0 - z0), Vector3(x1, JAIL_H * 0.5, (z0 + gate_z0) * 0.5))
-	_jail_wall(bars, Vector3(t, JAIL_H, z1 - gate_z1), Vector3(x1, JAIL_H * 0.5, (gate_z1 + z1) * 0.5))
-	_jail_wall(bars, Vector3(x1 - x0 + t, t, z1 - z0 + t), Vector3((x0 + x1) * 0.5, JAIL_H + t * 0.5, (z0 + z1) * 0.5))
+	_jail_wall(bars, Vector3(t, JAIL_H, gate_z0 - z0), Vector3(x0, JAIL_H * 0.5, (z0 + gate_z0) * 0.5))
+	_jail_wall(bars, Vector3(t, JAIL_H, z1 - gate_z1), Vector3(x0, JAIL_H * 0.5, (gate_z1 + z1) * 0.5))
 	var bar := CylinderMesh.new()
 	bar.top_radius = 0.035
 	bar.bottom_radius = 0.035
 	bar.height = JAIL_H
 	bar.radial_segments = 8
 	var spacing: float = 0.24
-	var n_north: int = int((x1 - x0) / spacing)
-	for i: int in range(1, n_north + 1):
-		_bar(bars, bar, Vector3(x0 + i * (x1 - x0) / (n_north + 0.5), JAIL_H * 0.5, z0), gold)
 	for span: Vector2 in [Vector2(z0, gate_z0), Vector2(gate_z1, z1)]:
 		var n: int = maxi(1, int((span.y - span.x) / spacing))
 		for i: int in n + 1:
-			_bar(bars, bar, Vector3(x1, JAIL_H * 0.5, span.x + i * (span.y - span.x) / n), gold)
-	# Cross bands and the roof grid.
+			_bar(bars, bar, Vector3(x0, JAIL_H * 0.5, span.x + i * (span.y - span.x) / n), gold)
+	# Cross bands, and a gold frame round the opening.
 	for y: float in [0.12, JAIL_H * 0.5, JAIL_H - 0.04]:
-		_mesh_box(bars, Vector3(x1 - x0, 0.07, 0.07), Vector3((x0 + x1) * 0.5, y, z0), gold)
-		_mesh_box(bars, Vector3(0.07, 0.07, z1 - z0), Vector3(x1, y, (z0 + z1) * 0.5), gold)
-	for i: int in 6:
-		var z: float = z0 + (i + 0.5) * (z1 - z0) / 6.0
-		_mesh_box(bars, Vector3(x1 - x0, 0.05, 0.05), Vector3((x0 + x1) * 0.5, JAIL_H, z), gold)
-	for i: int in 4:
-		var x: float = x0 + (i + 0.5) * (x1 - x0) / 4.0
-		_mesh_box(bars, Vector3(0.05, 0.05, z1 - z0), Vector3(x, JAIL_H, (z0 + z1) * 0.5), gold)
+		_mesh_box(bars, Vector3(0.07, 0.07, z1 - z0), Vector3(x0, y, zc), gold)
+	_mesh_box(bars, Vector3(0.1, 0.18, z1 - z0 + 0.36), Vector3(x0 - 0.04, JAIL_H + 0.09, zc), gold)
+	for z: float in [z0 - 0.09, z1 + 0.09]:
+		_mesh_box(bars, Vector3(0.1, JAIL_H + 0.18, 0.18), Vector3(x0 - 0.04, (JAIL_H + 0.18) * 0.5, z), gold)
 	# The gate: a solid collider in the gap; the barred leaf on a hinge at its north post.
 	var cell_door := StaticBody3D.new()
 	cell_door.name = "JailGate"
@@ -729,29 +894,36 @@ func _build_jail() -> void:
 	var dsh := BoxShape3D.new()
 	dsh.size = Vector3(t, JAIL_H, JAIL_GATE_W)
 	dcs.shape = dsh
-	dcs.position = Vector3(x1, JAIL_H * 0.5, JAIL_GATE_Z)
+	dcs.position = Vector3(x0, JAIL_H * 0.5, JAIL_GATE_Z)
 	cell_door.add_child(dcs)
 	add_child(cell_door)
 	jail_gate = Node3D.new()
 	jail_gate.name = "JailGateLeaf"
-	jail_gate.position = Vector3(x1, 0.0, gate_z0)
+	jail_gate.position = Vector3(x0, 0.0, gate_z0)
 	add_child(jail_gate)
 	for i: int in 5:
 		_bar(jail_gate, bar, Vector3(0, JAIL_H * 0.5, 0.12 + i * (JAIL_GATE_W - 0.24) / 4.0), gold)
 	for y: float in [0.12, JAIL_H * 0.5, JAIL_H - 0.04]:
 		_mesh_box(jail_gate, Vector3(0.08, 0.08, JAIL_GATE_W), Vector3(0, y, JAIL_GATE_W * 0.5), gold)
 	_mesh_box(jail_gate, Vector3(0.14, 0.24, 0.16), Vector3(0.0, 1.3, JAIL_GATE_W - 0.12), GreyboxKit.material(Palette.CASINO_BLACK, 0.6, 0.4))  # lock
-	# A bench against the west wall, a stone floor, the signs on top.
-	GreyboxKit.box(self, Vector3(0.5, 0.45, 2.4), Vector3(x0 + 0.3, 0.225, (z0 + z1) * 0.5), Color("#4A3426"), "JailBench")
-	_plane(Vector2(x1 - x0, z1 - z0), Vector3((x0 + x1) * 0.5, AREA_RUG_Y, (z0 + z1) * 0.5), Color("#5B5550"), "JailFloor")
-	var sign_pos := Vector3(x1 + 0.12, JAIL_H + 0.45, JAIL_GATE_Z)
+	# A bench against the back wall, a stone floor, a caged lamp, the sign over the opening.
+	GreyboxKit.box(self, Vector3(0.5, 0.45, 2.4), Vector3(x1 - 0.3, 0.225, zc), Color("#4A3426"), "JailBench")
+	_plane(Vector2(x1 - x0, z1 - z0), Vector3((x0 + x1) * 0.5, AREA_RUG_Y, zc), Color("#5B5550"), "JailFloor")
+	var bulb: MeshInstance3D = GreyboxKit.sphere(self, 0.1, Vector3((x0 + x1) * 0.5 + 0.4, JAIL_H - 0.2, zc), Palette.CREAM, "JailBulb")
+	var bulb_mat := StandardMaterial3D.new()
+	bulb_mat.albedo_color = Palette.CREAM
+	bulb_mat.emission_enabled = true
+	bulb_mat.emission = Color(1.0, 0.8, 0.5)
+	bulb_mat.emission_energy_multiplier = 2.0
+	bulb.material_override = bulb_mat
+	var lamp: OmniLight3D = GreyboxKit.lamp(self, bulb.position + Vector3(0, -0.15, 0), 0.9, 4.0)
+	lamp.name = "JailLamp"
+	var sign_pos := Vector3(x0 - 0.1, JAIL_H + 0.6, JAIL_GATE_Z)
 	GreyboxKit.box(self, Vector3(0.08, 0.7, 1.9), sign_pos, Palette.CASINO_BLACK.lightened(0.06), "JailSign", false)
 	GreyboxKit.box(self, Vector3(0.1, 0.08, 2.0), sign_pos + Vector3(0, 0.37, 0), Palette.WARM_GOLD, "JailSignTrim", false)
 	GreyboxKit.box(self, Vector3(0.1, 0.08, 2.0), sign_pos + Vector3(0, -0.37, 0), Palette.WARM_GOLD, "JailSignTrim", false)
-	_sign_label(sign_pos + Vector3(0.06, 0.0, 0), PI * 0.5, "JAIL", 110).modulate = Palette.LOSS_RED.lightened(0.15)
-	var north_sign: Label3D = _sign_label(Vector3((x0 + x1) * 0.5, JAIL_H + 0.3, z0 - 0.1), PI, "JAIL", 90)
-	north_sign.modulate = Palette.LOSS_RED.lightened(0.15)
-	# Where a jailed player looks from: above the cage, out over the floor.
+	_sign_label(sign_pos + Vector3(-0.06, 0.0, 0), -PI * 0.5, "JAIL", 110).modulate = Palette.LOSS_RED.lightened(0.15)
+	# Where a jailed player looks from: on the wall over the cell, out over the floor.
 	jail_camera = Node3D.new()
 	jail_camera.name = "JailCamera"
 	jail_camera.set_meta(&"yaw_limit", deg_to_rad(80.0))
@@ -782,7 +954,7 @@ func swing_jail_gate() -> void:
 	if jail_gate == null or not is_inside_tree():
 		return
 	var tw: Tween = jail_gate.create_tween()
-	tw.tween_property(jail_gate, ^"rotation:y", PI * 0.55, 0.35).set_ease(Tween.EASE_OUT)
+	tw.tween_property(jail_gate, ^"rotation:y", -PI * 0.55, 0.35)  # out into the casino (−x).set_ease(Tween.EASE_OUT)
 	tw.tween_interval(0.5)
 	tw.tween_property(jail_gate, ^"rotation:y", 0.0, 0.3).set_ease(Tween.EASE_IN)
 
