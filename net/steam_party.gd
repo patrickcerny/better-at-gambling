@@ -61,13 +61,13 @@ func start_hosting(display_name: String) -> int:
 	stop_hosting()
 	if await spawn_room_server("steam:%d" % SteamSvc.get_steam_id()) == 0:
 		return 0
-	if not SteamSvc.create_lobby("%s's party" % display_name, Protocol.MAX_PLAYERS):
+	if not SteamSvc.create_lobby("%s's lobby" % display_name, Protocol.MAX_PLAYERS):
 		last_error = SteamSvc.last_error
 		stop_hosting()
 		return 0
 	var lobby: int = await _wait_lobby_ready()
 	if lobby == 0:
-		last_error = SteamSvc.last_error if SteamSvc.last_error != "" else "Steam did not create the party lobby."
+		last_error = SteamSvc.last_error if SteamSvc.last_error != "" else "Steam did not create the lobby."
 		stop_hosting()
 		return 0
 	var outside := SteamTransport.new()
@@ -124,13 +124,13 @@ func join_host(host_steam_id: int, display_name: String, cosmetics: Dictionary) 
 ## Why a lobby can't be joined ("" = fine): another game on App 480, another build, or ourselves.
 static func check_lobby(info: Dictionary, my_steam_id: int) -> String:
 	if str(info.get("game", "")) != SteamSvc.LOBBY_GAME:
-		return "That Steam lobby is not a Better at Gambling party."
+		return "That Steam lobby is not a Better at Gambling lobby."
 	if str(info.get("build", "")) != Protocol.BUILD_ID:
 		return "Your friend is on version %s, you are on %s. Both need the same version." % [str(info.get("build", "?")), Protocol.BUILD_ID]
 	if int(info.get("owner", 0)) == 0:
-		return "The party has no host any more."
+		return "The lobby has no host any more."
 	if int(info.get("owner", 0)) == my_steam_id:
-		return "That is your own party."
+		return "That is your own lobby."
 	return ""
 
 
@@ -143,7 +143,7 @@ func spawn_room_server(host_uid: String) -> int:
 	var args: PackedStringArray = server_args(server_port, host_uid, _ready_file)
 	server_pid = OS.create_process(OS.get_executable_path(), args)
 	if server_pid <= 0:
-		last_error = "Could not start the party server on this PC."
+		last_error = "Could not start the lobby server on this PC."
 		server_pid = 0
 		return 0
 	Log.info(&"host", "room server process %d starting on loopback port %d" % [server_pid, server_port])
@@ -151,7 +151,7 @@ func spawn_room_server(host_uid: String) -> int:
 	var waited: float = 0.0
 	while not FileAccess.file_exists(_ready_file):
 		if waited > SERVER_START_TIMEOUT or not _server_running():
-			last_error = "The party server did not start (see logs/host_server.log)."
+			last_error = "The lobby server did not start (see logs/host_server.log)."
 			stop_hosting()
 			return 0
 		await get_tree().create_timer(0.1).timeout

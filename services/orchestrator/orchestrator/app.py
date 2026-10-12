@@ -165,7 +165,7 @@ def create_app(
         """Server browser: parties whose leader switched PUBLIC on (only ``public=1`` is offered)."""
         limit(f"ip:{client_ip(request)}")
         if public != 1:
-            raise ApiError(400, "bad_request", "Only public parties can be listed (public=1).")
+            raise ApiError(400, "bad_request", "Only public lobbies can be listed (public=1).")
         if build is not None and build != cfg.build_id:
             raise ApiError(426, "version_mismatch", "Update required: download the latest version.",
                            server_build=cfg.build_id)

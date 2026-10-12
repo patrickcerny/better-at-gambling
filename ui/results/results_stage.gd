@@ -91,7 +91,7 @@ func _process(delta: float) -> void:
 		var leader: bool = state.leader == local_id
 		play_button.visible = leader
 		var secs: int = ceili(maxf(state.results_return_in, 0.0))
-		wait_label.text = ("Back to the lobby in %ds" % secs) if leader else ("Waiting for the party leader… back to the lobby in %ds" % secs)
+		wait_label.text = ("Back to the lobby in %ds" % secs) if leader else ("Waiting for the lobby leader… back to the lobby in %ds" % secs)
 
 
 func _notification(what: int) -> void:
@@ -494,7 +494,7 @@ func _build_ui() -> void:
 	play_button.pressed.connect(func() -> void: play_again_pressed.emit())
 	buttons.add_child(play_button)
 	leave_button = Button.new()
-	leave_button.text = "MAIN MENU" if not _room else "LEAVE PARTY"
+	leave_button.text = "MAIN MENU" if not _room else "LEAVE LOBBY"
 	leave_button.pressed.connect(func() -> void: leave_pressed.emit())
 	buttons.add_child(leave_button)
 	if _room:

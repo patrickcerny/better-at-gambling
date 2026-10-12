@@ -70,10 +70,10 @@ func _ready() -> void:
 			menu.call(&"_hide_boxes")
 			menu.browser_box.visible = true
 			menu.call(&"fill_browser", [
-				{"room_id": "a", "room_code": "KX7PQ", "name": "Patrick's party", "players": 5, "max_players": 8, "phase": "match", "mode": "casino", "joinable": true},
-				{"room_id": "b", "room_code": "HN4TW", "name": "Big Wendy's party", "players": 2, "max_players": 8, "phase": "lobby", "mode": "minigames", "joinable": true},
-				{"room_id": "c", "room_code": "M2RZD", "name": "Snake Eyes's party", "players": 8, "max_players": 8, "phase": "lobby", "mode": "casino", "joinable": false},
-				{"room_id": "d", "room_code": "Q8VCE", "name": "Chip's party", "players": 3, "max_players": 8, "phase": "results", "mode": "casino", "joinable": false},
+				{"room_id": "a", "room_code": "KX7PQ", "name": "Patrick's lobby", "players": 5, "max_players": 8, "phase": "match", "mode": "casino", "joinable": true},
+				{"room_id": "b", "room_code": "HN4TW", "name": "Big Wendy's lobby", "players": 2, "max_players": 8, "phase": "lobby", "mode": "minigames", "joinable": true},
+				{"room_id": "c", "room_code": "M2RZD", "name": "Snake Eyes's lobby", "players": 8, "max_players": 8, "phase": "lobby", "mode": "casino", "joinable": false},
+				{"room_id": "d", "room_code": "Q8VCE", "name": "Chip's lobby", "players": 3, "max_players": 8, "phase": "results", "mode": "casino", "joinable": false},
 			])
 		"practice":
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()

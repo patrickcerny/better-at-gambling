@@ -71,7 +71,7 @@ func test_only_steam_hosting_and_no_rejoin() -> void:
 		assert_false(t.to_lower().contains("rejoin"), "no Rejoin last party: %s" % t)
 	assert_false(menu.has_method(&"_host_local"))
 	assert_false(menu.has_method(&"_rejoin_last"))
-	assert_true("Create Party" in _texts(menu), "the online form is still there")
+	assert_true("Create Lobby" in _texts(menu), "the online form is still there")
 
 
 func test_host_on_this_pc_needs_steam() -> void:
@@ -107,7 +107,7 @@ func test_no_join_by_ip_and_port() -> void:
 func test_browse_parties_lists_name_players_phase_and_join() -> void:
 	menu.call(&"_show_online")
 	var browse: Button = menu.find_child("BrowseParties", true, false) as Button
-	assert_not_null(browse, "Browse Parties under PLAY ONLINE")
+	assert_not_null(browse, "Browse Lobbies under PLAY ONLINE")
 	if browse == null:
 		return
 	browse.pressed.emit()
@@ -133,7 +133,7 @@ func test_browse_parties_lists_name_players_phase_and_join() -> void:
 	menu.fill_browser([])
 	await wait_process_frames(1)
 	assert_eq(menu.browser_list.get_child_count(), 0)
-	assert_string_contains(menu.browser_status.text, "No public parties")
+	assert_string_contains(menu.browser_status.text, "No public lobbies")
 
 
 func test_practice_offers_casino_or_minigames_only() -> void:

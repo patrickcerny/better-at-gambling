@@ -48,10 +48,10 @@ const KICK_REJOIN_SECONDS: float = 60.0
 const REJECT_TEXT: Dictionary = {
 	&"version_mismatch": "The server is on a different version. Update the game and try again.",
 	&"bad_token": "Could not verify your invitation. Try joining again.",
-	&"room_full": "This party is full.",
-	&"room_in_progress": "This party is on its results screen. Try again in a minute.",
+	&"room_full": "This lobby is full.",
+	&"room_in_progress": "This lobby is on its results screen. Try again in a minute.",
 	&"kicked": "You were kicked by the host.",
-	&"kick_cooldown": "You were kicked from this party. Try again in a minute.",
+	&"kick_cooldown": "You were kicked from this lobby. Try again in a minute.",
 	&"server_error": "Server error. Returning to the menu.",
 	&"timeout": "Could not reach the server.",
 }

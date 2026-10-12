@@ -97,6 +97,6 @@ func _room_or_error(res: Dictionary) -> Dictionary:
 		last_error = ""
 		return res["body"]
 	var body: Dictionary = res["body"]
-	last_error = str(body.get("message", "The party service did not answer."))
+	last_error = str(body.get("message", "The lobby service did not answer."))
 	Log.warn(&"online", "orchestrator call failed (%d %s)" % [res["status"], body.get("error", "")])
 	return {}

@@ -204,13 +204,13 @@ func friend_lobbies() -> Array[Dictionary]:
 
 func _on_lobby_created(result: int, id: int) -> void:
 	if result != 1 or id == 0:
-		last_error = "Steam could not create the party lobby (error %d)." % result
+		last_error = "Steam could not create the lobby (error %d)." % result
 		Log.warn(&"steam", last_error)
 		lobby_owner = false
 		lobby_ready.emit(0)
 		return
 	lobby_id = id
-	var party: String = str(get_meta(&"party_name", "%s's party" % get_persona_name()))
+	var party: String = str(get_meta(&"party_name", "%s's lobby" % get_persona_name()))
 	steam.call("setLobbyData", id, "game", LOBBY_GAME)
 	steam.call("setLobbyData", id, "build", Protocol.BUILD_ID)
 	steam.call("setLobbyData", id, "name", party)
@@ -224,7 +224,7 @@ func _on_lobby_joined(id: int, _permissions: int, _locked: bool, response: int) 
 	if lobby_owner:
 		return  # our own lobby: `lobby_created` handled it
 	if response != CHAT_ROOM_ENTER_RESPONSE_SUCCESS:
-		last_error = "Could not join the party (Steam says %s)." % _enter_text(response)
+		last_error = "Could not join the lobby (Steam says %s)." % _enter_text(response)
 		lobby_entered.emit({"lobby_id": id, "ok": false, "error": last_error})
 		return
 	lobby_id = id
@@ -246,11 +246,11 @@ func _on_join_requested(id: int, _friend: int) -> void:
 static func _enter_text(response: int) -> String:
 	match response:
 		2:
-			return "the party no longer exists"
+			return "the lobby no longer exists"
 		3:
 			return "you are not allowed in"
 		4:
-			return "the party is full"
+			return "the lobby is full"
 		6:
 			return "you are banned"
 	return "error %d" % response

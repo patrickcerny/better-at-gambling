@@ -149,7 +149,7 @@ func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> 
 	var blocked: float = server.kick_blocked_for(uid)
 	if blocked > 0.0:
 		Log.info(&"room", "peer %d (%s) refused: kicked %.0f s ago" % [peer, display_name, Protocol.KICK_REJOIN_SECONDS - blocked])
-		_reject(peer, &"kick_cooldown", "You were kicked from this party. Try again in %d s." % ceili(blocked))
+		_reject(peer, &"kick_cooldown", "You were kicked from this lobby. Try again in %d s." % ceili(blocked))
 		return
 	var pid: int = server.player_by_uid(uid)
 	if pid >= 0:
@@ -271,8 +271,8 @@ func is_public() -> bool:
 ## Name shown in the server browser: "<leader>'s party".
 func party_name() -> String:
 	if server == null or not server.state.players.has(server.lobby.leader()):
-		return "Party %s" % room_code
-	return "%s's party" % server.state.players[server.lobby.leader()].display_name
+		return "Lobby %s" % room_code
+	return "%s's lobby" % server.state.players[server.lobby.leader()].display_name
 
 
 ## Sends a heartbeat now (the PUBLIC toggle shows up in the browser without waiting 5 s).

@@ -144,7 +144,7 @@ func _build_online() -> void:
 	_online_box.add_child(_name_edit)
 	_name_edit.text_submitted.connect(func(_t: String) -> void: _save_name())
 	_name_edit.focus_exited.connect(_save_name)
-	_create_button = _button("Create Party", _create)
+	_create_button = _button("Create Lobby", _create)
 	_online_box.add_child(_create_button)
 	var join_row := HBoxContainer.new()
 	_online_box.add_child(join_row)
@@ -159,7 +159,7 @@ func _build_online() -> void:
 	_code_edit.text_submitted.connect(func(_t: String) -> void: _join_code())
 	join_row.add_child(_code_edit)
 	join_row.add_child(_button("Join", _join_code, 140))
-	_browse_button = _button("Browse Parties", _show_browser)
+	_browse_button = _button("Browse Lobbies", _show_browser)
 	_browse_button.name = "BrowseParties"
 	_online_box.add_child(_browse_button)
 	host_button = _button(HOST_LABEL, _host_steam)
@@ -185,9 +185,9 @@ func _build_online() -> void:
 
 ## PLAY ONLINE → Browse Parties: name, players/max, phase and a JOIN button per public party.
 func _build_browser() -> void:
-	browser_box = _sub_box("Browser", "PUBLIC PARTIES", 860.0)
+	browser_box = _sub_box("Browser", "PUBLIC LOBBIES", 860.0)
 	var hint := Label.new()
-	hint.text = "Parties whose leader switched PUBLIC on in the lobby. Running matches take new players too."
+	hint.text = "Lobbies whose leader switched PUBLIC on in the lobby. Running matches take new players too."
 	hint.theme_type_variation = &"MutedLabel"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	browser_box.add_child(hint)
@@ -260,7 +260,7 @@ static func practice_note() -> String:
 		parts.append("%s (%d+)" % [d.display_name, d.min_players])
 	if parts.is_empty():
 		return "Every minigame works solo."
-	return "Solo you play %s. These need more players, so play them in a party: %s." % [", ".join(solo) if not solo.is_empty() else "none", ", ".join(parts)]
+	return "Solo you play %s. These need more players, so play them in a lobby: %s." % [", ".join(solo) if not solo.is_empty() else "none", ", ".join(parts)]
 
 
 func _step_practice_count(step: int) -> void:
@@ -371,7 +371,7 @@ func _set_status(text: String, error: bool = false) -> void:
 
 
 func _create() -> void:
-	await _via_orchestrator(func(n: String) -> Dictionary: return await Net.online.create_party(n), "Creating party…", "CREATING PARTY")
+	await _via_orchestrator(func(n: String) -> Dictionary: return await Net.online.create_party(n), "Creating lobby…", "CREATING LOBBY")
 
 
 func _join_code() -> void:
@@ -388,7 +388,7 @@ func _join_code() -> void:
 func refresh_browser() -> void:
 	_browser_seq += 1
 	var seq: int = _browser_seq
-	browser_status.text = "Looking for parties…"
+	browser_status.text = "Looking for lobbies…"
 	browser_status.remove_theme_color_override(&"font_color")
 	_refresh_button.disabled = true
 	var rooms: Array[Dictionary] = await Net.online.list_parties()
@@ -409,7 +409,7 @@ func fill_browser(rooms: Array) -> void:
 		browser_list.remove_child(c)
 		c.queue_free()
 	browser_status.remove_theme_color_override(&"font_color")
-	browser_status.text = "" if not rooms.is_empty() else "No public parties right now. Create one and switch PUBLIC on in the lobby (TAB)."
+	browser_status.text = "" if not rooms.is_empty() else "No public lobbies right now. Create one and switch PUBLIC on in the lobby (TAB)."
 	for r: Variant in rooms:
 		if r is Dictionary:
 			browser_list.add_child(_browser_row(r))
@@ -434,7 +434,7 @@ func _browser_row(r: Dictionary) -> Control:
 	row.add_theme_constant_override(&"separation", 16)
 	framed.add_child(row)
 	var name_label := Label.new()
-	name_label.text = str(r.get("name", "Party"))
+	name_label.text = str(r.get("name", "Lobby"))
 	name_label.clip_text = true
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -532,7 +532,7 @@ var _friends_timer: float = 0.0
 func _refresh_steam_entries() -> void:
 	var on: bool = SteamSvc.is_available()
 	host_button.disabled = not on
-	host_button.tooltip_text = "Run the party on this PC; invite Steam friends from the lobby" if on else "Start Steam to host"
+	host_button.tooltip_text = "Run the lobby on this PC; invite Steam friends from the lobby" if on else "Start Steam to host"
 	friends_box.visible = on
 	if not on:
 		return
@@ -541,13 +541,13 @@ func _refresh_steam_entries() -> void:
 	var parties: Array[Dictionary] = SteamSvc.friend_lobbies()
 	if parties.is_empty():
 		var none := Label.new()
-		none.text = "No friends in a party right now."
+		none.text = "No friends in a lobby right now."
 		none.theme_type_variation = &"MutedLabel"
 		_friends_list.add_child(none)
 	for f: Dictionary in parties:
 		var lobby: int = int(f["lobby"])
 		var party: String = str(f.get("party", ""))
-		_friends_list.add_child(_button("Join %s" % (party if party != "" else "%s's party" % str(f["name"])), func() -> void: _join_steam_lobby(lobby)))
+		_friends_list.add_child(_button("Join %s" % (party if party != "" else "%s's lobby" % str(f["name"])), func() -> void: _join_steam_lobby(lobby)))
 
 
 func _process(delta: float) -> void:
@@ -564,7 +564,7 @@ func _host_steam() -> void:
 	if _busy or not SteamSvc.is_available():
 		return
 	_busy = true
-	_set_status("Starting your party…")
+	_set_status("Starting your lobby…")
 	_status.remove_theme_color_override(&"font_color")
 	var name_: String = _display_name()
 	var port: int = await Net.steam_party.start_hosting(name_)
@@ -589,7 +589,7 @@ func _join_steam_lobby(lobby_id: int) -> void:
 	if _busy:
 		return
 	_busy = true
-	_set_status("Joining your friend's party…")
+	_set_status("Joining your friend's lobby…")
 	_status.remove_theme_color_override(&"font_color")
 	var host_id: int = await Net.steam_party.enter_lobby(lobby_id)
 	if host_id == 0:

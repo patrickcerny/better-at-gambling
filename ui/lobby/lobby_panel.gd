@@ -150,7 +150,7 @@ func _build() -> void:
 	next.custom_minimum_size = Vector2(54, 44)
 	next.pressed.connect(_cycle_skin.bind(1))
 	skin_row.add_child(next)
-	right.add_child(_heading("PARTY SETTINGS"))
+	right.add_child(_heading("LOBBY SETTINGS"))
 	_settings_note = Label.new()
 	_settings_note.theme_type_variation = &"SmallLabel"
 	right.add_child(_settings_note)
@@ -197,7 +197,7 @@ func _build() -> void:
 	close_b.pressed.connect(close)
 	bottom.add_child(close_b)
 	var leave := Button.new()
-	leave.text = "LEAVE PARTY"
+	leave.text = "LEAVE LOBBY"
 	leave.pressed.connect(func() -> void: leave_requested.emit())
 	bottom.add_child(leave)
 
@@ -252,7 +252,7 @@ func _refresh() -> void:
 		return
 	var code: String = str(Net.room.get("room_code", ""))
 	var steam_party: bool = int(Net.room.get("steam_lobby", 0)) != 0
-	_title.text = "PARTY LOBBY" + ("   ·   CODE %s" % code if code != "" else ("   ·   STEAM" if steam_party else ""))
+	_title.text = "LOBBY" + ("   ·   CODE %s" % code if code != "" else ("   ·   STEAM" if steam_party else ""))
 	public_button.visible = not steam_party
 	invite_button.visible = steam_party
 	_countdown_label.text = "Doors open in %d…" % ceili(state.countdown) if state.countdown > 0.0 else "Step up on the pedestal with your name (or press READY)."
@@ -274,7 +274,7 @@ func _refresh() -> void:
 		var pid: int = ids[i]
 		r["pid"] = pid
 		kick.text = "SURE?" if _kick_armed == pid and _now() < _kick_armed_until else "KICK"
-		kick.tooltip_text = "Kick %s from the party (they can't rejoin for %d s)" % [str(state.players[pid].get("name", "?")), int(Protocol.KICK_REJOIN_SECONDS)]
+		kick.tooltip_text = "Kick %s from the lobby (they can't rejoin for %d s)" % [str(state.players[pid].get("name", "?")), int(Protocol.KICK_REJOIN_SECONDS)]
 		var p: Dictionary = state.players[pid]
 		(r["swatch"] as ColorRect).color = Palette.player_color(int(p.get("color", 0)))
 		var tags: PackedStringArray = []
@@ -296,7 +296,7 @@ func _refresh() -> void:
 	_ready_button.text = "NOT READY" if _my_ready() else "READY"
 	_skin_label.text = str(Cosmetics.SKIN_NAMES.get(_my_skin(), "Bean"))
 	var leader: bool = local_id == state.leader
-	_settings_note.text = "You lead this party." if leader else "Only the party leader (★) can change these."
+	_settings_note.text = "You lead this lobby." if leader else "Only the lobby leader (★) can change these."
 	var presets: MatchPresets = Registry.presets
 	var mg: int = int(state.lobby_settings.get("minigames", presets.default_minigames))
 	var gm: int = int(state.lobby_settings.get("gamble_minutes", presets.default_gamble_minutes))

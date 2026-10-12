@@ -2207,7 +2207,7 @@ func _update_prompt() -> void:
 			hud.set_prompt(InputGlyphs.fill("[{interact}] Wardrobe: pick your skin"))
 			return
 		&"settings":
-			hud.set_prompt(InputGlyphs.fill("[{interact}] Party settings" if view.state.leader == local_id else "[{interact}] Party settings (only the leader ★ can change them)"))
+			hud.set_prompt(InputGlyphs.fill("[{interact}] Lobby settings" if view.state.leader == local_id else "[{interact}] Lobby settings (only the leader ★ can change them)"))
 			return
 	var floor_prompt: String = casino_floor.prompt() if casino_floor != null else ""
 	if floor_prompt != "":

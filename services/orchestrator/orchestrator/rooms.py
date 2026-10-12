@@ -163,7 +163,7 @@ class RoomManager:
             # New players may join in the lobby and during a running match (they play from the next
             # minigame); only the results screen turns them away until the room is back in its lobby.
             if room.phase == "results":
-                raise ApiError(409, "room_in_progress", "That party is on its results screen. Try again in a minute.")
+                raise ApiError(409, "room_in_progress", "That lobby is on its results screen. Try again in a minute.")
             if self.occupancy(room, now, ident.player_uid) >= self.config.max_players:
                 raise ApiError(409, "room_full", "That room is full.")
         token = self._issue_token(room, ident, now)
@@ -212,7 +212,7 @@ class RoomManager:
                 continue
             full = r.players >= self.config.max_players
             rows.append({
-                "room_id": r.room_id, "room_code": r.code, "name": r.name or f"Party {r.code}",
+                "room_id": r.room_id, "room_code": r.code, "name": r.name or f"Lobby {r.code}",
                 "players": r.players, "max_players": self.config.max_players, "phase": r.phase,
                 "mode": r.mode, "joinable": r.phase != "results" and not full,
             })
