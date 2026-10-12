@@ -5,7 +5,8 @@ extends Node3D
 ##   wardrobe mirror and the party settings board, shut off from the casino by the lobby doors
 ##   until the match starts;
 ## - the casino floor: blackjack lounge, roulette pit, slot rows, Plinko wall, bar, gift shop and
-##   the barred jail cell where security locks people up;
+##   the barred jail cell where security locks people up, with the Race Hall (the horse race
+##   table) opening off its east wall through a wide archway;
 ## - the VIP lounge (north), its own room behind the north door, where the bouncer checks you.
 ## Built procedurally from the tables below so it is easy to tune.
 
@@ -22,6 +23,8 @@ const STATIONS: Dictionary = {
 	&"slot_9": [&"slots", Vector3(-15, 0, -8.5), 0], &"slot_10": [&"slots", Vector3(-12.5, 0, -8.5), 0],
 	&"slot_11": [&"slots", Vector3(-10, 0, -8.5), 0], &"slot_12": [&"slots", Vector3(-7.5, 0, -8.5), 0],
 	&"plinko_1": [&"plinko", Vector3(11, 0, -14.5), 0], &"plinko_2": [&"plinko", Vector3(17.5, 0, -14.5), 0],
+	# The Race Hall (east annex): the long horse race table, stools on its south side.
+	&"horse_race_1": [&"horse_race", Vector3(29.0, 0, -10.0), 0],
 	&"roulette_1": [&"roulette", Vector3(-6, 0, -3), 0], &"roulette_2": [&"roulette", Vector3(6, 0, -3), 180],
 	&"blackjack_1": [&"blackjack", Vector3(-16, 0, 4), 0], &"blackjack_2": [&"blackjack", Vector3(-9, 0, 4), 0],
 	&"blackjack_3": [&"blackjack", Vector3(-2, 0, 4), 0],
@@ -48,6 +51,16 @@ const VIP_DOOR_H: float = 3.2
 const VIP_GATE_POS: Vector3 = Vector3(0.0, 0.0, -SIZE_Z * 0.5)
 ## Which way the bouncer pushes someone without access: back out onto the casino floor.
 const VIP_GATE_PUSH: Vector3 = Vector3(0.0, 0.0, 1.0)
+## The Race Hall (Patrick: "horse race table: bigger room"): an annex east of the casino floor,
+## x 22..ANNEX_X1, z ANNEX_Z0..ANNEX_Z1 (wall centre lines), open to the floor through an archway
+## in the east wall from ARCH_Z0 to ARCH_Z1, ARCH_H high. The jail (west wall), the bar, Gift Shop
+## and Odd Jobs cabinet (east wall, south of the arch) stay where they are.
+const ANNEX_X1: float = 36.0
+const ANNEX_Z0: float = -SIZE_Z * 0.5
+const ANNEX_Z1: float = -2.5
+const ARCH_Z0: float = -14.5
+const ARCH_Z1: float = -4.0
+const ARCH_H: float = 4.6
 ## Pillars: the west pair stands in the roulette pit, the east pair frames the casino side of the
 ## lobby doors (half set into the start-room wall).
 const PILLARS: Array[Vector3] = [Vector3(-9.6, 0, -1), Vector3(9.6, 0, -1), Vector3(-3.75, 0, 8.4), Vector3(3.75, 0, 8.4)]
@@ -148,6 +161,7 @@ func _ready() -> void:
 	_build_lobby()
 	_build_floor_areas()
 	_build_vip_room()
+	_build_race_hall()
 	_build_jail()
 	_build_stations()
 	_build_props()
@@ -348,7 +362,10 @@ func _build_floor_and_walls() -> void:
 	GreyboxKit.box(self, Vector3(north_w, WALL_H, 0.5), Vector3(hx - north_w * 0.5, WALL_H * 0.5, -hz), wall, "WallN")
 	GreyboxKit.box(self, Vector3(VIP_DOOR_HALF * 2.0, WALL_H - VIP_DOOR_H, 0.5), Vector3(0, (WALL_H + VIP_DOOR_H) * 0.5, -hz), wall, "WallNTop")
 	GreyboxKit.box(self, Vector3(0.5, WALL_H, SIZE_Z), Vector3(-hx, WALL_H * 0.5, 0), wall, "WallW")
-	GreyboxKit.box(self, Vector3(0.5, WALL_H, SIZE_Z), Vector3(hx, WALL_H * 0.5, 0), wall, "WallE")
+	# East wall: the archway into the Race Hall between ARCH_Z0 and ARCH_Z1, wall above it.
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, ARCH_Z0 + hz), Vector3(hx, WALL_H * 0.5, (-hz + ARCH_Z0) * 0.5), wall, "WallE")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, hz - ARCH_Z1), Vector3(hx, WALL_H * 0.5, (ARCH_Z1 + hz) * 0.5), wall, "WallE")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H - ARCH_H, ARCH_Z1 - ARCH_Z0), Vector3(hx, (WALL_H + ARCH_H) * 0.5, (ARCH_Z0 + ARCH_Z1) * 0.5), wall, "WallETop")
 	# South wall with the entrance gap.
 	GreyboxKit.box(self, Vector3(hx - 2.0, WALL_H, 0.5), Vector3(-SIZE_X * 0.25 - 1.0, WALL_H * 0.5, hz), wall, "WallS1")
 	GreyboxKit.box(self, Vector3(hx - 2.0, WALL_H, 0.5), Vector3(SIZE_X * 0.25 + 1.0, WALL_H * 0.5, hz), wall, "WallS2")
@@ -672,6 +689,41 @@ func _build_vip_room() -> void:
 		GreyboxKit.capsule(plinth, 0.3, 1.2, Vector3(0, 1.1, 0), GreyboxKit.gold(), "Statue")
 
 
+## The Race Hall: floor, carpet, walls and ceiling of the east annex, gold casing round the
+## archway and a sign over it facing the casino floor. The horse race table is a station.
+func _build_race_hall() -> void:
+	var wall: Color = Color("#4A2F2A")
+	var hx: float = SIZE_X * 0.5
+	var x0: float = hx + 0.25  # inner face of the casino's east wall
+	var x1: float = ANNEX_X1 + 0.25
+	var z0: float = ANNEX_Z0 - 0.25
+	var z1: float = ANNEX_Z1 + 0.25
+	GreyboxKit.box(self, Vector3(x1 - hx, 0.5, z1 - z0), Vector3((hx + x1) * 0.5, -0.25, (z0 + z1) * 0.5), Color("#8C7F78"), "FloorAnnex")
+	var cx0: float = hx - 0.25
+	var cx1: float = ANNEX_X1 - 1.0
+	var cz0: float = ANNEX_Z0 + 1.0
+	var cz1: float = ANNEX_Z1 - 1.0
+	_plane(Vector2(cx1 - cx0, cz1 - cz0), Vector3((cx0 + cx1) * 0.5, 0.01, (cz0 + cz1) * 0.5), Palette.CASINO_RED.darkened(0.45), "AnnexCarpet")
+	GreyboxKit.box(self, Vector3(x1 - x0, WALL_H, 0.5), Vector3((x0 + x1) * 0.5, WALL_H * 0.5, ANNEX_Z0), wall, "WallAnnex")
+	GreyboxKit.box(self, Vector3(x1 - x0, WALL_H, 0.5), Vector3((x0 + x1) * 0.5, WALL_H * 0.5, ANNEX_Z1), wall, "WallAnnex")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, z1 - z0), Vector3(ANNEX_X1, WALL_H * 0.5, (z0 + z1) * 0.5), wall, "WallAnnex")
+	GreyboxKit.box(self, Vector3(x1 - hx, 0.3, z1 - z0), Vector3((hx + x1) * 0.5, WALL_H + 0.15, (z0 + z1) * 0.5), Palette.CASINO_BLACK, "CeilingAnnex")
+	# Gold casing round the archway on both faces.
+	var mid_z: float = (ARCH_Z0 + ARCH_Z1) * 0.5
+	for face: float in [-1.0, 1.0]:
+		var x: float = hx + face * 0.28
+		for z: float in [ARCH_Z0, ARCH_Z1]:
+			GreyboxKit.box(self, Vector3(0.06, ARCH_H + 0.1, 0.18), Vector3(x, (ARCH_H + 0.1) * 0.5, z + (0.09 if z == ARCH_Z0 else -0.09)), Palette.WARM_GOLD, "ArchCasing", false)
+		GreyboxKit.box(self, Vector3(0.08, 0.2, ARCH_Z1 - ARCH_Z0 + 0.36), Vector3(x, ARCH_H + 0.1, mid_z), Palette.WARM_GOLD, "ArchCasing", false)
+	# The sign over the arch, facing the casino floor (−x).
+	var sign_pos := Vector3(hx - 0.3, ARCH_H + 1.15, mid_z)
+	GreyboxKit.box(self, Vector3(0.08, 1.3, 5.6), sign_pos, Palette.VIP_BURGUNDY, "RaceSign", false)
+	for dy: float in [-0.67, 0.67]:
+		GreyboxKit.box(self, Vector3(0.1, 0.08, 5.8), sign_pos + Vector3(-0.01, dy, 0), Palette.VIP_GOLD, "RaceSignTrim", false)
+	_sign_label(sign_pos + Vector3(-0.06, 0.15, 0), -PI * 0.5, "THE BEAN DERBY", 96).modulate = Palette.VIP_GOLD
+	_sign_label(sign_pos + Vector3(-0.06, -0.33, 0), -PI * 0.5, "HORSE RACING  ·  PAYS 1:4", 40)
+
+
 ## The jail cell (Patrick: "just bars where the bouncer brings you"): gold bars on the two open
 ## sides, a barred roof, a bench and a JAIL sign. The bars and the gate are solid (layer 1, like
 ## the walls): nobody walks, falls or gets thrown out. The gate's collider never opens; its leaf
@@ -810,6 +862,8 @@ func _make_station(kind: StringName) -> StationBase:
 			return RouletteStation.new()
 		&"blackjack":
 			return BlackjackStation.new()
+		&"horse_race":
+			return HorseRaceStation.new()
 	Log.error(&"map", "unknown station kind %s" % kind)
 	return StationBase.new()
 
@@ -867,9 +921,9 @@ func _build_lights() -> void:
 	e.glow_bloom = 0.1
 	env.environment = e
 	add_child(env)
-	# Chandeliers (start room, centre, VIP lounge) and lamps over each area: warm, with dark
+	# Chandeliers (start room, centre, VIP lounge, Race Hall) and lamps over each area: warm, with dark
 	# corners between.
-	for p: Vector3 in [Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11), Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, 5.8, -21), Vector3(-13, 6.0, 12), Vector3(13, 6.0, 12)]:
+	for p: Vector3 in [Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11), Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, 5.8, -21), Vector3(-13, 6.0, 12), Vector3(13, 6.0, 12), Vector3(25.5, 6.0, -9.5), Vector3(32.5, 6.0, -9.5)]:
 		GreyboxKit.lamp(self, p, 3.0, 16.0)  # the chandelier itself is LoungeDecor (client only)
 	var sun := DirectionalLight3D.new()
 	sun.light_color = Color(1.0, 0.9, 0.75)
@@ -893,7 +947,8 @@ func _build_navmesh() -> void:
 	nm.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_EXPLICIT
 	nm.geometry_source_group_name = &"navsource"
 	nm.geometry_collision_mask = 1
-	nm.filter_baking_aabb = AABB(Vector3(-SIZE_X * 0.5, -1, VIP_Z_FAR), Vector3(SIZE_X, 7.0, SIZE_Z * 0.5 - VIP_Z_FAR))
+	# The casino, start room and VIP lounge, plus the Race Hall to the east.
+	nm.filter_baking_aabb = AABB(Vector3(-SIZE_X * 0.5, -1, VIP_Z_FAR), Vector3(ANNEX_X1 + SIZE_X * 0.5, 7.0, SIZE_Z * 0.5 - VIP_Z_FAR))
 	nav_region.navigation_mesh = nm
 	add_child(nav_region)
 	# Static colliders register with the physics server a frame later; bake once they exist.

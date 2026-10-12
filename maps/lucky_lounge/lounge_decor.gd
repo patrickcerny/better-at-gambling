@@ -19,15 +19,17 @@ const TEX_DIR: String = "res://assets/textures/"
 const CHANDELIERS: Array[Vector3] = [
 	Vector3(0, 6.0, 11), Vector3(0, 6.5, -3), Vector3(-13, 6.0, 4), Vector3(-13, 6.0, -11),
 	Vector3(14, 6.0, -12), Vector3(16, 6.0, 4), Vector3(0, 5.8, -21), Vector3(-13, 6.0, 12),
-	Vector3(13, 6.0, 12),
+	Vector3(13, 6.0, 12), Vector3(25.5, 6.0, -9.5), Vector3(32.5, 6.0, -9.5),
 ]
 const BULB_COLOR: Color = Color(1.0, 0.82, 0.52)
 const GLASS_GLOW: Color = Color(0.45, 0.42, 0.62)
-## Arched windows: [centre on the wall, inward normal, height]. Two in the VIP lounge's back wall;
-## the Plinko wall and the mirror/board walls stay free.
+## Arched windows: [centre on the wall, inward normal, height]. Two in the VIP lounge's back wall,
+## two in the Race Hall's east wall (the casino's east wall is the archway there); the Plinko wall
+## and the mirror/board walls stay free.
 const WINDOWS: Array = [
 	[Vector3(-21.75, 3.5, -11.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, -4.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, 3.0), Vector3(1, 0, 0), 3.2],
-	[Vector3(21.75, 3.5, -11.0), Vector3(-1, 0, 0), 3.2], [Vector3(21.75, 3.5, -4.0), Vector3(-1, 0, 0), 3.2], [Vector3(21.75, 3.5, 3.0), Vector3(-1, 0, 0), 3.2],
+	[Vector3(21.75, 3.5, 3.0), Vector3(-1, 0, 0), 3.2],
+	[Vector3(35.75, 3.5, -12.6), Vector3(-1, 0, 0), 3.2], [Vector3(35.75, 3.5, -5.9), Vector3(-1, 0, 0), 3.2],
 	[Vector3(-16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2], [Vector3(16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2],
 	[Vector3(-19.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2], [Vector3(-11.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2],
 	[Vector3(-3.2, 3.5, -25.75), Vector3(0, 0, 1), 3.2], [Vector3(3.2, 3.5, -25.75), Vector3(0, 0, 1), 3.2],
@@ -136,6 +138,7 @@ func _tex(folder: String, metres: float, tint: Color = Color.WHITE, normal_stren
 func _floors() -> void:
 	# Wine-red casino carpet (gold lattice, in the palette) with the carpet-fibre normal.
 	_retexture("Carpet", _tex("casino_carpet", 2.2, Color(0.92, 0.9, 0.9), 0.35, 0.95))
+	_retexture("AnnexCarpet", _tex("casino_carpet", 2.2, Color(0.92, 0.9, 0.9), 0.35, 0.95))
 	# The VIP lounge and the bar stand on herringbone parquet.
 	var parquet: StandardMaterial3D = _tex("herringbone_parquet", 1.6, Color(0.72, 0.56, 0.44), 0.45, 0.5)
 	_retexture("VipCarpet", parquet)
@@ -218,7 +221,7 @@ func _walls() -> void:
 	var hz: float = LuckyLounge.SIZE_Z * 0.5 - 0.25
 	# Damask wallpaper on every wall (wine on wine), gold on black in the VIP lounge.
 	var damask: StandardMaterial3D = _tex("damask_wallpaper", 2.0, Color(0.95, 0.9, 0.9), 0.0, 0.85)
-	for n: String in ["WallN", "WallW", "WallE", "WallS1", "WallS2", "WallSTop", "WallLobby", "PorchWall", "PorchSide"]:
+	for n: String in ["WallN", "WallW", "WallE", "WallS1", "WallS2", "WallSTop", "WallLobby", "PorchWall", "PorchSide", "WallAnnex"]:
 		_retexture_solid(n, damask)
 	var vip_damask: StandardMaterial3D = _tex("damask_wallpaper", 1.6, Color(0.95, 0.92, 0.85), 0.0, 0.8, 0.0, "albedo_gold.jpg")
 	_retexture_solid("WallVip", vip_damask)
@@ -237,11 +240,20 @@ func _walls() -> void:
 	var lt: float = LuckyLounge.LOBBY_WALL_T * 0.5
 	var ld: float = LuckyLounge.LOBBY_DOOR_HALF + 0.2
 	var vz: float = LuckyLounge.VIP_Z_FAR
+	var ax0: float = LuckyLounge.SIZE_X * 0.5 + 0.25
+	var ax1: float = LuckyLounge.ANNEX_X1 - 0.25
+	var az1: float = LuckyLounge.ANNEX_Z1 - 0.25
 	var runs: Array = [
 		[Vector3(-hx, 0, -hz), Vector3(-door - 0.2, 0, -hz), Vector3(0, 0, 1)],
 		[Vector3(door + 0.2, 0, -hz), Vector3(hx, 0, -hz), Vector3(0, 0, 1)],
 		[Vector3(-hx, 0, -hz), Vector3(-hx, 0, hz), Vector3(1, 0, 0)],
-		[Vector3(hx, 0, -hz), Vector3(hx, 0, hz), Vector3(-1, 0, 0)],
+		# The east wall, split by the Race Hall archway.
+		[Vector3(hx, 0, -hz), Vector3(hx, 0, LuckyLounge.ARCH_Z0 - 0.2), Vector3(-1, 0, 0)],
+		[Vector3(hx, 0, LuckyLounge.ARCH_Z1 + 0.2), Vector3(hx, 0, hz), Vector3(-1, 0, 0)],
+		# The Race Hall: north, east and south walls.
+		[Vector3(ax0, 0, -hz), Vector3(ax1, 0, -hz), Vector3(0, 0, 1)],
+		[Vector3(ax1, 0, -hz), Vector3(ax1, 0, az1), Vector3(-1, 0, 0)],
+		[Vector3(ax0, 0, az1), Vector3(ax1, 0, az1), Vector3(0, 0, -1)],
 		[Vector3(-hx, 0, hz), Vector3(-2.3, 0, hz), Vector3(0, 0, -1)],
 		[Vector3(2.3, 0, hz), Vector3(hx, 0, hz), Vector3(0, 0, -1)],
 		# The start-room wall, casino face and start-room face.
@@ -284,6 +296,11 @@ func _walls() -> void:
 		var z: float = spec[0]
 		var n_z: float = 1.0 if (z == -hz or z == lz + lt) else -1.0
 		_box(Vector3(float(spec[1]) * 2.0, 0.22, 0.14), Vector3(0, LuckyLounge.WALL_H - 0.2, z + n_z * 0.07), _gold_mat, "gold")
+	# And over the Race Hall archway, on both faces.
+	var arch_len: float = LuckyLounge.ARCH_Z1 - LuckyLounge.ARCH_Z0 + 0.4
+	var arch_mid: float = (LuckyLounge.ARCH_Z0 + LuckyLounge.ARCH_Z1) * 0.5
+	for x: float in [hx - 0.07, hx + 0.5 + 0.07]:
+		_box(Vector3(0.14, 0.22, arch_len), Vector3(x, LuckyLounge.WALL_H - 0.2, arch_mid), _gold_mat, "gold")
 
 
 func _near_opening(p: Vector3, radius: float) -> bool:
@@ -298,6 +315,9 @@ func _near_opening(p: Vector3, radius: float) -> bool:
 	for c: Vector3 in OPENINGS:
 		if Vector2(c.x, c.z).distance_to(Vector2(p.x, p.z)) < radius + 1.0:
 			return true
+	# The Race Hall archway in the casino's east wall.
+	if absf(p.x - LuckyLounge.SIZE_X * 0.5) < 1.0 and p.z > LuckyLounge.ARCH_Z0 - 1.0 and p.z < LuckyLounge.ARCH_Z1 + 1.0:
+		return true
 	return false
 
 
@@ -419,7 +439,7 @@ func _art() -> void:
 		add_child(mirror)
 	for spec: Array in [
 		[Vector3(-21.75, 3.5, -7.5), Vector3(1, 0, 0)], [Vector3(-21.75, 3.6, 9.8), Vector3(1, 0, 0)],
-		[Vector3(21.75, 3.5, -7.5), Vector3(-1, 0, 0)], [Vector3(21.75, 3.5, 11.0), Vector3(-1, 0, 0)],
+		[Vector3(21.75, 3.5, 11.0), Vector3(-1, 0, 0)], [Vector3(29.0, 3.5, -2.75), Vector3(0, 0, -1)],
 		[Vector3(-8.75, 3.6, -18.4), Vector3(1, 0, 0)], [Vector3(8.75, 3.6, -18.4), Vector3(-1, 0, 0)],
 	]:
 		var n: Vector3 = spec[1]
@@ -509,6 +529,13 @@ func _sconces() -> void:
 		var z: float = -hz + 3.0 + i * (2.0 * hz - 6.0) / 3.0
 		spots.append([Vector3(-hx, y, z), Vector3(1, 0, 0)])
 		spots.append([Vector3(hx, y, z), Vector3(-1, 0, 0)])
+	# The Race Hall: either side of its windows, and its back (south) wall either side of the painting.
+	var ax: float = LuckyLounge.ANNEX_X1 - 0.3
+	for z: float in [-15.0, -9.25, -3.5]:
+		spots.append([Vector3(ax, y, z), Vector3(-1, 0, 0)])
+	for x: float in [25.0, 33.0]:
+		spots.append([Vector3(x, y, LuckyLounge.ANNEX_Z1 - 0.3), Vector3(0, 0, -1)])
+		spots.append([Vector3(x, y, -hz), Vector3(0, 0, 1)])
 	# The VIP lounge's side walls.
 	for z: float in [-23.6, -18.4]:
 		spots.append([Vector3(-LuckyLounge.VIP_X + 0.05, y, z), Vector3(1, 0, 0)])

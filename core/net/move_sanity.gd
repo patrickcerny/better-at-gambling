@@ -7,9 +7,9 @@ extends RefCounted
 var max_speed: float = 16.0
 ## Distance always allowed per report regardless of time (jitter, small corrections), m.
 var slack: float = 1.5
-## Playable volume (the casino, the start room, the porch and the VIP lounge behind the north
-## wall, with some margin).
-var bounds: AABB = AABB(Vector3(-23.5, -3.0, -27.5), Vector3(47.0, 13.0, 49.5))
+## Playable volume (the casino, the start room, the porch, the VIP lounge behind the north wall
+## and the Race Hall east of the casino, with some margin).
+var bounds: AABB = AABB(Vector3(-23.5, -3.0, -27.5), Vector3(61.0, 13.0, 49.5))
 ## Extra playable volumes while they are open: a walkable minigame room far from the casino
 ## (`WalkableLogicBase.ROOM_ORIGIN`). Without it every move in the room was "off the map" and the
 ## client snapped back to its spawn (0.9.2: stuck at the start of Pass the Bomb).
