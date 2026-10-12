@@ -30,6 +30,9 @@ var _status: Label
 var _busy: bool = false
 var _settings: SettingsPanel
 var _settings_button: GearButton
+## The T-shirt button next to the gear and the clothes menu it opens (skin picker).
+var clothes_button: TShirtButton
+var clothes: ClothesPanel
 var _how_to_play: HowToPlayPanel
 ## Server browser (Patrick: "Server browser good"): public parties from the orchestrator.
 var browser_box: VBoxContainer
@@ -93,7 +96,28 @@ func _ready() -> void:
 	_settings = SettingsPanel.new()
 	add_child(_settings)
 	_settings.closed.connect(func() -> void: _settings_button.grab_focus())
-	_settings_button.pressed.connect(func() -> void: _settings.open(false))
+	_settings_button.pressed.connect(func() -> void:
+		clothes.close()
+		_settings.open(false))
+	# Clothes (T-shirt) left of the gear: the skin is picked here, not in game.
+	clothes_button = TShirtButton.new()
+	clothes_button.name = "ClothesButton"
+	clothes_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	clothes_button.offset_left = -48.0 - 2.0 * GearButton.SIZE
+	clothes_button.offset_top = -32.0 - GearButton.SIZE
+	clothes_button.offset_right = -48.0 - GearButton.SIZE
+	clothes_button.offset_bottom = -32.0
+	clothes_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	clothes_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(clothes_button)
+	clothes = ClothesPanel.new()
+	add_child(clothes)
+	clothes.closed.connect(func() -> void:
+		if not _settings.visible:
+			clothes_button.grab_focus())
+	clothes_button.pressed.connect(func() -> void:
+		_settings.close()
+		clothes.open())
 	_how_to_play = HowToPlayPanel.new()
 	_how_to_play.name = "HowToPlay"
 	_how_to_play.visible = false

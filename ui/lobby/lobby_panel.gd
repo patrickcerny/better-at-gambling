@@ -1,7 +1,7 @@
 class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
-## accessibility: the 8 slots (name, color, skin, ready, leader), the ready toggle, your skin
+## accessibility: the 8 slots (name, color, skin, ready, leader), the ready toggle
 ## and — for the party leader — the mode (casino or minigames only), match length (minigames,
 ## gambling minutes between them), items, PUBLIC (listed in the server browser) and a KICK button
 ## next to every other player (press twice: KICK → SURE?). Every button sends an intent; the panel
@@ -32,8 +32,6 @@ var invite_button: Button
 var _kick_armed: int = -1
 var _kick_armed_until: float = 0.0
 var _length_note: Label
-var _skin_label: Label
-var _skin_next: Button
 ## The 8 slot rows, built once and updated in place (rebuilding them made the panel, and the
 ## READY button with it, jump on every snapshot, so clicks missed). Each: {frame, swatch, name, ready, kick, empty}.
 var _rows: Array[Dictionary] = []
@@ -66,7 +64,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	_refresh()
 
 
-## Shows the panel; `focus` is &"settings", &"wardrobe" or &"" (general).
+## Shows the panel; `focus` is &"settings" or &"" (general).
 func open(focus: StringName = &"") -> void:
 	visible = true
 	_opened_frame = Engine.get_process_frames()
@@ -75,8 +73,6 @@ func open(focus: StringName = &"") -> void:
 		&"settings":
 			if _steppers.has("minigames"):
 				(_steppers["minigames"]["plus"] as Button).grab_focus()
-		&"wardrobe":
-			_skin_next.grab_focus()
 		_:
 			_ready_button.grab_focus()
 
@@ -131,25 +127,6 @@ func _build() -> void:
 		_ready_button.text = "NOT READY" if on else "READY"
 		Net.send_intent(Intents.make(&"set_ready", {"ready": on})))
 	right.add_child(_ready_button)
-	right.add_child(_heading("YOUR SKIN"))
-	var skin_row := HBoxContainer.new()
-	skin_row.add_theme_constant_override(&"separation", 8)
-	right.add_child(skin_row)
-	var prev := Button.new()
-	prev.text = "◀"
-	prev.custom_minimum_size = Vector2(54, 44)
-	prev.pressed.connect(_cycle_skin.bind(-1))
-	skin_row.add_child(prev)
-	_skin_label = Label.new()
-	_skin_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_skin_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	skin_row.add_child(_skin_label)
-	_skin_next = Button.new()
-	var next: Button = _skin_next
-	next.text = "▶"
-	next.custom_minimum_size = Vector2(54, 44)
-	next.pressed.connect(_cycle_skin.bind(1))
-	skin_row.add_child(next)
 	right.add_child(_heading("LOBBY SETTINGS"))
 	_settings_note = Label.new()
 	_settings_note.theme_type_variation = &"SmallLabel"
@@ -294,7 +271,6 @@ func _refresh() -> void:
 		ready.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if is_ready else Color("#9A8F7A"))
 	_ready_button.set_pressed_no_signal(_my_ready())
 	_ready_button.text = "NOT READY" if _my_ready() else "READY"
-	_skin_label.text = str(Cosmetics.SKIN_NAMES.get(_my_skin(), "Bean"))
 	var leader: bool = local_id == state.leader
 	_settings_note.text = "You lead this lobby." if leader else "Only the lobby leader (★) can change these."
 	var presets: MatchPresets = Registry.presets
@@ -358,21 +334,6 @@ func _step_setting(key: String, step: int) -> void:
 	var fallback: int = presets.default_minigames if key == "minigames" else presets.default_gamble_minutes
 	var now: int = int(state.lobby_settings.get(key, fallback))
 	Net.send_intent(Intents.make(&"lobby_setting", {"key": key, "value": now + step}))
-
-
-func _my_skin() -> StringName:
-	return StringName(state.players.get(local_id, {}).get("skin", "bean"))
-
-
-## Steps through the skins; the choice is remembered for the next party.
-func _cycle_skin(step: int) -> void:
-	if state == null:
-		return
-	var i: int = maxi(Cosmetics.SKINS.find(_my_skin()), 0)
-	var skin: StringName = Cosmetics.SKINS[posmod(i + step, Cosmetics.SKINS.size())]
-	Settings.set_value("profile", "skin", String(skin))
-	Settings.save()
-	Net.send_intent(Intents.make(&"set_skin", {"skin": skin}))
 
 
 ## KICK on slot `slot`: the first press arms it ("SURE?" for 3 s), the second kicks.

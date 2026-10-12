@@ -2182,13 +2182,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 # --- World checks ------------------------------------------------------------------------------
 
-## &"wardrobe"/&"settings" when the local player stands at the mirror/settings board in the lobby.
+## &"settings" when the local player stands at the settings board in the lobby (skins are picked
+## in the main menu's Clothes menu).
 func _lobby_spot() -> StringName:
 	if local == null or not view.state.room_mode or view.state.phase != Phase.Id.LOBBY:
 		return &""
 	var p: Vector3 = local.global_position
-	if Vector2(p.x - LuckyLounge.MIRROR_POS.x, p.z - LuckyLounge.MIRROR_POS.z).length() < 2.6:
-		return &"wardrobe"
 	if Vector2(p.x - LuckyLounge.SETTINGS_BOARD_POS.x, p.z - LuckyLounge.SETTINGS_BOARD_POS.z).length() < 2.6:
 		return &"settings"
 	return &""
@@ -2203,9 +2202,6 @@ func _update_prompt() -> void:
 		hud.set_prompt("")
 		return
 	match _lobby_spot():
-		&"wardrobe":
-			hud.set_prompt(InputGlyphs.fill("[{interact}] Wardrobe: pick your skin"))
-			return
 		&"settings":
 			hud.set_prompt(InputGlyphs.fill("[{interact}] Lobby settings" if view.state.leader == local_id else "[{interact}] Lobby settings (only the leader ★ can change them)"))
 			return
