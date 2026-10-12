@@ -76,6 +76,13 @@ func test_half_open_is_gathered_at_the_tiebacks() -> void:
 	var m: ShaderMaterial = scene.curtain_left.material as ShaderMaterial
 	assert_gt(float(m.get_shader_parameter(&"gather")), 0.5, "fabric pulled into the tiebacks")
 	assert_almost_eq(scene.curtain_left.get_global_rect().position.x, 0.0, 0.5, "still hanging on the rail")
+	assert_gt(float(m.get_shader_parameter(&"sway")), 0.5, "closing: the hem sways out behind the rail")
+	scene._set_curtain(0.6)
+	assert_lt(float(m.get_shader_parameter(&"sway")), -0.5, "opening: it sways the other way")
+	scene._set_curtain(1.0)
+	assert_almost_eq(float(m.get_shader_parameter(&"sway")), 0.0, 0.0001, "still once fully open")
+	scene._set_curtain(0.0)
+	assert_almost_eq(float(m.get_shader_parameter(&"sway")), 0.0, 0.0001, "still once fully closed")
 	scene._set_curtain(1.0)
 
 

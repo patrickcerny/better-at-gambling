@@ -98,6 +98,8 @@ var curtain_plaque: PanelContainer = null
 ## 1.0 = curtain fully open (panels off screen), 0.0 = closed (panels cover the screen).
 var curtain_open: float = 1.0
 var curtain_tween: Tween = null
+## Which way the curtain last moved: 1 closing, -1 opening (the hem trails the other way).
+var _curtain_dir: float = 1.0
 ## Seconds the curtain takes to close, stays closed showing the name, and takes to open.
 const PAUSE_LAYER: int = 85
 const CURTAIN_CLOSE_TIME: float = 0.6
@@ -1649,22 +1651,37 @@ func _build_curtain() -> void:
 	curtain_plaque = PanelContainer.new()
 	curtain_plaque.name = "CurtainPlaque"
 	curtain_plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# A gold-rimmed plaque: a thick bevelled gold frame, a dark velvet field and a thin bright inner
+	# gold line.
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.09, 0.03, 0.045, 0.92)
+	sb.bg_color = Color(0.09, 0.03, 0.045, 0.95)
 	sb.border_color = Palette.WARM_GOLD
-	sb.set_border_width_all(5)
-	sb.set_corner_radius_all(22)
-	sb.shadow_color = Color(0, 0, 0, 0.5)
-	sb.shadow_size = 18
-	sb.content_margin_left = 64
-	sb.content_margin_right = 64
-	sb.content_margin_top = 14
-	sb.content_margin_bottom = 22
+	sb.set_border_width_all(7)
+	sb.border_blend = true
+	sb.set_corner_radius_all(24)
+	sb.shadow_color = Color(0, 0, 0, 0.55)
+	sb.shadow_size = 22
+	sb.shadow_offset = Vector2(0, 8)
+	sb.set_content_margin_all(9)
 	curtain_plaque.add_theme_stylebox_override(&"panel", sb)
+	var inner := PanelContainer.new()
+	inner.name = "Inner"
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var line := StyleBoxFlat.new()
+	line.bg_color = Color(0.16, 0.05, 0.07, 1.0)
+	line.border_color = Color(Palette.VIP_GOLD, 0.85)
+	line.set_border_width_all(2)
+	line.set_corner_radius_all(16)
+	line.content_margin_left = 56
+	line.content_margin_right = 56
+	line.content_margin_top = 8
+	line.content_margin_bottom = 16
+	inner.add_theme_stylebox_override(&"panel", line)
+	curtain_plaque.add_child(inner)
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_theme_constant_override(&"separation", -8)
-	curtain_plaque.add_child(box)
+	inner.add_child(box)
 	curtain_kicker = _curtain_label(34, Palette.WARM_GOLD)
 	curtain_title = _curtain_label(112, Palette.VIP_GOLD)
 	box.add_child(curtain_kicker)
@@ -1734,7 +1751,10 @@ func _curtain_back_to_casino(seconds: float) -> void:
 ## Moves both curtain panels: `amount` 1.0 parks them off screen, 0.0 covers the screen. The first
 ## part of opening gathers the fabric into the tiebacks, the rest pulls the panels off the edges.
 func _set_curtain(amount: float) -> void:
-	curtain_open = clampf(amount, 0.0, 1.0)
+	amount = clampf(amount, 0.0, 1.0)
+	if not is_equal_approx(amount, curtain_open):
+		_curtain_dir = 1.0 if amount < curtain_open else -1.0
+	curtain_open = amount
 	var gather: float = smoothstep(0.0, CURTAIN_GATHER, curtain_open)
 	var slide: float = smoothstep(CURTAIN_GATHER * 0.8, 1.0, curtain_open)
 	# Closing slides the panels in; opening gathers first. Both are the same curve read backwards,
@@ -1744,8 +1764,11 @@ func _set_curtain(amount: float) -> void:
 	curtain_left.anchor_right = 0.5 - shift
 	curtain_right.anchor_right = 1.0 + shift
 	curtain_right.anchor_left = 0.5 + shift
+	# A slight sway while it moves: strongest halfway, still at both ends.
+	var sway: float = _curtain_dir * sin(PI * curtain_open)
 	for r: ColorRect in [curtain_left, curtain_right]:
 		(r.material as ShaderMaterial).set_shader_parameter(&"gather", gather)
+		(r.material as ShaderMaterial).set_shader_parameter(&"sway", sway)
 	curtain_valance.anchor_top = -0.16 * slide
 	curtain_valance.anchor_bottom = 0.16 - 0.16 * slide
 	curtain_valance.visible = curtain_open < 1.0
