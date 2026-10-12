@@ -221,7 +221,11 @@ func say(text: String, seconds: float = 2.0) -> void:
 func play_emote(id: StringName) -> void:
 	if visuals == null or not is_standing() and state != State.SEATED:
 		return
-	if visuals.emote(id) and id == &"six_seven":
+	if not visuals.emote(id):
+		return
+	if cam != null:
+		cam.begin_emote_view()  # our own emote: see it in third person
+	if id == &"six_seven":
 		say("6 7", 2.0)
 
 
@@ -407,6 +411,8 @@ func _physics_process(delta: float) -> void:
 	_clock += delta
 	if bubble.visible and _clock > _bubble_until:
 		bubble.visible = false
+	if cam != null and cam.emote_view and not visuals.is_emoting():
+		cam.end_emote_view()
 	match state:
 		State.RAGDOLL, State.AWAY:
 			if ragdoll != null and is_instance_valid(ragdoll):

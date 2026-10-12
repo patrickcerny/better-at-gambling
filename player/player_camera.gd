@@ -36,6 +36,9 @@ var _seated_yaw_center: float = 0.0
 ## How far you can turn from the station view (an anchor's "yaw_limit" meta overrides it).
 var seated_yaw_limit: float = SEATED_YAW_LIMIT
 var _bob_time: float = 0.0
+## Set while an emote borrowed third person from first (Patrick: "Third-person camera during
+## emote"); `end_emote_view` goes back to first person.
+var emote_view: bool = false
 var _anchor_blend: float = 0.0
 
 
@@ -64,6 +67,22 @@ func activate() -> void:
 
 func toggle_mode() -> void:
 	mode = Mode.THIRD if mode == Mode.FIRST else Mode.FIRST
+	emote_view = false  # the player picked a view themselves: keep it after the emote
+
+
+## The local player started an emote: watch it from behind in third person. Already in third
+## person nothing changes.
+func begin_emote_view() -> void:
+	if mode == Mode.FIRST:
+		mode = Mode.THIRD
+		emote_view = true
+
+
+## The emote is over: back to first person if the emote switched away from it.
+func end_emote_view() -> void:
+	if emote_view:
+		emote_view = false
+		mode = Mode.FIRST
 
 
 ## Mouse/stick look.

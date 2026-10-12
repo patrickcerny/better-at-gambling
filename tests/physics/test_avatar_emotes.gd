@@ -77,6 +77,7 @@ func test_key_sends_the_emote_and_the_bean_plays_it() -> void:
 	add_child_autofree(scene)
 	await wait_seconds(3.3)
 	assert_eq(scene.router.mode, InputRouter.Mode.WALK)
+	assert_eq(scene.local.cam.mode, PlayerCamera.Mode.FIRST, "first person by default")
 	var k := InputEventKey.new()
 	k.physical_keycode = KEY_5
 	k.keycode = KEY_5
@@ -84,6 +85,7 @@ func test_key_sends_the_emote_and_the_bean_plays_it() -> void:
 	get_tree().root.push_input(k)
 	await wait_physics_frames(3)
 	assert_eq(scene.local.visuals.emote_id, &"thumbs_up", "key 5 = thumbs up, through the server")
+	assert_eq(scene.local.cam.mode, PlayerCamera.Mode.THIRD, "our emote is watched in third person")
 	# A dummy's emote arrives as an event like anyone else's.
 	var bot: int = -1
 	for pid: int in scene.avatars:
@@ -95,3 +97,23 @@ func test_key_sends_the_emote_and_the_bean_plays_it() -> void:
 	await wait_seconds(AvatarVisuals.EMOTE_SECONDS + 0.3)
 	assert_false(scene.local.visuals.is_emoting())
 	assert_false((scene.avatars[bot] as PlayerAvatar).visuals.is_emoting())
+	assert_eq(scene.local.cam.mode, PlayerCamera.Mode.FIRST, "back to first person after the emote")
+
+
+## Patrick: "Third-person camera during emote": only a first-person view switches, and a view the
+## player picks during the emote (camera toggle) is kept afterwards.
+func test_emote_view_restores_only_what_it_changed() -> void:
+	var cam := PlayerCamera.new()
+	add_child_autofree(cam)
+	cam.mode = PlayerCamera.Mode.THIRD
+	cam.begin_emote_view()
+	assert_false(cam.emote_view, "already third person: nothing to restore")
+	cam.end_emote_view()
+	assert_eq(cam.mode, PlayerCamera.Mode.THIRD)
+	cam.mode = PlayerCamera.Mode.FIRST
+	cam.begin_emote_view()
+	assert_eq(cam.mode, PlayerCamera.Mode.THIRD)
+	cam.toggle_mode()  # back to first by hand mid-emote
+	cam.toggle_mode()  # and third again: the player's own choice now
+	cam.end_emote_view()
+	assert_eq(cam.mode, PlayerCamera.Mode.THIRD, "a view picked during the emote stays")
