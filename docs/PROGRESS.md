@@ -139,6 +139,23 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-12 / 0.9.5 (tutorial, jail in the wall, horse race, later ideas)
+- Tutorial: eight picture pages (real in-game renders in assets/tutorial, `tools/tutorial_pictures.sh`)
+  with BACK/NEXT/DONE, opens the first time PRACTICE or PLAY ONLINE is pressed (`tutorial/seen` in
+  settings), a "?" button next to the gear in the main menu and the pause menu reopens it.
+- Map: the jail is an alcove cut into the east wall (bars flush with the wall, gate in the middle);
+  ready pedestals get a warm spotlight from above instead of a material change; brass name plates
+  behind the pedestals; Reception desk and wardrobe mirror gone; settings tablet by the host spawn
+  (press E); finer marble floor with a brass border and the runner to the lobby doors.
+- Race Hall: a new annex east of the casino, north of the jail beside the VIP lounge, through an
+  arch with "THE BEAN DERBY" sign. Horse race table: 4 procedurally built horses with a gallop cycle,
+  random names each round (48 in the pool), deterministic seeded race replayed on every client,
+  1:4 payout, one horse per player per race, 6 seats.
+- UI: "Party" is "Lobby" everywhere; clothes menu (T-shirt button) replaces the in-game skin picker;
+  third-person camera during an emote; bat 1.35x bigger in hand; curtain polish (velvet sheen,
+  pelmet, sway); minigame selector in the lobby settings (picture per game, host enables/disables,
+  `minigame_pool` lobby setting); end screen closes table panels.
+
 ### 2026-10-11 / 0.9.4 (playtest batch 2)
 - Vote Race: 3D game-show runway instead of the 2D strip. Bat orientation in hand fixed (model axis).
   Item-aim outline fixed (grew in model units). Minigames-only: no item card on results, no item slots.
