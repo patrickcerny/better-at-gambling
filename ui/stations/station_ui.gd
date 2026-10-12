@@ -237,4 +237,8 @@ static func rejection_text(error: StringName) -> String:
 			return "Table is full"
 		&"no_tips_here":
 			return "No dealer to tip here"
+		&"one_horse_only":
+			return "One horse per race"
+		&"invalid_horse":
+			return "Pick a horse"
 	return String(error).capitalize()

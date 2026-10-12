@@ -59,6 +59,22 @@ func on_event(ev: Dictionary) -> void:
 			_on_bet(ev)
 		&"round_started":
 			_sweep_stale(StringName(ev.get("station", &"")))
+			var hr: HorseRaceStation = stations.get(StringName(ev.get("station", &"")), null) as HorseRaceStation
+			if hr != null:
+				hr.reset_table()
+				hr.set_names(ev.get("names", []))
+		&"horse_race_started":
+			# The gates open: every client replays the same seeded race.
+			var hr: HorseRaceStation = stations.get(StringName(ev["station"]), null) as HorseRaceStation
+			if hr != null:
+				hr.start_race(int(ev["seed"]), 0.0)
+		&"horse_race_finished":
+			# The bets settle now on the server; here the result waits until the winner's nose
+			# crosses the line on this table.
+			var sid: StringName = StringName(ev["station"])
+			var hr: HorseRaceStation = stations.get(sid, null) as HorseRaceStation
+			if hr != null:
+				_shown_at[sid] = Time.get_ticks_msec() + int(hr.finish(int(ev["winner"]), int(ev.get("seed", -1))) * 1000.0)
 		&"roulette_spin_started":
 			var rs: RouletteStation = stations.get(StringName(ev["station"]), null) as RouletteStation
 			if rs != null:
@@ -100,7 +116,7 @@ func _on_bet(ev: Dictionary) -> void:
 	if st is SlotsStation:
 		(st as SlotsStation).start_spin(pid == local_id)
 		return
-	if not (st is RouletteStation or st is BlackjackStation):
+	if not (st is RouletteStation or st is BlackjackStation or st is HorseRaceStation):
 		return  # Plinko drops its own chip
 	var seat: int = _seat_index(st, pid)
 	var start: Vector3 = _seat_edge(st, seat)
@@ -112,7 +128,7 @@ func _on_bet(ev: Dictionary) -> void:
 	var color: Color = color_of.call(pid) if color_of.is_valid() else ChipStack.NO_COLOR
 	var unit: int = int(min_bet_of.call(sid)) if min_bet_of.is_valid() else 0
 	var chips: int = ChipStack.chip_count(int(ev["amount"]), unit)
-	if st is RouletteStation:
+	if st is RouletteStation or st is HorseRaceStation:
 		# On its printed spot and nowhere else: a second column is centred on the spot (it used to
 		# trail onto the next row), and another bet on the same spot stacks on top of the chips
 		# already there (it used to be nudged sideways onto the neighbouring number).
@@ -132,7 +148,8 @@ func _on_bet(ev: Dictionary) -> void:
 	Audio.play_at(&"chip_clack", stack, -10.0, randf_range(0.95, 1.1))
 
 
-## Height of the chips already on a roulette spot (every player's), so the next stack goes on top.
+## Height of the chips already on a roulette spot or horse pad (every player's), so the next stack
+## goes on top.
 func _height_on_spot(sid: StringName, type: StringName, value: int) -> float:
 	var h: float = 0.0
 	for key: String in _bets:
@@ -355,6 +372,8 @@ static func _seat_edge(st: StationBase, seat: int) -> Vector3:
 	var p: Vector3 = st.seats[clampi(seat, 0, st.seats.size() - 1)].position
 	if st is RouletteStation:
 		return Vector3(p.x, RouletteStation.FELT_Y, signf(p.z) * 0.8)
+	if st is HorseRaceStation:
+		return Vector3(p.x, HorseRaceStation.TABLE_TOP + 0.02, HorseRaceStation.TABLE_D * 0.5 - 0.05)
 	if st is BlackjackStation:
 		# Over the padded rail (not inside it): the stack arcs from here down onto the felt.
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
@@ -369,6 +388,10 @@ static func _bet_spot(st: StationBase, seat: int, type: StringName, value: int) 
 		if type == &"":
 			return Vector3(_seat_edge(st, seat).x, RouletteStation.FELT_Y, 0.0)
 		return RouletteStation.bet_spot(type, value)
+	if st is HorseRaceStation:
+		if type == &"":
+			return Vector3(_seat_edge(st, seat).x, HorseRaceStation.TABLE_TOP + 0.02, HorseRaceStation.LEDGE_Z)
+		return HorseRaceStation.bet_spot(value)
 	if st is BlackjackStation and not st.seats.is_empty():
 		var p: Vector3 = st.seats[clampi(seat, 0, st.seats.size() - 1)].position
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
@@ -380,6 +403,8 @@ static func _bet_spot(st: StationBase, seat: int, type: StringName, value: int) 
 static func _house_spot(st: StationBase) -> Vector3:
 	if st is RouletteStation:
 		return RouletteStation.HOUSE_SPOT
+	if st is HorseRaceStation:
+		return HorseRaceStation.HOUSE_SPOT
 	if st is BlackjackStation:
 		return Vector3(0.75, 1.0, -0.22)  # the dealer's chip rack
 	return Vector3(0, 0.95, 0)

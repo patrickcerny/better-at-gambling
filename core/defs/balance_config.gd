@@ -47,6 +47,17 @@ extends Resource
 @export var roulette_lucky_neighbor_ratio: float = 5.0
 @export var roulette_jinx_ratio: float = 0.9
 
+@export_group("Horse Race")
+@export var horse_min_bet: int = 10
+## Most one player may stake on one race (all on the one horse they back).
+@export var horse_max_total: int = 100
+## Profit ratio on the winning horse (Patrick: "1:4": the stake back plus four times it).
+@export var horse_payout_ratio: int = 4
+## Seconds from the first bet of a round until the gates open.
+@export var horse_countdown: float = 12.0
+## Seconds the result stays up after the winner crosses the line (the rest run out meanwhile).
+@export var horse_result_time: float = 5.0
+
 @export_group("Slots")
 @export var slots_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var slots_spin_time: float = 1.6
