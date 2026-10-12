@@ -1,8 +1,9 @@
 extends GutTest
 ## The ready pedestals (0.8.15): one marble column stump per player colour along the south wall
-## of the entrance hall, a wall sign with the player's name, a warm glow from above while they
-## are ready (0.9.4: the marble itself never changes), and low enough steps that a player simply
-## walks up onto it (standing up there is what readies you).
+## of the entrance hall, a brass name plate behind it with the player's name (FREE when nobody has
+## the colour), a warm glow from above while they are ready (0.9.4: the marble itself never
+## changes), and low enough steps that a player simply walks up onto it (standing up there is
+## what readies you).
 
 var scene: MatchScene
 
@@ -14,7 +15,7 @@ func before_each() -> void:
 	await wait_seconds(3.3)
 
 
-func test_one_pedestal_per_colour_with_signs_on_the_wall() -> void:
+func test_one_pedestal_per_colour_with_name_plates_behind() -> void:
 	var pads: Array[Node] = get_tree().get_nodes_in_group(&"ready_pads")
 	assert_eq(pads.size(), LuckyLounge.PEDESTALS.size(), "eight pedestals")
 	assert_eq(scene.map.pedestal_labels.size(), 8)
@@ -24,11 +25,18 @@ func test_one_pedestal_per_colour_with_signs_on_the_wall() -> void:
 		assert_gt(LuckyLounge.PEDESTALS[i].z, 14.5, "along the south wall")
 		assert_gt(absf(LuckyLounge.PEDESTALS[i].x), 2.5, "clear of the revolving door gap (x −2..2)")
 		var sign: Label3D = scene.map.pedestal_labels[i]
-		assert_almost_eq(sign.global_position.x, LuckyLounge.PEDESTALS[i].x, 0.01, "the sign hangs above its pedestal")
-		assert_gt(sign.global_position.z, LuckyLounge.PEDESTALS[i].z, "on the wall behind it")
+		assert_almost_eq(sign.global_position.x, LuckyLounge.PEDESTALS[i].x, 0.01, "the plate stands behind its pedestal")
+		assert_gt(sign.global_position.z, LuckyLounge.PEDESTALS[i].z + 0.45, "behind the column, on the wall side")
+		assert_lt(sign.global_position.z, LuckyLounge.SIZE_Z * 0.5 - 0.25, "in front of the wall")
+		# Above the name tag of whoever stands on the pedestal (feet at the top + 2.15 m).
+		assert_gt(sign.global_position.y - 0.2, LuckyLounge.PEDESTAL_TOP + 2.15 + 0.15, "clear of the name tag over a bean up there")
+	var mine: int = int(scene.view.state.players[scene.local_id]["color"])
+	for i: int in 8:
+		if i != mine:
+			assert_eq(scene.map.pedestal_labels[i].text, LuckyLounge.PEDESTAL_FREE, "nobody in colour %d: FREE" % i)
 
 
-func test_the_glow_follows_ready() -> void:
+func test_the_plate_follows_the_owner_and_the_glow_follows_ready() -> void:
 	# A map of its own: the match scene refreshes its pedestals from the shared state every frame.
 	var map: LuckyLounge = (load("res://maps/lucky_lounge/lucky_lounge.tscn") as PackedScene).instantiate()
 	map.bake_navmesh = false
@@ -55,13 +63,13 @@ func test_the_glow_follows_ready() -> void:
 	for i: int in 8:
 		if i != 2:
 			assert_false(map.pedestal_lights[i].visible, "only the ready pedestal glows (%d)" % i)
-			assert_eq(map.pedestal_labels[i].text, "")
+			assert_eq(map.pedestal_labels[i].text, LuckyLounge.PEDESTAL_FREE)
 	map.set_pedestal(2, "Patrick", false)
 	await wait_seconds(0.5)
 	assert_false(map.pedestal_lights[2].visible, "faded out when not ready")
 	assert_false(map.pedestal_glows[2].visible)
 	map.set_pedestal(2, "", false)
-	assert_eq(map.pedestal_labels[2].text, "", "nobody in that colour: FREE again")
+	assert_eq(map.pedestal_labels[2].text, LuckyLounge.PEDESTAL_FREE, "nobody in that colour: FREE again")
 
 
 func test_names_and_ready_state_follow_the_shared_state() -> void:

@@ -87,6 +87,12 @@ const PEDESTALS: Array[Vector3] = [
 const PEDESTAL_GLOW: Color = Color(1.0, 0.8, 0.45)
 const PEDESTAL_LIGHT_ENERGY: float = 6.0
 const PEDESTAL_GLOW_FADE: float = 0.3
+## A pedestal's name plate when nobody has its colour.
+const PEDESTAL_FREE: String = "FREE"
+## How high the name plate's centre sits (on its post behind the column): above the name tag of a
+## player standing on the pedestal (feet 0.8 + tag 2.15 = 2.95), so the two never overlap.
+const PEDESTAL_PLATE_Y: float = 3.5
+const PEDESTAL_NAME_SIZE: int = 44
 const MARBLE: Color = Color("#E6DFD2")
 const MARBLE_DARK: Color = Color("#B9AE9C")
 ## The wall between the start room and the casino (centre line) and its doorway: the lobby
@@ -117,7 +123,7 @@ const JAIL_CAM_POS: Vector3 = Vector3(21.1, 4.4, -7.5)
 const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 
 var stations: Dictionary[StringName, StationBase] = {}
-## Per ready pedestal: its name sign on the wall, the top slab (never changes), and the warm
+## Per ready pedestal: the name on its brass plate, the top slab (never changes), and the warm
 ## spotlight from the ceiling that comes on while its player is ready (with its light cone and the
 ## pool of light on the top, `pedestal_glows`).
 var pedestal_labels: Array[Label3D] = []
@@ -223,8 +229,8 @@ func ready_pad(color_index: int) -> Vector3:
 	return PEDESTALS[clampi(color_index, 0, PEDESTALS.size() - 1)]
 
 
-## Writes the player's name on the pedestal's wall sign ("" = nobody has this colour: the sign goes
-## blank) and fades the glow from above in while they are ready, out when they are not.
+## Writes the player's name on the pedestal's brass plate ("" = nobody has this colour: the plate
+## reads FREE) and fades the glow from above in while they are ready, out when they are not.
 func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
 	if color_index < 0 or color_index >= pedestal_labels.size():
 		return
@@ -233,8 +239,9 @@ func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
 		return
 	_pedestal_state[color_index] = state
 	var label: Label3D = pedestal_labels[color_index]
-	label.text = player_name.to_upper()
-	label.modulate = Palette.player_color(color_index).lightened(0.25) if player_name != "" else Palette.CREAM
+	label.text = player_name.to_upper() if player_name != "" else PEDESTAL_FREE
+	label.font_size = PEDESTAL_NAME_SIZE if label.text.length() <= 8 else maxi(20, PEDESTAL_NAME_SIZE * 8 / label.text.length())  # long names fit the plate
+	label.modulate = Palette.player_color(color_index).lightened(0.35) if player_name != "" else Palette.CREAM.darkened(0.35)
 	var to: float = 1.0 if ready and player_name != "" else 0.0
 	var tw: Tween = _glow_tweens[color_index]
 	if tw != null and tw.is_valid():
@@ -567,16 +574,38 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 		# Step k climbs from the room side: lowest tread farthest from the column.
 		var step: Node3D = GreyboxKit.box(root, Vector3(0.96, rise, run), Vector3(0, rise * (k + 0.5), -0.45 - stair_len + run * (k + 0.5)), MARBLE if k % 2 == 0 else MARBLE_DARK, "Step%d" % k, false)
 		(step.get_node("Mesh") as MeshInstance3D).material_override = marble if k % 2 == 0 else marble_dark
-	# Name on the wall above, facing the room.
-	var label: Label3D = _sign_label(Vector3(pos.x, 2.2, SIZE_Z * 0.5 - 0.3), PI, "", 64)
-	label.text = ""
-	pedestal_labels.append(label)
+	pedestal_labels.append(_build_name_plate(root, i))
 	pedestal_tops.append(top_mesh)
 	_build_glow(root)
 	_pedestal_state.append(["", false])
 	_glow_level.append(0.0)
 	_glow_tweens.append(null)
 	_set_glow(0.0, i)
+
+
+## The brass name plate on a slim post behind the column (between it and the wall), facing the
+## room; high enough to read over the head of whoever stands on the pedestal.
+func _build_name_plate(root: Node3D, i: int) -> Label3D:
+	var brass: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
+	var back_z: float = SIZE_Z * 0.5 - 0.25 - root.position.z - 0.1  # just off the wall
+	var plate_h: float = 0.36
+	GreyboxKit.cylinder(root, 0.025, PEDESTAL_PLATE_Y, Vector3(0, PEDESTAL_PLATE_Y * 0.5, back_z), Palette.WARM_GOLD, "PlatePost", false, 0.85)
+	var plate: MeshInstance3D = _mesh_box(root, Vector3(1.0, plate_h, 0.04), Vector3(0, PEDESTAL_PLATE_Y, back_z - 0.02), brass)
+	plate.name = "NamePlate"
+	var inset: MeshInstance3D = _mesh_box(root, Vector3(0.92, plate_h - 0.08, 0.01), Vector3(0, PEDESTAL_PLATE_Y, back_z - 0.045), GreyboxKit.material(Palette.CASINO_BLACK.lightened(0.04), 0.0, 0.6))
+	inset.name = "NamePlateInset"
+	var label := Label3D.new()
+	label.name = "Name"
+	label.text = PEDESTAL_FREE
+	label.font_size = PEDESTAL_NAME_SIZE
+	label.pixel_size = 0.004
+	label.modulate = Palette.CREAM.darkened(0.35)
+	label.outline_modulate = Palette.CASINO_BLACK
+	label.outline_size = 8
+	label.position = Vector3(0, PEDESTAL_PLATE_Y, back_z - 0.055)
+	label.rotation.y = PI
+	root.add_child(label)
+	return label
 
 
 ## The glow from above (off until the pedestal's player is ready): a warm spotlight straight down
