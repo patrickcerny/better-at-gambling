@@ -153,8 +153,9 @@ func _floors() -> void:
 	_area_rug("RouletteRug", Palette.CASINO_RED.darkened(0.3), Palette.CASINO_RED.darkened(0.5))
 	_area_rug("SlotsRug", Palette.WARM_GOLD.darkened(0.5), Palette.WARM_GOLD.darkened(0.66))
 	_area_rug("PlinkoRug", Palette.VIP_BURGUNDY.darkened(0.15), Palette.VIP_BURGUNDY.darkened(0.38))
-	# The jail cell stands on cold grey stone.
+	# The jail cell: cold grey stone floor and walls.
 	_retexture("JailFloor", _tex("black_marble", 1.4, Color(0.62, 0.6, 0.58), 0.3, 0.6))
+	_retexture_solid("JailWall", _tex("black_marble", 1.6, Color(0.55, 0.53, 0.5), 0.4, 0.8))
 
 
 ## Patterned carpet on the greybox area rug `node_name`, with a brass strip around its edge.
@@ -241,7 +242,9 @@ func _walls() -> void:
 		[Vector3(-hx, 0, -hz), Vector3(-door - 0.2, 0, -hz), Vector3(0, 0, 1)],
 		[Vector3(door + 0.2, 0, -hz), Vector3(hx, 0, -hz), Vector3(0, 0, 1)],
 		[Vector3(-hx, 0, -hz), Vector3(-hx, 0, hz), Vector3(1, 0, 0)],
-		[Vector3(hx, 0, -hz), Vector3(hx, 0, hz), Vector3(-1, 0, 0)],
+		# The east wall stops either side of the jail cell's opening.
+		[Vector3(hx, 0, -hz), Vector3(hx, 0, LuckyLounge.JAIL_AREA.position.z - 0.2), Vector3(-1, 0, 0)],
+		[Vector3(hx, 0, LuckyLounge.JAIL_AREA.end.z + 0.2), Vector3(hx, 0, hz), Vector3(-1, 0, 0)],
 		[Vector3(-hx, 0, hz), Vector3(-2.3, 0, hz), Vector3(0, 0, -1)],
 		[Vector3(2.3, 0, hz), Vector3(hx, 0, hz), Vector3(0, 0, -1)],
 		# The start-room wall, casino face and start-room face.
@@ -419,7 +422,7 @@ func _art() -> void:
 		add_child(mirror)
 	for spec: Array in [
 		[Vector3(-21.75, 3.5, -7.5), Vector3(1, 0, 0)], [Vector3(-21.75, 3.6, 9.8), Vector3(1, 0, 0)],
-		[Vector3(21.75, 3.5, -7.5), Vector3(-1, 0, 0)], [Vector3(21.75, 3.5, 11.0), Vector3(-1, 0, 0)],
+		[Vector3(21.75, 3.5, 11.0), Vector3(-1, 0, 0)],
 		[Vector3(-8.75, 3.6, -18.4), Vector3(1, 0, 0)], [Vector3(8.75, 3.6, -18.4), Vector3(-1, 0, 0)],
 	]:
 		var n: Vector3 = spec[1]

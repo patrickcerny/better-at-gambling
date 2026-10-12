@@ -94,21 +94,23 @@ const LOBBY_DOOR_H: float = 4.0
 ## The barrier in the doorway while the doors are shut: thicker than the wall so a body thrown at
 ## it full speed can't tunnel through in one physics step.
 const LOBBY_BARRIER_T: float = 0.9
-## Jail (Patrick: "an own room where the security puts you", "just bars"): a gold-barred cell in
-## the casino's south-west corner, against the west wall and the start-room wall, next to the
-## reception desk on the other side. Inner volume, gate in the east bars, where the bouncer
-## delivers people (outside the gate), spots inside, and where they walk out when the time is up
-## (at the lobby doors, on the casino side).
-const JAIL_AREA: AABB = AABB(Vector3(-21.75, -1.0, 4.6), Vector3(2.75, 5.0, 3.55))
+## Jail (Patrick: "an own room where the security puts you", "just bars"; 0.9.4: "in the wall, on
+## the right side of the room"): a cell recessed into the casino's east wall (on your right as you
+## come in through the lobby doors), between the Plinko corner and the Odd Jobs cabinet. Its gold
+## bars are the front face, flush with the wall line (x = SIZE_X / 2 − 0.25); the cell itself lies
+## behind the wall plane. Inner volume, gate in the middle of the bars, where the bouncer delivers
+## people (outside the gate), spots inside, and where they walk out when the time is up (at the
+## lobby doors, on the casino side).
+const JAIL_AREA: AABB = AABB(Vector3(21.75, -1.0, -9.3), Vector3(2.75, 5.0, 3.6))
 const JAIL_H: float = 3.0
-const JAIL_GATE_Z: float = 6.4
+const JAIL_GATE_Z: float = -7.5
 const JAIL_GATE_W: float = 1.2
-const JAIL_DOOR: Vector3 = Vector3(-18.1, 0, 6.4)
-const JAIL_SPOTS: Array[Vector3] = [Vector3(-20.0, 0, 5.6), Vector3(-20.0, 0, 7.2), Vector3(-19.7, 0, 6.4), Vector3(-20.5, 0, 6.4)]
+const JAIL_DOOR: Vector3 = Vector3(20.85, 0, -7.5)
+const JAIL_SPOTS: Array[Vector3] = [Vector3(22.75, 0, -8.3), Vector3(22.75, 0, -6.7), Vector3(22.45, 0, -7.5), Vector3(23.25, 0, -7.5)]
 const JAIL_EXITS: Array[Vector3] = [Vector3(0.6, 0, 7.2), Vector3(1.4, 0, 7.2), Vector3(-0.2, 0, 7.2), Vector3(2.2, 0, 7.2)]
-## The jailed player's view: above the cage, looking out over the floor.
-const JAIL_CAM_POS: Vector3 = Vector3(-19.6, 4.4, 7.6)
-const JAIL_CAM_LOOK: Vector3 = Vector3(-3.0, 0.4, -5.0)
+## The jailed player's view: on the wall over the cell, looking out over the floor.
+const JAIL_CAM_POS: Vector3 = Vector3(21.1, 4.4, -7.5)
+const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 
 var stations: Dictionary[StringName, StationBase] = {}
 ## Per ready pedestal: its name sign on the wall and the top slab (lit gold while its player is ready).
@@ -348,7 +350,12 @@ func _build_floor_and_walls() -> void:
 	GreyboxKit.box(self, Vector3(north_w, WALL_H, 0.5), Vector3(hx - north_w * 0.5, WALL_H * 0.5, -hz), wall, "WallN")
 	GreyboxKit.box(self, Vector3(VIP_DOOR_HALF * 2.0, WALL_H - VIP_DOOR_H, 0.5), Vector3(0, (WALL_H + VIP_DOOR_H) * 0.5, -hz), wall, "WallNTop")
 	GreyboxKit.box(self, Vector3(0.5, WALL_H, SIZE_Z), Vector3(-hx, WALL_H * 0.5, 0), wall, "WallW")
-	GreyboxKit.box(self, Vector3(0.5, WALL_H, SIZE_Z), Vector3(hx, WALL_H * 0.5, 0), wall, "WallE")
+	# East wall, with the jail cell's opening cut into it (the cell is `_build_jail`).
+	var jz0: float = JAIL_AREA.position.z
+	var jz1: float = JAIL_AREA.end.z
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, jz0 + hz), Vector3(hx, WALL_H * 0.5, (jz0 - hz) * 0.5), wall, "WallE")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, hz - jz1), Vector3(hx, WALL_H * 0.5, (jz1 + hz) * 0.5), wall, "WallE")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H - JAIL_H, jz1 - jz0), Vector3(hx, (WALL_H + JAIL_H) * 0.5, (jz0 + jz1) * 0.5), wall, "WallE")
 	# South wall with the entrance gap.
 	GreyboxKit.box(self, Vector3(hx - 2.0, WALL_H, 0.5), Vector3(-SIZE_X * 0.25 - 1.0, WALL_H * 0.5, hz), wall, "WallS1")
 	GreyboxKit.box(self, Vector3(hx - 2.0, WALL_H, 0.5), Vector3(SIZE_X * 0.25 + 1.0, WALL_H * 0.5, hz), wall, "WallS2")
@@ -560,7 +567,7 @@ func _build_floor_areas() -> void:
 	# Coloured rugs identify game areas (readable from a distance). They sit 1 cm above the
 	# carpet (0.01) and 1 cm below the station rugs (0.03): closer layers z-fight at distance.
 	# LoungeDecor turns them into patterned, brass-edged carpets on clients.
-	_plane(Vector2(16.6, 5), Vector3(-10.3, AREA_RUG_Y, 4), Palette.FELT_GREEN.darkened(0.6), "BlackjackRug")  # stops short of the jail cell
+	_plane(Vector2(16.6, 5), Vector3(-10.3, AREA_RUG_Y, 4), Palette.FELT_GREEN.darkened(0.6), "BlackjackRug")
 	_plane(Vector2(18, 8), Vector3(0, AREA_RUG_Y, -3), Palette.CASINO_RED.darkened(0.5), "RouletteRug")
 	_plane(Vector2(16, 9), Vector3(-13.5, AREA_RUG_Y, -11), Palette.WARM_GOLD.darkened(0.6), "SlotsRug")
 	_plane(Vector2(12, 5), Vector3(14, AREA_RUG_Y, -13), Palette.VIP_BURGUNDY.darkened(0.3), "PlinkoRug")
@@ -672,16 +679,29 @@ func _build_vip_room() -> void:
 		GreyboxKit.capsule(plinth, 0.3, 1.2, Vector3(0, 1.1, 0), GreyboxKit.gold(), "Statue")
 
 
-## The jail cell (Patrick: "just bars where the bouncer brings you"): gold bars on the two open
-## sides, a barred roof, a bench and a JAIL sign. The bars and the gate are solid (layer 1, like
-## the walls): nobody walks, falls or gets thrown out. The gate's collider never opens; its leaf
-## swings for show when the bouncer puts someone in or lets them out (`swing_jail_gate`).
+## The jail cell (Patrick: "just bars where the bouncer brings you", "in the wall"): an alcove cut
+## into the east wall, stone walls on three sides and a ceiling, gold bars across its open front
+## (flush with the wall line) with the gate in the middle, a bench, a caged lamp and a JAIL sign
+## over the opening. The bars and the gate are solid (layer 1, like the walls): nobody walks, falls
+## or gets thrown out. The gate's collider never opens; its leaf swings for show when the bouncer
+## puts someone in or lets them out (`swing_jail_gate`).
 func _build_jail() -> void:
 	var a: AABB = JAIL_AREA
-	var x0: float = a.position.x
-	var x1: float = a.end.x  # the east bars, with the gate
-	var z0: float = a.position.z  # the north bars
+	var x0: float = a.position.x  # the bars, with the gate (the wall's inner face)
+	var x1: float = a.end.x  # the back wall's face
+	var z0: float = a.position.z
 	var z1: float = a.end.z
+	var zc: float = (z0 + z1) * 0.5
+	var stone := Color("#4A4440")
+	# The alcove behind the wall: floor slab, side walls, back wall, ceiling.
+	var back: float = x1 + 0.5
+	var wx0: float = x0 + 0.5  # the outside face of the casino wall
+	GreyboxKit.box(self, Vector3(back - x0, 0.5, z1 - z0 + 1.0), Vector3((x0 + back) * 0.5, -0.25, zc), Color("#8C7F78"), "JailSlab")
+	for z: float in [z0 - 0.25, z1 + 0.25]:
+		GreyboxKit.box(self, Vector3(back - wx0, WALL_H, 0.5), Vector3((wx0 + back) * 0.5, WALL_H * 0.5, z), stone, "JailWall")
+	GreyboxKit.box(self, Vector3(0.5, WALL_H, z1 - z0 + 1.0), Vector3(x1 + 0.25, WALL_H * 0.5, zc), stone, "JailWall")
+	GreyboxKit.box(self, Vector3(back - wx0, WALL_H - JAIL_H, z1 - z0 + 1.0), Vector3((wx0 + back) * 0.5, (WALL_H + JAIL_H) * 0.5, zc), stone, "JailWall")
+	GreyboxKit.box(self, Vector3(x1 - x0, 0.06, z1 - z0), Vector3((x0 + x1) * 0.5, JAIL_H - 0.03, zc), Palette.CASINO_BLACK, "JailCeiling", false)
 	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.8, 0.35)
 	var bars := StaticBody3D.new()
 	bars.name = "JailCell"
@@ -692,33 +712,24 @@ func _build_jail() -> void:
 	var t: float = 0.3  # collision thickness (the bars themselves are thin)
 	var gate_z0: float = JAIL_GATE_Z - JAIL_GATE_W * 0.5
 	var gate_z1: float = JAIL_GATE_Z + JAIL_GATE_W * 0.5
-	_jail_wall(bars, Vector3(x1 - x0 + t, JAIL_H, t), Vector3((x0 + x1) * 0.5, JAIL_H * 0.5, z0))
-	_jail_wall(bars, Vector3(t, JAIL_H, gate_z0 - z0), Vector3(x1, JAIL_H * 0.5, (z0 + gate_z0) * 0.5))
-	_jail_wall(bars, Vector3(t, JAIL_H, z1 - gate_z1), Vector3(x1, JAIL_H * 0.5, (gate_z1 + z1) * 0.5))
-	_jail_wall(bars, Vector3(x1 - x0 + t, t, z1 - z0 + t), Vector3((x0 + x1) * 0.5, JAIL_H + t * 0.5, (z0 + z1) * 0.5))
+	_jail_wall(bars, Vector3(t, JAIL_H, gate_z0 - z0), Vector3(x0, JAIL_H * 0.5, (z0 + gate_z0) * 0.5))
+	_jail_wall(bars, Vector3(t, JAIL_H, z1 - gate_z1), Vector3(x0, JAIL_H * 0.5, (gate_z1 + z1) * 0.5))
 	var bar := CylinderMesh.new()
 	bar.top_radius = 0.035
 	bar.bottom_radius = 0.035
 	bar.height = JAIL_H
 	bar.radial_segments = 8
 	var spacing: float = 0.24
-	var n_north: int = int((x1 - x0) / spacing)
-	for i: int in range(1, n_north + 1):
-		_bar(bars, bar, Vector3(x0 + i * (x1 - x0) / (n_north + 0.5), JAIL_H * 0.5, z0), gold)
 	for span: Vector2 in [Vector2(z0, gate_z0), Vector2(gate_z1, z1)]:
 		var n: int = maxi(1, int((span.y - span.x) / spacing))
 		for i: int in n + 1:
-			_bar(bars, bar, Vector3(x1, JAIL_H * 0.5, span.x + i * (span.y - span.x) / n), gold)
-	# Cross bands and the roof grid.
+			_bar(bars, bar, Vector3(x0, JAIL_H * 0.5, span.x + i * (span.y - span.x) / n), gold)
+	# Cross bands, and a gold frame round the opening.
 	for y: float in [0.12, JAIL_H * 0.5, JAIL_H - 0.04]:
-		_mesh_box(bars, Vector3(x1 - x0, 0.07, 0.07), Vector3((x0 + x1) * 0.5, y, z0), gold)
-		_mesh_box(bars, Vector3(0.07, 0.07, z1 - z0), Vector3(x1, y, (z0 + z1) * 0.5), gold)
-	for i: int in 6:
-		var z: float = z0 + (i + 0.5) * (z1 - z0) / 6.0
-		_mesh_box(bars, Vector3(x1 - x0, 0.05, 0.05), Vector3((x0 + x1) * 0.5, JAIL_H, z), gold)
-	for i: int in 4:
-		var x: float = x0 + (i + 0.5) * (x1 - x0) / 4.0
-		_mesh_box(bars, Vector3(0.05, 0.05, z1 - z0), Vector3(x, JAIL_H, (z0 + z1) * 0.5), gold)
+		_mesh_box(bars, Vector3(0.07, 0.07, z1 - z0), Vector3(x0, y, zc), gold)
+	_mesh_box(bars, Vector3(0.1, 0.18, z1 - z0 + 0.36), Vector3(x0 - 0.04, JAIL_H + 0.09, zc), gold)
+	for z: float in [z0 - 0.09, z1 + 0.09]:
+		_mesh_box(bars, Vector3(0.1, JAIL_H + 0.18, 0.18), Vector3(x0 - 0.04, (JAIL_H + 0.18) * 0.5, z), gold)
 	# The gate: a solid collider in the gap; the barred leaf on a hinge at its north post.
 	var cell_door := StaticBody3D.new()
 	cell_door.name = "JailGate"
@@ -729,29 +740,36 @@ func _build_jail() -> void:
 	var dsh := BoxShape3D.new()
 	dsh.size = Vector3(t, JAIL_H, JAIL_GATE_W)
 	dcs.shape = dsh
-	dcs.position = Vector3(x1, JAIL_H * 0.5, JAIL_GATE_Z)
+	dcs.position = Vector3(x0, JAIL_H * 0.5, JAIL_GATE_Z)
 	cell_door.add_child(dcs)
 	add_child(cell_door)
 	jail_gate = Node3D.new()
 	jail_gate.name = "JailGateLeaf"
-	jail_gate.position = Vector3(x1, 0.0, gate_z0)
+	jail_gate.position = Vector3(x0, 0.0, gate_z0)
 	add_child(jail_gate)
 	for i: int in 5:
 		_bar(jail_gate, bar, Vector3(0, JAIL_H * 0.5, 0.12 + i * (JAIL_GATE_W - 0.24) / 4.0), gold)
 	for y: float in [0.12, JAIL_H * 0.5, JAIL_H - 0.04]:
 		_mesh_box(jail_gate, Vector3(0.08, 0.08, JAIL_GATE_W), Vector3(0, y, JAIL_GATE_W * 0.5), gold)
 	_mesh_box(jail_gate, Vector3(0.14, 0.24, 0.16), Vector3(0.0, 1.3, JAIL_GATE_W - 0.12), GreyboxKit.material(Palette.CASINO_BLACK, 0.6, 0.4))  # lock
-	# A bench against the west wall, a stone floor, the signs on top.
-	GreyboxKit.box(self, Vector3(0.5, 0.45, 2.4), Vector3(x0 + 0.3, 0.225, (z0 + z1) * 0.5), Color("#4A3426"), "JailBench")
-	_plane(Vector2(x1 - x0, z1 - z0), Vector3((x0 + x1) * 0.5, AREA_RUG_Y, (z0 + z1) * 0.5), Color("#5B5550"), "JailFloor")
-	var sign_pos := Vector3(x1 + 0.12, JAIL_H + 0.45, JAIL_GATE_Z)
+	# A bench against the back wall, a stone floor, a caged lamp, the sign over the opening.
+	GreyboxKit.box(self, Vector3(0.5, 0.45, 2.4), Vector3(x1 - 0.3, 0.225, zc), Color("#4A3426"), "JailBench")
+	_plane(Vector2(x1 - x0, z1 - z0), Vector3((x0 + x1) * 0.5, AREA_RUG_Y, zc), Color("#5B5550"), "JailFloor")
+	var bulb: MeshInstance3D = GreyboxKit.sphere(self, 0.1, Vector3((x0 + x1) * 0.5 + 0.4, JAIL_H - 0.2, zc), Palette.CREAM, "JailBulb")
+	var bulb_mat := StandardMaterial3D.new()
+	bulb_mat.albedo_color = Palette.CREAM
+	bulb_mat.emission_enabled = true
+	bulb_mat.emission = Color(1.0, 0.8, 0.5)
+	bulb_mat.emission_energy_multiplier = 2.0
+	bulb.material_override = bulb_mat
+	var lamp: OmniLight3D = GreyboxKit.lamp(self, bulb.position + Vector3(0, -0.15, 0), 0.9, 4.0)
+	lamp.name = "JailLamp"
+	var sign_pos := Vector3(x0 - 0.1, JAIL_H + 0.6, JAIL_GATE_Z)
 	GreyboxKit.box(self, Vector3(0.08, 0.7, 1.9), sign_pos, Palette.CASINO_BLACK.lightened(0.06), "JailSign", false)
 	GreyboxKit.box(self, Vector3(0.1, 0.08, 2.0), sign_pos + Vector3(0, 0.37, 0), Palette.WARM_GOLD, "JailSignTrim", false)
 	GreyboxKit.box(self, Vector3(0.1, 0.08, 2.0), sign_pos + Vector3(0, -0.37, 0), Palette.WARM_GOLD, "JailSignTrim", false)
-	_sign_label(sign_pos + Vector3(0.06, 0.0, 0), PI * 0.5, "JAIL", 110).modulate = Palette.LOSS_RED.lightened(0.15)
-	var north_sign: Label3D = _sign_label(Vector3((x0 + x1) * 0.5, JAIL_H + 0.3, z0 - 0.1), PI, "JAIL", 90)
-	north_sign.modulate = Palette.LOSS_RED.lightened(0.15)
-	# Where a jailed player looks from: above the cage, out over the floor.
+	_sign_label(sign_pos + Vector3(-0.06, 0.0, 0), -PI * 0.5, "JAIL", 110).modulate = Palette.LOSS_RED.lightened(0.15)
+	# Where a jailed player looks from: on the wall over the cell, out over the floor.
 	jail_camera = Node3D.new()
 	jail_camera.name = "JailCamera"
 	jail_camera.set_meta(&"yaw_limit", deg_to_rad(80.0))
@@ -782,7 +800,7 @@ func swing_jail_gate() -> void:
 	if jail_gate == null or not is_inside_tree():
 		return
 	var tw: Tween = jail_gate.create_tween()
-	tw.tween_property(jail_gate, ^"rotation:y", PI * 0.55, 0.35).set_ease(Tween.EASE_OUT)
+	tw.tween_property(jail_gate, ^"rotation:y", -PI * 0.55, 0.35)  # out into the casino (−x).set_ease(Tween.EASE_OUT)
 	tw.tween_interval(0.5)
 	tw.tween_property(jail_gate, ^"rotation:y", 0.0, 0.3).set_ease(Tween.EASE_IN)
 

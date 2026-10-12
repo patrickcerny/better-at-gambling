@@ -69,14 +69,14 @@ func test_a_jailed_player_is_put_in_the_cell_and_held_there() -> void:
 	assert_eq(Serializer.to_vec3(ev["pos"]), spot, "the event says where the cell spot is")
 	assert_eq(fx.server.world.get_position(p), spot)
 	# The client walks out through the bars: refused and held inside.
-	assert_false(fx.server.apply_move(p, Vector3(-17.0, 0, 6.4), 0.0, false), "walking out is refused")
+	assert_false(fx.server.apply_move(p, Vector3(19.5, 0, -7.5), 0.0, false), "walking out is refused")
 	assert_true(fx.server.map_def.in_jail(fx.server.world.get_position(p)), "still in the cell")
 	# A small step inside the cell is fine.
 	var inside: Vector3 = spot + Vector3(0.3, 0, 0.2)
 	assert_true(fx.server.apply_move(p, inside, 0.0, false))
 	assert_eq(fx.server.world.get_position(p), inside)
 	# Offline moves are clamped too, and the cell holds them every tick.
-	fx.intent(p, &"move", {"pos": Serializer.vec3(Vector3(-10, 0, 6.4)), "yaw": 0.0})
+	fx.intent(p, &"move", {"pos": Serializer.vec3(Vector3(10, 0, -7.5)), "yaw": 0.0})
 	assert_true(fx.server.map_def.in_jail(fx.server.world.get_position(p)), "move intent clamped")
 	fx.server.world.set_transform(p, Vector3(-12, 0, 2), 0.0)
 	fx.run(0.1)

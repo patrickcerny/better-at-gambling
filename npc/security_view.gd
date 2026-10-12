@@ -13,8 +13,8 @@ extends Node
 
 ## No bouncer close enough: how long the player lies knocked out before they are in the cell.
 const KNOCKOUT_SECONDS: float = 1.0
-## Facing out of the cell, through the gate (+x).
-const CELL_YAW: float = -PI * 0.5
+## Facing out of the cell, through the gate (−x: the cell is in the east wall).
+const CELL_YAW: float = PI * 0.5
 
 var scene: MatchScene
 var map: LuckyLounge

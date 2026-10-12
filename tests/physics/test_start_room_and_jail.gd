@@ -82,8 +82,9 @@ func test_a_ragdoll_past_the_door_line_is_sent_back() -> void:
 
 func test_the_jail_gate_and_bars_keep_a_prisoner_in() -> void:
 	var cell: AABB = LuckyLounge.JAIL_AREA
-	for target: Vector3 in [Vector3(-14.0, 0, LuckyLounge.JAIL_GATE_Z), Vector3(-20.0, 0, 1.0), Vector3(-14.0, 0, 9.5)]:
-		_put(LuckyLounge.JAIL_SPOTS[2], -PI * 0.5)
+	# Out through the gate, along the bars either way, and through the back wall of the alcove.
+	for target: Vector3 in [Vector3(14.0, 0, LuckyLounge.JAIL_GATE_Z), Vector3(20.0, 0, -14.0), Vector3(20.0, 0, 0.0), Vector3(28.0, 0, LuckyLounge.JAIL_GATE_Z)]:
+		_put(LuckyLounge.JAIL_SPOTS[2], PI * 0.5)
 		await wait_physics_frames(3)
 		assert_true(_inside(cell, scene.local.global_position), "starts in the cell")
 		scene.local.auto_target = target
@@ -95,3 +96,26 @@ func test_the_jail_gate_and_bars_keep_a_prisoner_in() -> void:
 
 func _inside(cell: AABB, p: Vector3) -> bool:
 	return p.x > cell.position.x and p.x < cell.end.x and p.z > cell.position.z and p.z < cell.end.z
+
+
+func test_the_cell_is_recessed_into_the_east_wall() -> void:
+	var cell: AABB = LuckyLounge.JAIL_AREA
+	var wall_face: float = LuckyLounge.SIZE_X * 0.5 - 0.25
+	assert_almost_eq(cell.position.x, wall_face, 0.01, "the bars stand on the wall line")
+	assert_gt(cell.end.x, wall_face + 2.0, "the cell lies behind the wall plane")
+	assert_lt(LuckyLounge.JAIL_DOOR.x, wall_face - 0.5, "the bouncer drops off on the casino side")
+	assert_almost_eq(LuckyLounge.JAIL_DOOR.z, LuckyLounge.JAIL_GATE_Z, 0.01, "in front of the gate")
+	# The guard's navmesh reaches the drop-off in front of the gate.
+	var t: float = 0.0
+	while not scene.map.navmesh_ready and t < 5.0:
+		await wait_seconds(0.2)
+		t += 0.2
+	assert_true(scene.map.navmesh_ready)
+	var map_rid: RID = scene.map.nav_region.get_navigation_map()
+	var near: Vector3 = NavigationServer3D.map_get_closest_point(map_rid, LuckyLounge.JAIL_DOOR)
+	assert_lt(Vector2(near.x, near.z).distance_to(Vector2(LuckyLounge.JAIL_DOOR.x, LuckyLounge.JAIL_DOOR.z)), 0.3, "navmesh at the gate (%s)" % near)
+	var path: PackedVector3Array = NavigationServer3D.map_get_path(map_rid, Vector3(0, 0, -4), LuckyLounge.JAIL_DOOR, true)
+	assert_gt(path.size(), 1, "a path from the floor to the gate")
+	if path.size() > 0:
+		var end: Vector3 = path[path.size() - 1]
+		assert_lt(Vector2(end.x - LuckyLounge.JAIL_DOOR.x, end.z - LuckyLounge.JAIL_DOOR.z).length(), 0.3, "the path ends at the gate (%s)" % end)
