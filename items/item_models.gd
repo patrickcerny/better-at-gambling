@@ -36,6 +36,12 @@ const GRIPS: Dictionary = {
 	&"scratch_ticket": [Vector3(0.0, 0.2, -0.2), Vector3(75, 0, 0)],
 	&"dog_collar": [Vector3(0.0, 0.18, -0.22), Vector3(60, 0, 0)],
 }
+## In the hand and in first person only, scaled up around the fist on top of `SIZES` (the grip
+## offset scales with it, so the knob stays in the fist). Patrick: the bat looked thin and small
+## in hand.
+const HAND_SCALE: Dictionary = {
+	&"baseball_bat": 1.35,
+}
 ## AvatarVisuals.ARM_REST turned back (the hand hangs at -1.3 rad about x).
 const HAND_UPRIGHT: float = 1.3
 
@@ -60,6 +66,11 @@ static func has_own(item: StringName) -> bool:
 
 static func size_for(item: StringName) -> float:
 	return float(SIZES.get(item, DEFAULT_SIZE))
+
+
+## Extra uniform scale in the hand / first person (`HAND_SCALE`, 1 otherwise).
+static func hand_scale(item: StringName) -> float:
+	return float(HAND_SCALE.get(item, 1.0))
 
 
 ## A new instance of `item`'s model, its longest side scaled to `size` (the item's hand size when
@@ -96,8 +107,10 @@ static func make_held(item: StringName) -> Node3D:
 	held.rotation.x = HAND_UPRIGHT
 	var m: Node3D = make(item)
 	var grip: Array = GRIPS.get(item, DEFAULT_GRIP)
-	m.position = grip[0]
+	var k: float = hand_scale(item)
+	m.position = (grip[0] as Vector3) * k
 	m.rotation_degrees = grip[1]
+	m.scale = Vector3.ONE * k
 	held.add_child(m)
 	return held
 
@@ -172,10 +185,12 @@ static func make_view(item: StringName) -> Node3D:
 	view.set_meta(&"item", item)
 	view.position = VIEW_OFFSET
 	view.rotation_degrees = Vector3(0, -18, 0)
+	var k: float = hand_scale(item)
 	var m: Node3D = make(item, size_for(item) * VIEW_SCALE)
 	var grip: Array = VIEW_GRIPS.get(item, GRIPS.get(item, DEFAULT_GRIP))
-	m.position = grip[0] if VIEW_GRIPS.has(item) else Vector3.ZERO
+	m.position = (grip[0] as Vector3) * k if VIEW_GRIPS.has(item) else Vector3.ZERO
 	m.rotation_degrees = grip[1]
+	m.scale = Vector3.ONE * k
 	view.add_child(m)
 	return view
 

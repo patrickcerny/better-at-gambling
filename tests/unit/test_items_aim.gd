@@ -124,6 +124,9 @@ func test_held_bat_points_barrel_up_and_forward() -> void:
 	assert_gt(barrel.y, knob.y + 0.5, "barrel above the grip, not the handle sticking up")
 	assert_lt(barrel.z, knob.z, "barrel forward (-z) of the grip")
 	assert_lt(knob.distance_to(hand), barrel.distance_to(hand), "the fist holds the handle end")
+	var expected: float = ItemModels.size_for(&"baseball_bat") * ItemModels.hand_scale(&"baseball_bat")
+	assert_almost_eq(barrel.distance_to(knob), expected, expected * 0.1, "bat 1.35x its plain size in hand")
+	assert_lt(knob.distance_to(hand), 0.3, "knob in the fist")
 
 
 func test_first_person_bat_points_barrel_up_and_away() -> void:
