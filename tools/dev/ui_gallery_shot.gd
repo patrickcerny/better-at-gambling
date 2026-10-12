@@ -1,6 +1,6 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|shop|rewards|settings|controls|pause|tutorial|online|browser|practice|joining`
+## `--panel lobby|shop|rewards|settings|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining`
 ## over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
@@ -58,7 +58,13 @@ func _ready() -> void:
 		"tutorial":
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
-			menu.call(&"_show_tutorial")
+			menu.call(&"_show_tutorial", null)
+			(menu.get("how_to_play") as HowToPlayPanel).show_page(2)
+		"pause_tutorial":
+			var p := PauseMenu.new()
+			add_child(p)
+			p.open()
+			p.open_tutorial()
 		"online":
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
