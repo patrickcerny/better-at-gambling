@@ -385,8 +385,14 @@ func start_mic_check() -> void:
 		mic_check = VoiceMicTest.new()
 		mic_check.name = "MicCheck"
 		add_child(mic_check)
+	if not mic_check.finished.is_connected(_on_mic_check_finished):
+		mic_check.finished.connect(_on_mic_check_finished)
 	mic_check.start(meter_capture())
 	mic_check_result.text = mic_check.verdict
+
+
+func _on_mic_check_finished(text: String) -> void:
+	mic_check_result.text = text
 
 
 func mic_checking() -> bool:

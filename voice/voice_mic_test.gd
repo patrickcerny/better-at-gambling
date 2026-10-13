@@ -16,6 +16,9 @@ signal finished(verdict: String)
 enum State { IDLE, RECORDING, PLAYING, DONE }
 
 const RECORD_SECONDS: float = 3.0
+## A microphone can take a moment to deliver its first audio: the recording waits this much
+## longer for its `RECORD_SECONDS` of frames before it gives up.
+const GRACE_SECONDS: float = 3.0
 ## Below this peak the microphone only sent silence (dBFS).
 const SILENT_DB: float = -60.0
 ## Below this peak it works but is too quiet to be heard well over the game.
@@ -101,7 +104,7 @@ func _process(delta: float) -> void:
 	match state:
 		State.RECORDING:
 			_t += delta
-			if _t >= RECORD_SECONDS:
+			if frames.size() >= roundi(RECORD_SECONDS / VoiceCodec.FRAME_SECONDS) or _t >= RECORD_SECONDS + GRACE_SECONDS:
 				_end_recording()
 		State.PLAYING:
 			_t += delta
