@@ -139,6 +139,16 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-13 / 0.9.7 (macOS build)
+- Patrick: "How hard would it be to ship the game for mac too?" (has an Apple Developer account and a
+  MacBook). GodotSteam 4.23.1 macOS universal dylibs in addons/godotsteam/osx, ETC2/ASTC import on,
+  "macOS" export preset (universal .app in a zip, bundle id at.bulldogrealestate.betterAtGambling,
+  microphone usage text, entitlements in tools/macos/entitlements.plist), release.yml exports it on
+  ubuntu and tools/macos/package.sh signs with rcodesign 0.29.0: Developer ID + notarization when the
+  six Apple secrets exist, ad-hoc otherwise (release notes then explain "Open Anyway"). Host mode paths
+  (ready file, host_server.log) live under user://. First release 0.9.7 shipped ad-hoc signed; nothing
+  was run on a real Mac yet.
+
 ### 2026-10-13 / 0.9.6 (horse race odds)
 - Patrick: "Horse Race is always favoured to win for you (by a bit, like the other games, but dont
   show it), pays 1:4 (but bit better payout)". The server draws the race seed with a 30% chance to
