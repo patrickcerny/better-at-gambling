@@ -149,7 +149,7 @@ func test_payout_is_one_to_four_and_losers_pay_the_house() -> void:
 	hr.drain_events()
 	_run_to_result()
 	assert_eq(hr.winner, 0)
-	assert_eq(fx.economy.balance(1), 1000 - 50 + 250, "stake back plus four times it")
+	assert_eq(fx.economy.balance(1), 1000 - 50 + 275, "stake back plus 4.5 times it (the table says 1:4)")
 	assert_eq(fx.economy.balance(2), 1000 - 30, "the losing stake stays with the house")
 	var evs: Array[Dictionary] = hr.drain_events()
 	var fin: Array[Dictionary] = _types(evs, &"horse_race_finished")
@@ -159,7 +159,7 @@ func test_payout_is_one_to_four_and_losers_pay_the_house() -> void:
 	var results: Array[Dictionary] = _types(evs, &"round_result")
 	assert_eq(results.size(), 2)
 	for r: Dictionary in results:
-		assert_eq(int(r["net"]), 200 if int(r["player"]) == 1 else -30)
+		assert_eq(int(r["net"]), 225 if int(r["player"]) == 1 else -30)
 	assert_false(hr.has_stake(1))
 	# The race was exactly where the plan says when it paid: the winner's nose on the line.
 	assert_gte(hr.progress[0], HorseRaceLogic.FINISH)
@@ -170,6 +170,56 @@ func test_payout_is_one_to_four_and_losers_pay_the_house() -> void:
 	assert_eq(hr.race_seed, -1)
 	assert_eq(_types(hr.drain_events(), &"round_started").size(), 1)
 	assert_ne(hr.names, old)
+
+
+## Counts how many of `n` seed draws (fresh bets each time) a backed horse wins.
+func _backed_wins(n: int, horse: int) -> int:
+	var wins: int = 0
+	for _i: int in n:
+		hr.bets = [{"player": 1, "horse": horse, "amount": 10}]
+		if HorseRaceLogic.winner_of(hr._draw_seed()) == horse:
+			wins += 1
+	return wins
+
+
+func test_the_backed_horse_is_quietly_favoured() -> void:
+	fx.balance.horse_favour = 0.0
+	fx.rng.reseed(777)
+	var plain: int = _backed_wins(40, 2)
+	fx.balance.horse_favour = 1.0
+	fx.rng.reseed(777)
+	var favoured: int = _backed_wins(40, 2)
+	assert_gt(favoured, plain, "a redraw when nobody at the table would win tilts the race to the backed horse")
+	assert_lt(favoured, 40, "but it is only a nudge, not a fix")
+	hr.bets = []
+	# The clients only ever see the seed: nothing in the public state or the start event says so.
+	hr.place_bet(1, {"horse": 2, "amount": 10})
+	hr.tick(fx.balance.horse_countdown + 0.01)
+	var started: Array[Dictionary] = _types(hr.drain_events(), &"horse_race_started")
+	assert_eq(started.size(), 1)
+	assert_false(started[0].has("favour"))
+	assert_false(hr.get_public_state().has("favour"))
+
+
+func test_luck_rerolls_the_race_like_the_other_tables() -> void:
+	fx.balance.horse_favour = 0.0
+	hr.luck.reroll_per_point = 1.0  # force the luck effects
+	fx.give_luck(1, 3)
+	fx.rng.reseed(99)
+	var lucky: int = _backed_wins(40, 1)
+	fx.rng.reseed(99)
+	hr.luck.reroll_per_point = 0.0
+	var plain: int = _backed_wins(40, 1)
+	assert_gt(lucky, plain, "a lucky player's horse wins more often")
+	hr.luck.reroll_per_point = 1.0
+	hr.bets = []
+	hr.drain_events()
+	hr.place_bet(1, {"horse": 1, "amount": 10})
+	hr.tick(fx.balance.horse_countdown + 0.01)
+	var evs: Array[Dictionary] = hr.drain_events()
+	assert_eq(_types(evs, &"horse_race_started").size(), 1)
+	# A flourish may or may not fire (only when the reroll changed the outcome), never an error.
+	assert_true(_types(evs, &"luck_flourish").size() <= 1)
 
 
 func test_server_progress_follows_the_plan() -> void:

@@ -257,7 +257,7 @@ func _start_race() -> void:
 	state = State.RACING
 	counting = false
 	timer = 0.0
-	race_seed = rng.range_int(1, 2_000_000_000)
+	race_seed = _draw_seed()
 	_names_used = true
 	race_time = 0.0
 	winner = -1
@@ -286,7 +286,7 @@ func _finish() -> void:
 		var p: int = int(b["player"])
 		var stake: int = int(b["amount"])
 		var horse: int = int(b["horse"])
-		var base_return: int = stake * (balance.horse_payout_ratio + 1) if horse == winner else 0
+		var base_return: int = stake + int(floor(stake * balance.horse_payout_ratio)) if horse == winner else 0
 		_settle(p, stake, base_return, {"type": &"horse", "value": horse, "horse": horse, "winner": winner})
 		played[p] = true
 	for p: int in played.keys():
@@ -294,6 +294,39 @@ func _finish() -> void:
 	bets.clear()
 	state = State.RESULT
 	timer = balance.horse_result_time
+
+
+## The race is drawn with a quiet thumb on the scale (Patrick: "always favoured to win for you, by
+## a bit, like the other games, but dont show it"): with `balance.horse_favour` chance a race that
+## no horse anyone backed would win is redrawn once, then every bettor's luck rerolls the seed the
+## way the other tables reroll a card or a wheel. Nothing of it reaches the clients: they only get
+## the final seed, and the replay is the same honest-looking race everywhere.
+func _draw_seed() -> int:
+	var backed: Dictionary[int, bool] = {}
+	for b: Dictionary in bets:
+		backed[int(b["horse"])] = true
+	var current: Array[int] = [rng.range_int(1, 2_000_000_000)]
+	if not backed.is_empty() and not backed.has(winner_of(current[0])) and rng.chance(balance.horse_favour):
+		current[0] = rng.range_int(1, 2_000_000_000)
+	for b: Dictionary in bets:  # one bet per player (one horse per race)
+		var p: int = int(b["player"])
+		var horse: int = int(b["horse"])
+		var lk: int = modifiers.get_luck(p, game_id)
+		if lk == 0:
+			continue
+		var d: LuckRng.Draw = luck.draw(lk, func() -> int:
+			var out: int = current[0]
+			current[0] = rng.range_int(1, 2_000_000_000)
+			return out, func(seed_value: int) -> float: return 1.0 if winner_of(seed_value) == horse else 0.0)
+		current[0] = int(d.value)
+		if d.luck_changed:
+			events.append(GameEvents.luck_flourish(p, station_id, &"lucky" if lk > 0 else &"jinxed"))
+	return current[0]
+
+
+## Which lane a seed's race is won by.
+static func winner_of(seed_value: int) -> int:
+	return int(simulate(seed_value)["winner"])
 
 
 ## Four distinct names from the pool.

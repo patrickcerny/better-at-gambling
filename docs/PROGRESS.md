@@ -139,6 +139,13 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-13 / 0.9.6 (horse race odds)
+- Patrick: "Horse Race is always favoured to win for you (by a bit, like the other games, but dont
+  show it), pays 1:4 (but bit better payout)". The server draws the race seed with a 30% chance to
+  redraw once when no backed horse would win, then each bettor's luck rerolls the seed like a card
+  or a wheel (`HorseRaceLogic._draw_seed`); clients only see the final seed. Payout 4.5x the stake
+  while the table still says 1:4 (`horse_payout_ratio`, `horse_favour` in BalanceConfig).
+
 ### 2026-10-12 / 0.9.5 (tutorial, jail in the wall, horse race, later ideas)
 - Tutorial: eight picture pages (real in-game renders in assets/tutorial, `tools/tutorial_pictures.sh`)
   with BACK/NEXT/DONE, opens the first time PRACTICE or PLAY ONLINE is pressed (`tutorial/seen` in

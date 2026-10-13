@@ -51,8 +51,11 @@ extends Resource
 @export var horse_min_bet: int = 10
 ## Most one player may stake on one race (all on the one horse they back).
 @export var horse_max_total: int = 100
-## Profit ratio on the winning horse (Patrick: "1:4": the stake back plus four times it).
-@export var horse_payout_ratio: int = 4
+## Profit ratio on the winning horse. The table says 1:4; Patrick wants it to pay "a bit better".
+@export var horse_payout_ratio: float = 4.5
+## Chance that a race nobody at the table would win is redrawn once (Patrick: "always favoured to
+## win for you, by a bit, like the other games, but dont show it").
+@export var horse_favour: float = 0.3
 ## Seconds from the first bet of a round until the gates open.
 @export var horse_countdown: float = 12.0
 ## Seconds the result stays up after the winner crosses the line (the rest run out meanwhile).
