@@ -139,6 +139,22 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-13 / 0.9.8 (voice chat)
+- Patrick: "Why is the voicechat still not working? Test it somehow". Three real losses found and
+  fixed with a test each: (1) Godot 4.7.2 `ENetMultiplayerPeer.create_server` passes the channel
+  count as the incoming bandwidth, so clients throttled to 1/32 about 1 s after connecting (47% of
+  a new player's voice frames lost for ~9 s) → `host.bandwidth_limit(0, 0)` in enet_transport;
+  (2) ENet's throttle kept dropping unreliable packets for seconds after a client hitch →
+  `throttle_configure(5000, 2, 0)` per peer; (3) `ClientMatchView.resync` made the match scene
+  rebuild late joiners' avatars on every sit-down, dropping their voice playback → departed
+  avatars removed deferred. Also: one-channel mics no longer halved, open-mic gate -45 dB, mic
+  rate measured and corrected, own distance curve for voice, explicit generator mix rate.
+  Proof: tests/integration/test_voice_tone_roundtrip (Goertzel on decoded frames), the net voice
+  test with `--voice-dump` (Bob's WAV: 440 Hz at 0.365 of 0.366, 978 sent / 971 played), a manual
+  PulseAudio run on Linux. Settings > Audio > TEST MICROPHONE (3 s record and playback through the
+  real path, plain verdict) and a Voice status line; one log line per stage (see the 0.9.8 notes
+  in the thread). Unverifiable here: WASAPI quirks (>2-channel mics, 24-bit), real Steam relay.
+
 ### 2026-10-13 / 0.9.7 (macOS build)
 - Patrick: "How hard would it be to ship the game for mac too?" (has an Apple Developer account and a
   MacBook). GodotSteam 4.23.1 macOS universal dylibs in addons/godotsteam/osx, ETC2/ASTC import on,
