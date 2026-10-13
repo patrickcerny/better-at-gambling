@@ -252,3 +252,11 @@ func test_a_device_at_its_reported_rate_is_left_alone() -> void:
 	assert_almost_eq(cap.measured_rate, 44100.0, 400.0)
 	assert_eq(cap.rate_override, 0.0)
 	assert_eq(VoiceCapture.nearest_common_rate(31000.0), 0, "a hitch's odd number is not a rate")
+
+
+func test_microphone_test_verdicts_in_plain_words() -> void:
+	assert_eq(VoiceMicTest.verdict_for("", 75, 0.25), "Microphone works, peak -12 dB.")
+	assert_string_contains(VoiceMicTest.verdict_for("", 75, 0.01), "quiet (peak -40 dB)")
+	assert_string_contains(VoiceMicTest.verdict_for("", 75, 0.0), "Only silence")
+	assert_string_contains(VoiceMicTest.verdict_for("", 0, 0.0), "No audio from the microphone: check the Windows privacy settings")
+	assert_true(VoiceMicTest.verdict_for("no audio device (headless)", 0, 0.0).begins_with("No audio device (headless)"))

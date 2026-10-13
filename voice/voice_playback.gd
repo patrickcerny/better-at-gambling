@@ -161,7 +161,8 @@ func _count_played(f: PackedFloat32Array) -> void:
 		var how: String = "headless, no sound"
 		if _gen != null:
 			how = "on bus %s at %s" % [BUS, "%.0f%% volume" % (gain * 100.0) if positional else "full volume"]
-		Log.info(&"voice", "first frame played for player %d (%s, level %s)" % [speaker, how, VoiceCapture.db_text(VoiceCodec.rms(f))])
+		var who: String = "player %d" % speaker if positional else "the microphone test"
+		Log.info(&"voice", "first frame played for %s (%s, level %s)" % [who, how, VoiceCapture.db_text(VoiceCodec.rms(f))])
 	frame_played.emit(f)
 
 

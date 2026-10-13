@@ -3,6 +3,8 @@ extends GutTest
 ## only in game), changes apply at once, Esc closes it, and the CONTROLS tab remaps keys: click a
 ## binding, press a key (Esc cancels), saved locally in the settings file and shown by InputGlyphs.
 
+const FakeMicTest = preload("res://tests/unit/test_voice_mic.gd")
+
 var panel: SettingsPanel
 var _old_sens: float
 var _old_fov: float
@@ -240,3 +242,47 @@ func test_mic_meter_tests_the_microphone_while_the_audio_tab_shows() -> void:
 	assert_not_null(panel.mic_test)
 	panel.close()
 	assert_null(panel.mic_test, "closing the panel closes it too")
+
+
+func test_test_microphone_without_an_audio_device_says_so() -> void:
+	panel.open(false)
+	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
+	await wait_process_frames(2)
+	assert_true(panel.mic_check_button.is_visible_in_tree())
+	panel.mic_check_button.pressed.emit()
+	await wait_process_frames(1)
+	assert_true(panel.mic_check_result.text.begins_with("No audio device"), panel.mic_check_result.text)
+	assert_false(panel.mic_check_button.disabled, "nothing running: try again any time")
+	assert_eq(panel.voice_diag.text, "Voice status: not in an online match.")
+	panel.close()
+
+
+func test_test_microphone_records_and_plays_back_through_voice_chat() -> void:
+	panel.open(false)
+	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
+	await wait_process_frames(2)
+	var mic: FakeMicTest.FakeMic = FakeMicTest.FakeMic.new()
+	mic.tone_hz = 440.0
+	panel.mic_check = VoiceMicTest.new()
+	panel.mic_check.source_override = mic
+	panel.add_child(panel.mic_check)
+	panel.mic_check_button.pressed.emit()
+	assert_true(panel.mic_checking())
+	var last: int = Time.get_ticks_msec()
+	var waited: int = 0
+	while panel.mic_checking() and waited < 10000:
+		await get_tree().process_frame
+		var now: int = Time.get_ticks_msec()
+		mic.speak((now - last) / 1000.0, 0.3)  # the microphone delivers in real time
+		waited += now - last
+		last = now
+	await wait_process_frames(1)
+	var text: String = panel.mic_check_result.text
+	assert_true(text.begins_with("Microphone works, peak -1"), text)
+	assert_between(linear_to_db(panel.mic_check.peak), -12.0, -10.0, "a 0.3 tone peaks at -10.5 dBFS")
+	assert_string_contains(text, "Played it back")
+	var played: int = panel.mic_check.playback.frames_played if panel.mic_check.playback != null else 0
+	assert_between(played, 70, 76, "3 s of 40 ms frames came back out of the playback")
+	assert_eq(played, panel.mic_check.frames.size(), "every recorded frame was played")
+	panel.close()
+	assert_false(panel.mic_checking())

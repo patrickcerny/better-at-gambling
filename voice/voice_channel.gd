@@ -230,6 +230,8 @@ func _name(pid: int) -> String:
 ## speaker, the last error.
 func diagnostics() -> String:
 	var mic: String
+	if not online:
+		return "no voice in Practice (nobody to talk to)"
 	if not is_active():
 		mic = "voice off"
 	elif not _test_samples.is_empty():

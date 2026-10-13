@@ -42,6 +42,12 @@ var mic_status: Label
 ## The microphone the meter reads when no match is running (main menu): started while the AUDIO
 ## tab shows, stopped when it closes. In a match the meter reads the voice channel's capture.
 var mic_test: VoiceCapture = null
+## TEST MICROPHONE: records 3 s and plays it back through the real voice path (`VoiceMicTest`).
+var mic_check_button: Button
+var mic_check_result: Label
+var mic_check: VoiceMicTest = null
+## Voice diagnostics line (microphone, frames sent, received and played per speaker, last error).
+var voice_diag: Label
 var _mutes: VoiceMuteList
 var _meter_fill: StyleBoxFlat
 var _mic_retry: float = 0.0
@@ -192,6 +198,26 @@ func _build_audio(page: VBoxContainer) -> void:
 	mic_status.custom_minimum_size = Vector2(190, 0)
 	mic_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	level_row.add_child(mic_status)
+	var check_row := _row(page, "Hear yourself")
+	mic_check_button = Button.new()
+	mic_check_button.name = "TestMic"
+	mic_check_button.text = "TEST MICROPHONE"
+	mic_check_button.custom_minimum_size = Vector2(220, 42)
+	mic_check_button.pressed.connect(start_mic_check)
+	check_row.add_child(mic_check_button)
+	mic_check_result = Label.new()
+	mic_check_result.name = "MicTestResult"
+	mic_check_result.theme_type_variation = &"SmallLabel"
+	mic_check_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mic_check_result.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mic_check_result.text = "Records %d s from the microphone and plays it back to you through voice chat." % roundi(VoiceMicTest.RECORD_SECONDS)
+	check_row.add_child(mic_check_result)
+	voice_diag = Label.new()
+	voice_diag.name = "VoiceDiag"
+	voice_diag.theme_type_variation = &"SmallLabel"
+	voice_diag.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	voice_diag.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.7))
+	page.add_child(voice_diag)
 	_mutes = VoiceMuteList.new()
 	page.add_child(_mutes)
 
@@ -325,7 +351,8 @@ func _process(delta: float) -> void:
 	if not _audio_showing():
 		return
 	if _live_channel() != null:
-		_stop_mic_test()
+		if not mic_checking():
+			_stop_meter_capture()
 	elif mic_test == null:
 		mic_test = VoiceCapture.new()
 		mic_test.name = "MicTest"
@@ -333,7 +360,7 @@ func _process(delta: float) -> void:
 		add_child(mic_test)
 		mic_test.start_microphone()
 		_mic_retry = MIC_RETRY_SECONDS
-	elif not mic_test.mic_active:
+	elif not mic_test.mic_active and not mic_checking():
 		_mic_retry -= delta
 		if _mic_retry <= 0.0:
 			_mic_retry = MIC_RETRY_SECONDS
@@ -345,6 +372,33 @@ func _process(delta: float) -> void:
 	mic_meter.value = clampf((db + 60.0) / 60.0, 0.0, 1.0)
 	_meter_fill.bg_color = Palette.MONEY_GREEN if db >= VoiceCapture.OPEN_MIC_THRESHOLD_DB else Palette.WARM_GOLD
 	mic_status.text = mic_status_text(cap)
+	if mic_check != null:
+		mic_check_result.text = mic_check.verdict
+	mic_check_button.disabled = mic_checking()
+	mic_check_button.text = "TESTING…" if mic_checking() else "TEST MICROPHONE"
+	voice_diag.text = voice_status_text()
+
+
+## TEST MICROPHONE: 3 s from the microphone the meter reads, played back through voice chat.
+func start_mic_check() -> void:
+	if mic_check == null:
+		mic_check = VoiceMicTest.new()
+		mic_check.name = "MicCheck"
+		add_child(mic_check)
+	mic_check.start(meter_capture())
+	mic_check_result.text = mic_check.verdict
+
+
+func mic_checking() -> bool:
+	return mic_check != null and mic_check.is_running()
+
+
+## The voice diagnostics line under the microphone test.
+static func voice_status_text() -> String:
+	var ch: VoiceChannel = VoiceChannel.current
+	if ch == null or not is_instance_valid(ch):
+		return "Voice status: not in an online match."
+	return "Voice status: %s" % ch.diagnostics()
 
 
 ## The words next to the meter.
@@ -359,6 +413,12 @@ static func mic_status_text(cap: VoiceCapture) -> String:
 
 
 func _stop_mic_test() -> void:
+	if mic_check != null:
+		mic_check.stop()
+	_stop_meter_capture()
+
+
+func _stop_meter_capture() -> void:
 	if mic_test != null:
 		mic_test.stop_microphone()
 		mic_test.queue_free()
