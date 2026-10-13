@@ -42,8 +42,8 @@ if ! "$TOOLS/godot/godot" --headless --version 2>/dev/null | grep -q "^${GODOT_V
 fi
 echo "[setup] godot $("$TOOLS/godot/godot" --headless --version)"
 
-# 2. Export templates (large, ~1.3 GB download)
-if [[ $WANT_TEMPLATES -eq 1 && ! -f "$TEMPLATE_DIR/linux_release.x86_64" ]]; then
+# 2. Export templates (large, ~1.3 GB download; includes macos.zip for the macOS export)
+if [[ $WANT_TEMPLATES -eq 1 && ( ! -f "$TEMPLATE_DIR/linux_release.x86_64" || ! -f "$TEMPLATE_DIR/macos.zip" ) ]]; then
 	fetch_verified "$BASE_URL/$TEMPLATES_TPZ" "$CACHE/$TEMPLATES_TPZ" "$TEMPLATES_SHA512"
 	rm -rf "$CACHE/tpz" && mkdir -p "$CACHE/tpz" "$TEMPLATE_DIR"
 	unzip -oq "$CACHE/$TEMPLATES_TPZ" -d "$CACHE/tpz"
