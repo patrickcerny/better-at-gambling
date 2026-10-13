@@ -21,6 +21,8 @@ static var _users: int = 0
 
 ## Why `start` failed ("" while fine), for the HUD, the settings panel and the log.
 var error: String = ""
+## Stale frames `read_all` threw away (they still count as delivered for the rate check).
+var skipped: int = 0
 var _started: bool = false
 
 
@@ -85,5 +87,6 @@ func read_all() -> PackedVector2Array:
 	if n > int(r * STALE_SECONDS):
 		var keep: int = int(r * KEEP_SECONDS)
 		read(n - keep)
+		skipped += n - keep
 		n = keep
 	return read(n)

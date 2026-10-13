@@ -14,6 +14,11 @@ class FakeMic:
 	var phase: int = 0
 	var starts: int = 0
 	var stops: int = 0
+	## Frames the device really delivers per second (0: what it reports, `mic_rate`).
+	var deliver_rate: float = 0.0
+	## Only the left channel carries sound (a mono mic in a stereo stream).
+	var left_only: bool = false
+	var tone_hz: float = 300.0
 
 	func start() -> Error:
 		starts += 1
@@ -44,21 +49,26 @@ class FakeMic:
 
 	## Queues `seconds` of a 300 Hz tone at `amp` (stereo, as drivers deliver it).
 	func speak(seconds: float, amp: float = 0.4) -> void:
-		for i: int in int(seconds * mic_rate):
-			var x: float = amp * sin(TAU * 300.0 * phase / mic_rate)
+		var r: float = deliver_rate if deliver_rate > 0.0 else mic_rate
+		for i: int in int(seconds * r):
+			var x: float = amp * sin(TAU * tone_hz * phase / r)
 			phase += 1
-			queued.append(Vector2(x, x))
+			queued.append(Vector2(x, 0.0 if left_only else x))
 
 
 var cap: VoiceCapture
 var mic: FakeMic
 var packets: Array[PackedByteArray] = []
+## The capture's microsecond clock (advanced by `_talk`).
+var now_usec: int = 0
 
 
 func before_each() -> void:
 	cap = VoiceCapture.new()
 	mic = FakeMic.new()
 	cap.source = mic
+	now_usec = 1000
+	cap.clock = func() -> int: return now_usec
 	add_child_autofree(cap)
 	packets.clear()
 	cap.frame_captured.connect(func(p: PackedByteArray) -> void: packets.append(p))
@@ -69,11 +79,12 @@ func after_each() -> void:
 
 
 ## One second of microphone audio, read the way `_process` reads it each frame.
-func _talk(seconds: float, rate: float = 48000.0) -> void:
+func _talk(seconds: float, rate: float = 48000.0, amp: float = 0.4) -> void:
 	mic.mic_rate = rate
 	var steps: int = int(seconds / 0.016)
 	for i: int in steps:
-		mic.speak(0.016)
+		mic.speak(0.016, amp)
+		now_usec += 16000
 		cap._process(0.016)
 
 
@@ -177,3 +188,67 @@ func test_apply_points_the_driver_at_the_saved_device() -> void:
 	assert_eq(str(Settings.get_value("voice", "input_device")), "Microphone that is not here", "the choice stays saved")
 	Settings.change("voice", "input_device", old)
 	assert_eq(AudioServer.input_device, "Default")
+
+
+func test_a_mic_that_only_fills_one_channel_is_not_halved() -> void:
+	# Patrick's voice never reached anyone: some mics deliver a stereo stream with one dead side,
+	# and averaging both sides made them 6 dB quieter than they are (under the open-mic gate).
+	mic.left_only = true
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.PUSH_TO_TALK
+	cap.ptt_pressed = true
+	_talk(1.0)
+	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
+	assert_almost_eq(VoiceCodec.rms(decoded), 0.4 / sqrt(2.0), 0.03, "the live channel at its own level")
+	var both := PackedVector2Array([Vector2(0.5, 0.3), Vector2(-0.5, -0.3)])
+	assert_almost_eq(VoiceCapture.to_mono(both)[0], 0.4, 0.0001, "two live channels are still averaged")
+	var right := PackedVector2Array([Vector2(0.0, 0.5), Vector2(0.0, -0.5)])
+	assert_almost_eq(VoiceCapture.to_mono(right)[0], 0.5, 0.0001, "a right-only mic works too")
+
+
+func test_open_mic_opens_for_a_quiet_microphone() -> void:
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	_talk(1.0, 48000.0, 0.012)  # -41 dBFS RMS: a webcam mic at arm's length
+	assert_gt(packets.size(), 20, "a quiet voice still opens the gate")
+	packets.clear()
+	_talk(1.0, 48000.0, 0.001)  # -63 dBFS: room hiss
+	assert_lt(packets.size(), 14, "hiss does not keep it open (only the hangover and the end frame)")
+	assert_false(cap.transmitting)
+
+
+func test_a_device_that_runs_at_another_rate_than_it_reports_is_measured_and_resampled() -> void:
+	mic.mic_rate = 48000.0  # what the driver says
+	mic.deliver_rate = 16000.0  # what the headset really sends
+	mic.tone_hz = 300.0
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.PUSH_TO_TALK
+	cap.ptt_pressed = true
+	var steps: int = int(4.0 / 0.016)
+	for i: int in steps:
+		mic.speak(0.016)
+		now_usec += 16000
+		cap._process(0.016)
+	assert_almost_eq(cap.measured_rate, 16000.0, 400.0, "measured from frames per second of wall time")
+	assert_eq(cap.input_rate(), 16000.0, "resampled from the real rate")
+	packets.clear()
+	for i: int in int(1.0 / 0.016):
+		mic.speak(0.016)
+		now_usec += 16000
+		cap._process(0.016)
+	assert_between(packets.size(), 23, 26, "25 frames a second again, not 8")
+	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
+	var crossings: int = 0
+	for i: int in range(1, decoded.size()):
+		if decoded[i - 1] < 0.0 and decoded[i] >= 0.0:
+			crossings += 1
+	assert_between(crossings, 11, 13, "300 Hz stays 300 Hz (12 cycles in 40 ms)")
+
+
+func test_a_device_at_its_reported_rate_is_left_alone() -> void:
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	_talk(4.0, 44100.0)
+	assert_almost_eq(cap.measured_rate, 44100.0, 400.0)
+	assert_eq(cap.rate_override, 0.0)
+	assert_eq(VoiceCapture.nearest_common_rate(31000.0), 0, "a hitch's odd number is not a rate")
