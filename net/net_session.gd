@@ -57,6 +57,8 @@ var clock: NetClock = NetClock.new()
 var room_host: RoomHost = null
 ## SERVER: proximity voice relay (created on the first voice packet).
 var voice_relay: VoiceRelay = null
+## SERVER: peers whose voice was dropped because they are not players (logged once each).
+var _voice_unknown_peers: Dictionary[int, bool] = {}
 ## SERVER: returns the world dictionary to stream (set by the match scene).
 var world_provider: Callable
 ## Last refusal/disconnect (code + player-facing text), for the menu's error panel.
@@ -143,6 +145,7 @@ func stop() -> void:
 		room_host = null
 	local_server = null
 	voice_relay = null
+	_voice_unknown_peers.clear()
 	local_player_id = -1
 	_welcomed = false
 	_snapshot = {}
@@ -173,10 +176,12 @@ func send_intent(intent: Dictionary) -> Dictionary:
 
 
 ## CLIENT: sends one captured voice frame (`VoicePacket` up packet) to the server for relaying.
-## No-op otherwise (Practice has nobody to talk to).
-func send_voice(packet: PackedByteArray) -> void:
+## False (nothing sent) otherwise (Practice has nobody to talk to, or not connected).
+func send_voice(packet: PackedByteArray) -> bool:
 	if mode == Mode.CLIENT and _welcomed and transport != null:
 		transport.send(NetTransport.SERVER_PEER, Protocol.CHANNEL_VOICE, false, packet)
+		return true
+	return false
 
 
 ## Latest full snapshot (immediate in LOCAL mode; the cached, status-refreshed copy in CLIENT mode).
@@ -540,6 +545,9 @@ func _voice_packet(peer: int, data: PackedByteArray) -> void:
 	elif mode == Mode.SERVER and local_server != null and room_host != null:
 		var speaker: int = room_host.player_of(peer)
 		if speaker < 0:
+			if not _voice_unknown_peers.has(peer):
+				_voice_unknown_peers[peer] = true
+				Log.info(&"voice", "voice packet from peer %d dropped: not a player (yet)" % peer)
 			return
 		if voice_relay == null:
 			voice_relay = VoiceRelay.new()

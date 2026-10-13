@@ -11,6 +11,12 @@ const BURST_SECONDS: float = 0.5
 
 var relayed_packets: int = 0
 var dropped_packets: int = 0
+## Per speaker: packets received, packets that reached nobody (out of reach), packets over the cap.
+var received_from: Dictionary[int, int] = {}
+var unheard_from: Dictionary[int, int] = {}
+var dropped_from: Dictionary[int, int] = {}
+## Per listener: packets sent on.
+var delivered_to: Dictionary[int, int] = {}
 
 var _tokens: Dictionary[int, float] = {}
 var _last_at: Dictionary[int, float] = {}
@@ -36,8 +42,14 @@ func route(server: MatchServer, speaker: int, data: PackedByteArray, now: float,
 	var up: Dictionary = VoicePacket.parse_up(data)
 	if up.is_empty() or server == null or not server.state.players.has(speaker):
 		return out
+	if not received_from.has(speaker):
+		Log.info(&"voice", "first voice packet from player %d (%d bytes)" % [speaker, data.size()])
+	received_from[speaker] = received_from.get(speaker, 0) + 1
 	if not allow(speaker, data.size(), now):
 		dropped_packets += 1
+		if not dropped_from.has(speaker):
+			Log.warn(&"voice", "player %d sends more than %d B/s: frames dropped" % [speaker, int(MAX_BYTES_PER_SECOND)])
+		dropped_from[speaker] = dropped_from.get(speaker, 0) + 1
 		return out
 	var phase: Phase.Id = server.phases.phase if server.phases != null else Phase.Id.LOBBY
 	var spos: Vector3 = server.world.get_position(speaker)
@@ -56,7 +68,28 @@ func route(server: MatchServer, speaker: int, data: PackedByteArray, now: float,
 		out[l] = by_flags[flags]
 	if not out.is_empty():
 		relayed_packets += 1
+		var first: Array[int] = []
+		for l: int in out:
+			if not delivered_to.has(l):
+				first.append(l)
+			delivered_to[l] = delivered_to.get(l, 0) + 1
+		if not first.is_empty():
+			Log.info(&"voice", "relaying player %d's voice to player(s) %s (%s)" % [speaker, str(first), Phase.name_of(phase)])
+	else:
+		if not unheard_from.has(speaker):
+			Log.info(&"voice", "player %d talks but nobody is in reach (%s, %d other player(s))" % [speaker, Phase.name_of(phase), listeners.size() - (1 if listeners.has(speaker) else 0)])
+		unheard_from[speaker] = unheard_from.get(speaker, 0) + 1
 	return out
+
+
+## One line for the log: what each speaker sent and each listener got.
+func summary() -> String:
+	var parts: Array[String] = []
+	for s: int in received_from:
+		parts.append("player %d sent %d (%d reached nobody, %d over the cap)" % [s, received_from[s], unheard_from.get(s, 0), dropped_from.get(s, 0)])
+	for l: int in delivered_to:
+		parts.append("player %d got %d" % [l, delivered_to[l]])
+	return "voice relay: " + ("; ".join(parts) if not parts.is_empty() else "no voice")
 
 
 ## Forgets a speaker's bandwidth state (left the room).

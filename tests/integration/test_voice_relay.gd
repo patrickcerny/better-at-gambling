@@ -219,3 +219,71 @@ func test_client_channel_plays_relayed_voice_and_respects_mutes() -> void:
 		ch.playbacks[2].advance(VoiceCodec.FRAME_SECONDS)
 	assert_true(ch.is_talking(2))
 	assert_false(ch.is_talking(3))
+
+
+func test_relay_counts_what_each_speaker_sent_and_each_listener_got() -> void:
+	for i: int in 4:
+		_route(i * VoiceCodec.FRAME_SECONDS, _frame(i))
+	fx.server.world.set_transform(near, Vector3(0, 0, 30), 0.0)
+	_route(1.0, _frame(5))  # nobody in reach now
+	assert_eq(relay.received_from[speaker], 5)
+	assert_eq(relay.delivered_to[near], 4)
+	assert_false(relay.delivered_to.has(far))
+	assert_eq(relay.unheard_from[speaker], 1)
+	var line: String = relay.summary()
+	assert_string_contains(line, "player %d sent 5 (1 reached nobody, 0 over the cap)" % speaker)
+	assert_string_contains(line, "player %d got 4" % near)
+
+
+func test_client_channel_says_why_voice_is_ignored_and_what_it_heard() -> void:
+	var head := Node3D.new()
+	add_child_autofree(head)
+	var ch := VoiceChannel.new()
+	ch.audio_enabled = false
+	ch.setup(null, 1, func(pid: int) -> Node3D: return head if pid == 2 else null, null, true)
+	add_child_autofree(ch)
+	var old: String = str(Settings.get_value("voice", "mode"))
+	var codec := MulawCodec.new()
+	var tone: PackedFloat32Array = VoiceWav.tone(220.0, 0.04, VoiceCodec.SAMPLE_RATE, 0.4)
+	Settings.change("voice", "mode", "off")
+	ch._on_voice(VoicePacket.make_down(2, 0, 0, codec.encode(tone)))
+	assert_eq(ch.received_from[2], 1, "counted even while voice is off")
+	assert_eq(ch.received_packets, 0, "but not played")
+	assert_string_contains(ch.diagnostics(), "voice off")
+	Settings.change("voice", "mode", "push_to_talk")
+	for seq: int in range(1, 6):
+		ch._on_voice(VoicePacket.make_down(2, seq, 0, codec.encode(tone)))
+	ch._on_voice(VoicePacket.make_down(7, 0, 0, codec.encode(tone)))  # no avatar for 7
+	for i: int in 10:
+		ch.playbacks[2].advance(VoiceCodec.FRAME_SECONDS)
+	assert_eq(ch.played_from[2], 5)
+	assert_string_contains(ch.last_error, "no avatar for player 7")
+	var d: String = ch.diagnostics()
+	assert_string_contains(d, "sent 0")
+	assert_string_contains(d, "player 2 6 in/5 played")
+	assert_string_contains(d, "last error: no avatar for player 7")
+	Settings.change("voice", "mode", old)
+
+
+func test_voice_dump_writes_what_each_speaker_played() -> void:
+	var head := Node3D.new()
+	add_child_autofree(head)
+	var ch := VoiceChannel.new()
+	ch.audio_enabled = false
+	ch.setup(null, 1, func(pid: int) -> Node3D: return head if pid == 2 else null, null, true)
+	add_child(ch)
+	ch.dump_path = "user://voice_dump_test.wav"
+	var codec := MulawCodec.new()
+	var tone: PackedFloat32Array = VoiceWav.tone(440.0, 0.04, VoiceCodec.SAMPLE_RATE, 0.4)
+	for seq: int in 8:
+		ch._on_voice(VoicePacket.make_down(2, seq, VoicePacket.FLAG_END if seq == 7 else 0, codec.encode(tone)))
+	for i: int in 12:
+		ch.playbacks[2].advance(VoiceCodec.FRAME_SECONDS)
+	remove_child(ch)  # leaving the match writes the dump
+	ch.free()
+	var path: String = VoiceChannel.dump_file("user://voice_dump_test.wav", 2)
+	assert_eq(path, "user://voice_dump_test_p2.wav")
+	var w: Dictionary = VoiceWav.read(path)
+	assert_eq(int(w.get("rate", 0)), VoiceCodec.SAMPLE_RATE)
+	assert_eq((w.get("samples", PackedFloat32Array()) as PackedFloat32Array).size(), 8 * VoiceCodec.FRAME_SAMPLES)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

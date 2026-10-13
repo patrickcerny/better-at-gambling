@@ -284,6 +284,8 @@ func heartbeat_soon() -> void:
 func _close(reason: String) -> void:
 	_closing = true
 	Log.info(&"room", "closing room %s: %s" % [room_code, reason])
+	if Net.voice_relay != null:
+		Log.info(&"voice", Net.voice_relay.summary())
 	if orchestrator != "":
 		await http.post(orchestrator.path_join("v1/internal/closing"), {"room_id": room_id, "room_secret": room_secret, "reason": reason})
 	_quit(0)

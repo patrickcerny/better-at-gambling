@@ -25,6 +25,8 @@ var _link_up: Dictionary[int, bool] = {}
 var _queued: Dictionary[int, Array] = {}
 ## Friends whose room connection dropped this poll (dropped on Steam after forwarding).
 var _lost: Array[int] = []
+## Friends whose first voice packet each way was logged ("in": friend → room, "out": room → friend).
+var _voice_seen: Dictionary[String, bool] = {}
 
 
 func _init(p_outside: NetTransport, p_local_factory: Callable, p_uid_of: Callable = Callable()) -> void:
@@ -55,6 +57,8 @@ func poll() -> void:
 		# Packets that came with a disconnect (a REJECT before the kick) are still forwarded.
 		for p: Dictionary in link.poll():
 			var ch: int = int(p["channel"])
+			if ch == Protocol.CHANNEL_VOICE:
+				_log_voice("out", peer, (p["data"] as PackedByteArray).size())
 			outside.send(peer, ch, Protocol.is_reliable_channel(ch), p["data"])
 		link.flush()
 	for peer: int in _lost:
@@ -131,6 +135,8 @@ func _drop_link(peer: int, say_bye: bool) -> void:
 func _from_outside(peer: int, channel: int, data: PackedByteArray) -> void:
 	if not _links.has(peer):
 		return
+	if channel == Protocol.CHANNEL_VOICE:
+		_log_voice("in", peer, data.size())
 	if channel == Protocol.CHANNEL_EVENTS:
 		data = _stamp_hello(peer, data)
 	elif channel == Protocol.CHANNEL_STATE:
@@ -143,6 +149,18 @@ func _from_outside(peer: int, channel: int, data: PackedByteArray) -> void:
 			q.append([channel, data])
 		return
 	_links[peer].send(NetTransport.SERVER_PEER, channel, Protocol.is_reliable_channel(channel), data)
+
+
+## One line per friend and direction: the first voice packet bridged.
+func _log_voice(way: String, peer: int, bytes: int) -> void:
+	var key: String = "%s%d" % [way, peer]
+	if _voice_seen.has(key):
+		return
+	_voice_seen[key] = true
+	if way == "in":
+		Log.info(&"host", "voice: first packet from friend peer %d over Steam to the room (%d bytes)" % [peer, bytes])
+	else:
+		Log.info(&"host", "voice: first packet from the room to friend peer %d over Steam (%d bytes)" % [peer, bytes])
 
 
 func _stamp_hello(peer: int, data: PackedByteArray) -> PackedByteArray:

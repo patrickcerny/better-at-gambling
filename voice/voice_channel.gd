@@ -27,14 +27,26 @@ var hud: VoiceHud = null
 var playbacks: Dictionary[int, VoicePlayback] = {}
 var muted: Dictionary[int, bool] = {}
 var received_packets: int = 0
+## Packets received per speaker (also those that were ignored, see `diagnostics`).
+var received_from: Dictionary[int, int] = {}
+## Frames played per speaker.
+var played_from: Dictionary[int, int] = {}
+## The last thing that went wrong ("" when nothing did), for the settings panel.
+var last_error: String = ""
 ## Plays sound (VoicePlayback); tests turn it off.
 var audio_enabled: bool = true
+## `--voice-dump`: where played frames go (empty: not dumping) and what each speaker played.
+var dump_path: String = ""
+var dumped: Dictionary[int, PackedFloat32Array] = {}
 
 var _mode: String = "push_to_talk"
 var _test_samples: PackedFloat32Array = PackedFloat32Array()
 var _test_rate: int = 0
 var _test_pos: float = 0.0
 var _played_at_start: int = 0
+var _logged_sent: bool = false
+## "<what><player>" keys of the one-off log lines already written.
+var _logged: Dictionary[String, bool] = {}
 
 
 ## Wires the channel up before it enters the tree. `ui_parent` gets the voice HUD (may be null).
@@ -70,12 +82,18 @@ func _ready() -> void:
 			_test_samples = w["samples"]
 			_test_rate = int(w["rate"])
 			Log.info(&"voice", "--voice-test: looping %s (%.1f s) into the capture path" % [wav, _test_samples.size() / float(_test_rate)])
+	dump_path = cmd.get_string("voice-dump")
 	_apply_settings()
+	if online:
+		Log.info(&"voice", "voice chat: %s, player %d" % [MODE_LABELS[MODE_KEYS.find(_mode)], local_id])
 
 
 func _exit_tree() -> void:
 	if online:
 		Log.info(&"voice", "sent %d frames (%d bytes), received %d frames from %d speakers, played %d frames" % [capture.frames_sent, capture.bytes_sent, received_packets, playbacks.size(), VoicePlayback.total_frames_played - _played_at_start])
+		for pid: int in received_from:
+			Log.info(&"voice", "voice from player %d: received %d, played %d" % [pid, received_from[pid], played_from.get(pid, 0)])
+	_write_dump()
 	if current == self:
 		current = null
 	if Net.voice_received.is_connected(_on_voice):
@@ -153,24 +171,78 @@ func _set_mouth(pid: int, openness: float) -> void:
 
 
 func _on_frame(packet: PackedByteArray) -> void:
-	if is_active():
-		Net.send_voice(packet)
+	if not is_active():
+		return
+	if Net.send_voice(packet):
+		if not _logged_sent:
+			_logged_sent = true
+			Log.info(&"voice", "first voice packet sent to the server (%d bytes)" % packet.size())
+	elif _once("unsent", 0):
+		last_error = "not connected: voice frames are not sent"
+		Log.warn(&"voice", last_error)
 
 
 ## A relayed frame from the server (also called directly by tests).
 func _on_voice(data: PackedByteArray) -> void:
-	if not is_active():
-		return
 	var p: Dictionary = VoicePacket.parse_down(data)
 	if p.is_empty():
+		if _once("malformed", 0):
+			Log.warn(&"voice", "malformed voice packet (%d bytes) ignored" % data.size())
 		return
 	var speaker: int = int(p["speaker"])
-	if speaker == local_id or muted.get(speaker, false):
+	received_from[speaker] = received_from.get(speaker, 0) + 1
+	if _once("rx", speaker):
+		Log.info(&"voice", "first voice packet received from player %d (%s)" % [speaker, _name(speaker)])
+	if not is_active():
+		if _once("off", speaker):
+			Log.info(&"voice", "voice from player %d ignored: voice chat is off on this PC (Settings > Audio)" % speaker)
+		return
+	if speaker == local_id:
+		return
+	if muted.get(speaker, false):
+		if _once("muted", speaker):
+			Log.info(&"voice", "voice from player %d ignored: muted" % speaker)
 		return
 	var pb: VoicePlayback = playback_for(speaker)
-	if pb != null:
-		received_packets += 1
-		pb.push_packet(p)
+	if pb == null:
+		if _once("noavatar", speaker):
+			last_error = "no avatar for player %d yet: their voice is dropped" % speaker
+			Log.warn(&"voice", last_error)
+		return
+	received_packets += 1
+	pb.push_packet(p)
+
+
+## True the first time it is asked about `what` for `pid` (one-off log lines).
+func _once(what: String, pid: int) -> bool:
+	var key: String = "%s%d" % [what, pid]
+	if _logged.has(key):
+		return false
+	_logged[key] = true
+	return true
+
+
+func _name(pid: int) -> String:
+	return state.player_name(pid) if state != null else "player %d" % pid
+
+
+## One-line status for the settings panel: microphone, frames sent, frames received and played per
+## speaker, the last error.
+func diagnostics() -> String:
+	var mic: String
+	if not is_active():
+		mic = "voice off"
+	elif not _test_samples.is_empty():
+		mic = "--voice-test WAV"
+	elif capture.mic_active:
+		mic = "mic \"%s\" %d Hz" % [capture.source.device(), roundi(capture.input_rate())]
+	else:
+		mic = "no mic (%s)" % capture.mic_error
+	var heard: Array[String] = []
+	for pid: int in received_from:
+		heard.append("%s %d in/%d played" % [_name(pid), received_from[pid], played_from.get(pid, 0)])
+	var err: String = last_error if last_error != "" else capture.mic_error
+	return "%s · sent %d · %s · last error: %s" % [mic, capture.frames_sent, ", ".join(heard) if not heard.is_empty() else "heard nobody yet", err if err != "" else "none"]
 
 
 ## The speaker's playback node, created under their avatar on first use (null without an avatar).
@@ -189,7 +261,32 @@ func playback_for(pid: int) -> VoicePlayback:
 	pb.audio_enabled = audio_enabled
 	a.add_child(pb)
 	playbacks[pid] = pb
+	pb.frame_played.connect(_on_played.bind(pid))
 	return pb
+
+
+func _on_played(f: PackedFloat32Array, pid: int) -> void:
+	played_from[pid] = played_from.get(pid, 0) + 1
+	if dump_path == "":
+		return
+	if not dumped.has(pid):
+		dumped[pid] = PackedFloat32Array()
+	dumped[pid].append_array(f)
+
+
+## `--voice-dump`: one WAV per speaker heard.
+func _write_dump() -> void:
+	if dump_path == "":
+		return
+	for pid: int in dumped:
+		var path: String = dump_file(dump_path, pid)
+		var err: Error = VoiceWav.write(path, dumped[pid], VoiceCodec.SAMPLE_RATE)
+		Log.info(&"voice", "voice dump: %d frames from player %d -> %s (%s)" % [dumped[pid].size() / VoiceCodec.FRAME_SAMPLES, pid, path, error_string(err)])
+
+
+## Where `--voice-dump <base>` writes player `pid`'s voice.
+static func dump_file(base: String, pid: int) -> String:
+	return "%s_p%d.wav" % [base.get_basename(), pid]
 
 
 ## The speaker's playback node, or null (never a freed one: avatars take theirs with them).
