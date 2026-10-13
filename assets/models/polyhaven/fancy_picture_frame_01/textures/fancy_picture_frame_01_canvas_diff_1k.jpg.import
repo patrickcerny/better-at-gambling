@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dble8lq361cql"
 path.s3tc="res://.godot/imported/fancy_picture_frame_01_canvas_diff_1k.jpg-28f1db4e6f77b935e2aa22dd802bca50.s3tc.ctex"
+path.etc2="res://.godot/imported/fancy_picture_frame_01_canvas_diff_1k.jpg-28f1db4e6f77b935e2aa22dd802bca50.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/models/polyhaven/fancy_picture_frame_01/textures/fancy_picture_frame_01_canvas_diff_1k.jpg"
-dest_files=["res://.godot/imported/fancy_picture_frame_01_canvas_diff_1k.jpg-28f1db4e6f77b935e2aa22dd802bca50.s3tc.ctex"]
+dest_files=["res://.godot/imported/fancy_picture_frame_01_canvas_diff_1k.jpg-28f1db4e6f77b935e2aa22dd802bca50.s3tc.ctex", "res://.godot/imported/fancy_picture_frame_01_canvas_diff_1k.jpg-28f1db4e6f77b935e2aa22dd802bca50.etc2.ctex"]
 
 [params]
 

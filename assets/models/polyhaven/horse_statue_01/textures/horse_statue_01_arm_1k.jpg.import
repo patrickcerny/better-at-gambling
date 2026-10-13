@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dqb155hc8mfes"
 path.s3tc="res://.godot/imported/horse_statue_01_arm_1k.jpg-ec9547808ece225214718153897ef6db.s3tc.ctex"
+path.etc2="res://.godot/imported/horse_statue_01_arm_1k.jpg-ec9547808ece225214718153897ef6db.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/models/polyhaven/horse_statue_01/textures/horse_statue_01_arm_1k.jpg"
-dest_files=["res://.godot/imported/horse_statue_01_arm_1k.jpg-ec9547808ece225214718153897ef6db.s3tc.ctex"]
+dest_files=["res://.godot/imported/horse_statue_01_arm_1k.jpg-ec9547808ece225214718153897ef6db.s3tc.ctex", "res://.godot/imported/horse_statue_01_arm_1k.jpg-ec9547808ece225214718153897ef6db.etc2.ctex"]
 
 [params]
 

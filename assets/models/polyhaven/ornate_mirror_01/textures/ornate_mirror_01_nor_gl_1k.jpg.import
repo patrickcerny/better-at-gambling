@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bd61l0dbdbttg"
 path.s3tc="res://.godot/imported/ornate_mirror_01_nor_gl_1k.jpg-d0c0683cf9cce7cdd7e38c86b1b03116.s3tc.ctex"
+path.etc2="res://.godot/imported/ornate_mirror_01_nor_gl_1k.jpg-d0c0683cf9cce7cdd7e38c86b1b03116.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/models/polyhaven/ornate_mirror_01/textures/ornate_mirror_01_nor_gl_1k.jpg"
-dest_files=["res://.godot/imported/ornate_mirror_01_nor_gl_1k.jpg-d0c0683cf9cce7cdd7e38c86b1b03116.s3tc.ctex"]
+dest_files=["res://.godot/imported/ornate_mirror_01_nor_gl_1k.jpg-d0c0683cf9cce7cdd7e38c86b1b03116.s3tc.ctex", "res://.godot/imported/ornate_mirror_01_nor_gl_1k.jpg-d0c0683cf9cce7cdd7e38c86b1b03116.etc2.ctex"]
 
 [params]
 

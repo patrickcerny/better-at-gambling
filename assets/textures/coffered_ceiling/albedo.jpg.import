@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://ifjqbb1xbrmw"
 path.s3tc="res://.godot/imported/albedo.jpg-6aee5bdb90b0e0f5655598f8cf5053c5.s3tc.ctex"
+path.etc2="res://.godot/imported/albedo.jpg-6aee5bdb90b0e0f5655598f8cf5053c5.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/coffered_ceiling/albedo.jpg"
-dest_files=["res://.godot/imported/albedo.jpg-6aee5bdb90b0e0f5655598f8cf5053c5.s3tc.ctex"]
+dest_files=["res://.godot/imported/albedo.jpg-6aee5bdb90b0e0f5655598f8cf5053c5.s3tc.ctex", "res://.godot/imported/albedo.jpg-6aee5bdb90b0e0f5655598f8cf5053c5.etc2.ctex"]
 
 [params]
 
