@@ -30,6 +30,14 @@ static func reach(phase: Phase.Id, speaker_pos: Vector3, listener_pos: Vector3, 
 	return Reach.NONE
 
 
+## Loudness (linear gain) of positional voice at `distance` metres: 1 within
+## `FULL_VOLUME_RADIUS`, then a straight fade to 0 at `HEARING_RADIUS` (half volume at 12 m).
+static func gain_at(distance: float) -> float:
+	if distance <= FULL_VOLUME_RADIUS:
+		return 1.0
+	return clampf((HEARING_RADIUS - distance) / (HEARING_RADIUS - FULL_VOLUME_RADIUS), 0.0, 1.0)
+
+
 ## Packet flags for a reach (see `VoicePacket`).
 static func flags_for(r: Reach) -> int:
 	match r:
