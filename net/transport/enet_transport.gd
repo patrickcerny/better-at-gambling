@@ -12,6 +12,11 @@ const TIMEOUT_MS: int = 10000
 ## the casino builds. Every new peer starts with this; `set_peer_timeout` tightens it to
 ## `TIMEOUT_MS` once the client says it has loaded (`Protocol.Msg.LOADED`).
 const LOADING_TIMEOUT_MS: int = 30000
+## ENet packet throttle (see `_on_peer_connected`): ENet's default interval, faster recovery,
+## and no slowing down when the round trip spikes.
+const THROTTLE_INTERVAL_MS: int = 5000
+const THROTTLE_ACCELERATION: int = 2
+const THROTTLE_DECELERATION: int = 0
 
 var peer: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
 var _server: bool = false
@@ -25,6 +30,12 @@ func listen(port: int, max_clients: int, bind_ip: String = "*") -> Error:
 	var err: Error = peer.create_server(port, max_clients, CHANNELS)
 	if err != OK:
 		return err
+	# Godot 4.7's ENetMultiplayerPeer.create_server passes the channel count (4 + 2 system
+	# channels) where ENet expects the incoming bandwidth, so the server tells every client it
+	# can take 6 bytes/s. ENet's bandwidth throttle then cut each client's unreliable packets to
+	# 1 in 32 a second after it connected, recovering over ~9 s: half of a new player's voice
+	# frames (and moves) never arrived. No limit, as intended.
+	peer.host.bandwidth_limit(0, 0)
 	peer.host.compress(ENetConnection.COMPRESS_RANGE_CODER)
 	peer.peer_connected.connect(_on_peer_connected)
 	peer.peer_disconnected.connect(func(id: int) -> void: peer_disconnected.emit(id))
@@ -124,4 +135,26 @@ func _on_peer_connected(id: int) -> void:
 	var p: ENetPacketPeer = peer.get_peer(id)
 	if p != null:
 		p.set_timeout(32, LOADING_TIMEOUT_MS / 2, LOADING_TIMEOUT_MS)
+		# ENet slows a peer's unreliable packets (drops some on purpose) whenever its round trip
+		# jumps above the average, e.g. while that player's game hitches loading a minigame, and
+		# takes seconds to recover: voice from the server cut out after every hitch. Keep the
+		# speed up (deceleration 0); reliable packets were never affected.
+		p.throttle_configure(THROTTLE_INTERVAL_MS, THROTTLE_ACCELERATION, THROTTLE_DECELERATION)
 	peer_connected.emit(id)
+
+
+## The peer's current ENet packet throttle (32 = everything goes out), -1 when unknown. For tests.
+func packet_throttle(id: int) -> int:
+	if peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+		return -1
+	var p: ENetPacketPeer = peer.get_peer(id)
+	return int(p.get_statistic(ENetPacketPeer.PEER_PACKET_THROTTLE)) if p != null else -1
+
+
+## The peer's ENet packet throttle limit (`ENetPacketPeer.PACKET_THROTTLE_SCALE` = 32: unreliable
+## packets are never dropped on purpose; 1 drops 31 of 32), -1 when unknown. For tests.
+func packet_throttle_limit(id: int) -> int:
+	if peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+		return -1
+	var p: ENetPacketPeer = peer.get_peer(id)
+	return int(p.get_statistic(ENetPacketPeer.PEER_PACKET_THROTTLE_LIMIT)) if p != null else -1
