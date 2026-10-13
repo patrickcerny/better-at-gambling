@@ -51,5 +51,21 @@ func test_room_server_command_line() -> void:
 	var user: PackedStringArray = args.slice(args.find("--") + 1)
 	assert_eq(user, PackedStringArray(["--server", "--host-mode", "--port", "31337", "--host-uid", "steam:7", "--ready-file", "/tmp/ready.txt", "--empty-timeout", "120"]))
 	assert_true("--path" in args, "dev runs (no export template) point the engine at the project")
+	assert_eq(args[args.find("--log-file") + 1], SteamParty.server_log_path())
 	var port: int = SteamParty.free_loopback_port()
 	assert_between(port, 1024, 65535)
+
+
+## Host mode writes nothing next to the executable: inside a signed macOS .app that folder is
+## read-only. The ready file and the room server's log go to user://.
+func test_room_server_files_live_in_user_data() -> void:
+	var user_dir: String = OS.get_user_data_dir()
+	var exe_dir: String = OS.get_executable_path().get_base_dir()
+	var ready: String = SteamParty.ready_file_path(4242)
+	var log_path: String = SteamParty.server_log_path()
+	for path: String in [ready, log_path]:
+		assert_true(path.begins_with(user_dir + "/"), "%s is under user://" % path)
+		assert_false(path.begins_with(exe_dir + "/"), "%s is not next to the executable" % path)
+	assert_eq(ready.get_file(), "host_ready_4242.txt")
+	assert_ne(SteamParty.ready_file_path(1), SteamParty.ready_file_path(2), "one ready file per hosting process")
+	assert_eq(log_path.get_file(), "host_server.log")

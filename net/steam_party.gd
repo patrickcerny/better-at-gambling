@@ -138,9 +138,13 @@ static func check_lobby(info: Dictionary, my_steam_id: int) -> String:
 ## port, or 0 with `last_error` set. `hosting` is true from here on (`stop_hosting` ends it).
 func spawn_room_server(host_uid: String) -> int:
 	server_port = free_loopback_port()
-	_ready_file = OS.get_user_data_dir().path_join("host_ready_%d.txt" % OS.get_process_id())
+	_ready_file = ready_file_path(OS.get_process_id())
 	DirAccess.remove_absolute(_ready_file)
 	var args: PackedStringArray = server_args(server_port, host_uid, _ready_file)
+	# The game's own binary; in the macOS build that is "Better at Gambling.app/Contents/MacOS/
+	# Better at Gambling", which create_process execs directly (only an .app folder path goes
+	# through NSWorkspace / `open`). Nothing is written next to it: inside a signed bundle that
+	# folder is read-only, so the ready file and the log live in user:// (see the helpers below).
 	server_pid = OS.create_process(OS.get_executable_path(), args)
 	if server_pid <= 0:
 		last_error = "Could not start the lobby server on this PC."
@@ -177,9 +181,20 @@ static func server_args(port: int, host_uid: String, ready_file: String) -> Pack
 	var args: PackedStringArray = []
 	if not OS.has_feature("template"):
 		args.append_array(["--path", ProjectSettings.globalize_path("res://")])  # dev: the editor binary
-	args.append_array(["--headless", "--audio-driver", "Dummy", "--log-file", OS.get_user_data_dir().path_join("logs/host_server.log")])
+	args.append_array(["--headless", "--audio-driver", "Dummy", "--log-file", server_log_path()])
 	args.append_array(["--", "--server", "--host-mode", "--port", str(port), "--host-uid", host_uid, "--ready-file", ready_file, "--empty-timeout", "120"])
 	return args
+
+
+## File the room server creates once it listens (`--ready-file`), one per hosting game process.
+## In user://, never next to the executable (read-only inside a signed macOS .app).
+static func ready_file_path(pid: int) -> String:
+	return OS.get_user_data_dir().path_join("host_ready_%d.txt" % pid)
+
+
+## The room server's log (user://logs/host_server.log), for the same reason.
+static func server_log_path() -> String:
+	return OS.get_user_data_dir().path_join("logs/host_server.log")
 
 
 ## A UDP port nobody on this PC uses.
