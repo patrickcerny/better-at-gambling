@@ -176,21 +176,43 @@ def test_the_party_leader_leaves_the_lobby_and_the_next_one_starts_the_match(pro
         assert p.errors() == [], (p.name, p.errors()[:5])
 
 
+def _read_wav(path):
+    """Mono 16-bit WAV -> (rate, samples in [-1, 1])."""
+    with wave.open(str(path), "rb") as w:
+        assert w.getnchannels() == 1 and w.getsampwidth() == 2, path
+        rate = w.getframerate()
+        raw = w.readframes(w.getnframes())
+    return rate, [v / 32768.0 for v in struct.unpack(f"<{len(raw) // 2}h", raw)]
+
+
+def _tone_amplitude(x, hz, rate):
+    """Goertzel: amplitude of the `hz` component (a sine of amplitude A reads about A)."""
+    c = 2.0 * math.cos(2.0 * math.pi * hz / rate)
+    s1 = s2 = 0.0
+    for v in x:
+        s1, s2 = v + c * s1 - s2, s1
+    return math.sqrt(max(s1 * s1 + s2 * s2 - c * s1 * s2, 0.0)) * 2.0 / len(x)
+
+
 def test_voice_from_one_client_is_relayed_by_the_dedicated_server_and_played_by_the_other(procs, tmp_path):
-    """Proximity voice end to end (Patrick on 0.9.0: "fix the proximity chat"): Alice loops a WAV
-    into her capture path (`--voice-test`, open mic), the headless dedicated server (Dummy audio
-    driver) relays it, Bob's VoicePlayback plays it under Alice's avatar."""
+    """Proximity voice end to end (Patrick: "think of a way to test it if the other user received
+    it"): Alice loops a 440 Hz WAV into her capture path (`--voice-test`, open mic), the headless
+    dedicated server (Dummy audio driver) relays it, Bob's VoicePlayback plays it under Alice's
+    avatar and `--voice-dump` writes what it played. Every hop's frame count is compared, and the
+    WAV Bob played must be Alice's tone at Alice's level."""
+    tone_hz, amp = 440.0, 12000 / 32768
     wav_path = tmp_path / "voice.wav"
     with wave.open(str(wav_path), "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(16000)
-        w.writeframes(b"".join(struct.pack("<h", int(12000 * math.sin(2 * math.pi * 300 * i / 16000))) for i in range(16000)))
+        w.writeframes(b"".join(struct.pack("<h", int(12000 * math.sin(2 * math.pi * tone_hz * i / 16000))) for i in range(16000)))
+    dump = tmp_path / "bob_heard.wav"
     port = free_port()
     server = _server(procs, "voice-server", port, "--minigames", "0", "--gamble-seconds", "30", "--seed", "3")
     server.wait_for(r"server listening", 30)
     alice = _client(procs, "voice-alice", port, "--voice-test", str(wav_path))
-    bob = _client(procs, "voice-bob", port)
+    bob = _client(procs, "voice-bob", port, "--voice-dump", str(dump))
     assert alice.wait(240) == 0, alice.log_path
     assert bob.wait(60) == 0, bob.log_path
     assert server.wait(60) == 0, server.log_path
@@ -204,5 +226,39 @@ def test_voice_from_one_client_is_relayed_by_the_dedicated_server_and_played_by_
     assert sent > 200, stats  # 25 frames/s while she is on the casino floor
     assert received > 100 and speakers == 1, stats
     assert played > 100, stats
+    a_id = int(re.search(r"welcomed as player (\d+)", alice.log()).group(1))
+    b_id = int(re.search(r"welcomed as player (\d+)", bob.log()).group(1))
+    # Hop by hop: Alice sent -> the server got -> the server sent Bob -> Bob got -> Bob played -> dumped.
+    relay = re.search(r"voice relay: (.*)", server.log())
+    assert relay, ("no relay summary", server.log_path)
+    got_at_server = int(re.search(rf"player {a_id} sent (\d+)", relay.group(1)).group(1))
+    to_bob = int(re.search(rf"player {b_id} got (\d+)", relay.group(1)).group(1))
+    per_speaker = re.search(rf"voice from player {a_id}: received (\d+), played (\d+)", bob.log())
+    assert per_speaker, ("no per-speaker line", bob.log_path)
+    bob_got, bob_played = int(per_speaker.group(1)), int(per_speaker.group(2))
+    dumped = int(re.search(rf"voice dump: (\d+) frames from player {a_id}", bob.log()).group(1))
+    hops = {"alice sent": sent, "server got": got_at_server, "server sent bob": to_bob, "bob got": bob_got, "bob played": bob_played, "dumped": dumped}
+    print("voice hops:", hops)
+    assert got_at_server >= sent * 0.98 - 2, hops  # loopback: nothing lost on the way up
+    assert to_bob >= got_at_server * 0.9, hops  # Bob was in reach nearly all the time
+    assert bob_got >= to_bob * 0.98 - 2, hops  # nothing lost on the way down
+    # Unplayed: at most what sat in Bob's jitter buffer (max 12 frames) when the match ended.
+    assert bob_played >= bob_got - 12, hops
+    # One playback under Alice's avatar all match long (a resync used to respawn her avatar,
+    # dropping the buffered audio each time).
+    assert bob.log().count(f"first frame played for player {a_id} ") == 1, bob.log_path
+    assert dumped == bob_played, hops
+    # What Bob played is Alice's tone, at Alice's level, for as long as he got it.
+    rate, x = _read_wav(dump.with_name(f"bob_heard_p{a_id}.wav"))
+    assert rate == 8000 and len(x) == dumped * 320, (rate, len(x), dumped)
+    body = x[320 * 3:]
+    at_tone = _tone_amplitude(body, tone_hz, rate)
+    others = {hz: _tone_amplitude(body, hz, rate) for hz in (300.0, 700.0, 1000.0, 2000.0)}
+    print(f"bob heard {len(x) / rate:.1f} s: {tone_hz:.0f} Hz at {at_tone:.3f}, others {others}")
+    assert len(x) / rate > 5.0
+    assert all(v < at_tone * 0.05 for v in others.values()), (at_tone, others)
+    assert abs(at_tone - amp) < amp * 0.1, (at_tone, amp)
+    rms = math.sqrt(sum(v * v for v in body) / len(body))
+    assert abs(rms - amp / math.sqrt(2)) < amp / math.sqrt(2) * 0.1, (rms, amp)
     for p in (server, alice, bob):
         assert p.errors() == [], (p.name, p.errors()[:5])

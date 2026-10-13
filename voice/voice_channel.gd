@@ -85,7 +85,10 @@ func _ready() -> void:
 	dump_path = cmd.get_string("voice-dump")
 	_apply_settings()
 	if online:
-		Log.info(&"voice", "voice chat: %s, player %d" % [MODE_LABELS[MODE_KEYS.find(_mode)], local_id])
+		var how: String = MODE_LABELS[MODE_KEYS.find(_mode)]
+		if not _test_samples.is_empty() and _mode != "off":
+			how = "open mic from the --voice-test WAV"
+		Log.info(&"voice", "voice chat: %s, player %d" % [how, local_id])
 
 
 func _exit_tree() -> void:
