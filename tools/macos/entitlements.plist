@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+Entitlements of the Developer ID (hardened runtime) signature of Better at Gambling.app's main
+executable, applied by .github/workflows/release.yml with rcodesign. Keep in sync with the
+codesign/entitlements/* switches of the "macOS" preset in export_presets.cfg (those only feed
+Godot's own ad-hoc signature).
+- audio-input: microphone for voice chat (with NSMicrophoneUsageDescription in Info.plist).
+- disable-library-validation: load the GodotSteam / Steam API dylibs in Contents/Frameworks.
+- allow-dyld-environment-variables: lets the Steam overlay inject itself (DYLD_INSERT_LIBRARIES).
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
+	<true/>
+</dict>
+</plist>
