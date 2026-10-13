@@ -1,10 +1,20 @@
-# Builds the Windows and Linux clients on every push to main. Each game version (BUILD_ID in
+# Builds the Windows, Linux and macOS clients on every push to main. Each game version (BUILD_ID in
 # core/net/protocol.gd, bumped once per stage) gets its own release v<version>; later pushes with the
 # same version refresh that release's downloads instead of adding a new one.
 # Shareable links that always point at the newest build:
 #   https://github.com/patrickcerny/better-at-gambling/releases/latest
 #   https://github.com/patrickcerny/better-at-gambling/releases/latest/download/BetterAtGambling-windows.zip
 # The VPS deploys the same commit on its own (deploy/install.sh cron, waits for empty rooms).
+#
+# macOS: exported from Linux as a universal .app (preset "macOS"), then tools/macos/package.sh
+# re-signs it with rcodesign. Godot's own rcodesign signing refuses apps with GDExtension libraries
+# (GodotSteam), so the preset only ad-hoc signs and the real signature happens after the export.
+# With the repository secrets MACOS_CERT_P12 (base64 .p12, "Developer ID Application"),
+# MACOS_CERT_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER_ID and APPLE_TEAM_ID
+# the app gets a Developer ID signature (hardened runtime, tools/macos/entitlements.plist) and is
+# notarized and stapled; without them it ships ad-hoc signed and the release notes say how to open
+# it. The secrets only reach that one step, as environment variables; the script writes the key
+# files into a private directory under $RUNNER_TEMP and deletes it when done.
 name: Build & release
 
 on:
@@ -23,7 +33,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60  # notarization waits for Apple (usually a few minutes)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,9 +70,54 @@ jobs:
           unzip -l dist/BetterAtGambling-windows.zip
           ls -la dist
 
+      - name: Export macOS
+        run: |
+          # Bundle version (CFBundleShortVersionString/CFBundleVersion) = game version; the preset
+          # leaves both empty (= project version) and only this checkout's copy is changed.
+          build_id=$(sed -n 's/^const BUILD_ID: String = "\(.*\)"/\1/p' core/net/protocol.gd)
+          if [[ "$build_id" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+            sed -i -e "s|^application/short_version=\"\"$|application/short_version=\"$build_id\"|" \
+              -e "s|^application/version=\"\"$|application/version=\"$build_id\"|" export_presets.cfg
+          fi
+          mkdir -p build/macos
+          # A .zip holding "Better at Gambling.app" (universal x86_64 + arm64, ad-hoc signed by Godot),
+          # with GodotSteam and libsteam_api.dylib in Contents/Frameworks.
+          tools/godot/godot --headless --path . --export-release "macOS" "$PWD/build/macos/BetterAtGambling.zip"
+          git checkout -- export_presets.cfg
+          test -s build/macos/BetterAtGambling.zip
+          unzip -l build/macos/BetterAtGambling.zip
+
+      - name: Install rcodesign
+        env:
+          RCODESIGN_VERSION: "0.29.0"  # apple-codesign, github.com/indygreg/apple-platform-rs
+          RCODESIGN_SHA256: dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002
+        run: |
+          name="apple-codesign-${RCODESIGN_VERSION}-x86_64-unknown-linux-musl"
+          curl -fsSL --retry 4 --retry-delay 2 -o "$RUNNER_TEMP/$name.tar.gz" \
+            "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${RCODESIGN_VERSION}/$name.tar.gz"
+          echo "$RCODESIGN_SHA256  $RUNNER_TEMP/$name.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$name.tar.gz" -C "$RUNNER_TEMP"
+          echo "RCODESIGN=$RUNNER_TEMP/$name/rcodesign" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/$name/rcodesign" --version
+
+      - name: Sign, notarize and pack macOS
+        id: macos
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # Sets steps.macos.outputs.signed: true (Developer ID + notarized) or false (ad-hoc).
+        run: |
+          tools/macos/package.sh build/macos/BetterAtGambling.zip dist/BetterAtGambling-macos.zip
+          ls -la dist
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          MACOS_SIGNED: ${{ steps.macos.outputs.signed }}
         run: |
           build_id=$(sed -n 's/^const BUILD_ID: String = "\(.*\)"/\1/p' core/net/protocol.gd)
           tag="v${build_id}"
@@ -75,6 +130,15 @@ jobs:
             echo 'Online parties run on the game server automatically, no setup needed. Older versions cannot join.'
             echo 'Or, with Steam running, Play Online → Host on this PC (Steam) and invite friends through Steam'
             echo '(keep the DLLs next to the exe; Steam shows the game as "Spacewar", the free test App ID).'
+            echo
+            echo '**Mac:** download `BetterAtGambling-macos.zip`, unzip, drag `Better at Gambling.app` to Applications,'
+            echo 'double-click; first start asks for microphone access for voice chat.'
+            if [[ "$MACOS_SIGNED" != "true" ]]; then
+              echo 'This Mac build is not notarized by Apple yet, so the first double-click is refused ("cannot verify"):'
+              echo 'click Done, then System Settings → Privacy & Security → "Open Anyway" (once; on macOS 14 and older'
+              echo 'Control-click the app → Open works too). If macOS calls the app "damaged", run'
+              echo '`xattr -dr com.apple.quarantine "/Applications/Better at Gambling.app"` in Terminal.'
+            fi
             echo
             echo "### Changes${prev:+ since $prev}"
             git log --no-merges --format='- %s' ${prev:+$prev..}HEAD | head -60
