@@ -147,6 +147,7 @@ var _predicted_hit_at: float = -INF
 ## Knocked down into a ragdoll: get up at this scene time (host only, like `_ko_until`).
 var _down_until: Dictionary[int, float] = {}
 var _pile_sync_timer: float = 0.0
+var _departed_check_queued: bool = false
 ## `--quit-after-results`: scripted clients exit once the digest is logged (network tests).
 var cmd_quit_after_results: bool = false
 ## Late join (Patrick: "Let players join running rounds"): "Joining next round" while the minigame
@@ -498,11 +499,22 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	return a
 
 
-## Spawns avatars for players we only learned about from a snapshot.
+## Spawns avatars for players we only learned about from a snapshot. Avatars of players who are
+## gone are dropped at the end of the frame: `ClientMatchView.resync` applies the last snapshot
+## (which lacks everyone who joined after it) and only then replays their `player_joined`, so an
+## immediate check freed and respawned those players' avatars on every resync (sitting down, ...),
+## and with them their voice playback and its buffered audio (found by `tests/net -k voice`).
 func _sync_avatars() -> void:
 	for pid: int in view.state.players:
 		if not avatars.has(pid):
 			_spawn_avatar(pid, view.state.players[pid])
+	if not _departed_check_queued:
+		_departed_check_queued = true
+		_drop_departed_avatars.call_deferred()
+
+
+func _drop_departed_avatars() -> void:
+	_departed_check_queued = false
 	for pid: int in avatars.keys():
 		if not view.state.players.has(pid):
 			avatars[pid].queue_free()
