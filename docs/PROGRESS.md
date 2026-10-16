@@ -139,7 +139,47 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
-### 2026-10-16 / next build (Wheel of Fortune)
+### 2026-10-16 / 0.9.10 (four new games, random floor, Patrick's second feedback burst)
+- Released 2026-10-16. PROTOCOL_VERSION 8 (tipping gone from the wire, new station events, the
+  floor plan in `match_started` / `regroup_started` / the snapshot, blackjack hands carry `clock`,
+  emotes in the snapshot).
+- New casino games, each with the house rule from 0.9.6 (a losing draw redone once with a small
+  chance, then luck; never shown) and RTP 101–102%: Wheel of Fortune (`wheel_1`, 54 segments),
+  Hi-Lo (`hilo_1` at (18.6, 0, −4.8), east of craps), craps with two thrown dice (`craps_1` at
+  (14, 0, −6): Pass / Don't Pass / Field / Any Seven, the shooter throws, the client's dice tumble
+  onto the server's faces) and scratch cards (`scratch_1` kiosk at (−19, 0, 10)). Registry entries
+  7–10. Hot table, House Comp, stats and items work at all of them.
+- Random casino floor (`core/match/floor_plan.gd`, `docs/FLOOR_PLAN.md`): every non-fixed station
+  spot is redrawn from the match seed when the lobby opens, on Play Again and at every regroup;
+  spots close at random (a rope and CLOSED TONIGHT sign, or a plant), nothing is guaranteed, soft
+  cap of two per table game, at least 60% of the spots open. `FloorGeometry` checks each drawn
+  floor against the real colliders and the navmesh (gap 0.35 m, every chair reachable). Practice
+  keeps the full floor; minigames-only never draws. Seated players at a vanished table are stood
+  up and refunded; the TONIGHT'S FLOOR board by the doors lists the draw. Tuning in
+  `data/balance/floor_plan.tres`; `--floor random|full` for dev.
+- Emotes: all ten are animated in 3D (`Emotes.SECONDS` 2.5; the bean's arms, lean, feet and face;
+  skins act them out through their own clips or driven arm bones), with a front camera view.
+- Settings: voice loudness slider (an amplifier for a loud or quiet mic), the microphone test
+  clutter removed, the Controls tab in sections (movement, interaction, tables, minigames), more
+  frame limits.
+- Odd Jobs: a tutorial page, the aim box covers the whole cabinet front, no click rate limit
+  (client or server; `IntentValidator.UNLIMITED`).
+- Waiting room: the play-money note under the title is gone.
+- Blackjack split: two real hands played in turn, the second hand's card dealt when play reaches
+  it, a per-player decision clock with `bj_split_time_bonus`, a rim outline and HAND 1/2 marker on
+  the hand in play.
+- Bets over the balance go all-in (`core/economy/bet_clamp.gd`: `StationLogicBase.bet_limits`,
+  `clamp_bet`, `with_all_in`; `bet_placed` carries `all_in` and `requested`), at every table.
+- Dealer tipping removed entirely (Patrick: "that was a stupid idea from me"): no `tip_dealer`
+  intent, no `dealer_tipped` event, no tip jar, no tip balance settings.
+- Fixes on the way: `HotTableDirector` remembers its last pick after the table cools, so the same
+  table is never hot twice in a row; the emote physics test no longer samples the pose during a
+  blink and settles by frames rather than the clock; the net voice test counts the jitter
+  buffer's deliberate drops (`late`, `overflowed`, `lost` now in Bob's voice summary line).
+- Suite before release: lint ok; unit 815; sim 22; integration 242; physics 166; ui 270; smoke 4
+  + boot; session; orchestrator 68; net 12. Not verified: real online play of the new games with
+  several clients, the scratch feel with a real mouse, the new sounds by ear.
+### 2026-10-16 / Wheel of Fortune (0.9.10)
 - Patrick approved a Big Six money wheel as a new table: `wheel_1` on the casino floor east of the
   blackjack lounge (11, 0, 5), registered as game `wheel` (data/registry/games.tres, map stations,
   Hot Table candidate). 54 segments ($1 ×24, $2 ×15, $5 ×7, $10 ×4, $20 ×2, Joker, Logo), chips on
@@ -156,7 +196,7 @@
   Tests: unit `test_wheel.gd`, sim `test_wheel_rtp.gd`, integration `test_wheel_flow.gd`, ui
   `test_wheel_ui.gd`, physics `test_wheel_table.gd` (the real casino: no overlaps, dealer, navmesh,
   sit and bet). Dev shot: `tools/dev/wheel_shot.tscn`.
-### 2026-10-16 / scratch cards (after 0.9.9, not released)
+### 2026-10-16 / scratch cards (0.9.10)
 - Patrick approved a new casino game, scratch cards. A brass-and-wood kiosk with a card dispenser,
   a desk lamp, a "SCRATCH CARDS" board and an attendant bean, in the start room by the west wall
   (`scratch_1` at (-19, 0, 10), facing east); one player at a time like a slot machine.
@@ -180,7 +220,7 @@
   prints its prizes on that stake; `bet_placed` carries `all_in` / `requested`. The buy buttons say
   "$X ALL IN" then. Registered as games.tres entry 10 after wheel, Hi-Lo and craps.
 
-### 2026-10-16 / Hi-Lo table (after 0.9.9, not released)
+### 2026-10-16 / Hi-Lo table (0.9.10)
 - Patrick approved a new table: Hi-Lo (`games/hilo/`). Oval card table with burgundy felt, a dealer
   (DealerLogic; no tipping), 4 seats, one shared single deck, everyone plays
   their own hand: ante, a card up, HIGHER or LOWER (aces high, a tie loses), ride or cash out up a
@@ -190,7 +230,7 @@
   `hilo_favour` 15%, then luck rerolls it; nothing of it is published. Measured RTP over 120k hands
   per strategy: likelier side 1.0154, random side 1.0206, long shot 1.0157 (expectations 1.014 to
   1.016); the printed pays alone return 0.93 to 0.97.
-- On the casino floor at (16, 0, −5), east of the roulette pit (the spot asked for, (16, 0, 7), is
+- On the casino floor at (18.6, 0, −4.8), east of the craps table (the spot asked for, (16, 0, 7), is
   the bar and its back bar). New events `hilo_dealt`, `hilo_call`, `hilo_reshuffle`; no new intents
   (`place_bet {amount}`, `action higher|lower|cash_out`).
 
