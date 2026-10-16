@@ -45,6 +45,12 @@ func bet_sizes() -> Array[int]:
 	return out
 
 
+## All-in: a listed size the balance can't cover bets everything (down to the smallest size).
+func bet_limits(_p: int, bet: Dictionary) -> Vector2i:
+	var sizes: Array[int] = bet_sizes()
+	return BetClamp.size_range(sizes) if int(bet.get("amount", 0)) in sizes else Vector2i(-1, -1)
+
+
 func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not p in players:
 		return fail(&"not_seated")
@@ -54,7 +60,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not risk in RISKS:
 		return fail(&"invalid_risk")
 	var amount: int = int(bet.get("amount", 0))
-	if not amount in bet_sizes():
+	if not size_allowed(amount, bet, bet_sizes()):
 		return fail(&"invalid_amount")
 	if not _take_stake(p, amount):
 		return fail(&"insufficient_funds")
@@ -68,7 +74,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	_next_drop_id += 1
 	drops.append(drop)
 	cooldowns[p] = balance.plinko_drop_cooldown
-	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id, "risk": risk}))
+	events.append(GameEvents.bet_placed(p, station_id, amount, with_all_in(bet, {"game": game_id, "risk": risk})))
 	# The slot is public: clients need it to replay the server's steered path.
 	events.append(GameEvents.make(&"plinko_dropped", {"station": station_id, "player": p, "drop_id": drop["drop_id"], "risk": risk, "slot": drop["slot"]}))
 	if d.luck_changed:

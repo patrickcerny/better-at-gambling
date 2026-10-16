@@ -6,6 +6,8 @@ extends Control
 ## cursor is free (InputRouter), so every button here is clicked with the mouse as well.
 
 signal rejected(error: StringName)
+## A short heads-up for the HUD toast (e.g. "ALL IN").
+signal notice(text: String)
 
 var station_id: StringName
 var local_id: int = -1
@@ -18,8 +20,6 @@ var title: Label
 var status_label: Label
 var hint: Label
 var limits_mult: float = 1.0
-## Tip jar (blackjack and roulette): tip the dealer for a little luck at this table.
-var tip_button: Button = null
 ## Display name shown in the header.
 var game_title: String = "GAME"
 ## True at a waiting-room table (`FunRoom`): play money, shown as such under the title.
@@ -84,8 +84,6 @@ func _ready() -> void:
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_color_override(&"font_color", Color("#9A8F7A"))
 	body.add_child(hint)
-	if has_tip_jar():
-		_build_tip_button()
 
 
 ## Shows the overlay for a station.
@@ -98,9 +96,8 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 	fun = FunRoom.is_fun(station_id)
 	title.text = game_title
 	play_money_label.visible = fun
-	if tip_button != null:
-		tip_button.visible = not fun  # no dealer to tip with play chips
 	_show_play_money()
+	_sync_bet_panel()
 	var vip: bool = bool(pub.get("vip", false))
 	limits_mult = Registry.balance.limits_multiplier(state.segment_index if state != null else 0) * (3.0 if vip else 1.0)
 	_on_open()
@@ -126,6 +123,7 @@ func update_state(p_pub: Dictionary, p_priv: Dictionary) -> void:
 	pub = p_pub
 	priv = p_priv
 	_show_play_money()
+	_sync_bet_panel()
 	if visible:
 		if _glyph_epoch != InputGlyphs.epoch:
 			_update_glyphs()
@@ -164,6 +162,44 @@ func _show_play_money() -> void:
 		play_money_label.text = "PLAY MONEY  %s  ·  just for fun" % money(my_balance())
 
 
+## The table's `BetPanel` (a subclass's `bet_panel`), null for tables without one.
+func the_bet_panel() -> BetPanel:
+	return get(&"bet_panel") as BetPanel
+
+
+## All-in: the bet panel clamps to what you have, and its first all-in per bet is a toast.
+## Any table whose overlay has a `bet_panel: BetPanel` gets this without doing anything.
+func _sync_bet_panel() -> void:
+	var bp: BetPanel = the_bet_panel()
+	if bp == null:
+		return
+	if not bp.went_all_in.is_connected(_on_went_all_in):
+		bp.went_all_in.connect(_on_went_all_in)
+	if state != null:
+		bp.set_balance(my_balance())
+
+
+## What the table still takes from you this round when its max is a per-round total (roulette,
+## horse race): the bet panel's max minus your bets in the public state's `bets` list.
+func bet_room() -> int:
+	var bp: BetPanel = the_bet_panel()
+	if bp == null:
+		return 0
+	var total: int = 0
+	for b: Variant in pub.get("bets", []):
+		if b is Dictionary and int((b as Dictionary).get("player", -1)) == local_id:
+			total += int((b as Dictionary).get("amount", 0))
+	return maxi(bp.max_bet - total, 0)
+
+
+func _on_went_all_in(amount: int) -> void:
+	notice.emit(all_in_text(amount))
+
+
+static func all_in_text(amount: int) -> String:
+	return "ALL IN: betting everything you have (%s)" % money(amount)
+
+
 ## Limit scaled like the server does.
 func scaled(amount: int) -> int:
 	return int(floor(amount * limits_mult))
@@ -177,40 +213,6 @@ func _panel_height() -> float:
 ## of following the cursor (InputRouter.look_locked).
 func wants_camera_lock() -> bool:
 	return false
-
-
-## The tip jar is at the tables with a dealer to tip.
-func has_tip_jar() -> bool:
-	return game_title == "BLACKJACK" or game_title == "ROULETTE"
-
-
-func _build_tip_button() -> void:
-	tip_button = Button.new()
-	tip_button.name = "TipButton"
-	tip_button.focus_mode = Control.FOCUS_NONE
-	tip_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	tip_button.custom_minimum_size = Vector2(0, 36)
-	tip_button.text = tip_text()
-	tip_button.tooltip_text = "Throw the dealer a few chips: +%d luck here for %d rounds" % [Registry.balance.tip_luck, Registry.balance.tip_rounds]
-	tip_button.pressed.connect(tip)
-	body.add_child(tip_button)
-
-
-static func tip_text() -> String:
-	return "TIP $%d  ·  +%d LUCK ×%d" % [Registry.balance.tip_amount, Registry.balance.tip_luck, Registry.balance.tip_rounds]
-
-
-## Sends `tip_dealer` for this table; thanks you on the button for a moment.
-func tip() -> bool:
-	var ok: bool = send(&"tip_dealer")
-	if ok and tip_button != null:
-		tip_button.text = "THANKS!  +%d LUCK" % Registry.balance.tip_luck
-		Audio.play(&"chip_clack", &"UI", -4.0, 1.2)
-		if is_inside_tree():
-			get_tree().create_timer(1.6).timeout.connect(func() -> void:
-				if is_instance_valid(tip_button):
-					tip_button.text = tip_text())
-	return ok
 
 
 ## True for overlays that sit at the right edge instead of over the middle of the screen.
@@ -266,12 +268,12 @@ static func rejection_text(error: StringName) -> String:
 			return "Too far away"
 		&"station_full":
 			return "Table is full"
-		&"no_tips_here":
-			return "No dealer to tip here"
 		&"one_horse_only":
 			return "One horse per race"
 		&"invalid_horse":
 			return "Pick a horse"
+		&"invalid_symbol":
+			return "Pick a symbol"
 		&"card_open":
 			return "Scratch your card first"
 		&"no_card":

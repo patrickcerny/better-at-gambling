@@ -201,10 +201,10 @@ func set_private(priv: Dictionary) -> void:
 		discard_label.text = "\n".join(parts)
 
 
-## "Lucky Clover 0:32", "Double Trouble (next win)", "Spring Glove ×2", "Dealer tip ×3".
+## "Lucky Clover 0:32", "Double Trouble (next win)", "Spring Glove ×2".
 static func effect_text(e: Dictionary) -> String:
 	var id: StringName = StringName(e.get("item", ""))
-	var name: String = "Dealer tip" if id == ItemSystem.TIP_ID else RewardPanel.item_name(id)
+	var name: String = RewardPanel.item_name(id)
 	var left: float = float(e.get("left", -1.0))
 	var uses: int = int(e.get("uses", -1))
 	if left >= 0.0:

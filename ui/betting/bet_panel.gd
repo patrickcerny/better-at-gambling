@@ -3,12 +3,19 @@ extends PanelContainer
 ## Reusable chip selector + amount stepper + CONFIRM / CLEAR / REPEAT (§2.7). This is the
 ## keyboard/gamepad/accessibility path; physical betting (chips on the felt) sits on top of it.
 ## Keys: 1–4 chips, [ ] prev/next chip, Enter confirm, Backspace clear, R repeat.
+##
+## All-in (BetClamp): with `set_balance` fed, a bet over what you have bets everything you have
+## (still capped by the max; under the minimum it stays as asked and the server refuses it).
+## Chips worth more than your balance show the balance, an "ALL IN" tag marks the bet, and
+## `went_all_in` fires once each time the bet becomes all-in (the table shows a toast).
 
 signal confirmed(amount: int)
 signal cleared
 signal repeated
 signal amount_changed(amount: int)
 signal chip_changed(value: int)
+## The bet just became all-in at `amount` (everything the player has).
+signal went_all_in(amount: int)
 
 var chips: Array[int] = [10, 25, 50, 100]
 var min_bet: int = 10
@@ -16,6 +23,10 @@ var max_bet: int = 200
 var amount: int = 0
 var selected_chip: int = 0
 var last_amount: int = 0
+## What the player can bet (-1 = unknown: no all-in clamping).
+var balance: int = -1
+## True while the current bet is everything the player has (the "ALL IN" tag shows).
+var all_in: bool = false
 ## When true, selecting a chip confirms immediately (slots/Plinko style).
 var instant: bool = false
 ## Chip button size and gap; slim docked panels (roulette) set smaller ones before `_ready`.
@@ -24,6 +35,7 @@ var chip_gap: int = 10
 
 var _chip_buttons: Array[Button] = []
 var _amount_label: Label
+var _all_in_tag: Label
 var _limits_label: Label
 var _confirm: Button
 var _clear: Button
@@ -72,10 +84,56 @@ func chip_value() -> int:
 	return chips[clampi(selected_chip, 0, chips.size() - 1)]
 
 
+## Updates what the player has; an amount over it drops to it (all-in).
+func set_balance(b: int) -> void:
+	if b == balance:
+		return
+	balance = b
+	if amount > 0:
+		set_amount(amount)  # re-clamps, and re-checks the ALL IN tag
+	else:
+		_refresh()  # a chip already on the layout keeps its tag until the next chip or CLEAR
+
+
+## The stake for one chip placed on the layout (roulette, horse race), all-in when the chip is
+## worth more than the balance. `room` is what the table still takes from you (-1 = `max_bet`).
+func chip_stake(room: int = -1) -> int:
+	var r: int = max_bet if room < 0 else room
+	var stake: int = _clamped(chip_value(), r)
+	_set_all_in(_is_all_in(chip_value(), r))
+	return stake
+
+
 func set_amount(a: int) -> void:
-	amount = clampi(a, 0, max_bet)
+	amount = _clamped(clampi(a, 0, max_bet), max_bet)
+	_set_all_in(amount > 0 and _is_all_in(a, max_bet))
 	_refresh()
 	amount_changed.emit(amount)
+
+
+## `requested` cut to `room` and then to the balance (BetClamp); unchanged when the bet would be
+## refused anyway (balance under the minimum, no room, unknown balance) so the server says why.
+func _clamped(requested: int, room: int) -> int:
+	if balance < 0 or requested < min_bet:
+		return requested
+	var c: int = BetClamp.clamp_amount(requested, balance, min_bet, room)
+	return c if c > 0 else requested
+
+
+func _is_all_in(requested: int, room: int) -> bool:
+	if balance < 0 or requested < min_bet:
+		return false
+	return bool(BetClamp.resolve(requested, balance, min_bet, room)["all_in"])
+
+
+func _set_all_in(v: bool) -> void:
+	var was: bool = all_in
+	all_in = v
+	if _all_in_tag != null:
+		_all_in_tag.visible = all_in
+		_all_in_tag.text = "ALL IN  $%d" % balance if all_in else "ALL IN"
+	if all_in and not was:
+		went_all_in.emit(balance)
 
 
 func select_chip(index: int) -> void:
@@ -84,7 +142,7 @@ func select_chip(index: int) -> void:
 	chip_changed.emit(chip_value())
 	Audio.play(&"ui_click", &"UI", -12.0)
 	if instant:
-		confirmed.emit(chip_value())
+		confirmed.emit(chip_stake())
 
 
 func confirm() -> void:
@@ -154,6 +212,11 @@ func _refresh() -> void:
 	_limits_label.text = "MIN $%d   MAX $%d" % [min_bet, max_bet]
 	for i: int in _chip_buttons.size():
 		_chip_buttons[i].button_pressed = i == selected_chip
+		# A chip worth more than you have bets what you have.
+		var c: int = chips[i] if i < chips.size() else 0
+		var shown: int = _clamped(c, max_bet)
+		_chip_buttons[i].text = "$%d" % shown
+		_chip_buttons[i].tooltip_text = "ALL IN: $%d is everything you have" % shown if shown < c else ""
 	_confirm.disabled = amount < min_bet and amount != 0
 	_repeat.disabled = last_amount <= 0
 
@@ -167,6 +230,14 @@ func _build() -> void:
 	_limits_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_limits_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
 	v.add_child(_limits_label)
+	_all_in_tag = Label.new()
+	_all_in_tag.name = "AllInTag"
+	_all_in_tag.text = "ALL IN"
+	_all_in_tag.theme_type_variation = &"SmallLabel"
+	_all_in_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_all_in_tag.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	_all_in_tag.visible = all_in
+	v.add_child(_all_in_tag)
 	_chips_row = HBoxContainer.new()
 	_chips_row.name = "Chips"
 	_chips_row.alignment = BoxContainer.ALIGNMENT_CENTER

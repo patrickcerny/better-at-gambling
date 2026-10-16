@@ -169,6 +169,20 @@ func test_server_paid_card_opens_and_refund_resets() -> void:
 	assert_true(ui.card_view.symbols.is_empty())
 
 
+func test_cards_over_the_balance_go_all_in() -> void:
+	st.balances[1] = 30
+	await wait_process_frames(2)
+	assert_false(ui.buy_buttons[0].disabled)
+	assert_false(ui.buy_buttons[1].disabled, "the $25 card still sells")
+	assert_string_contains(ui.buy_buttons[1].text, "$25")
+	assert_false(ui.buy_buttons[2].disabled)
+	assert_string_contains(ui.buy_buttons[2].text, "$30 ALL IN", "the $50 card sells for everything")
+	st.balances[1] = 9
+	await wait_process_frames(2)
+	for t: int in 3:
+		assert_true(ui.buy_buttons[t].disabled, "under the cheapest card nothing sells")
+
+
 func test_the_printed_table_matches_the_logic() -> void:
 	var cfg: BalanceConfig = Registry.balance
 	for t: int in 3:

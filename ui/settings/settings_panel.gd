@@ -2,8 +2,9 @@ class_name SettingsPanel
 extends PanelContainer
 ## Settings screen (Patrick: "settings, better UI: sounds, sensitivity etc."; "Different tabs for
 ## the settings"; "Settings resume button at the bottom"), shared by the main menu and the in-game
-## pause menu. Four tabs: GAME (mouse, field of view), VIDEO, AUDIO (volumes, voice chat) and
-## CONTROLS (key remapping: click a binding, press a key or mouse button, Esc cancels). Every
+## pause menu. Four tabs: GAME (field of view), VIDEO, AUDIO (volumes, voice chat, mic volume and
+## test) and CONTROLS (key bindings grouped Movement / Interaction / Social / Camera & system:
+## click a binding, press a key or mouse button, Esc cancels; then mouse and gamepad look). Every
 ## control applies at once through `Settings`; the file is written when the panel closes. BACK
 ## (and Esc) returns to whoever opened it; in game RESUME also goes straight back to play.
 
@@ -18,6 +19,14 @@ const TABS: Array[String] = ["GAME", "VIDEO", "AUDIO", "CONTROLS"]
 const CAPTURE_TEXT: String = "Press a key…"
 ## The mic test tries a microphone that would not open again this often.
 const MIC_RETRY_SECONDS: float = 2.0
+## The CONTROLS tab's sections (Patrick: "structure the controls tab better, into movement,
+## interaction etc"), each listing its remappable actions (`Settings.KEYBINDS`) in order.
+const CONTROL_SECTIONS: Dictionary[String, Array] = {
+	"MOVEMENT": [&"move_forward", &"move_back", &"move_left", &"move_right", &"sprint", &"jump"],
+	"INTERACTION": [&"interact", &"grab", &"shove", &"shake", &"item_1", &"item_2", &"item_3", &"leave_station"],
+	"SOCIAL": [&"emote_wheel", &"emote_1", &"emote_2", &"emote_3", &"emote_4", &"push_to_talk", &"ping", &"leaderboard"],
+	"CAMERA & SYSTEM": [&"toggle_camera", &"pause"],
+}
 
 var in_game: bool = false
 ## Index into `TABS` of the page showing.
@@ -33,12 +42,19 @@ var bind_buttons: Dictionary[StringName, Button] = {}
 var _resume: Button
 var _back: Button
 var _reset_keys: Button
-## AUDIO tab: voice mode, microphone choice (`input_devices[i]` is item i) and the input level.
+## The CONTROLS tab's gamepad button next to each binding (read only).
+var pad_labels: Dictionary[StringName, Label] = {}
+## The CONTROLS tab's section headings, by `CONTROL_SECTIONS` title.
+var control_headings: Dictionary[String, Label] = {}
+## VIDEO tab: the frame limit list (`Settings.FPS_CAPS` order).
+var fps_option: OptionButton
+## AUDIO tab: voice mode, microphone choice (`input_devices[i]` is item i), mic volume and the
+## small input level meter next to TEST MICROPHONE.
 var voice_mode: OptionButton
 var input_device: OptionButton
 var input_devices: PackedStringArray = PackedStringArray()
+var mic_gain_slider: HSlider
 var mic_meter: ProgressBar
-var mic_status: Label
 ## The microphone the meter reads when no match is running (main menu): started while the AUDIO
 ## tab shows, stopped when it closes. In a match the meter reads the voice channel's capture.
 var mic_test: VoiceCapture = null
@@ -46,8 +62,6 @@ var mic_test: VoiceCapture = null
 var mic_check_button: Button
 var mic_check_result: Label
 var mic_check: VoiceMicTest = null
-## Voice diagnostics line (microphone, frames sent, received and played per speaker, last error).
-var voice_diag: Label
 var _mutes: VoiceMuteList
 var _meter_fill: StyleBoxFlat
 var _mic_retry: float = 0.0
@@ -125,9 +139,6 @@ func _ready() -> void:
 
 
 func _build_game(page: VBoxContainer) -> void:
-	page.add_child(_heading("MOUSE"))
-	_slider(page, "Mouse sensitivity", "controls", "mouse_sensitivity", 0.2, 3.0, 0.05, false)
-	_check(page, "Invert mouse Y", "controls", "invert_y")
 	page.add_child(_heading("CAMERA"))
 	_slider(page, "Field of view", "video", "fov", 70.0, 110.0, 1.0, false)
 
@@ -137,13 +148,14 @@ func _build_video(page: VBoxContainer) -> void:
 	_check(page, "Fullscreen", "video", "fullscreen")
 	_check(page, "VSync", "video", "vsync")
 	var fps_row := _row(page, "Frame limit")
-	var fps := OptionButton.new()
+	fps_option = OptionButton.new()
+	fps_option.name = "FrameLimit"
 	for cap: int in Settings.FPS_CAPS:
-		fps.add_item("Unlimited" if cap == 0 else "%d FPS" % cap)
-	fps.selected = maxi(Settings.FPS_CAPS.find(int(Settings.get_value("video", "max_fps"))), 0)
-	fps.item_selected.connect(func(i: int) -> void: Settings.change("video", "max_fps", Settings.FPS_CAPS[i]))
-	fps.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fps_row.add_child(fps)
+		fps_option.add_item(Settings.fps_label(cap))
+	fps_option.selected = maxi(Settings.FPS_CAPS.find(int(Settings.get_value("video", "max_fps"))), 0)
+	fps_option.item_selected.connect(func(i: int) -> void: Settings.change("video", "max_fps", Settings.FPS_CAPS[i]))
+	fps_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fps_row.add_child(fps_option)
 
 
 func _build_audio(page: VBoxContainer) -> void:
@@ -153,7 +165,7 @@ func _build_audio(page: VBoxContainer) -> void:
 	_slider(page, "Effects", "audio", "sfx", 0.0, 1.0, 0.05, true)
 	_slider(page, "Menus", "audio", "ui", 0.0, 1.0, 0.05, true)
 	page.add_child(_heading("VOICE CHAT"))
-	_slider(page, "Voice volume", "audio", "voice", 0.0, 1.0, 0.05, true)
+	_slider(page, "Voice volume (others)", "audio", "voice", 0.0, 1.0, 0.05, true)
 	var voice_row := _row(page, "Voice chat")
 	voice_mode = OptionButton.new()
 	voice_mode.name = "VoiceMode"
@@ -171,79 +183,105 @@ func _build_audio(page: VBoxContainer) -> void:
 	input_device.custom_minimum_size = Vector2(200, 0)
 	input_device.item_selected.connect(func(i: int) -> void: Settings.change("voice", "input_device", input_devices[i]))
 	device_row.add_child(input_device)
-	var level_row := _row(page, "Mic level")
+	mic_gain_slider = _slider(page, "Mic volume (your voice)", "voice", "mic_gain", 0.0, Settings.MAX_MIC_GAIN, 0.05, true)
+	mic_gain_slider.name = "MicGain"
+	var check_row := _row(page, "Hear yourself")
+	mic_check_button = Button.new()
+	mic_check_button.name = "TestMic"
+	mic_check_button.text = "TEST MICROPHONE"
+	mic_check_button.tooltip_text = "Records %d s and plays it back to you." % roundi(VoiceMicTest.RECORD_SECONDS)
+	mic_check_button.custom_minimum_size = Vector2(220, 42)
+	mic_check_button.pressed.connect(start_mic_check)
+	check_row.add_child(mic_check_button)
 	mic_meter = ProgressBar.new()
 	mic_meter.name = "MicMeter"
 	mic_meter.min_value = 0.0
 	mic_meter.max_value = 1.0
 	mic_meter.step = 0.0
 	mic_meter.show_percentage = false
-	mic_meter.custom_minimum_size = Vector2(160, 18)
-	mic_meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mic_meter.custom_minimum_size = Vector2(90, 12)
 	mic_meter.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color("#2A1A1A")
 	bg.border_color = Color(Palette.WARM_GOLD, 0.35)
-	bg.set_border_width_all(2)
-	bg.set_corner_radius_all(9)
+	bg.set_border_width_all(1)
+	bg.set_corner_radius_all(6)
 	_meter_fill = StyleBoxFlat.new()
 	_meter_fill.bg_color = Palette.MONEY_GREEN
-	_meter_fill.set_corner_radius_all(9)
+	_meter_fill.set_corner_radius_all(6)
 	mic_meter.add_theme_stylebox_override(&"background", bg)
 	mic_meter.add_theme_stylebox_override(&"fill", _meter_fill)
-	level_row.add_child(mic_meter)
-	mic_status = Label.new()
-	mic_status.name = "MicStatus"
-	mic_status.theme_type_variation = &"SmallLabel"
-	mic_status.custom_minimum_size = Vector2(190, 0)
-	mic_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	level_row.add_child(mic_status)
-	var check_row := _row(page, "Hear yourself")
-	mic_check_button = Button.new()
-	mic_check_button.name = "TestMic"
-	mic_check_button.text = "TEST MICROPHONE"
-	mic_check_button.custom_minimum_size = Vector2(220, 42)
-	mic_check_button.pressed.connect(start_mic_check)
-	check_row.add_child(mic_check_button)
+	check_row.add_child(mic_meter)
 	mic_check_result = Label.new()
 	mic_check_result.name = "MicTestResult"
 	mic_check_result.theme_type_variation = &"SmallLabel"
-	mic_check_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mic_check_result.clip_text = true
 	mic_check_result.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mic_check_result.text = "Records %d s from the microphone and plays it back to you through voice chat." % roundi(VoiceMicTest.RECORD_SECONDS)
 	check_row.add_child(mic_check_result)
-	voice_diag = Label.new()
-	voice_diag.name = "VoiceDiag"
-	voice_diag.theme_type_variation = &"SmallLabel"
-	voice_diag.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	voice_diag.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.7))
-	page.add_child(voice_diag)
 	_mutes = VoiceMuteList.new()
 	page.add_child(_mutes)
 
 
 func _build_controls(page: VBoxContainer) -> void:
-	page.add_child(_heading("KEYBOARD & MOUSE"))
 	var hint := Label.new()
 	hint.theme_type_variation = &"SmallLabel"
-	hint.text = "Click a binding, then press a key or mouse button. Esc cancels. Saved on this PC."
+	hint.text = "Click a key, then press the new key or mouse button. Esc cancels. Gamepad buttons are on the right."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	page.add_child(hint)
-	for action: StringName in Settings.KEYBINDS:
-		var h: HBoxContainer = _row(page, Settings.KEYBINDS[action])
-		var b := Button.new()
-		b.name = "Bind_%s" % action
-		b.custom_minimum_size = Vector2(220, 42)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(start_capture.bind(action))
-		h.add_child(b)
-		bind_buttons[action] = b
-	_reset_keys = _button(page, "Reset to defaults", func() -> void:
+	for title: String in CONTROL_SECTIONS:
+		var heading: Label = _heading(title)
+		page.add_child(heading)
+		control_headings[title] = heading
+		if title == "MOVEMENT":
+			_info_row(page, "Look", "Mouse", "Right stick")
+		for action: StringName in CONTROL_SECTIONS[title]:
+			_bind_row(page, action)
+	_reset_keys = _button(page, "Reset keys to defaults", func() -> void:
 		cancel_capture()
 		Settings.reset_keybinds()
 		refresh_bindings())
 	_reset_keys.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	page.add_child(_heading("MOUSE"))
+	_slider(page, "Mouse sensitivity", "controls", "mouse_sensitivity", 0.2, 3.0, 0.05, false)
+	_check(page, "Invert mouse Y", "controls", "invert_y")
+	page.add_child(_heading("GAMEPAD"))
+	_slider(page, "Look speed (right stick)", "controls", "stick_sensitivity", 0.2, 3.0, 0.05, false)
 	refresh_bindings()
+
+
+## One remappable action: its name, the key button (click to rebind) and the gamepad button.
+func _bind_row(page: VBoxContainer, action: StringName) -> void:
+	var h: HBoxContainer = _row(page, Settings.KEYBINDS[action])
+	var b := Button.new()
+	b.name = "Bind_%s" % action
+	b.custom_minimum_size = Vector2(220, 40)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.pressed.connect(start_capture.bind(action))
+	h.add_child(b)
+	bind_buttons[action] = b
+	pad_labels[action] = _pad_label(h)
+
+
+## A row that is not remappable (look): what drives it on each device.
+func _info_row(page: VBoxContainer, text: String, keys: String, pad: String) -> void:
+	var h: HBoxContainer = _row(page, text)
+	var l := Label.new()
+	l.text = keys
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.custom_minimum_size = Vector2(220, 40)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(l)
+	_pad_label(h).text = pad
+
+
+func _pad_label(h: HBoxContainer) -> Label:
+	var l := Label.new()
+	l.theme_type_variation = &"SmallLabel"
+	l.custom_minimum_size = Vector2(130, 0)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.7))
+	h.add_child(l)
+	return l
 
 
 ## Shows the panel on its current tab; `p_in_game` adds RESUME next to BACK.
@@ -371,12 +409,10 @@ func _process(delta: float) -> void:
 	var db: float = linear_to_db(lvl) if lvl > 0.00001 else -100.0
 	mic_meter.value = clampf((db + 60.0) / 60.0, 0.0, 1.0)
 	_meter_fill.bg_color = Palette.MONEY_GREEN if db >= VoiceCapture.OPEN_MIC_THRESHOLD_DB else Palette.WARM_GOLD
-	mic_status.text = mic_status_text(cap)
 	if mic_check != null:
 		mic_check_result.text = mic_check.verdict
 	mic_check_button.disabled = mic_checking()
 	mic_check_button.text = "TESTING…" if mic_checking() else "TEST MICROPHONE"
-	voice_diag.text = voice_status_text()
 
 
 ## TEST MICROPHONE: 3 s from the microphone the meter reads, played back through voice chat.
@@ -397,25 +433,6 @@ func _on_mic_check_finished(text: String) -> void:
 
 func mic_checking() -> bool:
 	return mic_check != null and mic_check.is_running()
-
-
-## The voice diagnostics line under the microphone test.
-static func voice_status_text() -> String:
-	var ch: VoiceChannel = VoiceChannel.current
-	if ch == null or not is_instance_valid(ch):
-		return "Voice status: not in an online match."
-	return "Voice status: %s" % ch.diagnostics()
-
-
-## The words next to the meter.
-static func mic_status_text(cap: VoiceCapture) -> String:
-	if cap == null or not cap.mic_active:
-		if cap != null and cap.mic_error != "":
-			return "No microphone: %s" % cap.mic_error
-		return "Microphone off"
-	if cap.meter_level() <= 0.0:
-		return "Listening… say something"
-	return "Microphone works"
 
 
 func _stop_mic_test() -> void:
@@ -446,8 +463,12 @@ func cancel_capture() -> void:
 	refresh_bindings()
 
 
-## Rewrites every binding button from the live InputMap (remapped keys in gold).
+## Rewrites every binding button from the live InputMap (remapped keys in gold) and the gamepad
+## button next to it (`InputGlyphs`, "-" for actions with none).
 func refresh_bindings() -> void:
+	for action: StringName in pad_labels:
+		var pad: PackedStringArray = InputGlyphs.labels(action, true)
+		pad_labels[action].text = " / ".join(pad) if not pad.is_empty() else "-"
 	for action: StringName in bind_buttons:
 		var b: Button = bind_buttons[action]
 		b.text = Settings.binding_label(action)

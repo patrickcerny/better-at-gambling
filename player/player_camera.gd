@@ -4,6 +4,9 @@ extends Node3D
 ## anchor while seated, where the head follows `seated_look` (the cursor's offset from the middle
 ## of the screen, or the right stick) a little: ±25° yaw, ±15° pitch, smoothed. The mouse stays
 ## free while seated so the station overlay can be clicked. Auto third-person while ragdolled.
+## Emoting (Patrick: "When you emote, you go into third person"): the camera swings round to a
+## closer three-quarter view from the front for the emote's length so you watch yourself act it
+## out, standing or in a seat, then eases back to the view you had.
 
 enum Mode { FIRST, THIRD }
 
@@ -14,6 +17,16 @@ const THIRD_DISTANCE: float = 3.5
 const SEATED_LOOK_YAW: float = deg_to_rad(25.0)
 const SEATED_LOOK_PITCH: float = deg_to_rad(15.0)
 const SEATED_LOOK_SPEED: float = 7.0
+## Emote view: distance from the body, how far round from straight in front, camera and look-at
+## heights (standing / seated), and how long it takes to swing there and back.
+const EMOTE_DISTANCE: float = 2.6
+const EMOTE_SEATED_DISTANCE: float = 2.4
+const EMOTE_ANGLE: float = deg_to_rad(32.0)
+const EMOTE_HEIGHT: float = 1.45
+const EMOTE_LOOK_HEIGHT: float = 0.95
+const EMOTE_SEATED_HEIGHT: float = 1.85
+const EMOTE_SEATED_LOOK_HEIGHT: float = 0.9
+const EMOTE_BLEND_SECONDS: float = 0.3
 
 var mode: Mode = Mode.FIRST
 var camera: Camera3D
@@ -36,10 +49,13 @@ var _seated_yaw_center: float = 0.0
 ## How far you can turn from the station view (an anchor's "yaw_limit" meta overrides it).
 var seated_yaw_limit: float = SEATED_YAW_LIMIT
 var _bob_time: float = 0.0
-## Set while an emote borrowed third person from first (Patrick: "Third-person camera during
-## emote"); `end_emote_view` goes back to first person.
+## On while our own emote plays (`begin_emote_view` / `end_emote_view`); `emote_blend` eases
+## 0 → 1 towards the emote view and back.
 var emote_view: bool = false
+var emote_blend: float = 0.0
 var _anchor_blend: float = 0.0
+## Where the camera would be without the emote view (first, third or seated), last frame.
+var _base_xf: Transform3D = Transform3D.IDENTITY
 
 
 func _ready() -> void:
@@ -65,24 +81,36 @@ func activate() -> void:
 	camera.current = true
 
 
+## Flips first/third person. During an emote view the player takes the camera back: it ends,
+## and the view goes to first person (the one you are not looking at).
 func toggle_mode() -> void:
-	mode = Mode.THIRD if mode == Mode.FIRST else Mode.FIRST
-	emote_view = false  # the player picked a view themselves: keep it after the emote
-
-
-## The local player started an emote: watch it from behind in third person. Already in third
-## person nothing changes.
-func begin_emote_view() -> void:
-	if mode == Mode.FIRST:
-		mode = Mode.THIRD
-		emote_view = true
-
-
-## The emote is over: back to first person if the emote switched away from it.
-func end_emote_view() -> void:
 	if emote_view:
 		emote_view = false
+		emote_blend = 0.0
 		mode = Mode.FIRST
+		return
+	mode = Mode.THIRD if mode == Mode.FIRST else Mode.FIRST
+
+
+## The local player started an emote: swing round to watch it. `mode` stays what the player
+## picked, so the view goes back to it afterwards.
+func begin_emote_view() -> void:
+	emote_view = true
+
+
+## The emote is over (or was cut short): ease back to the player's own view.
+func end_emote_view() -> void:
+	emote_view = false
+
+
+## True while the camera sees the body: third person, or swinging to or from an emote view.
+func shows_body() -> bool:
+	return mode == Mode.THIRD or emote_blend > 0.02
+
+
+## True while the emote view (fully or partly) replaces the player's own view.
+func in_emote_view() -> bool:
+	return emote_blend > 0.0
 
 
 ## Mouse/stick look.
@@ -117,6 +145,45 @@ func aim() -> Vector3:
 
 
 func update_camera(speed: float, on_floor: bool, ragdolled: bool, delta: float) -> void:
+	if ragdolled:
+		emote_view = false
+		emote_blend = 0.0  # knocked out of the emote: the ragdoll camera takes over at once
+	else:
+		emote_blend = move_toward(emote_blend, 1.0 if emote_view else 0.0, delta / EMOTE_BLEND_SECONDS)
+	if emote_blend > 0.0:
+		camera.global_transform = _base_xf  # the player's own view moves on underneath
+	_update_base(speed, on_floor, ragdolled, delta)
+	_base_xf = camera.global_transform
+	if emote_blend > 0.0:
+		var k: float = smoothstep(0.0, 1.0, emote_blend)
+		camera.global_transform = _base_xf.interpolate_with(emote_transform(), k)
+
+
+## The emote view: a three-quarter view from the front (off to the body's left), the camera
+## pulled in if a wall or table is in the way. Seated it sits higher, looking down past the table.
+func emote_transform() -> Transform3D:
+	var seated: bool = anchor != null
+	var fwd: Vector3 = -global_basis.z
+	fwd.y = 0.0
+	fwd = fwd.normalized() if fwd.length() > 0.01 else Vector3.FORWARD
+	var dir: Vector3 = fwd.rotated(Vector3.UP, EMOTE_ANGLE)
+	var look: Vector3 = global_position + Vector3.UP * (EMOTE_SEATED_LOOK_HEIGHT if seated else EMOTE_LOOK_HEIGHT)
+	var want: Vector3 = global_position + dir * (EMOTE_SEATED_DISTANCE if seated else EMOTE_DISTANCE)
+	want.y = global_position.y + (EMOTE_SEATED_HEIGHT if seated else EMOTE_HEIGHT)
+	if is_inside_tree():
+		var head: Vector3 = global_position + Vector3.UP * 1.2
+		var q := PhysicsRayQueryParameters3D.create(head, want, 1)
+		var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(q)
+		if not hit.is_empty():
+			var at: Vector3 = hit["position"]
+			want = at + (head - at).normalized() * minf(0.25, head.distance_to(at) * 0.5)
+	if want.distance_to(look) < 0.05:
+		want = look - fwd
+	return Transform3D(Basis.looking_at(look - want, Vector3.UP), want)
+
+
+## The player's own view: seated station view, ragdoll follow, third or first person.
+func _update_base(speed: float, on_floor: bool, ragdolled: bool, delta: float) -> void:
 	var third: bool = mode == Mode.THIRD or ragdolled
 	var up_rot := Basis.from_euler(Vector3(pitch, yaw, 0.0))
 	if anchor != null:

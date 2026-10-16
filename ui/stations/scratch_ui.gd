@@ -142,6 +142,10 @@ func buy(tier: int) -> bool:
 	if card_open():
 		return false
 	preview_tier = tier
+	var bal: int = my_balance()
+	var price: int = _prices()[tier]
+	if bal < price and bal >= _prices()[0]:
+		notice.emit(all_in_text(bal))
 	return send(&"place_bet", {"bet": {"tier": tier}})
 
 
@@ -201,7 +205,10 @@ func _update_controls() -> void:
 	var prices: Array[int] = _prices()
 	for t: int in buy_buttons.size():
 		buy_buttons[t].visible = not open
-		buy_buttons[t].disabled = bal < prices[t]
+		# All-in: a card over the balance sells for the balance, while that covers the cheapest.
+		buy_buttons[t].disabled = bal < prices[0]
+		var all_in: bool = bal < prices[t] and not buy_buttons[t].disabled
+		buy_buttons[t].text = ("%s ALL IN\n%s" % [money(bal), ScratchStation.TIER_NAMES[t]]) if all_in else ("$%d\n%s" % [prices[t], ScratchStation.TIER_NAMES[t]])
 	info_label.text = "%s %s   •   %s" % ["PLAY MONEY" if fun else "BALANCE", money(bal), "CARD %s" % money(shown_price) if shown_serial >= 0 else "Three in a line wins"]
 
 

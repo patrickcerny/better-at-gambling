@@ -188,11 +188,12 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
-	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"scratch", ScratchUi.new()]]:
+	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"scratch", ScratchUi.new()]]:
 		var ui: StationUi = pair[1]
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
 		ui.rejected.connect(func(err: StringName) -> void: hud.toast(StationUi.rejection_text(err), 1.5))
+		ui.notice.connect(func(text: String) -> void: hud.toast(text, 1.8))
 		ui_layer.add_child(ui)
 		station_uis[pair[0]] = ui
 	emote_wheel = EmoteWheel.new()
@@ -452,6 +453,8 @@ func _spawn_avatars() -> void:
 	if local != null:
 		local.cam.activate()
 		hud.set_crosshair_visible(true)
+	# Joining mid-emote: pick it up where it is (after `_seat`'s deferred calls, which would cut it).
+	(func() -> void: EmoteWheel.replay(avatars, view.state.emotes)).call_deferred()
 
 
 func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
@@ -977,12 +980,8 @@ func _on_event(ev: Dictionary) -> void:
 			_unseat(int(ev["player"]))
 		&"player_thrown_out":
 			_throw_out(int(ev["target"]), String(ev.get("guard", "guard")))
-		&"emote":
-			EmoteWheel.present(avatars.get(int(ev["player"]), null), StringName(ev["id"]))
-		&"player_emote":
-			var emoter: PlayerAvatar = avatars.get(int(ev["player"]), null)
-			if emoter != null:
-				emoter.play_emote(StringName(ev["emote"]))
+		&"emote", &"player_emote":
+			EmoteWheel.apply_event(avatars, ev)  # everyone's copy acts it out; ours in third person
 		&"intent_rejected":
 			if int(ev["player"]) == local_id:
 				_end_prediction(StringName(ev.get("intent", &"")), true)
@@ -2289,7 +2288,7 @@ func _near_odd_jobs() -> bool:
 	var p: Vector3 = local.global_position
 	var d: float = Vector2(p.x - LuckyLounge.ODD_JOBS_POS.x, p.z - LuckyLounge.ODD_JOBS_POS.z).length()
 	var to_shop: float = Vector2(p.x - LuckyLounge.SHOP_POS.x, p.z - LuckyLounge.SHOP_POS.z).length()
-	return d < 1.6 and d < to_shop and absf(p.y - LuckyLounge.ODD_JOBS_POS.y) < 1.5  # the nearer kiosk wins
+	return d < 2.0 and d < to_shop and absf(p.y - LuckyLounge.ODD_JOBS_POS.y) < 1.5  # the nearer kiosk wins
 
 
 func _check_vip_gate() -> void:
@@ -2476,6 +2475,8 @@ func _on_station_state(sid: StringName) -> void:
 		elif node is HorseRaceStation:
 			(node as HorseRaceStation).local_player = local_id  # outlines the horse you backed
 			(node as HorseRaceStation).show_state(st)
+		elif node is WheelStation:
+			(node as WheelStation).show_state(st)
 		elif node is ScratchStation:
 			(node as ScratchStation).show_state(st)
 	if current_ui != null and current_ui.station_id == sid:
@@ -2617,6 +2618,8 @@ func _min_bet(st: StationBase) -> int:
 			base = cfg.plinko_bet_sizes[0]
 		&"horse_race":
 			base = cfg.horse_min_bet
+		&"wheel":
+			base = cfg.wheel_min_bet
 		&"scratch":
 			base = cfg.scratch_prices[0]
 	return int(floor(base * mult))

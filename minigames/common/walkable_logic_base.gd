@@ -21,7 +21,7 @@ const ROOM_ORIGIN: Vector3 = Vector3(200, 0, 0)
 ## (a small step against the bound is just held at the bound), as in the jail cell.
 const SNAP_DISTANCE: float = 1.5
 ## Casino intents no walkable game allows (stations, items, the shop, tips, the megaphone).
-const BLOCKED_INTENTS: Array[StringName] = [&"sit", &"use_item", &"shop_buy", &"tip_dealer", &"megaphone", &"place_bet", &"action", &"rps_pick"]
+const BLOCKED_INTENTS: Array[StringName] = [&"sit", &"use_item", &"shop_buy", &"megaphone", &"place_bet", &"action", &"rps_pick"]
 
 ## Server world view (positions, facings). Null in pure unit tests that never pick targets.
 var world: WorldQuery = null
