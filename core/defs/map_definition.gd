@@ -36,6 +36,11 @@ extends Resource
 ## Spots inside the cell and where players come out when their time is up, cycled by player id.
 @export var jail_spots: Array[Vector3] = []
 @export var jail_exits: Array[Vector3] = []
+## The waiting room's play-money stations, station id → game id (filled by the map scene; empty = no
+## waiting room). Never in `stations`: they run on the server's separate fun ledger (`FunRoom`).
+@export var fun_stations: Dictionary = {}
+## The waiting room's inner volume (filled by the map scene).
+@export var waiting_area: AABB = AABB()
 
 
 ## Entrance-hall spot for a player id (Vector3.INF when the map has none).
@@ -76,3 +81,8 @@ func jail_spot(player_id: int) -> Vector3:
 ## Where a player comes out when their time is up (Vector3.INF when the map has none).
 func jail_exit(player_id: int) -> Vector3:
 	return jail_exits[posmod(player_id - 1, jail_exits.size())] if not jail_exits.is_empty() else Vector3.INF
+
+
+## True when the map has a waiting room with play-money stations.
+func has_waiting_room() -> bool:
+	return not fun_stations.is_empty() and waiting_area.has_volume()

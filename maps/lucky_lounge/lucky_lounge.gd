@@ -1,12 +1,14 @@
 class_name LuckyLounge
 extends Node3D
-## Greybox of "The Lucky Lounge" (§2.3, docs/ART_DIRECTION.md). Three rooms on one floor:
+## Greybox of "The Lucky Lounge" (§2.3, docs/ART_DIRECTION.md). Its rooms, all on one floor:
 ## - the start room (entrance hall, south): front entrance, the ready pedestals and the lobby
 ##   settings tablet, shut off from the casino by the lobby doors until the match starts;
 ## - the casino floor: blackjack lounge, roulette pit, slot rows, Plinko wall, bar, gift shop and
 ##   the barred jail cell where security locks people up, with the Race Hall (the horse race
 ##   table) opening off its east wall through a wide archway;
-## - the VIP lounge (north), its own room behind the north door, where the bouncer checks you.
+## - the VIP lounge (north), its own room behind the north door, where the bouncer checks you;
+## - the waiting room (behind the start room, through the door between the pedestals): a blackjack
+##   table and four slots on play money while an online room waits in its lobby.
 ## Built procedurally from the tables below so it is easy to tune.
 
 const SIZE_X: float = 44.0
@@ -120,6 +122,28 @@ const LOBBY_DOOR_H: float = 4.0
 ## The barrier in the doorway while the doors are shut: thicker than the wall so a body thrown at
 ## it full speed can't tunnel through in one physics step.
 const LOBBY_BARRIER_T: float = 0.9
+## The waiting room (Patrick: "a blackjack table just for fun ... when you're bored"): a
+## small room behind the start room's south wall, through the doorway between the pedestals where
+## the closed-off porch used to be. One blackjack table and four slot machines on play money only
+## (`FunRoom`, server side). Inner faces x −WAIT_X..WAIT_X, z WAIT_Z0..WAIT_Z1, WAIT_H high. Its
+## double door fills the entrance gap (x −WAIT_DOOR_HALF..WAIT_DOOR_HALF): open while an online
+## room waits in LOBBY, shut and solid from the moment the match starts.
+const WAIT_X: float = 5.5
+const WAIT_Z0: float = SIZE_Z * 0.5 + 0.25
+const WAIT_Z1: float = 23.25
+const WAIT_H: float = 4.2
+const WAIT_DOOR_HALF: float = 2.0
+const WAIT_DOOR_H: float = 3.2
+## The room's inner volume (feet inside it = in the waiting room).
+const WAITING_AREA: AABB = AABB(Vector3(-WAIT_X, -1.0, WAIT_Z0), Vector3(WAIT_X * 2.0, 5.0, WAIT_Z1 - WAIT_Z0))
+## The play-money stations: id → [kind, position, yaw degrees], like STATIONS. The `fun_` prefix
+## keeps them out of everything that reads the real ledger (`FunRoom.is_fun`).
+const FUN_STATIONS: Dictionary = {
+	&"fun_blackjack_1": [&"blackjack", Vector3(0, 0, 20.9), 180],
+	&"fun_slot_1": [&"slots", Vector3(-5.1, 0, 18.3), 90], &"fun_slot_2": [&"slots", Vector3(-5.1, 0, 20.3), 90],
+	&"fun_slot_3": [&"slots", Vector3(5.1, 0, 18.3), -90], &"fun_slot_4": [&"slots", Vector3(5.1, 0, 20.3), -90],
+}
+const WAITING_SIGN: String = "WAITING ROOM  ·  PLAY MONEY"
 ## Jail (Patrick: "an own room where the security puts you", "just bars"; 0.9.4: "in the wall, on
 ## the right side of the room"): a cell recessed into the casino's east wall (on your right as you
 ## come in through the lobby doors), between the Plinko corner and the Odd Jobs cabinet. Its gold
@@ -176,6 +200,12 @@ var jail_gate: Node3D
 var jail_camera: Node3D
 ## False for decorative copies (the menu and loading panorama): no navmesh bake.
 var bake_navmesh: bool = true
+## The waiting room's door: the solid barrier while shut, its two leaves, and whether it is open
+## (shut by default: Practice, the menu and a running match never open it).
+var waiting_door: StaticBody3D
+var waiting_open: bool = false
+var _waiting_leaves: Array[Node3D] = []
+var _waiting_tween: Tween = null
 
 
 func _ready() -> void:
@@ -185,6 +215,7 @@ func _ready() -> void:
 	_build_vip_room()
 	_build_race_hall()
 	_build_jail()
+	_build_waiting_room()
 	_build_stations()
 	_build_props()
 	_build_lights()
@@ -239,6 +270,7 @@ static func describe_rooms(def: MapDefinition) -> void:
 	def.jail_area = JAIL_AREA
 	def.jail_spots = JAIL_SPOTS.duplicate()
 	def.jail_exits = JAIL_EXITS.duplicate()
+	describe_waiting_room(def)
 
 
 ## Centre (floor level) of the ready pedestal in a player colour.
@@ -421,11 +453,7 @@ func _build_floor_and_walls() -> void:
 	GreyboxKit.box(self, Vector3(mid_w, WALL_H, LOBBY_WALL_T), Vector3(-hx + mid_w * 0.5, WALL_H * 0.5, LOBBY_DOORS_Z), wall, "WallLobby")
 	GreyboxKit.box(self, Vector3(mid_w, WALL_H, LOBBY_WALL_T), Vector3(hx - mid_w * 0.5, WALL_H * 0.5, LOBBY_DOORS_Z), wall, "WallLobby")
 	GreyboxKit.box(self, Vector3(LOBBY_DOOR_HALF * 2.0, WALL_H - LOBBY_DOOR_H, LOBBY_WALL_T), Vector3(0, (WALL_H + LOBBY_DOOR_H) * 0.5, LOBBY_DOORS_Z), wall, "WallLobbyTop")
-	# Porch outside the entrance, closed off: nobody leaves the building on foot.
-	GreyboxKit.box(self, Vector3(8.0, 0.5, 5.0), Vector3(0, -0.25, hz + 2.5), Color("#8C7F78"), "Porch")
-	GreyboxKit.box(self, Vector3(8.0, WALL_H, 0.5), Vector3(0, WALL_H * 0.5, hz + 5.0), wall, "PorchWall")
-	for x: float in [-4.0, 4.0]:
-		GreyboxKit.box(self, Vector3(0.5, WALL_H, 5.0), Vector3(x, WALL_H * 0.5, hz + 2.5), wall, "PorchSide")
+	# Behind the entrance gap: the waiting room (`_build_waiting_room`).
 	# Ceiling (dark, keeps the lighting warm and cosy).
 	GreyboxKit.box(self, Vector3(SIZE_X, 0.3, SIZE_Z), Vector3(0, WALL_H + 0.15, 0), Palette.CASINO_BLACK, "Ceiling")
 	# Gold trim along the long walls (the north one stops at the VIP door).
@@ -1013,6 +1041,129 @@ func swing_jail_gate() -> void:
 	tw.tween_property(jail_gate, ^"rotation:y", -PI * 0.55, 0.35)  # out into the casino (−x).set_ease(Tween.EASE_OUT)
 	tw.tween_interval(0.5)
 	tw.tween_property(jail_gate, ^"rotation:y", 0.0, 0.3).set_ease(Tween.EASE_IN)
+
+
+# --- The waiting room (play money) -----------------------------------------------------------
+
+
+## Tells the server about the waiting room: its play-money stations (id → game) and its volume.
+static func describe_waiting_room(def: MapDefinition) -> void:
+	var games: Dictionary = {}
+	for sid: StringName in FUN_STATIONS:
+		games[sid] = (FUN_STATIONS[sid] as Array)[0]
+	def.fun_stations = games
+	def.waiting_area = WAITING_AREA
+
+
+## True when `pos` (feet) is inside the waiting room.
+static func in_waiting_room(pos: Vector3) -> bool:
+	return WAITING_AREA.has_point(pos)
+
+
+## The waiting room behind the entrance gap: parquet floor, wine walls, a low coffered ceiling with
+## its own lamp, the blackjack table against the back wall under the "WAITING ROOM · PLAY MONEY"
+## board, two slot machines along each side wall, and the double door in the gap.
+func _build_waiting_room() -> void:
+	var wall: Color = Color("#4A2F2A")
+	var hz: float = SIZE_Z * 0.5
+	var depth: float = WAIT_Z1 + 0.5 - hz
+	var mid_z: float = (hz + WAIT_Z1 + 0.5) * 0.5
+	GreyboxKit.box(self, Vector3(WAIT_X * 2.0 + 1.0, 0.5, depth), Vector3(0, -0.25, mid_z), Color("#8C7F78"), "WaitSlab")
+	_plane(Vector2(WAIT_X * 2.0, WAIT_Z1 - hz), Vector3(0, 0.012, (hz + WAIT_Z1) * 0.5), Color("#5A3A26"), "WaitFloor")
+	for sx: float in [-1.0, 1.0]:
+		GreyboxKit.box(self, Vector3(0.5, WALL_H, depth - 0.25), Vector3(sx * (WAIT_X + 0.25), WALL_H * 0.5, mid_z + 0.125), wall, "WaitWall")
+	GreyboxKit.box(self, Vector3(WAIT_X * 2.0 + 1.0, WALL_H, 0.5), Vector3(0, WALL_H * 0.5, WAIT_Z1 + 0.25), wall, "WaitWall")
+	GreyboxKit.box(self, Vector3(WAIT_X * 2.0, 0.3, WAIT_Z1 - WAIT_Z0), Vector3(0, WAIT_H + 0.15, (WAIT_Z0 + WAIT_Z1) * 0.5), Palette.CASINO_BLACK, "CeilingWaiting")
+	GreyboxKit.lamp(self, Vector3(0, WAIT_H - 0.6, 19.6), 2.6, 9.0)
+	# The board over the dealer, read from the doorway.
+	var board_z: float = WAIT_Z1 - 0.05
+	GreyboxKit.box(self, Vector3(5.0, 1.0, 0.08), Vector3(0, 3.05, board_z), Palette.CASINO_BLACK.lightened(0.06), "WaitSignBoard", false)
+	for y: float in [3.58, 2.52]:
+		GreyboxKit.box(self, Vector3(5.2, 0.07, 0.1), Vector3(0, y, board_z - 0.01), Palette.WARM_GOLD, "WaitSignTrim", false)
+	var title: Label3D = _sign_label(Vector3(0, 3.17, board_z - 0.07), PI, WAITING_SIGN, 54)
+	title.name = "WaitingSign"
+	title.modulate = Palette.VIP_GOLD
+	_sign_label(Vector3(0, 2.8, board_z - 0.07), PI, "just for fun: wins and losses never touch your real money", 26).name = "WaitingSignNote"
+	for sid: StringName in FUN_STATIONS:
+		var entry: Array = FUN_STATIONS[sid]
+		var st: StationBase = _make_station(entry[0])
+		st.name = String(sid)
+		st.station_id = sid
+		st.position = entry[1]
+		st.rotation.y = deg_to_rad(float(entry[2]))
+		add_child(st)
+		stations[sid] = st
+		var strip: Label3D = st.find_child("JackpotLabel", true, false) as Label3D
+		if strip != null:  # no progressive jackpot on play money
+			strip.text = "PLAY MONEY"
+			strip.font_size = 50
+	_build_waiting_door()
+
+
+## The double door in the entrance gap: a solid barrier filling the gap while shut (built by hand,
+## outside the navmesh like the lobby doors), two dark-wood leaves hinged at the jambs on the
+## room's inner face, and a gold casing on the start-room side.
+func _build_waiting_door() -> void:
+	var hz: float = SIZE_Z * 0.5
+	waiting_door = StaticBody3D.new()
+	waiting_door.name = "WaitingDoor"
+	waiting_door.collision_layer = 1
+	waiting_door.collision_mask = 0
+	var cs := CollisionShape3D.new()
+	cs.name = "Shape"
+	var sh := BoxShape3D.new()
+	sh.size = Vector3(WAIT_DOOR_HALF * 2.0, WAIT_DOOR_H, LOBBY_BARRIER_T)
+	cs.shape = sh
+	cs.position = Vector3(0, WAIT_DOOR_H * 0.5, hz)
+	waiting_door.add_child(cs)
+	add_child(waiting_door)
+	var wood: StandardMaterial3D = GreyboxKit.material(Color("#3A2318"), 0.0, 0.6)
+	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.8, 0.35)
+	for side: float in [-1.0, 1.0]:
+		var hinge := Node3D.new()
+		hinge.name = "WaitLeaf%s" % ("L" if side < 0.0 else "R")
+		hinge.position = Vector3(side * WAIT_DOOR_HALF, 0.0, hz + 0.17)
+		add_child(hinge)
+		_waiting_leaves.append(hinge)
+		var w: float = WAIT_DOOR_HALF - 0.02
+		_mesh_box(hinge, Vector3(w, WAIT_DOOR_H - 0.04, 0.1), Vector3(-side * w * 0.5, WAIT_DOOR_H * 0.5, 0), wood)
+		for y: float in [0.95, 2.35]:
+			_mesh_box(hinge, Vector3(w - 0.44, 1.05, 0.02), Vector3(-side * w * 0.5, y, -0.055), gold)
+			_mesh_box(hinge, Vector3(w - 0.58, 0.91, 0.025), Vector3(-side * w * 0.5, y, -0.06), wood)
+		_mesh_box(hinge, Vector3(0.07, 0.45, 0.05), Vector3(-side * (w - 0.16), 1.6, -0.08), gold)  # handle
+		var plate := Label3D.new()
+		plate.text = "ROOM" if side < 0.0 else "WAITING"  # read left to right from the start room (−x is on the right)
+		plate.font_size = 40
+		plate.pixel_size = 0.005
+		plate.modulate = Palette.VIP_GOLD
+		plate.outline_modulate = Palette.CASINO_BLACK
+		plate.outline_size = 8
+		plate.position = Vector3(-side * w * 0.5, 1.65, -0.075)
+		plate.rotation.y = PI  # read from the start room (−z)
+		hinge.add_child(plate)
+	var z: float = hz - 0.28
+	for x: float in [-1.0, 1.0]:
+		GreyboxKit.box(self, Vector3(0.16, WAIT_DOOR_H + 0.08, 0.06), Vector3(x * (WAIT_DOOR_HALF + 0.08), (WAIT_DOOR_H + 0.08) * 0.5, z), Palette.WARM_GOLD, "WaitDoorCasing", false)
+	GreyboxKit.box(self, Vector3(WAIT_DOOR_HALF * 2.0 + 0.32, 0.12, 0.07), Vector3(0, WAIT_DOOR_H + 0.04, z), Palette.WARM_GOLD, "WaitDoorCasing", false)
+
+
+## Opens the waiting room (the room's lobby) or shuts and locks it (the match started): shut, a
+## solid barrier fills the doorway; opening swings both leaves through the room until they lie
+## flat against its front wall (clear of the pedestals outside and the slots inside) and drops it.
+func set_waiting_room_open(open: bool) -> void:
+	if waiting_door == null or open == waiting_open:
+		return
+	waiting_open = open
+	(waiting_door.get_node(^"Shape") as CollisionShape3D).set_deferred(&"disabled", open)
+	if _waiting_tween != null and _waiting_tween.is_valid():
+		_waiting_tween.kill()
+	_waiting_tween = create_tween().set_parallel() if is_inside_tree() else null
+	for i: int in _waiting_leaves.size():
+		var angle: float = (-PI if i == 0 else PI) if open else 0.0  # all the way round, flat to the wall
+		if _waiting_tween != null:
+			_waiting_tween.tween_property(_waiting_leaves[i], ^"rotation:y", angle, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		else:
+			_waiting_leaves[i].rotation.y = angle
 
 
 func _build_stations() -> void:
