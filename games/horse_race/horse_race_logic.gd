@@ -109,6 +109,12 @@ func horse_of(p: int) -> int:
 	return -1
 
 
+## All-in: a chip over the balance (or over what is left of the race's max total) bets what fits.
+func bet_limits(p: int, _bet: Dictionary) -> Vector2i:
+	var lim: Vector2i = limits()
+	return Vector2i(lim.x, lim.y - player_total(p))
+
+
 ## Bet shape: `{horse: 0..3, amount}`. One horse per player per race (backing every horse at 1:4
 ## would be a sure profit); more chips on the same horse are fine up to the table maximum.
 func place_bet(p: int, bet: Dictionary) -> Dictionary:
@@ -131,7 +137,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not _take_stake(p, amount):
 		return fail(&"insufficient_funds")
 	bets.append({"player": p, "horse": horse, "amount": amount, "covered": last_covered})
-	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id, "type": &"horse", "value": horse, "horse": horse, "name": names[horse] if horse < names.size() else ""}))
+	events.append(GameEvents.bet_placed(p, station_id, amount, with_all_in(bet, {"game": game_id, "type": &"horse", "value": horse, "horse": horse, "name": names[horse] if horse < names.size() else ""})))
 	if not counting:
 		counting = true
 		timer = balance.horse_countdown

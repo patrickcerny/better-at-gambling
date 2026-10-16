@@ -67,6 +67,60 @@ func place_bet(_player: int, _bet: Dictionary) -> Dictionary:
 	return fail(&"not_implemented")
 
 
+## All-in (Patrick: "just bet the max amount (all you have)"): the table limits for `bet` as
+## `Vector2i(min, room)`, where room is the most this bet may be (the max bet, or what is left of
+## a per-round total). `Vector2i(-1, -1)` (the default) means no clamping for this bet: a game or
+## a malformed bet that `place_bet` refuses as usual. A game gets all-in by overriding this one.
+func bet_limits(_player: int, _bet: Dictionary) -> Vector2i:
+	return Vector2i(-1, -1)
+
+
+## What `player` can stake right now: the balance, plus what Fake Cash would pay for.
+func stake_available(player: int) -> int:
+	var fake: int = scaled(FAKE_CASH_CAP) if modifiers != null and modifiers.has_flag(player, &"fake_cash") else 0
+	return economy.balance(player) + fake
+
+
+## The bet `place_bet` gets (StationManager calls this for every `place_bet` intent): `amount`
+## cut to the table room and then to what the player has (`BetClamp`). A bet the balance cut down
+## carries `all_in: true` and the `requested` amount; anything the client sent under those keys
+## is dropped. A bet even the minimum doesn't fit is passed on unchanged, and `place_bet` refuses
+## it with its usual reason (below_min / above_max / insufficient_funds).
+func clamp_bet(player: int, bet: Dictionary) -> Dictionary:
+	var out: Dictionary = bet.duplicate()
+	out.erase("all_in")
+	out.erase("requested")
+	var lim: Vector2i = bet_limits(player, out)
+	if lim.x < 0 or not out.has("amount"):
+		return out
+	var requested: int = int(out["amount"])
+	var res: Dictionary = BetClamp.resolve(requested, stake_available(player), lim.x, lim.y)
+	if res["error"] != &"":
+		return out
+	out["amount"] = int(res["amount"])
+	if bool(res["all_in"]):
+		out["all_in"] = true
+		out["requested"] = requested
+	return out
+
+
+## Fixed bet sizes (slots, Plinko): a listed size, or an all-in amount `clamp_bet` cut down
+## between the smallest and the largest size.
+static func size_allowed(amount: int, bet: Dictionary, sizes: Array[int]) -> bool:
+	if amount in sizes:
+		return true
+	var r: Vector2i = BetClamp.size_range(sizes)
+	return bool(bet.get("all_in", false)) and r.x > 0 and amount >= r.x and amount <= r.y
+
+
+## `details` for `bet_placed`, plus `all_in` / `requested` when the balance cut the bet down.
+static func with_all_in(bet: Dictionary, details: Dictionary) -> Dictionary:
+	if bool(bet.get("all_in", false)):
+		details["all_in"] = true
+		details["requested"] = int(bet.get("requested", 0))
+	return details
+
+
 ## A game action (hit, stand, spin, stop, …).
 func player_action(_player: int, _action: StringName, _params: Dictionary = {}) -> Dictionary:
 	return fail(&"not_implemented")

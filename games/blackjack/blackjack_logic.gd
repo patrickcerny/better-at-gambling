@@ -59,6 +59,11 @@ func limits() -> Vector2i:
 	return Vector2i(scaled(balance.bj_min_bet), scaled(balance.bj_max_bet))
 
 
+## All-in: a bet over the balance (or the max) bets what fits.
+func bet_limits(_p: int, _bet: Dictionary) -> Vector2i:
+	return limits()
+
+
 func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not p in seats:
 		return fail(&"not_seated")
@@ -75,7 +80,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not _take_stake(p, amount):
 		return fail(&"insufficient_funds")
 	hands[p] = {"stake": amount, "cards": [] as Array[int], "done": false, "doubled": false, "blackjack": false, "settled": false, "covered": last_covered}
-	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id}))
+	events.append(GameEvents.bet_placed(p, station_id, amount, with_all_in(bet, {"game": game_id})))
 	if state == State.IDLE:
 		state = State.BETTING
 		timer = balance.bj_betting_window

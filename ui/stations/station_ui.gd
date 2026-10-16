@@ -6,6 +6,8 @@ extends Control
 ## cursor is free (InputRouter), so every button here is clicked with the mouse as well.
 
 signal rejected(error: StringName)
+## A short heads-up for the HUD toast (e.g. "ALL IN").
+signal notice(text: String)
 
 var station_id: StringName
 var local_id: int = -1
@@ -95,6 +97,7 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 	title.text = game_title
 	play_money_label.visible = fun
 	_show_play_money()
+	_sync_bet_panel()
 	var vip: bool = bool(pub.get("vip", false))
 	limits_mult = Registry.balance.limits_multiplier(state.segment_index if state != null else 0) * (3.0 if vip else 1.0)
 	_on_open()
@@ -120,6 +123,7 @@ func update_state(p_pub: Dictionary, p_priv: Dictionary) -> void:
 	pub = p_pub
 	priv = p_priv
 	_show_play_money()
+	_sync_bet_panel()
 	if visible:
 		if _glyph_epoch != InputGlyphs.epoch:
 			_update_glyphs()
@@ -156,6 +160,44 @@ func my_balance() -> int:
 func _show_play_money() -> void:
 	if fun and play_money_label != null:
 		play_money_label.text = "PLAY MONEY  %s  ·  just for fun" % money(my_balance())
+
+
+## The table's `BetPanel` (a subclass's `bet_panel`), null for tables without one.
+func the_bet_panel() -> BetPanel:
+	return get(&"bet_panel") as BetPanel
+
+
+## All-in: the bet panel clamps to what you have, and its first all-in per bet is a toast.
+## Any table whose overlay has a `bet_panel: BetPanel` gets this without doing anything.
+func _sync_bet_panel() -> void:
+	var bp: BetPanel = the_bet_panel()
+	if bp == null:
+		return
+	if not bp.went_all_in.is_connected(_on_went_all_in):
+		bp.went_all_in.connect(_on_went_all_in)
+	if state != null:
+		bp.set_balance(my_balance())
+
+
+## What the table still takes from you this round when its max is a per-round total (roulette,
+## horse race): the bet panel's max minus your bets in the public state's `bets` list.
+func bet_room() -> int:
+	var bp: BetPanel = the_bet_panel()
+	if bp == null:
+		return 0
+	var total: int = 0
+	for b: Variant in pub.get("bets", []):
+		if b is Dictionary and int((b as Dictionary).get("player", -1)) == local_id:
+			total += int((b as Dictionary).get("amount", 0))
+	return maxi(bp.max_bet - total, 0)
+
+
+func _on_went_all_in(amount: int) -> void:
+	notice.emit(all_in_text(amount))
+
+
+static func all_in_text(amount: int) -> String:
+	return "ALL IN: betting everything you have (%s)" % money(amount)
 
 
 ## Limit scaled like the server does.
