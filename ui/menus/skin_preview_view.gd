@@ -2,9 +2,12 @@ class_name SkinPreviewView
 extends TextureRect
 ## A bean wearing one character skin (`Cosmetics.SKINS`), turning gently on a transparent
 ## SubViewport: the tiles of the `ClothesPanel`. Same pattern as `Logo3DView` (own world, pixel
-## look under `Settings.pixel_scale()`); nothing 3D is built when headless.
+## look under `Settings.pixel_scale()`); nothing 3D is built when headless. `portrait` frames the
+## head and shoulders instead of the whole bean (the Tab list's player rows).
 
 var skin: StringName = &"bean"
+var color: Color = Palette.player_color(0)
+var portrait: bool = false
 var visuals: AvatarVisuals
 var _viewport: SubViewport
 var _t: float = 0.0
@@ -16,6 +19,15 @@ static func make(p_skin: StringName, min_size: Vector2 = Vector2(150, 180)) -> S
 	v.skin = p_skin
 	v.custom_minimum_size = min_size
 	return v
+
+
+## Re-dresses the bean (a player changed skin or colour) without rebuilding the viewport.
+func set_look(p_skin: StringName, p_color: Color) -> void:
+	skin = p_skin
+	color = p_color
+	if visuals != null:
+		visuals.set_skin(skin)
+		visuals.set_color(color)
 
 
 func _ready() -> void:
@@ -36,12 +48,12 @@ func _ready() -> void:
 	visuals = AvatarVisuals.new()
 	visuals.skin_id = skin
 	root.add_child(visuals)
-	visuals.set_color(Palette.player_color(0))
+	visuals.set_color(color)
 	var cam := Camera3D.new()
 	cam.fov = 30.0
-	cam.position = Vector3(0, 1.0, -3.6)
+	cam.position = Vector3(0, 1.2, -2.0) if portrait else Vector3(0, 1.0, -3.6)
 	root.add_child(cam)
-	cam.look_at_from_position(cam.position, Vector3(0, 0.82, 0), Vector3.UP)
+	cam.look_at_from_position(cam.position, Vector3(0, 1.0 if portrait else 0.82, 0), Vector3.UP)
 	cam.current = true
 	var key := DirectionalLight3D.new()
 	key.light_color = Color(1.0, 0.94, 0.84)
@@ -71,7 +83,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_t += delta
 	if visuals != null:
-		visuals.rotation.y = sin(_t * 0.7) * 0.6
+		visuals.rotation.y = sin(_t * 0.7) * (0.35 if portrait else 0.6)
 
 
 func _fit() -> void:
