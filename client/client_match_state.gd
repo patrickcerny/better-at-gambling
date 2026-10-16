@@ -69,6 +69,9 @@ var results_return_in: float = -1.0
 ## {peel, owner, pos, seconds}).
 var effects: Dictionary[int, Array] = {}
 var peels: Dictionary[int, Dictionary] = {}
+## Emotes still playing when the last snapshot was taken (player → {id, t seconds in}): a late
+## joiner replays them (`MatchScene`).
+var emotes: Dictionary[int, Dictionary] = {}
 ## Gift Shop offers this segment [{item, price, rarity}].
 var shop_offers: Array = []
 ## Drink puddles the waiter spilled (puddle id → {puddle, pos, seconds}) and the player holding
@@ -135,6 +138,9 @@ func apply_snapshot(snap: Dictionary) -> void:
 		effects[int(id)] = (snap["effects"][id] as Array).duplicate()
 	shop_offers = (snap.get("shop", {}) as Dictionary).get("offers", []).duplicate(true)
 	shop_changed.emit()
+	emotes.clear()
+	for id: Variant in snap.get("emotes", {}):
+		emotes[int(id)] = (snap["emotes"][id] as Dictionary).duplicate()
 	peels.clear()
 	for p: Dictionary in snap.get("peels", []):
 		peels[int(p["peel"])] = p

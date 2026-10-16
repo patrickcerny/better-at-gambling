@@ -171,7 +171,7 @@ func test_tutorial_pages_and_done() -> void:
 		return
 	assert_true(how.visible)
 	assert_false((menu.get_node("Center/Column/VBox") as Control).visible, "entries step aside")
-	assert_gte(HowToPlayPanel.PAGES.size(), 7, "goal, moving, tables, items, minigames, rough play, jail, friends")
+	assert_gte(HowToPlayPanel.PAGES.size(), 7, "goal, moving, tables, items, odd jobs, minigames, rough play, jail, friends")
 	assert_eq(how.page, 0)
 	assert_true(how.back_button.disabled)
 	for i: int in HowToPlayPanel.PAGES.size() - 1:

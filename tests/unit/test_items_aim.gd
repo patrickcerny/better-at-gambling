@@ -68,7 +68,7 @@ func test_choice_items_and_stake_preview() -> void:
 
 
 func test_rejections_for_the_new_items_read_well() -> void:
-	for e: StringName in [&"not_seated", &"you_lead", &"bounced", &"no_tips_here", &"no_target"]:
+	for e: StringName in [&"not_seated", &"you_lead", &"bounced", &"no_target"]:
 		assert_false(ItemController.rejection_text(e).contains("_"), str(e))
 
 

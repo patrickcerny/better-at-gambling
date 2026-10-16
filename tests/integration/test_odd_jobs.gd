@@ -75,6 +75,17 @@ func test_shared_bar_pays_the_player_whose_click_completes_it() -> void:
 	assert_eq(float(bars.back()["fill"]), 0.0)
 
 
+func test_a_burst_of_clicks_all_counts() -> void:
+	# No rate limit anywhere on the way (validator or cabinet): 30 presses in one tick all land.
+	var p: int = fx.player_ids[0]
+	fx.server.economy.apply(p, 499 - fx.server.economy.balance(p), &"test")
+	var needed: int = OddJobs.presses_needed(fx.server.economy.balance(p))
+	assert_eq(needed, 60)
+	for i: int in 30:
+		assert_true(fx.intent(p, &"odd_jobs_press")["ok"], "press %d" % i)
+	assert_almost_eq(fx.server.odd_jobs.fill(), 30.0 / needed, 0.001)
+
+
 func test_rich_player_is_refused() -> void:
 	var p: int = fx.player_ids[1]
 	if fx.server.economy.balance(p) < OddJobs.CAP:

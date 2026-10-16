@@ -30,6 +30,9 @@ extends Resource
 @export var bj_betting_window: float = 8.0
 @export var bj_action_time: float = 10.0
 @export var bj_result_time: float = 2.0
+## A split gives the splitting player this many extra decision clocks (x bj_action_time) on top
+## of what they had left, so both hands can be played (1.0 = the full decision time again).
+@export var bj_split_time_bonus: float = 1.0
 ## Profit ratio paid on winning hands when the dealer busts (1.0 = plain 1:1).
 @export var bj_dealer_bust_bonus: float = 1.07
 @export var bj_blackjack_ratio: float = 1.5
@@ -60,6 +63,69 @@ extends Resource
 @export var horse_countdown: float = 12.0
 ## Seconds the result stays up after the winner crosses the line (the rest run out meanwhile).
 @export var horse_result_time: float = 5.0
+
+@export_group("Craps")
+@export var craps_min_bet: int = 10
+## Most one player may have on the craps felt at once (line bets riding a point included).
+@export var craps_max_total: int = 200
+## Profit ratios actually paid. The felt says Pass / Don't Pass 1:1, Field 1:1 (2 and 12 2:1) and
+## Any Seven 4:1; the one-roll bets pay a little better (like the horse race's 1:4), so with the
+## favour below every bet returns 100.5–102% to a player alone at the table (tests/sim).
+@export var craps_line_ratio: float = 1.0
+@export var craps_field_ratio: float = 1.08
+@export var craps_field_double_ratio: float = 2.1
+@export var craps_any_seven_ratio: float = 4.8
+## Chance that a roll on which no bet at the table wins (and one would lose) is redrawn once
+## (Patrick, 0.9.6: "always favoured to win for you, by a bit, like the other games, but dont
+## show it").
+@export var craps_favour: float = 0.055
+## Seconds from the first chip on the felt (or from a roll while a point is on) until the stickman
+## throws for a shooter who has not pressed SHOOT.
+@export var craps_shoot_time: float = 12.0
+## Seconds a betting window stays open before the shooter may throw (everyone gets a chance to bet).
+@export var craps_shoot_lock: float = 2.0
+## Seconds from the throw until the dice rest and the bets settle (the client throw rests by
+## `CrapsDice.REST_TIME`, inside this).
+@export var craps_throw_time: float = 2.6
+## Seconds the roll stays up before the next betting window.
+@export var craps_result_time: float = 2.0
+
+@export_group("Wheel of Fortune")
+@export var wheel_min_bet: int = 10
+## Most one player may stake on one spin, over every symbol together.
+@export var wheel_max_total: int = 200
+## Chance that a spin nobody at the wheel would win is redrawn once (the house rule of 0.9.6:
+## every table quietly favours its bettors a bit, never shown). The wheel pays its honest Big Six
+## odds; 0.31 lifts a lone bettor's return to 98.8–104.9% depending on the symbol (101.3% over the
+## seven symbols, `tests/sim/test_wheel_rtp.gd`).
+@export var wheel_favour: float = 0.31
+## Seconds from the first bet of a round until the dealer spins.
+@export var wheel_countdown: float = 12.0
+## Seconds the wheel spins at full speed before it starts slowing onto the result
+## (`WheelLogic.LAND_TIME` covers the slowing down).
+@export var wheel_spin_time: float = 3.0
+## Seconds the result stays up before the next round opens.
+@export var wheel_result_time: float = 4.0
+@export_group("Hi-Lo")
+@export var hilo_min_bet: int = 10
+@export var hilo_max_bet: int = 100
+## What a right call returns on average per $1 riding on it, the quiet favour counted in: the pays
+## are set from this (`HiLoLogic.pay_for`) and never exceed the fair odds 1/p.
+@export var hilo_return: float = 1.02
+## Chance that a call which would lose has its card redrawn once (Patrick's house rule from 0.9.6:
+## "favoured for you, by a bit, like the other games, but dont show it").
+@export var hilo_favour: float = 0.15
+## Most a single right call pays (stake included), however long the shot.
+@export var hilo_max_pay: float = 25.0
+## The streak ladder: right calls in one hand before it cashes out on its own, and the most a pot
+## can grow to (times the ante).
+@export var hilo_max_rungs: int = 6
+@export var hilo_pot_cap: float = 50.0
+## The single deck is reshuffled before an ante once fewer cards than this are left.
+@export var hilo_reshuffle_at: int = 15
+## Seconds to make a call (then the table calls for you) and how long a result stays up.
+@export var hilo_action_time: float = 15.0
+@export var hilo_result_time: float = 2.5
 
 @export_group("Slots")
 @export var slots_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
@@ -161,11 +227,6 @@ extends Resource
 ## Banana peel: trigger radius and how long the slip stuns.
 @export var banana_radius: float = 0.9
 @export var banana_stun: float = 1.2
-## Tip jar (station UI button at blackjack and roulette): what one tip costs, and the luck it buys
-## at that game for that many rounds.
-@export var tip_amount: int = 25
-@export var tip_luck: int = 1
-@export var tip_rounds: int = 3
 
 @export_group("Results")
 ## Seconds the results screen stays up before an online room returns to its lobby on its own.

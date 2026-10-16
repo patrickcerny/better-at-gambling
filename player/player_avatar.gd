@@ -217,16 +217,23 @@ func say(text: String, seconds: float = 2.0) -> void:
 	_bubble_until = _clock + seconds
 
 
-## Acts out a number-key emote (`Emotes.ANIMATED`) on the bean or skin; "67" also gets a bubble.
-func play_emote(id: StringName) -> void:
+## Acts out an emote (the wheel's or a number key's, `Emotes`) on the bean or skin, standing or
+## in a seat. Wheel emotes always show their bubble ("👋 WAVE"); "67" says "6 7" when it plays.
+## Our own emote swings the camera round to watch it (`PlayerCamera.begin_emote_view`) unless it
+## is a replay (`at` > 0: a late joiner catching up on one already playing). Returns whether the
+## body acts it out (not while ragdolled, held, carried or knocked out).
+func play_emote(id: StringName, at: float = 0.0) -> bool:
+	if Emotes.has(id) and at <= 0.0:
+		say(Emotes.bubble_text(id), 2.0)
 	if visuals == null or not is_standing() and state != State.SEATED:
-		return
-	if not visuals.emote(id):
-		return
-	if cam != null:
-		cam.begin_emote_view()  # our own emote: see it in third person
+		return false
+	if not visuals.emote(id, at):
+		return false
+	if cam != null and at <= 0.0:
+		cam.begin_emote_view()  # our own emote: watch it in third person
 	if id == &"six_seven":
-		say("6 7", 2.0)
+		say("6 7", Emotes.SECONDS - at)
+	return true
 
 
 ## Swaps the body for a ragdoll launched with `velocity`. Returns the ragdoll (parented to our parent).
@@ -336,6 +343,7 @@ func release_held() -> void:
 func sit(p_seat: Node3D, anchor: Node3D) -> void:
 	seat = p_seat
 	state = State.SEATED
+	visuals.stop_emote()  # sitting down cuts an emote short (emote again in the seat)
 	visuals.sitting = true
 	velocity = Vector3.ZERO
 	push_velocity = Vector3.ZERO
@@ -354,6 +362,7 @@ func sit(p_seat: Node3D, anchor: Node3D) -> void:
 func stand() -> void:
 	if state != State.SEATED:
 		return
+	visuals.stop_emote()
 	_leave_seat()
 	state = State.STANDING
 
@@ -429,6 +438,7 @@ func _physics_process(delta: float) -> void:
 				if router != null:
 					cam.seated_look = router.seated_look()  # the head follows the cursor a little
 				cam.update_camera(0.0, true, false, delta)
+				visuals.visible = cam.shows_body()  # an emote in the seat is watched from across the table
 			return
 	if state == State.STUNNED and _clock >= stunned_until:
 		state = State.STANDING
@@ -446,7 +456,7 @@ func _physics_process(delta: float) -> void:
 	if cam != null:
 		cam.update_camera(Vector3(velocity.x, 0, velocity.z).length(), is_on_floor(), false, delta)
 		# First person: the bean would fill the view, so only show it in third person.
-		visuals.visible = cam.mode == PlayerCamera.Mode.THIRD
+		visuals.visible = cam.shows_body()
 		visuals.gaze = cam.aim()  # our bean's eyes look where the camera looks
 
 

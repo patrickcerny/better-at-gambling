@@ -92,6 +92,30 @@ func test_every_page_has_a_picture_heading_and_text() -> void:
 	assert_eq((how.find_child("Title", true, false) as Label).text, "HOW TO PLAY")
 
 
+func test_smash_the_button_page_follows_the_shop() -> void:
+	# Patrick: "Add smash the button to the tutorial".
+	var how: HowToPlayPanel = await _panel()
+	var at: int = -1
+	var shop: int = -1
+	for i: int in HowToPlayPanel.PAGES.size():
+		if str(HowToPlayPanel.PAGES[i][0]) == "SMASH THE BUTTON":
+			at = i
+		if str(HowToPlayPanel.PAGES[i][2]).ends_with("shop.webp"):
+			shop = i
+	assert_gt(at, -1, "the page is there")
+	assert_eq(at, shop + 1, "right after the items / Gift Shop page")
+	assert_eq(HowToPlayPanel.PAGES.size(), 9)
+	how.show_page(at)
+	assert_eq(how.heading.text, "SMASH THE BUTTON")
+	assert_string_contains(how.body.text, "Odd Jobs cabinet")
+	assert_string_contains(how.body.text, "Gift Shop")
+	assert_string_contains(how.body.text, "big red button")
+	assert_string_contains(how.body.text, "$50")
+	assert_false(how.body.text.contains("{"), "the click key is filled in")
+	assert_eq(how.picture.texture.resource_path, "res://assets/tutorial/oddjobs.webp")
+	assert_eq(how.counter.text, "%d / 9" % (at + 1))
+
+
 func test_escape_and_skip_close() -> void:
 	var how: HowToPlayPanel = await _panel()
 	watch_signals(how)

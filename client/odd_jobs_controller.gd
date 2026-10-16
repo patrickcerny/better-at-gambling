@@ -1,15 +1,13 @@
 class_name OddJobsController
 extends Node
 ## Client side of the Odd Jobs cabinet (no window): walk up, look at the big red button and click
-## (left mouse or E); each click is one `odd_jobs_press`. The bar is shared by everyone in the
+## (left mouse or E); each click is one `odd_jobs_press`, sent at once: no cap, as fast as you can click. The bar is shared by everyone in the
 ## casino and the click that fills it wins the $50 (server/odd_jobs.gd); the cabinet shows the bar,
 ## "N clicks to $50" at your own share and who won. While you are broke (below the House Comp line,
 ## the smallest table minimum) the cabinet's lamps pulse and the button is outlined, with a
 ## one-time hint. Never decides anything: the server counts, fills and pays.
 
 const ENOUGH_TEXT: String = "You've got enough. Go gamble!"
-## Client-side cap on sends (the server drops anything over ~12/s anyway).
-const MIN_SEND_GAP: float = 1.0 / 14.0
 const HINT_TEXT: String = "Broke? Smash the big red button at the Odd Jobs cabinet by the Gift Shop: $50 a bar."
 
 var scene: MatchScene
@@ -18,7 +16,6 @@ var aimed: bool = false
 var broke: bool = false
 ## The shared bar as last heard from the server (plus local clicks counted ahead online).
 var fill: float = 0.0
-var _last_send: float = -INF
 
 
 func _init(p_scene: MatchScene) -> void:
@@ -55,7 +52,8 @@ func _casino_open() -> bool:
 	return (ph == Phase.Id.CASINO or ph == Phase.Id.PRE_MINIGAME) and not scene._minigames_only()
 
 
-## True when the local player stands at the cabinet and the camera looks at the button.
+## True when the local player stands at the cabinet and the camera looks at its front: the deck
+## around the button, the bar riser or the marquee (`OddJobsCabinet.AIM_BOX`), not just the cap.
 func is_aiming() -> bool:
 	var cab: OddJobsCabinet = cabinet()
 	if cab == null or scene.local == null or not scene.local.is_standing() or scene.local.cam == null:
@@ -91,10 +89,6 @@ func try_press() -> bool:
 		cab.show_note(ENOUGH_TEXT)
 		scene.hud.toast(ENOUGH_TEXT, 1.5)
 		return true
-	var now: float = Time.get_ticks_msec() / 1000.0
-	if now - _last_send < MIN_SEND_GAP:
-		return true
-	_last_send = now
 	var res: Dictionary = Net.send_intent(Intents.make(&"odd_jobs_press"))
 	cab.dip()
 	Audio.play_at(&"ui_click", cab.button, -2.0, randf_range(0.85, 1.1))

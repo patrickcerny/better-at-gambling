@@ -193,8 +193,10 @@ func test_every_game_fits_every_spot_the_draw_allows_it_on() -> void:
 	assert_not_null(geo, "the map measured its games")
 	var pool: Dictionary = FloorPlan.pool_of(Registry.game_footprints(), Registry.floor_plan)
 	var anchors: Array = def.floor_anchors
+	var full: Dictionary = FloorPlan.full(anchors)
 	for a: Dictionary in anchors:
 		assert_true(geo.fits(a, StringName(a["default"])), "%s fits spot %s %s" % [a["default"], a["id"], geo.why_not(a, StringName(a["default"]))])
+		assert_true(geo.clear_of(a, StringName(a["default"]), full, _by_id(anchors)), "the full floor keeps the walkway at %s (%s %s)" % [a["id"], a["default"], geo.world_rect(a, StringName(a["default"]))])
 	for game: StringName in Registry.games:
 		if not geo.rects.has(game):
 			continue

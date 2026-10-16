@@ -23,8 +23,9 @@ extends Resource
 @export var default_weight: float = 1.0
 @export var weights: Dictionary = {}
 ## Walkway kept between two drawn tables, metres (a game only goes on a spot where it fits the
-## room and keeps this gap to its neighbours: `FloorGeometry`).
-@export var gap: float = 0.6
+## room and keeps this gap to its neighbours: `FloorGeometry`; chairs are already in the rects, so
+## this is the space between two chairs. 0.35 is the tightest pair on the full floor: craps and Hi-Lo).
+@export var gap: float = 0.35
 
 
 ## Draw weight of a game.

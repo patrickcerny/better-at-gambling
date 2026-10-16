@@ -26,9 +26,12 @@ const STATIONS: Dictionary = {
 	&"plinko_1": [&"plinko", Vector3(11, 0, -14.5), 0], &"plinko_2": [&"plinko", Vector3(17.5, 0, -14.5), 0],
 	# The Race Hall (east annex): the long horse race table, stools on its south side.
 	&"horse_race_1": [&"horse_race", Vector3(29.0, 0, -19.0), 0],
+	&"hilo_1": [&"hilo", Vector3(18.6, 0, -4.8), 0],
+	&"craps_1": [&"craps", Vector3(14, 0, -6), 0],
 	&"roulette_1": [&"roulette", Vector3(-6, 0, -3), 0], &"roulette_2": [&"roulette", Vector3(6, 0, -3), 180],
 	&"blackjack_1": [&"blackjack", Vector3(-16, 0, 4), 0], &"blackjack_2": [&"blackjack", Vector3(-9, 0, 4), 0],
 	&"blackjack_3": [&"blackjack", Vector3(-2, 0, 4), 0],
+	&"wheel_1": [&"wheel", Vector3(11, 0, 5), 0],
 	# VIP lounge (ground floor, behind the north door): the tables either side of the aisle from
 	# the door, the two slots against its back wall.
 	&"vip_blackjack_1": [&"blackjack", Vector3(-4.3, 0, -20.5), 0], &"vip_roulette_1": [&"roulette", Vector3(4.0, 0, -20.5), 0],
@@ -175,7 +178,7 @@ const FLOOR_KEEP_OUT: Array[Rect2] = [
 	Rect2(-10.2, -1.6, 1.2, 1.2), Rect2(9.0, -1.6, 1.2, 1.2),
 	Rect2(14.0, 3.1, 7.75, 5.0), Rect2(15.2, 1.7, 1.6, 1.6),
 	Rect2(18.9, 0.1, 2.85, 3.6), Rect2(19.6, -1.7, 2.15, 1.5), Rect2(20.6, -3.0, 1.15, 1.0),
-	Rect2(20.2, -9.3, 1.55, 3.6), Rect2(19.6, -15.75, 2.15, 5.0),
+	Rect2(20.2, -8.4, 1.55, 1.7), Rect2(19.6, -15.75, 2.15, 5.0),
 	Rect2(-3.0, 6.5, 6.0, 1.65), Rect2(-2.7, -16.0, 5.4, 1.6), Rect2(-20.6, -1.6, 1.2, 1.2),
 	Rect2(-8.75, -17.8, 1.7, 1.0), Rect2(7.05, -17.8, 1.7, 1.0), Rect2(-8.75, -21.5, 1.0, 1.0), Rect2(7.75, -21.5, 1.0, 1.0),
 	Rect2(-2.4, -17.6, 4.8, 1.6), Rect2(-11.4, 9.1, 1.6, 1.6), Rect2(-21.75, 11.3, 1.4, 1.4),
@@ -1119,10 +1122,9 @@ func _build_waiting_room() -> void:
 	GreyboxKit.box(self, Vector3(5.0, 1.0, 0.08), Vector3(0, 3.05, board_z), Palette.CASINO_BLACK.lightened(0.06), "WaitSignBoard", false)
 	for y: float in [3.58, 2.52]:
 		GreyboxKit.box(self, Vector3(5.2, 0.07, 0.1), Vector3(0, y, board_z - 0.01), Palette.WARM_GOLD, "WaitSignTrim", false)
-	var title: Label3D = _sign_label(Vector3(0, 3.17, board_z - 0.07), PI, WAITING_SIGN, 54)
+	var title: Label3D = _sign_label(Vector3(0, 3.05, board_z - 0.07), PI, WAITING_SIGN, 54)
 	title.name = "WaitingSign"
 	title.modulate = Palette.VIP_GOLD
-	_sign_label(Vector3(0, 2.8, board_z - 0.07), PI, "just for fun: wins and losses never touch your real money", 26).name = "WaitingSignNote"
 	for sid: StringName in FUN_STATIONS:
 		var entry: Array = FUN_STATIONS[sid]
 		var st: StationBase = _make_station(entry[0])
@@ -1410,6 +1412,12 @@ func _make_station(kind: StringName) -> StationBase:
 			return BlackjackStation.new()
 		&"horse_race":
 			return HorseRaceStation.new()
+		&"craps":
+			return CrapsStation.new()
+		&"wheel":
+			return WheelStation.new()
+		&"hilo":
+			return HiLoStation.new()
 	# A newer game can bring its own station scene (`GameDefinition.station_scene`).
 	var def: GameDefinition = Registry.games.get(kind, null)
 	if def != null and def.station_scene != null:

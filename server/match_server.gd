@@ -47,7 +47,7 @@ var odd_jobs: OddJobs
 ## The waiter NPC's trips and drink puddles, and the Megaphone prop by the bar (M7, npc/).
 var waiter: WaiterLogic
 var megaphone: MegaphoneLogic
-## Dealers at blackjack and roulette tables (v0.8.4, npc/): station_id → DealerLogic.
+## Dealers at blackjack, roulette and craps tables (v0.8.4, npc/): station_id → DealerLogic.
 var dealers: Dictionary[StringName, DealerLogic] = {}
 ## Online room: drops a kicked player's connection (`RoomHost.kick_player`; tests leave it unset).
 var kick_handler: Callable
@@ -89,6 +89,9 @@ var _kicked: Dictionary[String, float] = {}
 ## Who the current/last minigame started with (late joiners are not in it; the snapshot tells
 ## them to sit it out). Kept through its rewards.
 var _minigame_roster: Array[int] = []
+## player → [emote id, server uptime it started]: the emote each player acted out last, so a
+## late joiner's snapshot can replay one still playing (`emotes`). Cosmetic only.
+var _emotes: Dictionary[int, Array] = {}
 ## Walkable minigame ("W", minigames/common/walkable_logic_base.gd) whose room is up: set when it
 ## starts, kept through its rewards (everyone still stands in the room) and dropped at the regroup.
 ## While set, positions are clamped to the room and casino intents are refused (`minigame`).
@@ -551,6 +554,7 @@ func get_snapshot() -> Dictionary:
 	snap["mode"] = settings.get("mode", MatchMode.CASINO)
 	snap["effects"] = items.public_effects()
 	snap["peels"] = items.peels_wire()
+	snap["emotes"] = _emotes_wire()
 	snap["floor"] = {"puddles": waiter.wire(), "megaphone": megaphone.wire()}
 	snap["shop"] = items.shop.wire() if items.shop != null else {}
 	snap["floor_plan"] = floor_wire()
@@ -1068,6 +1072,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"emote":
 			if not Emotes.has(StringName(str(intent["id"]))):
 				return StationLogicBase.fail(&"unknown_emote")
+			_emotes[player] = [StringName(intent["id"]), _uptime]
 			_emit(GameEvents.make(&"emote", {"player": player, "id": StringName(intent["id"])}))
 			return StationLogicBase.OK_RESULT
 		&"play_emote":
@@ -1147,11 +1152,6 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			return items.discard(player, int(intent["slot"]), match_time)
 		&"rps_pick":
 			return items.duels.pick(player, int(intent["duel"]), int(intent["pick"]), match_time)
-		&"tip_dealer":
-			var tip_sid: StringName = stations.station_of(player)
-			if tip_sid == &"" or tip_sid != StringName(intent["station"]):
-				return StationLogicBase.fail(&"not_seated")
-			return items.tip(player, stations.game_of.get(tip_sid, &""), tip_sid, match_time)
 		&"shop_buy":
 			var shop_pos: Vector3 = map_def.shop_position
 			if shop_pos.is_finite() and world.get_position(player).distance_to(shop_pos) > map_def.interact_range:
@@ -1213,8 +1213,21 @@ func _play_emote(player: int, intent: Dictionary) -> Dictionary:
 		return StationLogicBase.fail(&"unknown_emote")
 	if rules.is_knocked_down(player, match_time):
 		return StationLogicBase.fail(&"not_standing")
+	_emotes[player] = [StringName(v), _uptime]
 	_emit(GameEvents.make(&"player_emote", {"player": player, "emote": StringName(v)}))
 	return StationLogicBase.OK_RESULT
+
+
+## Emotes still playing, for the snapshot: player → {id, t (seconds since it started)}.
+func _emotes_wire() -> Dictionary:
+	var out: Dictionary = {}
+	for pid: int in _emotes.keys():
+		var t: float = _uptime - float(_emotes[pid][1])
+		if t >= Emotes.SECONDS or not state.players.has(pid):
+			_emotes.erase(pid)
+			continue
+		out[pid] = {"id": _emotes[pid][0], "t": snappedf(t, 0.01)}
+	return out
 
 
 ## Gets a seated player off their seat, exactly like their own "leave" (a round in play is settled

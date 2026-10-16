@@ -18,8 +18,10 @@ const CLIPS: Dictionary = {
 	&"walk": ["|Walk", "_Walk"],
 	&"run": ["|Run", "_Run"],
 	&"sit": ["_Sitting"],
-	# Emotes on skins with clips (thumbs up and the dance): a wave, or clapping.
-	&"wave": ["|Wave", "_Clapping"],
+	# Emotes (`Emotes` ids) a skin has a fitting clip for: the wave, and clapping for GG. Every other
+	# emote drives the skin's arm bones (`arm_driver`) to the bean's pose instead.
+	&"wave": ["|Wave"],
+	&"gg": ["_Clapping"],
 }
 ## Right-hand bones, tried in order (for `right_hand`).
 const RIGHT_HAND_BONES: Array[StringName] = [&"Wrist.R", &"Palm.R", &"DEF-HAND.R"]
@@ -113,6 +115,26 @@ static func right_hand(root: Node3D) -> BoneAttachment3D:
 			skel.add_child(ba)
 			return ba
 	return null
+
+
+## A `SkinArmModifier` on the skin's skeleton (made once per model) that points its arms for
+## emotes and held items, or null when the model has no arm bones it knows.
+static func arm_driver(root: Node3D) -> SkinArmModifier:
+	var found: Array[Node] = root.find_children("*", "Skeleton3D", true, false)
+	if found.is_empty():
+		return null
+	var skel: Skeleton3D = found[0]
+	var existing: Node = skel.get_node_or_null("EmoteArms")
+	if existing != null:
+		return existing as SkinArmModifier
+	var mod := SkinArmModifier.new()
+	mod.name = "EmoteArms"
+	if not mod.setup(skel):
+		mod.free()
+		return null
+	mod.root = root
+	skel.add_child(mod)
+	return mod
 
 
 ## Emotes on skins without clips that have arm bones (`lower_arms`): lifts each arm from hanging

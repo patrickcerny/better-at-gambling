@@ -11,3 +11,4 @@ empty_chance = 0.15
 max_per_type = 2
 default_weight = 1.0
 weights = {}
+gap = 0.35

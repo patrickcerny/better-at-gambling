@@ -4,7 +4,9 @@ extends Node
 ## only, it never touches money or rules):
 ## - chips slide from a seat onto the felt when a bet is placed (roulette on its layout spot,
 ##   blackjack in front of the seat), then to the winner (with the house's chips) or to the house;
-## - the roulette ball circles and drops into the server's number; slot reels stop one by one;
+## - the roulette ball circles and drops into the server's number; the Wheel of Fortune slows onto
+##   the server's segment; slot reels stop one by one; the craps dice are thrown and come to rest
+##   on the server's roll;
 ## - win / lose / jackpot feedback over the player once the table has shown the result: floating
 ##   "+$120" / "-$50", coins or a sad puff, and for the local player's big wins and jackpots a gold
 ##   burst with screen shake and hit-stop.
@@ -75,6 +77,28 @@ func on_event(ev: Dictionary) -> void:
 			var hr: HorseRaceStation = stations.get(sid, null) as HorseRaceStation
 			if hr != null:
 				_shown_at[sid] = Time.get_ticks_msec() + int(hr.finish(int(ev["winner"]), int(ev.get("seed", -1))) * 1000.0)
+		&"craps_rolled":
+			# The dice leave the shooter's hand; the bets settle on the server as they rest here.
+			var sid: StringName = StringName(ev["station"])
+			var cs: CrapsStation = stations.get(sid, null) as CrapsStation
+			if cs != null:
+				var by: int = int(ev.get("shooter", -1))
+				var seat: int = _seat_index(cs, by) if by >= 0 and avatar_of.is_valid() and avatar_of.call(by) != null else -1
+				_shown_at[sid] = Time.get_ticks_msec() + int(cs.throw(ev["dice"], int(ev["seed"]), seat) * 1000.0)
+		&"craps_result":
+			var cs: CrapsStation = stations.get(StringName(ev["station"]), null) as CrapsStation
+			if cs != null:
+				cs.show_result(int(ev["total"]), StringName(ev["outcome"]), int(ev["point"]))
+		&"wheel_spin_started":
+			var ws: WheelStation = stations.get(StringName(ev["station"]), null) as WheelStation
+			if ws != null:
+				ws.start_spin()
+		&"wheel_result":
+			# The wheel slows onto the server's segment; the bets pay as the pointer settles on it.
+			var sid: StringName = StringName(ev["station"])
+			var ws: WheelStation = stations.get(sid, null) as WheelStation
+			if ws != null:
+				_shown_at[sid] = Time.get_ticks_msec() + int(ws.land(int(ev["segment"]), float(ev.get("seconds", WheelLogic.LAND_TIME))) * 1000.0)
 		&"roulette_spin_started":
 			var rs: RouletteStation = stations.get(StringName(ev["station"]), null) as RouletteStation
 			if rs != null:
@@ -93,6 +117,9 @@ func on_event(ev: Dictionary) -> void:
 			if ss != null:
 				_landing.append(sid)
 				_shown_at[sid] = Time.get_ticks_msec() + int(ss.stop_on(ev["line"], int(ev["player"]) == local_id) * 1000.0)
+		&"bj_action":
+			if StringName(ev.get("action", &"")) == &"split":
+				_on_bj_split(ev)
 		&"round_result":
 			_on_result(ev)
 		&"bets_refunded":
@@ -116,7 +143,7 @@ func _on_bet(ev: Dictionary) -> void:
 	if st is SlotsStation:
 		(st as SlotsStation).start_spin(pid == local_id)
 		return
-	if not (st is RouletteStation or st is BlackjackStation or st is HorseRaceStation):
+	if not (st is RouletteStation or st is BlackjackStation or st is HorseRaceStation or st is WheelStation or st is CrapsStation or st is HiLoStation):
 		return  # Plinko drops its own chip
 	var seat: int = _seat_index(st, pid)
 	var start: Vector3 = _seat_edge(st, seat)
@@ -128,7 +155,14 @@ func _on_bet(ev: Dictionary) -> void:
 	var color: Color = color_of.call(pid) if color_of.is_valid() else ChipStack.NO_COLOR
 	var unit: int = int(min_bet_of.call(sid)) if min_bet_of.is_valid() else 0
 	var chips: int = ChipStack.chip_count(int(ev["amount"]), unit)
-	if st is RouletteStation or st is HorseRaceStation:
+	if st is CrapsStation:
+		# On the seat's own spot of that bet; more chips on it stack on top of the player's own.
+		target = _bet_spot(st, seat, type, value)
+		for b: Dictionary in list:
+			var s: ChipStack = b["stack"]
+			if is_instance_valid(s) and b["type"] == type:
+				target.y += mini(ChipStack.chip_count(s.amount, s.unit), ChipStack.COLUMN_CHIPS) * ChipStack.CHIP_HEIGHT
+	elif st is RouletteStation or st is HorseRaceStation or st is WheelStation:
 		# On its printed spot and nowhere else: a second column is centred on the spot (it used to
 		# trail onto the next row), and another bet on the same spot stacks on top of the chips
 		# already there (it used to be nudged sideways onto the neighbouring number).
@@ -148,7 +182,28 @@ func _on_bet(ev: Dictionary) -> void:
 	Audio.play_at(&"chip_clack", stack, -10.0, randf_range(0.95, 1.1))
 
 
-## Height of the chips already on a roulette spot or horse pad (every player's), so the next stack
+## A blackjack split: the bet slides in front of the first hand and an equal stack (the second
+## stake) comes in from the rail in front of the second; each pays or goes to the house with its
+## own hand's result (`details.hand`).
+func _on_bj_split(ev: Dictionary) -> void:
+	var sid: StringName = StringName(ev["station"])
+	var st: BlackjackStation = stations.get(sid, null) as BlackjackStation
+	var pid: int = int(ev["player"])
+	var list: Array = _bets.get(_key(sid, pid), [])
+	if st == null or list.is_empty() or not is_instance_valid(list[0]["stack"]):
+		return
+	var first: ChipStack = list[0]["stack"]
+	var seat: int = _seat_index(st, pid)
+	first.slide_to(st.to_global(st.hand_bet_spot(seat, 0)), 0.3, 0.05)
+	var stack: ChipStack = ChipStack.make(first.amount, first.color, first.unit)
+	st.add_child(stack)
+	stack.position = _seat_edge(st, seat)
+	stack.slide_to(st.to_global(st.hand_bet_spot(seat, 1)), 0.4, 0.12)
+	list.append({"stack": stack, "type": &"split", "value": 1, "at": Time.get_ticks_msec()})
+	Audio.play_at(&"chip_clack", stack, -10.0, randf_range(0.95, 1.1))
+
+
+## Height of the chips already on a roulette spot, horse pad or wheel symbol (every player's), so the next stack
 ## goes on top.
 func _height_on_spot(sid: StringName, type: StringName, value: int) -> float:
 	var h: float = 0.0
@@ -176,8 +231,8 @@ func _on_result(ev: Dictionary) -> void:
 		_shown_at[sid] = Time.get_ticks_msec() + int(t * 1000.0)
 	elif st is PlinkoStation:
 		_shown_at[sid] = Time.get_ticks_msec() + int(PLINKO_DELAY * 1000.0)
-	elif st is BlackjackStation:
-		_shown_at[sid] = Time.get_ticks_msec() + int(BLACKJACK_DELAY * 1000.0)
+	elif st is BlackjackStation or st is HiLoStation:
+		_shown_at[sid] = Time.get_ticks_msec() + int(BLACKJACK_DELAY * 1000.0)  # the card lands first
 	var delay: float = _delay_for(sid)
 	var stack: ChipStack = _take_stack(sid, pid, details)
 	if stack != null:
@@ -312,7 +367,11 @@ func _take_stack(sid: StringName, pid: int, details: Dictionary) -> ChipStack:
 	if list.is_empty():
 		return null
 	var idx: int = 0
-	if details.has("type"):
+	if int(details.get("hand", 0)) == 1:  # a blackjack split's second hand
+		for i: int in list.size():
+			if StringName(list[i]["type"]) == &"split":
+				idx = i
+	elif details.has("type"):
 		for i: int in list.size():
 			if StringName(list[i]["type"]) == StringName(details["type"]) and int(list[i]["value"]) == int(details.get("value", 0)):
 				idx = i
@@ -374,6 +433,12 @@ static func _seat_edge(st: StationBase, seat: int) -> Vector3:
 		return Vector3(p.x, RouletteStation.FELT_Y, signf(p.z) * 0.8)
 	if st is HorseRaceStation:
 		return Vector3(p.x, HorseRaceStation.TABLE_TOP + 0.02, HorseRaceStation.TABLE_D * 0.5 - 0.05)
+	if st is CrapsStation:
+		return Vector3(p.x, CrapsStation.RAIL_TOP + 0.07, CrapsStation.TABLE_D * 0.5 - 0.12)
+	if st is WheelStation:
+		return Vector3(p.x, WheelStation.FELT_Y, WheelStation.LEDGE_Z)
+	if st is HiLoStation:
+		return Vector3(p.x, HiLoStation.TABLE_TOP + 0.12, HiLoStation.RAIL_OUTER)  # over the rail
 	if st is BlackjackStation:
 		# Over the padded rail (not inside it): the stack arcs from here down onto the felt.
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
@@ -392,6 +457,16 @@ static func _bet_spot(st: StationBase, seat: int, type: StringName, value: int) 
 		if type == &"":
 			return Vector3(_seat_edge(st, seat).x, HorseRaceStation.TABLE_TOP + 0.02, HorseRaceStation.LEDGE_Z)
 		return HorseRaceStation.bet_spot(value)
+	if st is CrapsStation:
+		if type == &"":
+			return Vector3(_seat_edge(st, seat).x, CrapsStation.FELT_Y + 0.003, CrapsStation.PASS_Z)
+		return CrapsStation.bet_spot(type, seat)
+	if st is WheelStation:
+		if type == &"":
+			return Vector3(_seat_edge(st, seat).x, WheelStation.FELT_Y, WheelStation.LEDGE_Z - 0.15)
+		return WheelStation.bet_spot(value)
+	if st is HiLoStation:
+		return HiLoStation.bet_spot(seat)  # the gold ante ring in front of the seat
 	if st is BlackjackStation and not st.seats.is_empty():
 		var p: Vector3 = st.seats[clampi(seat, 0, st.seats.size() - 1)].position
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
@@ -405,6 +480,12 @@ static func _house_spot(st: StationBase) -> Vector3:
 		return RouletteStation.HOUSE_SPOT
 	if st is HorseRaceStation:
 		return HorseRaceStation.HOUSE_SPOT
+	if st is CrapsStation:
+		return CrapsStation.HOUSE_SPOT
+	if st is WheelStation:
+		return WheelStation.HOUSE_SPOT
+	if st is HiLoStation:
+		return HiLoStation.HOUSE_SPOT
 	if st is BlackjackStation:
 		return Vector3(0.75, 1.0, -0.22)  # the dealer's chip rack
 	return Vector3(0, 0.95, 0)

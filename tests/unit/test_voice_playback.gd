@@ -204,11 +204,8 @@ func test_a_spurt_is_not_cut_between_two_packets() -> void:
 
 
 func test_the_microphone_test_says_when_playback_failed() -> void:
-	assert_string_contains(VoiceMicTest.playback_verdict(75, 75, "", true, 48000.0), "Played it back: 75 of 75 frames at 48000 Hz. You should have heard yourself")
-	var failed: String = VoiceMicTest.playback_verdict(75, 75, "the voice player is not playing", true, 48000.0)
-	assert_true(failed.begins_with("Playback failed: the voice player is not playing"), failed)
-	assert_false(failed.contains("should have heard"))
-	assert_string_contains(VoiceMicTest.playback_verdict(75, 75, "", false, 0.0), "no sound device here")
+	assert_eq(VoiceMicTest.result_after_playback("", 75, 0.25), "Microphone works")
+	assert_eq(VoiceMicTest.result_after_playback("the voice player is not playing", 75, 0.25), "Playback failed", "one short line; the reason is in the log")
 
 
 func test_upsampler_is_continuous_across_any_cut() -> void:

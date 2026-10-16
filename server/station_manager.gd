@@ -166,7 +166,8 @@ func route(player: int, intent: Dictionary) -> Dictionary:
 				return StationLogicBase.fail(&"bad_bet")
 			if logic.round_seconds() > closing_in:
 				return StationLogicBase.fail(&"table_closing")
-			return logic.place_bet(player, bet)
+			# All-in: more than the balance (or the table max) bets what fits (BetClamp).
+			return logic.place_bet(player, logic.clamp_bet(player, bet))
 		&"clear_bets":
 			return logic.player_action(player, &"clear_bets")
 		&"action":

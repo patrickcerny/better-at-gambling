@@ -24,7 +24,8 @@ $750 after each minigame played, $900 from the fourth on (`BalanceConfig.comp_am
 **Odd Jobs** cabinet next to the Gift Shop (casino phases, not in minigames-only): look at its big
 red 3D button and click (or E). One bar shared by everyone; each click adds the clicker's share,
 1/presses where presses = 10 at $0 up to 60 at $499 (refused at $500+), and the click that fills
-the bar wins $50, then it starts over. Idle bar drains 0.1/s after 0.5 s; ~12 clicks/s per player.
+the bar wins $50, then it starts over. Idle bar drains 0.1/s after 0.5 s; no click rate limit.
+The aim target is the cabinet's whole front (deck, bar riser, marquee), not just the cap.
 The cabinet's lamps pulse and the button is outlined while you are below the House Comp line.
 
 ## Casino games (MVP)
@@ -37,13 +38,39 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
 - **Horse Race** (Race Hall annex): 4 horses with names drawn from a pool each round, one horse per
   player per race, the first over the line pays 1:4. A seeded server race (~9 s, the lead changes)
   every client replays. $10–$100.
+- **Wheel of Fortune** (Big Six money wheel, casino floor by the lobby doors): 54 segments, $1 ×24,
+  $2 ×15, $5 ×7, $10 ×4, $20 ×2, Joker and Logo ×1 each. Chips on any symbols; a symbol pays its
+  face value to one ($1 1:1 … $20 20:1), Joker and Logo 40:1, exactly as printed on the layout. The
+  dealer spins 12 s after the first bet; the server draws the segment (house rule: a spin no bet
+  would win is redrawn once with 31% chance, then luck rerolls, never shown) and every client slows
+  the wheel onto it. 5 stools, a dealer. $10 min per bet, $200 per spin.
+- **Craps** (casino floor, east of the roulette pit): two dice. Pass Line (come-out 7/11 win, 2/3/12
+  lose, else the point, then the point before a 7) and Don't Pass (the other side, bar 12 pushes)
+  1:1, ride until decided, go down only on a come-out; Field (2, 3, 4, 9, 10, 11 at 1:1, 2 and 12 at
+  2:1) and Any Seven (4:1) for one roll. The shooter is whoever has sat longest and keeps the dice
+  until a seven-out, then they pass on; SHOOT throws (2 s after a betting window opens), the
+  stickman throws after 12 s. The client throws two tumbling dice that rest on the server's faces
+  (a deterministic throw relabelled by a cube rotation, `CrapsDice`). The felt's odds are the real
+  ones; the one-roll bets pay a bit better (Field 1.08 / 2.1, Any Seven 4.8) and a roll on which no
+  bet wins and one would lose is redrawn with 5.5% chance, so every bet returns 101–101.6% to a
+  player alone. A stickman (shoves like a dealer). $10 min per bet, $200 on the felt.
+- **Hi-Lo** (casino floor, east of the roulette pit): oval card table, a dealer, 4 seats, one shared
+  single deck (aces high, reshuffled under 15 cards). Everyone plays their own hand: ante, a card is
+  turned up, call HIGHER or LOWER (a tie loses). Each call shows its true chance from the cards left
+  and its pay, locked when the card goes up: the fair odds less a small edge (×2.00 at 47% on an 8,
+  ×1.06 at 94%, ×11.42 at 8%), at most ×25. A right call multiplies the pot; ride it on the next
+  card or cash out; the ladder stops at 6 right calls or 50× the ante. Timeout (15 s), standing up
+  or the match end: a won pot is cashed out, a fresh ante takes the likelier side. A minigame gives
+  fresh antes back and banks won pots. House rule as at the horse race (0.9.6): a call that would
+  lose has its card redrawn once with 15% chance, then luck rerolls it; never shown. $10–$100.
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
 **Floor plan** ([`FLOOR_PLAN.md`](FLOOR_PLAN.md)): in online matches every casino round starts on a
 new floor. The floor is a set of fixed spots (table-, slot- and Plinko-sized, on the floor and in
 the VIP lounge); when the lobby opens and at every regroup (everyone shut in the entrance hall)
-each spot is redrawn from the match seed: a game of its size by weight, or closed tonight (velvet
+each spot is redrawn from the match seed: a game of its size that fits there (measured floor,
+keep-outs, a walkway to its neighbours) by weight, or closed tonight (velvet
 rope and a CLOSED TONIGHT sign, or a plant). Nothing is guaranteed; at least 60% of each area is
 open and at most 2 tables of one game per area (soft). The Race Hall, the waiting room, Odd Jobs,
 the shop and the jail never move. A TONIGHT'S FLOOR board in the entrance hall lists the games and
@@ -121,6 +148,11 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | horse_race_countdown | — (the tote board counts down) |
 | horse_race_started | last_call_bell, high (the starting bell) |
 | horse_race_finished | chime when the winner's nose crosses the line on the table |
+| craps_rolled | chip_clack, low (the dice leave the hand; another as they rest) |
+| wheel_spin_started | whoosh, low (the dealer's pull), then the clicker: plink, high, one per peg (at most ~20/s) |
+| wheel_result | — (the clicker slows down); reel_stop, low, as the wheel rests on the segment |
+| hilo_dealt / hilo_call | card_deal as the card slides out of the deck onto the seat's spot (TableCards) |
+| hilo_reshuffle | — (the deck on the table is full again) |
 | jackpot_won | jackpot_siren (bell arpeggio, coin shower, held chord) |
 | last_call | last_call_bell (brass hand bell ×3) + Last Call music |
 | minigame_started | whoosh + quiz music |

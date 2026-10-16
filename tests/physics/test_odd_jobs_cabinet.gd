@@ -66,9 +66,9 @@ func test_cabinet_is_reachable_over_the_navmesh() -> void:
 	assert_lt(Vector2(shop_path[shop_path.size() - 1].x - LuckyLounge.SHOP_POS.x, shop_path[shop_path.size() - 1].z - LuckyLounge.SHOP_POS.z).length(), 0.5)
 
 
-## Stands the local player at the cabinet, facing it, and pitches the camera at the button
-## (`on` false: looking straight ahead over the deck instead).
-func _stand_and_look(on: bool) -> void:
+## Stands the local player at the cabinet, facing it, and pitches the camera at `target` (world;
+## Vector3.INF: turned 90 degrees, looking along the room instead).
+func _stand_and_look(target: Vector3) -> void:
 	var me: int = scene.local_id
 	scene.local.teleport(LuckyLounge.ODD_JOBS_POS, -PI / 2.0)
 	scene.server.set_server_position(me, LuckyLounge.ODD_JOBS_POS)
@@ -76,9 +76,12 @@ func _stand_and_look(on: bool) -> void:
 	var cam: PlayerCamera = scene.local.cam
 	cam.pitch = 0.0
 	await wait_process_frames(2)
+	var on: bool = target.is_finite()
 	if on:
-		var d: Vector3 = scene.map.odd_jobs.button_center() - cam.camera.global_position
+		var d: Vector3 = target - cam.camera.global_position
 		cam.pitch = atan2(d.y, Vector2(d.x, d.z).length())
+	else:
+		cam.yaw += PI / 2.0
 	# The camera settles over a few frames and the HUD prompt reads the aim a frame after the
 	# controller sets it: wait for the aim, then one more frame for the prompt (slow runners).
 	for i: int in 30:
@@ -106,7 +109,7 @@ func test_look_at_the_button_and_click_it() -> void:
 	var me: int = scene.local_id
 	await _go_broke()
 	assert_eq(scene.server.economy.balance(me), 0)
-	await _stand_and_look(true)
+	await _stand_and_look(scene.map.odd_jobs.button_center())
 	assert_true(scene.odd_jobs.aimed, "looking at the button")
 	assert_string_contains(scene.hud.prompt_label.text, "SMASH")
 	assert_null(scene.find_child("OddJobsPanel", true, false) as Control, "no popup window any more")
@@ -141,8 +144,8 @@ func test_look_at_the_button_and_click_it() -> void:
 
 func test_looking_away_does_not_press() -> void:
 	await _go_broke()
-	await _stand_and_look(false)
-	assert_false(scene.odd_jobs.aimed, "looking over the deck, not at the button")
+	await _stand_and_look(Vector3.INF)
+	assert_false(scene.odd_jobs.aimed, "looking along the room, not at the cabinet")
 	assert_string_contains(scene.hud.prompt_label.text, "look at the big red button")
 	await _click()
 	scene.router.interact.emit()
@@ -153,6 +156,31 @@ func test_looking_away_does_not_press() -> void:
 	scene.server.set_server_position(scene.local_id, Vector3(14, 0, -0.95))
 	await wait_process_frames(3)
 	assert_false(scene.odd_jobs.aimed, "out of reach")
+
+
+func test_deck_edge_counts_and_every_fast_click_lands() -> void:
+	# Patrick: "the red button click thing is too small its very hard to target it" and "no rate
+	# limit": aim at the deck's front edge, well off the cap, and click 30 times in one second.
+	var me: int = scene.local_id
+	var cab: OddJobsCabinet = scene.map.odd_jobs
+	await _go_broke()
+	scene.server.economy.apply(me, 499, &"test")  # 60 clicks a bar: 30 clicks = half of it
+	await wait_process_frames(2)
+	var edge: Vector3 = cab.global_transform * Vector3(-0.43, 1.08, 0.0)
+	assert_gt(Vector2(edge.x - cab.button_center().x, edge.z - cab.button_center().z).length(), 0.3, "off the cap")
+	await _stand_and_look(edge)
+	assert_true(scene.odd_jobs.aimed, "the deck's edge counts as aiming")
+	assert_string_contains(scene.hud.prompt_label.text, "SMASH")
+	assert_not_null(cab.button.get_node("Mesh").material_overlay, "the outline shows the aim")
+	var needed: int = OddJobs.presses_needed(scene.server.economy.balance(me))
+	assert_eq(needed, 60)
+	var t0: int = Time.get_ticks_msec()
+	for i: int in 30:
+		scene.router.grab_pressed.emit()
+		await wait_seconds(0.03)
+	assert_lt(Time.get_ticks_msec() - t0, 1500, "a one-second burst")
+	assert_almost_eq(scene.server.odd_jobs.fill(), 30.0 / needed, 0.001, "all 30 clicks reached the server")
+	assert_eq(scene.server.economy.balance(me), 499)
 
 
 func test_glow_only_while_broke() -> void:

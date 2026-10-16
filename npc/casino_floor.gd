@@ -17,7 +17,7 @@ const PUDDLE_COLOR: Color = Color("#7A3B22")
 
 var scene: MatchScene
 var waiter: Waiter = null
-## Dealers at each blackjack and roulette table (v0.8.4): station_id → Dealer node.
+## Dealers at each blackjack, roulette and craps table (v0.8.4): station_id → Dealer node.
 var dealers: Dictionary[StringName, Dealer] = {}
 ## Start room and jail (0.8.19).
 var security: SecurityView = null
@@ -84,11 +84,12 @@ func _dealer_spot(station: StationBase) -> Vector3:
 	return station.global_position + (DealerLogic.OFFSETS[station.game_id] as Vector3).rotated(Vector3.UP, station.global_rotation.y)
 
 
-## Spawn dealers at each blackjack and roulette table (v0.8.4) that has none yet.
+## Spawn dealers at each table with a dealer (blackjack, roulette, the wheel, craps, Hi-Lo; v0.8.4)
+## that has none yet.
 func _spawn_dealers(fresh: bool = true) -> void:
 	if fresh:
 		dealers.clear()
-	# One dealer per blackjack and roulette table, placed in the table's own frame (its yaw turns
+	# One dealer per table with a dealer, placed in the table's own frame (its yaw turns
 	# the offset) and facing the players. Dealers stand still, so online clients place them from
 	# the map too; a host (headless servers included) also reports them to the server's DealerLogic.
 	for sid: StringName in scene.map.stations:
