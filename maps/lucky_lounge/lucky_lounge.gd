@@ -1081,10 +1081,9 @@ func _build_waiting_room() -> void:
 	GreyboxKit.box(self, Vector3(5.0, 1.0, 0.08), Vector3(0, 3.05, board_z), Palette.CASINO_BLACK.lightened(0.06), "WaitSignBoard", false)
 	for y: float in [3.58, 2.52]:
 		GreyboxKit.box(self, Vector3(5.2, 0.07, 0.1), Vector3(0, y, board_z - 0.01), Palette.WARM_GOLD, "WaitSignTrim", false)
-	var title: Label3D = _sign_label(Vector3(0, 3.17, board_z - 0.07), PI, WAITING_SIGN, 54)
+	var title: Label3D = _sign_label(Vector3(0, 3.05, board_z - 0.07), PI, WAITING_SIGN, 54)
 	title.name = "WaitingSign"
 	title.modulate = Palette.VIP_GOLD
-	_sign_label(Vector3(0, 2.8, board_z - 0.07), PI, "just for fun: wins and losses never touch your real money", 26).name = "WaitingSignNote"
 	for sid: StringName in FUN_STATIONS:
 		var entry: Array = FUN_STATIONS[sid]
 		var st: StationBase = _make_station(entry[0])
