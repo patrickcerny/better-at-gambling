@@ -208,3 +208,77 @@ func test_late_join_mid_shuffle() -> void:
 	assert_almost_eq(late.shuffle_t, FindTheLadyLogic.FLIP_TIME + FindTheLadyLogic.swap_time(0) * 1.5, 0.05)
 	late.shuffle_pose(late.shuffle_length() + 0.1)
 	assert_eq(late.card_in_slot(logic.lady_slot), logic.lady_start, "the late joiner ends on the same Queen")
+
+
+## Patrick (0.9.9): "YOU NEED TO BE ABLE TO CLICK THE CARDS". In the game the stage sits inside
+## the pixel view (a SubViewport drawn at 1/3), while its UI stays sharp in the window, so a click
+## reaches the stage in viewport pixels and the card's screen rectangle is in canvas pixels.
+func test_click_through_the_pixel_view_picks_the_card() -> void:
+	sent.clear()
+	if stage != null and is_instance_valid(stage):
+		stage.free()
+	var pv := PixelView.new()
+	add_child_autofree(pv)
+	pv.setup(false)
+	assert_eq(pv.shrink(), 3, "the game's pixel look")
+	# Headless there is no window to size the container from: give it the window's canvas size.
+	pv.container.size = get_viewport().get_visible_rect().size
+	pv.container.scale = Vector2.ONE
+	var host := Control.new()
+	host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	host.mouse_filter = Control.MOUSE_FILTER_IGNORE  # like the match scene's layers over the pixel view
+	add_child_autofree(host)
+	stage = FindTheLadyStage.new()
+	stage.ui_host = host
+	stage.send_intent = func(i: Dictionary) -> Dictionary:
+		sent.append(i)
+		return logic.submit(1, i, 50.0)
+	pv.world.add_child(stage)
+	var ids: Array[int] = [1, 2, 3, 4]
+	stage.begin(st, 1, {"minigame": &"find_the_lady", "players": ids}, {})
+	_pump()
+	_to_pick()
+	await get_tree().process_frame
+	var r: Rect2 = stage.slot_rect(2)
+	assert_true(r.size.x > 0.0, "card 3 has a screen rectangle")
+	var canvas: Vector2 = stage.chip_layer.get_viewport().get_visible_rect().size
+	var view: Vector2 = stage.camera.get_viewport().get_visible_rect().size
+	assert_almost_eq(view.x * 3.0, canvas.x, 3.0, "the pixel view is drawn at a third of the canvas")
+	var view_r := Rect2(r.position * view / canvas, r.size * view / canvas)
+	# What the SubViewportContainer hands the stage: the click in the pixel viewport's pixels.
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = view_r.get_center()
+	stage._unhandled_input(click)
+	assert_eq(sent.size(), 1, "a click on the card in the pixel view sends the pick")
+	if sent.size() == 1:
+		assert_eq(int(sent[0]["slot"]), 2)
+	# And the same click pushed through the window lands on the stage the same way (GUT's own
+	# result window is drawn over the game in the runner: hidden while we click).
+	var hidden: Array[CanvasLayer] = []
+	for n: Node in get_tree().root.find_children("*", "CanvasLayer", true, false):
+		var l: CanvasLayer = n
+		if l.visible and l != stage.ui and not pv.is_ancestor_of(l):
+			l.visible = false
+			hidden.append(l)
+	stage.my_pick = -1
+	stage._pick_sent_at = -1.0
+	sent.clear()
+	var mm := InputEventMouseMotion.new()
+	mm.position = r.get_center()
+	mm.global_position = r.get_center()
+	mm.relative = Vector2(10, 0)
+	get_viewport().push_input(mm, true)
+	var push := InputEventMouseButton.new()
+	push.button_index = MOUSE_BUTTON_LEFT
+	push.pressed = true
+	push.position = r.get_center()
+	push.global_position = r.get_center()
+	get_viewport().push_input(push, true)
+	for l: CanvasLayer in hidden:
+		if is_instance_valid(l):
+			l.visible = true
+	assert_eq(sent.size(), 1, "a window click on the card reaches the stage inside the pixel view")
+	if sent.size() == 1:
+		assert_eq(int(sent[0]["slot"]), 2)

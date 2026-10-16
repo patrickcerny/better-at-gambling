@@ -774,7 +774,7 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var motion := event as InputEventMouseMotion
 	if motion != null:
-		var s: int = slot_at(motion.position) if can_act() else -1
+		var s: int = slot_at(_event_to_canvas(motion.position)) if can_act() else -1
 		if s != hover_slot:
 			hover_slot = s
 			_refresh_cards()
@@ -782,7 +782,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	var click := event as InputEventMouseButton
 	if click != null:
 		if click.pressed and click.button_index == MOUSE_BUTTON_LEFT and can_act():
-			var s: int = slot_at(click.position)
+			var s: int = slot_at(_event_to_canvas(click.position))
 			if s >= 0:
 				pick(s)
 				get_viewport().set_input_as_handled()
@@ -798,6 +798,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if n >= 0 and n < card_count:
 		pick(n)
 		get_viewport().set_input_as_handled()
+
+
+## A mouse position the stage was handed, on the UI canvas the card rectangles use. In the game the
+## stage sits inside the pixel view (a SubViewport drawn at 1/3), so its container hands it clicks
+## in viewport pixels, while `slot_rect` is in canvas pixels; outside a pixel view this is identity.
+func _event_to_canvas(pos: Vector2) -> Vector2:
+	if camera == null or chip_layer == null:
+		return pos
+	return PixelView.to_canvas(camera, pos, chip_layer)
 
 
 ## True while the local player may still pick this round.
