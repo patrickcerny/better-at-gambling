@@ -7,8 +7,11 @@ extends Node3D
 ## Procedural animation (M7): spring lean on acceleration, squash on landing and stretch in the
 ## air, a squash and gasp when hit, idle bob, blinking, a banana slip, cheering / sulking / big-win
 ## reactions with matching faces, flailing while carried, a wobbly get-up after a ragdoll,
-## knockout birdies, and the number-key emotes (`emote`: 67, thumbs up, thumbs down and the
-## default dance). (docs/ART_DIRECTION.md)
+## knockout birdies, and every emote (`emote`): the wheel's wave, laugh, taunt, cry, dance and GG
+## and the number keys' 67, thumbs up, thumbs down and default dance, each its own motion of the
+## arms, body, feet and face. Character skins act them out too: a fitting clip of their own when
+## they have one, else their arm bones are driven to the same pose (`SkinArmModifier`).
+## (docs/ART_DIRECTION.md)
 ##
 ## `update_motion` feeds movement in; everything is drawn once per frame in `_process`, so beans
 ## nobody moves (quiz podiums, results) still react. Headless (servers, tests) only the state is
@@ -48,7 +51,7 @@ const SWING_WINDUP: float = 0.07
 const SWING_CONTACT: float = 0.12
 const SWING_SECONDS: float = 0.38
 ## How long a number-key emote plays (`emote`).
-const EMOTE_SECONDS: float = 2.5
+const EMOTE_SECONDS: float = Emotes.SECONDS
 ## Walking faster than this cancels an emote (after the first moment).
 const EMOTE_CANCEL_SPEED: float = 2.2
 ## The gasp face after a hit.
@@ -105,6 +108,10 @@ var emote_time: float = 0.0
 ## mouth): (pitch, splay, glove roll) in `_set_arm` terms. Wins over walking, emotes and reactions
 ## so what the hand holds stays put; `Vector3.INF` = none.
 var hold_arm_r: Vector3 = Vector3.INF
+## Run the animation headless too (tests read the pose; servers never set it).
+var animate_headless: bool = false
+## The skin's arm driver (null for the bean and skins without arm bones).
+var arm_driver: SkinArmModifier = null
 
 var _rig: Node3D
 var _lean: Vector2 = Vector2.ZERO
@@ -149,6 +156,11 @@ var _motion: StringName = &""
 ## Player-colored ring at the feet: skins hide the bean, so this keeps who-is-who readable.
 var _ring: MeshInstance3D
 var _ring_mat: StandardMaterial3D
+## The current emote uses the skin's own clip (`SkinLibrary.CLIPS`) instead of driven arms.
+var _emote_clip: bool = false
+## Whole-body offset from the emote (hops), added on the rig.
+var _emote_lift: Vector3 = Vector3.ZERO
+var _tears: Array[MeshInstance3D] = []
 var _headless: bool = false
 
 
@@ -189,6 +201,7 @@ func set_skin(id: StringName) -> void:
 		skin_root = null
 	_anim = null
 	_motion = &""
+	arm_driver = null
 	var model: Node3D = SkinLibrary.instantiate(id)
 	if model != null:
 		_rig.add_child(model)
@@ -197,6 +210,8 @@ func set_skin(id: StringName) -> void:
 		_anim = SkinLibrary.animation_player(model)
 		_play(&"idle")
 		_reparent_hand_slot(model)
+		arm_driver = SkinLibrary.arm_driver(model)
+	_emote_clip = emote_id != &"" and _anim != null and SkinLibrary.clip(_anim, emote_id) != &""
 	var bean: bool = skin_root == null
 	body.visible = bean
 	arm_l.visible = bean
@@ -260,7 +275,7 @@ func update_motion(velocity: Vector3, on_floor: bool, delta: float) -> void:
 	if skin_root != null:
 		var speed: float = Vector2(velocity.x, velocity.z).length()
 		if emote_id != &"" and speed <= EMOTE_CANCEL_SPEED:
-			_play(&"wave" if emote_id in [&"thumbs_up", &"default_dance"] else &"idle")
+			_play(emote_id if _emote_clip and not sitting else (&"sit" if sitting else &"idle"))
 		elif sitting:
 			_play(&"sit")
 		elif speed > 4.2:
@@ -316,16 +331,18 @@ func hit(dir: Vector3, strength: float = 1.0) -> void:
 	stop_emote()
 
 
-## Plays a number-key emote (`Emotes.ANIMATED`) for `EMOTE_SECONDS`. Unknown ids are ignored.
-## Returns whether it started.
-func emote(id: StringName) -> bool:
-	if not Emotes.is_animated(id) or carried or knocked_out or _ragdoll != null:
+## Plays an emote (any in `Emotes`, wheel or number key) for `EMOTE_SECONDS`, starting `at`
+## seconds in (a late joiner catching up). A new emote replaces the one playing. Unknown ids are
+## ignored. Returns whether it started.
+func emote(id: StringName, at: float = 0.0) -> bool:
+	if not Emotes.has_animation(id) or carried or knocked_out or _ragdoll != null or at >= EMOTE_SECONDS:
 		return false
 	emote_id = id
-	emote_time = 0.0
+	emote_time = maxf(at, 0.0)
 	if reaction != &"big_win":
 		reaction = &""
 	_motion = &""
+	_emote_clip = _anim != null and SkinLibrary.clip(_anim, id) != &""
 	return true
 
 
@@ -334,8 +351,6 @@ func hold_right_arm(pose: Vector3) -> void:
 	if pose == hold_arm_r:
 		return
 	hold_arm_r = pose
-	if pose == Vector3.INF and skin_root != null and emote_id == &"":
-		SkinLibrary.pose_arms(skin_root, 0.0, 0.0)
 
 
 func is_emoting() -> bool:
@@ -348,9 +363,9 @@ func stop_emote() -> void:
 		return
 	emote_id = &""
 	emote_time = 0.0
+	_emote_clip = false
+	_emote_lift = Vector3.ZERO
 	_motion = &""  # skins pick their walk/idle clip again
-	if skin_root != null:
-		SkinLibrary.pose_arms(skin_root, 0.0, 0.0)
 
 
 ## The reaction for a round's net result.
@@ -414,11 +429,11 @@ func _process(delta: float) -> void:
 		if swing_time >= SWING_SECONDS:
 			swing_time = -1.0
 	if emote_id != &"":
-		emote_time += step
+		emote_time += minf(delta, 0.25)  # real time (a slow frame must not stretch the emote)
 		var speed: float = Vector2(_velocity.x, _velocity.z).length()
 		if emote_time >= EMOTE_SECONDS or (emote_time > 0.3 and speed > EMOTE_CANCEL_SPEED):
 			stop_emote()
-	if _headless or not is_visible_in_tree():
+	if (_headless and not animate_headless) or not is_visible_in_tree():
 		return
 	_animate(delta)
 
@@ -464,10 +479,7 @@ func _animate(frame_delta: float) -> void:
 		skin_root.rotation = Vector3(_lean.x * 0.6, float(em.get("twist", 0.0)), -_lean.y * 0.6)
 		skin_root.scale = Vector3(sq.x, _squash * bob, sq.z)
 		skin_root.position = em.get("shift", Vector3.ZERO) as Vector3
-		if emote_id != &"" or hold_arm_r != Vector3.INF:
-			var arms: Vector4 = em.get("arms", Vector4(ARM_REST, 0.0, ARM_REST, 0.0)) as Vector4
-			var lift_r: float = _skin_lift(arms.z) if hold_arm_r == Vector3.INF else _skin_lift(hold_arm_r.x)
-			SkinLibrary.pose_arms(skin_root, _skin_lift(arms.x), lift_r)
+		_drive_skin_arms(em)
 	_animate_rig()
 	_animate_arms(walk, em)
 	_animate_legs(walk, em)
@@ -476,9 +488,52 @@ func _animate(frame_delta: float) -> void:
 		_point_arms(reach_target)
 
 
-## Arm pitch (bean convention) → skin arm lift (0 down, 1 forward, 2 up).
-func _skin_lift(pitch: float) -> float:
-	return clampf((pitch - ARM_REST) / (PI * 0.5 - ARM_REST) * 2.0, 0.0, 2.0)
+## Points a skin's arms like the bean's: the emote's pose (its `skin` directions when it has
+## them: upper arm and forearm per side, for gestures that need an elbow), and the held-item arm.
+func _drive_skin_arms(em: Dictionary) -> void:
+	if arm_driver == null:
+		return
+	var w: float = 0.0 if em.is_empty() or (_emote_clip and not sitting) else float(em["w"])
+	var arms: Vector4 = em.get("arms", Vector4(ARM_REST, -0.38, ARM_REST, -0.38)) as Vector4
+	var dirs: Array = em.get("skin", []) as Array
+	for i: int in 2:
+		var side: float = -1.0 if i == 0 else 1.0
+		var pose: Vector2 = Vector2(arms.x, arms.y) if i == 0 else Vector2(arms.z, arms.w)
+		var upper: Vector3 = arm_direction(pose.x, pose.y, side)
+		var lower: Vector3 = upper
+		if dirs.size() == 4:
+			upper = (dirs[i * 2] as Vector3).normalized()
+			lower = (dirs[i * 2 + 1] as Vector3).normalized()
+		var arm_w: float = w
+		if i == 1 and hold_arm_r != Vector3.INF and not carried:
+			upper = arm_direction(hold_arm_r.x, hold_arm_r.y, side)
+			lower = upper
+			arm_w = 1.0
+		arm_driver.upper_dir[i] = upper
+		arm_driver.lower_dir[i] = lower
+		arm_driver.weight[i] = arm_w
+
+
+## Where a bean arm posed (`pitch`, `splay`) points, in the rig's space (-Z forward); `side` -1
+## for the left arm, +1 for the right.
+static func arm_direction(pitch: float, splay: float, side: float) -> Vector3:
+	var roll: float = splay if side < 0.0 else -splay
+	return Basis(Vector3.BACK, roll) * Basis(Vector3.RIGHT, pitch) * Vector3.FORWARD
+
+
+## The (pitch, splay) that points a bean arm along `dir` (rig space); inverse of `arm_direction`.
+static func arm_pose(dir: Vector3, side: float) -> Vector2:
+	var d: Vector3 = dir.normalized()
+	var h: float = Vector2(d.x, d.y).length()
+	var roll: float = 0.0
+	var pitch: float = 0.0
+	if d.y >= 0.0:
+		roll = atan2(-d.x, d.y) if h > 0.0001 else 0.0
+		pitch = atan2(h, -d.z)
+	else:
+		roll = atan2(d.x, -d.y)
+		pitch = -atan2(h, -d.z)
+	return Vector2(pitch, roll if side < 0.0 else -roll)
 
 
 ## Whole-body pose on the rig: slip, big-win hop and spin, carried, get-up.
@@ -509,6 +564,7 @@ func _animate_rig() -> void:
 	if carried:
 		roll = -PI * 0.5
 		lift = Vector3(-(BODY_HEIGHT * 0.5 + BODY_BOTTOM - PIVOT.y), 0.0, 0.0)  # centre the lying body
+	lift += _emote_lift
 	var q: Quaternion = Quaternion.from_euler(Vector3(pitch, spin, roll))
 	if _get_up_t >= 0.0:
 		_get_up_t += minf(get_process_delta_time(), 1.0 / 30.0)
@@ -541,22 +597,31 @@ func _slip_curve(t: float) -> float:
 	return 1.0 - smoothstep(0.5, 1.05, t)
 
 
-## The current emote's pose: body `lean` (Vector2 like `_lean`), `twist` (yaw), `shift` (body
-## offset), `squash`, `arms` (Vector4: left pitch, left splay, right pitch, right splay), `rolls`
-## (Vector2: glove roll left/right, 0 = thumb forward), `fists` (0..1), `feet` (Vector4: left
-## x/z, right x/z offsets), face `smile`, `open`, `brow` (raise, worry), `look` (pupil offset).
+## The current emote's pose: body `lean` (Vector2 like `_lean`; -x leans forward), `twist`
+## (yaw), `shift` (body offset), `lift` (whole character, for hops), `squash`, `arms` (Vector4:
+## left pitch, left splay, right pitch, right splay), `rolls` (Vector2: glove roll left/right,
+## 0 = thumb forward), `fists` (right, 0..1), `fists_l`, `flat` (open hands), `feet` (Vector4:
+## left x/z, right x/z offsets), `step` (foot lifts), face `smile`, `open`, `brow` (raise, worry),
+## `look` (pupil offset), `eyes` (how open), `wink` (left eye shut), `tears`, and for skins `skin`
+## (upper-arm and forearm directions, left then right, when a gesture needs bent elbows).
 ## Empty when no emote plays. Each one eases in and out over ~0.2 s.
 func _emote_pose() -> Dictionary:
 	if emote_id == &"":
+		_emote_lift = Vector3.ZERO
 		return {}
 	var t: float = emote_time
 	var w: float = smoothstep(0.0, 0.18, t) * (1.0 - smoothstep(EMOTE_SECONDS - 0.25, EMOTE_SECONDS, t))
 	var p: Dictionary = {}
 	match emote_id:
 		&"six_seven":
-			# Both palms up at chest height, weighing "six... seven" up and down, head tilting along.
+			# The 67 meme: both hands straight out in front, palms up, weighing "six... seven" up
+			# and down in turn like a pair of scales, the head tilting along. Skins bend their
+			# elbows at their sides with the forearms doing the weighing.
 			var s: float = sin(t * TAU * 2.0)
-			p["arms"] = Vector4(-0.1 + s * 0.5, 0.75, -0.1 - s * 0.5, 0.75)
+			var lp: float = -0.1 + s * 0.5
+			var rp: float = -0.1 - s * 0.5
+			p["arms"] = Vector4(lp, 0.0, rp, 0.0)
+			p["skin"] = [Vector3(-0.12, -0.95, 0.2), Vector3(-0.05, sin(lp), -cos(lp)), Vector3(0.12, -0.95, 0.2), Vector3(0.05, sin(rp), -cos(rp))]
 			p["rolls"] = Vector2(-PI * 0.5, PI * 0.5)  # thumbs point out: palms up
 			p["flat"] = 1.0  # open, flat hands
 			p["lean"] = Vector2(0.04, s * 0.14)
@@ -593,10 +658,181 @@ func _emote_pose() -> Dictionary:
 			p["look"] = Vector2(0.0, -0.25)
 		&"default_dance":
 			p = _default_dance(t)
-	for key: String in ["lean", "twist", "shift", "squash"]:
+		&"wave":
+			p = _wave(t)
+		&"laugh":
+			p = _laugh(t)
+		&"cry":
+			p = _cry(t)
+		&"taunt":
+			p = _taunt(t)
+		&"dance":
+			p = _disco(t)
+		&"gg":
+			p = _gg(t)
+	for key: String in ["lean", "twist", "shift", "squash", "lift"]:
 		if p.has(key):
 			p[key] = p[key] * w
+	_emote_lift = p.get("lift", Vector3.ZERO) as Vector3
 	p["w"] = w
+	return p
+
+
+## Both arms' (pitch, splay) from directions in the rig's space, as an `arms` Vector4.
+static func _arms_to(left: Vector3, right: Vector3) -> Vector4:
+	var l: Vector2 = arm_pose(left, -1.0)
+	var r: Vector2 = arm_pose(right, 1.0)
+	return Vector4(l.x, l.y, r.x, r.y)
+
+
+## A little hop at the start of an emote (whole body, so the feet leave the floor too).
+static func _pop(t: float, height: float = 0.12) -> Vector3:
+	return Vector3(0.0, sin(clampf(t / 0.32, 0.0, 1.0) * PI) * height, 0.0)
+
+
+## Wave: a hop, then the right arm high and out, open palm to the front, swinging side to side
+## over the head; leaning into it with a big grin.
+func _wave(t: float) -> Dictionary:
+	var s: float = sin(t * TAU * 2.0)
+	var p: Dictionary = {}
+	var right: Vector3 = Vector3(0.45 + 0.4 * s, 0.85, -0.2)
+	p["arms"] = _arms_to(Vector3(-0.3, -0.95, 0.0), right)
+	p["rolls"] = Vector2(0.0, PI * 0.5)  # palm faces the front
+	p["flat"] = 1.0
+	p["lean"] = Vector2(0.04, 0.08 + s * 0.04)
+	p["twist"] = -0.15
+	p["lift"] = _pop(t)
+	p["smile"] = 1.0
+	p["open"] = 0.55
+	p["brow"] = Vector2(0.9, 0.0)
+	p["look"] = Vector2(0.0, 0.1)
+	p["skin"] = [Vector3(-0.2, -1.0, 0.0), Vector3(-0.1, -1.0, -0.1), Vector3(0.9, 0.35, -0.15), right]
+	return p
+
+
+## Laugh (pointing and laughing at you): the right fist jabs out at whoever watches, the left
+## hand clutches the belly, the bean rocks back with quick "ha-ha-ha" shakes and then doubles
+## over; mouth wide open, eyes squeezed into happy slits.
+func _laugh(t: float) -> Dictionary:
+	var ha: float = sin(t * TAU * 6.0)
+	var over: float = smoothstep(1.0, 1.4, t)
+	var p: Dictionary = {}
+	var belly: Vector2 = arm_pose(Vector3(0.05, -0.45, -0.9), -1.0)
+	p["arms"] = Vector4(belly.x, belly.y, -0.05 + ha * 0.06 - over * 0.25, 0.0)
+	p["rolls"] = Vector2(PI * 0.5, PI * 0.5)  # palm to the belly; the pointing fist thumb in
+	p["fists"] = 1.0
+	p["lean"] = Vector2(lerpf(0.24, -0.34, over) + ha * 0.05, ha * 0.03)
+	p["shift"] = Vector3(0.0, absf(ha) * 0.035, 0.0)
+	p["squash"] = ha * 0.05
+	p["smile"] = 1.0
+	p["open"] = 1.0
+	p["eyes"] = 0.18
+	p["brow"] = Vector2(0.8, -0.2)
+	p["look"] = Vector2(0.0, lerpf(0.35, -0.2, over))
+	var point: Vector3 = arm_direction(p["arms"].z, 0.0, 1.0)
+	p["skin"] = [Vector3(-0.2, -0.85, -0.5), Vector3(0.8, 0.0, -0.6), point, point]
+	return p
+
+
+## Cry: slumped, both fists rubbing the eyes in turn, shoulders hitching with every sob, a wailing
+## frown with the brows up in the middle, eyes shut and tears running.
+func _cry(t: float) -> Dictionary:
+	var rub: float = sin(t * TAU * 2.5)
+	var sob: float = maxf(sin(t * TAU * 3.0), 0.0)
+	var p: Dictionary = {}
+	p["arms"] = _arms_to(Vector3(0.4, 0.33 + rub * 0.1, -0.85), Vector3(-0.4, 0.33 - rub * 0.1, -0.85))
+	p["fists"] = 1.0
+	p["fists_l"] = 1.0
+	p["lean"] = Vector2(-0.18 - sob * 0.06, sin(t * TAU * 0.7) * 0.06)
+	p["twist"] = sin(t * TAU * 0.7) * 0.12
+	p["shift"] = Vector3(0.0, -0.03 + sob * 0.04, 0.0)
+	p["squash"] = -0.06 + sob * 0.05
+	p["smile"] = -1.0
+	p["open"] = 0.55 + sob * 0.3
+	p["eyes"] = 0.1
+	p["brow"] = Vector2(-0.1, 1.0)
+	p["look"] = Vector2(0.0, -0.3)
+	p["tears"] = 1.0
+	p["skin"] = [Vector3(0.2, -0.6, -0.75), Vector3(0.35, 0.95 + rub * 0.1, -0.1), Vector3(-0.2, -0.6, -0.75), Vector3(-0.35, 0.95 - rub * 0.1, -0.1)]
+	return p
+
+
+## Taunt (the "nyah-nyah"): thumbs at the temples, open hands waggling, hips wiggling, leaning in
+## with a wink and a cheeky open grin.
+func _taunt(t: float) -> Dictionary:
+	var wag: float = sin(t * TAU * 4.0)
+	var wiggle: float = sin(t * TAU * 2.2)
+	var p: Dictionary = {}
+	p["arms"] = _arms_to(Vector3(0.1, 0.97, -0.2), Vector3(-0.1, 0.97, -0.2))
+	p["rolls"] = Vector2(PI * 0.5 + wag * 0.55, -PI * 0.5 - wag * 0.55)
+	p["flat"] = 1.0
+	p["lean"] = Vector2(-0.14, wiggle * 0.12)
+	p["twist"] = wiggle * 0.35
+	p["shift"] = Vector3(wiggle * 0.05, absf(wiggle) * 0.02, 0.0)
+	p["lift"] = _pop(t, 0.08)
+	p["feet"] = Vector4(wiggle * 0.04, 0.0, wiggle * 0.04, 0.0)
+	p["smile"] = 0.9
+	p["open"] = 0.5
+	p["wink"] = 1.0
+	p["brow"] = Vector2(0.8, -0.4)
+	p["look"] = Vector2(0.0, 0.0)
+	p["skin"] = [Vector3(-1.0, 0.3, -0.1), Vector3(0.8, 0.6, -0.1), Vector3(1.0, 0.3, -0.1), Vector3(-0.8, 0.6, -0.1)]
+	return p
+
+
+## Dance (the wheel's disco): left hand on the hip, the right fist stabbing up to the ceiling and
+## down across to the other hip on every beat, hips swaying and feet stepping with it.
+func _disco(t: float) -> Dictionary:
+	var beat: float = t * 2.0
+	var b: int = int(floor(beat)) % 2
+	var f: float = beat - floor(beat)
+	var k: float = smoothstep(0.0, 0.3, f)
+	var up_dir: Vector3 = Vector3(0.5, 0.85, -0.3).normalized()
+	var down_dir: Vector3 = Vector3(-0.45, -0.75, -0.5).normalized()
+	var right: Vector3 = up_dir.slerp(down_dir, k) if b == 0 else down_dir.slerp(up_dir, k)
+	var side: float = 1.0 if b == 1 else -1.0  # hips go towards the pointing hand
+	var sway: float = lerpf(-side, side, k)
+	var bounce: float = absf(cos(f * PI))
+	var p: Dictionary = {}
+	p["arms"] = _arms_to(Vector3(-0.85, -0.5, 0.15), right)
+	p["rolls"] = Vector2(0.0, 0.0)
+	p["fists"] = 1.0
+	p["lean"] = Vector2(-0.04, sway * 0.12)
+	p["twist"] = sway * 0.25
+	p["shift"] = Vector3(sway * 0.07, -0.05 * (1.0 - bounce), 0.0)
+	p["squash"] = -0.05 * (1.0 - bounce)
+	p["feet"] = Vector4(sway * 0.05, 0.0, sway * 0.05, 0.0)
+	p["step"] = Vector2(maxf(-sway, 0.0), maxf(sway, 0.0))
+	p["smile"] = 1.0
+	p["open"] = 0.35
+	p["brow"] = Vector2(0.6, 0.0)
+	p["look"] = Vector2(right.x * 0.4, right.y * 0.4)
+	p["skin"] = [Vector3(-0.9, -0.4, 0.2), Vector3(0.6, -0.3, -0.3), right, right]
+	return p
+
+
+## GG: the right hand held out for a handshake, pumping it, then a polite bow with the hand on the
+## belly and the eyes closed.
+func _gg(t: float) -> Dictionary:
+	var pump: float = sin(t * TAU * 3.0) * (1.0 - smoothstep(1.0, 1.25, t))
+	var bow: float = smoothstep(1.15, 1.55, t) * (1.0 - smoothstep(2.05, 2.35, t))
+	var shake: Vector2 = Vector2(-0.2 + pump * 0.14, 0.0)  # straight out, thumb up
+	var chest: Vector2 = arm_pose(Vector3(-0.55, -0.45, -0.7), 1.0)
+	var r: Vector2 = shake.lerp(chest, smoothstep(1.0, 1.3, t))
+	var right: Vector3 = arm_direction(r.x, r.y, 1.0)
+	var l: Vector2 = arm_pose(Vector3(-0.2, -0.9, 0.35), -1.0)
+	var p: Dictionary = {}
+	p["arms"] = Vector4(l.x, l.y, r.x, r.y)
+	p["rolls"] = Vector2(0.0, 0.0)  # thumb up, palm to the side: a handshake
+	p["flat"] = 1.0
+	p["lean"] = Vector2(-0.5 * bow, 0.0)
+	p["shift"] = Vector3(0.0, -0.03 * bow, 0.0)
+	p["smile"] = 0.9
+	p["open"] = lerpf(0.3, 0.0, bow)
+	p["eyes"] = lerpf(1.0, 0.15, bow)
+	p["brow"] = Vector2(0.5, 0.0)
+	p["look"] = Vector2(0.0, -0.2 * bow)
+	p["skin"] = [Vector3(-0.1, -1.0, 0.3), Vector3(-0.1, -1.0, 0.3), right, right]
 	return p
 
 
@@ -648,6 +884,7 @@ func _animate_arms(walk: float, em: Dictionary) -> void:
 	var r: Vector2 = Vector2(ARM_REST - swing, -0.38 - walk * 0.15)
 	var rolls: Vector2 = Vector2.ZERO
 	var fists: float = 0.0
+	var fists_l: float = 0.0
 	var flat: float = 0.0
 	if not _on_floor and not carried:
 		# Airborne: arms fly up and windmill a little.
@@ -673,6 +910,7 @@ func _animate_arms(walk: float, em: Dictionary) -> void:
 		r = r.lerp(Vector2(a.z, a.w), w)
 		rolls = rolls.lerp(em.get("rolls", Vector2.ZERO) as Vector2, w)
 		fists = lerpf(fists, float(em.get("fists", 0.0)), w)
+		fists_l = float(em.get("fists_l", 0.0)) * w
 		flat = float(em.get("flat", 0.0)) * w
 	if swing_time >= 0.0 and not carried:
 		# Wind-up pulls the hands back by the hips, the thrust shoots them straight out.
@@ -699,7 +937,7 @@ func _animate_arms(walk: float, em: Dictionary) -> void:
 	hand_r.rotation.z = -rolls.y
 	for i: int in 2:
 		var glove: MeshInstance3D = hand_l if i == 0 else hand_r
-		var f: float = fists if i == 1 or emote_id == &"default_dance" or reaction != &"" or swing_time >= 0.0 else 0.0
+		var f: float = fists if i == 1 or emote_id == &"default_dance" or reaction != &"" or swing_time >= 0.0 else fists_l
 		glove.scale = Vector3(1.0 - 0.12 * f - 0.45 * flat, 1.0 - 0.1 * f + 0.15 * flat, 0.92 - 0.1 * f + 0.25 * flat)
 		var thumb: MeshInstance3D = _thumbs[i]
 		thumb.scale = Vector3.ONE * (1.0 + 0.45 * f)
@@ -772,6 +1010,7 @@ func _animate_face(delta: float, em: Dictionary) -> void:
 		smile = lerpf(smile, float(em.get("smile", smile)), w)
 		face_mouth = lerpf(face_mouth, float(em.get("open", face_mouth)), w)
 		brow = brow.lerp(em.get("brow", brow) as Vector2, w)
+		open = lerpf(open, float(em.get("eyes", open)), w)
 	if _hit_face > 0.0:
 		# Gasp: eyes pop wide with tiny pupils, round `O`, brows up.
 		size = maxf(size, 1.3)
@@ -799,8 +1038,11 @@ func _animate_face(delta: float, em: Dictionary) -> void:
 			open = minf(open, 0.1)
 	_eye_scale = lerpf(_eye_scale, size, minf(1.0, 12.0 * delta))
 	_eye_open = lerpf(_eye_open, open, minf(1.0, 18.0 * delta))
+	var wink: float = float(em.get("wink", 0.0)) * w
 	for eye: MeshInstance3D in [eye_l, eye_r]:
-		eye.scale = Vector3(_eye_scale, _eye_scale * maxf(_eye_open, 0.08), _eye_scale * 0.8)
+		var lid: float = _eye_open * (1.0 - 0.9 * wink) if eye == eye_l else _eye_open
+		eye.scale = Vector3(_eye_scale, _eye_scale * maxf(lid, 0.08), _eye_scale * 0.8)
+	_animate_tears(float(em.get("tears", 0.0)) * w)
 	_brow = _brow.lerp(brow, minf(1.0, 12.0 * delta))
 	for i: int in 2:
 		var side: float = -1.0 if i == 0 else 1.0
@@ -837,6 +1079,21 @@ func _animate_face(delta: float, em: Dictionary) -> void:
 	for c: MeshInstance3D in _cheeks:
 		c.scale = c.scale.lerp(Vector3(0.07, 0.04, 0.03) * maxf(cheeks, 0.001), minf(1.0, 10.0 * delta))
 		c.visible = c.scale.x > 0.004
+
+
+## Crying: a drop runs down from under each eye, again and again (`amount` 0 hides them).
+func _animate_tears(amount: float) -> void:
+	for i: int in _tears.size():
+		var tear: MeshInstance3D = _tears[i]
+		tear.visible = amount > 0.3
+		if not tear.visible:
+			continue
+		var side: float = -1.0 if i == 0 else 1.0
+		var k: float = fposmod(_time * 1.3 + i * 0.45, 1.0)
+		var x: float = side * (EYE_SPREAD + 0.03)
+		var y: float = EYE_Y - _body_center_y() - EYE_RADIUS * 0.8 - k * 0.3
+		tear.position = Vector3(x, y, _front_z(y, x) - 0.02)
+		tear.scale = Vector3(0.028, 0.04, 0.028) * (1.0 - k * 0.4)
 
 
 ## Pupils look along `gaze`, at the watching camera, or around; little saccades keep them alive.
@@ -1052,6 +1309,15 @@ func _build() -> void:
 	mouth.material_override = _mouth_mat
 	mouth.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	body.add_child(mouth)
+	var tear_mat := StandardMaterial3D.new()
+	tear_mat.albedo_color = Color("#8FD3FF")
+	tear_mat.emission_enabled = true
+	tear_mat.emission = Color("#8FD3FF") * 0.4
+	for side: float in [-1.0, 1.0]:
+		var tear: MeshInstance3D = _blob(body, Vector3(side * EYE_SPREAD, 0.0, 0.0), Vector3.ONE * 0.03, tear_mat, "TearL" if side < 0.0 else "TearR")
+		tear.visible = false
+		tear.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_tears.append(tear)
 	arm_l = _arm("ArmL")
 	arm_r = _arm("ArmR")
 	hand_l = arm_l.get_node("Hand")

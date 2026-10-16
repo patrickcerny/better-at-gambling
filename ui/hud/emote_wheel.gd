@@ -128,11 +128,35 @@ static func _style(bg: Color, border: Color, radius: int, width: int) -> StyleBo
 	return sb
 
 
-## Shows an emote on a character: bubble with the emoji and word, a hop if standing, and its sound.
+## Shows an emote on a character: the bubble with the emoji and word, the character acting it
+## out (`PlayerAvatar.play_emote`; our own one in third person), and its sound.
 static func present(avatar: PlayerAvatar, id: StringName) -> void:
 	if avatar == null or not Emotes.has(id):
 		return
-	avatar.say(Emotes.bubble_text(id), 2.0)
-	if avatar.is_standing():
-		avatar.hop(Vector3(0, 3.5, 0))
+	avatar.play_emote(id)
 	Audio.play_at(Emotes.sound(id), avatar, -6.0)
+
+
+## An `emote` (wheel) or `player_emote` (number key) event on the avatars (player id →
+## PlayerAvatar) of whoever receives it. Returns whether it was one of those events.
+static func apply_event(avatars: Dictionary, ev: Dictionary) -> bool:
+	match StringName(ev.get("type", &"")):
+		&"emote":
+			present(avatars.get(int(ev["player"]), null), StringName(ev["id"]))
+		&"player_emote":
+			var emoter: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if emoter != null:
+				emoter.play_emote(StringName(ev["emote"]))
+		_:
+			return false
+	return true
+
+
+## Late joiners: emotes the snapshot says are still playing (`ClientMatchState.emotes`) pick up
+## where they are, without bubbles or sounds and without moving anyone's camera.
+static func replay(avatars: Dictionary, emotes: Dictionary) -> void:
+	for pid: int in emotes:
+		var a: PlayerAvatar = avatars.get(pid, null)
+		var row: Dictionary = emotes[pid]
+		if a != null and not a.visuals.is_emoting():
+			a.play_emote(StringName(row.get("id", "")), maxf(float(row.get("t", 0.0)), 0.01))
