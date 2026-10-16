@@ -84,7 +84,7 @@ func _on_open() -> void:
 ## Puts the selected chip on `horse` (sends the bet; the server checks everything).
 func bet_on(horse: int) -> bool:
 	selected_horse = horse
-	return send(&"place_bet", {"bet": {"horse": horse, "amount": bet_panel.chip_value()}})
+	return send(&"place_bet", {"bet": {"horse": horse, "amount": bet_panel.chip_stake(bet_room())}})
 
 
 func _hint_text() -> String:

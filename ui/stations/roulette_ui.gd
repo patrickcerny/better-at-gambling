@@ -214,7 +214,7 @@ func _spot(text: String, type: StringName, value: int, color: Color, parent: Con
 	b.add_theme_stylebox_override(&"hover", hover)
 	b.add_theme_stylebox_override(&"focus", hover)
 	b.set_meta(&"type", type)
-	b.pressed.connect(func() -> void: send(&"place_bet", {"bet": {"type": type, "value": value, "amount": bet_panel.chip_value()}}))
+	b.pressed.connect(func() -> void: send(&"place_bet", {"bet": {"type": type, "value": value, "amount": bet_panel.chip_stake(bet_room())}}))
 	(parent if parent != null else grid).add_child(b)
 	_buttons.append(b)
 	if text != "":

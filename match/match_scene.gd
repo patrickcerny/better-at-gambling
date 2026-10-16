@@ -193,6 +193,7 @@ func _ready() -> void:
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
 		ui.rejected.connect(func(err: StringName) -> void: hud.toast(StationUi.rejection_text(err), 1.5))
+		ui.notice.connect(func(text: String) -> void: hud.toast(text, 1.8))
 		ui_layer.add_child(ui)
 		station_uis[pair[0]] = ui
 	emote_wheel = EmoteWheel.new()
