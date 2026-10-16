@@ -133,8 +133,8 @@
   nobody could move in Pass the Bomb; minigames come from a shuffled bag (no repeat until every game the
   table can play has come once); Escape opens the pause menu in every minigame (own layer above the stage
   UI). Games: Bat Heist (vault, bats, coin stealing), Last Seat at the Table (parlor, musical chairs),
-  Grab Your Hand (card hall, poker hands), Roulette Sumo (wheel room, speeding wheel, rolling ball,
-  freezing bats), Dodge the Dice (climb room "board": tilted roulette board, falling hazards, climbing
+  Grab Your Hand (card hall, poker hands), Roulette Sumo (wheel room, fast wheel that flings you
+  outward, rolling ball, little pushes, no bats), Dodge the Dice (climb room "board": tilted roulette board, falling hazards, climbing
   kit), Jackpot Climb (climb room "towers": chip stacks up to the JACKPOT sign).
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through

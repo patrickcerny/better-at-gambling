@@ -2,35 +2,31 @@ class_name RouletteSumoStage
 extends WalkableStage
 ## Client presentation of Roulette Sumo on the giant wheel (`WheelRoom`; a `WalkableStage`: real
 ## avatars, the normal camera). The rotor turns to the server's wheel angle and drags our own bean
-## with it (`RouletteSumoLogic.drift` every physics frame, the same maths the server uses for
-## frozen beans); ragdolls this process simulates are dragged by the deck too. A giant ivory ball
-## rolls round the deck, predicted from the server's last segment (`step_ball`) and eased onto
-## each update. Every bean carries the casino's bat; E swings it and a hit freezes the target: the
-## bean goes icy blue inside a shell of ice shards with "FROZEN" over it, and its input is ignored
-## (the avatar's stun) until the server thaws it. Falling off: an outward tumble into the pit,
+## with it (`RouletteSumoLogic.drift` every physics frame); ragdolls this process simulates (the
+## tumble over the rim) are dragged by the deck too. A giant ivory ball rolls round the deck,
+## predicted from the server's last segment (`step_ball`) and eased onto each update; when it
+## touches a bean that bean slides away (a push, no knockdown). No bats: the action, shove and
+## grab buttons all push the bean in front (`minigame_action push`); the server decides, and the
+## pushed bean's own client slides it about a metre. Falling off: an outward tumble into the pit,
 ## "OFF THE WHEEL!", then the gallery. Lucky runs the show from the croupier dais. The overlay
-## shows the clock, a wheel-speed gauge (x1.0 to x4.8), who is still on, the feed, Lucky's lines
-## and a context prompt (swing / edge warning / frozen).
+## shows the clock, a wheel-speed gauge, who is still on, the feed, Lucky's lines and a context
+## prompt (push / edge warning).
 
-const ICE: Color = Color("#A9D8F2")
-const ICE_DEEP: Color = Color("#5FA8D3")
 ## Beans past this radius get an edge warning.
-const EDGE_WARN: float = WheelRoom.RIM_RADIUS - 1.3
+const EDGE_WARN: float = WheelRoom.RIM_RADIUS - 2.0
 ## How fast the shown ball catches up with the predicted one (1/s).
 const BALL_EASE: float = 6.0
 ## Ragdoll parts near the deck take this share of the deck's speed per physics frame.
 const DECK_GRIP: float = 0.25
+## A push lifts the bean this share of its strength (a little hop).
+const PUSH_LIFT: float = 0.12
 
 var clock: float = 0.0
 var done: bool = false
 var winner: int = -1
 var out: Array[int] = []
-## pid → seconds left frozen / down (client estimates, corrected by the state).
-var frozen_left: Dictionary[int, float] = {}
-var down_left: Dictionary[int, float] = {}
 var rotor: Node3D = null
 var host: QuizHost = null
-var bats: Dictionary[int, Node3D] = {}
 ## Ball: predicted state (flat, relative to the centre), the shown offset that eases out.
 var ball_pos: Vector2 = Vector2.ZERO
 var ball_vel: Vector2 = Vector2.ZERO
@@ -41,17 +37,15 @@ var _ball_spin: Node3D = null
 ## Shown wheel speed (eases to 0 after the end), the shown angle.
 var _omega: float = 0.0
 var _angle: float = 0.0
-var _ice: Dictionary[int, Node3D] = {}
 var _cooldown: float = 0.0
-var _predicted_swing: float = -1.0
-var _view_bat: Node3D = null
+var _predicted_push: float = -1.0
 var _gauge_fill: ColorRect = null
 var _gauge_label: Label = null
 var _gauge_panel: PanelContainer = null
 var _host_panel: PanelContainer = null
 var _host_label: Label = null
-var _next_mark: int = 2
-var _ice_mat: StandardMaterial3D = null
+## Lucky's speed calls: the next ramp fraction to call out (1/3, 2/3, full speed).
+var _next_mark: int = 1
 
 
 func _build_room() -> Node3D:
@@ -65,7 +59,6 @@ func _build_game(_start: Dictionary) -> void:
 	_build_ball()
 	if _is_dedicated():
 		return
-	_build_bats()
 	host = QuizHost.new()
 	host.name = "LuckyHost"
 	add_child(host)
@@ -75,7 +68,7 @@ func _build_game(_start: Dictionary) -> void:
 		_build_gauge()
 		_build_host_panel()
 	set_clock(RouletteSumoLogic.GAME_SECONDS)
-	_say("Welcome to my wheel! Bat a bean to freeze it, dodge my ball, and don't fall off.", QuizHost.Pose.HAPPY)
+	_say("Welcome to my wheel! Push the others off, dodge my ball, and don't fall off.", QuizHost.Pose.HAPPY)
 	_refresh_status()
 
 
@@ -91,18 +84,6 @@ func apply_state(st: Dictionary) -> void:
 	for g: Variant in st.get("out", []):
 		for p: Variant in g:
 			out.append(int(p))
-	for p: int in out:
-		_drop_player(p)
-	var fz: Dictionary = st.get("frozen", {})
-	for p: int in frozen_left.keys():
-		if not fz.has(p) and not fz.has(str(p)):
-			_thaw(p)
-	for k: Variant in fz:
-		_freeze(int(k), float(fz[k]))
-	down_left.clear()
-	var dn: Dictionary = st.get("down", {})
-	for k: Variant in dn:
-		down_left[int(k)] = float(dn[k])
 	_refresh_status()
 
 
@@ -115,39 +96,48 @@ func alive_players() -> Array[int]:
 
 
 func can_act() -> bool:
-	return super.can_act() and not done and local_id in roster and local_id not in out and not frozen_left.has(local_id) and not down_left.has(local_id)
+	if not super.can_act() or done or local_id not in roster or local_id in out:
+		return false
+	var me: PlayerAvatar = local_avatar()
+	return me == null or me.is_standing()
 
 
 # --- Input --------------------------------------------------------------------------------------
 
-## E swings the bat (cooldown shown at once; the server decides the hit).
+## E pushes the bean in front (the server decides who, and how hard).
 func on_action_pressed() -> bool:
+	return _push()
+
+
+## The shove click pushes too (the casino's shove, with its knockdowns, is off here).
+func on_shove_pressed() -> bool:
+	return _push()
+
+
+## So does the grab click (no grabbing on the wheel).
+func on_grab_pressed() -> bool:
+	return _push()
+
+
+func _push() -> bool:
 	if not can_act():
 		return going and not over
 	if _cooldown > 0.0:
 		return true
-	var target: int = swing_target()
-	var payload: Dictionary = {"kind": &"swing"}
+	var target: int = push_target()
+	var payload: Dictionary = {"kind": &"push"}
 	if target >= 0:
 		payload["target"] = target
-	_cooldown = RouletteSumoLogic.SWING_COOLDOWN
-	_predicted_swing = 0.35
-	_swing_bat(local_id)
+	_cooldown = RouletteSumoLogic.PUSH_COOLDOWN
+	_predicted_push = 0.6
+	_push_swing(local_id)
 	Net.send_intent(Intents.make(&"minigame_action", payload))
 	return true
 
 
-## The bean the bat would freeze (the server's pick), or -1.
-func swing_target() -> int:
-	var me: PlayerAvatar = local_avatar()
-	if me == null:
-		return -1
-	var candidates: Dictionary = {}
-	for pid: int in alive_players():
-		var a: PlayerAvatar = avatar(pid)
-		if pid != local_id and a != null and not frozen_left.has(pid) and not down_left.has(pid):
-			candidates[pid] = a.global_position
-	return InteractionRules.pick_in_reach(me.global_position, me.facing(), candidates, local_id, RouletteSumoLogic.BAT_REACH)
+## The bean a push would reach (the server's pick), or -1.
+func push_target() -> int:
+	return local_target(RouletteSumoLogic.PUSH_REACH)
 
 
 # --- Events -------------------------------------------------------------------------------------
@@ -166,97 +156,85 @@ func on_event(ev: Dictionary) -> void:
 		&"player_knocked_down":
 			_aim_knockdown(int(ev["target"]), StringName(ev.get("cause", &"")))
 	if _is_dedicated():
-		return  # the dedicated server only needs the room's floor (and the ragdoll pushes above)
+		return  # the dedicated server only needs the room's floor (and the tumble's direction)
 	match StringName(ev["type"]):
 		&"minigame_go":
 			banner("SPIN!", Palette.VIP_GOLD, 1.4)
 			Audio.play(&"countdown_beep", &"SFX", -4.0, 1.2)
-			_say("No bumping, only bats. Spin it up!", QuizHost.Pose.DRUMROLL)
+			_say("Push them off and keep walking. Spin it up!", QuizHost.Pose.DRUMROLL)
 		&"roulette_sumo_begin":
 			feed("Last bean on the wheel wins", Palette.VIP_GOLD)
-		&"roulette_sumo_swing":
-			var who: int = int(ev["player"])
-			if who != local_id or _predicted_swing <= 0.0:
-				_swing_bat(who)
-			var res: StringName = StringName(ev.get("result", &""))
-			if res in [&"frozen", &"thawing"]:
-				var ta: PlayerAvatar = avatar(int(ev["target"]))
-				if ta != null:
-					Audio.play_at(&"boing", ta, -8.0, 1.4)
-					Vfx.floating_text(self, ta.global_position + Vector3(0, 2.2, 0), "ALREADY ICED" if res == &"frozen" else "THAWING", Palette.CREAM, 80, 0.6, 0.8)
-		&"roulette_sumo_frozen":
-			_on_frozen(int(ev["player"]), int(ev["target"]), float(ev.get("seconds", RouletteSumoLogic.FREEZE_SECONDS)))
-		&"roulette_sumo_thawed":
-			_thaw(int(ev["player"]))
+		&"roulette_sumo_push":
+			_on_push(ev)
 		&"roulette_sumo_ball_hit":
-			_on_ball_hit(int(ev["player"]), float(ev.get("seconds", RouletteSumoLogic.KNOCK_SECONDS)))
+			_on_ball_hit(ev)
 		&"minigame_eliminated":
 			_on_out(ev)
 		&"roulette_sumo_over":
 			done = true
 			winner = int(ev.get("winner", -1))
-			for p: int in frozen_left.keys():
-				_thaw(p)
 			_announce(ev.get("ranking", []), StringName(ev.get("reason", &"")))
 	_refresh_status()
 
 
-## The scene throws a downed bean's ragdoll along `_impact_dir`: away from the ball and along its
-## roll for a ball hit, outward over the rim for a fall.
+## The scene throws a bean that went over the rim outward into the pit (`_impact_dir`).
 func _aim_knockdown(pid: int, cause: StringName) -> void:
-	if scene == null or pid not in roster:
+	if scene == null or pid not in roster or cause != &"fell":
 		return
 	var a: PlayerAvatar = avatar(pid)
 	if a == null:
 		return
 	var c: Vector3 = WheelRoom.center()
-	var dir := Vector3.ZERO
-	if cause == &"ball":
-		var b: Vector3 = _ball_world()
-		var away := Vector3(a.global_position.x - b.x, 0.0, a.global_position.z - b.z)
-		dir = away.normalized() + Vector3(ball_vel.x, 0.0, ball_vel.y).normalized() * 1.2
-	elif cause == &"fell":
-		dir = Vector3(a.global_position.x - c.x, 0.0, a.global_position.z - c.z)
+	var dir := Vector3(a.global_position.x - c.x, 0.0, a.global_position.z - c.z)
 	if dir.length() > 0.01:
 		scene._impact_dir[pid] = dir.normalized()
 
 
-func _on_frozen(by: int, target: int, seconds: float) -> void:
-	_freeze(target, seconds)
-	var ta: PlayerAvatar = avatar(target)
-	if ta != null:
-		var at: Vector3 = ta.global_position + Vector3(0, 1.1, 0)
-		HitPop.at(self, at, 1.2)
-		Audio.play_at(&"bonk", ta, 0.0, randf_range(0.65, 0.75))
-		Audio.play_at(&"chime", ta, -6.0, 1.6)
-		Vfx.floating_text(self, at + Vector3(0, 0.6, 0), "FREEZE!", ICE, 110, 0.9, 1.0)
-		var ba: PlayerAvatar = avatar(by)
-		if ba != null:
-			ta.visuals.hit(ta.global_position - ba.global_position, 0.8)
-	feed("%s  froze  %s" % [player_name(by), player_name(target)], player_color(by))
+## A push went out: the pusher's arms thrust, and on contact the target slides a little.
+func _on_push(ev: Dictionary) -> void:
+	var by: int = int(ev["player"])
+	var target: int = int(ev.get("target", -1))
+	if by != local_id or _predicted_push <= 0.0:
+		_push_swing(by)
+	if target < 0:
+		return
+	var dir: Vector3 = _wire_dir(ev.get("dir", []))
+	var strength: float = float(ev.get("strength", RouletteSumoLogic.PUSH_STRENGTH))
+	create_tween().tween_callback(func() -> void: _shoved(target, dir, strength, false)).set_delay(AvatarVisuals.SWING_CONTACT)
 	if target == local_id:
-		banner("FROZEN!", ICE, 1.0)
-		if scene != null:
-			scene._juice(0.05, 0.35)
+		feed("%s pushed you" % player_name(by), player_color(by))
 	elif by == local_id:
-		banner("FROZE %s!" % player_name(target).to_upper(), ICE, 0.9)
-		if scene != null:
-			scene._juice(0.04, 0.15)
+		feed("You pushed %s" % player_name(target), player_color(by))
 
 
-func _on_ball_hit(pid: int, seconds: float) -> void:
-	down_left[pid] = seconds
-	_thaw(pid)
-	var a: PlayerAvatar = avatar(pid)
-	if a != null:
-		HitPop.at(self, a.global_position + Vector3(0, 1.0, 0), 1.6)
-		Audio.play_at(&"bonk", a, 2.0, 0.5)
-		Vfx.floating_text(self, a.global_position + Vector3(0, 2.0, 0), "BOWLED!", Palette.CREAM, 110, 0.9, 1.0)
-	feed("The ball flattened %s" % player_name(pid), Palette.CREAM)
+func _on_ball_hit(ev: Dictionary) -> void:
+	var pid: int = int(ev["player"])
+	_shoved(pid, _wire_dir(ev.get("dir", [])), float(ev.get("strength", RouletteSumoLogic.BALL_PUSH)), true)
+	feed("The ball bumped %s" % player_name(pid), Palette.CREAM)
 	if pid == local_id:
-		banner("BOWLED OVER!", Palette.LOSS_RED, 1.0)
-	elif randf() < 0.5:
-		_say("Strike! Mind my ball, %s." % player_name(pid), QuizHost.Pose.SURPRISED)
+		banner("BUMPED!", Palette.CREAM, 0.8)
+	elif randf() < 0.4:
+		_say("Mind my ball, %s!" % player_name(pid), QuizHost.Pose.SURPRISED)
+
+
+## Slides `pid` along `dir` (our own bean moves; a puppet only flinches, its owner moves it).
+func _shoved(pid: int, dir: Vector3, strength: float, heavy: bool) -> void:
+	var a: PlayerAvatar = avatar(pid)
+	if a == null or not is_instance_valid(a) or pid in out or dir == Vector3.ZERO:
+		return
+	if a.is_standing():
+		a.knockback(dir, strength, PUSH_LIFT)
+	HitPop.at(self, a.global_position + Vector3(0, 1.0, 0) - dir * 0.3, 1.3 if heavy else 0.8)
+	Audio.play_at(&"boing" if heavy else &"bonk", a, -6.0, randf_range(0.9, 1.1))
+	if pid == local_id and scene != null:
+		scene._juice(0.03, 0.25 if heavy else 0.15)
+
+
+static func _wire_dir(v: Variant) -> Vector3:
+	if not (v is Array) or (v as Array).size() < 2:
+		return Vector3.ZERO
+	var d := Vector3(float(v[0]), 0.0, float(v[1]))
+	return d.normalized() if d.length() > 0.01 else Vector3.ZERO
 
 
 func _on_out(ev: Dictionary) -> void:
@@ -267,7 +245,6 @@ func _on_out(ev: Dictionary) -> void:
 		if pid not in out:
 			out.append(pid)
 		names.append(player_name(pid))
-		_drop_player(pid)
 		var a: PlayerAvatar = avatar(pid)
 		if a != null and cause == &"fell":
 			Audio.play_at(&"whoosh", a, -2.0, 0.7)
@@ -307,83 +284,13 @@ func _announce(ranking: Array, reason: StringName) -> void:
 	Audio.play(&"quiz_winner", &"SFX", -4.0)
 
 
-# --- Freeze -------------------------------------------------------------------------------------
-
-func _freeze(pid: int, seconds: float) -> void:
-	if pid in out or seconds <= 0.0:
-		return
-	frozen_left[pid] = seconds
+## The two-handed shove thrust (no bat), with a whoosh.
+func _push_swing(pid: int) -> void:
 	var a: PlayerAvatar = avatar(pid)
 	if a == null:
 		return
-	a.stun(seconds)  # no input until the server thaws them (the server refuses moves anyway)
-	if _is_dedicated() or (_ice.has(pid) and is_instance_valid(_ice[pid])):
-		return
-	if _ice_mat == null:
-		_ice_mat = StandardMaterial3D.new()
-		_ice_mat.albedo_color = Color(ICE, 0.45)
-		_ice_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_ice_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		_ice_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	for n: Node in a.visuals.find_children("*", "GeometryInstance3D", true, false):
-		(n as GeometryInstance3D).material_overlay = _ice_mat
-	var shell := Node3D.new()
-	shell.name = "IceShell"
-	add_child(shell)
-	var shard_mat := StandardMaterial3D.new()
-	shard_mat.albedo_color = Color(ICE.lightened(0.3), 0.42)
-	shard_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	shard_mat.roughness = 0.08
-	shard_mat.metallic_specular = 1.0
-	shard_mat.emission_enabled = true
-	shard_mat.emission = ICE_DEEP
-	shard_mat.emission_energy_multiplier = 0.25
-	for i: int in 7:
-		var s := MeshInstance3D.new()
-		var pm := PrismMesh.new()
-		var h: float = 0.7 + 0.25 * float(i % 3)
-		pm.size = Vector3(0.32, h, 0.26)
-		s.mesh = pm
-		s.material_override = shard_mat
-		var ang: float = TAU * float(i) / 7.0
-		s.position = Vector3(sin(ang) * 0.42, h * 0.5 + 0.05 * float(i % 2), cos(ang) * 0.42)
-		s.rotation = Vector3(0.25 * cos(ang), ang, 0.25 * sin(ang))
-		shell.add_child(s)
-	var tag := Label3D.new()
-	tag.name = "FrozenTag"
-	tag.text = "FROZEN"
-	tag.font = Vfx.font()
-	tag.font_size = 64
-	tag.pixel_size = 0.006
-	tag.modulate = ICE
-	tag.outline_modulate = Palette.CASINO_BLACK
-	tag.outline_size = 14
-	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	tag.no_depth_test = true
-	tag.position = Vector3(0, 2.5, 0)
-	shell.add_child(tag)
-	shell.global_position = a.global_position
-	shell.scale = Vector3.ONE * 0.2
-	shell.create_tween().tween_property(shell, "scale", Vector3.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_ice[pid] = shell
-
-
-func _thaw(pid: int) -> void:
-	var was: bool = frozen_left.has(pid)
-	frozen_left.erase(pid)
-	var a: PlayerAvatar = avatar(pid)
-	if a != null and is_instance_valid(a):
-		for n: Node in a.visuals.find_children("*", "GeometryInstance3D", true, false):
-			if (n as GeometryInstance3D).material_overlay == _ice_mat:
-				(n as GeometryInstance3D).material_overlay = null
-		if was and a.state == PlayerAvatar.State.STUNNED:
-			a.stunned_until = -INF  # input back at once
-	var shell: Node3D = _ice.get(pid, null)
-	_ice.erase(pid)
-	if shell != null and is_instance_valid(shell):
-		if Vfx.enabled() and was and a != null:
-			Audio.play_at(&"chip_clack", a, -6.0, 1.6)
-		shell.queue_free()
+	a.visuals.swing()
+	Audio.play_at(&"whoosh", a, -12.0, randf_range(1.15, 1.35))
 
 
 # --- Per frame ----------------------------------------------------------------------------------
@@ -426,20 +333,7 @@ func _process(delta: float) -> void:
 	if _is_dedicated():
 		return
 	_cooldown = maxf(_cooldown - delta, 0.0)
-	_predicted_swing = maxf(_predicted_swing - delta, 0.0) if _predicted_swing > 0.0 else -1.0
-	for p: int in frozen_left.keys():
-		frozen_left[p] -= delta
-		if frozen_left[p] <= -1.0:
-			_thaw(p)  # the server's thaw got lost
-	for p: int in down_left.keys():
-		down_left[p] -= delta
-		if down_left[p] <= -1.0:
-			down_left.erase(p)
-	for p: int in _ice:
-		var a: PlayerAvatar = avatar(p)
-		if a != null and is_instance_valid(_ice[p]):
-			_ice[p].global_position = a.global_position
-	_update_view_bat()
+	_predicted_push = maxf(_predicted_push - delta, 0.0) if _predicted_push > 0.0 else -1.0
 	_update_hud()
 	_speed_lines()
 
@@ -453,7 +347,7 @@ func _update_hud() -> void:
 		set_clock(RouletteSumoLogic.GAME_SECONDS - clock)
 	if _gauge_fill != null:
 		var f: float = RouletteSumoLogic.speed_factor(_omega)
-		var t: float = clampf((_omega - RouletteSumoLogic.OMEGA_START) / (RouletteSumoLogic.OMEGA_MAX - RouletteSumoLogic.OMEGA_START), 0.0, 1.0)
+		var t: float = RouletteSumoLogic.ramp_fraction(_omega)
 		_gauge_fill.anchor_right = maxf(t, 0.02)
 		_gauge_fill.color = Palette.VIP_GOLD.lerp(Palette.LOSS_RED, t * t)
 		_gauge_label.text = "x%.1f" % f
@@ -461,16 +355,18 @@ func _update_hud() -> void:
 	_update_prompt()
 
 
-## Lucky calls the speed-ups (x2, x3, x4, full speed).
+## Lucky calls the speed-ups (a third, two thirds, full speed).
 func _speed_lines() -> void:
-	if not going or done or over:
+	if not going or done or over or _next_mark > 3:
 		return
-	var f: float = RouletteSumoLogic.speed_factor(_omega)
-	if _next_mark <= 4 and f >= float(_next_mark):
-		_say("Faster! The wheel's at x%d." % _next_mark if _next_mark < 4 else "Full speed! Hold on to something!", QuizHost.Pose.SURPRISED)
-		if _next_mark == 4:
-			banner("FULL SPEED!", Palette.LOSS_RED, 1.2)
-		_next_mark += 1
+	if RouletteSumoLogic.ramp_fraction(_omega) * 3.0 < float(_next_mark) - 0.001:
+		return
+	if _next_mark < 3:
+		_say("Faster! The wheel's at x%.1f." % RouletteSumoLogic.speed_factor(_omega), QuizHost.Pose.SURPRISED)
+	else:
+		_say("Full speed! Hold on to something!", QuizHost.Pose.SURPRISED)
+		banner("FULL SPEED!", Palette.LOSS_RED, 1.2)
+	_next_mark += 1
 
 
 func _update_prompt() -> void:
@@ -482,18 +378,12 @@ func _update_prompt() -> void:
 	if local_id in out:
 		set_prompt("OFF THE WHEEL")
 		return
-	if frozen_left.has(local_id):
-		set_prompt("FROZEN!  YOU'RE SLIDING...")
-		return
-	if down_left.has(local_id):
-		set_prompt("")
-		return
 	var me: PlayerAvatar = local_avatar()
-	var t: int = swing_target()
-	if t >= 0 and _cooldown <= 0.0:
-		set_prompt("FREEZE %s!  [{interact}]" % player_name(t).to_upper())
-	elif me != null and RouletteSumoLogic.flat_radius(me.global_position) > EDGE_WARN:
-		set_prompt("THE EDGE!  GET TO THE MIDDLE!")
+	var t: int = push_target()
+	if me != null and RouletteSumoLogic.flat_radius(me.global_position) > EDGE_WARN:
+		set_prompt("THE EDGE!  WALK TO THE MIDDLE!")
+	elif t >= 0 and _cooldown <= 0.0:
+		set_prompt("PUSH %s!  [{shove}]" % player_name(t).to_upper())
 	else:
 		set_prompt("")
 
@@ -510,19 +400,9 @@ func _refresh_status() -> void:
 			tag = "OUT"
 		elif p == winner:
 			tag = "WINNER"
-		elif frozen_left.has(p):
-			tag = "FROZEN"
-		elif down_left.has(p):
-			tag = "DOWN"
 		lines.append("%s  %s" % [who, tag])
 	status_label.text = "\n".join(lines)
 	status_label.add_theme_font_size_override(&"font_size", 26)
-
-
-func _drop_player(p: int) -> void:
-	_thaw(p)
-	down_left.erase(p)
-	_remove_bat(p)
 
 
 # --- The ball -------------------------------------------------------------------------------------
@@ -584,62 +464,6 @@ func _update_ball(delta: float) -> void:
 func _ball_world() -> Vector3:
 	var p: Vector2 = ball_pos + _ball_offset
 	return WheelRoom.center() + Vector3(p.x, WheelRoom.WHEEL_TOP + RouletteSumoLogic.BALL_RADIUS, p.y)
-
-
-# --- Bats -----------------------------------------------------------------------------------------
-
-func _build_bats() -> void:
-	for p: int in roster:
-		var a: PlayerAvatar = avatar(p)
-		if a == null:
-			continue
-		var bat: Node3D = ItemModels.make_held(&"baseball_bat")
-		bat.name = "SumoBat"
-		ItemModels.attach_to_hand(a.visuals, bat)
-		bats[p] = bat
-
-
-## The bat whips round (the casino bat's swing, as in Bat Heist).
-func _swing_bat(pid: int) -> void:
-	var a: PlayerAvatar = avatar(pid)
-	if a == null:
-		return
-	a.visuals.swing()
-	Audio.play_at(&"whoosh", a, -8.0, randf_range(0.8, 0.95))
-	if pid == local_id and _view_bat != null and is_instance_valid(_view_bat):
-		var base: Vector3 = _view_bat.rotation
-		var vt: Tween = _view_bat.create_tween()
-		vt.tween_property(_view_bat, "rotation", base + Vector3(0.3, 0.0, 0.9), 0.08)
-		vt.tween_property(_view_bat, "rotation", base + Vector3(-0.4, 0.0, -1.2), 0.13).set_ease(Tween.EASE_IN)
-		vt.tween_property(_view_bat, "rotation", base, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	var bat: Node3D = bats.get(pid, null)
-	if bat == null or not is_instance_valid(bat):
-		return
-	var rest := Vector3(ItemModels.HAND_UPRIGHT, 0.0, 0.0)
-	var t: Tween = bat.create_tween()
-	t.tween_property(bat, "rotation", rest + Vector3(-0.5, 0.0, 1.1), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	t.tween_property(bat, "rotation", rest + Vector3(0.25, 0.0, -1.5), 0.13).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	t.tween_property(bat, "rotation", rest, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-func _update_view_bat() -> void:
-	var me: PlayerAvatar = local_avatar()
-	var want: bool = me != null and me.cam != null and me.cam.mode == PlayerCamera.Mode.FIRST and bats.has(local_id) and not done and not over
-	if want and (_view_bat == null or not is_instance_valid(_view_bat)):
-		_view_bat = ItemModels.make_view(&"baseball_bat")
-		_view_bat.name = "SumoViewBat"
-		me.cam.camera.add_child(_view_bat)
-	elif not want and _view_bat != null:
-		if is_instance_valid(_view_bat):
-			_view_bat.queue_free()
-		_view_bat = null
-
-
-func _remove_bat(pid: int) -> void:
-	var bat: Node3D = bats.get(pid, null)
-	if bat != null and is_instance_valid(bat):
-		bat.queue_free()
-	bats.erase(pid)
 
 
 # --- Overlay: the speed gauge and Lucky's line ---------------------------------------------------
@@ -749,15 +573,3 @@ func _say(text: String, pose: QuizHost.Pose = QuizHost.Pose.IDLE, hold: float = 
 	_host_panel.pivot_offset = Vector2(0, _host_panel.size.y)
 	_host_panel.scale = Vector2.ONE * 0.85
 	_host_panel.create_tween().tween_property(_host_panel, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-## Bats and ice live on avatars outside this stage: they go with it.
-func _exit_tree() -> void:
-	done = true
-	for p: int in frozen_left.keys():
-		_thaw(p)
-	for p: int in bats.keys():
-		_remove_bat(p)
-	if _view_bat != null and is_instance_valid(_view_bat):
-		_view_bat.queue_free()
-	_view_bat = null

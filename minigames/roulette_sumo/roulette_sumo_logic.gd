@@ -1,11 +1,11 @@
 class_name RouletteSumoLogic
 extends WalkableLogicBase
 ## "Roulette Sumo" (MINIGAME_IDEAS #9), a walkable minigame on the giant wheel of `WheelRoom`.
-## Patrick 2026-10-11: no shove, no grab, no throw. Everyone carries a bat: a hit **freezes** the
-## target for `FREEZE_SECONDS` (no knockdown). The wheel turns faster and faster, a giant roulette
-## ball rolls round the deck and knocks beans down, and whoever leaves the wheel is out. The last
-## bean on the wheel wins; after `GAME_SECONDS` the beans still on it rank by distance from the
-## centre (nearest first). Ranking = order of falling off, decided from the server's positions.
+## Patrick 2026-10-16: no bats, no knockouts: the only weapon is a little push. The wheel spins up
+## fast and flings beans hard toward the rim, a giant roulette ball rolls round the deck and shoves
+## whoever it touches, and whoever leaves the wheel is out. The last bean on the wheel wins; after
+## `GAME_SECONDS` the beans still on it rank by distance from the centre (nearest first). Ranking =
+## order of falling off, decided from the server's positions.
 ##
 ## The wheel (deterministic, nothing to stream per tick):
 ## - The game clock starts at the first tick after the briefing. The wheel's angular speed is
@@ -13,17 +13,17 @@ extends WalkableLogicBase
 ##   capped; its angle `wheel_angle(clock)` is the integral. A once-per-second
 ##   `roulette_sumo_wheel {clock, angle, omega}` event and the public state let clients re-sync.
 ## - Standing on the deck drags a bean along: per step `drift(pos, omega, dt)` turns it round the
-##   centre by `omega * dt` and slides it outward by `SLIDE * omega^2 * r * dt` (the faster the
-##   wheel, the harder it flings you to the rim). The CLIENT applies `drift` to its own bean every
-##   physics frame, so its reported positions already carry the drift (well inside the move
-##   sanity's 16 m/s); puppets get it from their owner's stream. The server does not move
-##   reporting beans itself (one teleport event per bean per tick would flood the wire).
-## - A frozen bean's moves are refused: the server keeps a pin per frozen bean and drifts it with
-##   the same `drift` every tick. `clamp_position` accepts reports near the pin (lag slack) and
-##   returns the pin otherwise, so a frozen bean slides with the wheel and nowhere else.
+##   centre by `omega * dt` and slides it outward at `SLIDE * omega^2 * r` m/s (the faster the
+##   wheel and the further out, the harder it flings you to the rim). The CLIENT applies `drift` to
+##   its own bean every physics frame, so its reported positions already carry the drift; puppets
+##   get it from their owner's stream. The server does not move reporting beans itself.
+## - Tuning (2026-10-16, measured in `tests/unit/test_roulette_sumo_logic.gd`): a bean standing
+##   still on its spawn ring (r 4.4) goes over the rim in about 2.8 s at the start and about 0.5 s
+##   at full speed (before: 22 s and 3 s). At full speed the outward pull at r 4.4 is 4.3 m/s
+##   against a 5.5 m/s walk, so a bean has to keep walking inward to stay on, and past r 5.6 only a
+##   sprint gets it back.
 ## - Falls: a bean whose flat distance from the centre is past `FALL_RADIUS`, or who is more than
-##   `FALL_DEPTH` below the deck, is out (`eliminate`, a short ragdoll, then the gallery). Frozen
-##   beans are judged at their pin.
+##   `FALL_DEPTH` below the deck, is out (`eliminate`, a short tumble, then the gallery).
 ##
 ## The ball (server path, client prediction):
 ## - One ball of radius `BALL_RADIUS` rolls on the deck in the room's frame (the wheel doesn't
@@ -32,24 +32,26 @@ extends WalkableLogicBase
 ##   velocity rotates at that rate); it bounces off the rim and the turret (`step_ball`).
 ## - `roulette_sumo_ball {ball, clock}` goes out at every new segment and once per second; the
 ##   public state carries it too. Clients run the same `step_ball` from the last update.
-## - A standing bean within `BALL_HIT` of the ball's centre (flat, at deck height) is knocked down
-##   for `KNOCK_SECONDS` (`pending_knockdowns`, cause "ball"); `roulette_sumo_ball_hit` carries the
-##   ball's direction, which the scene uses to throw the ragdoll (the push). A bean the ball hit
-##   can't be hit again for `KNOCK_SECONDS + BALL_GRACE`.
+## - A bean within `BALL_HIT` of the ball's centre (flat, at deck height) gets shoved:
+##   `roulette_sumo_ball_hit {player, dir, strength}` (away from the ball and along its roll, no
+##   knockdown). The bean's own client slides it; it can't be hit again for `BALL_GRACE`.
 ##
-## The bat: `minigame_action {kind: "swing", target?}` (cooldown `SWING_COOLDOWN`, a miss is fine)
-## picks the bean in front within `BAT_REACH` from the server's own positions (the target is a
-## hint). Frozen, downed and freshly thawed (`THAW_GRACE`) beans can't be hit.
+## The push: `minigame_action {kind: "push", target?}` (the action, shove and grab buttons all
+## send it; cooldown `PUSH_COOLDOWN`, a miss is fine) picks the bean in front within `PUSH_REACH`
+## from the server's own positions (the target is a hint) and sends `roulette_sumo_push {player,
+## target, dir, strength}`. The target's client slides it at `PUSH_STRENGTH` m/s along `dir`
+## (about a metre): a nudge, never a knockdown or a knockout. The casino's shove (with its
+## knockdowns and knockouts), grab and throw stay off.
 
 enum State { PLAYING, DONE }
 
-const GAME_SECONDS: float = 90.0
+const GAME_SECONDS: float = 60.0
 ## Wheel speed (rad/s): start, cap, and the seconds of the linear ramp between them.
-const OMEGA_START: float = 0.25
-const OMEGA_MAX: float = 1.2
-const RAMP_SECONDS: float = 60.0
+const OMEGA_START: float = 0.55
+const OMEGA_MAX: float = 1.4
+const RAMP_SECONDS: float = 25.0
 ## Outward slide per (rad/s)^2 per metre of radius per second.
-const SLIDE: float = 0.12
+const SLIDE: float = 0.5
 ## Out past this flat distance from the centre (the rim plus a foot over the edge), or this far
 ## below the deck.
 const FALL_RADIUS: float = WheelRoom.RIM_RADIUS + 0.3
@@ -65,18 +67,14 @@ const SEG_MAX: float = 2.6
 ## The ball's centre stays between these flat radii (turret and rim, minus its own radius).
 const BALL_MIN_R: float = WheelRoom.HUB_RADIUS + BALL_RADIUS + 0.05
 const BALL_MAX_R: float = WheelRoom.RIM_RADIUS - BALL_RADIUS - 0.15
-const KNOCK_SECONDS: float = 1.5
+## Push speed (m/s) the ball gives (a push decays at 8 m/s^2 in `PlayerAvatar`: about 1.9 m).
+const BALL_PUSH: float = 5.5
 const BALL_GRACE: float = 1.0
-## The bat.
-const SWING_COOLDOWN: float = 1.2
-const BAT_REACH: float = 2.0
-const FREEZE_SECONDS: float = 1.5
-const THAW_GRACE: float = 1.0
-## A frozen bean's report may be this far from its pin, plus the wheel's speed there times this
-## many seconds of lag.
-const PIN_SLACK: float = 0.6
-const PIN_LAG: float = 0.25
-## Ragdoll when a bean goes over the edge, then the gallery.
+## The push: reach (the casino shove's), cooldown, push speed (m/s; about 1 m of slide).
+const PUSH_REACH: float = InteractionRules.REACH
+const PUSH_COOLDOWN: float = 0.8
+const PUSH_STRENGTH: float = 4.0
+## Tumble when a bean goes over the edge, then the gallery.
 const FALL_KNOCK: float = 1.2
 ## How often the wheel and the ball are re-sent.
 const SYNC_INTERVAL: float = 1.0
@@ -85,13 +83,9 @@ const END_HOLD: float = 3.5
 var state: State = State.PLAYING
 var clock: float = 0.0
 var wait_left: float = 0.0
-## player → game clock until which they are frozen / down / safe from the ball / safe from bats.
-var frozen_until: Dictionary[int, float] = {}
-var frozen_pin: Dictionary[int, Vector3] = {}
-var down_until: Dictionary[int, float] = {}
+## player → game clock until which the ball leaves them alone / of their last push.
 var ball_safe_until: Dictionary[int, float] = {}
-var thaw_until: Dictionary[int, float] = {}
-var last_swing: Dictionary[int, float] = {}
+var last_push: Dictionary[int, float] = {}
 ## Ball, flat and relative to the wheel centre (x, z): position, velocity, turn rate (rad/s).
 var ball_pos: Vector2 = Vector2.ZERO
 var ball_vel: Vector2 = Vector2.ZERO
@@ -100,8 +94,8 @@ var seg_left: float = 0.0
 ## Players still on the wheel at the time cap, nearest the centre first (the final order).
 var time_order: Array[int] = []
 var winner: int = -1
-## Fun stats: freezes landed, ball hits taken.
-var freezes: Dictionary[int, int] = {}
+## Fun stats: pushes landed.
+var pushes: Dictionary[int, int] = {}
 var _sync_left: float = 0.0
 var _announced: bool = false
 
@@ -113,7 +107,7 @@ func room_layout() -> Dictionary:
 func _on_room_setup(_context: Dictionary) -> void:
 	id = &"roulette_sumo"
 	for p: int in players:
-		freezes[p] = 0
+		pushes[p] = 0
 	# The ball starts on the rim track, rolling round it one way or the other.
 	var a: float = rng.unit() * TAU
 	ball_pos = Vector2(sin(a), cos(a)) * BALL_MAX_R
@@ -123,7 +117,8 @@ func _on_room_setup(_context: Dictionary) -> void:
 	seg_left = rng.range_float(SEG_MIN, SEG_MAX)
 
 
-## No shove, no grab (so no throw): only the bat and the ball move people.
+## The casino's shove (knockdowns, knockouts), grab and throw are off: the game's own little push
+## (`minigame_action push`, which the shove button sends here) is the only way to move people.
 func blocked_intents() -> Array[StringName]:
 	return [&"shove", &"grab", &"release"]
 
@@ -142,9 +137,14 @@ static func wheel_angle(t: float) -> float:
 	return a + OMEGA_MAX * maxf(t - RAMP_SECONDS, 0.0)
 
 
-## Speed as shown on the gauge: x1.0 at the start, x4.8 at the cap.
+## Speed as shown on the gauge: x1.0 at the start, about x2.5 at the cap.
 static func speed_factor(omega: float) -> float:
 	return omega / OMEGA_START
+
+
+## How far up the ramp `omega` is: 0 at the start, 1 at full speed.
+static func ramp_fraction(omega: float) -> float:
+	return clampf((omega - OMEGA_START) / (OMEGA_MAX - OMEGA_START), 0.0, 1.0)
 
 
 ## True if `pos` (world) stands on the deck, where the wheel drags it.
@@ -155,7 +155,7 @@ static func on_deck(pos: Vector3) -> bool:
 
 
 ## Where the wheel carries a bean at `pos` (world) in `dt` seconds at speed `omega`: round the
-## centre (counter-clockwise from above, like the rotor) and a little outward. Off the deck: as is.
+## centre (counter-clockwise from above, like the rotor) and outward. Off the deck: as is.
 static func drift(pos: Vector3, omega: float, dt: float) -> Vector3:
 	if not on_deck(pos) or omega == 0.0 or dt <= 0.0:
 		return pos
@@ -164,6 +164,11 @@ static func drift(pos: Vector3, omega: float, dt: float) -> Vector3:
 	rel = rel.rotated(Vector3.UP, omega * dt)
 	rel *= 1.0 + SLIDE * omega * omega * dt
 	return Vector3(c.x + rel.x, pos.y, c.z + rel.z)
+
+
+## Outward speed (m/s) the wheel gives a bean at flat radius `r` at speed `omega`.
+static func outward_speed(r: float, omega: float) -> float:
+	return SLIDE * omega * omega * r
 
 
 ## Flat distance of `pos` (world) from the wheel's centre.
@@ -216,15 +221,6 @@ func tick(delta: float, _now: float) -> void:
 			_finish()
 		return
 	clock = minf(clock + delta, GAME_SECONDS)
-	var omega: float = omega_at(clock)
-	for p: int in frozen_pin:
-		frozen_pin[p] = drift(frozen_pin[p], omega, delta)
-	for p: int in frozen_until.keys():
-		if clock >= frozen_until[p]:
-			_thaw(p)
-	for p: int in down_until.keys():
-		if clock >= down_until[p]:
-			down_until.erase(p)
 	_tick_ball(delta)
 	_sync_left -= delta
 	if _sync_left <= 0.0:
@@ -257,10 +253,8 @@ func _tick_ball(delta: float) -> void:
 	ball_vel = res[1]
 
 
-## The server's own position of `p`: the pin while frozen, else the last accepted report.
+## The server's own position of `p` (the last accepted report), or `Vector3.INF`.
 func server_position(p: int) -> Vector3:
-	if frozen_pin.has(p):
-		return frozen_pin[p]
 	if world != null and world.positions.has(p):
 		return world.get_position(p)
 	return Vector3.INF
@@ -270,22 +264,23 @@ func _check_ball_hits() -> void:
 	var b: Vector3 = ball_world()
 	var deck_y: float = WheelRoom.center().y + WheelRoom.WHEEL_TOP
 	for p: int in alive.duplicate():
-		if is_down(p) or clock < float(ball_safe_until.get(p, -INF)):
+		if clock < float(ball_safe_until.get(p, -INF)):
 			continue
 		var at: Vector3 = server_position(p)
 		if at == Vector3.INF or at.y < deck_y - 0.5 or at.y > deck_y + BALL_RADIUS * 2.0:
 			continue
-		if Vector2(at.x - b.x, at.z - b.z).length() <= BALL_HIT:
-			_ball_hit(p)
+		var off := Vector2(at.x - b.x, at.z - b.z)
+		if off.length() <= BALL_HIT:
+			_ball_hit(p, off)
 
 
-func _ball_hit(p: int) -> void:
-	_thaw(p)
-	down_until[p] = clock + KNOCK_SECONDS
-	ball_safe_until[p] = clock + KNOCK_SECONDS + BALL_GRACE
-	var dir: Vector2 = ball_vel.normalized() if ball_vel.length() > 0.01 else Vector2.RIGHT
-	pending_knockdowns.append({"player": p, "seconds": KNOCK_SECONDS, "cause": &"ball"})
-	events.append(GameEvents.make(&"roulette_sumo_ball_hit", {"player": p, "dir": [snappedf(dir.x, 0.001), snappedf(dir.y, 0.001)], "seconds": KNOCK_SECONDS}))
+## The ball shoves `p` away from it and along its roll: a push, no knockdown.
+func _ball_hit(p: int, off: Vector2) -> void:
+	ball_safe_until[p] = clock + BALL_GRACE
+	var roll: Vector2 = ball_vel.normalized() if ball_vel.length() > 0.01 else Vector2.ZERO
+	var away: Vector2 = off.normalized() if off.length() > 0.01 else Vector2.ZERO
+	var dir: Vector2 = (roll * 1.2 + away).normalized() if (roll * 1.2 + away).length() > 0.01 else Vector2.RIGHT
+	events.append(GameEvents.make(&"roulette_sumo_ball_hit", {"player": p, "dir": [snappedf(dir.x, 0.001), snappedf(dir.y, 0.001)], "strength": BALL_PUSH}))
 
 
 func _check_falls() -> void:
@@ -299,95 +294,37 @@ func _check_falls() -> void:
 			fell.append(p)
 	if fell.is_empty():
 		return
-	for p: int in fell:
-		_thaw(p)
-		down_until.erase(p)
 	eliminate(fell, &"fell", FALL_KNOCK)
 
 
-func is_frozen(p: int) -> bool:
-	return frozen_until.has(p)
-
-
-func is_down(p: int) -> bool:
-	return down_until.has(p)
-
-
-func _thaw(p: int) -> void:
-	if not frozen_until.has(p):
-		return
-	frozen_until.erase(p)
-	frozen_pin.erase(p)
-	if state == State.PLAYING and p in alive:
-		thaw_until[p] = clock + THAW_GRACE
-		events.append(GameEvents.make(&"roulette_sumo_thawed", {"player": p}))
-
-
-## A frozen bean stays at its drifting pin (a report near it is fine: the client drifts too).
-func clamp_position(player: int, pos: Vector3) -> Vector3:
-	if frozen_pin.has(player) and player in alive and player in players and not finished:
-		var pin: Vector3 = frozen_pin[player]
-		var slack: float = PIN_SLACK + omega_at(clock) * flat_radius(pin) * PIN_LAG
-		var off := Vector2(pos.x - pin.x, pos.z - pin.z)
-		return pos if off.length() <= slack and absf(pos.y - pin.y) <= 1.0 else pin
-	return super.clamp_position(player, pos)
-
-
-## The ragdoll stood up: the down ends now.
-func on_player_got_up(player: int) -> void:
-	down_until.erase(player)
-
-
-# --- The bat ----------------------------------------------------------------------------------
+# --- The push ---------------------------------------------------------------------------------
 
 func _on_action(player: int, kind: StringName, hint: int, _now: float) -> Dictionary:
 	if state != State.PLAYING:
 		return StationLogicBase.fail(&"game_over")
-	if kind != &"swing":
+	if kind != &"push":
 		return StationLogicBase.fail(&"bad_value")
-	if is_down(player):
-		return StationLogicBase.fail(&"down")
-	if is_frozen(player):
-		return StationLogicBase.fail(&"frozen")
-	if clock < float(last_swing.get(player, -INF)) + SWING_COOLDOWN:
+	if clock < float(last_push.get(player, -INF)) + PUSH_COOLDOWN:
 		return StationLogicBase.fail(&"cooldown")
-	last_swing[player] = clock
-	var exclude: Array[int] = []
-	for p: int in alive:
-		if is_down(p) or is_frozen(p) or clock < float(thaw_until.get(p, -INF)):
-			exclude.append(p)
-	var target: int = pick_target(player, hint, BAT_REACH, exclude)
-	var result: StringName = &"hit"
-	if target < 0:
-		var shielded: int = pick_target(player, hint, BAT_REACH)
-		if shielded >= 0 and not is_down(shielded):
-			target = shielded
-			result = &"frozen" if is_frozen(shielded) else &"thawing"
-		else:
-			result = &"miss"
-	events.append(GameEvents.make(&"roulette_sumo_swing", {"player": player, "target": target, "result": result}))
-	if result == &"hit":
-		_freeze(target, player)
-	return {"ok": true, "error": &"", "target": target, "result": result}
-
-
-func _freeze(target: int, by: int) -> void:
-	var at: Vector3 = server_position(target)
-	if at == Vector3.INF:
-		at = spawn_for(target)
-	frozen_until[target] = clock + FREEZE_SECONDS
-	frozen_pin[target] = at
-	thaw_until.erase(target)
-	freezes[by] = freezes.get(by, 0) + 1
-	events.append(GameEvents.make(&"roulette_sumo_frozen", {"player": by, "target": target, "seconds": FREEZE_SECONDS}))
+	last_push[player] = clock
+	var target: int = pick_target(player, hint, PUSH_REACH)
+	var dir := Vector2.ZERO
+	if target >= 0:
+		var from: Vector3 = world.get_position(player)
+		var to: Vector3 = world.get_position(target)
+		dir = Vector2(to.x - from.x, to.z - from.z)
+		if dir.length() < 0.01:
+			var f: Vector3 = world.get_facing(player)
+			dir = Vector2(f.x, f.z)
+		dir = dir.normalized() if dir.length() > 0.01 else Vector2.RIGHT
+		pushes[player] = pushes.get(player, 0) + 1
+	events.append(GameEvents.make(&"roulette_sumo_push", {"player": player, "target": target, "dir": [snappedf(dir.x, 0.001), snappedf(dir.y, 0.001)], "strength": PUSH_STRENGTH if target >= 0 else 0.0}))
+	return {"ok": true, "error": &"", "target": target, "result": &"push" if target >= 0 else &"miss"}
 
 
 # --- End ----------------------------------------------------------------------------------------
 
 func remove_player(player: int) -> void:
-	frozen_until.erase(player)
-	frozen_pin.erase(player)
-	down_until.erase(player)
 	super.remove_player(player)
 	if not finished and state == State.PLAYING and _announced and alive.size() <= 1:
 		_end_game(&"last_bean")
@@ -397,8 +334,6 @@ func _end_game(reason: StringName) -> void:
 	if state == State.DONE:
 		return
 	state = State.DONE
-	for p: int in frozen_until.keys():
-		_thaw(p)
 	if reason == &"time" and alive.size() > 1:
 		time_order = alive.duplicate()
 		time_order.sort_custom(func(a: int, b: int) -> bool:
@@ -458,14 +393,6 @@ func get_public_state() -> Dictionary:
 	st["angle"] = snappedf(wheel_angle(clock), 0.0001)
 	st["omega"] = snappedf(omega_at(clock), 0.0001)
 	st["ball"] = ball_wire()
-	var fz: Dictionary = {}
-	for p: int in frozen_until:
-		fz[p] = snappedf(maxf(frozen_until[p] - clock, 0.0), 0.01)
-	st["frozen"] = fz
-	var dn: Dictionary = {}
-	for p: int in down_until:
-		dn[p] = snappedf(maxf(down_until[p] - clock, 0.0), 0.01)
-	st["down"] = dn
 	st["winner"] = winner
 	if finished or state == State.DONE:
 		st["ranking"] = ranking()
@@ -473,4 +400,4 @@ func get_public_state() -> Dictionary:
 
 
 func private_state(player: int) -> Dictionary:
-	return {"cooldown": snappedf(maxf(float(last_swing.get(player, -INF)) + SWING_COOLDOWN - clock, 0.0), 0.01)}
+	return {"cooldown": snappedf(maxf(float(last_push.get(player, -INF)) + PUSH_COOLDOWN - clock, 0.0), 0.01)}

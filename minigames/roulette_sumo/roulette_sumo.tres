@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"roulette_sumo"
 display_name = "Roulette Sumo"
-rules_text = "Stay on the spinning wheel: it keeps getting faster, a giant ball bowls beans over and a bat hit freezes a bean in place. No shoving. Fall off and you're out; the last bean on the wheel wins."
+rules_text = "Stay on the spinning wheel: it spins up fast and flings you toward the edge, so keep walking to the middle. Push the others (a little shove, no knockouts) and dodge the giant ball, it bumps you too. No bats. Fall off and you're out; the last bean on the wheel wins."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2

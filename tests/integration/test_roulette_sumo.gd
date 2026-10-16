@@ -1,7 +1,8 @@
 extends GutTest
 ## Roulette Sumo on the authoritative server: the room opens on the wheel, a reported position
-## past the rim takes the bean out and moves it to the gallery, a bat swing decided from the
-## server's positions freezes the target and the server refuses their moves, and shoving is off.
+## past the rim takes the bean out and moves it to the gallery, a push decided from the server's
+## positions nudges the target (no knockdown, no knockout, no money moves, they keep moving), and
+## the casino's shove and grab are off.
 
 var fx: ServerFixture
 
@@ -82,25 +83,31 @@ func test_past_the_rim_is_out_and_goes_to_the_gallery() -> void:
 	assert_true(moved, "the scene is told to move them")
 
 
-func test_a_swing_freezes_and_the_frozen_move_is_refused() -> void:
+func test_a_push_nudges_without_knocking_down() -> void:
 	var g: RouletteSumoLogic = _to_game()
 	var a: int = fx.player_ids[0]
 	var b: int = fx.player_ids[1]
-	var bp: Vector3 = _deck(3.0, 0.0)
+	var bp: Vector3 = _deck(1.5, 0.0)
 	fx.server.world.set_transform(b, bp, 0.0)
 	fx.server.world.set_transform(a, bp + Vector3(1.2, 0, 0), PI * 0.5)  # yaw pi/2 faces -x: at b
-	var res: Dictionary = fx.intent(a, &"minigame_action", {"kind": "swing", "target": b})
-	assert_true(res["ok"], "swing: %s" % res)
-	assert_eq(fx.of_type(&"roulette_sumo_frozen").size(), 1)
-	assert_true(g.is_frozen(b))
-	assert_true(fx.of_type(&"player_knocked_down").is_empty(), "frozen, not knocked down")
-	var pin: Vector3 = g.frozen_pin[b]
-	assert_false(fx.server.apply_move(b, pin + Vector3(0, 0, 2.5), 0.0, false), "a frozen bean can't walk off")
-	assert_lt(fx.server.world.get_position(b).distance_to(g.frozen_pin[b]), 0.01, "held at the drifting pin")
-	fx.run(1.7)
-	assert_false(g.is_frozen(b), "thawed")
-	var at: Vector3 = fx.server.world.get_position(b)
-	assert_true(fx.server.apply_move(b, at + Vector3(0, 0, 0.8), 0.0, false), "moves again")
+	var money_before: Dictionary[int, int] = {}
+	for p: int in fx.player_ids:
+		money_before[p] = fx.server.economy.balance(p)
+	var res: Dictionary = fx.intent(a, &"minigame_action", {"kind": "push", "target": b})
+	assert_true(res["ok"], "push: %s" % res)
+	var pushes: Array[Dictionary] = fx.of_type(&"roulette_sumo_push")
+	assert_eq(pushes.size(), 1)
+	assert_eq(int(pushes[0]["target"]), b)
+	assert_eq(fx.intent(a, &"minigame_action", {"kind": "push", "target": b})["error"], &"cooldown")
+	fx.run(0.3)
+	assert_true(fx.of_type(&"player_knocked_down").is_empty(), "a push is no knockdown")
+	assert_true(fx.of_type(&"player_knocked_out").is_empty(), "nor a knockout")
+	assert_true(g.is_alive(b), "still on the wheel")
+	assert_true(fx.server.can_move(b), "and still walking")
+	assert_true(fx.server.apply_move(b, fx.server.world.get_position(b) + Vector3(-0.8, 0, 0), 0.0, false), "the slide the client reports is accepted")
+	for p: int in fx.player_ids:
+		assert_eq(fx.server.economy.balance(p), money_before[p], "no money moves on a push")
+	assert_eq(fx.intent(a, &"minigame_action", {"kind": "swing", "target": b})["error"], &"bad_value", "no bats")
 
 
 func test_shove_and_grab_are_refused() -> void:

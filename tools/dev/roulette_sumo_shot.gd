@@ -1,6 +1,6 @@
 extends Node3D
 ## Dev: Roulette Sumo 20 s in: the wheel turned, the ball rolling across the deck, four beans
-## with bats, Lucky on the dais and the overlay (render check).
+## pushing each other (no bats), Lucky on the dais and the overlay (render check).
 ## `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
 ## res://tools/dev/roulette_sumo_shot.tscn --out /tmp/rs.png --frames 30 --pixel 1`.
 
@@ -39,8 +39,6 @@ func _ready() -> void:
 		v.position = b[1]
 		v.rotation.y = b[2]
 		v.set_color(Palette.player_color(int(b[0]) - 1))
-		var bat: Node3D = ItemModels.make_held(&"baseball_bat")
-		ItemModels.attach_to_hand(v, bat)
 	var cam := Camera3D.new()
 	add_child(cam)
 	cam.fov = 64
