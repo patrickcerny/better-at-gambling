@@ -93,6 +93,9 @@ var _minigame_roster: Array[int] = []
 ## starts, kept through its rewards (everyone still stands in the room) and dropped at the regroup.
 ## While set, positions are clamped to the room and casino intents are refused (`minigame`).
 var _room: WalkableLogicBase = null
+## The waiting room's play-money games while an online room waits in LOBBY (null otherwise, and
+## for maps without one). Its own ledger: see `FunRoom`.
+var fun_room: FunRoom = null
 
 
 ## Wires balance/presets/registry data. Call before `add_player`/`start_match`.
@@ -206,6 +209,7 @@ func _build_schedule() -> void:
 ## Online room: wait in the entrance-hall lobby until everyone is ready (§2.2).
 func open_lobby() -> void:
 	room_mode = true
+	_open_fun_room()
 
 
 ## Adds a participant and returns its player id. Colors are fixed and unique; `skin` is the
@@ -258,6 +262,8 @@ func player_disconnected(player: int) -> void:
 	state.players[player].ready = false
 	rules.status(player).away = true  # untouchable while away (§2.12)
 	lobby.set_connected(player, false, _uptime)
+	if fun_room != null and fun_room.stations.is_seated(player):
+		stand_up(player)  # nobody keeps a play-money seat while away
 	if minigame != null:
 		minigame.remove_player(player)  # away players score 0 and get no minigame reward (§2.12)
 		_check_all_ready()  # the briefing doesn't wait for someone who left
@@ -274,6 +280,8 @@ func remove_player(player: int) -> void:
 		stand_up(player)
 	state.players.erase(player)
 	economy.remove_player(player)
+	if fun_room != null:
+		fun_room.remove_player(player)
 	odd_jobs.remove_player(player)
 	lobby.remove(player)
 	stats.erase(player)
@@ -359,6 +367,7 @@ func start_match() -> void:
 		_apply_length()
 		if schedule.minigames != state.minigames or not is_equal_approx(schedule.segment_s, state.gamble_s) or phases.minigames_only != MatchMode.is_minigames_only(settings):
 			_build_schedule()
+	_close_fun_room()
 	running = true
 	match_time = 0.0
 	phases.start()
@@ -382,6 +391,8 @@ func submit_intent(player: int, intent: Dictionary) -> Dictionary:
 	var why: StringName = validator.check(player, intent, phases.phase, _intent_clock(), state.players.has(player))
 	if _room != null and (why == &"" or why == &"wrong_phase") and _room.blocks_intent(StringName(intent.get("type", &""))):
 		why = &"minigame"  # walkable room: stations, items, shop, tips and the megaphone are off
+	if why == &"wrong_phase" and _is_fun_intent(intent):
+		why = &""  # the waiting room's play-money games run in the lobby
 	if why == &"wrong_phase" and StringName(intent.get("type", &"")) == &"odd_jobs_press" and MatchMode.is_minigames_only(settings):
 		why = &"money_off"  # no casino money to earn in minigames-only matches
 	if why == &"" and _jail_blocks(player, intent):
@@ -407,6 +418,11 @@ func get_snapshot() -> Dictionary:
 	snap["last_call"] = phases.last_call_announced
 	snap["piles"] = _piles_wire()
 	snap["lobby"] = lobby.to_wire()
+	if fun_room != null:
+		var with_fun: Dictionary = (snap.get("stations", {}) as Dictionary).duplicate()
+		with_fun.merge(fun_room.public_states())
+		snap["stations"] = with_fun
+		snap["fun"] = fun_room.to_wire()
 	snap["room"] = room_mode
 	snap["mode"] = settings.get("mode", MatchMode.CASINO)
 	snap["effects"] = items.public_effects()
@@ -510,6 +526,7 @@ func _step(delta: float) -> void:
 
 func _tick_lobby(delta: float) -> void:
 	_keep_out_of_casino()
+	_tick_fun_room(delta)
 	match lobby.tick(delta):
 		&"countdown_started":
 			_emit(GameEvents.make(&"lobby_countdown", {"seconds": LobbyController.COUNTDOWN_SECONDS}))
@@ -799,6 +816,7 @@ func return_to_lobby() -> void:
 	_apply_length()
 	_build_match_systems(0)
 	_emit(GameEvents.make(&"match_reset", {"minigames": state.minigames, "gamble_s": state.gamble_s, "duration_s": state.duration_s}))
+	_open_fun_room()
 	_flush()
 
 
@@ -837,10 +855,14 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if rules.is_knocked_down(player, match_time) or interactions.is_held(player):
 				return StationLogicBase.fail(&"incapacitated")
 			var sid: StringName = StringName(intent["station"])
+			if FunRoom.is_fun(sid) and (fun_room == null or not fun_room.open):
+				return StationLogicBase.fail(&"room_closed" if fun_room != null else &"unknown_station")
 			var pos: Vector3 = world.get_position(player)
 			var spos: Variant = map_def.station_positions.get(sid, null)
 			if spos != null and (Vector3(spos) - pos).length() > map_def.interact_range:
 				return StationLogicBase.fail(&"too_far")
+			if FunRoom.is_fun(sid):
+				return _sit_fun(player, sid)
 			if stations.vip.get(sid, false) and economy.balance(player) < vip_threshold() and not modifiers.has_flag(player, &"vip_pass"):
 				return StationLogicBase.fail(&"vip_denied")
 			if modifiers.has_flag(player, &"bounced"):
@@ -856,6 +878,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"leave":
 			return stand_up(player)
 		&"place_bet", &"clear_bets", &"action":
+			if FunRoom.is_fun(intent.get("station", "")):
+				return fun_room.route(player, intent) if fun_room != null else StationLogicBase.fail(&"unknown_station")
 			return stations.route(player, intent)
 		&"move":
 			if not can_move(player):
@@ -864,7 +888,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			state.players[player].position = world.get_position(player)
 			return StationLogicBase.OK_RESULT
 		&"grab":
-			if stations.is_seated(player) or rules.is_knocked_down(player, match_time):
+			if is_seated_anywhere(player) or rules.is_knocked_down(player, match_time):
 				return StationLogicBase.fail(&"not_standing")
 			return interactions.grab(player, int(intent["target"]), match_time)
 		&"release":
@@ -874,7 +898,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				_room.on_thrown(thrown, player)  # e.g. Bat Heist: a thrown bean lands knocked down
 			return released
 		&"shove":
-			if stations.is_seated(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player):
+			if is_seated_anywhere(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player):
 				return StationLogicBase.fail(&"not_standing")
 			var glove: bool = modifiers.has_flag(player, &"spring_glove", &"spring_glove")
 			# Optional "target": who the client swung at (older clients leave it out).
@@ -902,7 +926,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 					return StationLogicBase.OK_RESULT  # dealer attacked
 			return shoved
 		&"shake":
-			if stations.is_seated(player) or rules.is_knocked_down(player, match_time):
+			if is_seated_anywhere(player) or rules.is_knocked_down(player, match_time):
 				return StationLogicBase.fail(&"not_standing")
 			return interactions.shake(player, match_time)
 		&"break_free":
@@ -1066,6 +1090,8 @@ func _play_emote(player: int, intent: Dictionary) -> Dictionary:
 ## server uses it with a `reason` (minigame, regroup, thrown_out, vip_pass_ended).
 func stand_up(player: int, reason: StringName = &"") -> Dictionary:
 	var res: Dictionary = stations.leave(player)
+	if not res["ok"] and fun_room != null and fun_room.stations.is_seated(player):
+		res = fun_room.stations.leave(player)  # a play-money seat in the waiting room
 	if res["ok"]:
 		rules.status(player).seated = false
 		state.players[player].station = &""
@@ -1079,7 +1105,7 @@ func stand_up(player: int, reason: StringName = &"") -> Dictionary:
 
 ## True while the player's own client drives their body (standing, not held or ragdolled).
 func can_move(player: int) -> bool:
-	return not (stations.is_seated(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player) or _server_owned.get(player, false))
+	return not (is_seated_anywhere(player) or rules.is_knocked_down(player, match_time) or interactions.is_held(player) or _server_owned.get(player, false))
 
 
 ## Online movement report (unreliable stream, not rate-limited like intents). Returns false when
@@ -1195,6 +1221,7 @@ func _piles_wire() -> Array:
 
 ## Drains subsystem events and emits them in order.
 func _flush() -> void:
+	_flush_fun()
 	var batch: Array[Dictionary] = []
 	batch.append_array(stations.drain_events())
 	batch.append_array(interactions.drain_events())
@@ -1307,6 +1334,8 @@ func _move_to_seat(player: int, sid: StringName, seat: int) -> void:
 
 func _free_seat(sid: StringName, player: int) -> int:
 	var logic: StationLogicBase = stations.logics.get(sid, null)
+	if logic == null and fun_room != null:
+		logic = fun_room.stations.logics.get(sid, null)
 	if logic is BlackjackLogic and (logic as BlackjackLogic).seats.has(player):
 		return (logic as BlackjackLogic).seats.find(player)  # the hand's own seat
 	var used: Dictionary = {}
@@ -1523,3 +1552,87 @@ func _keep_out_of_casino() -> void:
 		set_server_position(id, spot)
 		Log.info(&"server", "player %d was past the lobby doors at %s: back to %s" % [id, pos, spot])
 		_emit(GameEvents.make(&"player_sent_back", {"player": id, "pos": Serializer.vec3(spot)}))
+
+
+# --- The waiting room (play money) ---
+
+
+## True while the player sits at any table: the casino's or the waiting room's.
+func is_seated_anywhere(player: int) -> bool:
+	return stations.is_seated(player) or (fun_room != null and fun_room.stations.is_seated(player))
+
+
+## The lobby opens (or reopens after a match): the waiting room's door opens with fresh play-money
+## tables, and walking into it is on the map again.
+func _open_fun_room() -> void:
+	if not room_mode or map_def == null or not map_def.has_waiting_room():
+		return
+	fun_room = FunRoom.new(map_def.fun_stations, _logic_scripts, balance, SeededRng.new(state.match_seed ^ 0xF0F0F0), map_def.waiting_area)
+	sanity.closed_bounds.clear()
+	_emit(GameEvents.make(&"waiting_room", {"open": true}))
+
+
+## The match starts: the waiting room's tables close (everyone stands up, open play rounds settle
+## on play chips), anyone still inside goes back to their start-room spot (`player_sent_back`, the
+## scene moves the body), the door locks and moves into the room are refused until the next lobby.
+func _close_fun_room() -> void:
+	if fun_room == null or not fun_room.open:
+		return
+	for p: int in fun_room.close():
+		stand_up(p, &"waiting_room_closed")
+	_flush_fun()
+	for id: int in state.players:
+		if not world.positions.has(id) or not fun_room.contains(world.get_position(id)):
+			continue
+		var spot: Vector3 = map_def.lobby_spawn(id)
+		if not spot.is_finite():
+			continue
+		_server_owned.erase(id)
+		set_server_position(id, spot)
+		Log.info(&"server", "player %d was in the waiting room at the start: back to %s" % [id, spot])
+		_emit(GameEvents.make(&"player_sent_back", {"player": id, "pos": Serializer.vec3(spot), "reason": &"waiting_room_closed"}))
+	sanity.closed_bounds = [fun_room.area]
+	_emit(GameEvents.make(&"waiting_room", {"open": false}))
+
+
+## LOBBY: fresh play chips for whoever walks in, and the play tables run.
+func _tick_fun_room(delta: float) -> void:
+	if fun_room == null or not fun_room.open:
+		return
+	for id: int in state.players:
+		if world.positions.has(id) and state.players[id].connected:
+			fun_room.update_presence(id, world.get_position(id))
+	fun_room.tick(delta)
+	_flush_fun()
+
+
+## Emits the waiting room's events (tagged `fun`) straight out: they never reach the stats, the
+## items or anything else that reads the real ledger.
+func _flush_fun() -> void:
+	if fun_room == null:
+		return
+	for ev: Dictionary in fun_room.drain_events():
+		_emit(ev)
+
+
+## A station intent the validator refused for the phase, aimed at an open waiting-room table in
+## the lobby: allowed (the play-money games only run there).
+func _is_fun_intent(intent: Dictionary) -> bool:
+	var type: StringName = StringName(intent.get("type", &""))
+	return fun_room != null and fun_room.open and phases.phase == Phase.Id.LOBBY and type in [&"place_bet", &"clear_bets", &"action"] and FunRoom.is_fun(intent.get("station", ""))
+
+
+## Sits a player at a waiting-room table (the reach check already passed).
+func _sit_fun(player: int, sid: StringName) -> Dictionary:
+	if fun_room == null:
+		return StationLogicBase.fail(&"unknown_station")
+	if stations.is_seated(player):
+		return StationLogicBase.fail(&"already_seated")
+	var res: Dictionary = fun_room.sit(player, sid)
+	if res["ok"]:
+		rules.status(player).seated = true
+		state.players[player].station = sid
+		state.players[player].seat = _free_seat(sid, player)
+		_move_to_seat(player, sid, state.players[player].seat)
+		_emit(GameEvents.make(&"player_sat", {"player": player, "station": sid, "seat": state.players[player].seat, "fun": true}))
+	return res
