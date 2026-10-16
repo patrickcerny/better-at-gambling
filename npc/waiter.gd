@@ -13,9 +13,14 @@ const ARRIVE: float = 0.9
 const PAUSE_SECONDS: float = 1.2
 ## Gives up on a waypoint after this long without getting any closer.
 const STUCK_SECONDS: float = 4.0
-## Tray held up on the right hand, above the shoulder (the classic waiter carry).
-const TRAY_POS: Vector3 = Vector3(0.46, 1.5, -0.62)
-const TRAY_ARM: float = 0.6
+## The right arm while he carries the tray: (pitch, splay, glove roll) for
+## `AvatarVisuals.hold_right_arm`, the arm out in front a little below level, palm up.
+const TRAY_ARM: Vector3 = Vector3(-0.35, -0.45, 0.0)
+## Plate thickness (it rests on top of the glove).
+const TRAY_THICKNESS: float = 0.03
+## Where the tray's centre sits over the palm (level, waiter space): a little out and ahead, so its
+## rim clears his belly.
+const TRAY_OVER_PALM: Vector3 = Vector3(0.06, 0.0, -0.1)
 ## Drinks on the tray (art direction palette: wine, champagne, lime).
 const DRINKS: Array[Color] = [Color("#681F2C"), Color("#E3B95C"), Color("#68C26F")]
 
@@ -82,9 +87,12 @@ func trip() -> void:
 	_fall = create_tween().set_parallel(true)
 	_fall.tween_property(visuals, ^"rotation:x", -1.35, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	_fall.tween_property(visuals, ^"position:y", 0.35, 0.35)
+	visuals.hold_right_arm(Vector3.INF)
 	if tray != null:
+		# Off the palm: it flies in the waiter's own space from where the hand had it.
+		tray.reparent(self, true)
 		var t: Tween = tray.create_tween()
-		t.tween_property(tray, ^"position", TRAY_POS + Vector3(-0.3, 0.4, -0.9), 0.22).set_ease(Tween.EASE_OUT)
+		t.tween_property(tray, ^"position", tray.position + Vector3(-0.3, 0.4, -0.9), 0.22).set_ease(Tween.EASE_OUT)
 		t.tween_property(tray, ^"position", Vector3(0.0, 0.05, -1.4), 0.25).set_ease(Tween.EASE_IN)
 		t.parallel().tween_property(tray, ^"rotation", Vector3(2.6, 0.7, 0.4), 0.47)
 		for i: int in tray.get_child_count():
@@ -176,7 +184,6 @@ func _move_toward(target_velocity: Vector3, delta: float) -> void:
 func _animate(v: Vector3, delta: float) -> void:
 	if visuals != null and not down:
 		visuals.update_motion(v, true, delta)
-		visuals.arm_r.rotation.x = TRAY_ARM
 
 
 func _build_visuals() -> void:
@@ -191,16 +198,18 @@ func _build_visuals() -> void:
 	_new_tray()
 
 
-## A gold tray with three drinks, carried in both hands.
+## A gold tray with three drinks, resting flat on his right palm: a child of the right arm, so it
+## goes wherever the arm goes while he walks.
 func _new_tray() -> void:
 	if visuals == null:
 		return
 	if tray != null:
 		tray.queue_free()
+	visuals.hold_right_arm(TRAY_ARM)
 	tray = Node3D.new()
 	tray.name = "Tray"
-	tray.position = TRAY_POS
-	add_child(tray)
+	tray.transform = tray_on_palm()
+	visuals.arm_r.add_child(tray)
 	var plate := MeshInstance3D.new()
 	plate.name = "Plate"
 	var pm := CylinderMesh.new()
@@ -209,6 +218,7 @@ func _new_tray() -> void:
 	pm.height = 0.03
 	pm.radial_segments = 20
 	plate.mesh = pm
+	plate.position.y = TRAY_THICKNESS * 0.5
 	plate.material_override = GreyboxKit.gold()
 	tray.add_child(plate)
 	for i: int in DRINKS.size():
@@ -226,7 +236,15 @@ func _new_tray() -> void:
 		mat.metallic_specular = 0.9
 		glass.material_override = mat
 		var a: float = i * TAU / 3.0 + 0.4
-		glass.position = Vector3(cos(a) * 0.17, 0.1, sin(a) * 0.17)
+		glass.position = Vector3(cos(a) * 0.17, TRAY_THICKNESS + gm.height * 0.5, sin(a) * 0.17)
 		tray.add_child(glass)
 	tray.scale = Vector3.ONE * 0.01
 	tray.create_tween().tween_property(tray, ^"scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## The tray's place in the right arm's space while he carries it: level with the floor whatever
+## the arm's pitch, its underside on top of the glove.
+static func tray_on_palm() -> Transform3D:
+	var arm: Basis = Basis(Vector3.BACK, -TRAY_ARM.y) * Basis(Vector3.RIGHT, TRAY_ARM.x)
+	var level: Basis = arm.inverse()
+	return Transform3D(level, AvatarVisuals.hand_center() + level * (TRAY_OVER_PALM + Vector3(0.0, AvatarVisuals.HAND_RADIUS * 0.85, 0.0)))

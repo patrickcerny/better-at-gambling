@@ -101,6 +101,10 @@ var gaze: Vector3 = Vector3.ZERO
 ## The number-key emote playing now (`Emotes.ANIMATED`, &"" = none) and for how long it has played.
 var emote_id: StringName = &""
 var emote_time: float = 0.0
+## A pose the right arm keeps while it carries something (a waiter's tray, the megaphone at the
+## mouth): (pitch, splay, glove roll) in `_set_arm` terms. Wins over walking, emotes and reactions
+## so what the hand holds stays put; `Vector3.INF` = none.
+var hold_arm_r: Vector3 = Vector3.INF
 
 var _rig: Node3D
 var _lean: Vector2 = Vector2.ZERO
@@ -325,6 +329,15 @@ func emote(id: StringName) -> bool:
 	return true
 
 
+## Keeps the right arm in `pose` (see `hold_arm_r`); `Vector3.INF` lets it hang and swing again.
+func hold_right_arm(pose: Vector3) -> void:
+	if pose == hold_arm_r:
+		return
+	hold_arm_r = pose
+	if pose == Vector3.INF and skin_root != null and emote_id == &"":
+		SkinLibrary.pose_arms(skin_root, 0.0, 0.0)
+
+
 func is_emoting() -> bool:
 	return emote_id != &""
 
@@ -451,9 +464,10 @@ func _animate(frame_delta: float) -> void:
 		skin_root.rotation = Vector3(_lean.x * 0.6, float(em.get("twist", 0.0)), -_lean.y * 0.6)
 		skin_root.scale = Vector3(sq.x, _squash * bob, sq.z)
 		skin_root.position = em.get("shift", Vector3.ZERO) as Vector3
-		if emote_id != &"":
+		if emote_id != &"" or hold_arm_r != Vector3.INF:
 			var arms: Vector4 = em.get("arms", Vector4(ARM_REST, 0.0, ARM_REST, 0.0)) as Vector4
-			SkinLibrary.pose_arms(skin_root, _skin_lift(arms.x), _skin_lift(arms.z))
+			var lift_r: float = _skin_lift(arms.z) if hold_arm_r == Vector3.INF else _skin_lift(hold_arm_r.x)
+			SkinLibrary.pose_arms(skin_root, _skin_lift(arms.x), lift_r)
 	_animate_rig()
 	_animate_arms(walk, em)
 	_animate_legs(walk, em)
@@ -668,6 +682,9 @@ func _animate_arms(walk: float, em: Dictionary) -> void:
 		l = Vector2(pitch, lerpf(-0.12, -0.2, k))
 		r = Vector2(pitch, lerpf(-0.12, -0.2, k))
 		fists = k
+	if hold_arm_r != Vector3.INF and not carried:
+		r = Vector2(hold_arm_r.x, hold_arm_r.y)
+		rolls.y = hold_arm_r.z
 	if carried:
 		l = Vector2(0.4 + sin(_time * 19.0) * 0.8, 0.3 + cos(_time * 13.0) * 0.4)
 		r = Vector2(0.4 + cos(_time * 17.0) * 0.8, 0.3 + sin(_time * 11.0) * 0.4)
@@ -1092,6 +1109,11 @@ func _blob(parent: Node, pos: Vector3, radii: Vector3, mat: Material, node_name:
 	return mi
 
 
+## Centre of a glove in its arm's space (the arm pivot sits at the shoulder).
+static func hand_center() -> Vector3:
+	return Vector3(0.0, 0.0, -ARM_LENGTH - HAND_RADIUS * 0.55)
+
+
 ## A stubby arm in the body colour ending in an oversized glove with a thumb. The pivot sits at
 ## the shoulder; the arm points along its -Z (`_set_arm` turns it), the thumb along +Y.
 func _arm(node_name: String) -> Node3D:
@@ -1133,7 +1155,7 @@ func _arm(node_name: String) -> Node3D:
 	hm.rings = 7
 	hand.mesh = hm
 	hand.material_override = glove_mat
-	hand.position = Vector3(0.0, 0.0, -ARM_LENGTH - HAND_RADIUS * 0.55)
+	hand.position = hand_center()
 	pivot.add_child(hand)
 	var thumb := MeshInstance3D.new()
 	thumb.name = "Thumb"
