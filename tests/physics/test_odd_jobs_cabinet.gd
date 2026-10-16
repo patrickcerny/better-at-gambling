@@ -79,7 +79,13 @@ func _stand_and_look(on: bool) -> void:
 	if on:
 		var d: Vector3 = scene.map.odd_jobs.button_center() - cam.camera.global_position
 		cam.pitch = atan2(d.y, Vector2(d.x, d.z).length())
-	await wait_process_frames(3)
+	# The camera settles over a few frames and the HUD prompt reads the aim a frame after the
+	# controller sets it: wait for the aim, then one more frame for the prompt (slow runners).
+	for i: int in 30:
+		await wait_process_frames(1)
+		if scene.odd_jobs.aimed == on:
+			break
+	await wait_process_frames(2)
 
 
 ## Broke without the House Comp topping you up again (it pays once per segment).
