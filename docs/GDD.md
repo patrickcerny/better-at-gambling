@@ -37,6 +37,15 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
 - **Horse Race** (Race Hall annex): 4 horses with names drawn from a pool each round, one horse per
   player per race, the first over the line pays 1:4. A seeded server race (~9 s, the lead changes)
   every client replays. $10–$100.
+- **Hi-Lo** (casino floor, east of the roulette pit): oval card table, a dealer, 4 seats, one shared
+  single deck (aces high, reshuffled under 15 cards). Everyone plays their own hand: ante, a card is
+  turned up, call HIGHER or LOWER (a tie loses). Each call shows its true chance from the cards left
+  and its pay, locked when the card goes up: the fair odds less a small edge (×2.00 at 47% on an 8,
+  ×1.06 at 94%, ×11.42 at 8%), at most ×25. A right call multiplies the pot; ride it on the next
+  card or cash out; the ladder stops at 6 right calls or 50× the ante. Timeout (15 s), standing up
+  or the match end: a won pot is cashed out, a fresh ante takes the likelier side. A minigame gives
+  fresh antes back and banks won pots. House rule as at the horse race (0.9.6): a call that would
+  lose has its card redrawn once with 15% chance, then luck rerolls it; never shown. $10–$100.
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
@@ -111,6 +120,8 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | horse_race_countdown | — (the tote board counts down) |
 | horse_race_started | last_call_bell, high (the starting bell) |
 | horse_race_finished | chime when the winner's nose crosses the line on the table |
+| hilo_dealt / hilo_call | card_deal as the card slides out of the deck onto the seat's spot (TableCards) |
+| hilo_reshuffle | — (the deck on the table is full again) |
 | jackpot_won | jackpot_siren (bell arpeggio, coin shower, held chord) |
 | last_call | last_call_bell (brass hand bell ×3) + Last Call music |
 | minigame_started | whoosh + quiz music |

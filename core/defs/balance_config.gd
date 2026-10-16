@@ -61,6 +61,27 @@ extends Resource
 ## Seconds the result stays up after the winner crosses the line (the rest run out meanwhile).
 @export var horse_result_time: float = 5.0
 
+@export_group("Hi-Lo")
+@export var hilo_min_bet: int = 10
+@export var hilo_max_bet: int = 100
+## What a right call returns on average per $1 riding on it, the quiet favour counted in: the pays
+## are set from this (`HiLoLogic.pay_for`) and never exceed the fair odds 1/p.
+@export var hilo_return: float = 1.02
+## Chance that a call which would lose has its card redrawn once (Patrick's house rule from 0.9.6:
+## "favoured for you, by a bit, like the other games, but dont show it").
+@export var hilo_favour: float = 0.15
+## Most a single right call pays (stake included), however long the shot.
+@export var hilo_max_pay: float = 25.0
+## The streak ladder: right calls in one hand before it cashes out on its own, and the most a pot
+## can grow to (times the ante).
+@export var hilo_max_rungs: int = 6
+@export var hilo_pot_cap: float = 50.0
+## The single deck is reshuffled before an ante once fewer cards than this are left.
+@export var hilo_reshuffle_at: int = 15
+## Seconds to make a call (then the table calls for you) and how long a result stays up.
+@export var hilo_action_time: float = 15.0
+@export var hilo_result_time: float = 2.5
+
 @export_group("Slots")
 @export var slots_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var slots_spin_time: float = 1.6

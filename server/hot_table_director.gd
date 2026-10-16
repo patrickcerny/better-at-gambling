@@ -7,6 +7,8 @@ var stations: StationManager
 var balance: BalanceConfig
 var rng: SeededRng
 var current: StringName = &""
+## The table that was hot last (kept after it cools off).
+var last: StringName = &""
 ## Seconds until the next hot table starts (counting only while the casino is open).
 var next_in: float = 0.0
 var time_left: float = 0.0
@@ -53,11 +55,14 @@ func _start() -> void:
 	if ids.is_empty():
 		return
 	ids.sort()
-	var previous: StringName = current
 	stop()
+	# Never the same table twice in a row: the last one has usually cooled off already (its 30 s
+	# are shorter than the gap), so remember it apart from `current`.
+	var previous: StringName = last
 	var pool: Array = ids.filter(func(s: StringName) -> bool: return s != previous)
 	var pick: StringName = pool[rng.range_int(0, pool.size() - 1)] if not pool.is_empty() else ids[0]
 	current = pick
+	last = pick
 	time_left = balance.hot_table_duration
 	stations.set_hot(pick, balance.hot_table_multiplier)
 	events.append(GameEvents.make(&"hot_table", {"station": pick, "seconds": balance.hot_table_duration, "multiplier": balance.hot_table_multiplier}))

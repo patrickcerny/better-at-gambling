@@ -116,7 +116,7 @@ func _on_bet(ev: Dictionary) -> void:
 	if st is SlotsStation:
 		(st as SlotsStation).start_spin(pid == local_id)
 		return
-	if not (st is RouletteStation or st is BlackjackStation or st is HorseRaceStation):
+	if not (st is RouletteStation or st is BlackjackStation or st is HorseRaceStation or st is HiLoStation):
 		return  # Plinko drops its own chip
 	var seat: int = _seat_index(st, pid)
 	var start: Vector3 = _seat_edge(st, seat)
@@ -176,8 +176,8 @@ func _on_result(ev: Dictionary) -> void:
 		_shown_at[sid] = Time.get_ticks_msec() + int(t * 1000.0)
 	elif st is PlinkoStation:
 		_shown_at[sid] = Time.get_ticks_msec() + int(PLINKO_DELAY * 1000.0)
-	elif st is BlackjackStation:
-		_shown_at[sid] = Time.get_ticks_msec() + int(BLACKJACK_DELAY * 1000.0)
+	elif st is BlackjackStation or st is HiLoStation:
+		_shown_at[sid] = Time.get_ticks_msec() + int(BLACKJACK_DELAY * 1000.0)  # the card lands first
 	var delay: float = _delay_for(sid)
 	var stack: ChipStack = _take_stack(sid, pid, details)
 	if stack != null:
@@ -374,6 +374,8 @@ static func _seat_edge(st: StationBase, seat: int) -> Vector3:
 		return Vector3(p.x, RouletteStation.FELT_Y, signf(p.z) * 0.8)
 	if st is HorseRaceStation:
 		return Vector3(p.x, HorseRaceStation.TABLE_TOP + 0.02, HorseRaceStation.TABLE_D * 0.5 - 0.05)
+	if st is HiLoStation:
+		return Vector3(p.x, HiLoStation.TABLE_TOP + 0.12, HiLoStation.RAIL_OUTER)  # over the rail
 	if st is BlackjackStation:
 		# Over the padded rail (not inside it): the stack arcs from here down onto the felt.
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
@@ -392,6 +394,8 @@ static func _bet_spot(st: StationBase, seat: int, type: StringName, value: int) 
 		if type == &"":
 			return Vector3(_seat_edge(st, seat).x, HorseRaceStation.TABLE_TOP + 0.02, HorseRaceStation.LEDGE_Z)
 		return HorseRaceStation.bet_spot(value)
+	if st is HiLoStation:
+		return HiLoStation.bet_spot(seat)  # the gold ante ring in front of the seat
 	if st is BlackjackStation and not st.seats.is_empty():
 		var p: Vector3 = st.seats[clampi(seat, 0, st.seats.size() - 1)].position
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
@@ -405,6 +409,8 @@ static func _house_spot(st: StationBase) -> Vector3:
 		return RouletteStation.HOUSE_SPOT
 	if st is HorseRaceStation:
 		return HorseRaceStation.HOUSE_SPOT
+	if st is HiLoStation:
+		return HiLoStation.HOUSE_SPOT
 	if st is BlackjackStation:
 		return Vector3(0.75, 1.0, -0.22)  # the dealer's chip rack
 	return Vector3(0, 0.95, 0)

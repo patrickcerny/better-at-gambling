@@ -476,6 +476,11 @@ static func in_play_text(st: ClientMatchState, pid: int) -> String:
 					for k: Variant in hands:
 						if int(k) == pid:
 							amount += int(hands[k].get("stake", 0))
+			&"hilo":
+				# The pot riding on the open call (the ante until a call came in).
+				var h: Dictionary = HiLoStation.hand_of(pub.get("hands", {}), pid)
+				if String(h.get("phase", "")) == "play":
+					amount += int(h.get("pot", h.get("stake", 0)))
 		if amount > 0:
 			total += amount
 			parts.append("%s $%d" % [ClientMatchState.station_label(StringName(sid)), amount])

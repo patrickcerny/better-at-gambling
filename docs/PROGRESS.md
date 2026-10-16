@@ -139,6 +139,21 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-16 / Hi-Lo table (after 0.9.9, not released)
+- Patrick approved a new table: Hi-Lo (`games/hilo/`). Oval card table with burgundy felt, a dealer
+  (DealerLogic, tips like blackjack and roulette), 4 seats, one shared single deck, everyone plays
+  their own hand: ante, a card up, HIGHER or LOWER (aces high, a tie loses), ride or cash out up a
+  six-step ladder (pot capped at 50× the ante). The buttons show the true chance from the cards
+  left and the pay, both locked by the server when the card goes up (`HiLoLogic.pay_for`: fair odds
+  less an edge, ×2.00 on an 8 either way). House rule from 0.9.6: a losing card is redrawn once with
+  `hilo_favour` 15%, then luck rerolls it; nothing of it is published. Measured RTP over 120k hands
+  per strategy: likelier side 1.0154, random side 1.0206, long shot 1.0157 (expectations 1.014 to
+  1.016); the printed pays alone return 0.93 to 0.97.
+- On the casino floor at (16, 0, −5), east of the roulette pit (the spot asked for, (16, 0, 7), is
+  the bar and its back bar). New events `hilo_dealt`, `hilo_call`, `hilo_reshuffle`; no new intents
+  (`place_bet {amount}`, `action higher|lower|cash_out`).
+- Hot Table: "never the same table twice in a row" only held while the last one was still hot; it
+  remembers the last table now (the extra station made the seeded match test pick a repeat).
 ### 2026-10-16 / 0.9.9 (Patrick's feedback burst)
 - Voice: Patrick "Sound input works, but i do not hear myself". Playback now runs the generator at
   the sound card's mix rate and upsamples the 8 kHz voice itself (linear, phase kept between
