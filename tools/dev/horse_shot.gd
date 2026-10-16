@@ -1,7 +1,8 @@
 extends Node3D
 ## Dev: the horse race miniatures for screenshots. Run with
-## scripts/screenshot.sh res://tools/dev/horse_shot.tscn horse 90 --pixel 1 --view side|field|front|track|seat
-## [--at seconds] (track/seat: the race table running a seeded race, frozen `--at` seconds in).
+## scripts/screenshot.sh res://tools/dev/horse_shot.tscn horse 90 --pixel 1 --view side|field|front|track|seat|crown
+## [--at seconds] [--bet lane] (track/seat/crown: the race table running a seeded race from `--at`
+## seconds in, the local player's money on `--bet` (outlined); crown: close-up on the leader).
 
 var _view: String = "side"
 var _station: HorseRaceStation
@@ -36,17 +37,30 @@ func _ready() -> void:
 	cam.fov = 50.0
 	add_child(cam)
 	match _view:
-		"track", "seat":
+		"track", "seat", "crown":
 			GreyboxKit.lamp(self, Vector3(-2, 4.5, 0), 2.5, 12.0)
 			GreyboxKit.lamp(self, Vector3(2, 4.5, 0), 2.5, 12.0)
 			Vfx.force_enabled = true
 			_station = HorseRaceStation.new()
 			_station.station_id = &"horse_race_1"
 			add_child(_station)
-			_station.show_state({"state": HorseRaceLogic.State.BETTING, "names": ["Lucky Seven", "Bean Lightning", "Sir Trots-a-Lot", "Hoof Hearted"], "race_seed": -1})
+			_station.local_player = 1
+			var bets: Array = [{"player": 1, "horse": c.get_int("bet", 1), "amount": 10}]
+			_station.show_state({"state": HorseRaceLogic.State.BETTING, "names": ["Lucky Seven", "Bean Lightning", "Sir Trots-a-Lot", "Hoof Hearted"], "race_seed": -1, "bets": bets})
 			var at: float = c.get_float("at", 4.0)
 			_station.start_race(4242, at)
-			if _view == "seat":
+			# Frozen there (the legs keep galloping), however slowly the frames render.
+			_station.get_node(^"RaceTicker").process_mode = Node.PROCESS_MODE_DISABLED
+			for h: HorseModel in _station.horses:
+				h.set_running(1.0)
+				h.gallop = 1.0
+			if _view == "crown":
+				var lead: HorseModel = _station.horses[_station.shown_order()[0]]
+				var head: Vector3 = lead.global_position + Vector3(0.3, 0.45, 0)
+				cam.fov = 40.0
+				cam.position = head + Vector3(0.2, 0.35, 1.3)
+				cam.look_at(head + Vector3(0.0, 0.0, -0.3))
+			elif _view == "seat":
 				cam.fov = 75.0
 				cam.global_transform = _station.camera_anchor.global_transform
 			else:

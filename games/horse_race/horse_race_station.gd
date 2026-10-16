@@ -36,6 +36,9 @@ const PAD_XS: Array[float] = [-1.05, -0.35, 0.35, 1.05]
 const HOUSE_SPOT: Vector3 = Vector3(3.85, TABLE_TOP + 0.02, LEDGE_Z)
 const SEAT_XS: Array[float] = [-2.25, -1.35, -0.45, 0.45, 1.35, 2.25]
 const SEAT_Z: float = 1.85
+## The leader's crown changes heads only when the new leader is this far ahead (1 cm on the
+## table, in progress units), so two noses within a hair never make it flicker.
+const CROWN_MARGIN: float = 0.01 / (FINISH_X - START_X)
 
 ## Client-side presentation (empty on a headless server).
 var horses: Array[HorseModel] = []
@@ -58,6 +61,14 @@ var _state: int = HorseRaceLogic.State.IDLE
 var _counting: bool = false
 var _timer: float = 0.0
 var _status_text: String = ""
+## The local player (the match scene sets it): their own bet outlines their horse.
+var local_player: int = -1
+## Lane the local player has money on (−1 = none); kept through the result, since the server
+## settles (and clears) the bets when the winner crosses.
+var backed_horse: int = -1
+## Lane wearing the leader's crown (−1 = nobody) and the crown itself (client only).
+var crown_lane: int = -1
+var crown: MeshInstance3D
 
 
 func _build_visuals() -> void:
@@ -137,6 +148,7 @@ func show_state(pub: Dictionary) -> void:
 			winner = int(pub["winner"])
 	elif race_seed != -1:
 		reset_table()
+	_update_backed(pub)
 	_update_board()
 
 
@@ -159,6 +171,7 @@ func start_race(seed_value: int, at: float = 0.0) -> void:
 	_last_prog = HorseRaceLogic.sample(plan, at)
 	_state = HorseRaceLogic.State.RACING
 	_place_horses(_last_prog)
+	_update_crown()
 	for g: Node3D in gates:
 		if g.is_inside_tree() and at < 0.5:
 			g.create_tween().tween_property(g, ^"rotation:y", deg_to_rad(105.0), 0.25).set_ease(Tween.EASE_OUT)
@@ -193,6 +206,29 @@ func reset_table() -> void:
 	_place_horses(_last_prog)
 	for h: HorseModel in horses:
 		h.set_running(0.0)
+	_set_crown(-1)
+
+
+## Which horse the local player backed, from the bets in the state: during BETTING and RACING the
+## bets are live; in RESULT they are already settled, so the horse stays outlined until the next
+## round (or the table rests).
+func _update_backed(pub: Dictionary) -> void:
+	var lane: int = -1
+	if _state == HorseRaceLogic.State.RESULT:
+		lane = backed_horse
+	elif _state != HorseRaceLogic.State.IDLE and local_player >= 0:
+		for b: Variant in pub.get("bets", []):
+			if b is Dictionary and int((b as Dictionary).get("player", -1)) == local_player:
+				lane = int((b as Dictionary).get("horse", -1))
+	set_backed_horse(lane)
+
+
+## Outlines lane `lane` (the local player's horse), or none for −1.
+func set_backed_horse(lane: int) -> void:
+	backed_horse = lane if lane >= 0 and lane < HorseRaceLogic.HORSES else -1
+	for i: int in horses.size():
+		if horses[i].outlined != (i == backed_horse):
+			horses[i].set_outlined(i == backed_horse)
 
 
 ## Lanes in the order the table shows them right now (leader first).
@@ -216,6 +252,7 @@ func _tick_race(delta: float) -> void:
 		horses[h].set_running(clampf(v / base, 0.0, 1.0) if v > 0.0005 else 0.0)
 	_place_horses(prog)
 	_last_prog = prog
+	_update_crown()
 	if winner_shown() and not _celebrated:
 		_celebrated = true
 		var champ: HorseModel = horses[winner] if winner < horses.size() else null
@@ -224,6 +261,42 @@ func _tick_race(delta: float) -> void:
 			get_tree().create_timer(0.6).timeout.connect(champ.celebrate)
 		Audio.play_at(&"chime", self, -6.0)
 	_update_board()
+
+
+## The crown goes to the leader of the running race (once they are off), changing heads only
+## when the new leader is `CROWN_MARGIN` clear of the one wearing it; the winner keeps it once
+## their nose is over the line.
+func _update_crown() -> void:
+	if plan.is_empty() or race_t < 0.3:
+		_set_crown(-1)
+		return
+	if winner_shown():
+		_set_crown(winner)
+		return
+	var lead: int = HorseRaceLogic.order_of(_last_prog)[0]
+	if crown_lane < 0 or crown_lane >= _last_prog.size():
+		_set_crown(lead)
+	elif lead != crown_lane and _last_prog[lead] - _last_prog[crown_lane] >= CROWN_MARGIN:
+		_set_crown(lead)
+
+
+func _set_crown(lane: int) -> void:
+	if lane == crown_lane:
+		return
+	crown_lane = lane
+	if crown == null:
+		if lane < 0 or not Vfx.enabled():
+			return
+		crown = HorseModel.make_crown()
+	if crown.get_parent() != null:
+		crown.get_parent().remove_child(crown)
+	if lane < 0 or lane >= horses.size():
+		return
+	horses[lane].body.add_child(crown)
+	if crown.is_inside_tree():
+		# A little pop onto the new head.
+		crown.scale = Vector3.ONE * 0.4
+		crown.create_tween().tween_property(crown, ^"scale", Vector3.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _place_horses(prog: Array) -> void:
@@ -255,11 +328,15 @@ func _set_names(n: Array) -> void:
 		h.rotation.y = -PI * 0.5  # faces down the track (+x)
 		if i < horses.size():
 			h.position = horses[i].position
+			if crown != null and crown.get_parent() == horses[i].body:
+				horses[i].body.remove_child(crown)
+				h.body.add_child(crown)
 			horses[i].queue_free()
 			horses[i] = h
 		else:
 			horses.append(h)
 		add_child(h)
+		h.set_outlined(i == backed_horse)
 	if plan.is_empty():
 		_place_horses([0.0, 0.0, 0.0, 0.0])
 
@@ -567,6 +644,11 @@ func _mesh_box(size: Vector3, pos: Vector3, mat: Material) -> MeshInstance3D:
 	mi.position = pos
 	add_child(mi)
 	return mi
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and crown != null and crown.get_parent() == null:
+		crown.free()  # off every head: nobody else frees it
 
 
 ## Runs the race replay every frame (StationBase turns its own processing on and off with the Hot

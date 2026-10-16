@@ -123,3 +123,91 @@ func test_chips_land_on_the_backed_horse_pad() -> void:
 				on_pad.append(h)
 	on_pad.sort()
 	assert_eq(on_pad, [0, 2] as Array[int], "one stack on each backed pad")
+
+
+func _outlined() -> Array[int]:
+	var out: Array[int] = []
+	for i: int in hr.horses.size():
+		var h: HorseModel = hr.horses[i]
+		var on: int = 0
+		for mi: MeshInstance3D in h.meshes:
+			if mi.material_overlay != null:
+				on += 1
+		assert_true(on == 0 or on == h.meshes.size(), "lane %d: the outline is on every mesh or none" % i)
+		if on > 0:
+			out.append(i)
+	return out
+
+
+## Patrick: "Highlight the horse you bet on by outlining it slightly": only the local player's own
+## horse, from the bet until the result clears (the server drops settled bets at the line).
+func test_the_local_players_horse_is_outlined_until_the_result_clears() -> void:
+	var names: Array = ["A", "B", "C", "D"]
+	var bets: Array = [{"player": 2, "horse": 0, "amount": 10}, {"player": 1, "horse": 2, "amount": 10}]
+	hr.local_player = 1
+	hr.show_state({"state": HorseRaceLogic.State.BETTING, "names": names, "bets": []})
+	assert_eq(_outlined(), [] as Array[int], "no bet, no outline")
+	hr.show_state({"state": HorseRaceLogic.State.BETTING, "names": names, "bets": bets})
+	assert_eq(_outlined(), [2] as Array[int], "my horse, not the other player's")
+	assert_eq(hr.horses[2].meshes.size(), 10, "body, tail and eight leg parts all carry it")
+	hr.show_state({"state": HorseRaceLogic.State.RACING, "names": names, "bets": bets, "race_seed": 777, "race_time": 1.0})
+	assert_eq(_outlined(), [2] as Array[int], "through the race")
+	hr.show_state({"state": HorseRaceLogic.State.RESULT, "names": names, "bets": [], "race_seed": 777, "race_time": 9.0, "winner": 1})
+	assert_eq(_outlined(), [2] as Array[int], "the bets are settled, the horse stays marked for the result")
+	hr.show_state({"state": HorseRaceLogic.State.BETTING, "names": ["E", "F", "G", "H"], "bets": []})
+	assert_eq(_outlined(), [] as Array[int], "gone when the next round starts")
+	hr.local_player = 2
+	hr.show_state({"state": HorseRaceLogic.State.BETTING, "names": ["E", "F", "G", "H"], "bets": bets})
+	assert_eq(_outlined(), [0] as Array[int], "the other seat sees its own horse")
+	hr.set_names(["I", "J", "K", "L"])
+	assert_eq(_outlined(), [0] as Array[int], "a new line-up walks in still marked")
+	hr.show_state({"state": HorseRaceLogic.State.IDLE, "names": ["I", "J", "K", "L"], "bets": []})
+	assert_eq(_outlined(), [] as Array[int])
+
+
+## "The first one should wear a little crown": the leader of the running race, changing heads
+## only when the new leader is a centimetre clear, and the winner keeps it over the line.
+func test_the_crown_follows_the_leader_with_hysteresis() -> void:
+	assert_eq(hr.crown_lane, -1, "no crown in the gate")
+	for seed_value: int in [7, 4242, 98765, 31337]:
+		hr.reset_table()
+		assert_eq(hr.crown_lane, -1)
+		assert_true(hr.crown == null or not hr.crown.is_inside_tree(), "the crown comes off between races")
+		hr.start_race(seed_value, 0.0)
+		var plan: Dictionary = HorseRaceLogic.simulate(seed_value)
+		var w: int = int(plan["winner"])
+		hr.finish(w, seed_value)
+		var moves: int = 0
+		var last: int = -1
+		while not hr.winner_shown():
+			hr._tick_race(0.05)
+			if hr.race_t < 0.3:
+				assert_eq(hr.crown_lane, -1, "not before they are off")
+				continue
+			var prog: Array[float] = hr._last_prog
+			var lead: int = HorseRaceLogic.order_of(prog)[0]
+			assert_ne(hr.crown_lane, -1)
+			if hr.crown_lane != lead:
+				assert_lt(prog[lead] - prog[hr.crown_lane], HorseRaceStation.CROWN_MARGIN, "seed %d t %.2f: the crown only lags a hair" % [seed_value, hr.race_t])
+			assert_eq(hr.crown.get_parent(), hr.horses[hr.crown_lane].body, "it sits on that horse")
+			if last >= 0 and hr.crown_lane != last:
+				moves += 1
+			last = hr.crown_lane
+		assert_eq(hr.crown_lane, w, "seed %d: the winner wears it over the line" % seed_value)
+		for _i: int in 20:
+			hr._tick_race(0.05)
+		assert_eq(hr.crown_lane, w, "and keeps it while the field runs out")
+		gut.p("seed %d: the crown changed heads %d times" % [seed_value, moves])
+	# The hysteresis itself: a hair ahead is not enough, a centimetre is.
+	hr._last_prog = [0.5, 0.4, 0.3, 0.2]
+	hr.winner = -1
+	hr._update_crown()
+	assert_eq(hr.crown_lane, 0)
+	hr._last_prog = [0.5, 0.5 + HorseRaceStation.CROWN_MARGIN * 0.5, 0.3, 0.2]
+	hr._update_crown()
+	assert_eq(hr.crown_lane, 0, "half a centimetre ahead: the crown stays put")
+	hr._last_prog = [0.5, 0.5 + HorseRaceStation.CROWN_MARGIN * 1.5, 0.3, 0.2]
+	hr._update_crown()
+	assert_eq(hr.crown_lane, 1, "a clear centimetre: it moves")
+	hr.reset_table()
+	assert_eq(hr.crown_lane, -1)

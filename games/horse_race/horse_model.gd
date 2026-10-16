@@ -31,6 +31,12 @@ const LEGS: Array = [
 const REAR_PIVOT_Z: float = 0.52
 ## Strides per second flat out.
 const STRIDE_HZ: float = 2.6
+## Where the leader's crown sits (on the jockey's cap, the highest point, in body space).
+const CROWN_SPOT: Vector3 = Vector3(0, 2.1, -0.36)
+## The "your horse" outline: warm gold, a few millimetres wide in the world whatever the scale.
+const OUTLINE_COLOR: Color = Color("#EDBE52")
+const OUTLINE_WIDTH: float = 0.01
+const OUTLINE_SHADER: Shader = preload("res://client/aim_outline.gdshader")
 
 ## 0 = standing still, 1 = full gallop; eases towards `target_gallop`.
 var gallop: float = 0.0
@@ -39,6 +45,10 @@ var body: Node3D
 var tail: Node3D
 var hips: Array[Node3D] = []
 var knees: Array[Node3D] = []
+## Every mesh of the horse (body, legs, tail): the outline goes on each, so it gallops along.
+var meshes: Array[MeshInstance3D] = []
+## True while the local player's money is on this horse (`set_outlined`).
+var outlined: bool = false
 
 var _phase: float = 0.0
 var _time: float = 0.0
@@ -47,6 +57,8 @@ var _offsets: Array[float] = []
 var _rearing: bool = false
 
 static var _material: StandardMaterial3D
+static var _outline: ShaderMaterial
+static var _crown_material: StandardMaterial3D
 
 
 ## `coat` is a key of COATS; `silks` colours the saddle cloth and the jockey; `seed_value` shifts
@@ -97,6 +109,71 @@ func _process(delta: float) -> void:
 ## Runs (`speed` 0..1, about the share of a full gallop) or stands (0).
 func set_running(speed: float) -> void:
 	target_gallop = clampf(speed, 0.0, 1.0)
+
+
+## Outlines the horse (the local player backed it) or not: an inverted hull drawn as each mesh's
+## overlay, grown along the normals in world space so it stays thin on the miniature.
+func set_outlined(on: bool) -> void:
+	outlined = on
+	for mi: MeshInstance3D in meshes:
+		mi.material_overlay = outline_material() if on else null
+
+
+static func outline_material() -> ShaderMaterial:
+	if _outline == null:
+		_outline = ShaderMaterial.new()
+		_outline.shader = OUTLINE_SHADER
+		_outline.set_shader_parameter(&"color", OUTLINE_COLOR)
+		_outline.set_shader_parameter(&"width", OUTLINE_WIDTH)
+	return _outline
+
+
+## A little low-poly gold crown (band, five points with ball tips, a red gem at the front) in the
+## horse's own units, built to sit at `CROWN_SPOT` on `body`. Facing −Z like the horse.
+static func make_crown() -> MeshInstance3D:
+	var mb := _MeshBuilder.new()
+	var gold := Color("#E0B04A")
+	var band := CylinderMesh.new()
+	band.top_radius = 0.15
+	band.bottom_radius = 0.135
+	band.height = 0.075
+	band.radial_segments = 10
+	band.rings = 1
+	mb.add(band, Transform3D(Basis(), Vector3(0, 0.0375, 0)), gold)
+	var spike := CylinderMesh.new()
+	spike.top_radius = 0.0
+	spike.bottom_radius = 0.045
+	spike.height = 0.1
+	spike.radial_segments = 4
+	spike.rings = 1
+	var tip := SphereMesh.new()
+	tip.radius = 0.02
+	tip.height = 0.04
+	tip.radial_segments = 6
+	tip.rings = 3
+	for k: int in 5:
+		var a: float = TAU * k / 5.0
+		var rim := Vector3(sin(a), 0, -cos(a)) * 0.135  # k = 0 at the front
+		mb.add(spike, Transform3D(Basis(Vector3.UP, -a), rim + Vector3(0, 0.12, 0)), gold)
+		mb.add(tip, Transform3D(Basis(), rim + Vector3(0, 0.175, 0)), gold.lightened(0.15))
+	var gem := SphereMesh.new()
+	gem.radius = 0.028
+	gem.height = 0.05
+	gem.radial_segments = 6
+	gem.rings = 3
+	mb.add(gem, Transform3D(Basis(), Vector3(0, 0.04, -0.148)), Color("#B3262E"))
+	var mi := MeshInstance3D.new()
+	mi.name = "Crown"
+	mi.mesh = mb.commit()
+	if _crown_material == null:
+		_crown_material = StandardMaterial3D.new()
+		_crown_material.vertex_color_use_as_albedo = true
+		_crown_material.metallic = 0.7
+		_crown_material.roughness = 0.35
+	mi.material_override = _crown_material
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = CROWN_SPOT
+	return mi
 
 
 ## Rears up once on its hind legs, front hooves in the air (the winner).
@@ -306,6 +383,7 @@ func _mesh(mb: _MeshBuilder, mesh_name: String) -> MeshInstance3D:
 	mi.name = mesh_name
 	mi.mesh = mb.commit()
 	mi.material_override = shared_material()
+	meshes.append(mi)
 	return mi
 
 
