@@ -20,6 +20,8 @@ var mics: Dictionary[int, FakeMicTest.FakeMic] = {}
 var avatars_bob: Dictionary[int, Node3D] = {}
 ## What Bob's playback played, per speaker (8 kHz samples, in play order).
 var heard: Dictionary[int, PackedFloat32Array] = {}
+## What Bob's playback pushed to its audio generator, per speaker (left channel at `OUT_RATE`).
+var pushed: Dictionary[int, PackedFloat32Array] = {}
 var _old_mode: String
 var _t: float = 0.0
 
@@ -38,6 +40,7 @@ func before_each() -> void:
 	senders.clear()
 	mics.clear()
 	heard.clear()
+	pushed.clear()
 	for pid: int in fx.player_ids:
 		var a := Node3D.new()
 		add_child_autofree(a)
@@ -159,6 +162,56 @@ func _check_tone(hz: float) -> void:
 
 func test_a_440hz_tone_arrives_intact() -> void:
 	_check_tone(440.0)
+
+
+## Patrick (0.9.8, Windows): "I do not hear myself". Bob's playback with sound on, at a 48 kHz
+## output: what it hands the audio generator is Alice's tone at 48 kHz, still 440 Hz, as loud,
+## continuous, 1920 output frames per 40 ms frame (Godot no longer resamples voice).
+func test_a_440hz_tone_reaches_the_generator_at_48khz() -> void:
+	const OUT_RATE: float = 48000.0
+	ch_bob.audio_enabled = true
+	ch_bob.playback_setup = func(pb: VoicePlayback) -> void:
+		var pid: int = pb.speaker
+		pb.output_rate = OUT_RATE
+		pb.sink = func(block: PackedVector2Array) -> void:
+			if not pushed.has(pid):
+				pushed[pid] = PackedFloat32Array()
+			for v: Vector2 in block:
+				pushed[pid].append(v.x)
+	var alice: int = fx.player_ids[0]
+	_speaker(alice, 440.0)
+	_run(2.0, true)
+	_run(0.6, false)
+	var pb: VoicePlayback = ch_bob.playbacks.get(alice, null)
+	assert_not_null(pb, "Bob plays Alice under her avatar")
+	if pb == null:
+		return
+	var sent: int = senders[alice].capture.frames_sent
+	assert_gt(sent, 45, "2 s of 40 ms frames went out")
+	assert_eq(pb.frames_played, sent, "every 8 kHz frame was played (frames_played counts voice frames)")
+	assert_true(pb.is_playing())
+	assert_eq(pb.failure, "")
+	var prime: int = int(VoicePlayback.PRIME_SECONDS * OUT_RATE)
+	var x: PackedFloat32Array = pushed[alice]
+	assert_eq(x.size(), prime + sent * 1920, "48 kHz: 20 ms of priming silence, then 1920 frames per voice frame")
+	var talk: PackedFloat32Array = x.slice(prime + 1920 * 2, prime + 1920 * (sent - 1))
+	var best: float = 0.0
+	var best_amp: float = -1.0
+	for hz: float in PROBES:
+		var a: float = tone_amplitude(talk, hz, OUT_RATE)
+		if a > best_amp:
+			best_amp = a
+			best = hz
+	assert_eq(best, 440.0, "the generator gets 440 Hz at 48 kHz")
+	for hz: float in PROBES:
+		if hz != 440.0:
+			assert_lt(tone_amplitude(talk, hz, OUT_RATE), best_amp * 0.05, "%d Hz is not in it" % roundi(hz))
+	assert_almost_eq(best_amp, AMP, AMP * 0.06, "as loud as Alice's mic")
+	var c: float = 2.0 * cos(TAU * 440.0 / OUT_RATE)
+	var worst: float = 0.0
+	for n: int in range(2, talk.size()):
+		worst = maxf(worst, absf(talk[n] - (c * talk[n - 1] - talk[n - 2])))
+	assert_lt(worst, AMP * 0.08, "one continuous tone at 48 kHz: no frame lost, repeated or gapped")
 
 
 func test_a_1khz_tone_arrives_intact() -> void:
