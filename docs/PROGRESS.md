@@ -139,6 +139,53 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-16 / 0.9.9 (Patrick's feedback burst)
+- Voice: Patrick "Sound input works, but i do not hear myself". Playback now runs the generator at
+  the sound card's mix rate and upsamples the 8 kHz voice itself (linear, phase kept between
+  frames), the player is primed and restarted if it stops, the talk spurt is no longer cut between
+  two packets (the choppiness heard on Linux), `clear()` no longer calls `clear_buffer()` on a live
+  generator. TEST MICROPHONE says "Playback failed: <reason>" when the player is not playing, and
+  the log carries driver, output device, rates, Voice/Master bus state, underruns and restarts.
+  Reproduced on Linux at 44.1/48 kHz: 3.00 s of 440 Hz, no gaps. The Windows cause is still not
+  proven; the next log from Patrick's PC settles it.
+- Practice is a plain solo casino game again (no minigame selection).
+- HUD: luck gauge centred over the item slots with the LUCK label above it.
+- Horse race: gold outline on the horse you backed, a crown on the leader (moves only when the new
+  leader is clearly ahead, winner keeps it), field spreads out (talent ±12%, surge/stumble/cruise
+  streaks; first-to-last at the line 1.0 → 2.7 horse lengths over 200 seeds).
+- Odd Jobs: a real 3D arcade button on the cabinet (aim at it and click or press E), no popup; one
+  shared bar for the whole casino, each click adds that player's share, the click that fills it
+  wins the $50; the cabinet glows and the button gets a warm outline when you are broke (below the
+  House Comp line).
+- Megaphone the right way round (bell forward, held in the fist; first person shows it in front of
+  the camera); waiters hold the drinks tray on the palm (`AvatarVisuals.hold_right_arm`); dealers
+  stand on the floor (`DealerLogic.OFFSETS` y 0.5 → 0).
+- Tab list "THE TABLE": skin portraits in the player's colour, colour bar, rank and money, leader
+  crown, HOST badge, talking icon, ready/waiting in the lobby; no READY button anywhere, only the
+  pedestal readies you.
+- Waiting room behind the start room's door: one blackjack table and four slot machines on play
+  money (`FunRoom`: own StationManager and Economy, nothing reaches stats, comps, items or the real
+  balance; $1,000 play chips per visit). Open only in an online lobby; at match start seated players
+  stand, anyone inside is sent back to their spawn, the door shuts and MoveSanity closes the room.
+- Find the Lady: cards clickable again. The stage lives inside the pixel view (SubViewport at 1/3),
+  so clicks arrived in viewport pixels while the card rectangles were in canvas pixels; every click
+  landed a third of the way to the top-left and missed. Mapped onto the canvas now; one test clicks
+  through the real window and pixel view, one runs the minigame on the authoritative server.
+- Roulette Sumo: wheel 0.55 → 1.4 rad/s over 25 s (was 0.25 → 1.2 over 60 s), outward pull 0.12 →
+  0.5 (a still bean falls off in 2.85 s at the start, 0.55 s at full speed), round 60 s; no bats,
+  no freeze, no knockdowns; E/shove/grab push the bean in front (4 m/s, about 1 m, 0.8 s cooldown).
+- Dodge the Dice: two betting layouts stacked (25 rows, 65 m flat, 1.9× the way), round 150 s, a
+  hazard every 0.5 → 0.2 s, 45% aimed, plus ball racks across the board (4–6 of 7 lanes, one gate
+  always open).
+- Jackpot Climb: three giant-chip tiers with checkpoint flags (8.5 / 16 / 21.5 m of 26 m), two lanes
+  per tier (steady hops on one side, one or two wide gaps on the other, four wide gaps in total),
+  falls return you to your last flag (server-decided, 1.5 s grace), 150 s round, a non-finisher's
+  height never counts below their checkpoint. Chips redrawn: flush edge spots, bevelled rim, face
+  rings, 0.12 m thick, core under the top face (the old inserts stuck out and every top was black).
+- Tests: `scripts/test.sh all` → lint ok, unit 721/721, sim 9/9, integration 191/191, physics 126/126 (one
+  Odd Jobs prompt-timing test made to wait for the aim after a miss on the slow runner), ui 236/236,
+  smoke 4/4, boot ok, session ok (87 steps), orchestrator 68, net 12/12 (22 min).
+
 ### 2026-10-13 / 0.9.8 (voice chat)
 - Patrick: "Why is the voicechat still not working? Test it somehow". Three real losses found and
   fixed with a test each: (1) Godot 4.7.2 `ENetMultiplayerPeer.create_server` passes the channel
