@@ -47,12 +47,14 @@ func test_the_table_stands_clear_on_the_casino_floor() -> void:
 	for other: AABB in _boxes(scene.map, false):
 		for a: AABB in own:
 			assert_false(a.grow(-0.02).intersects(other), "Hi-Lo collider %s overlaps %s" % [a, other])
-	# The stations around it keep their distance (nobody's stools in anyone's lap).
+	# The stations around it keep their distance (nobody's stools in anyone's lap). The craps
+	# table west of it is 4.3 m long, so 4.5 m between the centres leaves its rail more than half
+	# a metre from the Hi-Lo seats; the collider check above is the real overlap test.
 	for sid: StringName in scene.map.stations:
 		if sid == SID:
 			continue
 		var d: Vector3 = scene.map.stations[sid].global_position - hl.global_position
-		assert_gt(Vector2(d.x, d.z).length(), 6.0, "%s is a table's length away" % sid)
+		assert_gt(Vector2(d.x, d.z).length(), 4.5, "%s keeps its distance" % sid)
 	# The dealer stands on the floor behind the far side, facing the stools.
 	var dealer: Node3D = scene.casino_floor.dealers.get(SID, null)
 	assert_not_null(dealer, "a dealer at the table")

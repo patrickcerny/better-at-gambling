@@ -26,7 +26,7 @@ const STATIONS: Dictionary = {
 	&"plinko_1": [&"plinko", Vector3(11, 0, -14.5), 0], &"plinko_2": [&"plinko", Vector3(17.5, 0, -14.5), 0],
 	# The Race Hall (east annex): the long horse race table, stools on its south side.
 	&"horse_race_1": [&"horse_race", Vector3(29.0, 0, -19.0), 0],
-	&"hilo_1": [&"hilo", Vector3(16, 0, -5), 0],
+	&"hilo_1": [&"hilo", Vector3(18.6, 0, -4.8), 0],
 	&"craps_1": [&"craps", Vector3(14, 0, -6), 0],
 	&"roulette_1": [&"roulette", Vector3(-6, 0, -3), 0], &"roulette_2": [&"roulette", Vector3(6, 0, -3), 180],
 	&"blackjack_1": [&"blackjack", Vector3(-16, 0, 4), 0], &"blackjack_2": [&"blackjack", Vector3(-9, 0, 4), 0],
