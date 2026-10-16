@@ -36,12 +36,9 @@ func test_seven_symbols_with_their_odds() -> void:
 	assert_true(ui.wants_camera_lock(), "the head stays on the table while betting")
 	assert_lt(ui.panel.get_global_rect().size.y, 460.0, "a strip at the bottom, the wheel stays in view")
 	assert_true(ui.panel.get_global_rect().position.y > 1080 * 0.5, "in the lower half of the screen")
-	assert_lt(ui.panel.get_global_rect().size.x, 1000.0, "the tip jar fits in the chips row: %s" % ui.panel.get_global_rect())
-	assert_eq(ui.tip_button.get_parent(), ui.bets_row)
+	assert_lt(ui.panel.get_global_rect().size.x, 1000.0, "the chips row stays slim: %s" % ui.panel.get_global_rect())
 	assert_eq(ui.bet_panel.chip_value(), Registry.balance.wheel_min_bet, "the smallest chip first")
 	assert_string_contains(ui.status_label.text, "PICK A SYMBOL")
-	assert_not_null(ui.tip_button, "a dealer to tip")
-	assert_true(ui.tip_button.visible)
 
 
 func test_chips_on_several_symbols() -> void:
