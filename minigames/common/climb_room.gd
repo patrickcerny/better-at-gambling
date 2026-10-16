@@ -4,10 +4,11 @@ extends RefCounted
 ## shell (carpeted start apron, the gallery balcony behind it, damask walls, chandeliers):
 ##
 ## - `"board"` (Dodge the Dice): a giant roulette betting layout tilted ~35° from the floor, 14 m
-##   wide and ~41 m from the bottom edge to the top. Each of its 13 rows (1-2-3 at the bottom up
-##   to 34-35-36, the green zero on top) is a felt tread on a walnut step: a 0.35 m ledge the bean
-##   jumps, then a 2.6 m tread rising at ~30°. The dozens run up the west strip, the even-money
-##   bets up the east strip, the columns' 2:1 are painted on the apron. Some fields are polished
+##   wide and ~80 m from the bottom edge to the top. Its 25 rows are two betting layouts laid
+##   end to end (1-2-3 at the bottom up to 34-35-36, then 1-2-3 again up to 34-35-36, the green
+##   zero on top); each row is a felt tread on a walnut step: a 0.35 m ledge the bean jumps, then a
+##   2.6 m tread rising at ~30°. Each layout's dozens run up the west strip, its even-money bets up
+##   the east strip, the columns' 2:1 are painted on the apron. Some fields are polished
 ##   brass slide chutes (`CHUTES`) that carry a bean back down a row. On top: a landing with a gold
 ##   WINNER rail, Lucky's podium and a brass gantry of hoppers that drop the hazards.
 ## - `"towers"` (Jackpot Climb): a staggered spiral of giant chip stacks (`ChipTowers`) winding
@@ -20,7 +21,9 @@ extends RefCounted
 ## Local axes: -z climbs (the top is far north), +z is the apron and the gallery.
 
 const HALF_W: float = 7.0
-const ROWS: int = 13
+const ROWS: int = 25
+## Number rows per betting layout (1-36); the board stacks two, then the zero.
+const LAYOUT_ROWS: int = 12
 const ROW_D: float = 2.6
 const ROW_RISE: float = 1.82
 const LIP: float = 0.35
@@ -40,7 +43,8 @@ const MAX_SPOTS: int = 8
 ## strip.
 const COL_X: Array[float] = [-7.0, -4.5, -1.5, 1.5, 4.5, 7.0]
 ## Slide chutes: [row, column] (columns index `COL_X` gaps, 0 = west strip .. 4 = east strip).
-const CHUTES: Array = [[2, 2], [3, 4], [4, 1], [5, 3], [6, 0], [7, 2], [8, 4], [9, 1], [10, 3], [11, 2]]
+const CHUTES: Array = [[2, 2], [3, 4], [4, 1], [5, 3], [6, 0], [7, 2], [8, 4], [9, 1], [10, 3], [11, 2],
+	[13, 0], [14, 3], [15, 1], [16, 4], [17, 2], [18, 0], [19, 3], [20, 1], [21, 4], [22, 2], [23, 0]]
 ## The hazard gantry: hoppers over the top row.
 const HOPPER_X: Array[float] = [-5.6, -2.8, 0.0, 2.8, 5.6]
 const HOPPER_DROP: float = 3.4
@@ -148,9 +152,10 @@ static func in_chute(pos: Vector3) -> bool:
 	return ClimbKit.in_field(flight(), chute_fields(), pos)
 
 
-## Number printed on a field (row, column 1..3), 0 on the top row.
+## Number printed on a field (row, column 1..3), 0 on the top row. The board stacks two layouts,
+## so the numbers start over at 1 on row `LAYOUT_ROWS`.
 static func field_number(row: int, col: int) -> int:
-	return 0 if row >= ROWS - 1 else row * 3 + col
+	return 0 if row >= ROWS - 1 else (row % LAYOUT_ROWS) * 3 + col
 
 
 # --- Build --------------------------------------------------------------------------------------
@@ -339,18 +344,24 @@ static func _board(root: Node3D, brass: Material) -> void:
 			_plane(print, frame.translated(up * 0.01), Vector2(COL_X[4] - COL_X[1] - 0.1, length - 0.12), line)
 			_tile(print, frame.translated(up * 0.014), Vector2(COL_X[4] - COL_X[1] - 0.3, length - 0.32), Palette.FELT_GREEN.lightened(0.18), "0", 190)
 	# Outside bets up the strips: dozens west (4 rows each), even money east (2 rows each).
+	# Each layout gets its own labels; a label never lies on a chute.
 	var dozens: Array[String] = ["1st 12", "2nd 12", "3rd 12"]
-	for d: int in 3:
-		_strip_label(print, f, d * 4 + 1, -5.75, dozens[d], Palette.CREAM)
 	var even: Array[String] = ["1-18", "EVEN", "RED", "BLACK", "ODD", "19-36"]
-	for e: int in 6:
-		var row: int = e * 2 + (1 if Vector2i(e * 2, 4) in chutes else 0)
-		var c: Color = Palette.CREAM
-		if even[e] == "RED":
-			c = Palette.CASINO_RED.lightened(0.15)
-		elif even[e] == "BLACK":
-			c = Palette.CASINO_BLACK
-		_strip_label(print, f, row, 5.75, even[e], c)
+	var base: int = 0
+	while base + LAYOUT_ROWS < ROWS:
+		for d: int in 3:
+			var drow: int = base + d * 4 + 1
+			drow += 1 if Vector2i(drow, 0) in chutes else 0
+			_strip_label(print, f, drow, -5.75, dozens[d], Palette.CREAM)
+		for e: int in 6:
+			var row: int = base + e * 2 + (1 if Vector2i(base + e * 2, 4) in chutes else 0)
+			var c: Color = Palette.CREAM
+			if even[e] == "RED":
+				c = Palette.CASINO_RED.lightened(0.15)
+			elif even[e] == "BLACK":
+				c = Palette.CASINO_BLACK
+			_strip_label(print, f, row, 5.75, even[e], c)
+		base += LAYOUT_ROWS
 	# Cheek rails up both edges: walnut beams with a brass cap, invisible guards to the ceiling.
 	var cheek: StandardMaterial3D = GreyboxKit.material(WALNUT, 0.0, 0.42)
 	var tz: float = top_z(true)
@@ -492,7 +503,9 @@ static func _gantry(root: Node3D, brass: Material) -> void:
 static func _board_lights(root: Node3D, brass: Material) -> void:
 	var f: Dictionary = flight(true)
 	var glow: StandardMaterial3D = Vfx.glow_material(Color(1.0, 0.85, 0.55))
-	for z: float in [-4.0, -12.5, -21.0, -29.5]:
+	# A chandelier every 8.5 m up the board.
+	var z: float = -4.0
+	while z > top_z(true) + 2.0:
 		var y: float = ClimbKit.surface_y(f, z) + 7.5
 		var ch := Node3D.new()
 		ch.name = "Chandelier"
@@ -509,6 +522,14 @@ static func _board_lights(root: Node3D, brass: Material) -> void:
 			bulb.material_override = glow
 		VaultArena._vis(ch, Vector3(0.04, 3.0, 0.04), Vector3(0, 1.5, 0), brass)
 		GreyboxKit.lamp(root, Vector3(0, y - 0.6, z), 1.5, 13.0, LAMP)
+		z -= 8.5
+	# A soft fill high over the upper layout (the shared fill in `_lights` covers the lower one).
+	var fill := OmniLight3D.new()
+	fill.position = Vector3(0, ClimbKit.surface_y(f, top_z(true) * 0.7) + 12.0, top_z(true) * 0.7)
+	fill.light_color = Color(1.0, 0.86, 0.7)
+	fill.light_energy = 0.6
+	fill.omni_range = 40.0
+	root.add_child(fill)
 	var spot := SpotLight3D.new()
 	spot.name = "WinnerSpot"
 	spot.light_color = Color(1.0, 0.86, 0.6)
