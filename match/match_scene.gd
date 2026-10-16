@@ -453,6 +453,8 @@ func _spawn_avatars() -> void:
 	if local != null:
 		local.cam.activate()
 		hud.set_crosshair_visible(true)
+	# Joining mid-emote: pick it up where it is (after `_seat`'s deferred calls, which would cut it).
+	(func() -> void: EmoteWheel.replay(avatars, view.state.emotes)).call_deferred()
 
 
 func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
@@ -978,12 +980,8 @@ func _on_event(ev: Dictionary) -> void:
 			_unseat(int(ev["player"]))
 		&"player_thrown_out":
 			_throw_out(int(ev["target"]), String(ev.get("guard", "guard")))
-		&"emote":
-			EmoteWheel.present(avatars.get(int(ev["player"]), null), StringName(ev["id"]))
-		&"player_emote":
-			var emoter: PlayerAvatar = avatars.get(int(ev["player"]), null)
-			if emoter != null:
-				emoter.play_emote(StringName(ev["emote"]))
+		&"emote", &"player_emote":
+			EmoteWheel.apply_event(avatars, ev)  # everyone's copy acts it out; ours in third person
 		&"intent_rejected":
 			if int(ev["player"]) == local_id:
 				_end_prediction(StringName(ev.get("intent", &"")), true)

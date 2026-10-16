@@ -2,7 +2,9 @@ extends GutTest
 ## The new bean (AvatarVisuals) and its number-key emotes: an emote plays for ~2.5 s and ends on
 ## its own (or when the bean is hit or walks off), the right hand has a slot for held items that
 ## follows a character skin, and in the real match scene key 5 sends `play_emote` and everyone's
-## copy of our bean plays it.
+## copy of our bean plays it (ours watched in third person), and a wheel emote from someone else
+## plays on their bean without touching our camera. (Camera: test_emote_camera.gd; every emote's
+## motion: test_emote_animations.gd.)
 
 var scene: MatchScene
 
@@ -46,7 +48,8 @@ func test_hits_and_walking_off_cut_an_emote_short() -> void:
 	v.hit(Vector3.FORWARD, 1.0)
 	assert_false(v.is_emoting(), "a hit ends it")
 	v.emote(&"thumbs_up")
-	await wait_seconds(0.4)
+	await wait_process_frames(2)
+	v.emote_time = 0.4  # past the first moment, when walking may cancel it (no wall-clock race)
 	v.update_motion(Vector3(4, 0, 0), true, 0.016)
 	await wait_process_frames(2)
 	assert_false(v.is_emoting(), "walking off ends it")
@@ -85,7 +88,10 @@ func test_key_sends_the_emote_and_the_bean_plays_it() -> void:
 	get_tree().root.push_input(k)
 	await wait_physics_frames(3)
 	assert_eq(scene.local.visuals.emote_id, &"thumbs_up", "key 5 = thumbs up, through the server")
-	assert_eq(scene.local.cam.mode, PlayerCamera.Mode.THIRD, "our emote is watched in third person")
+	assert_true(scene.local.cam.emote_view, "our emote is watched in third person")
+	assert_eq(scene.local.cam.mode, PlayerCamera.Mode.FIRST, "the player's own choice of view is kept underneath")
+	await wait_physics_frames(30)
+	assert_true(scene.local.visuals.visible, "we see our own bean do it")
 	# A dummy's emote arrives as an event like anyone else's.
 	var bot: int = -1
 	for pid: int in scene.avatars:
@@ -97,23 +103,20 @@ func test_key_sends_the_emote_and_the_bean_plays_it() -> void:
 	await wait_seconds(AvatarVisuals.EMOTE_SECONDS + 0.3)
 	assert_false(scene.local.visuals.is_emoting())
 	assert_false((scene.avatars[bot] as PlayerAvatar).visuals.is_emoting())
+	assert_false(scene.local.cam.emote_view, "the emote view ends with the emote")
+	await wait_physics_frames(30)
 	assert_eq(scene.local.cam.mode, PlayerCamera.Mode.FIRST, "back to first person after the emote")
-
-
-## Patrick: "Third-person camera during emote": only a first-person view switches, and a view the
-## player picks during the emote (camera toggle) is kept afterwards.
-func test_emote_view_restores_only_what_it_changed() -> void:
-	var cam := PlayerCamera.new()
-	add_child_autofree(cam)
-	cam.mode = PlayerCamera.Mode.THIRD
-	cam.begin_emote_view()
-	assert_false(cam.emote_view, "already third person: nothing to restore")
-	cam.end_emote_view()
-	assert_eq(cam.mode, PlayerCamera.Mode.THIRD)
-	cam.mode = PlayerCamera.Mode.FIRST
-	cam.begin_emote_view()
-	assert_eq(cam.mode, PlayerCamera.Mode.THIRD)
-	cam.toggle_mode()  # back to first by hand mid-emote
-	cam.toggle_mode()  # and third again: the player's own choice now
-	cam.end_emote_view()
-	assert_eq(cam.mode, PlayerCamera.Mode.THIRD, "a view picked during the emote stays")
+	assert_false(scene.local.cam.in_emote_view())
+	assert_false(scene.local.visuals.visible, "first person hides our bean again")
+	# Someone else's wheel emote: their bean waves, our camera stays put.
+	var r: Dictionary = {}
+	for i: int in 40:  # the wheel shares the chat rate limit with everything else the bot sent
+		r = scene.server.submit_intent(bot, Intents.make(&"emote", {"id": &"wave"}))
+		if r["ok"]:
+			break
+		await wait_physics_frames(6)
+	assert_true(r["ok"], str(r))
+	await wait_physics_frames(3)
+	assert_eq((scene.avatars[bot] as PlayerAvatar).visuals.emote_id, &"wave", "the wheel's wave is acted out")
+	assert_eq((scene.avatars[bot] as PlayerAvatar).bubble.text, Emotes.bubble_text(&"wave"))
+	assert_false(scene.local.cam.emote_view, "other players' emotes leave our camera alone")
