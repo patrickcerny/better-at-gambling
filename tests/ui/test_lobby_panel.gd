@@ -1,7 +1,7 @@
 extends GutTest
-## Lobby panel (Patrick's playtest #17: "Ready sometimes can't be pressed while the Tab panel is
-## open"): the slot rows update in place so READY never moves under the cursor, Tab does not move
-## focus, Tab closes the panel again, and READY sends the state the button shows.
+## Lobby panel (the settings tablet's 2D mirror): the slot rows update in place so the buttons
+## never move under the cursor, Tab does not move focus, Tab closes the panel again, and there is
+## no READY button any more (Patrick: "They have to be on the podest").
 
 
 class FakeServer:
@@ -94,44 +94,38 @@ func test_rows_update_in_place() -> void:
 	panel.open()
 	await wait_process_frames(2)
 	var rows_before: Array[Node] = panel._slots.get_children()
-	var rect: Rect2 = panel._ready_button.get_global_rect()
+	var rect: Rect2 = panel._close_button.get_global_rect()
 	state.players[4] = {"name": "P4", "color": 4, "ready": true, "connected": true}
 	state.players_changed.emit()
 	await wait_process_frames(2)
 	assert_eq(panel._slots.get_children(), rows_before, "same row nodes after a snapshot")
 	assert_eq(panel._slots.get_child_count(), Protocol.MAX_PLAYERS)
-	assert_eq(panel._ready_button.get_global_rect(), rect, "READY did not move")
+	assert_eq(panel._close_button.get_global_rect(), rect, "CLOSE did not move")
 	assert_eq((panel._rows[3]["name"] as Label).text.strip_edges(), "P4")
 	assert_true((panel._rows[4]["empty"] as Label).visible, "slot 5 is open")
 
 
-func test_ready_clicks_land_while_tab_is_held_and_snapshots_arrive() -> void:
+func test_no_ready_control_only_the_pedestal_sets_ready() -> void:
 	panel.open()
+	await wait_process_frames(2)
+	assert_false("_ready_button" in panel, "the READY toggle is gone")
+	for n: Node in panel.find_children("*", "BaseButton", true, false):
+		var b: BaseButton = n
+		if b is Button:
+			assert_false((b as Button).text.contains("READY"), "no READY button (%s)" % b.name)
+	# Ready states still show, read-only.
+	state.players[2]["ready"] = true
+	state.players_changed.emit()
 	await wait_process_frames(1)
-	assert_true(panel.visible)
-	# Hold Tab: the press that opened the panel and the key repeats must neither close it nor move focus.
-	panel._opened_frame = Engine.get_process_frames()
-	_key(true)
-	for i: int in 5:
-		_key(true, true)
+	assert_eq((panel._rows[1]["ready"] as Label).text, "READY")
+	assert_eq((panel._rows[0]["ready"] as Label).text, "NOT READY")
+	# Clicking around the slots never sends set_ready.
+	for r: Dictionary in panel._rows:
+		_click(r["frame"] as Control)
 	await wait_process_frames(1)
-	assert_true(panel.visible, "held Tab keeps the panel open")
-	for i: int in 3:
-		state.players[2]["ready"] = i % 2 == 0
-		state.players_changed.emit()  # snapshot refresh between clicks
-		await wait_process_frames(1)
-		_click(panel._ready_button)
-		await wait_process_frames(1)
-		var want: bool = i % 2 == 0
-		assert_eq(fake.sent.size(), i + 1, "click %d reached READY" % i)
-		assert_eq(fake.sent[-1]["type"], &"set_ready")
-		assert_eq(bool(fake.sent[-1]["ready"]), want, "explicit ready state %s" % want)
-		# The server's answer arrives.
-		state.players[1]["ready"] = want
-		state.players_changed.emit()
-		await wait_process_frames(1)
-		assert_eq(panel._ready_button.button_pressed, want)
-	_key(false)
+	for intent: Dictionary in fake.sent:
+		assert_ne(intent["type"], &"set_ready")
+	assert_true(panel._close_button.has_focus(), "focus lands on CLOSE")
 
 
 func test_tab_closes_the_open_panel() -> void:

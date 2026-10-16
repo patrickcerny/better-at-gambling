@@ -1,11 +1,12 @@
 class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
-## accessibility: the 8 slots (name, color, skin, ready, leader), the ready toggle
-## and — for the party leader — the mode (casino or minigames only), match length (minigames,
+## accessibility: the 8 slots (name, color, skin, ready, leader) and — for the party leader — the mode (casino or minigames only), match length (minigames,
 ## gambling minutes between them), items, which minigames are on (MinigameSelector), PUBLIC (listed in the server browser) and a KICK button
 ## next to every other player (press twice: KICK → SURE?). Every button sends an intent; the panel
-## only redraws from the ClientMatchState mirror.
+## only redraws from the ClientMatchState mirror. There is no READY button: players get ready
+## only by standing on their pedestal (Patrick); the slots just show it. Opened at the settings
+## tablet; Tab shows the `PlayerList` instead.
 
 signal closed
 signal leave_requested
@@ -15,8 +16,8 @@ var local_id: int = -1
 
 var _title: Label
 var _slots: VBoxContainer
-var _ready_button: Button
 var _settings_box: VBoxContainer
+var _close_button: Button
 var _settings_note: Label
 var _countdown_label: Label
 ## Match length steppers (Patrick's note #12): setting key → {minus, plus, value: Label}.
@@ -35,8 +36,8 @@ var selector: MinigameSelector
 var _kick_armed: int = -1
 var _kick_armed_until: float = 0.0
 var _length_note: Label
-## The 8 slot rows, built once and updated in place (rebuilding them made the panel, and the
-## READY button with it, jump on every snapshot, so clicks missed). Each: {frame, swatch, name, ready, kick, empty}.
+## The 8 slot rows, built once and updated in place (rebuilding them made the panel jump on
+## every snapshot, so clicks missed). Each: {frame, swatch, name, ready, kick, empty}.
 var _rows: Array[Dictionary] = []
 ## Frame the panel was opened on: the Tab press that opened it must not close it again.
 var _opened_frame: int = -1
@@ -78,7 +79,7 @@ func open(focus: StringName = &"") -> void:
 			if _steppers.has("minigames"):
 				(_steppers["minigames"]["plus"] as Button).grab_focus()
 		_:
-			_ready_button.grab_focus()
+			_close_button.grab_focus()
 
 
 func close() -> void:
@@ -122,16 +123,6 @@ func _build() -> void:
 	right.add_theme_constant_override(&"separation", 8)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cols.add_child(right)
-	_ready_button = Button.new()
-	_ready_button.custom_minimum_size = Vector2(0, 60)
-	_ready_button.theme_type_variation = &"ActionButton"
-	_ready_button.toggle_mode = true
-	# The button's own pressed flag is what gets sent, so a click always means "this state",
-	# even if a snapshot lands between the click and the server's answer.
-	_ready_button.toggled.connect(func(on: bool) -> void:
-		_ready_button.text = "NOT READY" if on else "READY"
-		Net.send_intent(Intents.make(&"set_ready", {"ready": on})))
-	right.add_child(_ready_button)
 	right.add_child(_heading("LOBBY SETTINGS"))
 	_settings_note = Label.new()
 	_settings_note.theme_type_variation = &"SmallLabel"
@@ -180,10 +171,11 @@ func _build() -> void:
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override(&"separation", 20)
 	v.add_child(bottom)
-	var close_b := Button.new()
-	close_b.text = "CLOSE"
-	close_b.pressed.connect(close)
-	bottom.add_child(close_b)
+	_close_button = Button.new()
+	_close_button.name = "Close"
+	_close_button.text = "CLOSE"
+	_close_button.pressed.connect(close)
+	bottom.add_child(_close_button)
 	var leave := Button.new()
 	leave.text = "LEAVE LOBBY"
 	leave.pressed.connect(func() -> void: leave_requested.emit())
@@ -243,7 +235,7 @@ func _refresh() -> void:
 	_title.text = "LOBBY" + ("   ·   CODE %s" % code if code != "" else ("   ·   STEAM" if steam_party else ""))
 	public_button.visible = not steam_party
 	invite_button.visible = steam_party
-	_countdown_label.text = "Doors open in %d…" % ceili(state.countdown) if state.countdown > 0.0 else "Step up on the pedestal with your name (or press READY)."
+	_countdown_label.text = "Doors open in %d…" % ceili(state.countdown) if state.countdown > 0.0 else "Step up on the pedestal with your name to get ready."
 	var ids: Array = state.players.keys()
 	ids.sort()
 	for i: int in _rows.size():
@@ -280,8 +272,6 @@ func _refresh() -> void:
 		var ready: Label = r["ready"]
 		ready.text = "READY" if is_ready else "NOT READY"
 		ready.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if is_ready else Color("#9A8F7A"))
-	_ready_button.set_pressed_no_signal(_my_ready())
-	_ready_button.text = "NOT READY" if _my_ready() else "READY"
 	var leader: bool = local_id == state.leader
 	_settings_note.text = "You lead this lobby." if leader else "Only the lobby leader (★) can change these."
 	var presets: MatchPresets = Registry.presets
@@ -370,7 +360,4 @@ func _on_kick_pressed(slot: int) -> void:
 func _now() -> float:
 	return Time.get_ticks_msec() / 1000.0
 
-
-func _my_ready() -> bool:
-	return bool(state.players.get(local_id, {}).get("ready", false))
 

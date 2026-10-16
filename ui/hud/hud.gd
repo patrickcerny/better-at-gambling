@@ -2,7 +2,7 @@ class_name Hud
 extends Control
 ## In-world HUD (docs/ART_DIRECTION.md): money top-left with +/- pops, timer top-right, rank
 ## bottom-right, item slots bottom-centre, event feed, interaction prompt, crosshair, toast,
-## leaderboard on hold. Reads a ClientMatchState; never talks to the server.
+## Tab player list (`PlayerList`) on hold. Reads a ClientMatchState; never talks to the server.
 
 const FEED_MAX: int = 6
 const FEED_SECONDS: float = 6.0
@@ -22,8 +22,8 @@ var toast_label: Label
 var crosshair: Control
 var feed: VBoxContainer
 var items: ItemBar
-var leaderboard: PanelContainer
-var leaderboard_rows: VBoxContainer
+## The Tab list ("THE TABLE"): standings in the match, ready states in the lobby.
+var leaderboard: PlayerList
 var last_call_banner: Label
 var pops: Control
 ## Item activation banner (centre-top).
@@ -67,6 +67,8 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	state.money_changed.connect(_on_money_changed)
 	state.feed_message.connect(_on_feed)
 	state.phase_changed.connect(_on_phase)
+	if leaderboard != null:
+		leaderboard.bind(state, local_id)
 	if not state.players_changed.is_connected(_refresh_items):
 		state.players_changed.connect(_refresh_items)
 	_displayed_money = float(state.balance(local_id))
@@ -124,9 +126,7 @@ func toast(text: String, seconds: float = 2.0) -> void:
 
 
 func show_leaderboard(shown: bool) -> void:
-	leaderboard.visible = shown
-	if shown:
-		_fill_leaderboard()
+	leaderboard.show_list(shown)
 
 
 func set_crosshair_visible(v: bool) -> void:
@@ -173,8 +173,6 @@ func _process(delta: float) -> void:
 		last_call_banner.visible = true
 		last_call_banner.text = "LAST CALL  ×%.1f PAYOUTS  %02d:%02d" % [Registry.balance.last_call_multiplier, t / 60, t % 60]
 		timer_label.add_theme_color_override(&"font_color", Palette.LOSS_RED)
-	if leaderboard.visible:
-		_fill_leaderboard()
 	_update_countdowns()
 
 
@@ -276,22 +274,6 @@ func _on_phase(phase: Phase.Id) -> void:
 
 func _refresh_static() -> void:
 	_refresh_items()
-
-
-func _fill_leaderboard() -> void:
-	for c: Node in leaderboard_rows.get_children():
-		c.free()
-	var ids: Array = state.balances.keys()
-	ids.sort_custom(func(a: int, b: int) -> bool: return state.balance(a) > state.balance(b))
-	var rank: int = 0
-	for id: int in ids:
-		rank += 1
-		var row := Label.new()
-		row.text = "%s  %-14s  $%s" % [_ordinal(rank), state.player_name(id), _thousands(state.balance(id))]
-		row.add_theme_font_size_override(&"font_size", 28)
-		if id == local_id:
-			row.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-		leaderboard_rows.add_child(row)
 
 
 func _build() -> void:
@@ -419,28 +401,10 @@ func _build() -> void:
 	item_banner = _centre_label(-200, 48, Palette.VIP_GOLD)
 	item_banner.theme_type_variation = &"TitleLabel"
 	item_banner.visible = false
-	# Leaderboard (hold Tab).
-	leaderboard = PanelContainer.new()
-	leaderboard.set_anchors_preset(Control.PRESET_CENTER)
-	leaderboard.anchor_left = 0.5
-	leaderboard.anchor_right = 0.5
-	leaderboard.anchor_top = 0.5
-	leaderboard.anchor_bottom = 0.5
-	leaderboard.offset_left = -260
-	leaderboard.offset_right = 260
-	leaderboard.offset_top = -200
-	leaderboard.offset_bottom = 200
-	leaderboard.visible = false
+	# Player list (hold Tab).
+	leaderboard = PlayerList.new()
+	leaderboard.name = "PlayerList"
 	add_child(leaderboard)
-	var lb := VBoxContainer.new()
-	leaderboard.add_child(lb)
-	var title := Label.new()
-	title.theme_type_variation = &"HeadingLabel"
-	title.text = "STANDINGS"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lb.add_child(title)
-	leaderboard_rows = VBoxContainer.new()
-	lb.add_child(leaderboard_rows)
 	_outline_labels(self)
 
 
