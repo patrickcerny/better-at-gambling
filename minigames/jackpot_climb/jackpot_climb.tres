@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"jackpot_climb"
 display_name = "Jackpot Climb"
-rules_text = "Jump from chip stack to chip stack up to the JACKPOT sign. E swings your bat to knock climbers off their ledge. First to the top wins, the rest rank by height."
+rules_text = "Hop up the chip stacks to the JACKPOT sign. Each giant chip tier has a checkpoint flag: fall off and you come back at your last flag. Round every tier pick the steady side or the bold side with a few long jumps. E swings your bat to knock climbers off. First to the top wins, the rest rank by height."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2
