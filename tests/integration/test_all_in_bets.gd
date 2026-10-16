@@ -184,3 +184,29 @@ func test_below_min_request_is_refused() -> void:
 	_sit(sid)
 	var lim: Vector2i = (fx.server.stations.logics[sid] as BlackjackLogic).limits()
 	assert_eq(_bet(sid, {"amount": lim.x - 1})["error"], &"below_min")
+
+
+
+func test_craps() -> void:
+	var sid: StringName = &"craps_1"
+	_sit(sid)
+	var logic: CrapsLogic = fx.server.stations.logics[sid]
+	var lim: Vector2i = logic.limits()
+	_set_money(lim.x - 1)
+	assert_eq(_bet(sid, {"type": &"pass", "amount": lim.x * 5})["error"], &"insufficient_funds")
+	_set_money(lim.x * 3)
+	assert_eq(_bet(sid, {"type": &"pass", "amount": lim.x - 1})["error"], &"below_min", "under the minimum is refused")
+	_check_all_in(sid, {"type": &"pass", "amount": lim.x * 5}, lim.x + 3)
+	assert_eq(logic.player_total(p), lim.x + 3, "the pass line holds the all-in stake")
+
+
+func test_craps_over_the_felt_total_bets_what_is_left() -> void:
+	var sid: StringName = &"craps_1"
+	_sit(sid)
+	var lim: Vector2i = (fx.server.stations.logics[sid] as CrapsLogic).limits()
+	_set_money(lim.y * 2)
+	assert_true(_bet(sid, {"type": &"pass", "amount": lim.y - lim.x * 2})["ok"])
+	fx.events.clear()
+	assert_true(_bet(sid, {"type": &"field", "amount": lim.y})["ok"], "over the max on the felt: what is left goes in")
+	assert_eq(int(_last_bet_placed()["amount"]), lim.x * 2)
+	assert_eq(_bet(sid, {"type": &"any_seven", "amount": lim.x})["error"], &"above_max", "a full felt refuses as before")

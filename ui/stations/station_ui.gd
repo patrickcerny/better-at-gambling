@@ -272,6 +272,16 @@ static func rejection_text(error: StringName) -> String:
 			return "One horse per race"
 		&"invalid_horse":
 			return "Pick a horse"
+		&"point_is_on":
+			return "Line bets go down on the come-out roll"
+		&"one_side_only":
+			return "Pass or Don't Pass, not both"
+		&"not_shooter":
+			return "You're not the shooter"
+		&"no_bets":
+			return "Someone has to bet first"
+		&"wait_for_bets":
+			return "Give the table a moment to bet"
 		&"invalid_symbol":
 			return "Pick a symbol"
 		&"no_chance":

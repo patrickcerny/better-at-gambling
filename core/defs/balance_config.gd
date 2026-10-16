@@ -64,6 +64,32 @@ extends Resource
 ## Seconds the result stays up after the winner crosses the line (the rest run out meanwhile).
 @export var horse_result_time: float = 5.0
 
+@export_group("Craps")
+@export var craps_min_bet: int = 10
+## Most one player may have on the craps felt at once (line bets riding a point included).
+@export var craps_max_total: int = 200
+## Profit ratios actually paid. The felt says Pass / Don't Pass 1:1, Field 1:1 (2 and 12 2:1) and
+## Any Seven 4:1; the one-roll bets pay a little better (like the horse race's 1:4), so with the
+## favour below every bet returns 100.5–102% to a player alone at the table (tests/sim).
+@export var craps_line_ratio: float = 1.0
+@export var craps_field_ratio: float = 1.08
+@export var craps_field_double_ratio: float = 2.1
+@export var craps_any_seven_ratio: float = 4.8
+## Chance that a roll on which no bet at the table wins (and one would lose) is redrawn once
+## (Patrick, 0.9.6: "always favoured to win for you, by a bit, like the other games, but dont
+## show it").
+@export var craps_favour: float = 0.055
+## Seconds from the first chip on the felt (or from a roll while a point is on) until the stickman
+## throws for a shooter who has not pressed SHOOT.
+@export var craps_shoot_time: float = 12.0
+## Seconds a betting window stays open before the shooter may throw (everyone gets a chance to bet).
+@export var craps_shoot_lock: float = 2.0
+## Seconds from the throw until the dice rest and the bets settle (the client throw rests by
+## `CrapsDice.REST_TIME`, inside this).
+@export var craps_throw_time: float = 2.6
+## Seconds the roll stays up before the next betting window.
+@export var craps_result_time: float = 2.0
+
 @export_group("Wheel of Fortune")
 @export var wheel_min_bet: int = 10
 ## Most one player may stake on one spin, over every symbol together.
