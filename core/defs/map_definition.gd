@@ -53,6 +53,16 @@ extends Resource
 @export var floor_rects: Dictionary = {}
 @export var floor_areas: Array = []
 @export var floor_keep_out: Array = []
+## For the walkway check (measured by the map scene): game id → its chairs (Vector2 x, z) and
+## what of it the navmesh walks round (Rect2s), both in its own frame; footprint → a closed spot's
+## dressing the same way; everything else on the map the navmesh walks round (world Rect2s);
+## where people come into each area, and points the guards and waiter walk to.
+@export var floor_seats: Dictionary = {}
+@export var floor_obstacles: Dictionary = {}
+@export var floor_closed_obstacles: Dictionary = {}
+@export var floor_blockers: Array = []
+@export var floor_entries: Array = []
+@export var floor_walk_points: Array = []
 
 
 ## Entrance-hall spot for a player id (Vector3.INF when the map has none).

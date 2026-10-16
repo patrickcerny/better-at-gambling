@@ -63,14 +63,25 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   or the match end: a won pot is cashed out, a fresh ante takes the likelier side. A minigame gives
   fresh antes back and banks won pots. House rule as at the horse race (0.9.6): a call that would
   lose has its card redrawn once with 15% chance, then luck rerolls it; never shown. $10–$100.
+- **Scratch Cards** (kiosk in the start room, west wall): one player at the counter at a time. Buy a
+  $10 / $25 / $50 card (× limits); the server draws the whole card at purchase and sends it in one
+  `scratch_card` event; the panel shows it big under foil, scratched with the mouse or REVEAL ALL,
+  and it pays (`action reveal`) once bare, on walking away, or after 60 s. 3×3 symbols: three in a
+  row/column/diagonal pays that symbol's printed prize, a $ anywhere the instant prize. Prize tables
+  (× price, cherry/lemon/bell/clover/seven/diamond, then $): $10 1/2/3/5/15/50, $0.5; $25
+  1/2/4/8/25/100, $0.4; $50 1/3/5/10/40/200, $0.5. House rule: a blank is drawn again once with 25%
+  chance (`scratch_favour`), then luck rerolls the card; RTP 101.2% per tier. All-in: a card the
+  balance can't cover sells for the whole balance (as long as that covers the $10 card) and its
+  prizes print on that stake.
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
 **Floor plan** ([`FLOOR_PLAN.md`](FLOOR_PLAN.md)): in online matches every casino round starts on a
-new floor. The floor is a set of fixed spots (table-, slot- and Plinko-sized, on the floor and in
-the VIP lounge); when the lobby opens and at every regroup (everyone shut in the entrance hall)
-each spot is redrawn from the match seed: a game of its size that fits there (measured floor,
-keep-outs, a walkway to its neighbours) by weight, or closed tonight (velvet
+new floor. The floor is a set of fixed spots (table-, slot- and Plinko-sized and the scratch card
+kiosk, on the floor, in the VIP lounge and the entrance hall); when the lobby opens and at every
+regroup (everyone shut in the entrance hall) each spot is redrawn from the match seed: a game of
+its size that fits there (measured floor, keep-outs, a gap to its neighbours, every chair still
+walkable for the guards and waiter) by weight, or closed tonight (velvet
 rope and a CLOSED TONIGHT sign, or a plant). Nothing is guaranteed; at least 60% of each area is
 open and at most 2 tables of one game per area (soft). The Race Hall, the waiting room, Odd Jobs,
 the shop and the jail never move. A TONIGHT'S FLOOR board in the entrance hall lists the games and
@@ -153,6 +164,7 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | wheel_result | — (the clicker slows down); reel_stop, low, as the wheel rests on the segment |
 | hilo_dealt / hilo_call | card_deal as the card slides out of the deck onto the seat's spot (TableCards) |
 | hilo_reshuffle | — (the deck on the table is full again) |
+| scratch_card | card_deal as the card slides out of the kiosk's dispenser; scratching plays the scratch rasp per stroke (pitch varied) and a higher one as each cell's foil pops off |
 | jackpot_won | jackpot_siren (bell arpeggio, coin shower, held chord) |
 | last_call | last_call_bell (brass hand bell ×3) + Last Call music |
 | minigame_started | whoosh + quiz music |

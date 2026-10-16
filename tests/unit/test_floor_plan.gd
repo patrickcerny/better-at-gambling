@@ -33,11 +33,14 @@ func test_the_spots_come_from_the_map_and_the_race_hall_stays_fixed() -> void:
 		assert_false(ids.has(a["id"]), "spot ids are unique")
 		ids[a["id"]] = true
 		assert_ne(StringName(a["default"]), &"horse_race")
-		assert_true(StringName(a["footprint"]) in [&"table", &"cabinet", &"big"])
+		assert_true(StringName(a["footprint"]) in [&"table", &"cabinet", &"big", &"kiosk"])
 	assert_eq(LuckyLounge.fixed_games(), [&"horse_race"])
 	assert_false(pool.get(&"table", {}).has(&"horse_race"), "the horse race is never drawn")
 	assert_true(pool[&"cabinet"].has(&"slots"))
 	assert_true(pool[&"big"].has(&"plinko"))
+	assert_eq(pool[&"kiosk"].keys(), [&"scratch"], "the scratch counter has a class of its own")
+	for g: StringName in [&"wheel", &"craps", &"hilo"]:
+		assert_true(pool[&"table"].has(g), "%s is drawn" % g)
 
 
 func test_the_full_floor_is_the_map_as_built() -> void:
@@ -197,3 +200,29 @@ func test_the_geometry_keeps_big_games_off_tight_spots_and_apart() -> void:
 		if plan[&"t1"] == &"wide" or plan[&"t2"] == &"wide":
 			wide_seen += 1
 	assert_gt(wide_seen, 0, "the wide game still gets drawn where it fits")
+
+
+func test_the_walkway_check_finds_a_chair_walled_off() -> void:
+	# A 10 x 10 m room entered at the bottom, a wall across the middle with an opening; one game
+	# (a 1 x 1 m block, its chair 1 m above it) behind the wall. A 0.6 m opening is too narrow for
+	# the navmesh's 0.5 m radius, a 3 m one is fine.
+	var spot: Dictionary = {"id": &"t1", "footprint": &"table", "vip": false, "default": &"box", "pos": Vector3(5, 0, 2), "yaw": 0.0}
+	var by_id: Dictionary = {&"t1": spot}
+	for opening: float in [0.6, 3.0]:
+		var geo := FloorGeometry.new()
+		geo.rects = {&"box": Rect2(-0.5, -0.5, 1, 2)}
+		geo.seats = {&"box": [Vector2(0, 1.0)]}
+		geo.obstacles = {&"box": [Rect2(-0.5, -0.5, 1, 1)]}
+		geo.areas.assign([Rect2(0, 0, 10, 10)])
+		geo.entries.assign([Vector2(5, 9)])
+		var half: float = opening * 0.5
+		geo.blockers.assign([
+			Rect2(-1, -1, 12, 1), Rect2(-1, 10, 12, 1), Rect2(-1, 0, 1, 10), Rect2(10, 0, 1, 10),
+			Rect2(0, 5, 5 - half, 0.2), Rect2(5 + half, 5, 5 - half, 0.2),
+		])
+		assert_true(geo.can_walk())
+		var cut: Array[StringName] = geo.unreachable({&"t1": &"box"}, by_id)
+		if opening < 1.0:
+			assert_eq(cut, [&"t1"] as Array[StringName], "a 0.6 m gap walls the chair off")
+		else:
+			assert_true(cut.is_empty(), "a 3 m gap lets people through")

@@ -22,9 +22,9 @@ extends Resource
 ## the pool with `default_weight` unless `weights` (game id → weight) says otherwise; 0 = never.
 @export var default_weight: float = 1.0
 @export var weights: Dictionary = {}
-## Walkway kept between two drawn tables, metres (a game only goes on a spot where it fits the
-## room and keeps this gap to its neighbours: `FloorGeometry`; chairs are already in the rects, so
-## this is the space between two chairs. 0.35 is the tightest pair on the full floor: craps and Hi-Lo).
+## Least space between two drawn games, chair to chair, metres (`FloorGeometry`; 0.35 lets the
+## full floor's tightest pair, craps and Hi-Lo at 0.39 m, stand). That every chair can still be
+## walked to is checked over the whole floor on top of this.
 @export var gap: float = 0.35
 
 

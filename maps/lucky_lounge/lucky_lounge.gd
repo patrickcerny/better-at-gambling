@@ -28,6 +28,7 @@ const STATIONS: Dictionary = {
 	&"horse_race_1": [&"horse_race", Vector3(29.0, 0, -19.0), 0],
 	&"hilo_1": [&"hilo", Vector3(18.6, 0, -4.8), 0],
 	&"craps_1": [&"craps", Vector3(14, 0, -6), 0],
+	&"scratch_1": [&"scratch", Vector3(-19, 0, 10), 90],
 	&"roulette_1": [&"roulette", Vector3(-6, 0, -3), 0], &"roulette_2": [&"roulette", Vector3(6, 0, -3), 180],
 	&"blackjack_1": [&"blackjack", Vector3(-16, 0, 4), 0], &"blackjack_2": [&"blackjack", Vector3(-9, 0, 4), 0],
 	&"blackjack_3": [&"blackjack", Vector3(-2, 0, 4), 0],
@@ -170,24 +171,34 @@ const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 const FLOOR_AREAS: Array[Rect2] = [
 	Rect2(-21.75, -15.75, 43.5, 23.9), Rect2(-8.75, -25.75, 17.5, 9.5), Rect2(-21.75, 8.65, 10.0, 6.0),
 ]
-## What a drawn table keeps clear of: pillars, the bar and its stools, the megaphone stand, the
-## Gift Shop, the Odd Jobs cabinet, the jail's bars and drop-off, the Race Hall archway, the lobby
-## and VIP doorways, plants, the VIP lounge's statues, the settings tablet, and a square round every
-## guard and waiter route point so the patrols stay walkable.
-const FLOOR_KEEP_OUT: Array[Rect2] = [
-	Rect2(-10.2, -1.6, 1.2, 1.2), Rect2(9.0, -1.6, 1.2, 1.2),
+## What a drawn table keeps clear of (`FloorGeometry`). Solid things that stand on the floor:
+## pillars, the bar and its stools, the megaphone stand, the Gift Shop, the Odd Jobs cabinet, a
+## plant, the VIP lounge's gold statues and marble busts, the settings tablet, the hall plant.
+const FLOOR_SOLIDS: Array[Rect2] = [
+	Rect2(-10.2, -1.6, 1.2, 1.2), Rect2(9.0, -1.6, 1.2, 1.2), Rect2(-20.6, -1.6, 1.2, 1.2),
 	Rect2(14.0, 3.1, 7.75, 5.0), Rect2(15.2, 1.7, 1.6, 1.6),
 	Rect2(18.9, 0.1, 2.85, 3.6), Rect2(19.6, -1.7, 2.15, 1.5), Rect2(20.6, -3.0, 1.15, 1.0),
-	Rect2(20.2, -8.4, 1.55, 1.7), Rect2(19.6, -15.75, 2.15, 5.0),
-	Rect2(-3.0, 6.5, 6.0, 1.65), Rect2(-2.7, -16.0, 5.4, 1.6), Rect2(-20.6, -1.6, 1.2, 1.2),
 	Rect2(-8.75, -17.8, 1.7, 1.0), Rect2(7.05, -17.8, 1.7, 1.0), Rect2(-8.75, -21.5, 1.0, 1.0), Rect2(7.75, -21.5, 1.0, 1.0),
-	Rect2(-2.4, -17.6, 4.8, 1.6), Rect2(-11.4, 9.1, 1.6, 1.6), Rect2(-21.75, 11.3, 1.4, 1.4),
+	Rect2(-11.4, 9.1, 1.6, 1.6), Rect2(-21.75, 11.3, 1.4, 1.4),
+]
+## Floor that has to stay open: the jail door, the Race Hall archway, the lobby and VIP doorways
+## (both sides), and a square round every guard and waiter route point.
+const FLOOR_CLEAR: Array[Rect2] = [
+	Rect2(20.2, -8.4, 1.55, 1.7), Rect2(19.6, -15.75, 2.15, 5.0),
+	Rect2(-3.0, 6.5, 6.0, 1.65), Rect2(-2.7, -16.0, 5.4, 1.6), Rect2(-2.4, -17.6, 4.8, 1.6),
 	# Patrol route points (guards, then the waiter).
 	Rect2(-12.45, -0.45, 0.9, 0.9), Rect2(-12.45, -11.45, 0.9, 0.9), Rect2(-0.45, -11.45, 0.9, 0.9), Rect2(-0.45, -0.45, 0.9, 0.9),
 	Rect2(11.55, 0.05, 0.9, 0.9), Rect2(17.55, -8.45, 0.9, 0.9), Rect2(7.55, -8.45, 0.9, 0.9), Rect2(1.55, 6.55, 0.9, 0.9),
 	Rect2(13.55, 1.15, 0.9, 0.9), Rect2(2.05, 1.75, 0.9, 0.9), Rect2(-5.45, 0.15, 0.9, 0.9), Rect2(-12.95, -5.05, 0.9, 0.9),
 	Rect2(-1.45, -10.95, 0.9, 0.9), Rect2(8.55, -9.45, 0.9, 0.9), Rect2(12.05, -2.45, 0.9, 0.9),
 ]
+## The navmesh's agent (`_nav_template`; the floor plan's walkway check uses the same).
+const NAV_RADIUS: float = 0.5
+const NAV_HEIGHT: float = 2.0
+const NAV_CLIMB: float = 0.25
+## Where people come into each floor area (x, z): inside the lobby doors, inside the VIP door,
+## and the open side of the entrance hall's west end. Every drawn chair must be walkable from here.
+const FLOOR_ENTRIES: Array[Vector2] = [Vector2(0.0, 7.2), Vector2(0.0, -17.0), Vector2(-12.4, 11.6)]
 
 var stations: Dictionary[StringName, StationBase] = {}
 ## Per ready pedestal: the name on its brass plate, the top slab (never changes), and the warm
@@ -1291,14 +1302,27 @@ static func describe_floor(def: MapDefinition) -> void:
 			prefixes[game] = stem
 	def.floor_prefixes = prefixes
 	def.floor_areas = FLOOR_AREAS.duplicate()
-	def.floor_keep_out = FLOOR_KEEP_OUT.duplicate()
+	def.floor_keep_out = FLOOR_SOLIDS + FLOOR_CLEAR
+	def.floor_entries = FLOOR_ENTRIES.duplicate()
+	var walk: Array[Vector2] = []
+	for p: Vector3 in CasinoFloor.WAITER_ROUTE:
+		walk.append(Vector2(p.x, p.z))
+	for route: Array in GUARD_ROUTES:
+		for p: Vector3 in route:
+			walk.append(Vector2(p.x, p.z))
+	def.floor_walk_points = walk
 
 
-## Measures how much floor every drawable game takes (table, chairs and dealer, in its own frame)
-## by building its station once out of sight: `MapDefinition.floor_rects`. The server's draw then
-## only puts a game where it fits (`FloorGeometry`). Needs the map in the tree.
+## Measures the floor for the draw (`FloorGeometry`) by building every drawable game's station
+## once out of sight: how much floor it takes (table, chairs and dealer: `floor_rects`), where its
+## chairs are, and what of it the navmesh walks round (`floor_obstacles`); the same for a closed
+## spot's rope posts or plant pot; and everything else on the map the navmesh walks round
+## (`floor_blockers`: walls, bar, props, the fixed stations). Needs the map in the tree, on its
+## full floor.
 func measure_floor(def: MapDefinition) -> void:
 	var rects: Dictionary = {}
+	var seats: Dictionary = {}
+	var obstacles: Dictionary = {}
 	for game: StringName in Registry.games:
 		if footprint_of(game) == &"fixed":
 			continue
@@ -1306,9 +1330,57 @@ func measure_floor(def: MapDefinition) -> void:
 		st.position = Vector3(0, -40.0, 0)  # under the floor, for one frame at most
 		add_child(st)
 		rects[game] = station_rect(st)
+		var local: Array[Vector2] = []
+		var inv: Transform3D = st.global_transform.affine_inverse()
+		for i: int in st.seats.size():
+			var p: Vector3 = inv * st.seat_position(i)
+			local.append(Vector2(p.x, p.z))
+		seats[game] = local
+		obstacles[game] = nav_obstacles(st, inv, [])
 		remove_child(st)
 		st.free()
+	var closed: Dictionary = {}
+	var holder := Node3D.new()
+	holder.position = Vector3(0, -40.0, 0)
+	add_child(holder)
+	for fp: StringName in [&"table", &"cabinet", &"big", &"kiosk"]:
+		var spot: Node3D = FloorProps.closed_spot(holder, {"id": fp, "footprint": fp, "pos": Vector3.ZERO, "yaw": 0.0})
+		closed[fp] = nav_obstacles(spot, spot.global_transform.affine_inverse(), [])
+	remove_child(holder)
+	holder.free()
+	var skip: Array[Node] = [closed_spots]
+	for sid: StringName in stations:
+		if stations[sid].has_meta(&"anchor"):
+			skip.append(stations[sid])
 	def.floor_rects = rects
+	def.floor_seats = seats
+	def.floor_obstacles = obstacles
+	def.floor_closed_obstacles = closed
+	def.floor_blockers = nav_obstacles(self, Transform3D.IDENTITY, skip)
+
+
+## What under `root` the navmesh walks round, as floor rects in the frame `inv` maps into: the
+## static colliders it bakes from (group `navsource`, layer 1) that stand higher than it climbs and
+## lower than an agent's head, skipping the subtrees in `skip`.
+static func nav_obstacles(root: Node, inv: Transform3D, skip: Array[Node]) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for body: Node in root.find_children("*", "StaticBody3D", true, false):
+		var sb: StaticBody3D = body as StaticBody3D
+		if not sb.is_in_group(&"navsource") or (sb.collision_layer & 1) == 0:
+			continue
+		var skipped: bool = false
+		for s: Node in skip:
+			if s == sb or s.is_ancestor_of(sb):
+				skipped = true
+		if skipped:
+			continue
+		for cs: Node in sb.get_children():
+			if not cs is CollisionShape3D or (cs as CollisionShape3D).shape == null or (cs as CollisionShape3D).disabled:
+				continue
+			var b: AABB = inv * (cs as CollisionShape3D).global_transform * (cs as CollisionShape3D).shape.get_debug_mesh().get_aabb()
+			if b.end.y > NAV_CLIMB and b.position.y < NAV_HEIGHT:
+				out.append(Rect2(b.position.x, b.position.z, b.size.x, b.size.z))
+	return out
 
 
 ## A station's floor in its own frame (x, z): its static colliders, its chairs and its dealer.
@@ -1418,6 +1490,8 @@ func _make_station(kind: StringName) -> StationBase:
 			return WheelStation.new()
 		&"hilo":
 			return HiLoStation.new()
+		&"scratch":
+			return ScratchStation.new()
 	# A newer game can bring its own station scene (`GameDefinition.station_scene`).
 	var def: GameDefinition = Registry.games.get(kind, null)
 	if def != null and def.station_scene != null:
@@ -1513,9 +1587,9 @@ func _build_navmesh() -> void:
 ## copy without them).
 func _nav_template() -> NavigationMesh:
 	var nm := NavigationMesh.new()
-	nm.agent_radius = 0.5
-	nm.agent_height = 2.0
-	nm.agent_max_climb = 0.25  # one cell_height: stools (0.5 m) are obstacles, not steps
+	nm.agent_radius = NAV_RADIUS
+	nm.agent_height = NAV_HEIGHT
+	nm.agent_max_climb = NAV_CLIMB  # one cell_height: stools (0.5 m) are obstacles, not steps
 	nm.agent_max_slope = 40.0
 	nm.cell_size = 0.25
 	nm.cell_height = 0.25

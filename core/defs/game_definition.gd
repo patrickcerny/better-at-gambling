@@ -10,7 +10,8 @@ extends Resource
 @export var ui_scene: PackedScene
 @export var rug_color: Color = Color.WHITE
 ## Where the game stands on the casino floor (docs/FLOOR_PLAN.md): &"table" (blackjack- or
-## roulette-sized, the default), &"cabinet" (slot-machine-sized), &"big" (Plinko-sized) or
+## roulette-sized, the default), &"cabinet" (slot-machine-sized), &"big" (Plinko-sized), any other
+## name for a class of its own (&"kiosk": the scratch card counter, only on its own spot) or
 ## &"fixed" (never drawn: it has its own place, like the horse race in the Race Hall). Each round
 ## the floor plan puts a game only on spots of its own size.
 @export var floor_footprint: StringName = &"table"

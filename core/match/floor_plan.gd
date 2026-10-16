@@ -41,8 +41,10 @@ static func full(anchors: Array) -> Dictionary:
 ## area (casino floor, VIP lounge): each spot is closed with `empty_chance`, else gets a game of
 ## its size by weight, at most `max_per_type` of one game on `capped_footprints` spots; then
 ## closed spots reopen until `min_filled` of the area has a game (the cap gives way last). With
-## `geo` (the map's measurements) a game only goes where it fits and keeps the walkway to the
-## games already drawn next to it; the minimum fill never overrides that.
+## `geo` (the map's measurements) a game only goes where it fits and keeps the gap to the games
+## already drawn next to it, and if the drawn floor cuts a chair or a patrol point off, that game
+## closes and the area is topped up again with games that don't; the minimum fill never
+## overrides the room.
 static func draw(anchors: Array, pool: Dictionary, cfg: FloorPlanConfig, rng: SeededRng, geo: FloorGeometry = null) -> Dictionary:
 	var out: Dictionary = {}
 	var by_id: Dictionary = {}
@@ -55,7 +57,48 @@ static func draw(anchors: Array, pool: Dictionary, cfg: FloorPlanConfig, rng: Se
 			if bool(a.get("vip", false)) == vip:
 				area.append(a)
 		_draw_area(area, pool, cfg, rng, out, geo, by_id)
+	if geo != null and geo.can_walk():
+		_keep_walkable(anchors, pool, cfg, rng, out, geo, by_id)
 	return out
+
+
+## Closes games the walkway check cuts off, then reopens closed spots towards `min_filled` with
+## games that keep everything walkable.
+static func _keep_walkable(anchors: Array, pool: Dictionary, cfg: FloorPlanConfig, rng: SeededRng, out: Dictionary, geo: FloorGeometry, by_id: Dictionary) -> void:
+	for _round: int in 8:
+		var bad: Array[StringName] = geo.unreachable(out, by_id)
+		if bad.is_empty():
+			break
+		for id: StringName in bad:
+			out[id] = CLOSED
+	for vip: bool in [false, true]:
+		var area: Array[Dictionary] = []
+		var counts: Dictionary = {}
+		for a: Dictionary in anchors:
+			if bool(a.get("vip", false)) == vip:
+				area.append(a)
+				var g: StringName = StringName(out[a["id"]])
+				if g != CLOSED:
+					counts[g] = int(counts.get(g, 0)) + 1
+		var need: int = ceili(area.size() * cfg.min_filled) - filled(area, out)
+		if need <= 0:
+			continue
+		var order: Array = range(area.size())
+		rng.shuffle(order)
+		for capped: bool in [true, false]:
+			for i: Variant in order:
+				var a: Dictionary = area[int(i)]
+				if need <= 0 or out[a["id"]] != CLOSED:
+					continue
+				var game: StringName = _pick(a, pool, cfg, counts, capped, rng, geo, out, by_id)
+				if game == CLOSED:
+					continue
+				out[a["id"]] = game
+				if not geo.unreachable(out, by_id).is_empty():
+					out[a["id"]] = CLOSED
+					continue
+				counts[game] = int(counts.get(game, 0)) + 1
+				need -= 1
 
 
 static func _draw_area(area: Array[Dictionary], pool: Dictionary, cfg: FloorPlanConfig, rng: SeededRng, out: Dictionary, geo: FloorGeometry, by_id: Dictionary) -> void:

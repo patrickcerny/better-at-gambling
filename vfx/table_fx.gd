@@ -120,6 +120,11 @@ func on_event(ev: Dictionary) -> void:
 		&"bj_action":
 			if StringName(ev.get("action", &"")) == &"split":
 				_on_bj_split(ev)
+		&"scratch_card":
+			# A card was bought at the kiosk: it slides out of the dispenser onto the counter.
+			var sc: ScratchStation = stations.get(StringName(ev["station"]), null) as ScratchStation
+			if sc != null:
+				sc.dispense(int(ev.get("tier", 0)), int(ev.get("player", -1)) == local_id)
 		&"round_result":
 			_on_result(ev)
 		&"bets_refunded":
@@ -403,6 +408,8 @@ func _fx_point(st: StationBase, pid: int) -> Vector3:
 			return st.to_global(Vector3(0, 1.8, 0.55))
 		if st is PlinkoStation:
 			return st.to_global(Vector3(0, 1.5, 0.9))
+		if st is ScratchStation:
+			return st.to_global(ScratchStation.CARD_SPOT + Vector3(0, 0.45, 0.25))
 		var seat: int = _seat_index(st, pid)
 		return st.to_global(_seat_edge(st, seat).lerp(_bet_spot(st, seat, &"", 0), 0.5) + Vector3(0, 0.35, 0))
 	if a != null:

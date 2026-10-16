@@ -136,7 +136,7 @@ func _check_no_overlaps() -> void:
 func _check_navmesh() -> void:
 	var nav: RID = scene.map.nav_region.get_navigation_map()
 	var from: Vector3 = Vector3(0, 0, 6.5)
-	for sid: StringName in scene.server.floor_plan:
+	for sid: StringName in scene.map.floor_plan:
 		var st: StationBase = scene.map.stations[sid]
 		var target: Vector3 = st.seat_position(0)
 		var near: Vector3 = NavigationServer3D.map_get_closest_point(nav, target)
@@ -144,7 +144,7 @@ func _check_navmesh() -> void:
 		var path: PackedVector3Array = NavigationServer3D.map_get_path(nav, from, near, true)
 		assert_gt(path.size(), 1, "%s: a path to it" % sid)
 		if path.size() > 0:
-			assert_lt(path[path.size() - 1].distance_to(near), 0.3, "%s: the path gets there" % sid)
+			assert_lt(path[path.size() - 1].distance_to(near), 0.3, "%s: the path gets there (%s at %s, seat %s, path ends %s)" % [sid, st.get_meta(&"anchor", &""), st.global_position, near, path[path.size() - 1]])
 	var points: Array[Vector3] = []
 	points.append_array(CasinoFloor.WAITER_ROUTE)
 	for route: Array in LuckyLounge.GUARD_ROUTES:
@@ -194,6 +194,11 @@ func test_every_game_fits_every_spot_the_draw_allows_it_on() -> void:
 	var pool: Dictionary = FloorPlan.pool_of(Registry.game_footprints(), Registry.floor_plan)
 	var anchors: Array = def.floor_anchors
 	var full: Dictionary = FloorPlan.full(anchors)
+	var empty: Array[StringName] = []
+	assert_eq(geo.unreachable(full, _by_id(anchors)), empty, "the full floor passes the walkway check")
+	var t0: int = Time.get_ticks_usec()
+	FloorPlan.draw(anchors, pool, Registry.floor_plan, SeededRng.new(5), geo)
+	gut.p("one draw with the walkway check: %.1f ms" % ((Time.get_ticks_usec() - t0) / 1000.0))
 	for a: Dictionary in anchors:
 		assert_true(geo.fits(a, StringName(a["default"])), "%s fits spot %s %s" % [a["default"], a["id"], geo.why_not(a, StringName(a["default"]))])
 		assert_true(geo.clear_of(a, StringName(a["default"]), full, _by_id(anchors)), "the full floor keeps the walkway at %s (%s %s)" % [a["id"], a["default"], geo.world_rect(a, StringName(a["default"]))])
@@ -217,6 +222,8 @@ func test_every_game_fits_every_spot_the_draw_allows_it_on() -> void:
 					half[a["id"]] = plan[a["id"]] if plan[a["id"]] != FloorPlan.CLOSED and n % 2 == parity else FloorPlan.CLOSED
 					if plan[a["id"]] != FloorPlan.CLOSED:
 						n += 1
+				for id: StringName in geo.unreachable(half, _by_id(anchors)):
+					half[id] = FloorPlan.CLOSED  # cut off: the draw closes it (`FloorPlan._keep_walkable`)
 				var wire: Dictionary = FloorPlan.station_ids(anchors, half, def.floor_prefixes)
 				for sid: Variant in wire.keys():
 					var a: Dictionary = def.floor_anchor(StringName(wire[sid][1]))
@@ -224,22 +231,33 @@ func test_every_game_fits_every_spot_the_draw_allows_it_on() -> void:
 					if not geo.clear_of(a, StringName(wire[sid][0]), others, _by_id(anchors)):
 						wire.erase(sid)  # two of a kind side by side: the draw never does that
 				scene.map.apply_floor_plan(wire)
-				await wait_physics_frames(3)
+				await _wait_navmesh()
 				_check_no_overlaps()
+				_check_navmesh()
 				layouts += 1
 	assert_gt(layouts, 4)
 
 
+## Whole drawn floors (the walkway check closing what it cuts off) against the real navmesh: no
+## overlaps, every first chair and patrol point reachable. Stressed by hand with 40 draws on two
+## more seeds (1234, 777) when the check was tuned.
 func test_drawn_floors_keep_the_walkways() -> void:
 	var def: MapDefinition = scene.server.map_def
 	var geo: FloorGeometry = FloorGeometry.of_map(def, Registry.floor_plan.gap)
 	var pool: Dictionary = FloorPlan.pool_of(Registry.game_footprints(), Registry.floor_plan)
 	var rng := SeededRng.new(99)
-	for i: int in 6:
+	var short: int = 0
+	for i: int in 20:
 		var plan: Dictionary = FloorPlan.draw(def.floor_anchors, pool, Registry.floor_plan, rng, geo)
+		for vip: bool in [false, true]:
+			var area: Array = def.floor_anchors.filter(func(a: Dictionary) -> bool: return bool(a["vip"]) == vip)
+			if FloorPlan.filled(area, plan) < ceili(area.size() * Registry.floor_plan.min_filled):
+				short += 1
 		scene.map.apply_floor_plan(FloorPlan.station_ids(def.floor_anchors, plan, def.floor_prefixes))
-		await wait_physics_frames(3)
+		await _wait_navmesh()
 		_check_no_overlaps()
+		_check_navmesh()
+	assert_lt(short, 4, "the room rarely stops an area reaching its minimum fill (%d of 40)" % short)
 
 
 func _by_id(anchors: Array) -> Dictionary:
