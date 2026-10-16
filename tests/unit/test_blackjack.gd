@@ -206,12 +206,13 @@ func test_split_takes_equal_stake_and_settles_each_hand() -> void:
 	assert_true(bj.player_action(1, &"split")["ok"])
 	assert_eq(fx.economy.balance(1), 800)
 	assert_eq(HandEval.total(bj.hands[1]["cards"]), 11)
-	assert_eq(HandEval.total(bj.hands[1]["split"]["cards"]), 18)
+	assert_eq(HandEval.total(bj.hands[1]["split"]["cards"]), 8, "the second hand waits for its turn")
 	assert_eq(bj.player_action(1, &"split")["error"], &"cannot_split", "one split per round")
 	# Double after split on the first hand (11 + 10 = 21), then the second hand stands on 18.
 	assert_true(bj.player_action(1, &"double")["ok"])
 	assert_eq(fx.economy.balance(1), 700)
 	assert_eq(int(bj.hands[1]["active"]), 1)
+	assert_eq(HandEval.total(bj.hands[1]["split"]["cards"]), 18, "dealt as play moves on to it")
 	assert_eq(bj.state, BlackjackLogic.State.ACTING)
 	bj.player_action(1, &"stand")
 	assert_eq(bj.state, BlackjackLogic.State.PAYOUT)
@@ -298,9 +299,13 @@ func test_split_public_state_shows_both_hands() -> void:
 	var h: Dictionary = bj.get_public_state()["hands"][1]
 	assert_eq(int(h["active"]), 0)
 	assert_eq(h["cards"], [Card.make(7), Card.make(4)])
+	assert_eq(h["split"]["cards"], [Card.make(7)])
+	assert_eq(int(h["split"]["stake"]), 100)
+	bj.player_action(1, &"stand")
+	h = bj.get_public_state()["hands"][1]
+	assert_eq(int(h["active"]), 1, "play moved on to the second hand")
 	assert_eq(h["split"]["cards"], [Card.make(7), Card.make(10)])
 	assert_eq(int(h["split"]["total"]), 17)
-	assert_eq(int(h["split"]["stake"]), 100)
 
 
 func test_leaving_after_split_stands_both_hands() -> void:
@@ -376,3 +381,76 @@ func test_luck_rerolls_cards_dealt_to_split_hands() -> void:
 		bj.auto_resolve()
 		bj.drain_events()
 	assert_gt(flourishes_on_split, 0)
+
+
+# --- Split: two hands in turn, more time (0.9.10) ---
+
+
+## Patrick: "on split, give more time for me". The splitter's own clock gains a decision time;
+## the other player's clock is untouched and runs out first.
+func test_split_extends_only_the_splitters_clock() -> void:
+	bj.place_bet(1, {"amount": 100})
+	bj.place_bet(2, {"amount": 100})
+	# p1 8,8 ; p2 10,9 ; dealer 10,7 ; hand 1 gets 3, hand 2 gets 10
+	_stack([8, 10, 10, 8, 9, 7, 3, 10])
+	bj.tick(8.0)
+	assert_eq(bj.state, BlackjackLogic.State.ACTING)
+	var t: float = Registry.balance.bj_action_time
+	bj.tick(6.0)
+	assert_almost_eq(float(bj.get_public_state()["hands"][1]["clock"]), t - 6.0, 0.001)
+	assert_true(bj.player_action(1, &"split")["ok"])
+	var want: float = t - 6.0 + t * Registry.balance.bj_split_time_bonus
+	assert_almost_eq(float(bj.get_public_state()["hands"][1]["clock"]), want, 0.001, "a full decision time more")
+	assert_almost_eq(float(bj.get_public_state()["hands"][2]["clock"]), t - 6.0, 0.001, "nobody else gains time")
+	bj.tick(t - 6.0 + 0.1)
+	assert_true(bj.hands[2]["done"], "p2 timed out and stands")
+	assert_false(bj.hands[1]["done"], "the splitter still plays")
+	assert_eq(bj.state, BlackjackLogic.State.ACTING)
+	assert_almost_eq(bj.timer, want - (t - 6.0 + 0.1), 0.001, "the table clock follows the splitter")
+	assert_false(bj.get_public_state()["hands"][2].has("clock"), "a finished player has no clock")
+	bj.player_action(1, &"stand")
+	assert_eq(int(bj.get_public_state()["hands"][1]["active"]), 1)
+	bj.tick(want)
+	assert_eq(bj.state, BlackjackLogic.State.PAYOUT, "the extended clock ran out too")
+	assert_eq(_results().size(), 3)
+
+
+func test_split_hands_play_in_order() -> void:
+	bj.place_bet(1, {"amount": 100})
+	# p1 6,6 ; dealer 10,7 ; hand 1: 6+5 hit 10 = 21 (moves on) ; hand 2: 6+9, stand
+	_stack([6, 10, 6, 7, 5, 10, 9])
+	bj.tick(8.0)
+	bj.player_action(1, &"split")
+	var pub: Dictionary = bj.get_public_state()["hands"][1]
+	assert_eq(int(pub["active"]), 0, "the first hand first")
+	assert_eq((pub["split"]["cards"] as Array).size(), 1)
+	bj.drain_events()
+	bj.player_action(1, &"hit")
+	var ev: Dictionary = {}
+	for e: Dictionary in bj.drain_events():
+		if e["type"] == &"bj_action":
+			ev = e
+	assert_eq(int(ev["hand"]), 0, "the hit went to the first hand")
+	assert_eq(HandEval.total(bj.hands[1]["cards"]), 21)
+	pub = bj.get_public_state()["hands"][1]
+	assert_eq(int(pub["active"]), 1, "21 moves play on to the second hand")
+	assert_eq(int(pub["split"]["total"]), 15)
+	assert_true(pub["first_done"])
+	bj.player_action(1, &"stand")
+	assert_eq(bj.state, BlackjackLogic.State.PAYOUT)
+	var res: Array[Dictionary] = _results()
+	assert_eq(int(res[0]["details"]["hand"]), 0)
+	assert_eq(StringName(res[0]["details"]["outcome"]), &"win")
+	assert_eq(int(res[1]["details"]["hand"]), 1)
+	assert_eq(StringName(res[1]["details"]["outcome"]), &"lose")
+
+
+func test_second_hand_gets_its_card_when_time_runs_out() -> void:
+	bj.place_bet(1, {"amount": 100})
+	_stack([8, 10, 8, 7, 3, 9])
+	bj.tick(8.0)
+	bj.player_action(1, &"split")
+	bj.tick(100.0)
+	assert_eq(bj.state, BlackjackLogic.State.PAYOUT)
+	assert_eq(HandEval.total(bj.hands[1]["split"]["cards"]), 17, "two cards on the second hand at the settle")
+	assert_eq(_results().size(), 2)

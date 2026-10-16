@@ -224,7 +224,16 @@ so the Dealer Bust Bonus goes from 1.1:1 to 1.07:1: 101.5% over 400k hands with 
 (S17/DAS: always A-A and 8-8, never 10s or 5s, 9s vs 2–9 except 7, 7s/2s/3s vs 2–7, 6s vs 2–6,
 4s vs 5–6). Rejected: no double after split (one more rule to explain at the table).
 Controls: P / RB (RB only picks chips while the bet panel is open, which it isn't mid-hand).
-The second hand lies one row closer to the dealer on the felt, nudged right.
+~~The second hand lies one row closer to the dealer on the felt, nudged right.~~
+**2026-10-16 (Patrick: "give more time for me and actually make it 2 hands ... with an outline"):**
+each player now has their own decision clock (`clock` in the public hand, the table `timer` is the
+longest one still running); a split adds `bj_split_time_bonus` x `bj_action_time` (1.0 = a full
+decision time again) to the splitter's clock only. Hand 2 gets its second card when play moves on
+to it (or at the settle if time runs out), as at a real table; the odds are unchanged. On the felt
+the seat's cards become two groups side by side (hand 1 left, hand 2 right, tighter fan), each with
+its own bet stack and value tag; the hand being played gets the gold aim outline on its cards and a
+"HAND n" marker, seen by everyone at the table, and the panel's total and buttons name that hand.
+Only split hands are outlined (a single hand is never ambiguous).
 
 ## 2026-10-05 — Key hints follow the last device (InputGlyphs)
 `InputGlyphs` names an action's binding from the live InputMap for keyboard + mouse or for the
