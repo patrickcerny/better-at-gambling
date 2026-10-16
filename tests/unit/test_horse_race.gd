@@ -74,6 +74,34 @@ func test_races_are_fair_and_the_lead_changes() -> void:
 	assert_gt(changed, n / 2, "the lead changes hands in most races (%d/%d)" % [changed, n])
 
 
+## Patrick: "give the horses more space when one is in front ... a lot in front, a lot back". In
+## horse lengths on the table (a miniature's nose to tail over the gate-to-line distance), the
+## field is spread over a couple of lengths when the winner crosses, and further at its widest
+## (the old pace-noise race had first and last about one length apart at both moments).
+func test_the_field_spreads_out() -> void:
+	var length: float = HorseModel.LENGTH * HorseRaceStation.HORSE_SCALE / (HorseRaceStation.FINISH_X - HorseRaceStation.START_X)
+	var n: int = 50
+	var at_line: float = 0.0
+	var widest: float = 0.0
+	for s: int in n:
+		var plan: Dictionary = HorseRaceLogic.simulate(55001 + s * 97)
+		var wt: float = float(plan["finish"][int(plan["winner"])])
+		var p: Array[float] = HorseRaceLogic.sample(plan, wt)
+		at_line += (p.max() - p.min()) / length
+		var most: float = 0.0
+		var t: float = 0.5
+		while t < wt:
+			var q: Array[float] = HorseRaceLogic.sample(plan, t)
+			most = maxf(most, q.max() - q.min())
+			t += 0.1
+		widest += most / length
+	at_line /= n
+	widest /= n
+	gut.p("first to last: %.2f lengths at the line, %.2f at the widest" % [at_line, widest])
+	assert_gt(at_line, 1.5, "the field is strung out when the winner crosses")
+	assert_gt(widest, 2.0, "at its widest, the back runner is well behind")
+
+
 func test_names_are_distinct_and_new_each_round() -> void:
 	assert_gte(HorseRaceLogic.NAME_POOL.size(), 40)
 	var pool: Dictionary = {}
@@ -250,7 +278,7 @@ func test_refund_and_auto_resolve() -> void:
 	hr.place_bet(2, {"horse": 3, "amount": 20})
 	hr.auto_resolve()
 	assert_eq(hr.state, HorseRaceLogic.State.RESULT, "the match end runs the race at once")
-	assert_eq(fx.economy.balance(2), 980 + (100 if hr.winner == 3 else 0))
+	assert_eq(fx.economy.balance(2), 980 + (20 + int(floor(20 * fx.balance.horse_payout_ratio)) if hr.winner == 3 else 0))
 
 
 func test_leaving_mid_race_still_settles() -> void:
@@ -260,6 +288,6 @@ func test_leaving_mid_race_still_settles() -> void:
 	hr.leave(2)
 	_run_to_result()
 	assert_eq(hr.state, HorseRaceLogic.State.RESULT)
-	assert_eq(fx.economy.balance(1), 990 + (50 if hr.winner == 1 else 0))
+	assert_eq(fx.economy.balance(1), 990 + (10 + int(floor(10 * fx.balance.horse_payout_ratio)) if hr.winner == 1 else 0))
 	hr.tick(fx.balance.horse_result_time + 0.1)
 	assert_eq(hr.state, HorseRaceLogic.State.IDLE, "an empty table rests")

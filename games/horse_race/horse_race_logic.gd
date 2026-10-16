@@ -19,6 +19,11 @@ const RACE_SECONDS: float = 9.0
 ## Simulation step and the spacing of the recorded frames clients interpolate between.
 const SIM_DT: float = 0.05
 const FRAME_DT: float = 0.1
+## How far a horse's talent for the day strays from the average (both ways).
+const TALENT_SPREAD: float = 0.12
+## Odds that a horse's next streak is a surge or a stumble (otherwise a steady cruise).
+const SURGE_CHANCE: float = 0.3
+const STUMBLE_CHANCE: float = 0.25
 ## No race lasts longer than this (a hard cap, the slowest horse is well inside it).
 const MAX_SECONDS: float = 16.0
 ## Fun casino names; four distinct ones are drawn every round.
@@ -341,9 +346,10 @@ static func draw_names(r: SeededRng) -> Array[String]:
 
 ## The whole race from its seed, identical wherever it runs: `{frames: [PackedFloat32Array per
 ## horse, one value every FRAME_DT], finish: [seconds each nose reached the line], winner,
-## duration}`. Each horse has a small talent for the day and changes pace every half a second to
-## a second and a half, so the lead changes hands; the first nose over the line wins (an exact
-## tie, practically impossible, goes to the lower lane).
+## duration}`. Each horse has a talent for the day and runs in streaks: a surge, a stumble or a
+## steady cruise that lasts a second or two (`_next_streak`), so a leader can pull clear by a few
+## lengths, the back runner drops well behind and the lead still changes hands; the first nose
+## over the line wins (an exact tie, practically impossible, goes to the lower lane).
 static func simulate(seed_value: int) -> Dictionary:
 	var r := RandomNumberGenerator.new()
 	r.seed = seed_value
@@ -356,10 +362,11 @@ static func simulate(seed_value: int) -> Dictionary:
 	var finish: Array[float] = []
 	var frames: Array[PackedFloat32Array] = []
 	for h: int in HORSES:
-		talent.append(r.randf_range(0.97, 1.03))
+		talent.append(r.randf_range(1.0 - TALENT_SPREAD, 1.0 + TALENT_SPREAD))
 		speed.append(base * r.randf_range(0.25, 0.45))  # out of the gate
-		target.append(base * talent[h] * r.randf_range(0.85, 1.15))
-		seg_left.append(r.randf_range(0.4, 1.2))
+		var first: Vector2 = _next_streak(r)
+		target.append(base * talent[h] * first.x)
+		seg_left.append(first.y * 0.6)
 		pos.append(0.0)
 		finish.append(-1.0)
 		frames.append(PackedFloat32Array([0.0]))
@@ -374,8 +381,9 @@ static func simulate(seed_value: int) -> Dictionary:
 				seg_left[h] -= SIM_DT
 				if seg_left[h] <= 0.0:
 					# Always draw, finished or not, so the sequence never depends on the field.
-					target[h] = base * talent[h] * r.randf_range(0.8, 1.2)
-					seg_left[h] = r.randf_range(0.5, 1.5)
+					var streak: Vector2 = _next_streak(r)
+					target[h] = base * talent[h] * streak.x
+					seg_left[h] = streak.y
 				var goal: float = target[h]
 				if finish[h] >= 0.0:
 					goal = base * 0.25  # past the line: pulling up
@@ -398,6 +406,19 @@ static func simulate(seed_value: int) -> Dictionary:
 		if finish[h] < finish[win]:
 			win = h
 	return {"frames": frames, "finish": finish, "winner": win, "duration": (frames[0].size() - 1) * FRAME_DT}
+
+
+## A horse's next streak: (pace as a share of its talent, seconds it lasts). Always three draws,
+## so the random sequence never depends on which kind came up.
+static func _next_streak(r: RandomNumberGenerator) -> Vector2:
+	var kind: float = r.randf()
+	var amount: float = r.randf()
+	var length: float = r.randf()
+	if kind < SURGE_CHANCE:
+		return Vector2(lerpf(1.2, 1.45, amount), lerpf(0.9, 1.8, length))
+	if kind < SURGE_CHANCE + STUMBLE_CHANCE:
+		return Vector2(lerpf(0.5, 0.75, amount), lerpf(0.8, 1.6, length))
+	return Vector2(lerpf(0.92, 1.06, amount), lerpf(0.8, 1.6, length))
 
 
 ## Every horse's position at `seconds` into a race plan (linear between frames).
