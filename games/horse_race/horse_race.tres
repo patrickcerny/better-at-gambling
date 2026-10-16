@@ -10,3 +10,4 @@ display_name = "Horse Race"
 rules_text = "Back one of four horses before the gates open. The first nose over the line wins and pays 1:4 (your stake back plus four times it)."
 logic_script = ExtResource("2")
 rug_color = Color(0.153, 0.369, 0.286, 1)
+floor_footprint = &"fixed"

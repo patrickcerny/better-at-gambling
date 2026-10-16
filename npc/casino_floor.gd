@@ -67,20 +67,38 @@ func _spawn_waiter() -> void:
 	scene.world_root.add_child(waiter)
 
 
-## Spawn dealers at each blackjack and roulette table (v0.8.4).
-func _spawn_dealers() -> void:
-	dealers.clear()
+## The floor changed (docs/FLOOR_PLAN.md): the dealers go with the tables that closed and stand at
+## the new ones. The waiting room's dealer stays.
+func respawn_dealers() -> void:
+	for sid: StringName in dealers.keys():
+		var d: Dealer = dealers[sid]
+		if is_instance_valid(d) and scene.map.stations.has(sid) and d.position_offset.is_equal_approx(_dealer_spot(scene.map.stations[sid])):
+			continue
+		if is_instance_valid(d):
+			d.queue_free()
+		dealers.erase(sid)
+	_spawn_dealers(false)
+
+
+func _dealer_spot(station: StationBase) -> Vector3:
+	return station.global_position + (DealerLogic.OFFSETS[station.game_id] as Vector3).rotated(Vector3.UP, station.global_rotation.y)
+
+
+## Spawn dealers at each blackjack and roulette table (v0.8.4) that has none yet.
+func _spawn_dealers(fresh: bool = true) -> void:
+	if fresh:
+		dealers.clear()
 	# One dealer per blackjack and roulette table, placed in the table's own frame (its yaw turns
 	# the offset) and facing the players. Dealers stand still, so online clients place them from
 	# the map too; a host (headless servers included) also reports them to the server's DealerLogic.
 	for sid: StringName in scene.map.stations:
 		var station: StationBase = scene.map.stations[sid] as StationBase
-		if station == null or not DealerLogic.OFFSETS.has(station.game_id):
+		if station == null or not DealerLogic.OFFSETS.has(station.game_id) or dealers.has(sid):
 			continue
 		var dealer := Dealer.new()
 		dealer.name = "Dealer_%s" % sid
 		dealer.station_id = sid
-		dealer.position_offset = station.global_position + (DealerLogic.OFFSETS[station.game_id] as Vector3).rotated(Vector3.UP, station.global_rotation.y)
+		dealer.position_offset = _dealer_spot(station)
 		dealer.yaw = wrapf(station.global_rotation.y + float(DealerLogic.FACINGS[station.game_id]), -PI, PI)
 		dealer.puppet = false
 		scene.world_root.add_child(dealer)

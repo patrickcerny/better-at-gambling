@@ -26,6 +26,9 @@ static var test_dummies: int = 0
 static var test_briefing: float = -1.0
 ## Tests: the minigame curtain closes, holds and opens in a blink (see `curtain_times`).
 static var test_curtain_fast: bool = false
+## Tests: the `floor` setting ("random" draws a floor in Practice too, "full" never draws; "" =
+## `--floor`, else the FloorPlanConfig rule: online rooms draw, Practice keeps the full floor).
+static var test_floor: String = ""
 
 var map: LuckyLounge
 var server: MatchServer = null
@@ -76,6 +79,7 @@ var connection_label: Label
 var voice: VoiceChannel = null
 ## Table animations, win/lose VFX, screen shake / hit-stop, Last Call lighting (clients only).
 var table_fx: TableFx = null
+var last_call_lighting: LastCallLighting = null
 ## Item keys, target picker, discard choice (M5).
 var items_ctl: ItemController
 ## Banana peels on the floor (peel id → mesh) and item effect tags over heads (player → label).
@@ -302,6 +306,10 @@ func _ready() -> void:
 	casino_floor.name = "CasinoFloor"
 	add_child(casino_floor)
 	casino_floor.setup(self)
+	# The casino floor of this round (docs/FLOOR_PLAN.md): built from the replicated plan (late
+	# joiners get it in their snapshot); a host also switches it straight from its server.
+	view.state.floor_plan_changed.connect(func() -> void: _apply_floor(view.state.floor_plan))
+	_apply_floor(view.state.floor_plan)
 	event_sfx = EventSfx.new(self)
 	Loading.finish()
 	Net.notify_loaded()  # online: the 30 s loading timeout drops back to the normal 10 s
@@ -372,9 +380,14 @@ func _start_room_server(cmd: Cmdline) -> void:
 	def.shop_position = LuckyLounge.SHOP_POS
 	def.odd_jobs_position = LuckyLounge.ODD_JOBS_POS
 	LuckyLounge.describe_rooms(def)
+	LuckyLounge.describe_floor(def)
+	map.measure_floor(def)
 	var settings: Dictionary = _length_settings(cmd)
 	settings["seed"] = cmd.get_int("seed", 0)
+	settings["floor"] = test_floor if test_floor != "" else cmd.get_string("floor", "")
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
+	server.floor_changed = _on_server_floor
+	_on_server_floor(server.floor_plan)
 	server.world.obstacle_callback = _obstacle_between
 	server.timescale = cmd.get_float("timescale", 1.0)
 	server.lobby.min_participants = cmd.get_int("min-players", 2)
@@ -400,6 +413,37 @@ func _length_settings(cmd: Cmdline) -> Dictionary:
 	}
 
 
+## The host's server switched floors: the map builds it now (before anyone can sit down) and the
+## server's map definition gets the new tables' places and seats.
+func _on_server_floor(plan: Dictionary) -> void:
+	_apply_floor(plan)
+	server.map_def.station_positions = map.station_positions()
+	server.map_def.station_seats = map.station_seats()
+	server.map_def.station_yaws = map.station_yaws()
+
+
+## Builds a floor plan (wire form {station id: [game, anchor id]}; {} = the full floor) on the
+## map: nobody stays on a chair that goes, the dealers follow their tables and the Last Call
+## spotlights hang over the new ones.
+func _apply_floor(plan: Dictionary) -> void:
+	var want: Dictionary = plan if not plan.is_empty() else LuckyLounge.full_floor_plan()
+	if want == map.floor_plan:
+		return
+	for pid: int in avatars:
+		var a: PlayerAvatar = avatars[pid]
+		if a.state != PlayerAvatar.State.SEATED or a.seat == null:
+			continue
+		var st: StationBase = a.seat.get_parent() as StationBase
+		if st != null and st.has_meta(&"anchor") and want.get(st.station_id, []) != map.floor_plan.get(st.station_id, []):
+			_unseat(pid)
+	map.apply_floor_plan(want)
+	nearest_station = null  # it may have closed; the next frame finds the nearest again
+	if casino_floor != null:
+		casino_floor.respawn_dealers()
+	if last_call_lighting != null:
+		last_call_lighting.reset_spots()
+
+
 ## Practice: host the server in-process. Just you in the casino (Patrick: no bots); tests and
 ## screenshots add standing dummies with `--dummies N`.
 func _start_local(cmd: Cmdline) -> void:
@@ -415,11 +459,16 @@ func _start_local(cmd: Cmdline) -> void:
 	def.shop_position = LuckyLounge.SHOP_POS
 	def.odd_jobs_position = LuckyLounge.ODD_JOBS_POS
 	LuckyLounge.describe_rooms(def)
+	LuckyLounge.describe_floor(def)
+	map.measure_floor(def)
 	var settings: Dictionary = _length_settings(cmd)
 	# The main menu's practice choice (casino or minigames only, and how many minigames).
 	settings.merge(SceneRouter.practice_settings, true)
 	settings["seed"] = cmd.get_int("seed", randi() % 1000000)
+	settings["floor"] = test_floor if test_floor != "" else cmd.get_string("floor", "")
 	server.configure(settings, cfg, Registry.presets, Registry.game_logic_scripts(), def)
+	server.floor_changed = _on_server_floor
+	_on_server_floor(server.floor_plan)
 	server.world.obstacle_callback = _obstacle_between
 	_owns_server = true
 	var player_name: String = str(Settings.get_value("profile", "name", "You"))
@@ -2455,6 +2504,7 @@ func _add_table_fx() -> void:
 	table_fx.setup(map.stations, func(pid: int) -> PlayerAvatar: return avatars.get(pid, null), local_id, juice, world_root, _chip_color,
 		func(sid: StringName) -> int: return _min_bet(map.stations[sid]) if map.stations.has(sid) else 0)
 	var lc := LastCallLighting.new()
+	last_call_lighting = lc
 	lc.name = "LastCallLighting"
 	lc.setup(view.state, map, map.stations)
 	add_child(lc)

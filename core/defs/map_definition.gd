@@ -41,6 +41,18 @@ extends Resource
 @export var fun_stations: Dictionary = {}
 ## The waiting room's inner volume (filled by the map scene).
 @export var waiting_area: AABB = AABB()
+## The casino floor's spots for the per-round floor plan (docs/FLOOR_PLAN.md; filled by the map
+## scene, empty = a fixed floor that never changes): [{id, footprint, vip, default, pos, yaw}] in
+## map order, `default` being the game the spot has on the full floor, `yaw` in radians.
+@export var floor_anchors: Array = []
+## Game id → station id stem (slots → slot) so the drawn stations keep the usual names.
+@export var floor_prefixes: Dictionary = {}
+## Room for the draw (`FloorGeometry`): game id → its floor in its own frame (Rect2 over x, z;
+## measured by the map scene, empty = no geometry check), world rects tables may stand in, and
+## world rects they keep clear of.
+@export var floor_rects: Dictionary = {}
+@export var floor_areas: Array = []
+@export var floor_keep_out: Array = []
 
 
 ## Entrance-hall spot for a player id (Vector3.INF when the map has none).
@@ -86,3 +98,16 @@ func jail_exit(player_id: int) -> Vector3:
 ## True when the map has a waiting room with play-money stations.
 func has_waiting_room() -> bool:
 	return not fun_stations.is_empty() and waiting_area.has_volume()
+
+
+## True when the map has spots for a per-round floor plan.
+func has_floor_plan() -> bool:
+	return not floor_anchors.is_empty()
+
+
+## A floor spot by id ({} when unknown).
+func floor_anchor(anchor_id: StringName) -> Dictionary:
+	for a: Dictionary in floor_anchors:
+		if a["id"] == anchor_id:
+			return a
+	return {}

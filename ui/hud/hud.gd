@@ -268,7 +268,7 @@ func _on_feed(text: String, kind: StringName) -> void:
 			c = Palette.VIP_GOLD
 		&"chaos":
 			c = Color("#F0B27A")
-		&"item":
+		&"item", &"floor":
 			c = Palette.VIP_GOLD
 	l.add_theme_color_override(&"font_color", c)
 	feed.add_child(l)

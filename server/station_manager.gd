@@ -21,26 +21,68 @@ var out_of_order: Dictionary[StringName, float] = {}
 var closing_in: float = INF
 var _balance: BalanceConfig
 var _limits_multiplier: float = 1.0
+var _global_multiplier: float = 1.0
+## What `setup` got, for the stations a new floor plan adds (`apply_stations`).
+var _logic_scripts: Dictionary = {}
+var _economy: Economy
+var _modifiers: ModifierStack
+var _rng: SeededRng
+var _jackpot: ProgressiveJackpot
 
 
 ## Builds every station from `stations` (station id → game id) using the registry's logic scripts.
 func setup(stations: Dictionary, logic_scripts: Dictionary, balance: BalanceConfig, economy: Economy, modifiers: ModifierStack, rng: SeededRng, jackpot: ProgressiveJackpot, vip_ids: Array = []) -> void:
 	_balance = balance
+	_logic_scripts = logic_scripts
+	_economy = economy
+	_modifiers = modifiers
+	_rng = rng
+	_jackpot = jackpot
 	for sid: Variant in stations:
-		var station_id: StringName = StringName(sid)
-		var game_id: StringName = StringName(stations[sid])
-		var script: Script = logic_scripts.get(game_id, null)
-		if script == null:
-			Log.error(&"stations", "no logic registered for game %s (station %s)" % [game_id, station_id])
-			continue
-		var logic: StationLogicBase = script.new() as StationLogicBase
-		logic.game_id = game_id
-		logic.setup(station_id, balance, economy, modifiers, rng.fork(), jackpot)
-		logics[station_id] = logic
-		game_of[station_id] = game_id
-		if station_id in vip_ids:
-			vip[station_id] = true
+		_add(StringName(sid), StringName(stations[sid]), StringName(sid) in vip_ids)
 	set_limits_multiplier(1.0)
+
+
+func _add(station_id: StringName, game_id: StringName, is_vip: bool) -> void:
+	var script: Script = _logic_scripts.get(game_id, null)
+	if script == null:
+		Log.error(&"stations", "no logic registered for game %s (station %s)" % [game_id, station_id])
+		return
+	var logic: StationLogicBase = script.new() as StationLogicBase
+	logic.game_id = game_id
+	logic.setup(station_id, _balance, _economy, _modifiers, _rng.fork(), _jackpot)
+	logics[station_id] = logic
+	game_of[station_id] = game_id
+	if is_vip:
+		vip[station_id] = true
+
+
+## A new floor plan (docs/FLOOR_PLAN.md): `stations` (station id → game id) is every station from
+## now on. Stations that keep their id and game keep their logic (a blackjack shoe carries on);
+## the others close and the new ones open with the current limits. Nobody may be seated at a
+## station that goes (the server stands them up first); open bets were refunded at the minigame.
+## Returns the ids that closed.
+func apply_stations(stations: Dictionary, vip_ids: Array) -> Array[StringName]:
+	var closed: Array[StringName] = []
+	for sid: StringName in logics.keys():
+		if StringName(stations.get(sid, &"")) == game_of[sid] and (sid in vip_ids) == vip.get(sid, false):
+			continue
+		closed.append(sid)
+		logics[sid].refund_all()
+		logics.erase(sid)
+		game_of.erase(sid)
+		vip.erase(sid)
+		hot.erase(sid)
+		out_of_order.erase(sid)
+		for p: int in seat_of.keys():
+			if seat_of[p] == sid:
+				seat_of.erase(p)
+	for sid: Variant in stations:
+		if not logics.has(StringName(sid)):
+			_add(StringName(sid), StringName(stations[sid]), StringName(sid) in vip_ids)
+	set_limits_multiplier(_limits_multiplier)
+	set_global_multiplier(_global_multiplier)
+	return closed
 
 
 ## Applies the segment limits multiplier (VIP stations get ×3 on top).
@@ -52,6 +94,7 @@ func set_limits_multiplier(m: float) -> void:
 
 ## Applies the global winnings multiplier (Last Call).
 func set_global_multiplier(m: float) -> void:
+	_global_multiplier = m
 	for sid: StringName in logics:
 		logics[sid].global_multiplier = m
 

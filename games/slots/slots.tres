@@ -10,3 +10,4 @@ display_name = "Slots"
 rules_text = "Pick a bet and spin. Three of a kind pays big; the Clover is wild; three Diamonds win the Jackpot."
 logic_script = ExtResource("2")
 rug_color = Color(0.839, 0.659, 0.294, 1)
+floor_footprint = &"cabinet"

@@ -162,6 +162,30 @@ const JAIL_EXITS: Array[Vector3] = [Vector3(0.6, 0, 7.2), Vector3(1.4, 0, 7.2), 
 const JAIL_CAM_POS: Vector3 = Vector3(21.1, 4.4, -7.5)
 const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 
+## Where the floor plan may stand a table (world x, z rects; docs/FLOOR_PLAN.md): the casino floor,
+## the VIP lounge and the west end of the entrance hall (inner wall faces).
+const FLOOR_AREAS: Array[Rect2] = [
+	Rect2(-21.75, -15.75, 43.5, 23.9), Rect2(-8.75, -25.75, 17.5, 9.5), Rect2(-21.75, 8.65, 10.0, 6.0),
+]
+## What a drawn table keeps clear of: pillars, the bar and its stools, the megaphone stand, the
+## Gift Shop, the Odd Jobs cabinet, the jail's bars and drop-off, the Race Hall archway, the lobby
+## and VIP doorways, plants, the VIP lounge's statues, the settings tablet, and a square round every
+## guard and waiter route point so the patrols stay walkable.
+const FLOOR_KEEP_OUT: Array[Rect2] = [
+	Rect2(-10.2, -1.6, 1.2, 1.2), Rect2(9.0, -1.6, 1.2, 1.2),
+	Rect2(14.0, 3.1, 7.75, 5.0), Rect2(15.2, 1.7, 1.6, 1.6),
+	Rect2(18.9, 0.1, 2.85, 3.6), Rect2(19.6, -1.7, 2.15, 1.5), Rect2(20.6, -3.0, 1.15, 1.0),
+	Rect2(20.2, -9.3, 1.55, 3.6), Rect2(19.6, -15.75, 2.15, 5.0),
+	Rect2(-3.0, 6.5, 6.0, 1.65), Rect2(-2.7, -16.0, 5.4, 1.6), Rect2(-20.6, -1.6, 1.2, 1.2),
+	Rect2(-8.75, -17.8, 1.7, 1.0), Rect2(7.05, -17.8, 1.7, 1.0), Rect2(-8.75, -21.5, 1.0, 1.0), Rect2(7.75, -21.5, 1.0, 1.0),
+	Rect2(-2.4, -17.6, 4.8, 1.6), Rect2(-11.4, 9.1, 1.6, 1.6), Rect2(-21.75, 11.3, 1.4, 1.4),
+	# Patrol route points (guards, then the waiter).
+	Rect2(-12.45, -0.45, 0.9, 0.9), Rect2(-12.45, -11.45, 0.9, 0.9), Rect2(-0.45, -11.45, 0.9, 0.9), Rect2(-0.45, -0.45, 0.9, 0.9),
+	Rect2(11.55, 0.05, 0.9, 0.9), Rect2(17.55, -8.45, 0.9, 0.9), Rect2(7.55, -8.45, 0.9, 0.9), Rect2(1.55, 6.55, 0.9, 0.9),
+	Rect2(13.55, 1.15, 0.9, 0.9), Rect2(2.05, 1.75, 0.9, 0.9), Rect2(-5.45, 0.15, 0.9, 0.9), Rect2(-12.95, -5.05, 0.9, 0.9),
+	Rect2(-1.45, -10.95, 0.9, 0.9), Rect2(8.55, -9.45, 0.9, 0.9), Rect2(12.05, -2.45, 0.9, 0.9),
+]
+
 var stations: Dictionary[StringName, StationBase] = {}
 ## Per ready pedestal: the name on its brass plate, the top slab (never changes), and the warm
 ## spotlight from the ceiling that comes on while its player is ready (with its light cone and the
@@ -207,6 +231,14 @@ var waiting_door: StaticBody3D
 var waiting_open: bool = false
 var _waiting_leaves: Array[Node3D] = []
 var _waiting_tween: Tween = null
+## The floor plan standing now (docs/FLOOR_PLAN.md), wire form {station id: [game, anchor id]}:
+## the full floor (every spot with its usual game, from STATIONS) until `apply_floor_plan`.
+var floor_plan: Dictionary = {}
+## Closed spots' ropes and plants, and the list on the TONIGHT'S FLOOR board in the entrance hall.
+var closed_spots: Node3D
+var floor_board: Label3D
+## True while a navmesh rebake after a floor change waits for its colliders.
+var _rebake_queued: bool = false
 
 
 func _ready() -> void:
@@ -218,6 +250,12 @@ func _ready() -> void:
 	_build_jail()
 	_build_waiting_room()
 	_build_stations()
+	closed_spots = Node3D.new()
+	closed_spots.name = "ClosedSpots"
+	add_child(closed_spots)
+	floor_board = FloorProps.board(self)
+	floor_plan = full_floor_plan()
+	floor_board.text = FloorProps.board_text(floor_plan, floor_anchors(), fixed_games())
 	_build_props()
 	_build_lights()
 	if Vfx.enabled():
@@ -1168,16 +1206,196 @@ func set_waiting_room_open(open: bool) -> void:
 
 
 func _build_stations() -> void:
+	var anchor_of: Dictionary = {}
+	for a: Dictionary in floor_anchors():
+		anchor_of[a["station"]] = a["id"]
 	for sid: StringName in STATIONS:
 		var entry: Array = STATIONS[sid]
-		var st: StationBase = _make_station(entry[0])
-		st.name = String(sid)
-		st.station_id = sid
-		st.is_vip = String(sid).begins_with("vip_")
-		st.position = entry[1]
-		st.rotation.y = deg_to_rad(float(entry[2]))
+		var st: StationBase = _place_station(sid, entry[0], entry[1], deg_to_rad(float(entry[2])))
+		if anchor_of.has(sid):
+			st.set_meta(&"anchor", anchor_of[sid])
+
+
+func _place_station(sid: StringName, kind: StringName, pos: Vector3, yaw: float) -> StationBase:
+	var st: StationBase = _make_station(kind)
+	st.name = String(sid)
+	st.station_id = sid
+	st.is_vip = String(sid).begins_with("vip_")
+	st.position = pos
+	st.rotation.y = yaw
+	add_child(st)
+	stations[sid] = st
+	return st
+
+
+# --- Per-round floor plan (docs/FLOOR_PLAN.md) -------------------------------------------------
+
+## The floor's spots, from STATIONS: every station whose game isn't `fixed` (the horse race keeps
+## the Race Hall) is a spot of its game's size, numbered per area and size in STATIONS order
+## (t = table, c = cabinet, b = big; v in front for the VIP lounge): [{id, footprint, vip,
+## default (its game on the full floor), station (its id there), pos, yaw (radians)}]. A new
+## STATIONS line is a new spot.
+static func floor_anchors() -> Array:
+	var out: Array = []
+	var counts: Dictionary = {}
+	for sid: StringName in STATIONS:
+		var entry: Array = STATIONS[sid]
+		var game: StringName = entry[0]
+		var fp: StringName = footprint_of(game)
+		if fp == &"fixed":
+			continue
+		var vip: bool = String(sid).begins_with("vip_")
+		var key: String = ("v" if vip else "") + String(fp).left(1)
+		counts[key] = int(counts.get(key, 0)) + 1
+		out.append({"id": StringName("%s%d" % [key, counts[key]]), "footprint": fp, "vip": vip, "default": game, "station": sid, "pos": entry[1], "yaw": deg_to_rad(float(entry[2]))})
+	return out
+
+
+## A game's size class on the floor (`GameDefinition.floor_footprint`; table when unregistered).
+static func footprint_of(game: StringName) -> StringName:
+	var def: GameDefinition = Registry.games.get(game, null)
+	return def.floor_footprint if def != null else &"table"
+
+
+## Games that keep their own place whatever the plan (the horse race in the Race Hall).
+static func fixed_games() -> Array:
+	var out: Array = []
+	for sid: StringName in STATIONS:
+		var game: StringName = (STATIONS[sid] as Array)[0]
+		if footprint_of(game) == &"fixed" and not game in out:
+			out.append(game)
+	return out
+
+
+## The full floor in wire form: every spot with its usual game under its usual id.
+static func full_floor_plan() -> Dictionary:
+	var out: Dictionary = {}
+	for a: Dictionary in floor_anchors():
+		out[a["station"]] = [a["default"], a["id"]]
+	return out
+
+
+## Tells the server about the floor's spots and the station id stems (slots → slot).
+static func describe_floor(def: MapDefinition) -> void:
+	def.floor_anchors = floor_anchors()
+	var prefixes: Dictionary = {}
+	for sid: StringName in STATIONS:
+		var game: StringName = (STATIONS[sid] as Array)[0]
+		var stem: String = String(sid).trim_prefix("vip_")
+		var cut: int = stem.rfind("_")
+		if cut > 0 and stem.substr(cut + 1).is_valid_int():
+			stem = stem.left(cut)
+		if not prefixes.has(game):
+			prefixes[game] = stem
+	def.floor_prefixes = prefixes
+	def.floor_areas = FLOOR_AREAS.duplicate()
+	def.floor_keep_out = FLOOR_KEEP_OUT.duplicate()
+
+
+## Measures how much floor every drawable game takes (table, chairs and dealer, in its own frame)
+## by building its station once out of sight: `MapDefinition.floor_rects`. The server's draw then
+## only puts a game where it fits (`FloorGeometry`). Needs the map in the tree.
+func measure_floor(def: MapDefinition) -> void:
+	var rects: Dictionary = {}
+	for game: StringName in Registry.games:
+		if footprint_of(game) == &"fixed":
+			continue
+		var st: StationBase = _make_station(game)
+		st.position = Vector3(0, -40.0, 0)  # under the floor, for one frame at most
 		add_child(st)
-		stations[sid] = st
+		rects[game] = station_rect(st)
+		remove_child(st)
+		st.free()
+	def.floor_rects = rects
+
+
+## A station's floor in its own frame (x, z): its static colliders, its chairs and its dealer.
+static func station_rect(st: StationBase) -> Rect2:
+	var inv: Transform3D = st.global_transform.affine_inverse()
+	var box := AABB()
+	var first: bool = true
+	for body: Node in st.find_children("*", "StaticBody3D", true, false):
+		for cs: Node in body.find_children("*", "CollisionShape3D", true, false):
+			var shape: Shape3D = (cs as CollisionShape3D).shape
+			if shape == null:
+				continue
+			var b: AABB = inv * (cs as CollisionShape3D).global_transform * shape.get_debug_mesh().get_aabb()
+			box = b if first else box.merge(b)
+			first = false
+	var extras: Array[Vector3] = []
+	for s: Node3D in st.seats:
+		for d: Vector3 in [Vector3(0.3, 0, 0.3), Vector3(-0.3, 0, -0.3)]:
+			extras.append(inv * s.global_position + d)
+	if DealerLogic.OFFSETS.has(st.game_id):
+		var o: Vector3 = DealerLogic.OFFSETS[st.game_id]
+		extras.append(o + Vector3(0.35, 0, 0.35))
+		extras.append(o - Vector3(0.35, 0, 0.35))
+	for p: Vector3 in extras:
+		box = AABB(p, Vector3.ZERO) if first else box.expand(p)
+		first = false
+	return Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
+
+
+## Builds the floor of a plan (wire form; {} = the full floor): stations that stay on their spot
+## with the same game are kept, the others are taken down and the new ones built, closed spots get
+## their rope or plant, the hall board its list, and the navmesh is baked again (guards and the
+## waiter path round the new tables). Returns false when that plan is already standing.
+func apply_floor_plan(plan: Dictionary) -> bool:
+	var want: Dictionary = plan if not plan.is_empty() else full_floor_plan()
+	if want == floor_plan:
+		return false
+	floor_plan = want.duplicate(true)
+	var anchors: Array = floor_anchors()
+	var by_id: Dictionary = {}
+	for a: Dictionary in anchors:
+		by_id[a["id"]] = a
+	for sid: StringName in stations.keys():
+		var st: StationBase = stations[sid]
+		if not st.has_meta(&"anchor"):
+			continue  # the horse race and the waiting room's tables never move
+		var e: Variant = want.get(sid, null)
+		if e != null and StringName((e as Array)[0]) == st.game_id and StringName((e as Array)[1]) == StringName(st.get_meta(&"anchor")):
+			continue
+		stations.erase(sid)
+		st.name = "%s_gone" % sid
+		st.remove_from_group(&"stations")
+		remove_child(st)
+		st.queue_free()
+	for sid: Variant in want:
+		var entry: Array = want[sid]
+		if stations.has(StringName(sid)) or not by_id.has(StringName(entry[1])):
+			continue
+		var a: Dictionary = by_id[StringName(entry[1])]
+		var st: StationBase = _place_station(StringName(sid), StringName(entry[0]), a["pos"], float(a["yaw"]))
+		st.set_meta(&"anchor", a["id"])
+	var used: Dictionary = {}
+	for sid: Variant in want:
+		used[StringName((want[sid] as Array)[1])] = true
+	for c: Node in closed_spots.get_children():
+		closed_spots.remove_child(c)
+		c.queue_free()
+	for a: Dictionary in anchors:
+		if not used.has(a["id"]):
+			FloorProps.closed_spot(closed_spots, a)
+	floor_board.text = FloorProps.board_text(want, anchors, fixed_games())
+	if bake_navmesh and nav_region != null:
+		rebake_navmesh()
+	return true
+
+
+## Bakes the navmesh again from the colliders standing now (after the floor changed).
+func rebake_navmesh() -> void:
+	navmesh_ready = false
+	if _rebake_queued or not is_inside_tree():
+		return
+	_rebake_queued = true
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_rebake_queued = false
+	if not is_inside_tree():
+		return
+	nav_region.navigation_mesh = _nav_template()
+	nav_region.bake_navigation_mesh(false)
 
 
 func _make_station(kind: StringName) -> StationBase:
@@ -1192,6 +1410,12 @@ func _make_station(kind: StringName) -> StationBase:
 			return BlackjackStation.new()
 		&"horse_race":
 			return HorseRaceStation.new()
+	# A newer game can bring its own station scene (`GameDefinition.station_scene`).
+	var def: GameDefinition = Registry.games.get(kind, null)
+	if def != null and def.station_scene != null:
+		var node: StationBase = def.station_scene.instantiate() as StationBase
+		if node != null:
+			return node
 	Log.error(&"map", "unknown station kind %s" % kind)
 	return StationBase.new()
 
@@ -1264,6 +1488,22 @@ func _build_lights() -> void:
 func _build_navmesh() -> void:
 	nav_region = NavigationRegion3D.new()
 	nav_region.name = "NavRegion"
+	nav_region.navigation_mesh = _nav_template()
+	add_child(nav_region)
+	# Static colliders register with the physics server a frame later; bake once they exist.
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	if not is_inside_tree():
+		return  # freed while waiting (short-lived test scenes)
+	nav_region.bake_finished.connect(_on_bake_finished)
+	if _rebake_queued:
+		return  # the floor changed meanwhile: its rebake is on the way
+	nav_region.bake_navigation_mesh(false)
+
+
+## The navmesh's bake settings (a fresh resource for each bake: `_on_bake_finished` swaps in a
+## copy without them).
+func _nav_template() -> NavigationMesh:
 	var nm := NavigationMesh.new()
 	nm.agent_radius = 0.5
 	nm.agent_height = 2.0
@@ -1277,15 +1517,7 @@ func _build_navmesh() -> void:
 	nm.geometry_collision_mask = 1
 	# The casino, start room and VIP lounge, plus the Race Hall to the east.
 	nm.filter_baking_aabb = AABB(Vector3(-SIZE_X * 0.5, -1, VIP_Z_FAR), Vector3(ANNEX_X1 + SIZE_X * 0.5, 7.0, SIZE_Z * 0.5 - VIP_Z_FAR))
-	nav_region.navigation_mesh = nm
-	add_child(nav_region)
-	# Static colliders register with the physics server a frame later; bake once they exist.
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	if not is_inside_tree():
-		return  # freed while waiting (short-lived test scenes)
-	nav_region.bake_finished.connect(_on_bake_finished)
-	nav_region.bake_navigation_mesh(false)
+	return nm
 
 
 ## The bake fills the resource in place, which never reaches the NavigationServer (queries stay

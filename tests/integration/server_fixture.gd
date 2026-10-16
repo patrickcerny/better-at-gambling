@@ -10,7 +10,8 @@ var player_ids: Array[int] = []
 ## Tests that count quiz events pin the minigame pool to the quiz; pass your own `minigame_pool`
 ## (or "" for every minigame) to change that. The rules briefing before a minigame is off unless
 ## the test passes `minigame_briefing`. The map definition is a private copy, so a test may fill in
-## station positions without leaking them into the next test.
+## station positions without leaking them into the next test. A `floor` setting ("random", "full",
+## or "" for the match's own rule) gives the map its floor-plan spots.
 func _init(player_count: int = 2, settings: Dictionary = {"minigames": 2, "gamble_seconds": 100.0, "seed": 1}) -> void:
 	server = MatchServer.new()
 	var s: Dictionary = settings.duplicate()
@@ -22,6 +23,8 @@ func _init(player_count: int = 2, settings: Dictionary = {"minigames": 2, "gambl
 	map.station_positions = map.station_positions.duplicate()  # Resource.duplicate shares the dictionary
 	map.station_seats = map.station_seats.duplicate()
 	map.station_yaws = map.station_yaws.duplicate()
+	if s.has("floor"):
+		LuckyLounge.describe_floor(map)  # the per-round floor plan's spots (docs/FLOOR_PLAN.md)
 	server.configure(s, Registry.balance, Registry.presets, Registry.game_logic_scripts(), map)
 	server.event_emitted.connect(func(ev: Dictionary) -> void: events.append(ev))
 	for i: int in player_count:

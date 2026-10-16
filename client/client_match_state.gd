@@ -26,6 +26,8 @@ signal floor_changed
 signal fun_money_changed(player: int, amount: int, balance: int, reason: StringName)
 ## The waiting room's door opened (lobby) or shut (the match started).
 signal waiting_room_changed(open: bool)
+## The casino floor changed (docs/FLOOR_PLAN.md): a new plan in `floor_plan`.
+signal floor_plan_changed
 
 var phase: Phase.Id = Phase.Id.LOBBY
 var casino_time: float = 0.0
@@ -76,6 +78,10 @@ var megaphone_holder: int = -1
 ## The waiting room (online lobby only): open or shut, and each player's play-money balance there.
 var waiting_room_open: bool = false
 var fun_balances: Dictionary[int, int] = {}
+## The casino floor of this round, wire form {station id: [game, anchor id]} ({} = the map's full
+## floor), and the server's count of floors drawn this match.
+var floor_plan: Dictionary = {}
+var floor_round: int = 0
 ## Highest event sequence number ever applied. A resync (someone sits down, a gap) re-applies a
 ## cached snapshot and replays the events after it; the ones at or below this were already shown,
 ## so they rebuild the state without popping their money and feed lines again (Patrick: "a lot of
@@ -138,6 +144,7 @@ func apply_snapshot(snap: Dictionary) -> void:
 		puddles[int(p["puddle"])] = p
 	megaphone_holder = int((floor_state.get("megaphone", {}) as Dictionary).get("holder", -1))
 	floor_changed.emit()
+	_set_floor_plan(snap.get("floor_plan", {}))
 	var fun: Dictionary = snap.get("fun", {})
 	waiting_room_open = bool(fun.get("open", false))
 	fun_balances.clear()
@@ -259,6 +266,7 @@ func _apply(ev: Dictionary) -> void:
 			players_changed.emit()
 			lobby_changed.emit()
 		&"match_started":
+			_set_floor_plan(ev.get("floor_plan", {}))
 			minigames = int(ev.get("minigames", minigames))
 			gamble_s = float(ev.get("gamble_s", gamble_s))
 			duration_s = float(ev.get("duration_s", duration_s))
@@ -290,6 +298,8 @@ func _apply(ev: Dictionary) -> void:
 		&"rewards_started":
 			rewards = ev["rewards"]
 		&"regroup_started":
+			if _set_floor_plan(ev.get("floor_plan", {})):
+				_feed("The floor has changed! Tonight's games are on the board by the doors.", &"floor")
 			regroup_in = float(ev.get("seconds", 5.0))
 			rewards = []
 			for pid: Variant in (ev.get("positions", {}) as Dictionary):
@@ -377,6 +387,7 @@ func _apply(ev: Dictionary) -> void:
 			megaphone_holder = -1
 			floor_changed.emit()
 		&"match_reset":
+			_set_floor_plan(ev.get("floor_plan", {}))
 			minigames = int(ev.get("minigames", minigames))
 			gamble_s = float(ev.get("gamble_s", gamble_s))
 			duration_s = float(ev.get("duration_s", duration_s))
@@ -398,6 +409,24 @@ func _apply(ev: Dictionary) -> void:
 
 
 ## A feed line, unless the event is a replay of one already shown.
+## Takes a floor from the wire ({round, stations}; {} = no news). Tables that closed drop out of
+## `stations`. Returns true when the floor changed.
+func _set_floor_plan(wire: Variant) -> bool:
+	if typeof(wire) != TYPE_DICTIONARY or not (wire as Dictionary).has("stations"):
+		return false
+	var plan: Dictionary = (wire as Dictionary)["stations"]
+	if plan == floor_plan and int((wire as Dictionary).get("round", 0)) == floor_round:
+		return false
+	var before: Dictionary = floor_plan
+	floor_plan = plan.duplicate(true)
+	floor_round = int((wire as Dictionary).get("round", 0))
+	for sid: Variant in before:
+		if not floor_plan.has(sid) or floor_plan[sid] != before[sid]:
+			stations.erase(sid)
+	floor_plan_changed.emit()
+	return true
+
+
 func _feed(text: String, kind: StringName) -> void:
 	if not _replaying:
 		feed_message.emit(text, kind)

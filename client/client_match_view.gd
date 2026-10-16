@@ -54,6 +54,9 @@ func _process(delta: float) -> void:
 		state.casino_time = float(snap.get("casino_time", state.casino_time))
 		state.jackpot = int(snap.get("jackpot", state.jackpot))
 		var st: Dictionary = snap.get("stations", {})
+		for sid: Variant in state.stations.keys():
+			if not st.has(sid):
+				state.stations.erase(sid)  # closed with the floor plan (or the waiting room shut)
 		for sid: Variant in st:
 			state.stations[sid] = st[sid]
 			state.station_changed.emit(StringName(sid))
@@ -75,6 +78,10 @@ func _on_event(ev: Dictionary) -> void:
 		else:
 			resync()
 		return
+	if Net.is_client() and not (ev.get("floor_plan", {}) as Dictionary).is_empty() and ev["type"] != &"match_started":
+		# A new floor: the cached snapshot still lists the tables that closed (status updates only
+		# ever add stations), so take a fresh one.
+		Net.request_fresh_snapshot()
 	if not ok:
 		Log.warn(&"client", "event gap at seq %d, resyncing" % int(ev.get("seq", -1)))
 		if Net.is_client():

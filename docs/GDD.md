@@ -40,6 +40,16 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
+**Floor plan** ([`FLOOR_PLAN.md`](FLOOR_PLAN.md)): in online matches every casino round starts on a
+new floor. The floor is a set of fixed spots (table-, slot- and Plinko-sized, on the floor and in
+the VIP lounge); when the lobby opens and at every regroup (everyone shut in the entrance hall)
+each spot is redrawn from the match seed: a game of its size by weight, or closed tonight (velvet
+rope and a CLOSED TONIGHT sign, or a plant). Nothing is guaranteed; at least 60% of each area is
+open and at most 2 tables of one game per area (soft). The Race Hall, the waiting room, Odd Jobs,
+the shop and the jail never move. A TONIGHT'S FLOOR board in the entrance hall lists the games and
+the feed says "The floor has changed". Practice keeps the full floor. New table games join the
+draw on their own (`FloorPlanConfig`, `GameDefinition.floor_footprint`).
+
 ## Luck
 Luck L ∈ [−3, +3]. Single-player draws are rerolled with probability 0.12·|L| keeping the better
 (L>0) or worse (L<0) candidate. Roulette uses "Lucky neighbour" / "Jinxed" effects. Always visible.

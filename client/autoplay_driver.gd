@@ -115,7 +115,6 @@ func _answer(question: int, count: int) -> void:
 
 
 func _build_steps() -> void:
-	var sp: Dictionary = scene.map.station_positions()
 	# Any other player (a test dummy in Practice) is the shove/grab partner.
 	var bot: int = -1
 	for pid: int in scene.avatars:
@@ -155,7 +154,7 @@ func _build_steps() -> void:
 			]
 			return
 	steps = [
-		["walk", Vector3(sp[_st(&"blackjack_3")]) + Vector3(0, 0, 2.6)],
+		["walk_station", _st(&"blackjack_3"), Vector3(0, 0, 2.6)],
 		["sit", _st(&"blackjack_3")], ["wait", 0.5],
 		["intent", &"place_bet", {"station": _st(&"blackjack_3"), "bet": {"amount": 25}}], ["wait", 9.0],
 		["intent", &"action", {"station": _st(&"blackjack_3"), "action": &"stand"}], ["wait", 3.0],
@@ -163,7 +162,7 @@ func _build_steps() -> void:
 		["intent", &"action", {"station": _st(&"blackjack_3"), "action": &"hit"}], ["wait", 0.5],
 		["intent", &"action", {"station": _st(&"blackjack_3"), "action": &"stand"}], ["wait", 3.5],
 		["intent", &"leave", {}], ["wait", 0.5],
-		["walk", Vector3(sp[_st(&"roulette_1")]) + Vector3(1.0, 0, 2.0)],
+		["walk_station", _st(&"roulette_1"), Vector3(1.0, 0, 2.0)],
 		["sit", _st(&"roulette_1")], ["wait", 1.0],
 		["intent", &"place_bet", {"station": _st(&"roulette_1"), "bet": {"type": &"red", "value": 0, "amount": 25}}],
 		["intent", &"place_bet", {"station": _st(&"roulette_1"), "bet": {"type": &"straight", "value": 17, "amount": 10}}],
@@ -171,14 +170,14 @@ func _build_steps() -> void:
 		["intent", &"place_bet", {"station": _st(&"roulette_1"), "bet": {"type": &"dozen", "value": 2, "amount": 25}}],
 		["wait", 22.0],
 		["intent", &"leave", {}], ["wait", 0.5],
-		["walk", Vector3(sp[_st(&"slot_8")]) + Vector3(0, 0, 1.2)],
+		["walk_station", _st(&"slot_8"), Vector3(0, 0, 1.2)],
 		["sit", _st(&"slot_8")], ["wait", 0.5],
 		["intent", &"place_bet", {"station": _st(&"slot_8"), "bet": {"amount": 10}}], ["wait", 2.2],
 		["intent", &"place_bet", {"station": _st(&"slot_8"), "bet": {"amount": 25}}], ["wait", 0.8],
 		["intent", &"action", {"station": _st(&"slot_8"), "action": &"stop"}], ["wait", 1.0],
 		["intent", &"place_bet", {"station": _st(&"slot_8"), "bet": {"amount": 50}}], ["wait", 2.2],
 		["intent", &"leave", {}], ["wait", 0.5],
-		["walk", Vector3(sp[_st(&"plinko_1")]) + Vector3(-0.8, 0, 2.4)],
+		["walk_station", _st(&"plinko_1"), Vector3(-0.8, 0, 2.4)],
 		["sit", _st(&"plinko_1")], ["wait", 0.5],
 		["intent", &"place_bet", {"station": _st(&"plinko_1"), "bet": {"amount": 25, "risk": &"medium"}}], ["wait", 3.5],
 		["intent", &"place_bet", {"station": _st(&"plinko_1"), "bet": {"amount": 10, "risk": &"high"}}], ["wait", 3.5],
@@ -196,7 +195,7 @@ func _build_steps() -> void:
 		["walk", LuckyLounge.VIP_GATE_POS + Vector3(0, 0, 2.5)], ["wait", 0.5],
 		["jump_to", LuckyLounge.VIP_GATE_POS + Vector3(0, 0, -1.0)], ["wait", 3.0],
 		["walk", LuckyLounge.JAIL_DOOR + Vector3(-1.0, 0, 0)], ["wait", 1.0],
-		["walk", Vector3(sp[_st(&"blackjack_2")]) + Vector3(0, 0, 2.6)],
+		["walk_station", _st(&"blackjack_2"), Vector3(0, 0, 2.6)],
 		["sit", _st(&"blackjack_2")], ["wait", 0.5],
 		["intent", &"place_bet", {"station": _st(&"blackjack_2"), "bet": {"amount": 100}}], ["wait", 9.0],
 		["intent", &"action", {"station": _st(&"blackjack_2"), "action": &"double"}], ["wait", 4.0],
@@ -237,6 +236,24 @@ func _use_items(delta: float) -> void:
 
 func _st(id: StringName) -> StringName:
 	return VARIANT_STATIONS.get(id, id) if variant == 1 else id
+
+
+## The station a step means on tonight's floor (docs/FLOOR_PLAN.md): the one it names when it is
+## there (always on the full floor), else another table of the same game, else &"" (the step is
+## skipped: nothing is guaranteed in an online room).
+func _actual(id: StringName) -> StringName:
+	if scene.map.stations.has(id):
+		return id
+	if not LuckyLounge.STATIONS.has(id):
+		return &""
+	var game: StringName = (LuckyLounge.STATIONS[id] as Array)[0]
+	var ids: Array = scene.map.stations.keys()
+	ids.sort()
+	for sid: StringName in ids:
+		var same_room: bool = String(sid).begins_with("vip_") == String(id).begins_with("vip_")  # the bouncer
+		if same_room and not FunRoom.is_fun(sid) and scene.map.stations[sid].game_id == game:
+			return sid
+	return &""
 
 
 func _process(delta: float) -> void:
@@ -330,12 +347,28 @@ func _process(delta: float) -> void:
 			var to: Vector3 = step[1] - scene.local.global_position
 			scene.local.hop(Vector3(to.x, 0, to.z).normalized() * 6.0 + Vector3.UP * 7.0)
 			wait_left = 0.2
+		"walk_station":
+			# In front of the table in its own frame (it may stand on another spot tonight).
+			var sid: StringName = _actual(step[1])
+			if sid == &"":
+				Log.info(&"autoplay", "no %s on tonight's floor, skipping" % step[1])
+				return
+			var st: StationBase = scene.map.stations[sid]
+			steps.insert(index, ["walk", st.global_transform * Vector3(step[2])])
 		"sit":
-			var res: Dictionary = Net.send_intent(Intents.make(&"sit", {"station": step[1]}))
-			Log.info(&"autoplay", "sit %s -> %s" % [step[1], res])
+			var sit_at: StringName = _actual(step[1])
+			if sit_at == &"":
+				return
+			var res: Dictionary = Net.send_intent(Intents.make(&"sit", {"station": sit_at}))
+			Log.info(&"autoplay", "sit %s -> %s" % [sit_at, res])
 		"intent":
-			var res: Dictionary = Net.send_intent(Intents.make(step[1], step[2]))
-			Log.info(&"autoplay", "%s %s -> %s" % [step[1], step[2], res])
+			var payload: Dictionary = (step[2] as Dictionary).duplicate()
+			if payload.has("station"):
+				payload["station"] = _actual(StringName(payload["station"]))
+				if payload["station"] == &"":
+					return
+			var res: Dictionary = Net.send_intent(Intents.make(step[1], payload))
+			Log.info(&"autoplay", "%s %s -> %s" % [step[1], payload, res])
 		"approach_partner":
 			var partner: PlayerAvatar = scene.avatars.get(int(step[1]), null)
 			if partner != null:

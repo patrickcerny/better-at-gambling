@@ -10,3 +10,4 @@ display_name = "Plinko"
 rules_text = "Pick a bet and a risk row, then drop the chip. Edge slots pay the most; the High row can win the Jackpot."
 logic_script = ExtResource("2")
 rug_color = Color(0.408, 0.122, 0.173, 1)
+floor_footprint = &"big"

@@ -88,6 +88,17 @@ func _build_spots() -> void:
 		spots.append(s)
 
 
+## The floor changed: the spotlights over the tables that closed go, the new tables get theirs.
+func reset_spots() -> void:
+	for s: SpotLight3D in spots:
+		if is_instance_valid(s):
+			s.queue_free()
+	spots.clear()
+	if active and Vfx.enabled():
+		_build_spots.call_deferred()
+		_apply.call_deferred(level)
+
+
 func _apply(f: float) -> void:
 	level = f
 	if _env != null:

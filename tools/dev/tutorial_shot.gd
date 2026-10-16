@@ -6,7 +6,8 @@ extends Node
 ## Views: hall (the casino floor from above), table (sat at blackjack with a bet down), shop (the
 ## gift shop open, items in the HUD slots), jail (two beans behind the bars, a guard outside),
 ## lobby (ready pedestals glowing in the start room), rough (a shove knockdown, from the brawl clip),
-## leaderboard (the standings over the casino).
+## leaderboard (the standings over the casino). Dev checks only: race, racehall, floorboard and
+## closed (the last two with `--floor random`).
 
 var _scene: MatchScene
 var _view: String = "hall"
@@ -82,6 +83,20 @@ func _stage() -> void:
 			_scene.hud.visible = false
 		"racehall":  # inside the Race Hall (dev check only)
 			_free_cam(Vector3(23.2, 2.8, -11.4), Vector3(30.0, 0.9, -19.0), 75.0)
+			_scene.hud.visible = false
+		"floorboard":  # the TONIGHT'S FLOOR board in the entrance hall (dev check; `--floor random`)
+			_free_cam(FloorProps.BOARD_POS + Vector3(-1.2, -0.6, 4.2), FloorProps.BOARD_POS, 60.0)
+			_scene.hud.visible = false
+		"closed":  # a closed table spot on tonight's floor (dev check; `--floor random`)
+			var spot: Node3D = null
+			for c: Node in _scene.map.closed_spots.get_children():
+				if spot == null and c.find_child("ClosedSign", true, false) != null:
+					spot = c as Node3D
+			if spot == null and _scene.map.closed_spots.get_child_count() > 0:
+				spot = _scene.map.closed_spots.get_child(0) as Node3D
+			var at: Vector3 = spot.global_position if spot != null else Vector3.ZERO
+			var back: Vector3 = Vector3(-at.x, 0.0, -at.z - 3.0).normalized()  # from the middle of the floor
+			_free_cam(at + back * 4.5 + Vector3(0.0, 2.4, 0.0), at + Vector3(0, 1.0, 0), 65.0)
 			_scene.hud.visible = false
 		"jail":
 			var ids: Array[int] = _others()
