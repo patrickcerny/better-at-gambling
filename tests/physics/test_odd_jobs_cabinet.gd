@@ -1,6 +1,7 @@
 extends GutTest
 ## The Odd Jobs cabinet in the real match scene: built next to the Gift Shop, clear of everything
-## else, reachable over the navmesh, and the walk-up → E → smash → E flow.
+## else, reachable over the navmesh; look at the 3D button and click to press it (no window), the
+## bar and text live on the cabinet, and the lamps glow only while you are broke.
 
 var scene: MatchScene
 
@@ -65,45 +66,103 @@ func test_cabinet_is_reachable_over_the_navmesh() -> void:
 	assert_lt(Vector2(shop_path[shop_path.size() - 1].x - LuckyLounge.SHOP_POS.x, shop_path[shop_path.size() - 1].z - LuckyLounge.SHOP_POS.z).length(), 0.5)
 
 
-func _space() -> void:
-	var k := InputEventKey.new()
-	k.physical_keycode = KEY_SPACE
-	k.keycode = KEY_SPACE
-	k.pressed = true
-	Input.parse_input_event(k)
-	await wait_process_frames(1)
-	var up: InputEventKey = k.duplicate()
-	up.pressed = false
-	Input.parse_input_event(up)
-	await wait_seconds(0.1)
+## Stands the local player at the cabinet, facing it, and pitches the camera at the button
+## (`on` false: looking straight ahead over the deck instead).
+func _stand_and_look(on: bool) -> void:
+	var me: int = scene.local_id
+	scene.local.teleport(LuckyLounge.ODD_JOBS_POS, -PI / 2.0)
+	scene.server.set_server_position(me, LuckyLounge.ODD_JOBS_POS)
+	await wait_process_frames(2)
+	var cam: PlayerCamera = scene.local.cam
+	cam.pitch = 0.0
+	await wait_process_frames(2)
+	if on:
+		var d: Vector3 = scene.map.odd_jobs.button_center() - cam.camera.global_position
+		cam.pitch = atan2(d.y, Vector2(d.x, d.z).length())
+	await wait_process_frames(3)
 
 
-func test_walk_up_press_e_and_smash() -> void:
+## Broke without the House Comp topping you up again (it pays once per segment).
+func _go_broke() -> void:
 	var me: int = scene.local_id
 	scene.server.economy.take_up_to(me, 1000000, &"test")
 	await wait_seconds(0.3)  # a House Comp may land first
-	scene.local.teleport(LuckyLounge.ODD_JOBS_POS, -PI / 2.0)
-	scene.server.set_server_position(me, LuckyLounge.ODD_JOBS_POS)
-	await wait_seconds(0.3)
-	assert_string_contains(scene.hud.prompt_label.text, "ODD JOBS")
-	scene.router.interact.emit()
+	scene.server.economy.take_up_to(me, 1000000, &"test")
+	await wait_seconds(0.2)
+
+
+func _click() -> void:
+	scene.router.grab_pressed.emit()
+	await wait_seconds(0.1)
+
+
+func test_look_at_the_button_and_click_it() -> void:
+	var me: int = scene.local_id
+	await _go_broke()
+	assert_eq(scene.server.economy.balance(me), 0)
+	await _stand_and_look(true)
+	assert_true(scene.odd_jobs.aimed, "looking at the button")
+	assert_string_contains(scene.hud.prompt_label.text, "SMASH")
+	assert_null(scene.find_child("OddJobsPanel", true, false) as Control, "no popup window any more")
+	assert_eq(scene.router.mode, InputRouter.Mode.WALK, "you stay in the world")
+	var cab: OddJobsCabinet = scene.map.odd_jobs
+	var needed: int = OddJobs.presses_needed(0)
+	await _click()
+	assert_almost_eq(scene.server.odd_jobs.fill(), 1.0 / needed, 0.001, "one click = one press")
+	assert_gt(cab.shown_fill, 0.0, "the bar on the cabinet fills")
+	scene.router.grab_pressed.emit()
 	await wait_process_frames(2)
-	assert_true(scene.odd_jobs_panel.visible, "E opens the cabinet")
-	assert_eq(scene.router.mode, InputRouter.Mode.MENU)
-	var before: int = scene.server.economy.balance(me)
-	var needed: int = OddJobs.presses_needed(before)
-	for i: int in needed:
-		await _space()
-	assert_eq(scene.server.economy.balance(me), before + OddJobs.PAYOUT, "a full bar pays $50")
-	# Rich: refused, the button greys out.
+	assert_lt(cab.button.position.y, OddJobsCabinet.BUTTON_POS.y, "the button dips")
+	await wait_seconds(0.3)
+	assert_almost_eq(cab.button.position.y, OddJobsCabinet.BUTTON_POS.y, 0.001, "and springs back")
+	for i: int in needed - 3:
+		await _click()
+	assert_eq(scene.server.economy.balance(me), 0, "not paid before the bar is full")
+	scene.router.interact.emit()  # E presses it too
+	await wait_seconds(0.2)
+	assert_eq(scene.server.economy.balance(me), OddJobs.PAYOUT, "the click that fills it pays $50")
+	assert_string_contains(cab.note_label.text, "YOUR CLICK")
+	assert_almost_eq(cab.shown_fill, 0.0, 0.01, "the bar on the cabinet starts over")
+	# Rich: refused, with the note on the cabinet.
 	scene.server.economy.apply(me, OddJobs.CAP, &"test")
 	await wait_seconds(0.3)
-	assert_true(scene.odd_jobs_panel.is_refused())
-	var refused_at: int = scene.server.economy.balance(me)
-	await _space()
-	assert_eq(scene.server.economy.balance(me), refused_at)
-	assert_string_contains((scene.odd_jobs_panel.find_child("Note", true, false) as Label).text, "Go gamble")
-	scene.odd_jobs_panel.close_panel()
+	var rich: int = scene.server.economy.balance(me)
+	await _click()
+	assert_eq(scene.server.economy.balance(me), rich)
+	assert_eq(scene.server.odd_jobs.fill(), 0.0)
+	assert_string_contains(cab.note_label.text, "Go gamble")
+
+
+func test_looking_away_does_not_press() -> void:
+	await _go_broke()
+	await _stand_and_look(false)
+	assert_false(scene.odd_jobs.aimed, "looking over the deck, not at the button")
+	assert_string_contains(scene.hud.prompt_label.text, "look at the big red button")
+	await _click()
+	scene.router.interact.emit()
+	await wait_seconds(0.2)
+	assert_eq(scene.server.odd_jobs.fill(), 0.0, "no press without looking at it")
+	# Far away and looking its way: still nothing.
+	scene.local.teleport(Vector3(14, 0, -0.95), -PI / 2.0)
+	scene.server.set_server_position(scene.local_id, Vector3(14, 0, -0.95))
+	await wait_process_frames(3)
+	assert_false(scene.odd_jobs.aimed, "out of reach")
+
+
+func test_glow_only_while_broke() -> void:
+	var me: int = scene.local_id
+	var cab: OddJobsCabinet = scene.map.odd_jobs
+	assert_gt(scene.server.economy.balance(me), OddJobsController.broke_line(scene.cfg, 0))
 	await wait_process_frames(2)
-	assert_false(scene.odd_jobs_panel.visible)
-	assert_eq(scene.router.mode, InputRouter.Mode.WALK)
+	assert_false(cab.glowing, "no glow with money")
+	assert_false(cab.lamp_light.visible)
+	assert_null(cab.button.get_node("Mesh").material_overlay, "no outline with money")
+	await _go_broke()
+	assert_true(cab.glowing, "broke: the cabinet glows")
+	assert_true(cab.lamp_light.visible)
+	assert_not_null(cab.button.get_node("Mesh").material_overlay, "and the button is outlined")
+	assert_true(bool(Settings.get_value("hints", "odd_jobs", false)), "the one-time hint went out")
+	scene.server.economy.apply(me, 100, &"test")
+	await wait_seconds(0.3)
+	assert_false(cab.glowing, "money again: glow off")
+	assert_false(cab.lamp_light.visible)
