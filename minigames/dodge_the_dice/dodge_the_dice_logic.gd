@@ -16,10 +16,13 @@ extends WalkableLogicBase
 ##   `TIE_STEP`; equal heights share a rank). `points` = players ranked below.
 ##
 ## Hazards (server path, deterministic, nothing streamed per tick):
-## - From `FIRST_SPAWN` on the server drops one every `spawn_interval(clock)` seconds (1.6 s
-##   falling linearly to 0.7 s at 60 s): a roulette **ball** (small, fast, straight down), a
-##   **coin** (big, rolls slower, wobbles sideways) or a **die** (hops every row and picks a new
-##   lane each hop). 35% of them aim at a climbing bean's lane.
+## - From `FIRST_SPAWN` on the server drops one every `spawn_interval(clock)` seconds (0.5 s
+##   falling linearly to 0.2 s at `SPAWN_RAMP`): a roulette **ball** (small, fast, straight
+##   down), a **coin** (big, rolls slower, wobbles sideways) or a **die** (hops every row and picks
+##   a new lane each hop). `AIM_CHANCE` of them aim at a climbing bean's lane.
+## - On top of that, every `rack_interval(clock)` seconds (9 s falling to 4.5 s) a **rack**: a
+##   line of balls across the board at one speed with one gap (`RACK_SLOTS` lanes, `rack_size`
+##   of them filled, never the gate's lane). Each ball is announced like any other hazard.
 ## - Each is announced once as `dodge_the_dice_hazard {id, kind, lane, speed, t0, seed}` (also in
 ##   the public state while it rolls). Server and clients run the same `path_at(hazard, clock)`:
 ##   a drop from the gantry, then `speed` m/s (flat) down the board with the kind's sideways path
@@ -35,20 +38,29 @@ extends WalkableLogicBase
 
 enum State { PLAYING, DONE }
 
-const GAME_SECONDS: float = 90.0
+const GAME_SECONDS: float = 150.0
 ## After all but one are up, the last climber gets this long.
 const LAST_CALL: float = 10.0
 ## Hazard rate: seconds between drops, from the start to `SPAWN_RAMP` seconds in.
-const SPAWN_START: float = 1.6
-const SPAWN_END: float = 0.7
-const SPAWN_RAMP: float = 60.0
+const SPAWN_START: float = 0.5
+const SPAWN_END: float = 0.2
+const SPAWN_RAMP: float = 100.0
 const FIRST_SPAWN: float = 1.0
+## Racks: seconds between them (from the start to `SPAWN_RAMP`), the first one's time, the lanes
+## across the board and how many of them are filled (from the start to `SPAWN_RAMP`, one lane is
+## always the gate).
+const RACK_START: float = 9.0
+const RACK_END: float = 4.5
+const FIRST_RACK: float = 6.0
+const RACK_SLOTS: int = 7
+const RACK_FILL: Array[int] = [4, 6]
+const RACK_SPEED: Array[float] = [7.0, 9.0]
 const KINDS: Array[StringName] = [&"ball", &"coin", &"dice"]
 const KIND_WEIGHTS: Array[float] = [0.45, 0.25, 0.3]
 const RADIUS: Dictionary = {&"ball": 0.3, &"coin": 0.7, &"dice": 0.45}
 ## Flat speed down the board (m/s): [min, max] per kind.
 const SPEED: Dictionary = {&"ball": [8.5, 11.0], &"coin": [4.5, 6.0], &"dice": [5.5, 7.0]}
-const AIM_CHANCE: float = 0.35
+const AIM_CHANCE: float = 0.45
 ## Seconds a hazard falls from the gantry onto the top row, and where on the top row it lands
 ## (metres below the top edge).
 const DROP_TIME: float = 0.45
@@ -77,6 +89,7 @@ var wait_left: float = 0.0
 ## Hazards rolling now (wire dicts, see `path_at`).
 var hazards: Array[Dictionary] = []
 var next_spawn: float = FIRST_SPAWN
+var next_rack: float = FIRST_RACK
 var _next_id: int = 1
 ## Finish groups in order ([[p], [q, r], ...]) and the clock each finished at.
 var finish_groups: Array = []
@@ -123,6 +136,22 @@ func is_untouchable(player: int) -> bool:
 ## Seconds between hazard drops at game clock `t`.
 static func spawn_interval(t: float) -> float:
 	return lerpf(SPAWN_START, SPAWN_END, clampf(t / SPAWN_RAMP, 0.0, 1.0))
+
+
+## Seconds between racks at game clock `t`.
+static func rack_interval(t: float) -> float:
+	return lerpf(RACK_START, RACK_END, clampf(t / SPAWN_RAMP, 0.0, 1.0))
+
+
+## Balls in a rack at game clock `t` (the rest of the `RACK_SLOTS` lanes stay open).
+static func rack_size(t: float) -> int:
+	return roundi(lerpf(float(RACK_FILL[0]), float(RACK_FILL[1]), clampf(t / SPAWN_RAMP, 0.0, 1.0)))
+
+
+## Local x of rack lane `i` (0 .. `RACK_SLOTS` - 1), evenly across the board.
+static func rack_lane(i: int) -> float:
+	var lim: float = ClimbRoom.HALF_W - radius_of(&"ball") - 0.3
+	return lerpf(-lim, lim, float(i) / float(RACK_SLOTS - 1))
 
 
 static func radius_of(kind: StringName) -> float:
@@ -213,6 +242,9 @@ func tick(delta: float, _now: float) -> void:
 	while clock >= next_spawn:
 		_spawn(next_spawn)
 		next_spawn += spawn_interval(next_spawn)
+	while clock >= next_rack:
+		_spawn_rack(next_rack)
+		next_rack += rack_interval(next_rack)
 	hazards = hazards.filter(func(h: Dictionary) -> bool: return clock < end_time(h))
 	_check_hits()
 	_check_finishes()
@@ -247,9 +279,27 @@ func _spawn(t0: float) -> void:
 			var target: int = climbers[rng.range_int(0, climbers.size() - 1)]
 			lane = clampf(server_position(target).x - WalkableLogicBase.ROOM_ORIGIN.x, -lim, lim)
 	var sp: Array = SPEED[kind]
+	_add_hazard(kind, lane, rng.range_float(float(sp[0]), float(sp[1])), t0)
+
+
+## A rack: balls at one speed in `rack_size` of the `RACK_SLOTS` lanes, a random gate lane open.
+func _spawn_rack(t0: float) -> void:
+	var gate: int = rng.range_int(0, RACK_SLOTS - 1)
+	var free: Array[int] = []
+	for i: int in RACK_SLOTS:
+		if i != gate:
+			free.append(i)
+	var speed: float = rng.range_float(RACK_SPEED[0], RACK_SPEED[1])
+	var n: int = mini(rack_size(t0), free.size())
+	for _k: int in n:
+		var i: int = free.pop_at(rng.range_int(0, free.size() - 1))
+		_add_hazard(&"ball", rack_lane(i), speed, t0)
+
+
+func _add_hazard(kind: StringName, lane: float, speed: float, t0: float) -> void:
 	var h: Dictionary = {
 		"id": _next_id, "kind": String(kind), "lane": snappedf(lane, 0.001),
-		"speed": snappedf(rng.range_float(float(sp[0]), float(sp[1])), 0.001),
+		"speed": snappedf(speed, 0.001),
 		"t0": snappedf(t0, 0.001), "seed": rng.range_int(1, 1 << 30),
 	}
 	_next_id += 1

@@ -33,6 +33,7 @@ func _to_game() -> DodgeTheDiceLogic:
 		t += 0.5
 	# No random hazards during the checks.
 	g.next_spawn = INF
+	g.next_rack = INF
 	g.hazards.clear()
 	fx.run(0.1)
 	return g

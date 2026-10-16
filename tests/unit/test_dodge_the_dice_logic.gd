@@ -1,8 +1,9 @@
 extends GutTest
 ## Dodge the Dice (MINIGAME_IDEAS #15): height is progress up the tilted board from the server's
-## positions, standing on the landing finishes in order, the hazard rate grows, the seeded paths
-## stay on the board and match on every machine, a hit knocks down and slides back, immunity after
-## getting up, the landing is safe, the 90 s cap ranks by height with shared ties, last call,
+## positions, standing on the landing finishes in order, the board is the long 25-row climb, the
+## hazard rate grows, racks of balls leave a gate, the seeded paths stay on the board and match on
+## every machine, a hit knocks down and slides back, immunity after
+## getting up, the landing is safe, the 150 s cap ranks by height with shared ties, last call,
 ## dropouts and two players.
 
 const STEP: float = 0.05
@@ -17,6 +18,7 @@ func _game(players: Array[int], seed_value: int = 7) -> DodgeTheDiceLogic:
 	for p: int in players:
 		g.world.set_transform(p, g.spawn_for(p), g.spawn_yaw_for(p))
 	g.next_spawn = INF  # no hazards unless a test wants them
+	g.next_rack = INF
 	return g
 
 
@@ -65,10 +67,10 @@ func test_progress_from_positions() -> void:
 		assert_gt(h, last, "row %d is higher than the one below" % row)
 		assert_lt(h, 1.0, "row %d is not the top" % row)
 		last = h
-	assert_almost_eq(ClimbRoom.progress(_on_row(6)), 0.5, 0.06, "the middle row is about halfway")
+	assert_almost_eq(ClimbRoom.progress(_on_row(ClimbRoom.ROWS / 2)), 0.5, 0.04, "the middle row is about halfway")
 	assert_eq(ClimbRoom.progress(_landing()), 1.0, "the landing is the top")
 	assert_true(ClimbRoom.on_top(_landing()))
-	assert_true(g.arena.has_point(_landing()) and g.arena.has_point(_on_row(12, 6.5)), "the whole climb is in the arena")
+	assert_true(g.arena.has_point(_landing()) and g.arena.has_point(_on_row(ClimbRoom.ROWS - 1, 6.5)), "the whole climb is in the arena")
 	assert_almost_eq(rad_to_deg(ClimbKit.slope_angle(ClimbRoom.flight())), 35.0, 1.5, "tilted ~35 degrees")
 
 
@@ -76,7 +78,7 @@ func test_finish_order() -> void:
 	var g: DodgeTheDiceLogic = _game([1, 2, 3])
 	var evs: Array[Dictionary] = _run(g, STEP)
 	assert_eq(_of(evs, &"dodge_the_dice_begin").size(), 1, "announced on the first tick")
-	g.world.set_transform(2, _on_row(12, 0.0, 0.95), 0.0)
+	g.world.set_transform(2, _on_row(ClimbRoom.ROWS - 1, 0.0, 0.95), 0.0)
 	evs = _run(g, 0.2)
 	assert_true(_of(evs, &"dodge_the_dice_top").is_empty(), "the top row is not the top")
 	g.world.set_transform(2, _landing(), 0.0)
@@ -97,26 +99,86 @@ func test_finish_order() -> void:
 	assert_true(ClimbRoom.on_top(held), "held on the landing: %s" % held)
 
 
+func test_the_board_is_the_long_climb() -> void:
+	assert_eq(ClimbRoom.ROWS, 25, "two betting layouts and the zero")
+	var length: float = WalkableLogicBase.ROOM_ORIGIN.z - ClimbRoom.top_z()
+	assert_almost_eq(length, 65.0, 0.01, "65 m (flat) of board, was 33.8 m")
+	assert_gt(ClimbRoom.top_y(), 45.0, "the landing is way up")
+	assert_eq(ClimbRoom.field_number(0, 1), 1)
+	assert_eq(ClimbRoom.field_number(11, 3), 36)
+	assert_eq(ClimbRoom.field_number(12, 1), 1, "the second layout starts over at 1")
+	assert_eq(ClimbRoom.field_number(23, 3), 36)
+	assert_eq(ClimbRoom.field_number(ClimbRoom.ROWS - 1, 2), 0, "the zero on top")
+	assert_eq(DodgeTheDiceLogic.GAME_SECONDS, 150.0, "more time for the longer climb")
+	for c: Array in ClimbRoom.CHUTES:
+		assert_between(int(c[0]), 1, ClimbRoom.ROWS - 2, "chutes stay off the bottom row and the zero")
+	var rows_with_chutes: Dictionary = {}
+	for c: Array in ClimbRoom.CHUTES:
+		rows_with_chutes[int(c[0])] = true
+	assert_gt(rows_with_chutes.size(), 18, "chutes up the whole board")
+
+
 func test_hazard_rate_grows() -> void:
-	assert_almost_eq(DodgeTheDiceLogic.spawn_interval(0.0), 1.6, 0.001)
-	assert_almost_eq(DodgeTheDiceLogic.spawn_interval(60.0), 0.7, 0.001)
-	assert_almost_eq(DodgeTheDiceLogic.spawn_interval(85.0), 0.7, 0.001)
-	assert_lt(DodgeTheDiceLogic.spawn_interval(30.0), 1.6)
-	assert_gt(DodgeTheDiceLogic.spawn_interval(30.0), 0.7)
+	assert_almost_eq(DodgeTheDiceLogic.spawn_interval(0.0), 0.5, 0.001)
+	assert_almost_eq(DodgeTheDiceLogic.spawn_interval(100.0), 0.2, 0.001)
+	assert_almost_eq(DodgeTheDiceLogic.spawn_interval(140.0), 0.2, 0.001)
+	assert_lt(DodgeTheDiceLogic.spawn_interval(50.0), 0.5)
+	assert_gt(DodgeTheDiceLogic.spawn_interval(50.0), 0.2)
 	var g: DodgeTheDiceLogic = _game([1, 2])
 	g.next_spawn = DodgeTheDiceLogic.FIRST_SPAWN
 	var early: int = _of(_run(g, 10.0), &"dodge_the_dice_hazard").size()
-	_run(g, 50.0)
+	_run(g, 90.0)
 	var late_evs: Array[Dictionary] = _of(_run(g, 10.0), &"dodge_the_dice_hazard")
 	var late: int = late_evs.size()
-	assert_gt(early, 4)
-	assert_gt(late, early + 4, "more hazards later (%d vs %d)" % [late, early])
+	assert_between(early, 17, 22, "about two a second from the start (was 6)")
+	assert_between(late, 48, 52, "five a second late in the round (was 14)")
 	var kinds: Dictionary = {}
 	for e: Dictionary in late_evs:
 		kinds[str(e["kind"])] = true
 		for k: String in ["id", "kind", "lane", "speed", "t0", "seed"]:
 			assert_true(e.has(k), "hazard event has %s" % k)
 	assert_true(g.get_public_state().has("hazards"), "late joiners get the hazards")
+
+
+func test_racks_of_balls_leave_a_gate() -> void:
+	assert_almost_eq(DodgeTheDiceLogic.rack_interval(0.0), 9.0, 0.001)
+	assert_almost_eq(DodgeTheDiceLogic.rack_interval(120.0), 4.5, 0.001)
+	assert_eq(DodgeTheDiceLogic.rack_size(0.0), 4)
+	assert_eq(DodgeTheDiceLogic.rack_size(120.0), 6, "late racks leave only the gate")
+	var lim: float = ClimbRoom.HALF_W - DodgeTheDiceLogic.radius_of(&"ball")
+	assert_lt(absf(DodgeTheDiceLogic.rack_lane(0)), lim + 0.001)
+	assert_lt(DodgeTheDiceLogic.rack_lane(DodgeTheDiceLogic.RACK_SLOTS - 1), lim + 0.001)
+	var g: DodgeTheDiceLogic = _game([1, 2])
+	g.next_rack = DodgeTheDiceLogic.FIRST_RACK
+	var evs: Array[Dictionary] = _of(_run(g, 130.0), &"dodge_the_dice_hazard")
+	var by_t0: Dictionary = {}
+	for e: Dictionary in evs:
+		var key: String = "%.3f" % float(e["t0"])
+		if not by_t0.has(key):
+			by_t0[key] = []
+		(by_t0[key] as Array).append(e)
+	assert_between(by_t0.size(), 18, 22, "a rack every 9 s, then every 4.5 s")
+	var reach: float = DodgeTheDiceLogic.radius_of(&"ball") + DodgeTheDiceLogic.HIT_SLACK
+	var min_size: int = 99
+	var max_size: int = 0
+	for key: String in by_t0:
+		var rack: Array = by_t0[key]
+		min_size = mini(min_size, rack.size())
+		max_size = maxi(max_size, rack.size())
+		# The board's edges count as lanes `reach` outside it (a bean can stand right at the edge).
+		var lanes: Array[float] = [-ClimbRoom.HALF_W - reach, ClimbRoom.HALF_W + reach]
+		for e: Dictionary in rack:
+			assert_eq(StringName(e["kind"]), &"ball", "racks are balls")
+			assert_eq(float(e["speed"]), float((rack[0] as Dictionary)["speed"]), "one speed per rack")
+			lanes.append(float(e["lane"]))
+		lanes.sort()
+		var widest: float = 0.0
+		for i: int in lanes.size() - 1:
+			widest = maxf(widest, lanes[i + 1] - lanes[i])
+		var clear: float = widest - 2.0 * reach
+		assert_gt(clear, 1.9, "a gate a bean fits through (%.2f m clear)" % clear)
+	assert_eq(min_size, 4)
+	assert_eq(max_size, 6)
 
 
 func test_paths_are_deterministic_and_stay_on_the_board() -> void:

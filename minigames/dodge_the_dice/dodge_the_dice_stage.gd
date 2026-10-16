@@ -296,7 +296,7 @@ func _process(delta: float) -> void:
 		set_clock(minf(last_call_left, DodgeTheDiceLogic.GAME_SECONDS - clock))
 	else:
 		set_clock(DodgeTheDiceLogic.GAME_SECONDS - clock)
-	if not _said_halfway and going and clock >= 45.0 and not done:
+	if not _said_halfway and going and clock >= DodgeTheDiceLogic.GAME_SECONDS * 0.5 and not done:
 		_said_halfway = true
 		_say("Halfway! I'm rolling them faster now.", QuizHost.Pose.DRUMROLL)
 	_update_ladder()
