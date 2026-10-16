@@ -5,8 +5,9 @@ extends GutTest
 ## Pummel Party"), disabled with "Start Steam to host" when Steam isn't running (as in these
 ## headless tests); TUTORIAL opens the how-to-play pages and DONE returns. (The first-run
 ## tutorial gate is in test_tutorial.gd; here the tutorial counts as seen.)
-## PLAY ONLINE has no join-by-address and a server browser (Browse Parties); PRACTICE offers a
-## casino match or MINIGAMES ONLY with a note on the minigames a solo player can't play.
+## PLAY ONLINE has no join-by-address and a server browser (Browse Parties); PRACTICE goes
+## straight into a solo casino match (Patrick: "The practise mode should only be the game, not the
+## minigames selection"), no choice box in between.
 
 var menu: Control
 var _old_seen: Variant
@@ -146,19 +147,19 @@ func test_browse_parties_lists_name_players_phase_and_join() -> void:
 	assert_string_contains(menu.browser_status.text, "No public lobbies")
 
 
-func test_practice_offers_casino_or_minigames_only() -> void:
+func test_practice_starts_the_solo_casino_match() -> void:
+	var old_settings: Dictionary = SceneRouter.practice_settings
+	SceneRouter.practice_settings = {"mode": MatchMode.MINIGAMES, "minigames": 3}
+	menu.set(&"load_match", false)
+	watch_signals(menu)
 	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
 	await wait_process_frames(1)
-	assert_true(menu.practice_box.visible, "PRACTICE opens its choice")
-	assert_false((menu.get_node("Center/Column/VBox") as Control).visible)
-	assert_not_null(menu.practice_box.find_child("CasinoMatch", true, false))
-	assert_not_null(menu.practice_box.find_child("MinigamesOnly", true, false))
-	var note: String = menu.call(&"practice_note")
-	assert_string_contains(note, "Casino Quiz", "what a solo player gets")
-	assert_string_contains(note, "Bust or Bank (2+)", "the 2+ player minigames get a note")
-	var before: int = menu.practice_count
-	menu.call(&"_step_practice_count", 1)
-	assert_eq(menu.practice_count, mini(before + 1, Registry.presets.max_minigames))
+	assert_signal_emitted(menu, "practice_requested", "PRACTICE starts the match")
+	assert_eq(SceneRouter.practice_settings, {"mode": MatchMode.CASINO}, "the normal casino match")
+	assert_null(menu.find_child("PracticeMenu", true, false), "no practice choice box")
+	assert_null(menu.find_child("MinigamesOnly", true, false), "no minigames-only entry")
+	assert_null(menu.get(&"practice_box"))
+	SceneRouter.practice_settings = old_settings
 
 
 func test_tutorial_pages_and_done() -> void:

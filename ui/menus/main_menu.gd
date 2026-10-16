@@ -1,10 +1,11 @@
 extends Control
 ## Main menu, centred under the 3D logo (Patrick: "the main menu centered"): Play Online (create a
-## party, join by code, browse public parties), Practice (a casino match or minigames only),
+## party, join by code, browse public parties), Practice (straight into a solo casino match;
+## Patrick: "The practise mode should only be the game"; minigames only stays a lobby mode),
 ## Tutorial (how to play), Quit, and small buttons in the bottom-right corner: "?" (the tutorial
 ## again), the T-shirt (clothes) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
 ## the tutorial first (Patrick: "The Tutorial pops up when you click practise or play for the first
-## time") and then carries on to the box the player chose; `tutorial/seen` in user://settings.cfg
+## time") and then carries on to what the player chose; `tutorial/seen` in user://settings.cfg
 ## remembers it.
 ## Joining shows the joining screen (`Loading`, with the logo) until the match has loaded;
 ## connection errors from the last online attempt are shown here when we return. There is no
@@ -13,6 +14,10 @@ extends Control
 ## Host mode (Patrick: "like Pummel Party"): HOST ON THIS PC (STEAM) runs the party on this PC and
 ## friends join through Steam invites or the "Join a friend" list (`SteamParty`); without Steam
 ## running the button is disabled ("Start Steam to host").
+
+## PRACTICE starts a solo casino match: `practice_requested` fires first, then the match scene
+## loads unless `load_match` is off (tests stop there instead of leaving the menu).
+signal practice_requested(settings: Dictionary)
 
 @onready var _play_online: Button = %PlayOnline
 @onready var _practice: Button = %Practice
@@ -50,13 +55,8 @@ var browser_list: VBoxContainer
 var browser_status: Label
 var _refresh_button: Button
 var _browser_seq: int = 0
-## Practice choice: a casino match or minigames only (Patrick: "Play minigames button").
-var practice_box: VBoxContainer
-var practice_count: int = 5
-var _practice_casino: Button
-var _practice_minigames: Button
-var _practice_count_label: Label
-var _practice_note: Label
+## Off in tests: PRACTICE stops at `practice_requested` instead of loading the match.
+var load_match: bool = true
 
 
 func _ready() -> void:
@@ -90,7 +90,7 @@ func _ready() -> void:
 	move_child(shade, 2)
 	(%Footer as Label).text = "BUILD %s" % Protocol.BUILD_ID
 	_quit.pressed.connect(_on_quit_pressed)
-	_practice.pressed.connect(func() -> void: _tutorial_first(_show_practice))
+	_practice.pressed.connect(func() -> void: _tutorial_first(start_practice))
 	_play_online.pressed.connect(func() -> void: _tutorial_first(_show_online))
 	_tutorial.pressed.connect(func() -> void: _show_tutorial(_tutorial))
 	_settings_button = GearButton.new()
@@ -153,7 +153,6 @@ func _ready() -> void:
 	how_to_play.closed.connect(_on_tutorial_closed)
 	_build_online()
 	_build_browser()
-	_build_practice()
 	_practice.grab_focus()
 	Audio.set_mood(&"menu")
 	if DisplayServer.get_name() != "headless":
@@ -267,66 +266,13 @@ func _build_browser() -> void:
 	bottom.add_child(_button("Back", _show_online, 200))
 
 
-## PRACTICE: a casino match (as before) or MINIGAMES ONLY with a chosen number of minigames.
-func _build_practice() -> void:
-	practice_box = _sub_box("PracticeMenu", "PRACTICE")
-	_practice_casino = _button("Casino Match", func() -> void: start_practice(MatchMode.CASINO))
-	_practice_casino.name = "CasinoMatch"
-	practice_box.add_child(_practice_casino)
-	_practice_minigames = _button("Minigames Only", func() -> void: start_practice(MatchMode.MINIGAMES))
-	_practice_minigames.name = "MinigamesOnly"
-	practice_box.add_child(_practice_minigames)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override(&"separation", 10)
-	practice_box.add_child(row)
-	var label := Label.new()
-	label.text = "MINIGAMES"
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(label)
-	row.add_child(_button("−", func() -> void: _step_practice_count(-1), 54))
-	_practice_count_label = Label.new()
-	_practice_count_label.custom_minimum_size = Vector2(70, 0)
-	_practice_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	row.add_child(_practice_count_label)
-	row.add_child(_button("+", func() -> void: _step_practice_count(1), 54))
-	_practice_note = Label.new()
-	_practice_note.theme_type_variation = &"SmallLabel"
-	_practice_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_practice_note.custom_minimum_size = Vector2(540, 0)
-	_practice_note.text = practice_note()
-	practice_box.add_child(_practice_note)
-	practice_box.add_child(_button("Back", _show_main))
-	practice_count = int(SceneRouter.practice_settings.get("minigames", Registry.presets.default_minigames))
-	_step_practice_count(0)
-
-
-## Which minigames a solo practice can't play (they need more players).
-static func practice_note() -> String:
-	var defs: Array = Registry.minigames.values()
-	var solo: PackedStringArray = []
-	for d: MinigameDefinition in defs:
-		if d.min_players <= 1:
-			solo.append(d.display_name)
-	var parts: PackedStringArray = []
-	for d: MinigameDefinition in MatchMode.needs_more_players(defs, 1):
-		parts.append("%s (%d+)" % [d.display_name, d.min_players])
-	if parts.is_empty():
-		return "Every minigame works solo."
-	return "Solo you play %s. These need more players, so play them in a lobby: %s." % [", ".join(solo) if not solo.is_empty() else "none", ", ".join(parts)]
-
-
-func _step_practice_count(step: int) -> void:
-	var presets: MatchPresets = Registry.presets
-	practice_count = clampi(practice_count + step, maxi(presets.min_minigames, 1), presets.max_minigames)
-	_practice_count_label.text = "%d" % practice_count
-
-
-## Starts a Practice match in `mode` (the match scene merges `SceneRouter.practice_settings`).
-func start_practice(mode: StringName) -> void:
-	SceneRouter.practice_settings = {"mode": mode}
-	if mode == MatchMode.MINIGAMES:
-		SceneRouter.practice_settings["minigames"] = practice_count
-	SceneRouter.goto(SceneRouter.MATCH)
+## PRACTICE: the solo casino match straight away (the match scene merges
+## `SceneRouter.practice_settings` over the command line's).
+func start_practice() -> void:
+	SceneRouter.practice_settings = {"mode": MatchMode.CASINO}
+	practice_requested.emit(SceneRouter.practice_settings)
+	if load_match:
+		SceneRouter.goto(SceneRouter.MATCH)
 
 
 func _button(text: String, cb: Callable, min_width: float = 0.0) -> Button:
@@ -342,7 +288,6 @@ func _hide_boxes() -> void:
 	_set_logo_visible(false)
 	_online_box.visible = false
 	browser_box.visible = false
-	practice_box.visible = false
 	how_to_play.visible = false
 
 
@@ -352,12 +297,6 @@ func _show_online() -> void:
 	_status.text = ""
 	_refresh_steam_entries()
 	_create_button.grab_focus()
-
-
-func _show_practice() -> void:
-	_hide_boxes()
-	practice_box.visible = true
-	_practice_casino.grab_focus()
 
 
 func _show_browser() -> void:
@@ -374,8 +313,8 @@ static func tutorial_seen() -> bool:
 	return bool(Settings.get_value("tutorial", "seen", false))
 
 
-## PRACTICE / PLAY ONLINE: the first time ever, the tutorial comes first and `next` (the box the
-## player chose) opens when it closes; afterwards `next` straight away.
+## PRACTICE / PLAY ONLINE: the first time ever, the tutorial comes first and `next` (the match or
+## the box the player chose) follows when it closes; afterwards `next` straight away.
 func _tutorial_first(next: Callable) -> void:
 	if tutorial_seen():
 		next.call()
@@ -391,7 +330,7 @@ func _show_tutorial(opener: Control) -> void:
 	how_to_play.open()
 
 
-## DONE / SKIP / Esc: remembered as seen; on to the chosen box, or back to the entries.
+## DONE / SKIP / Esc: remembered as seen; on to the chosen match or box, or back to the entries.
 func _on_tutorial_closed() -> void:
 	Settings.set_value("tutorial", "seen", true)
 	Settings.save()
@@ -408,11 +347,10 @@ func _on_tutorial_closed() -> void:
 func _show_main() -> void:
 	if _busy:
 		return
-	var back_to: Button = _practice if practice_box.visible else _play_online
 	_hide_boxes()
 	_set_logo_visible(true)
 	_main_box.visible = true
-	back_to.grab_focus()
+	_play_online.grab_focus()
 
 
 ## Esc steps back out of a sub-menu (the settings panel and the tutorial handle their own).
@@ -422,7 +360,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if browser_box.visible:
 		get_viewport().set_input_as_handled()
 		_show_online()
-	elif _online_box.visible or practice_box.visible:
+	elif _online_box.visible:
 		get_viewport().set_input_as_handled()
 		_show_main()
 

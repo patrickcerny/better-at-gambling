@@ -3,20 +3,23 @@ extends GutTest
 ## with buttons. After that, theres a questionmark button just like the settings where you can see
 ## it again. The Tutorial pops up when you click practise or play for the first time."): picture
 ## pages with BACK / NEXT / DONE and SKIP; the first PRACTICE or PLAY ONLINE shows it once
-## (`tutorial/seen` in user://settings.cfg) and then opens what was chosen; a "?" next to the gear
+## (`tutorial/seen` in user://settings.cfg) and then carries on (PRACTICE: the solo casino match); a "?" next to the gear
 ## opens it from the main menu and from the pause menu.
 
 var _old_seen: Variant
+var _old_practice: Dictionary
 
 
 func before_each() -> void:
 	_old_seen = Settings.get_value("tutorial", "seen", "unset")
+	_old_practice = SceneRouter.practice_settings
 
 
 func after_each() -> void:
 	# Put the player's own flag back ("unset": erase the key again).
 	Settings.set_value("tutorial", "seen", null if typeof(_old_seen) == TYPE_STRING else _old_seen)
 	Settings.save()
+	SceneRouter.practice_settings = _old_practice
 
 
 func _menu() -> Control:
@@ -104,29 +107,43 @@ func test_escape_and_skip_close() -> void:
 	assert_false(how.visible, "SKIP closes")
 
 
-func test_first_practice_shows_the_tutorial_then_the_practice_box() -> void:
+func test_first_practice_shows_the_tutorial_then_starts_the_match() -> void:
 	Settings.set_value("tutorial", "seen", false)
 	Settings.save()
 	var menu: Control = await _menu()
+	menu.set(&"load_match", false)
+	watch_signals(menu)
 	var how: HowToPlayPanel = menu.get("how_to_play")
 	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
 	await wait_process_frames(1)
 	assert_true(how.visible, "the first PRACTICE opens the tutorial")
-	assert_false(menu.practice_box.visible, "the practice choice waits")
+	assert_signal_not_emitted(menu, "practice_requested", "the match waits")
 	assert_eq(how.page, 0)
 	for i: int in HowToPlayPanel.PAGES.size() - 1:
 		how.next_button.pressed.emit()
 	how.done_button.pressed.emit()
 	await wait_process_frames(1)
 	assert_false(how.visible)
-	assert_true(menu.practice_box.visible, "DONE carries on to the practice choice")
+	assert_signal_emit_count(menu, "practice_requested", 1, "DONE carries on to the match")
 	assert_true(bool(Settings.get_value("tutorial", "seen", false)), "remembered")
 	assert_true(_saved_seen(), "written to user://settings.cfg")
 	menu.call(&"_show_main")
 	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
 	await wait_process_frames(1)
 	assert_false(how.visible, "only once")
-	assert_true(menu.practice_box.visible)
+	assert_signal_emit_count(menu, "practice_requested", 2)
+
+
+func test_first_practice_skip_also_starts_the_match() -> void:
+	Settings.set_value("tutorial", "seen", false)
+	var menu: Control = await _menu()
+	menu.set(&"load_match", false)
+	watch_signals(menu)
+	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
+	await wait_process_frames(1)
+	(menu.get("how_to_play") as HowToPlayPanel).skip_button.pressed.emit()
+	await wait_process_frames(1)
+	assert_signal_emit_count(menu, "practice_requested", 1, "SKIP carries on to the match")
 
 
 func test_first_play_online_skip_carries_on_to_the_online_box() -> void:
@@ -142,13 +159,15 @@ func test_first_play_online_skip_carries_on_to_the_online_box() -> void:
 	assert_true(bool(Settings.get_value("tutorial", "seen", false)))
 
 
-func test_seen_goes_straight_to_the_practice_box() -> void:
+func test_seen_goes_straight_to_the_match() -> void:
 	Settings.set_value("tutorial", "seen", true)
 	var menu: Control = await _menu()
+	menu.set(&"load_match", false)
+	watch_signals(menu)
 	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
 	await wait_process_frames(1)
 	assert_false((menu.get("how_to_play") as HowToPlayPanel).visible)
-	assert_true(menu.practice_box.visible)
+	assert_signal_emit_count(menu, "practice_requested", 1)
 
 
 func test_question_mark_in_the_main_menu() -> void:
@@ -171,7 +190,7 @@ func test_question_mark_in_the_main_menu() -> void:
 	how.skip_button.pressed.emit()
 	await wait_process_frames(1)
 	assert_true((menu.get_node("Center/Column/VBox") as Control).visible, "back to the entries")
-	assert_false(menu.practice_box.visible, "nothing else opens")
+	assert_false((menu.find_child("Online", true, false) as Control).visible, "nothing else opens")
 	assert_true(help.has_focus(), "focus back on ?")
 
 
