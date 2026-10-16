@@ -1,8 +1,8 @@
 extends GutTest
 ## Jackpot Climb on the authoritative server: the room opens with everyone on the apron, a
 ## reported step onto the pad finishes the bean, a bat swing decided from the server's positions
-## knocks a neighbour off (a real knockdown with the attacker), and grabbing is off (shoving stays
-## on).
+## knocks a neighbour off (a real knockdown with the attacker), a fall after a checkpoint flag
+## comes back on that flag (the server moves the body), and grabbing is off (shoving stays on).
 
 var fx: ServerFixture
 
@@ -98,6 +98,28 @@ func test_a_swing_knocks_a_neighbour_down() -> void:
 	fx.server.report_got_up(b, fx.server.world.get_position(b))
 	assert_false(g.is_down(b))
 	assert_true(g.is_immune(b), "the short grace after getting up")
+
+
+func test_a_fall_after_flag_two_comes_back_on_flag_two() -> void:
+	var g: JackpotClimbLogic = _to_game()
+	var a: int = fx.player_ids[0]
+	var o: Vector3 = WalkableLogicBase.ROOM_ORIGIN
+	fx.server.world.set_transform(a, o + (ChipTowers.checkpoints()[0]["spots"] as Array)[0], 0.0)
+	fx.run(0.2)
+	fx.server.world.set_transform(a, o + (ChipTowers.checkpoints()[1]["spots"] as Array)[0], 0.0)
+	fx.run(0.2)
+	assert_eq(g.checkpoint.get(a, 0), 2, "flag 2 reached")
+	assert_eq(fx.of_type(&"jackpot_climb_checkpoint").size(), 2)
+	# Off the edge, all the way down to the net.
+	fx.server.world.set_transform(a, o + Vector3(-10.5, 0.0, ChipTowers.CENTER_Z), 0.0)
+	fx.run(0.2)
+	assert_eq(fx.of_type(&"jackpot_climb_respawn").size(), 1)
+	var moved: Array[Dictionary] = fx.of_type(&"minigame_player_moved").filter(func(e: Dictionary) -> bool: return int(e["player"]) == a)
+	assert_eq(moved.size(), 1, "the scene is told to put the body back")
+	var at: Vector3 = fx.server.world.get_position(a)
+	assert_eq(ChipTowers.checkpoint_at(at - o), 2, "on tier 2, not the floor: %s" % at)
+	assert_almost_eq(at.distance_to(g.respawn_spot(a, 2)), 0.0, 0.01)
+	assert_gte(float(fx.server.get_snapshot()["minigame"]["checkpoints"][a]), 2.0)
 
 
 func test_grab_refused_shove_allowed() -> void:

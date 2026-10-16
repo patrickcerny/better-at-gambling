@@ -10,10 +10,11 @@ extends RefCounted
 ##   bets up the east strip, the columns' 2:1 are painted on the apron. Some fields are polished
 ##   brass slide chutes (`CHUTES`) that carry a bean back down a row. On top: a landing with a gold
 ##   WINNER rail, Lucky's podium and a brass gantry of hoppers that drop the hazards.
-## - `"towers"` (Jackpot Climb): a staggered spiral of giant chip stacks (`ChipTowers`) winding
-##   inward and upward round the central jackpot stack, whose gold pad (the finish box) waits at
-##   `TOWER_TOP_Y` under the JACKPOT sign. A safety net covers the floor from the apron to the far
-##   wall. The climb axis runs straight up the jackpot stack, so progress is height.
+## - `"towers"` (Jackpot Climb): a cake of three giant-chip tiers with a checkpoint flag on each,
+##   climbed on two lanes of chip stacks round every tier (`ChipTowers`) up to the jackpot stack,
+##   whose gold pad (the finish box) waits at `TOWER_TOP_Y` under the JACKPOT sign. The hall is
+##   wider here (`half_x`). A safety net covers the floor from the apron to the far wall. The climb
+##   axis runs straight up the jackpot stack, so progress is height.
 ##
 ## `layout(variant)` is pure data for the server, `build(parent, variant)` makes the nodes, both
 ## around `WalkableLogicBase.ROOM_ORIGIN` (the centre of the board's bottom edge, on the floor).
@@ -50,6 +51,11 @@ const TOWER_TOP_Y: float = ChipTowers.TOP_Y
 const WALNUT: Color = Color("#4A2E1D")
 const WALNUT_DARK: Color = Color("#2B1A10")
 const LAMP: Color = Color(1.0, 0.8, 0.52)
+
+## Half width of the hall: the towers hall is wider than the board's (the chip cake needs it).
+static func half_x(variant: String) -> float:
+	return ChipTowers.HALL_HALF_X if variant == "towers" else HALL_HALF_X
+
 
 ## variant → its layout (pure data, built once: the server reads it every tick). Read only.
 static var _layouts: Dictionary = {}
@@ -103,11 +109,12 @@ static func _make_layout(variant: String) -> Dictionary:
 	var spots: Array[Vector3] = []
 	for i: int in MAX_SPOTS:
 		spots.append(o + Vector3(-7.0 + 2.0 * float(i), GALLERY_H, GALLERY_Z + 1.6 + (0.5 if i % 2 == 1 else 0.0)))
-	var gallery := AABB(o + Vector3(-HALL_HALF_X + 0.2, GALLERY_H - 0.6, GALLERY_Z + 0.2), Vector3((HALL_HALF_X - 0.2) * 2.0, 4.5, BACK_Z - GALLERY_Z - 0.4))
+	var hx: float = half_x(variant)
+	var gallery := AABB(o + Vector3(-hx + 0.2, GALLERY_H - 0.6, GALLERY_Z + 0.2), Vector3((hx - 0.2) * 2.0, 4.5, BACK_Z - GALLERY_Z - 0.4))
 	if variant == "towers":
 		var c: Vector3 = o + ChipTowers.pad_center()
 		var far: float = o.z + ChipTowers.FAR_Z + 0.2
-		var tower_arena := AABB(Vector3(o.x - HALL_HALF_X + 0.2, o.y - 1.0, far), Vector3((HALL_HALF_X - 0.2) * 2.0, TOWER_TOP_Y + 8.0, o.z + GALLERY_Z - 0.2 - far))
+		var tower_arena := AABB(Vector3(o.x - hx + 0.2, o.y - 1.0, far), Vector3((hx - 0.2) * 2.0, TOWER_TOP_Y + 8.0, o.z + GALLERY_Z - 0.2 - far))
 		var t_axis: Array[Vector3] = [Vector3(c.x, o.y, c.z), c]
 		return {"arena": tower_arena, "gallery": gallery, "spawns": spawns, "spawn_yaws": yaws, "gallery_spots": spots,
 			"axis": t_axis, "finish": ChipTowers.finish_box(o), "finish_spots": ChipTowers.finish_spots(o)}
@@ -165,7 +172,7 @@ static func build(parent: Node3D, variant: String = "board") -> Node3D:
 	var wall_h: float = (top_y() if variant == "board" else TOWER_TOP_Y) + 9.0
 	_shell(root, brass, wall_h, variant)
 	_apron(root, brass, variant)
-	_gallery(root, brass)
+	_gallery(root, brass, variant)
 	if variant == "towers":
 		ChipTowers.build(root, brass, wall_h)
 		_tower_lucky_podium(root, brass)
@@ -187,15 +194,16 @@ static func _shell(root: Node3D, brass: Material, wall_h: float, variant: String
 	var panels: StandardMaterial3D = VaultArena._tex("wooden_panels", 1.4, Color(0.55, 0.38, 0.28), 0.0, 0.6)
 	var ceiling: StandardMaterial3D = VaultArena._tex("coffered_ceiling", 3.0, Color(0.45, 0.36, 0.3), 0.0, 0.8)
 	var wood: StandardMaterial3D = GreyboxKit.material(WALNUT_DARK, 0.0, 0.55)
-	var w: float = HALL_HALF_X * 2.0
+	var hx: float = half_x(variant)
+	var w: float = hx * 2.0
 	VaultArena._solid(root, Vector3(w + 1.0, 0.4, len_z + 1.0), Vector3(0, -0.2, mid_z), carpet, "Floor")
 	VaultArena._solid(root, Vector3(w + 1.0, 0.4, len_z + 1.0), Vector3(0, wall_h + 0.2, mid_z), ceiling, "Ceiling")
-	VaultArena._solid(root, Vector3(WALL_T, wall_h, len_z + 1.0), Vector3(-HALL_HALF_X - WALL_T * 0.5, wall_h * 0.5, mid_z), paper, "WallW")
-	VaultArena._solid(root, Vector3(WALL_T, wall_h, len_z + 1.0), Vector3(HALL_HALF_X + WALL_T * 0.5, wall_h * 0.5, mid_z), paper, "WallE")
+	VaultArena._solid(root, Vector3(WALL_T, wall_h, len_z + 1.0), Vector3(-hx - WALL_T * 0.5, wall_h * 0.5, mid_z), paper, "WallW")
+	VaultArena._solid(root, Vector3(WALL_T, wall_h, len_z + 1.0), Vector3(hx + WALL_T * 0.5, wall_h * 0.5, mid_z), paper, "WallE")
 	VaultArena._solid(root, Vector3(w, wall_h, WALL_T), Vector3(0, wall_h * 0.5, far - WALL_T * 0.5), paper, "WallFar")
 	VaultArena._solid(root, Vector3(w, wall_h, WALL_T), Vector3(0, wall_h * 0.5, BACK_Z + WALL_T * 0.5), paper, "WallBack")
 	for side: float in [-1.0, 1.0]:
-		var x: float = side * (HALL_HALF_X - 0.04)
+		var x: float = side * (hx - 0.04)
 		VaultArena._vis(root, Vector3(0.08, 1.4, len_z), Vector3(x, 0.7, mid_z), panels)
 		VaultArena._vis(root, Vector3(0.12, 0.06, len_z), Vector3(x - side * 0.02, 1.42, mid_z), brass)
 		VaultArena._vis(root, Vector3(0.2, 0.3, len_z), Vector3(x - side * 0.06, wall_h - 0.15, mid_z), wood)
@@ -207,12 +215,12 @@ static func _shell(root: Node3D, brass: Material, wall_h: float, variant: String
 	var i: int = 0
 	while z > far + 2.0:
 		for side: float in [-1.0, 1.0]:
-			VaultArena._vis(root, Vector3(0.5, wall_h, 0.9), Vector3(side * (HALL_HALF_X - 0.25), wall_h * 0.5, z), marble)
-			VaultArena._vis(root, Vector3(0.62, 0.3, 1.02), Vector3(side * (HALL_HALF_X - 0.25), 0.15, z), marble)
+			VaultArena._vis(root, Vector3(0.5, wall_h, 0.9), Vector3(side * (hx - 0.25), wall_h * 0.5, z), marble)
+			VaultArena._vis(root, Vector3(0.62, 0.3, 1.02), Vector3(side * (hx - 0.25), 0.15, z), marble)
 			if z > far + 6.0 and PropModels.has(&"picture"):
 				var pic: Node3D = PropModels.make(&"picture", 0.0, 2.2)
 				var fz: float = z - 3.5
-				pic.position = Vector3(side * (HALL_HALF_X - 0.06), (ClimbKit.surface_y(flight(true), fz) if variant == "board" else 2.0) + 3.6, fz)
+				pic.position = Vector3(side * (hx - 0.06), (ClimbKit.surface_y(flight(true), fz) if variant == "board" else 2.0) + 3.6, fz)
 				pic.rotation = Vector3(0, -side * PI * 0.5, 0)
 				root.add_child(pic)
 		z -= 7.0
@@ -236,16 +244,17 @@ static func _apron(root: Node3D, brass: Material, variant: String = "board") -> 
 		_tile(root, Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 2.5)), Vector2(6.0, 1.4), Palette.FELT_GREEN.darkened(0.25), "JACKPOT CLIMB", 90)
 	else:
 		_board_apron(root, brass)
+	var hx: float = half_x(variant)
 	# Velvet ropes keep beans off the aisles beside the board.
 	var velvet: StandardMaterial3D = VaultArena._tex("velvet", 1.0, Palette.VIP_BURGUNDY.lightened(0.1), 0.0, 0.9)
 	for side: float in [-1.0, 1.0]:
-		for px: float in [HALF_W + 0.3, HALL_HALF_X - 0.4]:
+		for px: float in [HALF_W + 0.3, hx - 0.4]:
 			var p := Vector3(side * px, 0.0, 0.6)
 			ParlorRoom._cyl(root, 0.05, 0.95, p + Vector3(0, 0.475, 0), brass, 10)
 			ParlorRoom._cyl(root, 0.2, 0.05, p + Vector3(0, 0.025, 0), brass, 14)
 			VaultArena._sphere(root, 0.08, p + Vector3(0, 0.98, 0), brass)
-		VaultArena._vis(root, Vector3(HALL_HALF_X - HALF_W - 0.7, 0.06, 0.06), Vector3(side * (HALF_W + HALL_HALF_X - 0.1) * 0.5, 0.8, 0.6), velvet)
-		ClimbKit.guard(root, Vector3(HALL_HALF_X - HALF_W, 3.0, 0.4), Vector3(side * (HALF_W + HALL_HALF_X) * 0.5, 1.5, 0.6), "AisleGuard")
+		VaultArena._vis(root, Vector3(hx - HALF_W - 0.7, 0.06, 0.06), Vector3(side * (HALF_W + hx - 0.1) * 0.5, 0.8, 0.6), velvet)
+		ClimbKit.guard(root, Vector3(hx - HALF_W, 3.0, 0.4), Vector3(side * (HALF_W + hx) * 0.5, 1.5, 0.6), "AisleGuard")
 
 
 ## Lucky's podium in the apron's west corner (towers): walnut with a brass cap.
@@ -270,25 +279,26 @@ static func _board_apron(root: Node3D, brass: Material) -> void:
 	VaultArena._vis(root, Vector3(HALF_W * 2.0, 0.06, 0.08), Vector3(0, 0.04, 1.06), brass)
 
 
-static func _gallery(root: Node3D, brass: Material) -> void:
+static func _gallery(root: Node3D, brass: Material, variant: String = "board") -> void:
+	var hx: float = half_x(variant)
 	var depth: float = BACK_Z - GALLERY_Z
 	var mid: float = GALLERY_Z + depth * 0.5
-	VaultArena._solid(root, Vector3(HALL_HALF_X * 2.0, GALLERY_H, depth), Vector3(0, GALLERY_H * 0.5, mid), GreyboxKit.material(WALNUT_DARK, 0.0, 0.5), "Gallery")
+	VaultArena._solid(root, Vector3(hx * 2.0, GALLERY_H, depth), Vector3(0, GALLERY_H * 0.5, mid), GreyboxKit.material(WALNUT_DARK, 0.0, 0.5), "Gallery")
 	var rug := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(HALL_HALF_X * 2.0 - 0.6, depth - 0.5)
+	pm.size = Vector2(hx * 2.0 - 0.6, depth - 0.5)
 	rug.mesh = pm
 	rug.material_override = VaultArena._tex("velvet", 1.5, Palette.VIP_BURGUNDY.lightened(0.15), 0.0, 0.9)
 	rug.position = Vector3(0, GALLERY_H + 0.012, mid + 0.1)
 	root.add_child(rug)
-	VaultArena._vis(root, Vector3(HALL_HALF_X * 2.0, 0.08, 0.08), Vector3(0, GALLERY_H + 1.0, GALLERY_Z + 0.08), brass)
-	VaultArena._vis(root, Vector3(HALL_HALF_X * 2.0, 0.05, 0.05), Vector3(0, GALLERY_H + 0.5, GALLERY_Z + 0.08), brass)
-	var x: float = -HALL_HALF_X + 0.4
-	while x < HALL_HALF_X:
+	VaultArena._vis(root, Vector3(hx * 2.0, 0.08, 0.08), Vector3(0, GALLERY_H + 1.0, GALLERY_Z + 0.08), brass)
+	VaultArena._vis(root, Vector3(hx * 2.0, 0.05, 0.05), Vector3(0, GALLERY_H + 0.5, GALLERY_Z + 0.08), brass)
+	var x: float = -hx + 0.4
+	while x < hx:
 		VaultArena._vis(root, Vector3(0.06, 1.0, 0.06), Vector3(x, GALLERY_H + 0.5, GALLERY_Z + 0.08), brass)
 		x += 0.8
-	VaultArena._vis(root, Vector3(HALL_HALF_X * 2.0, 0.1, 0.12), Vector3(0, GALLERY_H - 0.05, GALLERY_Z + 0.02), brass)
-	ClimbKit.guard(root, Vector3(HALL_HALF_X * 2.0, 3.6, 0.3), Vector3(0, GALLERY_H + 1.8, GALLERY_Z), "GalleryBarrier")
+	VaultArena._vis(root, Vector3(hx * 2.0, 0.1, 0.12), Vector3(0, GALLERY_H - 0.05, GALLERY_Z + 0.02), brass)
+	ClimbKit.guard(root, Vector3(hx * 2.0, 3.6, 0.3), Vector3(0, GALLERY_H + 1.8, GALLERY_Z), "GalleryBarrier")
 	if PropModels.has(&"couch"):
 		for cx: float in [-6.0, 0.0, 6.0]:
 			var couch: Node3D = PropModels.make(&"couch", 0.0, 2.4)

@@ -47,6 +47,18 @@ Grab/hold, shove (2 hits in 1.5 s or 3 in 4 s → knockdown/KO), throw, knockout
 per shake capped 8% / $400×mult. Seated players protected. Security guards throw out attackers seen
 within 8 m. Money never depends on physics.
 
+## Minigames
+- **Jackpot Climb** (climb room "towers"): a jump-and-run up a 26 m cake of giant casino chips to
+  the gold pad under the JACKPOT sign. Three giant-chip tiers (tops at 8.5, 16 and 21.5 m) each
+  carry a checkpoint flag; round every tier two lanes of chip stacks fork at the flag and rejoin
+  on the next tier: a steady side of short hops (0.6–1.2 m of air) and a bold side with one or two
+  wide running jumps (2.6–2.9 m), the last climb round the jackpot stack is two lanes of narrow
+  stacks. The layout is fixed, so everyone climbs the same tower. The server sets each bean's
+  checkpoint when it stands on a tier and puts anyone who drops 2.5 m below it back at that flag
+  (before the first flag a fall just lands on the net). Bats knock climbers off, shoving is on,
+  grabbing off. 150 s; first to the pad wins, then the order of arrival, then the rest by height
+  (never counted below their checkpoint), with a 10 s last call once all but one are up.
+
 ## Online
 Dedicated Godot server per room on the owner's VPS, FastAPI room orchestrator, ENet over UDP,
 5-character room codes, Steam lobbies for invites/presence (M8).

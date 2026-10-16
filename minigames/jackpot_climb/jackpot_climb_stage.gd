@@ -4,10 +4,12 @@ extends WalkableStage
 ## `WalkableStage`: real avatars, the normal camera). Every bean carries the casino's baseball bat
 ## (Bat Heist's model and swing); E swings it, the server decides the hit
 ## (`minigame_action {kind: "swing", target?}`) and the room's knockdown throws the ragdoll away
-## from the attacker and up, off the ledge (`MatchScene._knock_down`). The JACKPOT sign turns
-## slowly over the pad, its warm bulbs chasing, and flashes each finisher's name. Lucky hosts
-## from the podium by the apron. The overlay: the clock, a vertical ladder with a rung per ledge
-## and every bean's marker, the finish order, the feed, Lucky's line and a context prompt.
+## from the attacker and up, off the ledge (`MatchScene._knock_down`). Reaching a tier lights its
+## checkpoint flag for us (gold cloth, a burst, a banner); falling below it, the server puts us back
+## at the flag (`minigame_player_moved`) and we show a puff there. The JACKPOT sign turns slowly
+## over the pad, its warm bulbs chasing, and flashes each finisher's name. Lucky hosts from the
+## podium by the apron. The overlay: the clock, a vertical ladder with a flag per checkpoint and
+## every bean's marker, the finish order, the feed, Lucky's line and a context prompt.
 
 const LADDER_H: float = 420.0
 const MARKER: float = 30.0
@@ -21,6 +23,8 @@ var finish_groups: Array = []
 var down_left: Dictionary[int, float] = {}
 var immune_left: Dictionary[int, float] = {}
 var last_call_left: float = -1.0
+## player → checkpoint reached (1..3).
+var checkpoints: Dictionary[int, int] = {}
 var host: QuizHost = null
 ## player → the bat in their hand.
 var bats: Dictionary[int, Node3D] = {}
@@ -40,6 +44,9 @@ var _host_panel: PanelContainer = null
 var _host_label: Label = null
 var _status_left: float = 0.0
 var _said_halfway: bool = false
+## Checkpoint index → its flag's cloth (lit gold once we reached it).
+var _cloths: Dictionary[int, MeshInstance3D] = {}
+var _lit_cloth: StandardMaterial3D = null
 
 
 func _build_room() -> Node3D:
@@ -56,12 +63,13 @@ func _build_game(_start: Dictionary) -> void:
 	host.rotation.y = 2.3  # facing the towers and the apron
 	host.scale = Vector3.ONE * 1.3
 	_find_sign()
+	_find_flags()
 	_build_bats()
 	if overlay != null:
 		_build_ladder()
 		_build_host_panel()
 	set_clock(JackpotClimbLogic.GAME_SECONDS)
-	_say("Welcome to the Jackpot Climb! Up the chips to my sign. Bats are allowed, so mind the edge.", QuizHost.Pose.HAPPY)
+	_say("Welcome to the Jackpot Climb! Hop up the chips to my sign. Every tier has a flag to catch your fall. Bats are allowed, so mind the edge.", QuizHost.Pose.HAPPY)
 	_refresh_status()
 
 
@@ -85,6 +93,10 @@ func apply_state(st: Dictionary) -> void:
 	for k: Variant in im:
 		immune_left[int(k)] = float(im[k])
 	last_call_left = float(st.get("last_call", -1.0))
+	var cps: Dictionary = st.get("checkpoints", {})
+	for k: Variant in cps:
+		checkpoints[int(k)] = maxi(int(cps[k]), int(checkpoints.get(int(k), 0)))
+	_light_flags()
 	_refresh_status()
 
 
@@ -177,6 +189,10 @@ func on_event(ev: Dictionary) -> void:
 			_set_immune(p, float(ev.get("immune", JackpotClimbLogic.IMMUNE_SECONDS)))
 		&"jackpot_climb_top":
 			_on_top(ev)
+		&"jackpot_climb_checkpoint":
+			_on_checkpoint(int(ev["player"]), int(ev.get("index", 1)))
+		&"jackpot_climb_respawn":
+			_on_respawn(int(ev["player"]), int(ev.get("index", 1)), Serializer.to_vec3(ev.get("pos", [])) if ev.has("pos") else Vector3.INF)
 		&"jackpot_climb_last_call":
 			last_call_left = float(ev.get("seconds", JackpotClimbLogic.LAST_CALL))
 			banner("LAST CALL!", Palette.LOSS_RED, 1.4)
@@ -219,6 +235,61 @@ func _on_hit(by: int, target: int, seconds: float) -> void:
 			scene._juice(0.04, 0.15)
 	elif randf() < 0.3:
 		_say("Ooh! %s takes the express elevator down." % player_name(target), QuizHost.Pose.SURPRISED)
+
+
+func _on_checkpoint(pid: int, k: int) -> void:
+	if k <= int(checkpoints.get(pid, 0)):
+		return
+	checkpoints[pid] = k
+	var a: PlayerAvatar = avatar(pid)
+	if pid == local_id:
+		banner("CHECKPOINT %d!" % k, Palette.VIP_GOLD, 1.4)
+		Audio.play(&"chime", &"SFX", -6.0, 1.1)
+		_light_flags()
+		var cloth: MeshInstance3D = _cloths.get(k, null)
+		if cloth != null and is_instance_valid(cloth):
+			WinFx.gold_burst(self, cloth.global_position, 0.7)
+			var t: Tween = cloth.create_tween()
+			cloth.scale = Vector3(1.0, 0.2, 1.0)
+			t.tween_property(cloth, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	elif a != null:
+		WinFx.coin_burst(self, a.global_position + Vector3(0, 1.2, 0), 8, 2.0)
+	feed("%s reached checkpoint %d" % [player_name(pid), k], player_color(pid))
+	if pid != local_id and randf() < 0.35:
+		_say("%s plants a flag on tier %d!" % [player_name(pid), k], QuizHost.Pose.HAPPY)
+
+
+func _on_respawn(pid: int, k: int, at: Vector3) -> void:
+	if at != Vector3.INF:
+		HitPop.at(self, at + Vector3(0, 1.0, 0), 1.0)
+	if pid == local_id:
+		banner("BACK TO CHECKPOINT %d" % k, Color(Palette.CREAM, 0.9), 1.0)
+		Audio.play(&"whoosh", &"SFX", -8.0, 1.3)
+
+
+## Our reached flags wear gold.
+func _light_flags() -> void:
+	var mine: int = int(checkpoints.get(local_id, 0))
+	for k: int in _cloths:
+		var cloth: MeshInstance3D = _cloths[k]
+		if cloth != null and is_instance_valid(cloth) and k <= mine and cloth.material_override != _lit_cloth:
+			cloth.material_override = _lit_cloth
+
+
+func _find_flags() -> void:
+	if room == null:
+		return
+	_lit_cloth = StandardMaterial3D.new()
+	_lit_cloth.albedo_color = Palette.VIP_GOLD
+	_lit_cloth.emission_enabled = true
+	_lit_cloth.emission = Palette.WARM_GOLD
+	_lit_cloth.emission_energy_multiplier = 0.9
+	_lit_cloth.roughness = 0.5
+	for cp: Dictionary in ChipTowers.checkpoints():
+		var k: int = int(cp["index"])
+		var flag: Node3D = room.find_child("Flag%d" % k, true, false) as Node3D
+		if flag != null:
+			_cloths[k] = flag.find_child("Cloth", true, false) as MeshInstance3D
 
 
 func _on_top(ev: Dictionary) -> void:
@@ -309,7 +380,7 @@ func _process(delta: float) -> void:
 		set_clock(minf(last_call_left, JackpotClimbLogic.GAME_SECONDS - clock))
 	else:
 		set_clock(JackpotClimbLogic.GAME_SECONDS - clock)
-	if not _said_halfway and going and clock >= 60.0 and not done:
+	if not _said_halfway and going and clock >= JackpotClimbLogic.GAME_SECONDS - 60.0 and not done:
 		_said_halfway = true
 		_say("One minute left! The jackpot is still waiting.", QuizHost.Pose.DRUMROLL)
 	_update_sign(delta)
@@ -341,16 +412,19 @@ func _update_prompt() -> void:
 		return
 	var t: int = swing_target()
 	var h: float = ClimbRoom.progress(me.global_position, JackpotClimbLogic.VARIANT)
+	var cp: int = int(checkpoints.get(local_id, 0))
 	if t >= 0 and _cooldown <= 0.0:
 		set_prompt("[{interact}] SWING AT %s!" % player_name(t).to_upper())
 	elif h < 0.02 and me.global_position.z > WalkableLogicBase.ROOM_ORIGIN.z - 1.0 and clock < 15.0:
-		set_prompt("CLIMB THE CHIPS!  [{jump}] JUMP TO THE NEXT STACK")
-	elif h < 0.02:
+		set_prompt("LEFT OR RIGHT ROUND THE CHIPS!  [{jump}] HOP TO THE NEXT STACK")
+	elif h < 0.02 and cp == 0:
 		set_prompt("ON THE NET: CLIMB AGAIN FROM THE FIRST STACK")
 	elif h > 0.85:
 		set_prompt("ALMOST AT THE JACKPOT!")
+	elif cp > 0 and absf(h - ChipTowers.level_y(cp) / ClimbRoom.TOWER_TOP_Y) < 0.01:
+		set_prompt("CHECKPOINT %d: PICK A SIDE AND HOP ON" % cp)
 	else:
-		set_prompt("[{jump}] JUMP TO THE NEXT STACK   [{interact}] SWING")
+		set_prompt("[{jump}] HOP TO THE NEXT STACK   [{interact}] SWING")
 
 
 func _refresh_status() -> void:
@@ -369,6 +443,8 @@ func _refresh_status() -> void:
 	rest.sort_custom(func(a: int, b: int) -> bool: return height_of(a) > height_of(b))
 	for p: int in rest:
 		var tag: String = "DOWN" if down_left.has(p) else "%dm" % roundi(height_of(p) * ClimbRoom.TOWER_TOP_Y)
+		if checkpoints.has(p):
+			tag += "  CP%d" % checkpoints[p]
 		lines.append("%s  %s" % ["YOU" if p == local_id else player_name(p), tag])
 	status_label.text = "\n".join(lines)
 	status_label.add_theme_font_size_override(&"font_size", 26)
@@ -535,16 +611,28 @@ func _build_ladder() -> void:
 	rail.size = Vector2(4, LADDER_H)
 	rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ladder_track.add_child(rail)
-	# A chip-coloured rung per ledge, a wide gold one for the pad.
-	var i: int = 0
-	for s: Dictionary in ChipTowers.stacks():
+	# A small rung every two metres, a burgundy flag per checkpoint, a wide gold one for the pad.
+	var y: float = 2.0
+	while y < ClimbRoom.TOWER_TOP_Y - 0.5:
 		var rung := ColorRect.new()
-		rung.color = Color(ChipStack.TIER_COLORS[i % ChipStack.TIER_COLORS.size()], 0.55)
-		rung.size = Vector2(22, 3)
-		rung.position = Vector2(48 - 11, LADDER_H * (1.0 - (s["pos"] as Vector3).y / ClimbRoom.TOWER_TOP_Y) - 1.5)
+		rung.color = Color(Palette.CREAM, 0.35)
+		rung.size = Vector2(16, 2)
+		rung.position = Vector2(48 - 8, LADDER_H * (1.0 - y / ClimbRoom.TOWER_TOP_Y) - 1.0)
 		rung.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_ladder_track.add_child(rung)
-		i += 1
+		y += 2.0
+	for cp: Dictionary in ChipTowers.checkpoints():
+		var fy: float = LADDER_H * (1.0 - float(cp["y"]) / ClimbRoom.TOWER_TOP_Y)
+		var bar := ColorRect.new()
+		bar.color = Palette.VIP_BURGUNDY.lightened(0.25)
+		bar.size = Vector2(44, 4)
+		bar.position = Vector2(48 - 22, fy - 2.0)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_ladder_track.add_child(bar)
+		var tag: Label = label(str(int(cp["index"])), 16, Palette.VIP_GOLD)
+		tag.position = Vector2(76, fy - 12.0)
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_ladder_track.add_child(tag)
 	var pad := ColorRect.new()
 	pad.color = Palette.VIP_GOLD
 	pad.size = Vector2(60, 4)

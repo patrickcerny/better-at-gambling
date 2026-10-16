@@ -1,18 +1,24 @@
 class_name JackpotClimbLogic
 extends WalkableLogicBase
-## "Jackpot Climb" (MINIGAME_IDEAS #11), a walkable climb in the climb room's "towers" layout
-## (`ClimbRoom`, `ChipTowers`): everyone starts on the apron and jumps from chip stack to chip
-## stack up a spiral to the gold pad on the jackpot stack under the JACKPOT sign. Everyone carries
-## a baseball bat: a hit knocks the target off their ledge. Shove allowed, grab (and so throw)
-## blocked. Order of reaching the top wins, then the rest by height.
+## "Jackpot Climb" (MINIGAME_IDEAS #11), a walkable jump-and-run in the climb room's "towers"
+## layout (`ClimbRoom`, `ChipTowers`): everyone starts on the apron and hops from chip stack to chip
+## stack up a cake of three giant-chip tiers to the gold pad on the jackpot stack under the JACKPOT
+## sign. Each tier has two lanes round it (a steady one of short hops, a bold one with a few wide
+## running jumps) and its top is a checkpoint flag. Everyone carries a baseball bat: a hit knocks
+## the target off their ledge. Shove allowed, grab (and so throw) blocked. Order of reaching the top
+## wins, then the rest by height.
 ##
 ## Everything is decided from the server's own positions (`world`):
 ## - Height: `ClimbRoom.progress(pos, "towers")`, the climb axis runs straight up the jackpot
 ##   stack (0 on the floor, 1 at the pad). Standing in the finish box over the pad
 ##   (`ClimbRoom.on_top`) **finishes** a bean, in order (same tick = shared place). Finishers are
 ##   held on the pad, safe from bats and shoves (`is_untouchable`).
-## - A fall is just physics: a bean knocked off lands on a lower stack or the safety net and
-##   climbs again. Nobody is eliminated (only dropouts leave).
+## - Checkpoints: standing on a tier's top (`ChipTowers.checkpoint_at`) sets that bean's
+##   checkpoint (only ever upward, `jackpot_climb_checkpoint`). A bean that drops `FALL_DROP` below
+##   its checkpoint's top (fell off, knocked off) is put back on the checkpoint's flag
+##   (`pending_moves`, `jackpot_climb_respawn`), then left alone for `RESPAWN_GRACE` while the
+##   move lands. Before the first flag a fall is just physics: the net, and climb again. Nobody is
+##   eliminated (only dropouts leave).
 ## - The bat: `minigame_action {kind: "swing", target?}`, `SWING_COOLDOWN` between swings (a miss
 ##   counts). The server picks the target in `BAT_REACH` in front of the swinger from its own
 ##   positions (the client's target is a hint, `pick_target`). A hit knocks the target down for
@@ -21,12 +27,13 @@ extends WalkableLogicBase
 ##   getting up (`on_player_got_up`, or when the down runs out on the server's clock).
 ## - The game ends when everyone is up, at `GAME_SECONDS`, or `LAST_CALL` seconds after all but
 ##   one are up. Ranking: finishers in order, then the rest by their height at the end (snapped to
-##   `TIE_STEP`; equal heights share a rank). `points` = players ranked below.
+##   `TIE_STEP`; equal heights share a rank). A bean's height never counts below its checkpoint (a
+##   fall at the buzzer doesn't cost the tier it reached). `points` = players ranked below.
 
 enum State { PLAYING, DONE }
 
 const VARIANT: String = "towers"
-const GAME_SECONDS: float = 120.0
+const GAME_SECONDS: float = 150.0
 ## After all but one are up, the last climber gets this long.
 const LAST_CALL: float = 10.0
 const SWING_COOLDOWN: float = 1.2
@@ -38,6 +45,9 @@ const IMMUNE_SECONDS: float = 1.0
 ## Heights within this share a rank.
 const TIE_STEP: float = 0.01
 const SYNC_INTERVAL: float = 1.0
+## A bean this far below its checkpoint's top goes back to the flag; then this long untouched.
+const FALL_DROP: float = 2.5
+const RESPAWN_GRACE: float = 1.5
 const END_HOLD: float = 4.0
 
 var state: State = State.PLAYING
@@ -59,7 +69,12 @@ var final_height: Dictionary[int, float] = {}
 var best_height: Dictionary[int, float] = {}
 var winner: int = -1
 var end_reason: StringName = &""
-## Fun stats: hits given and taken.
+## player → checkpoint reached (1..3; absent: none yet), and clock until which a respawn is in
+## flight (no new one meanwhile).
+var checkpoint: Dictionary[int, int] = {}
+var respawn_until: Dictionary[int, float] = {}
+## Fun stats: respawns, hits given and taken.
+var respawns: Dictionary[int, int] = {}
 var hits_given: Dictionary[int, int] = {}
 var hits_taken: Dictionary[int, int] = {}
 var _sync_left: float = 0.0
@@ -103,7 +118,19 @@ func height_of(p: int) -> float:
 	if is_up(p):
 		return 1.0
 	var at: Vector3 = server_position(p)
-	return ClimbRoom.progress(at, VARIANT) if at != Vector3.INF else 0.0
+	var h: float = ClimbRoom.progress(at, VARIANT) if at != Vector3.INF else 0.0
+	return maxf(h, checkpoint_height(p))
+
+
+## Progress of `p`'s checkpoint (0 without one).
+func checkpoint_height(p: int) -> float:
+	return ChipTowers.level_y(checkpoint[p]) / ClimbRoom.TOWER_TOP_Y if checkpoint.has(p) else 0.0
+
+
+## World respawn spot of `p` at checkpoint `k` (spread round the flag by roster place).
+func respawn_spot(p: int, k: int) -> Vector3:
+	var spots: Array = ChipTowers.checkpoints()[k - 1]["spots"]
+	return ROOM_ORIGIN + (spots[maxi(roster.find(p), 0) % spots.size()] as Vector3)
 
 
 func is_up(p: int) -> bool:
@@ -153,6 +180,7 @@ func tick(delta: float, _now: float) -> void:
 		if not is_up(p):
 			best_height[p] = maxf(float(best_height.get(p, 0.0)), height_of(p))
 	_check_finishes()
+	_check_checkpoints()
 	_sync_left -= delta
 	if _sync_left <= 0.0:
 		_sync()
@@ -184,6 +212,30 @@ func _check_finishes() -> void:
 		best_height[p] = 1.0
 		immune_until.erase(p)
 	events.append(GameEvents.make(&"jackpot_climb_top", {"players": group, "place": place, "clock": snappedf(clock, 0.01)}))
+
+
+## Flags reached (only upward) and falls below the last one (back to its flag).
+func _check_checkpoints() -> void:
+	for p: int in alive:
+		if is_up(p) or is_down(p):
+			continue
+		if respawn_until.has(p):
+			if clock < respawn_until[p]:
+				continue
+			respawn_until.erase(p)
+		var at: Vector3 = server_position(p)
+		if at == Vector3.INF:
+			continue
+		var k: int = ChipTowers.checkpoint_at(at - ROOM_ORIGIN)
+		if k > int(checkpoint.get(p, 0)):
+			checkpoint[p] = k
+			events.append(GameEvents.make(&"jackpot_climb_checkpoint", {"player": p, "index": k, "clock": snappedf(clock, 0.01)}))
+		elif checkpoint.has(p) and at.y < ROOM_ORIGIN.y + ChipTowers.level_y(checkpoint[p]) - FALL_DROP:
+			var to: Vector3 = respawn_spot(p, checkpoint[p])
+			pending_moves[p] = to
+			respawn_until[p] = clock + RESPAWN_GRACE
+			respawns[p] = respawns.get(p, 0) + 1
+			events.append(GameEvents.make(&"jackpot_climb_respawn", {"player": p, "index": checkpoint[p], "pos": Serializer.vec3(to)}))
 
 
 func _check_end() -> void:
@@ -286,6 +338,7 @@ func clamp_position(player: int, pos: Vector3) -> Vector3:
 func remove_player(player: int) -> void:
 	down_until.erase(player)
 	immune_until.erase(player)
+	respawn_until.erase(player)
 	super.remove_player(player)
 	if not finished and state == State.PLAYING and _announced:
 		_check_end()
@@ -371,6 +424,10 @@ func get_public_state() -> Dictionary:
 	for p: int in immune_until:
 		im[p] = snappedf(maxf(immune_until[p] - clock, 0.0), 0.01)
 	st["immune"] = im
+	var cps: Dictionary = {}
+	for p: int in checkpoint:
+		cps[p] = checkpoint[p]
+	st["checkpoints"] = cps
 	st["last_call"] = snappedf(maxf(LAST_CALL - (clock - last_call_at), 0.0), 0.01) if last_call_at >= 0.0 else -1.0
 	st["winner"] = winner
 	if finished or state == State.DONE:
@@ -380,4 +437,4 @@ func get_public_state() -> Dictionary:
 
 
 func private_state(player: int) -> Dictionary:
-	return {"cooldown": snappedf(maxf(float(last_swing.get(player, -INF)) + SWING_COOLDOWN - clock, 0.0), 0.01), "hits": hits_given.get(player, 0), "taken": hits_taken.get(player, 0)}
+	return {"cooldown": snappedf(maxf(float(last_swing.get(player, -INF)) + SWING_COOLDOWN - clock, 0.0), 0.01), "hits": hits_given.get(player, 0), "taken": hits_taken.get(player, 0), "checkpoint": checkpoint.get(player, 0), "respawns": respawns.get(player, 0)}
