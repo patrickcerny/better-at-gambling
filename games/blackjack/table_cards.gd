@@ -32,17 +32,27 @@ const RANK_FILES: Array[String] = ["", "A", "02", "03", "04", "05", "06", "07", 
 
 ## Where cards come from (local to the table).
 var shoe: Vector3 = Vector3.ZERO
-## Card spot and facing yaw per seat index, plus the dealer's (key -1).
+## Card spot and facing yaw per seat index, plus the dealer's (key -1); an optional third entry
+## is the fan step (sideways per card) for that pile.
 var spots: Dictionary[int, Array] = {}
 ## Where the dealer's cards turn to (local to the table); INF faces them straight down +z.
 var viewer: Vector3 = Vector3.INF
 ## The slanted rack the dealer's cards lean against.
 var dealer_rack: MeshInstance3D
 
+## The hand being played after a split: a gold outline around its cards (the aim outline shader on
+## a thin card-sized hull with smoothed normals, so it grows sideways into a rim).
+const OUTLINE_SHADER: Shader = preload("res://client/aim_outline.gdshader")
+const OUTLINE_WIDTH: float = 0.016
+
 ## Shown cards per seat (-1 = dealer): {"ids": Array[int], "nodes": Array[Node3D]}.
 var _piles: Dictionary[int, Dictionary] = {}
 
 var _textures: Dictionary[int, Texture2D] = {}
+## Piles drawn with the gold outline (the hand being played after a split).
+var _outlined: Array[int] = []
+var _outline_mat: ShaderMaterial
+var _outline_mesh: ArrayMesh
 ## Hole card shown through its back for the local Sunglasses wearer (-1 = none).
 var _xray: int = -1
 var _mesh: QuadMesh
@@ -70,6 +80,89 @@ func pile_nodes(key: int) -> Array[Node3D]:
 		for n: Node3D in _piles[key]["nodes"]:
 			out.append(n)
 	return out
+
+
+## Moves a pile to a new spot (and fan); its cards slide over. A split moves the first hand aside.
+func move_pile(key: int, spot: Array) -> void:
+	if spots.has(key) and spots[key] == spot:
+		return
+	spots[key] = spot
+	if not _piles.has(key):
+		return
+	var nodes: Array = _piles[key]["nodes"]
+	for i: int in nodes.size():
+		var n: Node3D = nodes[i]
+		n.create_tween().tween_property(n, ^"position", card_position(key, i), DEAL_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## A split: the last card of pile `from` (when it is `card`) slides over to start pile `to`
+## (instead of going back to the shoe and being dealt again).
+func split_pile(from: int, to: int, card: int) -> void:
+	if not _piles.has(from) or _piles.has(to) or not spots.has(to):
+		return
+	var ids: Array = _piles[from]["ids"]
+	var nodes: Array = _piles[from]["nodes"]
+	if nodes.size() != 2 or int(ids[1]) != card:
+		return
+	var n: Node3D = nodes.pop_back()
+	var c: int = int(ids.pop_back())
+	_piles[to] = {"ids": [c] as Array[int], "nodes": [n] as Array[Node3D]}
+	_set_outline(n, _outlined.has(to))
+	var t: Tween = n.create_tween().set_parallel(true)
+	t.tween_property(n, ^"position", card_position(to, 0), DEAL_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	t.tween_property(n, ^"rotation", card_rotation(to, c != FACE_DOWN), DEAL_TIME)
+
+
+## Outlines the cards of these piles (and the cards dealt to them later); every other pile loses it.
+func set_outlined(keys: Array[int]) -> void:
+	_outlined = keys.duplicate()
+	for key: int in _piles:
+		for n: Node3D in _piles[key]["nodes"]:
+			_set_outline(n, _outlined.has(key))
+
+
+## True when the card node shows the gold outline.
+static func is_outlined(card: Node3D) -> bool:
+	var o: Node3D = card.get_node_or_null(^"Outline")
+	return o != null and o.visible
+
+
+func _set_outline(card: Node3D, on: bool) -> void:
+	var o: MeshInstance3D = card.get_node_or_null(^"Outline")
+	if o == null:
+		if not on:
+			return
+		o = MeshInstance3D.new()
+		o.name = "Outline"
+		o.mesh = _hull_mesh()
+		if _outline_mat == null:
+			_outline_mat = ShaderMaterial.new()
+			_outline_mat.shader = OUTLINE_SHADER
+			_outline_mat.set_shader_parameter(&"color", Palette.VIP_GOLD)
+			_outline_mat.set_shader_parameter(&"width", OUTLINE_WIDTH)
+		o.material_override = _outline_mat
+		o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		card.add_child(o)
+	o.visible = on
+
+
+## A card-sized slab whose normals point out of its corners (mostly sideways), so the outline
+## shader grows it into a rim around the card rather than just pushing each face out.
+func _hull_mesh() -> ArrayMesh:
+	if _outline_mesh != null:
+		return _outline_mesh
+	var box := BoxMesh.new()
+	box.size = Vector3(CARD_SIZE.x, 0.002, CARD_SIZE.y)
+	var arrays: Array = box.get_mesh_arrays()
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals := PackedVector3Array()
+	for v: Vector3 in verts:
+		normals.append(Vector3(signf(v.x), signf(v.y) * 0.5, signf(v.z)).normalized())
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TANGENT] = null
+	_outline_mesh = ArrayMesh.new()
+	_outline_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return _outline_mesh
 
 
 func card_count() -> int:
@@ -104,6 +197,7 @@ func _sync(key: int, cards: Array, delay: float) -> float:
 	for i: int in range(keep, cards.size()):
 		var c: int = int(cards[i])
 		var node: Node3D = _make_card(c)
+		_set_outline(node, _outlined.has(key))
 		add_child(node)
 		_deal(node, key, i, delay)
 		delay += 0.18
@@ -147,6 +241,8 @@ func card_position(key: int, index: int) -> Vector3:
 	var lean := Basis(Vector3.UP, _yaw(key)) * Basis(Vector3.RIGHT, tilt)
 	var lift := Vector3(0.0, sin(tilt) * size * 0.5 + 0.002, 0.0)
 	var fan: Vector3 = Vector3(DEALER_FAN, 0.0, 0.0) if key == -1 else FAN
+	if (spots[key] as Array).size() > 2:
+		fan.x = float(spots[key][2])
 	return spot + lift + lean * Vector3(fan.x * index, STACK_GAP * index, fan.z * index)
 
 

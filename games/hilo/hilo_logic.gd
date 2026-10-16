@@ -78,6 +78,11 @@ func limits() -> Vector2i:
 	return Vector2i(scaled(balance.hilo_min_bet), scaled(balance.hilo_max_bet))
 
 
+## All-in: an ante over the balance (or the max) bets what fits.
+func bet_limits(_p: int, _bet: Dictionary) -> Vector2i:
+	return limits()
+
+
 ## Bet shape: `{amount}` (the ante). One hand per player at a time.
 func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not p in seats:
@@ -100,7 +105,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	var h: Dictionary = {"stake": amount, "covered": last_covered, "cards": [first] as Array[int], "phase": PLAY, "rung": 0, "mult": 1.0, "outcome": &"", "guess": "", "timer": 0.0}
 	hands[p] = h
 	_open_call(h)
-	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id}))
+	events.append(GameEvents.bet_placed(p, station_id, amount, with_all_in(bet, {"game": game_id})))
 	events.append(GameEvents.make(&"hilo_dealt", {"station": station_id, "player": p, "card": first}))
 	return OK_RESULT
 

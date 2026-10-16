@@ -22,6 +22,8 @@ var split_btn: Button
 var cut_btn: Button
 var bet_panel: BetPanel
 var actions: HBoxContainer
+## After a split, the hand the buttons play ("HAND 1" / "HAND 2"; "" when not split).
+var hand_tag: String = ""
 
 
 func _init() -> void:
@@ -99,9 +101,10 @@ func _hint_text() -> String:
 
 
 func _relabel() -> void:
-	hit.text = "HIT  %s" % InputGlyphs.hint(&"bj_hit")
-	stand.text = "STAND  %s" % InputGlyphs.hint(&"bj_stand")
-	double_btn.text = "DOUBLE  %s" % InputGlyphs.hint(&"bj_double")
+	var tag: String = (" " + hand_tag) if hand_tag != "" else ""
+	hit.text = "HIT%s  %s" % [tag, InputGlyphs.hint(&"bj_hit")]
+	stand.text = "STAND%s  %s" % [tag, InputGlyphs.hint(&"bj_stand")]
+	double_btn.text = "DOUBLE%s  %s" % [tag, InputGlyphs.hint(&"bj_double")]
 	split_btn.text = "SPLIT  %s" % InputGlyphs.hint(&"bj_split")
 
 
@@ -129,6 +132,9 @@ func _refresh() -> void:
 	var hands: Dictionary = pub.get("hands", {})
 	var mine: Dictionary = hands.get(local_id, hands.get(str(local_id), {}))
 	var dealer: Array = pub.get("dealer", [])
+	# Your own decision clock (a split extends it), else the table's.
+	if st == BlackjackLogic.State.ACTING and mine.has("clock"):
+		timer = float(mine["clock"])
 	match st:
 		BlackjackLogic.State.IDLE:
 			status_label.text = "Place a bet to start a round"
@@ -145,9 +151,11 @@ func _refresh() -> void:
 	if priv.has("hole_card"):
 		dealer_label.text += "   (peek: %s)" % Card.label(int(priv["hole_card"]))
 	var split: bool = mine.has("split")
-	var active_hand: Dictionary = (mine["split"] as Dictionary) if split and int(mine.get("active", 0)) == 1 else mine
-	if st == BlackjackLogic.State.ACTING and split and not bool(mine.get("done", true)):
-		status_label.text = "Your move: hand %d of 2  (%d s)" % [int(mine.get("active", 0)) + 1, int(ceil(timer))]
+	var active: int = int(mine.get("active", 0))
+	var active_hand: Dictionary = (mine["split"] as Dictionary) if split and active == 1 else mine
+	var playing_split: bool = st == BlackjackLogic.State.ACTING and split and not bool(mine.get("done", true))
+	if playing_split:
+		status_label.text = "Your move: hand %d of 2  (%d s)" % [active + 1, int(ceil(timer))]
 	if mine.is_empty():
 		hand_label.text = "—"
 		total_label.text = ""
@@ -156,15 +164,23 @@ func _refresh() -> void:
 		var lines: PackedStringArray = []
 		for i: int in 2:
 			var h: Dictionary = mine if i == 0 else mine["split"]
-			var playing: bool = not bool(mine.get("done", true)) and int(mine.get("active", 0)) == i
-			lines.append("%s%s   %s" % ["» " if playing else "", " ".join(_labels(h.get("cards", []))), _total_text(h, false)])
+			var playing: bool = playing_split and active == i
+			lines.append("%sHAND %d   %s   %s" % ["» " if playing else "", i + 1, " ".join(_labels(h.get("cards", []))), _total_text(h, false)])
 		hand_label.text = "\n".join(lines)
-		total_label.text = "SPLIT  $%d + $%d" % [int(mine.get("stake", 0)), int((mine["split"] as Dictionary).get("stake", 0))]
+		# The big number is the hand you are playing; both stakes once you are done.
+		if playing_split:
+			total_label.text = "HAND %d: %s" % [active + 1, _total_text(active_hand, false)]
+		else:
+			total_label.text = "SPLIT  $%d + $%d" % [int(mine.get("stake", 0)), int((mine["split"] as Dictionary).get("stake", 0))]
 	else:
 		var cards: Array = mine.get("cards", [])
 		hand_label.text = " ".join(_labels(cards)) if not cards.is_empty() else "bet $%d" % int(mine.get("stake", 0))
 		total_label.text = _total_text(mine, true)
 	var acting: bool = st == BlackjackLogic.State.ACTING and not mine.is_empty() and not bool(mine.get("done", true))
+	var tag: String = "HAND %d" % (active + 1) if playing_split else ""
+	if tag != hand_tag:
+		hand_tag = tag
+		_relabel()
 	actions.visible = acting
 	double_btn.disabled = not acting or (active_hand.get("cards", []) as Array).size() != 2
 	split_btn.visible = acting and bool(mine.get("can_split", false))

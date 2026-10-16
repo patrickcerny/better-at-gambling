@@ -30,6 +30,7 @@ const STATIONS: Dictionary = {
 	&"roulette_1": [&"roulette", Vector3(-6, 0, -3), 0], &"roulette_2": [&"roulette", Vector3(6, 0, -3), 180],
 	&"blackjack_1": [&"blackjack", Vector3(-16, 0, 4), 0], &"blackjack_2": [&"blackjack", Vector3(-9, 0, 4), 0],
 	&"blackjack_3": [&"blackjack", Vector3(-2, 0, 4), 0],
+	&"wheel_1": [&"wheel", Vector3(11, 0, 5), 0],
 	# VIP lounge (ground floor, behind the north door): the tables either side of the aisle from
 	# the door, the two slots against its back wall.
 	&"vip_blackjack_1": [&"blackjack", Vector3(-4.3, 0, -20.5), 0], &"vip_roulette_1": [&"roulette", Vector3(4.0, 0, -20.5), 0],
@@ -1082,10 +1083,9 @@ func _build_waiting_room() -> void:
 	GreyboxKit.box(self, Vector3(5.0, 1.0, 0.08), Vector3(0, 3.05, board_z), Palette.CASINO_BLACK.lightened(0.06), "WaitSignBoard", false)
 	for y: float in [3.58, 2.52]:
 		GreyboxKit.box(self, Vector3(5.2, 0.07, 0.1), Vector3(0, y, board_z - 0.01), Palette.WARM_GOLD, "WaitSignTrim", false)
-	var title: Label3D = _sign_label(Vector3(0, 3.17, board_z - 0.07), PI, WAITING_SIGN, 54)
+	var title: Label3D = _sign_label(Vector3(0, 3.05, board_z - 0.07), PI, WAITING_SIGN, 54)
 	title.name = "WaitingSign"
 	title.modulate = Palette.VIP_GOLD
-	_sign_label(Vector3(0, 2.8, board_z - 0.07), PI, "just for fun: wins and losses never touch your real money", 26).name = "WaitingSignNote"
 	for sid: StringName in FUN_STATIONS:
 		var entry: Array = FUN_STATIONS[sid]
 		var st: StationBase = _make_station(entry[0])
@@ -1193,6 +1193,8 @@ func _make_station(kind: StringName) -> StationBase:
 			return BlackjackStation.new()
 		&"horse_race":
 			return HorseRaceStation.new()
+		&"wheel":
+			return WheelStation.new()
 		&"hilo":
 			return HiLoStation.new()
 	Log.error(&"map", "unknown station kind %s" % kind)

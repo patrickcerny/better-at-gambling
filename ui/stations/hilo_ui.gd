@@ -32,10 +32,6 @@ func _dock_right() -> bool:
 	return true
 
 
-func has_tip_jar() -> bool:
-	return true
-
-
 ## Always locked: at this table you can always act (ante, or make the open call).
 func wants_camera_lock() -> bool:
 	return true

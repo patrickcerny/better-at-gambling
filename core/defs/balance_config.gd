@@ -30,6 +30,9 @@ extends Resource
 @export var bj_betting_window: float = 8.0
 @export var bj_action_time: float = 10.0
 @export var bj_result_time: float = 2.0
+## A split gives the splitting player this many extra decision clocks (x bj_action_time) on top
+## of what they had left, so both hands can be played (1.0 = the full decision time again).
+@export var bj_split_time_bonus: float = 1.0
 ## Profit ratio paid on winning hands when the dealer busts (1.0 = plain 1:1).
 @export var bj_dealer_bust_bonus: float = 1.07
 @export var bj_blackjack_ratio: float = 1.5
@@ -61,6 +64,22 @@ extends Resource
 ## Seconds the result stays up after the winner crosses the line (the rest run out meanwhile).
 @export var horse_result_time: float = 5.0
 
+@export_group("Wheel of Fortune")
+@export var wheel_min_bet: int = 10
+## Most one player may stake on one spin, over every symbol together.
+@export var wheel_max_total: int = 200
+## Chance that a spin nobody at the wheel would win is redrawn once (the house rule of 0.9.6:
+## every table quietly favours its bettors a bit, never shown). The wheel pays its honest Big Six
+## odds; 0.31 lifts a lone bettor's return to 98.8–104.9% depending on the symbol (101.3% over the
+## seven symbols, `tests/sim/test_wheel_rtp.gd`).
+@export var wheel_favour: float = 0.31
+## Seconds from the first bet of a round until the dealer spins.
+@export var wheel_countdown: float = 12.0
+## Seconds the wheel spins at full speed before it starts slowing onto the result
+## (`WheelLogic.LAND_TIME` covers the slowing down).
+@export var wheel_spin_time: float = 3.0
+## Seconds the result stays up before the next round opens.
+@export var wheel_result_time: float = 4.0
 @export_group("Hi-Lo")
 @export var hilo_min_bet: int = 10
 @export var hilo_max_bet: int = 100
@@ -182,11 +201,6 @@ extends Resource
 ## Banana peel: trigger radius and how long the slip stuns.
 @export var banana_radius: float = 0.9
 @export var banana_stun: float = 1.2
-## Tip jar (station UI button at blackjack and roulette): what one tip costs, and the luck it buys
-## at that game for that many rounds.
-@export var tip_amount: int = 25
-@export var tip_luck: int = 1
-@export var tip_rounds: int = 3
 
 @export_group("Results")
 ## Seconds the results screen stays up before an online room returns to its lobby on its own.

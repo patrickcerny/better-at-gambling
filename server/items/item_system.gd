@@ -325,33 +325,6 @@ func shield_knockout(target: int, attacker: int, now: float) -> bool:
 	return true
 
 
-## Tip jar (Patrick, 0.8.19): a seated player tips the dealer `tip_amount` (to the house) for
-## +`tip_luck` at that game for the next `tip_rounds` rounds. The tables with a dealer only.
-const TIP_ID: StringName = &"tip_jar"
-const TIP_GAMES: Array[StringName] = [&"blackjack", &"roulette", &"hilo"]
-
-
-func tip(player: int, game: StringName, station: StringName, now: float) -> Dictionary:
-	_now = now
-	if not players.has(player):
-		return StationLogicBase.fail(&"unknown_player")
-	if not game in TIP_GAMES:
-		return StationLogicBase.fail(&"no_tips_here")
-	if economy.balance(player) < balance.tip_amount:
-		return StationLogicBase.fail(&"insufficient_funds")
-	economy.apply(player, -balance.tip_amount, &"tip_dealer", station)
-	var m := Modifier.new()
-	m.id = TIP_ID
-	m.source_player = player
-	m.game_id = game
-	m.luck = balance.tip_luck
-	m.rounds_left = balance.tip_rounds
-	m.flags[&"segment_end"] = true
-	modifiers.add(player, m)
-	events.append(GameEvents.make(&"dealer_tipped", {"player": player, "station": station, "game": game, "amount": balance.tip_amount, "luck": m.luck, "rounds": m.rounds_left}))
-	return StationLogicBase.OK_RESULT
-
-
 ## Every server event passes through here once (MatchServer._flush): Jackpot Magnet holders get a
 ## house-paid share of other players' wins, and a greasy player who gets shaken drops double.
 func observe(ev: Dictionary, now: float) -> void:
@@ -581,7 +554,7 @@ func peels_wire() -> Array:
 func private_state(player: int, now: float) -> Dictionary:
 	var effects: Array = []
 	for m: Modifier in modifiers.get_mods(player):
-		if not defs.has(m.id) and m.id != TIP_ID:
+		if not defs.has(m.id):
 			continue
 		effects.append({"item": m.id, "luck": m.luck, "game": m.game_id, "left": snappedf(m.expires_at - now, 0.1) if m.expires_at != INF else -1.0, "uses": m.rounds_left})
 	var out: Dictionary = {"luck": modifiers.get_luck(player), "effects": effects}

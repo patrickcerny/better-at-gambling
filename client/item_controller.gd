@@ -395,8 +395,6 @@ static func rejection_text(error: StringName) -> String:
 			return "You're the leader: nobody richer to rob"
 		&"bounced":
 			return "The bouncer won't let you sit yet"
-		&"no_tips_here":
-			return "No dealer to tip here"
 	return StationUi.rejection_text(error)
 
 

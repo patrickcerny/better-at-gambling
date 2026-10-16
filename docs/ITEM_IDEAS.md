@@ -74,8 +74,7 @@ knockouts and falls keep the plain respawn.
 - **Sunglasses** did work on the server when used before sitting down (the effect waits for the
   next blackjack hand), but the client only wrote the peeked card into a hidden label. The hole card
   now shows through its back in a green x-ray look for the wearer.
-- **Tip jar:** TIP button on the blackjack and roulette panels: $25 to the house for +1 luck at
-  that game for the next 3 rounds (BalanceConfig `tip_amount`, `tip_luck`, `tip_rounds`).
+- **Tip jar:** removed again (Patrick, 2026-10-16): no TIP button, no `tip_dealer` intent.
 - **Bouncer** (rare): aim at a seated player; they are stood up at once (open bets handled as if
   they left) and can't sit anywhere for 12 s. Simplest reading: no NPC walk-up, a 1 s knockdown.
 - **Robin Hood** (legendary): 8% of the richest other player's money (max $800) split equally among

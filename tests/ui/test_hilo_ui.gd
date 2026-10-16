@@ -37,7 +37,6 @@ func test_no_hand_shows_the_ante_chips() -> void:
 	assert_false(ui.actions.visible)
 	assert_string_contains(ui.status_label.text, "Ante")
 	assert_eq(ui.bet_panel.chips[0], Registry.balance.hilo_min_bet, "the smallest chip is the table minimum")
-	assert_true(ui.tip_button != null and ui.tip_button.visible, "the dealer takes tips here")
 	assert_true(ui.wants_camera_lock())
 	assert_lte(ui.panel.get_global_rect().end.x, 1920.0, "docked on screen")
 

@@ -7,7 +7,7 @@ var stations: StationManager
 var balance: BalanceConfig
 var rng: SeededRng
 var current: StringName = &""
-## The table that was hot last (kept after it cools off).
+## The table that was hot last (kept after it cools down): the next one is never the same table.
 var last: StringName = &""
 ## Seconds until the next hot table starts (counting only while the casino is open).
 var next_in: float = 0.0
@@ -55,10 +55,8 @@ func _start() -> void:
 	if ids.is_empty():
 		return
 	ids.sort()
+	var previous: StringName = current if current != &"" else last
 	stop()
-	# Never the same table twice in a row: the last one has usually cooled off already (its 30 s
-	# are shorter than the gap), so remember it apart from `current`.
-	var previous: StringName = last
 	var pool: Array = ids.filter(func(s: StringName) -> bool: return s != previous)
 	var pick: StringName = pool[rng.range_int(0, pool.size() - 1)] if not pool.is_empty() else ids[0]
 	current = pick

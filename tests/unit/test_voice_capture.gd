@@ -14,6 +14,7 @@ var packets: Array[PackedByteArray] = []
 func before_each() -> void:
 	cap = VoiceCapture.new()
 	add_child_autofree(cap)
+	cap.gain = 1.0  # whatever the saved Mic volume is
 	packets.clear()
 	cap.frame_captured.connect(func(p: PackedByteArray) -> void: packets.append(p))
 
@@ -120,3 +121,45 @@ func test_off_sends_nothing() -> void:
 	cap.ptt_pressed = true
 	_feed(VoiceWav.tone(300.0, 1.0, 48000, 0.5), 48000)
 	assert_eq(packets.size(), 0)
+
+
+## Patrick: "change your voice loudness (so like an amplifier if the mic is too loud and stuff)".
+func test_mic_gain_scales_samples_and_clamps_at_full_scale() -> void:
+	var f := PackedFloat32Array([0.0, 0.1, -0.2, 0.4, -0.7, 0.9])
+	var up: PackedFloat32Array = VoiceCapture.apply_gain(f, 2.0)
+	assert_almost_eq(up[1], 0.2, 0.0001)
+	assert_almost_eq(up[2], -0.4, 0.0001)
+	assert_almost_eq(up[3], 0.8, 0.0001)
+	assert_eq(up[4], -1.0, "clamped, not wrapped")
+	assert_eq(up[5], 1.0, "clamped, not wrapped")
+	var down: PackedFloat32Array = VoiceCapture.apply_gain(f, 0.5)
+	assert_almost_eq(down[3], 0.2, 0.0001)
+	assert_almost_eq(down[4], -0.35, 0.0001)
+	assert_eq(VoiceCodec.rms(VoiceCapture.apply_gain(f, 0.0)), 0.0, "0 % mutes")
+	assert_eq(VoiceCapture.apply_gain(f, 1.0), f, "100 % leaves the samples alone")
+	assert_almost_eq(VoiceCapture.apply_gain(f, 10.0)[1], 0.2, 0.0001, "gain itself is capped at 200 %")
+
+
+func test_mic_gain_applies_before_the_gate_and_the_encoder() -> void:
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	# -50 dBFS RMS: under the open-mic gate at 100 %...
+	var quiet: PackedFloat32Array = VoiceWav.tone(300.0, 0.4, 48000, 0.0045)
+	_feed(quiet, 48000)
+	assert_eq(packets.size(), 0, "too quiet to open the gate")
+	# ...but 200 % lifts it by 6 dB, over the -45 dB gate.
+	cap.gain = 2.0
+	_feed(quiet, 48000)
+	assert_gt(packets.size(), 5, "amplified speech opens the gate")
+	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[3])["payload"])
+	assert_almost_eq(VoiceCodec.rms(decoded), 0.009 / sqrt(2.0), 0.002, "the encoded frame is the amplified one")
+	assert_almost_eq(cap.level, 0.009 / sqrt(2.0), 0.001, "the meter shows the amplified level")
+
+
+func test_mic_gain_follows_the_setting() -> void:
+	var old: float = float(Settings.get_value("voice", "mic_gain"))
+	Settings.change("voice", "mic_gain", 1.75)
+	assert_almost_eq(cap.gain, 1.75, 0.0001)
+	Settings.change("voice", "mic_gain", 5.0)
+	assert_almost_eq(cap.gain, Settings.MAX_MIC_GAIN, 0.0001, "kept within 200 %")
+	Settings.change("voice", "mic_gain", old)
+	assert_almost_eq(cap.gain, Settings.mic_gain(), 0.0001)

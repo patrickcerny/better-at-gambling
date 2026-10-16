@@ -21,6 +21,8 @@ var history_box: VBoxContainer
 var history: Array[Dictionary] = []
 var _cooldown: float = 0.0
 var _history_station: StringName = &""
+## All-in already announced for the current bet (the toast shows once per all-in bet).
+var _all_in_told: bool = false
 
 
 func _init() -> void:
@@ -107,11 +109,35 @@ func _on_open() -> void:
 	_render_history()
 
 
+## The chip the next drop bets: the chosen size, or everything you have when that is less
+## (all-in, BetClamp). Under the smallest size it stays as chosen and the server refuses it.
+func stake() -> int:
+	if sizes.is_empty():
+		return 0
+	var res: Dictionary = BetClamp.resolve_sized(sizes[bet_index], sizes, my_balance())
+	return int(res["amount"]) if res["error"] == &"" else sizes[bet_index]
+
+
+## True when the next drop is everything you have.
+func is_all_in() -> bool:
+	return not sizes.is_empty() and stake() < sizes[bet_index]
+
+
+func _show_amount() -> void:
+	if sizes.is_empty() or amount_label == null:
+		return
+	var all_in: bool = is_all_in()
+	amount_label.text = ("%s ALL IN" % money(stake())) if all_in else money(sizes[bet_index])
+	if all_in and not _all_in_told and visible:
+		notice.emit(all_in_text(stake()))
+	_all_in_told = all_in
+
+
 ## Drops a chip at the chosen bet and risk.
 func drop() -> void:
 	if _cooldown > 0.0 or sizes.is_empty():
 		return
-	if send(&"place_bet", {"bet": {"amount": sizes[bet_index], "risk": risk}}):
+	if send(&"place_bet", {"bet": {"amount": stake(), "risk": risk}}):
 		_cooldown = Registry.balance.plinko_drop_cooldown
 		Audio.play(&"chip_clack", &"UI", -8.0)
 		_update_drop()
@@ -163,7 +189,7 @@ func _select(i: int) -> void:
 	if sizes.is_empty():
 		return
 	bet_index = clampi(i, 0, sizes.size() - 1)
-	amount_label.text = money(sizes[bet_index])
+	_show_amount()
 	minus_btn.disabled = bet_index == 0
 	plus_btn.disabled = bet_index == sizes.size() - 1
 
@@ -237,6 +263,7 @@ func _refresh() -> void:
 		if int(d["player"]) == local_id:
 			flying += 1
 	status_label.text = ("Chip in flight…" if flying == 1 else "%d chips in flight…" % flying) if flying > 0 else "Pick a risk and drop a chip"
+	_show_amount()
 	_update_drop()
 
 

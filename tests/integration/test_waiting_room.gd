@@ -54,6 +54,21 @@ func _fun(id: int) -> int:
 	return fx.server.fun_room.balance(id)
 
 
+func test_play_money_bets_go_all_in_too() -> void:
+	_walk_in(p)
+	assert_true(fx.intent(p, &"sit", {"station": BJ})["ok"])
+	var fun_eco: Economy = fx.server.fun_room.economy
+	assert_true(fun_eco.apply(p, 35 - fun_eco.balance(p), &"test_setup"))
+	fx.events.clear()
+	assert_true(fx.intent(p, &"place_bet", {"station": BJ, "bet": {"amount": 200}})["ok"], "more than the play chips bets them all")
+	assert_eq(_fun(p), 0)
+	var placed: Array[Dictionary] = fx.of_type(&"bet_placed")
+	assert_eq(placed.size(), 1, "the fun table's bet goes out like the casino's")
+	if not placed.is_empty():
+		assert_eq(int(placed.back()["amount"]), 35)
+		assert_true(bool((placed.back()["details"] as Dictionary).get("all_in", false)))
+
+
 func test_the_lobby_opens_the_room_and_hands_out_play_chips() -> void:
 	assert_not_null(fx.server.fun_room, "an online lobby has a waiting room")
 	assert_true(fx.server.fun_room.open)

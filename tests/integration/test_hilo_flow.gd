@@ -2,7 +2,7 @@ extends GutTest
 ## The Hi-Lo table through the real server: sit, ante, the card comes up with its odds, a right
 ## call grows the pot, riding grows it again, cashing out pays it through the ledger; a wrong call
 ## loses it. A minigame gives fresh antes back and banks won pots; standing up mid-hand settles
-## it; the dealer takes tips like the other dealers.
+## it.
 
 const SID: StringName = &"hilo_1"
 
@@ -164,13 +164,3 @@ func test_standing_up_mid_hand_settles_it() -> void:
 	fx.intent(p, &"leave")
 	assert_eq(_results(p).size(), 2)
 	assert_false(fx.server.stations.has_stake(p))
-
-
-func test_the_dealer_takes_tips() -> void:
-	var p: int = fx.player_ids[3]
-	fx.intent(p, &"sit", {"station": SID})
-	var start: int = fx.server.economy.balance(p)
-	assert_true(fx.intent(p, &"tip_dealer", {"station": SID})["ok"])
-	assert_eq(fx.server.economy.balance(p), start - Registry.balance.tip_amount)
-	assert_eq(fx.server.modifiers.get_luck(p, &"hilo"), Registry.balance.tip_luck, "luck at this table")
-	assert_eq(fx.server.modifiers.get_luck(p, &"roulette"), 0, "and only here")

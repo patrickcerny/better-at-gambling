@@ -35,6 +35,10 @@ var mode: Mode = Mode.PUSH_TO_TALK
 ## Push-to-talk key state (the channel reads the input map).
 var ptt_pressed: bool = false
 var codec: VoiceCodec = MulawCodec.new()
+## Mic volume (Patrick: "change your voice loudness, like an amplifier if the mic is too loud"):
+## every frame is scaled by this before the level, the open-mic gate and the encoder see it,
+## clipped to full scale. Follows Settings > Audio > Mic volume (`Settings.mic_gain`).
+var gain: float = 1.0
 ## Level of the last frame (RMS, linear).
 var level: float = 0.0
 ## True while the last frame was sent.
@@ -113,8 +117,32 @@ func stop_microphone() -> void:
 	Log.info(&"voice", "microphone capture stopped (%d frames read, peak level %.3f)" % [mic_frames, mic_peak])
 
 
+func _ready() -> void:
+	_sync_gain()
+	Settings.changed.connect(_sync_gain)
+
+
+func _sync_gain() -> void:
+	gain = Settings.mic_gain()
+
+
 func _exit_tree() -> void:
 	stop_microphone()
+	if Settings.changed.is_connected(_sync_gain):
+		Settings.changed.disconnect(_sync_gain)
+
+
+## `frame` scaled by `amount` (clamped to 0..`Settings.MAX_MIC_GAIN`), every sample kept within
+## full scale so a loud voice turned up clips instead of wrapping.
+static func apply_gain(frame: PackedFloat32Array, amount: float) -> PackedFloat32Array:
+	var g: float = clampf(amount, 0.0, Settings.MAX_MIC_GAIN)
+	if is_equal_approx(g, 1.0):
+		return frame
+	var out := PackedFloat32Array()
+	out.resize(frame.size())
+	for i: int in frame.size():
+		out[i] = clampf(frame[i] * g, -1.0, 1.0)
+	return out
 
 
 func _process(delta: float) -> void:
@@ -232,7 +260,8 @@ func feed_mono(samples: PackedFloat32Array, rate: float) -> void:
 		_pending = _pending.slice(used)
 
 
-func _frame(frame: PackedFloat32Array) -> void:
+func _frame(raw: PackedFloat32Array) -> void:
+	var frame: PackedFloat32Array = apply_gain(raw, gain)
 	level = VoiceCodec.rms(frame)
 	frame_age = 0.0
 	frame_processed.emit(frame)

@@ -464,6 +464,12 @@ static func in_play_text(st: ClientMatchState, pid: int) -> String:
 					for b: Dictionary in pub.get("bets", []):
 						if int(b["player"]) == pid:
 							amount += int(b["amount"])
+			&"wheel":
+				var ws: int = int(pub.get("state", 0))
+				if ws == WheelLogic.State.BETTING or ws == WheelLogic.State.SPINNING:
+					for b: Dictionary in pub.get("bets", []):
+						if int(b["player"]) == pid:
+							amount += int(b["amount"])
 			&"horse_race":
 				var hs: int = int(pub.get("state", 0))
 				if hs == HorseRaceLogic.State.BETTING or hs == HorseRaceLogic.State.RACING:

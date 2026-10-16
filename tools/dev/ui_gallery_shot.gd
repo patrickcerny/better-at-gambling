@@ -1,6 +1,6 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|players|players_lobby|shop|rewards|settings|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining`
+## `--panel lobby|players|players_lobby|shop|rewards|settings|audio|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining`
 ## over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
@@ -54,10 +54,10 @@ func _ready() -> void:
 			p.open(rows, 6.0, true)
 			p.set_process(false)
 			p.timer_label.text = "6"
-		"settings", "controls":
+		"settings", "audio", "controls":
 			var p := SettingsPanel.new()
 			add_child(p)
-			p.current_tab = 3 if which == "controls" else 0
+			p.current_tab = maxi(SettingsPanel.TABS.find(which.to_upper()), 0)
 			p.open(true)
 		"pause":
 			var p := PauseMenu.new()

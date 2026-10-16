@@ -13,7 +13,6 @@ const PHASES: Dictionary = {
 	&"rps_pick": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 	&"shop_buy": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 	&"odd_jobs_press": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
-	&"tip_dealer": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 	&"discard_item": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME, Phase.Id.MINIGAME, Phase.Id.REWARDS, Phase.Id.REGROUP],
 	&"submit_answer": [Phase.Id.MINIGAME],
 	&"bust_or_bank_action": [Phase.Id.MINIGAME],
@@ -30,6 +29,10 @@ const PHASES: Dictionary = {
 	&"megaphone": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 }
 
+## Intents the limiter lets through at any rate: the Odd Jobs button is a clicking contest
+## (Patrick: "as fast clicking as possible and no rate limit"); its bar events stay throttled.
+const UNLIMITED: Array[StringName] = [&"odd_jobs_press"]
+
 var limiter: RateLimiter
 
 
@@ -43,9 +46,9 @@ func check(player: int, intent: Dictionary, phase: Phase.Id, now: float, known_p
 		return &"unknown_player"
 	if not Intents.validate(intent).is_empty():
 		return &"malformed"
-	if not limiter.allow(player, now):
-		return &"rate_limited"
 	var type: StringName = StringName(intent["type"])
+	if not type in UNLIMITED and not limiter.allow(player, now):
+		return &"rate_limited"
 	if PHASES.has(type) and not phase in PHASES[type]:
 		return &"wrong_phase"
 	return &""
