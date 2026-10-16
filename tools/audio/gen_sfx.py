@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Synthesizes the SFX that have no recorded (Kenney CC0) take: fountain splash, guard whistle,
 jackpot, big win, loss sting, slips, the waiter's tray crash, megaphone, last-call bell, cash
-register, hot-table shimmer, lounge chime and the spring boing. Writes 16-bit mono WAVs into
+register, hot-table shimmer, lounge chime, the spring boing and the scratch-card rasp. Writes 16-bit mono WAVs into
 audio/sfx/ (they replace the old sfxr-style placeholders from tools/gen_audio.py).
 
     python3 tools/audio/gen_sfx.py            # all
@@ -283,11 +283,24 @@ def boing():
     return finish(y, peak_db=-4.0)
 
 
+def scratch():
+    """A coin dragged over scratch-card foil: a short dry rasp of grainy, papery noise (played per
+    stroke with a varied pitch, so a long scratch is many of them)."""
+    rng = np.random.default_rng(21)
+    n = int(0.16 * SR)
+    t = secs(n)
+    rasp = band(noise(n, rng), 1800, 7500)
+    grains = np.repeat(rng.uniform(0.25, 1.0, n // 220 + 1), 220)[:n]  # the foil catching the coin edge
+    body = band(noise(n, rng), 500, 1800) * 0.35
+    env = (1 - np.exp(-t * 300)) * np.exp(-t * 9) * adsr(n, a=0.004, r=0.03)
+    return finish((rasp * grains + body) * env, peak_db=-6.0)
+
+
 RECIPES = {
     "splash": splash, "whistle": whistle, "jackpot_siren": jackpot, "big_win": big_win,
     "loss_sting": loss_sting, "slip": slip, "tray_crash": tray_crash, "megaphone": megaphone,
     "last_call_bell": last_call_bell, "cash_register": cash_register, "hot_table": hot_table,
-    "chime": chime, "boing": boing,
+    "chime": chime, "boing": boing, "scratch": scratch,
 }
 
 if __name__ == "__main__":

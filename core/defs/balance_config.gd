@@ -74,6 +74,27 @@ extends Resource
 @export var slots_two_cherry_pay: int = 2
 @export var slots_one_cherry_pay: int = 1
 
+@export_group("Scratch Cards")
+## Card prices, cheapest first (× table limits). Each tier has its own printed prize table.
+@export var scratch_prices: PackedInt32Array = PackedInt32Array([10, 25, 50])
+## Three in a line pays this many times the card price, per tier, symbol order cherry, lemon,
+## bell, clover, seven, diamond (the card prints these as dollar amounts).
+@export var scratch_pays_low: PackedFloat32Array = PackedFloat32Array([1, 2, 3, 5, 15, 50])
+@export var scratch_pays_mid: PackedFloat32Array = PackedFloat32Array([1, 2, 4, 8, 25, 100])
+@export var scratch_pays_high: PackedFloat32Array = PackedFloat32Array([1, 3, 5, 10, 40, 200])
+## A "$" anywhere on the card pays this many times the card price, per tier.
+@export var scratch_cash_pays: PackedFloat32Array = PackedFloat32Array([0.5, 0.4, 0.5])
+## How likely each card is, per tier: blank, "$" only, then three in a line of cherry, lemon,
+## bell, clover, seven, diamond. The server draws the outcome and builds a card that shows it.
+@export var scratch_odds_low: PackedInt32Array = PackedInt32Array([31300, 9000, 14000, 6000, 3000, 1400, 500, 100])
+@export var scratch_odds_mid: PackedInt32Array = PackedInt32Array([40800, 8000, 12000, 6000, 2500, 1200, 400, 60])
+@export var scratch_odds_high: PackedInt32Array = PackedInt32Array([52600, 7000, 11000, 4500, 2000, 1000, 300, 40])
+## House rule (0.9.6): chance that a card that would be a total blank is drawn again once, never
+## shown or sent (Patrick: "always favoured to win for you, by a bit, like the other games").
+@export var scratch_favour: float = 0.25
+## Seconds an unscratched card may lie on the counter before it scratches itself and pays.
+@export var scratch_auto_reveal: float = 60.0
+
 @export_group("Plinko")
 @export var plinko_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var plinko_drop_cooldown: float = 2.5
@@ -205,4 +226,28 @@ func plinko_weights(risk: StringName) -> PackedInt32Array:
 			return plinko_weights_medium
 		&"high":
 			return plinko_weights_high
+	return PackedInt32Array()
+
+
+## Scratch card prize table for a tier (0 = cheapest): line pays × the card price.
+func scratch_pays(tier: int) -> PackedFloat32Array:
+	match tier:
+		0:
+			return scratch_pays_low
+		1:
+			return scratch_pays_mid
+		2:
+			return scratch_pays_high
+	return PackedFloat32Array()
+
+
+## Scratch card outcome weights for a tier: blank, "$" only, then a line per symbol.
+func scratch_odds(tier: int) -> PackedInt32Array:
+	match tier:
+		0:
+			return scratch_odds_low
+		1:
+			return scratch_odds_mid
+		2:
+			return scratch_odds_high
 	return PackedInt32Array()

@@ -470,6 +470,9 @@ static func in_play_text(st: ClientMatchState, pid: int) -> String:
 					for b: Dictionary in pub.get("bets", []):
 						if int(b["player"]) == pid:
 							amount += int(b["amount"])
+			&"scratch":
+				if int(pub.get("player", -1)) == pid and not (pub.get("card", []) as Array).is_empty():
+					amount += int(pub.get("stake", 0))
 			&"blackjack":
 				if int(pub.get("state", 0)) != BlackjackLogic.State.PAYOUT:
 					var hands: Dictionary = pub.get("hands", {})

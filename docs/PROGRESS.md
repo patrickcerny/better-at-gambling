@@ -139,6 +139,26 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-16 / scratch cards (after 0.9.9, not released)
+- Patrick approved a new casino game, scratch cards. A brass-and-wood kiosk with a card dispenser,
+  a desk lamp, a "SCRATCH CARDS" board and an attendant bean, in the start room by the west wall
+  (`scratch_1` at (-19, 0, 10), facing east); one player at a time like a slot machine.
+- Server (`games/scratch/scratch_logic.gd`): buying a $10 / $25 / $50 card (× limits) draws the
+  outcome from the tier's odds (blank, $, or three of a symbol on one line), redraws a blank once
+  with `scratch_favour` 25% (house rule, never shown or sent), lets luck reroll the card, and builds
+  a 3×3 card showing exactly that outcome (fillers never finish a second line). One `scratch_card`
+  event carries it; `action reveal` pays the printed prize (Hot Table, items and Last Call multiply
+  the winnings as everywhere). Walking away pays it, a minigame refunds it, it scratches itself
+  after 60 s. Exact RTP with the house rule: 101.18% / 101.22% / 101.22% (hit 58% / 49% / 39%).
+- Panel (`ui/stations/scratch_ui.gd`, `scratch_card_view.gd`): the card 500×750 in the middle of
+  the screen with the tier's header, the prize table printed in dollars, foil scratched off with the
+  mouse (coin-sized brush, flakes, `scratch` sound from `tools/audio/gen_sfx.py`), a cell pops once
+  less than 45% of its foil is left, REVEAL ALL scratches the rest; the prize stamp shows only once
+  the whole card is bare.
+- Wire: new event `scratch_card {station, player, tier, price, serial, card}`, new station state
+  `{game, player, card, tier, stake, serial, last}`, `place_bet {tier}` (or `{amount}`), `action
+  reveal`. Protocol version unchanged.
+
 ### 2026-10-16 / 0.9.9 (Patrick's feedback burst)
 - Voice: Patrick "Sound input works, but i do not hear myself". Playback now runs the generator at
   the sound card's mix rate and upsamples the 8 kHz voice itself (linear, phase kept between

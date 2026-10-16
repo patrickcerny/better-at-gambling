@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/game_definition.gd" id="1"]
+[ext_resource type="Script" path="res://games/scratch/scratch_logic.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"scratch"
+display_name = "Scratch Cards"
+rules_text = "Buy a $10, $25 or $50 card and scratch the foil off. Three of a symbol in a row, column or diagonal wins that symbol's prize; a $ anywhere wins the instant prize. The prizes are printed on the card."
+logic_script = ExtResource("2")
+rug_color = Color(0.408, 0.122, 0.173, 1)
