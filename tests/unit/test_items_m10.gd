@@ -1,6 +1,6 @@
 extends GutTest
 ## The six M10 items (Bouncer, Robin Hood, Jackpot Magnet, Wild Card, Butter Fingers, Bribe the
-## Guard), the dealer tip jar and Sunglasses used before sitting down: what each does, its limits,
+## Guard) and Sunglasses used before sitting down: what each does, its limits,
 ## and that money only moves between players or is paid/taken by the house with a logged reason.
 
 var cfg: BalanceConfig = BalanceConfig.new()
@@ -184,29 +184,6 @@ func test_bribe_hides_offences_from_the_guards() -> void:
 	sys.interactions.offences.append({"attacker": 1, "victim": 2, "time": now + 31.0, "kind": &"shake"})
 	sys.tick(now + 31.0, true)
 	assert_eq(int(sys.interactions.recent_offences(now + 31.0)[0]["attacker"]), 1, "the bribe ran out")
-
-
-func test_tip_jar_costs_a_fixed_amount_for_luck_at_that_game() -> void:
-	var r: Dictionary = sys.tip(1, &"blackjack", &"blackjack_1", now)
-	assert_true(r["ok"], str(r))
-	assert_eq(eco.balance(1), 1000 - cfg.tip_amount)
-	assert_eq(mods.get_luck(1, &"blackjack"), cfg.tip_luck)
-	assert_eq(mods.get_luck(1, &"roulette"), 0, "only at that game")
-	assert_eq(mods.get_luck(1, &"slots"), 0)
-	assert_eq(_events(&"dealer_tipped").size(), 1)
-	var effects: Array = sys.private_state(1, now)["effects"]
-	assert_eq(StringName(effects[0]["item"]), ItemSystem.TIP_ID, "listed with the item effects")
-	for i: int in cfg.tip_rounds:
-		assert_eq(mods.get_luck(1, &"blackjack"), cfg.tip_luck, "round %d" % i)
-		mods.consume_round(1, &"blackjack")
-	assert_eq(mods.get_luck(1, &"blackjack"), 0, "three rounds")
-
-
-func test_tip_jar_refuses_other_games_and_broke_players() -> void:
-	assert_eq(sys.tip(1, &"slots", &"slots_1", now)["error"], &"no_tips_here")
-	eco.apply(2, -990, &"test")
-	assert_eq(sys.tip(2, &"roulette", &"roulette_1", now)["error"], &"insufficient_funds")
-	assert_eq(eco.balance(2), 10)
 
 
 func test_sunglasses_used_standing_still_peek_at_the_next_hand() -> void:

@@ -1,5 +1,5 @@
 extends GutTest
-## Tip jar, Bouncer, Jackpot Magnet and Sunglasses through the real MatchServer: intents in,
+## Bouncer, Jackpot Magnet and Sunglasses through the real MatchServer: intents in,
 ## money and seats out.
 
 var fx: ServerFixture
@@ -13,32 +13,6 @@ func before_each() -> void:
 
 func after_each() -> void:
 	fx.server.free()
-
-
-func test_tip_dealer_intent_takes_the_tip_and_adds_table_luck() -> void:
-	var p: int = fx.player_ids[0]
-	assert_eq(fx.intent(p, &"tip_dealer", {"station": &"blackjack_1"})["error"], &"not_seated")
-	assert_true(fx.intent(p, &"sit", {"station": &"blackjack_1"})["ok"])
-	var before: int = fx.server.economy.balance(p)
-	var r: Dictionary = fx.intent(p, &"tip_dealer", {"station": &"blackjack_1"})
-	assert_true(r["ok"], str(r))
-	assert_eq(fx.server.economy.balance(p), before - Registry.balance.tip_amount)
-	assert_eq(fx.server.modifiers.get_luck(p, &"blackjack"), Registry.balance.tip_luck)
-	fx.run(0.1)
-	assert_eq(fx.of_type(&"dealer_tipped").size(), 1)
-	assert_eq(fx.intent(p, &"tip_dealer", {"station": &"roulette_1"})["error"], &"not_seated", "only where you sit")
-
-
-func test_tip_dealer_needs_a_tipping_table() -> void:
-	var p: int = fx.player_ids[0]
-	var slots: StringName = &""
-	for sid: StringName in fx.server.stations.game_of:
-		if fx.server.stations.game_of[sid] == &"slots":
-			slots = sid
-			break
-	assert_ne(slots, &"")
-	assert_true(fx.intent(p, &"sit", {"station": slots})["ok"])
-	assert_eq(fx.intent(p, &"tip_dealer", {"station": slots})["error"], &"no_tips_here")
 
 
 func test_bouncer_unseats_and_blocks_sitting_for_a_while() -> void:

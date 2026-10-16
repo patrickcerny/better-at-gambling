@@ -108,7 +108,6 @@ func test_the_lobby_opens_it_and_the_match_start_shuts_it() -> void:
 	assert_true(scene.current_ui.fun)
 	assert_true(scene.current_ui.play_money_label.visible)
 	assert_string_contains(scene.current_ui.play_money_label.text, "PLAY MONEY")
-	assert_false(scene.current_ui.tip_button.visible, "no tips with play chips")
 	assert_eq(scene.server.fun_room.balance(scene.local_id), FunRoom.PLAY_CHIPS)
 	var real: int = scene.server.economy.balance(scene.local_id)
 	# Standing on the start room side next to the wall, the play tables are out of reach.

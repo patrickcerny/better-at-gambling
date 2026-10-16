@@ -1015,11 +1015,6 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			return items.discard(player, int(intent["slot"]), match_time)
 		&"rps_pick":
 			return items.duels.pick(player, int(intent["duel"]), int(intent["pick"]), match_time)
-		&"tip_dealer":
-			var tip_sid: StringName = stations.station_of(player)
-			if tip_sid == &"" or tip_sid != StringName(intent["station"]):
-				return StationLogicBase.fail(&"not_seated")
-			return items.tip(player, stations.game_of.get(tip_sid, &""), tip_sid, match_time)
 		&"shop_buy":
 			var shop_pos: Vector3 = map_def.shop_position
 			if shop_pos.is_finite() and world.get_position(player).distance_to(shop_pos) > map_def.interact_range:
