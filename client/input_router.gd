@@ -36,6 +36,8 @@ var capture_mouse: bool = true
 ## Mouse look sensitivity (radians per pixel).
 var mouse_sensitivity: float = 0.0025
 var invert_y: bool = false
+## Right-stick look multiplier (Settings > Controls > Gamepad).
+var stick_sensitivity: float = 1.0
 ## Seated look: the cursor sits in a dead zone this big (fraction of half the screen) before the head turns.
 const SEATED_DEAD_ZONE: float = 0.12
 ## Last cursor position seen (viewport pixels); NAN until the mouse moves.
@@ -61,6 +63,7 @@ func _ready() -> void:
 func _apply_settings() -> void:
 	mouse_sensitivity = Settings.mouse_look()
 	invert_y = bool(Settings.get_value("controls", "invert_y"))
+	stick_sensitivity = clampf(float(Settings.get_value("controls", "stick_sensitivity")), 0.2, 3.0)
 
 
 ## Switches input mode and the mouse capture that goes with it.
@@ -139,7 +142,7 @@ func stick_look() -> Vector2:
 	if mode == Mode.MENU or mode == Mode.STAGE:
 		return Vector2.ZERO
 	var v: Vector2 = Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
-	return v * STICK_LOOK_SPEED * (-1.0 if drunk else 1.0)
+	return v * STICK_LOOK_SPEED * stick_sensitivity * (-1.0 if drunk else 1.0)
 
 
 func sprint_held() -> bool:

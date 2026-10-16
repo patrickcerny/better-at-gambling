@@ -13,13 +13,19 @@ const PATH: String = "user://settings.cfg"
 const BASE_MOUSE: float = 0.0025
 const DEFAULTS: Dictionary = {
 	"audio": {"master": 0.8, "music": 0.6, "sfx": 0.8, "ui": 0.7, "voice": 0.9},
-	## Voice chat: "push_to_talk", "open_mic" or "off" (see `VoiceChannel.MODE_KEYS`), and the
-	## microphone: a name from `AudioServer.get_input_device_list()` ("Default": the system's).
-	"voice": {"mode": "push_to_talk", "input_device": "Default"},
-	"controls": {"mouse_sensitivity": 1.0, "invert_y": false},
+	## Voice chat: "push_to_talk", "open_mic" or "off" (see `VoiceChannel.MODE_KEYS`), the
+	## microphone: a name from `AudioServer.get_input_device_list()` ("Default": the system's), and
+	## `mic_gain`: how loud your own voice goes out (0..`MAX_MIC_GAIN`, 1 = as the mic hears it).
+	"voice": {"mode": "push_to_talk", "input_device": "Default", "mic_gain": 1.0},
+	## `stick_sensitivity` scales the gamepad's right-stick look.
+	"controls": {"mouse_sensitivity": 1.0, "invert_y": false, "stick_sensitivity": 1.0},
 	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
 }
-const FPS_CAPS: Array[int] = [0, 60, 120, 144, 240]
+## Frame limit choices (Settings > Video): 0 is off, `MATCH_MONITOR` follows the screen's refresh rate.
+const MATCH_MONITOR: int = -1
+const FPS_CAPS: Array[int] = [0, 30, 60, 90, 120, 144, 165, 240, MATCH_MONITOR]
+## Mic volume goes up to 200 % (an amplifier for a quiet microphone).
+const MAX_MIC_GAIN: float = 2.0
 ## The pixel look is the same for everyone (Patrick: "pixel look cannot be set, let it be for all
 ## users 1/3"): the world renders at a third of the window's resolution.
 const PIXEL_SCALE: int = 3
@@ -29,7 +35,7 @@ const KEYBIND_SECTION: String = "keybinds"
 ## Keyboard and mouse actions the Controls tab can remap, in the order it lists them.
 const KEYBINDS: Dictionary[StringName, String] = {
 	&"move_forward": "Move forward", &"move_back": "Move back", &"move_left": "Move left", &"move_right": "Move right",
-	&"jump": "Jump", &"interact": "Interact", &"shove": "Shove", &"grab": "Grab / throw", &"shake": "Shake",
+	&"sprint": "Sprint", &"jump": "Jump", &"interact": "Interact", &"shove": "Shove", &"grab": "Grab / throw", &"shake": "Shake",
 	&"item_1": "Item 1", &"item_2": "Item 2", &"item_3": "Item 3", &"emote_wheel": "Emote wheel",
 	&"emote_1": "Emote: 67", &"emote_2": "Emote: thumbs up", &"emote_3": "Emote: thumbs down", &"emote_4": "Emote: default dance",
 	&"leaderboard": "Leaderboard", &"ping": "Ping", &"toggle_camera": "Toggle camera",
@@ -227,7 +233,7 @@ func apply() -> void:
 			AudioServer.set_bus_mute(idx, v <= 0.001)
 			AudioServer.set_bus_volume_db(idx, slider_db(v))
 	apply_input_device()
-	Engine.max_fps = int(get_value("video", "max_fps"))
+	Engine.max_fps = fps_limit(int(get_value("video", "max_fps")), DisplayServer.screen_get_refresh_rate())
 	if DisplayServer.get_name() == "headless":
 		return
 	var fs: bool = bool(get_value("video", "fullscreen"))
@@ -237,6 +243,26 @@ func apply() -> void:
 	elif not fs and mode == DisplayServer.WINDOW_MODE_FULLSCREEN:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if bool(get_value("video", "vsync")) else DisplayServer.VSYNC_DISABLED)
+
+
+## The `Engine.max_fps` for a frame limit choice (`FPS_CAPS`): `MATCH_MONITOR` rounds the screen's
+## `refresh` rate (no limit when the screen will not say, as headless).
+static func fps_limit(choice: int, refresh: float) -> int:
+	if choice == MATCH_MONITOR:
+		return roundi(refresh) if refresh > 0.0 else 0
+	return maxi(choice, 0)
+
+
+## The Video tab's name for a frame limit choice.
+static func fps_label(choice: int) -> String:
+	if choice == MATCH_MONITOR:
+		return "Match monitor"
+	return "Off" if choice <= 0 else "%d FPS" % choice
+
+
+## The microphone gain the voice capture applies (the saved Mic volume, kept in 0..`MAX_MIC_GAIN`).
+func mic_gain() -> float:
+	return clampf(float(get_value("voice", "mic_gain")), 0.0, MAX_MIC_GAIN)
 
 
 ## The input device to use: the saved one while it is plugged in, else the system default.

@@ -139,7 +139,6 @@ func test_a_microphone_that_will_not_open_is_reported_and_retried() -> void:
 	assert_false(cap.start_microphone())
 	assert_false(cap.mic_active)
 	assert_ne(cap.mic_error, "", "the reason is kept for the HUD and the settings panel")
-	assert_eq(SettingsPanel.mic_status_text(cap).begins_with("No microphone"), true)
 	mic.fail = false
 	assert_true(cap.start_microphone(), "plugged in later: the next try opens it")
 	assert_eq(cap.mic_error, "")
@@ -254,9 +253,13 @@ func test_a_device_at_its_reported_rate_is_left_alone() -> void:
 	assert_eq(VoiceCapture.nearest_common_rate(31000.0), 0, "a hitch's odd number is not a rate")
 
 
-func test_microphone_test_verdicts_in_plain_words() -> void:
-	assert_eq(VoiceMicTest.verdict_for("", 75, 0.25), "Microphone works, peak -12 dB.")
-	assert_string_contains(VoiceMicTest.verdict_for("", 75, 0.01), "quiet (peak -40 dB)")
-	assert_string_contains(VoiceMicTest.verdict_for("", 75, 0.0), "Only silence")
-	assert_string_contains(VoiceMicTest.verdict_for("", 0, 0.0), "No audio from the microphone: check the Windows privacy settings")
-	assert_true(VoiceMicTest.verdict_for("no audio device (headless)", 0, 0.0).begins_with("No audio device (headless)"))
+## Patrick: "remove all of this unneeded microphone info": one short line each, details in the log.
+func test_microphone_test_verdicts_are_one_short_line() -> void:
+	assert_eq(VoiceMicTest.verdict_for("", 75, 0.25), "Microphone works")
+	assert_eq(VoiceMicTest.verdict_for("", 75, 0.01), "Microphone works, but quiet: raise Mic volume")
+	assert_eq(VoiceMicTest.verdict_for("", 75, 0.0), "Nothing heard, check the microphone", "only silence")
+	assert_eq(VoiceMicTest.verdict_for("", 0, 0.0), "Nothing heard, check the microphone", "no audio at all")
+	assert_eq(VoiceMicTest.verdict_for("no audio device (headless)", 0, 0.0), "Nothing heard, check the microphone", "would not open")
+	for v: String in [VoiceMicTest.WORKS, VoiceMicTest.QUIET, VoiceMicTest.NOTHING, VoiceMicTest.PLAYBACK_FAILED, VoiceMicTest.RECORDING, VoiceMicTest.PLAYING]:
+		assert_lt(v.length(), 50, "short: %s" % v)
+		assert_false(v.contains("\n"))
