@@ -28,10 +28,14 @@ var megaphone_model: Node3D = null
 var _headless: bool = false
 var _holder: int = -1
 var _pulse: float = 1.0
+## Whose arm is raised for the megaphone now.
+var _holding: AvatarVisuals = null
 
 
 func setup(p_scene: MatchScene) -> void:
 	scene = p_scene
+	# After the avatars have posed their arms this frame, so the megaphone sits in the fist.
+	process_priority = 10
 	_headless = DisplayServer.get_name() == "headless"
 	if not _headless:
 		_build_stand()
@@ -102,21 +106,61 @@ func _physics_process(_delta: float) -> void:
 			dealer_logic.yaw = dealer.yaw
 
 
-## In a holder's hand: held up to their mouth, pulsing while they talk.
-const HELD_POS: Vector3 = Vector3(0.12, 0.88, -0.55)
-const HELD_TILT: float = 0.15
+## In a holder's hand: the right arm raised in front (`AvatarVisuals.hold_right_arm`), the grip in
+## the fist, the bell pointing forward and a little up; it pulses while they talk.
+const HOLD_ARM: Vector3 = Vector3(0.3, -0.15, 0.0)
+## The megaphone's grip, in its own space (`make_megaphone`): the fist closes around it.
+const GRIP_POS: Vector3 = Vector3(0.0, -0.1, 0.0)
+## First person (your own bean is hidden): up in front of the view, a little right of centre.
+## Smaller there, so it doesn't fill the screen.
+const VIEW_POS: Vector3 = Vector3(0.24, -0.25, -0.55)
+const VIEW_TILT: float = 0.1
+const VIEW_SCALE: float = 0.65
+
+
+## The megaphone in a hand slot's space (`AvatarVisuals.hand_node`: -Z out of the fist along the
+## arm, +Y along the thumb): its forward (-Z) along the arm, the grip at the fist.
+static func hand_grip() -> Transform3D:
+	return Transform3D(Basis.IDENTITY, -GRIP_POS)
+
+
+## The megaphone in first person, in the camera's space.
+static func view_grip() -> Transform3D:
+	return Transform3D(Basis(Vector3.RIGHT, VIEW_TILT), VIEW_POS)
 
 
 func _process(delta: float) -> void:
 	if megaphone_model == null or _holder < 0:
+		_hold_with(null)
 		return
 	var h: PlayerAvatar = scene.avatars.get(_holder, null)
 	if h == null or not is_instance_valid(h) or h.visuals == null:
+		_hold_with(null)
 		return
+	_hold_with(h.visuals)
 	var talking: bool = scene.voice != null and scene.voice.is_talking(_holder)
 	_pulse = lerpf(_pulse, 1.25 if talking else 1.0, minf(1.0, 12.0 * delta))
-	megaphone_model.global_transform = h.visuals.global_transform * Transform3D(Basis.from_euler(Vector3(HELD_TILT, 0.0, 0.0)), HELD_POS)
-	megaphone_model.scale = Vector3.ONE * _pulse
+	var hand: Node3D = ItemModels.hand_node(h.visuals)
+	var k: float = 1.0
+	if h.cam != null and h.cam.camera != null and h.cam.mode == PlayerCamera.Mode.FIRST and not h.visuals.visible:
+		megaphone_model.global_transform = h.cam.camera.global_transform * view_grip()
+		k = VIEW_SCALE
+	elif hand != null:
+		megaphone_model.global_transform = hand.global_transform.orthonormalized() * hand_grip()
+	else:
+		megaphone_model.global_transform = h.visuals.global_transform * Transform3D(Basis.IDENTITY, ItemModels.ROOT_HAND_OFFSET) * hand_grip()
+	megaphone_model.scale = Vector3.ONE * _pulse * k
+
+
+## Raises the holder's right arm for the megaphone (and lets the previous holder's arm drop).
+func _hold_with(v: AvatarVisuals) -> void:
+	if v == _holding:
+		return
+	if _holding != null and is_instance_valid(_holding):
+		_holding.hold_right_arm(Vector3.INF)
+	_holding = v
+	if v != null:
+		v.hold_right_arm(HOLD_ARM)
 
 
 ## True (and the intent sent) when E should pick up the megaphone.
@@ -326,11 +370,13 @@ func _build_stand() -> void:
 	_place_megaphone()
 
 
-## A cream-and-red bullhorn pointing along −z.
+## A cream-and-red bullhorn pointing along −z: the wide bell (with its red rim) at −z, the narrow
+## mouthpiece at +z, the grip under the mouthpiece end (`GRIP_POS`).
 static func make_megaphone() -> Node3D:
 	var root := Node3D.new()
 	root.name = "Megaphone"
 	var cone := MeshInstance3D.new()
+	cone.name = "Horn"
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.05
 	cm.bottom_radius = 0.17
@@ -338,10 +384,11 @@ static func make_megaphone() -> Node3D:
 	cm.radial_segments = 16
 	cone.mesh = cm
 	cone.material_override = GreyboxKit.material(Palette.CREAM, 0.0, 0.5)
-	cone.rotation.x = -PI * 0.5
+	cone.rotation.x = PI * 0.5  # the cylinder's narrow top (+y) turns to +z, its wide bottom to -z
 	cone.position = Vector3(0, 0, -0.12)
 	root.add_child(cone)
 	var rim := MeshInstance3D.new()
+	rim.name = "Rim"
 	var tm := TorusMesh.new()
 	tm.inner_radius = 0.15
 	tm.outer_radius = 0.19
@@ -353,10 +400,11 @@ static func make_megaphone() -> Node3D:
 	rim.position = Vector3(0, 0, -0.31)
 	root.add_child(rim)
 	var grip := MeshInstance3D.new()
+	grip.name = "Grip"
 	var bm := BoxMesh.new()
 	bm.size = Vector3(0.05, 0.14, 0.06)
 	grip.mesh = bm
 	grip.material_override = GreyboxKit.material(Palette.CASINO_BLACK)
-	grip.position = Vector3(0, -0.1, 0.0)
+	grip.position = GRIP_POS
 	root.add_child(grip)
 	return root
