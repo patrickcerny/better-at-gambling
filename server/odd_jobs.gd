@@ -5,15 +5,15 @@ extends RefCounted
 ## (10 presses at $0 up to 60 at $499), so a broke player fills it faster; whoever's click fills
 ## the bar is paid $50 through the normal balance path ("the last click wins") and the bar starts
 ## over. At $500 or more a player's clicks are refused. Left alone the bar drains slowly, so nobody
-## fills one a press a minute. Clicks beyond about 12 a second per player are dropped (not
-## punished). The server owns every number here.
+## fills one a press a minute. No rate limit (Patrick: "as fast clicking as possible"): every
+## click counts, and IntentValidator exempts `odd_jobs_press` from its per-intent limit too; the
+## $500 cap bounds what clicking can earn. The server owns every number here.
 
 const PAYOUT: int = 50
 ## At or above this balance the cabinet refuses ("You've got enough. Go gamble!").
 const CAP: int = 500
 const MIN_PRESSES: int = 10
 const MAX_PRESSES: int = 60
-const PRESSES_PER_SECOND: float = 12.0
 ## Seconds after the last click (anyone's) before the bar starts draining, and how fast (bar/s).
 const DECAY_DELAY: float = 0.5
 const DECAY_PER_SECOND: float = 0.1
@@ -29,7 +29,6 @@ var _last_sent: float = -INF
 var _dirty: bool = false
 ## Who clicked last (the `player` of the next bar event; -1 = the bar only drained).
 var _last_by: int = -1
-var _limiter: RateLimiter = RateLimiter.new(PRESSES_PER_SECOND)
 
 
 func _init(p_economy: Economy) -> void:
@@ -49,16 +48,13 @@ func fill() -> float:
 	return _fill
 
 
-## One click of the button by `player` at game time `now`. Returns {ok, error}; a click over the
-## rate limit is ok but does nothing.
+## One click of the button by `player` at game time `now`. Returns {ok, error}; every click counts.
 func press(player: int, now: float) -> Dictionary:
 	if not economy.has_player(player):
 		return StationLogicBase.fail(&"unknown_player")
 	var needed: int = presses_needed(economy.balance(player))
 	if needed == 0:
 		return StationLogicBase.fail(&"enough_money")
-	if not _limiter.allow(player, now):
-		return StationLogicBase.OK_RESULT
 	_last_press = now
 	_last_by = player
 	var f: float = _fill + 1.0 / needed

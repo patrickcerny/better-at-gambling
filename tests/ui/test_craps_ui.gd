@@ -41,7 +41,6 @@ func test_four_bets_with_the_felt_odds() -> void:
 	assert_eq(ui.bet_panel.chip_value(), Registry.balance.craps_min_bet, "the smallest chip first")
 	assert_string_contains(ui.status_label.text, "COME-OUT")
 	assert_string_contains(ui.roll_label.text, "YOU", "you have the dice")
-	assert_true(ui.has_tip_jar(), "tip the stickman")
 
 
 func test_line_bets_lock_on_the_point_and_one_side_only() -> void:

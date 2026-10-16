@@ -6,7 +6,8 @@ extends Node
 ## Views: hall (the casino floor from above), table (sat at blackjack with a bet down), shop (the
 ## gift shop open, items in the HUD slots), jail (two beans behind the bars, a guard outside),
 ## lobby (ready pedestals glowing in the start room), rough (a shove knockdown, from the brawl clip),
-## leaderboard (the standings over the casino).
+## leaderboard (the standings over the casino), oddjobs (broke at the Odd Jobs cabinet, aiming at the
+## glowing red button, the shared bar part full).
 
 var _scene: MatchScene
 var _view: String = "hall"
@@ -23,7 +24,7 @@ func _ready() -> void:
 	var c: Cmdline = Cmdline.parse(OS.get_cmdline_user_args())
 	_view = c.get_string("view", "hall")
 	_shot = c.get_string("shot", "/tmp/tutorial_%s.png" % _view)
-	_at = c.get_float("at", float({"table": 17.0, "rough": 7.4}.get(_view, 5.0)))
+	_at = c.get_float("at", float({"table": 17.0, "rough": 7.4, "oddjobs": 9.0}.get(_view, 5.0)))
 	if _view == "rough":
 		# The scripted brawl (shoves through the real input path until the rival goes down).
 		var clip: Node = (load("res://tools/dev/brawl_clip.tscn") as PackedScene).instantiate()
@@ -44,6 +45,9 @@ func _process(delta: float) -> void:
 		_stage()
 	if _cam != null:
 		_cam.current = true
+	if _view == "oddjobs" and _staged and _t >= _at - 0.3 and _scene.server.odd_jobs.fill() == 0.0:
+		for i: int in 6:  # a bar part full (late: it drains when left alone)
+			_scene.server.odd_jobs.press(_scene.local_id, _scene.server.match_time)
 	for pid: int in _ready_ids:  # the scene lights the pedestals from the shared state
 		(_scene.view.state.players[pid] as Dictionary)["ready"] = true
 	if _shot != "" and _t >= _at:
@@ -77,6 +81,13 @@ func _stage() -> void:
 			_scene.local.cam.pitch = -0.1
 			_scene.router.set_mode(InputRouter.Mode.MENU)
 			_scene.shop_panel.open()
+		"oddjobs":
+			srv._comped[_scene.local_id] = srv.phases.segment_index()  # no House Comp toast in the picture
+			srv.economy.take_up_to(_scene.local_id, 1000000, &"dev")
+			var stand: Vector3 = LuckyLounge.ODD_JOBS_POS + Vector3(-0.15, 0, 0.35)
+			_place(_scene.local_id, stand, -PI * 0.5)
+			_scene.local.cam.yaw = -PI * 0.5 + 0.28
+			_scene.local.cam.pitch = -0.2
 		"race":  # the Race Hall archway from the casino floor (dev check only)
 			_free_cam(Vector3(10.0, 3.2, -4.0), Vector3(24.0, 1.8, -13.2), 70.0)
 			_scene.hud.visible = false

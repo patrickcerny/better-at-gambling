@@ -70,6 +70,12 @@ func player_total(p: int) -> int:
 	return sum
 
 
+## All-in: a chip over the balance (or over what is left of the spin's max total) bets what fits.
+func bet_limits(p: int, _bet: Dictionary) -> Vector2i:
+	var lim: Vector2i = limits()
+	return Vector2i(lim.x, lim.y - player_total(p))
+
+
 func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not p in players:
 		return fail(&"not_seated")
@@ -90,7 +96,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if not _take_stake(p, amount):
 		return fail(&"insufficient_funds")
 	bets.append({"player": p, "type": type, "value": value, "amount": amount, "covered": last_covered})
-	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id, "type": type, "value": value}))
+	events.append(GameEvents.bet_placed(p, station_id, amount, with_all_in(bet, {"game": game_id, "type": type, "value": value})))
 	return OK_RESULT
 
 

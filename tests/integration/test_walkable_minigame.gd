@@ -86,7 +86,6 @@ func test_casino_intents_are_refused_during_the_game() -> void:
 		&"sit": {"station": &"blackjack_1"},
 		&"use_item": {"slot": 0},
 		&"shop_buy": {"index": 0},
-		&"tip_dealer": {"station": &"blackjack_1"},
 		&"megaphone": {},
 	}
 	for type: StringName in blocked:

@@ -7,8 +7,7 @@ var stations: StationManager
 var balance: BalanceConfig
 var rng: SeededRng
 var current: StringName = &""
-## The last station that was hot (the next one is always another table, even after this one's
-## 30 s ran out before the next pick).
+## The table that was hot last (kept after it cools down): the next one is never the same table.
 var last: StringName = &""
 ## Seconds until the next hot table starts (counting only while the casino is open).
 var next_in: float = 0.0

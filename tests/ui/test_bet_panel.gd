@@ -91,3 +91,79 @@ func test_instant_mode_confirms_on_chip_press() -> void:
 	watch_signals(panel)
 	_press(&"bet_chip_3", false)
 	assert_signal_emitted_with_parameters(panel, "confirmed", [50])
+
+
+## All-in (Patrick): more than you have bets everything you have, with an ALL IN tag and one toast.
+func test_over_the_balance_clamps_to_all_in() -> void:
+	var tag: Label = panel.find_child("AllInTag", true, false) as Label
+	assert_not_null(tag)
+	assert_false(tag.visible, "no tag while the balance is unknown")
+	panel.set_amount(150)
+	assert_eq(panel.amount, 150, "unknown balance: nothing is clamped")
+	panel.set_amount(0)
+	watch_signals(panel)
+	panel.set_balance(37)
+	panel.set_amount(150)
+	assert_eq(panel.amount, 37, "the bet drops to everything you have")
+	assert_true(panel.all_in)
+	assert_true(tag.visible, "the ALL IN tag shows")
+	assert_string_contains(tag.text, "ALL IN")
+	assert_signal_emit_count(panel, "went_all_in", 1)
+	panel._adjust(panel.amount + 25)
+	assert_eq(panel.amount, 37, "adding chips stays all-in")
+	assert_signal_emit_count(panel, "went_all_in", 1, "the toast fires once per bet")
+	assert_eq(panel._chip_buttons[3].text, "$37", "a chip worth more than you have shows what it bets")
+	assert_eq(panel._chip_buttons[0].text, "$10")
+	panel.set_amount(20)
+	assert_false(panel.all_in)
+	assert_false(tag.visible)
+	_press(&"bet_chip_4", false)
+	panel.clear()
+	_press(&"bet_confirm", false)
+	assert_signal_emitted_with_parameters(panel, "confirmed", [37])
+
+
+func test_table_max_still_caps() -> void:
+	panel.set_balance(5000)
+	panel.set_amount(900)
+	assert_eq(panel.amount, 200, "the max wins over a big balance")
+	assert_false(panel.all_in)
+
+
+func test_under_the_minimum_is_left_for_the_server_to_refuse() -> void:
+	panel.set_balance(7)
+	panel.set_amount(50)
+	assert_eq(panel.amount, 50, "under the minimum nothing is clamped: the server says not enough money")
+	assert_false(panel.all_in)
+
+
+func test_balance_drop_reclamps_the_bet() -> void:
+	panel.set_balance(500)
+	panel.set_amount(100)
+	assert_false(panel.all_in)
+	panel.set_balance(60)
+	assert_eq(panel.amount, 60)
+	assert_true(panel.all_in)
+
+
+func test_chip_stake_for_layout_tables() -> void:
+	panel.set_balance(30)
+	panel.select_chip(3)
+	watch_signals(panel)
+	assert_eq(panel.chip_stake(), 30, "a $100 chip on the layout bets the $30 you have")
+	assert_true(panel.all_in)
+	assert_signal_emit_count(panel, "went_all_in", 1)
+	assert_eq(panel.chip_stake(200), 30)
+	assert_signal_emit_count(panel, "went_all_in", 1)
+	panel.set_balance(1000)
+	assert_eq(panel.chip_stake(40), 40, "what is left of the table total caps it")
+	assert_false(panel.all_in)
+
+
+func test_instant_mode_goes_all_in() -> void:
+	panel.setup([10, 25, 50, 100], 10, 100, "PULL", true)
+	panel.set_balance(42)
+	watch_signals(panel)
+	_press(&"bet_chip_4", false)
+	assert_signal_emitted_with_parameters(panel, "confirmed", [42])
+	assert_signal_emit_count(panel, "went_all_in", 1)

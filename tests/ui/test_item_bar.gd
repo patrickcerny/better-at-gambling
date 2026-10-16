@@ -1,6 +1,6 @@
 extends GutTest
 ## The item bar (held slot, name + description flash, the two-button choice), the Rock Paper
-## Scissors duel screen and the dealer tip button on the station panels.
+## Scissors duel screen.
 
 var root: Control
 var bar: ItemBar
@@ -79,10 +79,6 @@ func test_slots_do_not_overlap_the_flash() -> void:
 	assert_true(flash.position.y >= bar.get_global_rect().position.y - 1.0, "inside the bar")
 
 
-func test_tip_effect_reads_as_a_dealer_tip() -> void:
-	assert_string_contains(ItemBar.effect_text({"item": ItemSystem.TIP_ID, "left": -1.0, "uses": 3}), "Dealer tip")
-
-
 func test_duel_screen_picks_and_shows_the_result() -> void:
 	var panel := RpsDuelPanel.new()
 	add_child_autofree(panel)
@@ -116,25 +112,3 @@ func test_duel_tie_lets_you_pick_again() -> void:
 	assert_string_contains(panel.status_label.text, "Tie")
 	assert_false(panel.buttons[0].disabled, "pick again")
 	assert_true(panel.is_open())
-
-
-func test_tip_button_only_at_tables_with_a_dealer() -> void:
-	var st := ClientMatchState.new()
-	st.stations[&"blackjack_1"] = {"game": &"blackjack", "state": 0, "seats": [1, -1, -1, -1], "hands": {}, "dealer": []}
-	st.stations[&"slot_1"] = {"game": &"slots", "player": 1, "spinning": false, "line": [], "stake": 0}
-	st.balances[1] = 1000
-	var bj := BlackjackUi.new()
-	root.add_child(bj)
-	bj.open(&"blackjack_1", 1, st)
-	var slots := SlotsUi.new()
-	root.add_child(slots)
-	slots.open(&"slot_1", 1, st)
-	await wait_process_frames(2)
-	assert_not_null(bj.tip_button, "blackjack has a tip jar")
-	assert_string_contains(bj.tip_button.text, "$%d" % Registry.balance.tip_amount)
-	assert_true(bj.tip_button.is_visible_in_tree())
-	assert_null(slots.tip_button, "no dealer at a slot machine")
-	var rl := RouletteUi.new()
-	root.add_child(rl)
-	await wait_process_frames(1)
-	assert_not_null(rl.tip_button, "roulette has one too")

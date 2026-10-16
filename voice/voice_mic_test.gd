@@ -5,8 +5,9 @@ extends Node
 ## (`VoiceCapture`: driver buffer, mono, resampler, 40 ms frames), sends every frame through the
 ## voice packet framing and the μ-law codec, and plays it back through the real playback path
 ## (`VoicePlayback`: jitter buffer, decoder, `AudioStreamGenerator`, `Voice` bus, not positional)
-## at the pace the network would deliver it. You hear yourself, and `verdict` says in plain words
-## what the microphone did ("Microphone works, peak -12 dB", "No audio from the microphone…").
+## at the pace the network would deliver it. You hear yourself, and `verdict` is one short line
+## ("Microphone works", "Nothing heard, check the microphone", "Playback failed"); the details
+## (device, rates, peak, frames played, why it failed) go to the log only.
 ##
 ## In a match it listens to the voice channel's own capture (two readers would steal each other's
 ## samples from the driver); elsewhere to the settings meter's capture or a capture of its own.
@@ -23,6 +24,12 @@ const GRACE_SECONDS: float = 3.0
 const SILENT_DB: float = -60.0
 ## Below this peak it works but is too quiet to be heard well over the game.
 const QUIET_DB: float = -30.0
+const WORKS: String = "Microphone works"
+const QUIET: String = "Microphone works, but quiet: raise Mic volume"
+const NOTHING: String = "Nothing heard, check the microphone"
+const PLAYBACK_FAILED: String = "Playback failed"
+const RECORDING: String = "Recording… say something"
+const PLAYING: String = "Playing it back…"
 
 var state: State = State.IDLE
 ## What the test found, in plain words ("" until it has a result).
@@ -58,12 +65,14 @@ func start(live: VoiceCapture = null) -> void:
 		add_child(_capture)
 		_own_capture = true
 		if not _capture.start_microphone():
+			Log.info(&"voice", "microphone test: the microphone would not open (%s)" % _capture.mic_error)
+			Log.info(&"voice", VoiceChannel.audio_text())
 			_finish(verdict_for(_capture.mic_error, 0, 0.0))
 			return
 	_device = _capture.source.device()
 	_capture.frame_processed.connect(_on_frame)
 	state = State.RECORDING
-	verdict = "Recording %d s: say something…" % roundi(RECORD_SECONDS)
+	verdict = RECORDING
 	Log.info(&"voice", "microphone test: recording %.0f s from \"%s\"" % [RECORD_SECONDS, _device])
 	Log.info(&"voice", VoiceChannel.audio_text())
 
@@ -115,7 +124,8 @@ func _process(delta: float) -> void:
 			var all_in: bool = _pushed >= frames.size()
 			if all_in and (playback.frames_played >= frames.size() or _t > frames.size() * VoiceCodec.FRAME_SECONDS + 1.0):
 				Log.info(&"voice", "microphone test playback: %s" % playback.describe())
-				_finish("%s %s" % [verdict_for("", frames.size(), peak), playback_verdict(playback.frames_played, frames.size(), playback.failure, playback.audio_enabled, playback.output_rate)])
+				Log.info(&"voice", "microphone test: played back %d of %d frames at %d Hz%s%s" % [playback.frames_played, frames.size(), roundi(playback.output_rate), "" if playback.audio_enabled else " (no sound device)", ", failed: %s" % playback.failure if playback.failure != "" else ""])
+				_finish(result_after_playback(playback.failure, frames.size(), peak))
 
 
 func _end_recording() -> void:
@@ -132,7 +142,7 @@ func _end_recording() -> void:
 	playback.speaker = 0
 	add_child(playback)
 	state = State.PLAYING
-	verdict = found + " Playing it back…"
+	verdict = PLAYING
 	_t = 0.0
 	_pushed = 0
 
@@ -170,31 +180,20 @@ static func _peak_db(p: float) -> float:
 	return linear_to_db(p) if p > 0.00001 else -100.0
 
 
-## The plain-words result of playing `total` recorded frames back: `played` of them went into the
-## player, `failure` says why it could not make sound ("" when it could), `audio` is false where
-## there is no sound device (headless), `rate` is the output rate it played at.
-static func playback_verdict(played: int, total: int, failure: String, audio: bool, rate: float) -> String:
-	if failure != "":
-		return "Playback failed: %s (%d of %d frames). Please send the log file." % [failure, played, total]
-	if not audio:
-		return "Played it back: %d of %d frames (no sound device here)." % [played, total]
-	return "Played it back: %d of %d frames at %d Hz. You should have heard yourself; if not, check Voice volume and your speakers." % [played, total, roundi(rate)]
+## The one-line result once the recording was played back: `PLAYBACK_FAILED` when the player
+## could not make sound (`failure`, logged), else what the microphone did.
+static func result_after_playback(failure: String, frame_count: int, peak_linear: float) -> String:
+	return PLAYBACK_FAILED if failure != "" else verdict_for("", frame_count, peak_linear)
 
 
-## The plain-words result for a microphone that would not open (`error`), or that delivered
-## `frame_count` frames with a loudest sample of `peak_linear`.
+## The one-line result for a microphone that would not open (`error`), or that delivered
+## `frame_count` frames with a loudest sample of `peak_linear` (the reason is in the log).
 static func verdict_for(error: String, frame_count: int, peak_linear: float) -> String:
-	if error != "":
-		if error.begins_with("no audio device"):
-			return "N%s: no sound card or sound is off for this game." % error.substr(1)
-		if AudioServer.get_driver_name() == "Dummy":
-			return "No audio device (%s): no sound card or sound is off for this game." % error
-		return "No microphone: %s. Check that it is plugged in and allowed in the Windows privacy settings (Microphone: let desktop apps use it)." % error
-	if frame_count == 0:
-		return "No audio from the microphone: check the Windows privacy settings (Microphone: let desktop apps use it), that it is plugged in, or pick it in the list above."
+	if error != "" or frame_count == 0:
+		return NOTHING
 	var db: float = _peak_db(peak_linear)
 	if db < SILENT_DB:
-		return "Only silence from the microphone: it is muted, blocked in the Windows privacy settings, or the wrong device (pick it in the list above)."
+		return NOTHING
 	if db < QUIET_DB:
-		return "Microphone works but is quiet (peak %d dB): raise its level in the Windows sound settings." % roundi(db)
-	return "Microphone works, peak %d dB." % roundi(db)
+		return QUIET
+	return WORKS

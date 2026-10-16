@@ -119,7 +119,7 @@ func _on_open() -> void:
 ## Puts the selected chip on `type` (sends the bet; the server checks everything).
 func bet_on(type: StringName) -> bool:
 	selected_bet = type
-	return send(&"place_bet", {"bet": {"type": type, "amount": bet_panel.chip_value()}})
+	return send(&"place_bet", {"bet": {"type": type, "amount": bet_panel.chip_stake(bet_room())}})
 
 
 ## The shooter throws the dice.

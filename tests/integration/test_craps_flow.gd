@@ -217,12 +217,3 @@ func test_leaving_mid_point_still_settles_and_the_stickman_throws() -> void:
 	assert_true(fx.of_type(&"craps_rolled").any(func(e: Dictionary) -> bool: return int(e["shooter"]) == -1))
 	fx.run(Registry.balance.craps_throw_time + Registry.balance.craps_result_time + 0.5)
 	assert_eq(cr.state, CrapsLogic.State.IDLE, "an empty table rests")
-
-
-func test_tip_the_stickman() -> void:
-	_sit(1)
-	var a: int = fx.player_ids[0]
-	var before: int = fx.server.economy.balance(a)
-	assert_true(fx.intent(a, &"tip_dealer", {"station": SID})["ok"], "the stickman takes tips like a dealer")
-	assert_eq(fx.server.economy.balance(a), before - Registry.balance.tip_amount)
-	assert_gt(fx.server.modifiers.get_luck(a, &"craps"), 0, "luck at this table")

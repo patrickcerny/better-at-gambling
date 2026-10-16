@@ -2,6 +2,9 @@ class_name Emotes
 extends RefCounted
 ## The emotes (§2.4.2): id, the emoji shown over the character, the wheel label, and the sound
 ## played with it (`emote_<id>` from audio/sfx/ when it exists, otherwise the fallback clip).
+## Every emote, wheel or number key, is acted out by the character for `SECONDS` (Patrick: "it
+## actually animates your characters depending on the emote"; `AvatarVisuals.emote`), and the
+## local player watches their own one in third person (`PlayerCamera.begin_emote_view`).
 
 ## [id, emoji, label, fallback sfx]
 const LIST: Array[Array] = [
@@ -15,11 +18,18 @@ const LIST: Array[Array] = [
 ## Animated emotes on number keys 4-7 (`play_emote` intent → `player_emote` event): the bean (or
 ## skin) acts them out for `AvatarVisuals.EMOTE_SECONDS`. Order = keys emote_1..emote_4.
 const ANIMATED: Array[StringName] = [&"six_seven", &"thumbs_up", &"thumbs_down", &"default_dance"]
+## How long a character acts an emote out (the server keeps it this long for late joiners).
+const SECONDS: float = 2.5
 
 
 ## True for the animated (key) emotes.
 static func is_animated(id: StringName) -> bool:
 	return ANIMATED.has(id)
+
+
+## True for every emote a character can act out: the wheel's and the number keys'.
+static func has_animation(id: StringName) -> bool:
+	return has(id) or is_animated(id)
 
 
 static func has(id: StringName) -> bool:

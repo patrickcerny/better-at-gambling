@@ -120,6 +120,13 @@ func has_bet(p: int, type: StringName) -> bool:
 	return false
 
 
+## All-in: a chip over the balance (or over what is left of the player's max on the felt) bets
+## what fits.
+func bet_limits(p: int, _bet: Dictionary) -> Vector2i:
+	var lim: Vector2i = limits()
+	return Vector2i(lim.x, lim.y - player_total(p))
+
+
 ## Bet shape: `{type: pass|dont_pass|field|any_seven, amount}`. More chips on a bet you already
 ## have go onto it (one entry per player and type).
 func place_bet(p: int, bet: Dictionary) -> Dictionary:
@@ -152,7 +159,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 			break
 	if not merged:
 		bets.append({"player": p, "type": type, "amount": amount, "covered": last_covered})
-	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id, "type": type, "value": 0}))
+	events.append(GameEvents.bet_placed(p, station_id, amount, with_all_in(bet, {"game": game_id, "type": type, "value": 0})))
 	if not counting:
 		counting = true
 		timer = balance.craps_shoot_time

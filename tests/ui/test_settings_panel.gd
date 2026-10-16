@@ -229,7 +229,7 @@ func test_mic_meter_tests_the_microphone_while_the_audio_tab_shows() -> void:
 	assert_not_null(panel.mic_test, "outside a match the panel opens the mic itself")
 	assert_eq(panel.meter_capture(), panel.mic_test)
 	assert_true(panel.mic_meter.is_visible_in_tree())
-	assert_true(panel.mic_status.text.begins_with("No microphone"), "headless: says why (%s)" % panel.mic_status.text)
+	assert_eq(panel.mic_meter.get_parent(), panel.mic_check_button.get_parent(), "a small meter next to TEST MICROPHONE")
 	assert_eq(panel.mic_meter.value, 0.0)
 	# A microphone that hears something moves the bar.
 	panel.mic_test.feed_mono(VoiceWav.tone(300.0, 0.2, 48000, 0.3), 48000)
@@ -244,6 +244,32 @@ func test_mic_meter_tests_the_microphone_while_the_audio_tab_shows() -> void:
 	assert_null(panel.mic_test, "closing the panel closes it too")
 
 
+## Patrick: "remove all of this unneeded microphone info (was good for testing, now useless)".
+func test_audio_tab_has_no_voice_diagnostics_on_screen() -> void:
+	panel.open(false)
+	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
+	await wait_process_frames(2)
+	var texts: Array[String] = []
+	_collect_texts(panel, texts)
+	for t: String in texts:
+		assert_false(t.contains("Voice status"), "no voice status line: %s" % t)
+		assert_false(t.contains("Windows privacy"), "no long diagnostics: %s" % t)
+		assert_false(t.contains("No microphone"), "no microphone error text: %s" % t)
+	assert_eq(panel.mic_check_result.text, "", "nothing next to the button until it is pressed")
+	assert_null(panel.find_child("VoiceDiag", true, false))
+	assert_null(panel.find_child("MicStatus", true, false))
+	panel.close()
+
+
+func _collect_texts(n: Node, out: Array[String]) -> void:
+	if n is Label:
+		out.append((n as Label).text)
+	elif n is Button:
+		out.append((n as Button).text)
+	for c: Node in n.get_children():
+		_collect_texts(c, out)
+
+
 func test_test_microphone_without_an_audio_device_says_so() -> void:
 	panel.open(false)
 	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
@@ -251,13 +277,14 @@ func test_test_microphone_without_an_audio_device_says_so() -> void:
 	assert_true(panel.mic_check_button.is_visible_in_tree())
 	panel.mic_check_button.pressed.emit()
 	await wait_process_frames(1)
-	assert_true(panel.mic_check_result.text.begins_with("No audio device"), panel.mic_check_result.text)
+	assert_eq(panel.mic_check_result.text, VoiceMicTest.NOTHING, "one short line")
 	assert_false(panel.mic_check_button.disabled, "nothing running: try again any time")
-	assert_eq(panel.voice_diag.text, "Voice status: not in an online match.")
 	panel.close()
 
 
 func test_test_microphone_records_and_plays_back_through_voice_chat() -> void:
+	var old_gain: float = float(Settings.get_value("voice", "mic_gain"))
+	Settings.change("voice", "mic_gain", 1.0)
 	panel.open(false)
 	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
 	await wait_process_frames(2)
@@ -268,6 +295,7 @@ func test_test_microphone_records_and_plays_back_through_voice_chat() -> void:
 	panel.add_child(panel.mic_check)
 	panel.mic_check_button.pressed.emit()
 	assert_true(panel.mic_checking())
+	assert_eq(panel.mic_check_result.text, VoiceMicTest.RECORDING)
 	var last: int = Time.get_ticks_msec()
 	var waited: int = 0
 	while panel.mic_checking() and waited < 10000:
@@ -277,12 +305,104 @@ func test_test_microphone_records_and_plays_back_through_voice_chat() -> void:
 		waited += now - last
 		last = now
 	await wait_process_frames(1)
-	var text: String = panel.mic_check_result.text
-	assert_true(text.begins_with("Microphone works, peak -1"), text)
+	assert_eq(panel.mic_check_result.text, "Microphone works")
 	assert_between(linear_to_db(panel.mic_check.peak), -12.0, -10.0, "a 0.3 tone peaks at -10.5 dBFS")
-	assert_string_contains(text, "Played it back")
 	var played: int = panel.mic_check.playback.frames_played if panel.mic_check.playback != null else 0
 	assert_between(played, 70, 76, "3 s of 40 ms frames came back out of the playback")
 	assert_eq(played, panel.mic_check.frames.size(), "every recorded frame was played")
 	panel.close()
 	assert_false(panel.mic_checking())
+	Settings.change("voice", "mic_gain", old_gain)
+
+
+## Patrick: "change your voice loudness (so like an amplifier if the mic is too loud and stuff)".
+func test_mic_volume_slider_goes_to_200_percent_and_drives_the_capture() -> void:
+	var old_gain: float = float(Settings.get_value("voice", "mic_gain"))
+	panel.open(false)
+	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
+	await wait_process_frames(2)
+	var s: HSlider = panel.mic_gain_slider
+	assert_true(s.is_visible_in_tree(), "on the AUDIO tab")
+	assert_eq(s.min_value, 0.0)
+	assert_eq(s.max_value, 2.0, "up to 200 %")
+	var row: Node = s.get_parent()
+	assert_eq((row.get_child(0) as Label).text, "Mic volume (your voice)")
+	assert_eq((row.get_child(2) as Label).text, "%d%%" % roundi(s.value * 100.0))
+	s.value = 1.5
+	assert_almost_eq(float(Settings.get_value("voice", "mic_gain")), 1.5, 0.001, "saved in settings")
+	assert_eq((row.get_child(2) as Label).text, "150%")
+	assert_almost_eq(panel.mic_test.gain, 1.5, 0.001, "the live capture follows at once")
+	s.value = 0.0
+	assert_almost_eq(panel.mic_test.gain, 0.0, 0.001)
+	panel.close()
+	var cfg := ConfigFile.new()
+	assert_eq(cfg.load(Settings.PATH), OK)
+	assert_almost_eq(float(cfg.get_value("voice", "mic_gain", -1.0)), 0.0, 0.001, "persisted on close")
+	# Playback volume stays its own slider, labelled apart.
+	var labels: Array[String] = []
+	_collect_texts(panel.pages[SettingsPanel.TABS.find("AUDIO")], labels)
+	assert_has(labels, "Voice volume (others)")
+	Settings.change("voice", "mic_gain", old_gain)
+	Settings.save()
+
+
+## Patrick: "Strucutre the controls tab in the settings better (into movement, interaction etc)".
+func test_controls_are_grouped_into_sections() -> void:
+	var page: VBoxContainer = panel.pages[SettingsPanel.TABS.find("CONTROLS")]
+	assert_eq(panel.control_headings.keys(), ["MOVEMENT", "INTERACTION", "SOCIAL", "CAMERA & SYSTEM"])
+	assert_has(SettingsPanel.CONTROL_SECTIONS["MOVEMENT"], &"move_forward")
+	assert_has(SettingsPanel.CONTROL_SECTIONS["MOVEMENT"], &"sprint")
+	assert_has(SettingsPanel.CONTROL_SECTIONS["MOVEMENT"], &"jump")
+	for a: StringName in [&"interact", &"grab", &"shove", &"shake", &"item_1", &"item_2", &"item_3", &"leave_station"]:
+		assert_has(SettingsPanel.CONTROL_SECTIONS["INTERACTION"], a)
+	for a: StringName in [&"emote_wheel", &"emote_1", &"emote_4", &"push_to_talk", &"ping", &"leaderboard"]:
+		assert_has(SettingsPanel.CONTROL_SECTIONS["SOCIAL"], a)
+	assert_has(SettingsPanel.CONTROL_SECTIONS["CAMERA & SYSTEM"], &"toggle_camera")
+	assert_has(SettingsPanel.CONTROL_SECTIONS["CAMERA & SYSTEM"], &"pause")
+	# Every remappable action is listed exactly once, and each sits under its own heading.
+	var seen: Array[StringName] = []
+	for title: String in SettingsPanel.CONTROL_SECTIONS:
+		var heading_at: int = panel.control_headings[title].get_index()
+		var next_at: int = page.get_child_count()
+		for other: String in panel.control_headings:
+			var i: int = panel.control_headings[other].get_index()
+			if i > heading_at and i < next_at:
+				next_at = i
+		for a: StringName in SettingsPanel.CONTROL_SECTIONS[title]:
+			assert_false(a in seen, "%s listed once" % a)
+			seen.append(a)
+			var row_at: int = panel.bind_buttons[a].get_parent().get_index()
+			assert_between(row_at, heading_at + 1, next_at - 1, "%s under %s" % [a, title])
+	assert_eq(seen.size(), Settings.KEYBINDS.size(), "every remappable action has a section")
+	# Mouse and gamepad look have their own small headings on this tab.
+	var texts: Array[String] = []
+	_collect_texts(page, texts)
+	for t: String in ["MOUSE", "GAMEPAD", "Mouse sensitivity", "Invert mouse Y", "Look speed (right stick)"]:
+		assert_has(texts, t)
+	# The gamepad button shows next to each binding.
+	assert_eq(panel.pad_labels[&"jump"].text, "A")
+	assert_eq(panel.pad_labels[&"sprint"].text, "L3")
+
+
+func test_the_controls_tab_scrolls() -> void:
+	var page: VBoxContainer = panel.pages[SettingsPanel.TABS.find("CONTROLS")]
+	assert_true(page.get_parent().get_parent() is ScrollContainer, "a long tab scrolls")
+
+
+## Patrick: "Add More frame limits".
+func test_frame_limit_choices() -> void:
+	var old: int = int(Settings.get_value("video", "max_fps"))
+	var items: Array[String] = []
+	for i: int in panel.fps_option.item_count:
+		items.append(panel.fps_option.get_item_text(i))
+	assert_eq(items, ["Off", "30 FPS", "60 FPS", "90 FPS", "120 FPS", "144 FPS", "165 FPS", "240 FPS", "Match monitor"] as Array[String])
+	panel.fps_option.select(5)
+	panel.fps_option.item_selected.emit(5)
+	assert_eq(int(Settings.get_value("video", "max_fps")), 144)
+	assert_eq(Engine.max_fps, 144, "applied through Engine.max_fps")
+	panel.fps_option.select(0)
+	panel.fps_option.item_selected.emit(0)
+	assert_eq(Engine.max_fps, 0, "off")
+	assert_eq(Settings.fps_limit(Settings.MATCH_MONITOR, 143.9), 144, "match monitor rounds the refresh rate")
+	assert_eq(Settings.fps_limit(Settings.MATCH_MONITOR, -1.0), 0, "no limit when the screen will not say")
+	Settings.change("video", "max_fps", old)
