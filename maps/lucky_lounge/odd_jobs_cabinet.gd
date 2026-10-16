@@ -95,7 +95,7 @@ func _build() -> void:
 	note_label = _label("OddJobsNote", Vector3(BAR_X - 0.01, 1.33, 0), 18, Palette.WARM_GOLD)
 	# Lamps: a strip under the deck's front edge and the marquee bulbs share one warm material.
 	_lamp_mat = StandardMaterial3D.new()
-	_lamp_mat.albedo_color = Palette.CREAM
+	_lamp_mat.albedo_color = Palette.WARM_GOLD.lerp(Palette.CREAM, 0.4)
 	_lamp_mat.emission_enabled = true
 	_lamp_mat.emission = Palette.WARM_GOLD
 	_lamp_mat.emission_energy_multiplier = 0.0
@@ -208,7 +208,7 @@ func _process(delta: float) -> void:
 		var pulse: float = 0.5 + 0.5 * sin(_time * 4.0)
 		_lamp_mat.emission_energy_multiplier = 0.8 + 1.6 * pulse
 		lamp_light.light_energy = 0.4 + 0.5 * pulse
-		_outline.set_shader_parameter(&"width", 0.008 + 0.01 * pulse)
+		_outline.set_shader_parameter(&"width", 0.012 + 0.012 * pulse)
 	if _note_until > 0.0 and _time >= _note_until:
 		_note_until = 0.0
 		note_label.text = ""
