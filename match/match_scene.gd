@@ -586,12 +586,9 @@ func _connect_router() -> void:
 		else:
 			emote_wheel.close_and_pick())
 	router.emote_key.connect(func(i: int) -> void: Net.send_intent(Intents.make(&"play_emote", {"emote": Emotes.ANIMATED[i]})))
-	router.leaderboard_toggled.connect(func(shown: bool) -> void:
-		if view.state.phase == Phase.Id.LOBBY and view.state.room_mode:
-			if shown:
-				_open_lobby_panel(&"")
-		else:
-			hud.show_leaderboard(shown))
+	# Hold Tab: the player list, in the lobby too (ready only comes from the pedestals; the lobby
+	# settings stay at the settings tablet).
+	router.leaderboard_toggled.connect(func(shown: bool) -> void: hud.show_leaderboard(shown))
 	router.pause.connect(_on_pause)
 	router.item_used.connect(func(slot: int) -> void:
 		if not (stage is WalkableStage and view.state.phase == Phase.Id.MINIGAME):
