@@ -2289,7 +2289,7 @@ func _near_odd_jobs() -> bool:
 	var p: Vector3 = local.global_position
 	var d: float = Vector2(p.x - LuckyLounge.ODD_JOBS_POS.x, p.z - LuckyLounge.ODD_JOBS_POS.z).length()
 	var to_shop: float = Vector2(p.x - LuckyLounge.SHOP_POS.x, p.z - LuckyLounge.SHOP_POS.z).length()
-	return d < 1.6 and d < to_shop and absf(p.y - LuckyLounge.ODD_JOBS_POS.y) < 1.5  # the nearer kiosk wins
+	return d < 2.0 and d < to_shop and absf(p.y - LuckyLounge.ODD_JOBS_POS.y) < 1.5  # the nearer kiosk wins
 
 
 func _check_vip_gate() -> void:
