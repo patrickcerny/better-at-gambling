@@ -25,10 +25,16 @@ func test_every_dealer_stands_clear_of_its_table_and_faces_it() -> void:
 				assert_almost_eq(local.x, RouletteStation.WHEEL_X, 0.05, "%s: level with the wheel" % sid)
 				assert_lt(local.z, -1.3, "%s: outside the 1.8 m deep body (and its 0.42 m radius clear of it)" % sid)
 				assert_gt(local.z, -1.6, "%s: close to the table, not out on the floor" % sid)
-				assert_almost_eq(local.y, 0.5, 0.05, "%s: standing on the floor" % sid)
 			&"blackjack":
 				assert_almost_eq(local.z, -1.2, 0.05, "%s: on the straight north edge" % sid)
 				assert_almost_eq(local.x, 0.0, 0.05)
+		# Feet on the floor, not hovering half a metre up (Patrick: "the dealers are floating").
+		assert_almost_eq(dealer.global_position.y, 0.0, 0.05, "%s: standing on the floor" % sid)
+		var down: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(dealer.global_position + Vector3.UP * 0.3, dealer.global_position + Vector3.DOWN * 0.5, 1)
+		var hit: Dictionary = dealer.get_world_3d().direct_space_state.intersect_ray(down)
+		assert_false(hit.is_empty(), "%s: floor under the dealer" % sid)
+		if not hit.is_empty():
+			assert_almost_eq(dealer.global_position.y, (hit["position"] as Vector3).y, 0.05, "%s: feet on the floor's surface" % sid)
 		# Facing: the dealer's forward points at the table (the players sit on the far side).
 		var to_table: Vector3 = station.global_position - dealer.global_position
 		to_table.y = 0.0
