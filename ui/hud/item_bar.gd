@@ -336,18 +336,23 @@ func _build() -> void:
 	effects_label = _label(&"SmallLabel")
 	effects_label.visible = false
 	col.add_child(effects_label)
-	# Luck dial gauge: "LUCK +2" with dial meter (red to green, swinging needle).
-	var luck_row := HBoxContainer.new()
+	# Luck dial gauge (red to green, swinging needle) centred over the slots, "LUCK +2" on top of
+	# it (Patrick: "center the barometer. the luck thingy should be on top of the barometer").
+	var luck_row := VBoxContainer.new()
+	luck_row.name = "LuckRow"
 	luck_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	luck_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	luck_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	luck_row.add_theme_constant_override(&"separation", 12)
+	luck_row.add_theme_constant_override(&"separation", 2)
 	col.add_child(luck_row)
 	luck_label = _label(&"SmallLabel")
 	luck_label.text = "LUCK 0"
-	luck_label.custom_minimum_size = Vector2(80, 0)
+	luck_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	luck_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	luck_row.add_child(luck_label)
 	luck_dial = _create_luck_dial()
 	luck_dial.custom_minimum_size = Vector2(150, 78)
+	luck_dial.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	luck_row.add_child(luck_dial)
 	# Item info card (I on the held item).
 	info_panel = _panel(Palette.WARM_GOLD)
