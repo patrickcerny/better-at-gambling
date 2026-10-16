@@ -31,9 +31,11 @@ func _ready() -> void:
 	shouter.global_position = Vector3(14.6, 0, -1.4)
 	shouter.rotation.y = deg_to_rad(10.0)
 	shouter.mouth_open = 1.0
+	shouter.hold_right_arm(CasinoFloor.HOLD_ARM)
+	shouter._animate_arms(0.0, {})
 	var mega: Node3D = CasinoFloor.make_megaphone()
 	add_child(mega)
-	mega.global_transform = shouter.global_transform * Transform3D(Basis.from_euler(Vector3(CasinoFloor.HELD_TILT, 0.0, 0.0)), CasinoFloor.HELD_POS)
+	mega.global_transform = shouter.hand_node().global_transform.orthonormalized() * CasinoFloor.hand_grip()
 	var cam := Camera3D.new()
 	add_child(cam)
 	var far: bool = Cmdline.parse(OS.get_cmdline_user_args()).get_string("cam", "") == "far"
