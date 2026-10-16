@@ -7,9 +7,12 @@ extends RefCounted
 var max_speed: float = 16.0
 ## Distance always allowed per report regardless of time (jitter, small corrections), m.
 var slack: float = 1.5
-## Playable volume (the casino, the start room, the porch, the VIP lounge behind the north wall
-## and the Race Hall east of the casino, with some margin).
-var bounds: AABB = AABB(Vector3(-23.5, -3.0, -27.5), Vector3(61.0, 13.0, 49.5))
+## Playable volume (the casino, the start room, the waiting room behind it, the VIP lounge behind
+## the north wall and the Race Hall east of the casino, with some margin).
+var bounds: AABB = AABB(Vector3(-23.5, -3.0, -27.5), Vector3(61.0, 13.0, 52.0))
+## Volumes inside `bounds` that are shut right now: the waiting room once the match started (its
+## door is locked). A move into one is off the map.
+var closed_bounds: Array[AABB] = []
 ## Extra playable volumes while they are open: a walkable minigame room far from the casino
 ## (`WalkableLogicBase.ROOM_ORIGIN`). Without it every move in the room was "off the map" and the
 ## client snapped back to its spawn (0.9.2: stuck at the start of Pass the Bomb).
@@ -37,8 +40,12 @@ func check(player: int, pos: Vector3, now: float) -> bool:
 	return true
 
 
-## True if `pos` is inside the casino volume or an open extra volume (a minigame room).
+## True if `pos` is inside the casino volume (outside a shut room) or an open extra volume (a
+## minigame room).
 func in_bounds(pos: Vector3) -> bool:
+	for shut: AABB in closed_bounds:
+		if shut.has_point(pos):
+			return false
 	if bounds.has_point(pos):
 		return true
 	for box: AABB in extra_bounds:

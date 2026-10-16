@@ -62,6 +62,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 		state.money_changed.disconnect(_on_money_changed)
 		state.feed_message.disconnect(_on_feed)
 		state.phase_changed.disconnect(_on_phase)
+		state.fun_money_changed.disconnect(_on_fun_money_changed)
 	state = p_state
 	local_id = p_local_id
 	state.money_changed.connect(_on_money_changed)
@@ -69,6 +70,7 @@ func bind(p_state: ClientMatchState, p_local_id: int) -> void:
 	state.phase_changed.connect(_on_phase)
 	if leaderboard != null:
 		leaderboard.bind(state, local_id)
+	state.fun_money_changed.connect(_on_fun_money_changed)
 	if not state.players_changed.is_connected(_refresh_items):
 		state.players_changed.connect(_refresh_items)
 	_displayed_money = float(state.balance(local_id))
@@ -241,6 +243,15 @@ func _on_money_changed(player: int, amount: int, _balance: int, reason: StringNa
 		Audio.play(&"minor_win" if amount < AvatarVisuals.BIG_WIN else &"big_win", &"SFX", -6.0)
 	elif amount > 0:
 		Audio.play(&"coin" if amount < 200 else &"big_win", &"SFX", -6.0)
+
+
+## Waiting-room play money: the same win stingers, but the money counter (the real balance) and
+## its pops stay out of it; the station panel shows the play balance.
+func _on_fun_money_changed(player: int, amount: int, _balance: int, reason: StringName) -> void:
+	if player != local_id or amount <= 0:
+		return
+	if str(reason).begins_with("win_"):
+		Audio.play(&"minor_win" if amount < AvatarVisuals.BIG_WIN else &"big_win", &"SFX", -6.0)
 
 
 func _on_feed(text: String, kind: StringName) -> void:

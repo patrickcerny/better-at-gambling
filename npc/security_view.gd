@@ -3,7 +3,8 @@ extends Node
 ## The match scene's side of the start room and the jail (0.8.19). All decisions are the server's;
 ## this shows them and puts the bodies this process owns where the server says:
 ## - `player_sent_back`: someone got past the shut lobby doors while the room waits in LOBBY
-##   (thrown, a physics glitch): their ragdoll ends and they stand on their start-room spot again.
+##   (thrown, a physics glitch), or was still in the waiting room when the match started (reason
+##   `waiting_room_closed`): their ragdoll ends and they stand on their start-room spot again.
 ## - `player_jailed`: the nearest bouncer carries them to the cell gate (`Guard.carry` to the jail)
 ##   or, with no bouncer at hand, they are knocked out on the spot for a moment; then they are
 ##   locked in the barred cell. The jailed player watches the floor from above the cage and the
@@ -70,7 +71,7 @@ func is_local_jailed() -> bool:
 func on_event(ev: Dictionary) -> void:
 	match StringName(ev["type"]):
 		&"player_sent_back":
-			_sent_back(int(ev["player"]), Serializer.to_vec3(ev["pos"]))
+			_sent_back(int(ev["player"]), Serializer.to_vec3(ev["pos"]), StringName(ev.get("reason", "")))
 		&"player_jailed":
 			_jailed(ev)
 		&"player_released_from_jail":
@@ -130,13 +131,16 @@ func _place(a: PlayerAvatar, pos: Vector3, yaw: float) -> void:
 
 # --- Start room ---------------------------------------------------------------------------------
 
-func _sent_back(pid: int, pos: Vector3) -> void:
+func _sent_back(pid: int, pos: Vector3, reason: StringName = &"") -> void:
 	var a: PlayerAvatar = scene.avatars.get(pid, null)
 	if a == null:
 		return
 	_place(a, pos, 0.0)
 	if pid == scene.local_id and scene.hud != null:
-		scene.hud.toast("The casino isn't open yet! Back to the start room.", 2.0)
+		if reason == &"waiting_room_closed":  # the match started: the waiting room shut behind them
+			scene.hud.toast("The match is starting! The waiting room is closed.", 2.5)
+		else:
+			scene.hud.toast("The casino isn't open yet! Back to the start room.", 2.0)
 
 
 # --- Jail ---------------------------------------------------------------------------------------

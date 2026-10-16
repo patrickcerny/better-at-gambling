@@ -97,6 +97,7 @@ func _build_window(trim: Material) -> void:
 		_part(Vector3(0.815, 0.045, 0.05), Vector3(0, REELS_POS.y + side * 0.2075, FRONT_Z + 0.03), trim, "WindowFrame")
 	_part(Vector3(0.7, 0.16, 0.02), Vector3(0, 1.69, FRONT_Z + 0.01), GreyboxKit.material(Palette.CASINO_BLACK), "JackpotStrip")
 	var jp := _label("JACKPOT", 72, 0.0016, Palette.VIP_GOLD)
+	jp.name = "JackpotLabel"  # the waiting room's play-money machines say PLAY MONEY here
 	jp.position = Vector3(0, 1.69, FRONT_Z + 0.022)
 	add_child(jp)
 

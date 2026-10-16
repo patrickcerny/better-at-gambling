@@ -290,6 +290,9 @@ func _ready() -> void:
 		for id: String in cmd.get_string("give-items", "").split(",", false):
 			for pid: int in server.state.players:
 				server.items.give(pid, StringName(id), server.match_time)
+	# The waiting room's door follows the server: open in the lobby, locked once the match starts.
+	map.set_waiting_room_open(view.state.waiting_room_open)
+	view.state.waiting_room_changed.connect(map.set_waiting_room_open)
 	if view.state.phase == Phase.Id.LOBBY and view.state.room_mode:
 		map.set_lobby_open(false)
 		if local != null:
@@ -2241,8 +2244,11 @@ func _update_prompt() -> void:
 		hud.set_prompt(InputGlyphs.fill("[{interact}] Gift Shop: one item per round"))
 		return
 	var best_d: float = INF
+	var in_waiting_room: bool = LuckyLounge.in_waiting_room(local.global_position)
 	for sid: StringName in map.stations:
 		var st: StationBase = map.stations[sid]
+		if FunRoom.is_fun(sid) != in_waiting_room:
+			continue  # the waiting room's tables only from inside it (never through its wall)
 		var d: float = Vector3(st.global_position.x - local.global_position.x, 0.0, st.global_position.z - local.global_position.z).length()
 		if absf(st.global_position.y - local.global_position.y) > 1.5:
 			continue
@@ -2254,6 +2260,8 @@ func _update_prompt() -> void:
 		var text: String = nearest_station.prompt_text(min_bet)
 		if nearest_station.is_vip:
 			text += "   VIP ACCESS — $%d+" % _vip_threshold()
+		if FunRoom.is_fun(nearest_station.station_id):
+			text += "   ·   PLAY MONEY"
 		hud.set_prompt(text)
 	else:
 		var target: int = _reach_target(true)

@@ -34,12 +34,11 @@ const WINDOWS: Array = [
 	[Vector3(-19.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2], [Vector3(-11.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2],
 	[Vector3(-3.2, 3.5, -25.75), Vector3(0, 0, 1), 3.2], [Vector3(3.2, 3.5, -25.75), Vector3(0, 0, 1), 3.2],
 ]
-## Double doors: [centre on the wall, inward normal, height]: staff door by the slots and the
-## street door seen through the entrance. (The middle of the north wall is the VIP lounge's open
-## doorway now; the lobby doors are the map's own.)
+## Double doors: [centre on the wall, inward normal, height]: the staff door by the slots. (The
+## middle of the north wall is the VIP lounge's open doorway now; the lobby doors and the waiting
+## room's door in the entrance gap are the map's own.)
 const DOORS: Array = [
 	[Vector3(-13.75, 0.0, -15.75), Vector3(0, 0, 1), 2.7],
-	[Vector3(0.0, 0.0, 20.75), Vector3(0, 0, -1), 2.9],
 ]
 ## Open doorways (floor centre): the VIP door and the lobby doors. No frames or sconces there.
 const OPENINGS: Array[Vector3] = [Vector3(0.0, 0.0, -16.0), Vector3(0.0, 0.0, LuckyLounge.LOBBY_DOORS_Z)]
@@ -101,6 +100,7 @@ func _ready() -> void:
 	_chandeliers()
 	_sconces()
 	_signs()
+	_waiting_room()
 	_environment()
 	_flush()
 
@@ -249,7 +249,7 @@ func _walls() -> void:
 	var hz: float = LuckyLounge.SIZE_Z * 0.5 - 0.25
 	# Damask wallpaper on every wall (wine on wine), gold on black in the VIP lounge.
 	var damask: StandardMaterial3D = _tex("damask_wallpaper", 2.0, Color(0.95, 0.9, 0.9), 0.0, 0.85)
-	for n: String in ["WallN", "WallW", "WallE", "WallS1", "WallS2", "WallSTop", "WallLobby", "PorchWall", "PorchSide", "WallAnnex"]:
+	for n: String in ["WallN", "WallW", "WallE", "WallS1", "WallS2", "WallSTop", "WallLobby", "WallAnnex"]:
 		_retexture_solid(n, damask)
 	var vip_damask: StandardMaterial3D = _tex("damask_wallpaper", 1.6, Color(0.95, 0.92, 0.85), 0.0, 0.8, 0.0, "albedo_gold.jpg")
 	_retexture_solid("WallVip", vip_damask)
@@ -614,6 +614,94 @@ func _environment() -> void:
 			e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 			e.tonemap_exposure = 1.08
 			e.tonemap_white = 6.0
+
+
+# --- The waiting room -------------------------------------------------------------------------
+
+## The play-money room behind the entrance gap, dressed like the rest of the lounge but cosier:
+## herringbone parquet, damask over mahogany wainscoting with a brass rail, gold crown moulding
+## under its low coffered ceiling (the map's `CeilingWaiting` gets the coffers with the others), a
+## small chandelier over the blackjack table, sconces either side of the sign and a red runner from
+## the door.
+func _waiting_room() -> void:
+	if map.get_node_or_null(^"WaitFloor") == null:
+		return
+	var x: float = LuckyLounge.WAIT_X
+	var z0: float = LuckyLounge.WAIT_Z0
+	var z1: float = LuckyLounge.WAIT_Z1
+	var h: float = LuckyLounge.WAIT_H
+	_retexture("WaitFloor", _tex("herringbone_parquet", 1.6, Color(0.72, 0.56, 0.44), 0.45, 0.5))
+	_retexture_solid("WaitWall", _tex("damask_wallpaper", 2.0, Color(0.95, 0.9, 0.9), 0.0, 0.85))
+	var door: float = LuckyLounge.WAIT_DOOR_HALF + 0.1
+	var runs: Array = [
+		[Vector3(-x, 0, z0), Vector3(-x, 0, z1), Vector3(1, 0, 0)],
+		[Vector3(x, 0, z0), Vector3(x, 0, z1), Vector3(-1, 0, 0)],
+		[Vector3(-x, 0, z1), Vector3(x, 0, z1), Vector3(0, 0, -1)],
+		[Vector3(-x, 0, z0), Vector3(-door, 0, z0), Vector3(0, 0, 1)],
+		[Vector3(door, 0, z0), Vector3(x, 0, z0), Vector3(0, 0, 1)],
+	]
+	for run: Array in runs:
+		var a: Vector3 = run[0]
+		var b: Vector3 = run[1]
+		var n: Vector3 = run[2]
+		var mid: Vector3 = (a + b) * 0.5
+		var length: float = (b - a).length()
+		var basis := Basis.looking_at(-n, Vector3.UP)
+		_box_b(Vector3(length, 1.05, 0.06), mid + n * 0.03 + Vector3(0, 0.525, 0), basis, _wood_mat, "wood")
+		_box_b(Vector3(length, 0.09, 0.1), mid + n * 0.06 + Vector3(0, 1.08, 0), basis, _brass_mat, "brass")
+		_box_b(Vector3(length, 0.18, 0.12), mid + n * 0.06 + Vector3(0, h - 0.09, 0), basis, _gold_mat, "gold")
+	# The crown moulding carries on over the door, and a runner leads in from it.
+	_box(Vector3(door * 2.0, 0.18, 0.12), Vector3(0, h - 0.09, z0 + 0.06), _gold_mat, "gold")
+	var run_len: float = 2.0
+	_plane(Vector2(2.4, run_len), Vector3(0, 0.03, z0 + run_len * 0.5), _carpet(Palette.CASINO_RED.darkened(0.15), Palette.CASINO_RED.darkened(0.35), 0.8)).name = "WaitRunner"
+	# A small chandelier over the table: gold ring, bulbs and crystals.
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.42
+	ring.outer_radius = 0.5
+	ring.rings = 20
+	ring.ring_segments = 6
+	var bulb := SphereMesh.new()
+	bulb.radius = 0.07
+	bulb.height = 0.14
+	bulb.radial_segments = 8
+	bulb.rings = 4
+	var crystal := PrismMesh.new()
+	crystal.size = Vector3(0.06, 0.18, 0.06)
+	var stem := CylinderMesh.new()
+	stem.top_radius = 0.025
+	stem.bottom_radius = 0.025
+	stem.height = 1.0
+	stem.radial_segments = 6
+	var c := Vector3(0, h - 0.75, 20.3)
+	_add(&"stem", stem, _gold_mat, Transform3D(Basis().scaled(Vector3(1, 0.75, 1)), c + Vector3(0, 0.375, 0)))
+	_add(&"ring", ring, _gold_mat, Transform3D(Basis(), c))
+	for i: int in 8:
+		var o := Vector3(cos(TAU * i / 8.0), 0, sin(TAU * i / 8.0))
+		_add(&"bulb", bulb, _bulb_mat, Transform3D(Basis(), c + o * 0.46 + Vector3(0, 0.1, 0)))
+		_add(&"crystal", crystal, _crystal_mat, Transform3D(Basis(Vector3.RIGHT, PI), c + o * 0.46 + Vector3(0, -0.17, 0)))
+	_add(&"bulb", bulb, _bulb_mat, Transform3D(Basis().scaled(Vector3.ONE * 1.5), c + Vector3(0, -0.3, 0)))
+	# Sconces either side of the sign board, and a painting on each side wall between the slots.
+	var plate := BoxMesh.new()
+	plate.size = Vector3(0.2, 0.42, 0.05)
+	var shade := CylinderMesh.new()
+	shade.top_radius = 0.09
+	shade.bottom_radius = 0.15
+	shade.height = 0.22
+	shade.radial_segments = 10
+	var shade_mat := StandardMaterial3D.new()
+	shade_mat.albedo_color = Palette.CREAM
+	shade_mat.emission_enabled = true
+	shade_mat.emission = Color(1.0, 0.78, 0.45)
+	shade_mat.emission_energy_multiplier = 1.6
+	for sx: float in [-3.3, 3.3]:
+		var p := Vector3(sx, 2.6, z1)
+		_add(&"plate", plate, _gold_mat, Transform3D(Basis(), p - Vector3(0, 0, 0.03)))
+		_add(&"shade", shade, shade_mat, Transform3D(Basis(), p + Vector3(0, 0.18, -0.18)))
+	for sx: float in [-1.0, 1.0]:
+		var pic: Node3D = PropModels.make(&"picture", 0.0, 1.2)
+		pic.position = Vector3(sx * (x - 0.1), 1.9, 19.3)
+		pic.rotation.y = -sx * PI * 0.5
+		add_child(pic)
 
 
 # --- Batching ---------------------------------------------------------------------------------
