@@ -18,8 +18,6 @@ var title: Label
 var status_label: Label
 var hint: Label
 var limits_mult: float = 1.0
-## Tip jar (blackjack and roulette): tip the dealer for a little luck at this table.
-var tip_button: Button = null
 ## Display name shown in the header.
 var game_title: String = "GAME"
 ## True at a waiting-room table (`FunRoom`): play money, shown as such under the title.
@@ -84,8 +82,6 @@ func _ready() -> void:
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_color_override(&"font_color", Color("#9A8F7A"))
 	body.add_child(hint)
-	if has_tip_jar():
-		_build_tip_button()
 
 
 ## Shows the overlay for a station.
@@ -98,8 +94,6 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 	fun = FunRoom.is_fun(station_id)
 	title.text = game_title
 	play_money_label.visible = fun
-	if tip_button != null:
-		tip_button.visible = not fun  # no dealer to tip with play chips
 	_show_play_money()
 	var vip: bool = bool(pub.get("vip", false))
 	limits_mult = Registry.balance.limits_multiplier(state.segment_index if state != null else 0) * (3.0 if vip else 1.0)
@@ -179,40 +173,6 @@ func wants_camera_lock() -> bool:
 	return false
 
 
-## The tip jar is at the tables with a dealer to tip.
-func has_tip_jar() -> bool:
-	return game_title == "BLACKJACK" or game_title == "ROULETTE"
-
-
-func _build_tip_button() -> void:
-	tip_button = Button.new()
-	tip_button.name = "TipButton"
-	tip_button.focus_mode = Control.FOCUS_NONE
-	tip_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	tip_button.custom_minimum_size = Vector2(0, 36)
-	tip_button.text = tip_text()
-	tip_button.tooltip_text = "Throw the dealer a few chips: +%d luck here for %d rounds" % [Registry.balance.tip_luck, Registry.balance.tip_rounds]
-	tip_button.pressed.connect(tip)
-	body.add_child(tip_button)
-
-
-static func tip_text() -> String:
-	return "TIP $%d  ·  +%d LUCK ×%d" % [Registry.balance.tip_amount, Registry.balance.tip_luck, Registry.balance.tip_rounds]
-
-
-## Sends `tip_dealer` for this table; thanks you on the button for a moment.
-func tip() -> bool:
-	var ok: bool = send(&"tip_dealer")
-	if ok and tip_button != null:
-		tip_button.text = "THANKS!  +%d LUCK" % Registry.balance.tip_luck
-		Audio.play(&"chip_clack", &"UI", -4.0, 1.2)
-		if is_inside_tree():
-			get_tree().create_timer(1.6).timeout.connect(func() -> void:
-				if is_instance_valid(tip_button):
-					tip_button.text = tip_text())
-	return ok
-
-
 ## True for overlays that sit at the right edge instead of over the middle of the screen.
 func _dock_right() -> bool:
 	return false
@@ -266,8 +226,6 @@ static func rejection_text(error: StringName) -> String:
 			return "Too far away"
 		&"station_full":
 			return "Table is full"
-		&"no_tips_here":
-			return "No dealer to tip here"
 		&"one_horse_only":
 			return "One horse per race"
 		&"invalid_horse":

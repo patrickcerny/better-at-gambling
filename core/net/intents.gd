@@ -14,7 +14,6 @@ const SCHEMA: Dictionary = {
 	&"shop_buy": ["index"],
 	## One smash of the Odd Jobs button next to the Gift Shop (the server counts and pays).
 	&"odd_jobs_press": [],
-	&"tip_dealer": ["station"],
 	&"submit_answer": ["question", "index"],
 	&"bust_or_bank_action": ["action"],
 	&"vote_race_vote": ["target"],
