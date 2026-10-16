@@ -306,3 +306,13 @@ our own yet, the game stays the GitHub zip and Steam just has to be running.
   folder with the Steam API library. Quiz answer timing credits only the loopback round trip in
   host mode (the room can't see the Steam leg). An own App ID later is a one-line change
   (`SteamSvc.APP_ID`) plus the store setup.
+
+## 2026-10-16 — Wheel of Fortune: honest Big Six odds, the favour redraw makes it generous
+The layout pays exactly what it prints ($1 1:1, $2 2:1, $5 5:1, $10 10:1, $20 20:1, Joker/Logo
+40:1), which alone returns 75.9–88.9% (a real Big Six house edge). The 0.9.6 house rule supplies the
+rest: a spin no bet at the wheel would win is redrawn once with `wheel_favour` = 0.31. One redraw
+chance cannot put every symbol in 100.5–102% (the band would need 0.24–0.27 for $1 and 0.34–0.36
+for $5), so 0.31 puts the seven-symbol mean at 101.3% with each symbol 98.8% ($5) to 104.9% ($10);
+`tests/sim/test_wheel_rtp.gd` holds every symbol to 98–105% and the mean to 100.5–102%. With
+several bettors on different symbols the redraw fires less often, so a crowded wheel is a little
+less generous per player. Luck rerolls the segment by what it pays that player (monotonic in L).

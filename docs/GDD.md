@@ -37,6 +37,12 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
 - **Horse Race** (Race Hall annex): 4 horses with names drawn from a pool each round, one horse per
   player per race, the first over the line pays 1:4. A seeded server race (~9 s, the lead changes)
   every client replays. $10–$100.
+- **Wheel of Fortune** (Big Six money wheel, casino floor by the lobby doors): 54 segments, $1 ×24,
+  $2 ×15, $5 ×7, $10 ×4, $20 ×2, Joker and Logo ×1 each. Chips on any symbols; a symbol pays its
+  face value to one ($1 1:1 … $20 20:1), Joker and Logo 40:1, exactly as printed on the layout. The
+  dealer spins 12 s after the first bet; the server draws the segment (house rule: a spin no bet
+  would win is redrawn once with 31% chance, then luck rerolls, never shown) and every client slows
+  the wheel onto it. 5 stools, a dealer to tip. $10 min per bet, $200 per spin.
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
@@ -111,6 +117,8 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | horse_race_countdown | — (the tote board counts down) |
 | horse_race_started | last_call_bell, high (the starting bell) |
 | horse_race_finished | chime when the winner's nose crosses the line on the table |
+| wheel_spin_started | whoosh, low (the dealer's pull), then the clicker: plink, high, one per peg (at most ~20/s) |
+| wheel_result | — (the clicker slows down); reel_stop, low, as the wheel rests on the segment |
 | jackpot_won | jackpot_siren (bell arpeggio, coin shower, held chord) |
 | last_call | last_call_bell (brass hand bell ×3) + Last Call music |
 | minigame_started | whoosh + quiz music |

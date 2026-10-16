@@ -61,6 +61,23 @@ extends Resource
 ## Seconds the result stays up after the winner crosses the line (the rest run out meanwhile).
 @export var horse_result_time: float = 5.0
 
+@export_group("Wheel of Fortune")
+@export var wheel_min_bet: int = 10
+## Most one player may stake on one spin, over every symbol together.
+@export var wheel_max_total: int = 200
+## Chance that a spin nobody at the wheel would win is redrawn once (the house rule of 0.9.6:
+## every table quietly favours its bettors a bit, never shown). The wheel pays its honest Big Six
+## odds; 0.31 lifts a lone bettor's return to 98.8–104.9% depending on the symbol (101.3% over the
+## seven symbols, `tests/sim/test_wheel_rtp.gd`).
+@export var wheel_favour: float = 0.31
+## Seconds from the first bet of a round until the dealer spins.
+@export var wheel_countdown: float = 12.0
+## Seconds the wheel spins at full speed before it starts slowing onto the result
+## (`WheelLogic.LAND_TIME` covers the slowing down).
+@export var wheel_spin_time: float = 3.0
+## Seconds the result stays up before the next round opens.
+@export var wheel_result_time: float = 4.0
+
 @export_group("Slots")
 @export var slots_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var slots_spin_time: float = 1.6

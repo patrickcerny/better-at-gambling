@@ -326,9 +326,10 @@ func shield_knockout(target: int, attacker: int, now: float) -> bool:
 
 
 ## Tip jar (Patrick, 0.8.19): a seated player tips the dealer `tip_amount` (to the house) for
-## +`tip_luck` at that game for the next `tip_rounds` rounds. Blackjack and roulette only.
+## +`tip_luck` at that game for the next `tip_rounds` rounds. Blackjack, roulette and the Wheel of
+## Fortune only (the tables with a dealer).
 const TIP_ID: StringName = &"tip_jar"
-const TIP_GAMES: Array[StringName] = [&"blackjack", &"roulette"]
+const TIP_GAMES: Array[StringName] = [&"blackjack", &"roulette", &"wheel"]
 
 
 func tip(player: int, game: StringName, station: StringName, now: float) -> Dictionary:

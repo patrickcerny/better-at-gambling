@@ -29,6 +29,7 @@ const STATIONS: Dictionary = {
 	&"roulette_1": [&"roulette", Vector3(-6, 0, -3), 0], &"roulette_2": [&"roulette", Vector3(6, 0, -3), 180],
 	&"blackjack_1": [&"blackjack", Vector3(-16, 0, 4), 0], &"blackjack_2": [&"blackjack", Vector3(-9, 0, 4), 0],
 	&"blackjack_3": [&"blackjack", Vector3(-2, 0, 4), 0],
+	&"wheel_1": [&"wheel", Vector3(11, 0, 5), 0],
 	# VIP lounge (ground floor, behind the north door): the tables either side of the aisle from
 	# the door, the two slots against its back wall.
 	&"vip_blackjack_1": [&"blackjack", Vector3(-4.3, 0, -20.5), 0], &"vip_roulette_1": [&"roulette", Vector3(4.0, 0, -20.5), 0],
@@ -1192,6 +1193,8 @@ func _make_station(kind: StringName) -> StationBase:
 			return BlackjackStation.new()
 		&"horse_race":
 			return HorseRaceStation.new()
+		&"wheel":
+			return WheelStation.new()
 	Log.error(&"map", "unknown station kind %s" % kind)
 	return StationBase.new()
 
