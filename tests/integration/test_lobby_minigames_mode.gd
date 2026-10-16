@@ -2,7 +2,8 @@ extends GutTest
 ## MINIGAMES ONLY party mode (Patrick: "Play minigames button so you can only play minigames with
 ## friends"): the leader picks it in the lobby; the match plays the chosen number of minigames back
 ## to back (briefing → minigame → results/rewards → next minigame) with no casino phase at all,
-## then the podium. Practice runs the same mode from its own settings.
+## then the podium. `--practice --mode minigames` runs the same mode solo (dev/testing; the menu's
+## PRACTICE is always the casino match).
 
 var server: MatchServer
 var events: Array[Dictionary] = []
@@ -91,7 +92,7 @@ func test_practice_minigames_only_solo_plays_what_one_player_can() -> void:
 	for id: StringName in played:
 		assert_lte((Registry.minigames[id] as MinigameDefinition).min_players, 1, "%s works solo" % id)
 	var too_few: Array[MinigameDefinition] = MatchMode.needs_more_players(Registry.minigames.values(), 1)
-	assert_false(too_few.is_empty(), "the practice menu notes the 2+ player minigames")
+	assert_false(too_few.is_empty(), "some minigames need 2+ players (lobby only)")
 	for d: MinigameDefinition in too_few:
 		assert_gt(d.min_players, 1)
 	practice.free()

@@ -2,8 +2,8 @@ class_name MatchMode
 extends RefCounted
 ## Party modes (Patrick: "Play minigames button so you can only play minigames with friends (also
 ## good for testing for me)"). The leader picks one in the lobby (`lobby_setting` key `mode`);
-## Practice picks one on the main menu (`SceneRouter.practice_settings`, or `--mode` on the
-## command line).
+## Practice from the main menu is always CASINO (`SceneRouter.practice_settings`); `--mode` on the
+## command line picks one for `--practice` and `--server`.
 ## - CASINO: the normal match, gambling segments with a minigame between each.
 ## - MINIGAMES: no casino at all: the chosen number of minigames back to back, each with its
 ##   briefing and its results (rewards), then the podium. Items are off (there is nowhere to use
