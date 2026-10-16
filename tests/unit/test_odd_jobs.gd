@@ -1,7 +1,7 @@
 extends GutTest
 ## Odd Jobs cabinet rules (server/odd_jobs.gd): ONE bar shared by every player, each click adds the
 ## clicker's share (1 / presses needed at their money), the click that fills it is paid $50 and
-## the bar starts over; idle decay, refusal at $500+, the per-player rate limit.
+## the bar starts over; idle decay, refusal at $500+, and no rate limit (every click counts).
 
 var economy: Economy
 var jobs: OddJobs
@@ -16,7 +16,7 @@ func before_each() -> void:
 	now = 0.0
 
 
-## `player` clicks `n` times at a steady 10/s (under the limit).
+## `player` clicks `n` times at a steady 10/s.
 func _press(n: int, player: int = 1) -> void:
 	for i: int in n:
 		now += 0.1
@@ -121,20 +121,30 @@ func test_rich_player_cannot_snipe_the_last_click() -> void:
 	assert_eq(economy.balance(2), 50)
 
 
-func test_rate_limit_drops_extra_presses() -> void:
-	# 40 presses in the same instant: only the burst (12) counts, the rest are dropped quietly.
-	economy.apply(1, 499, &"test")  # 60 presses a bar: nothing pays out here
+func test_presses_count_at_any_rate() -> void:
+	# Patrick: "as fast clicking as possible and no rate limit": 40 presses in the same instant
+	# all count, and so do 30 more within a millisecond each.
+	economy.apply(1, 499, &"test")  # 60 presses a bar: nothing pays out until the 60th
 	for i: int in 40:
 		assert_true(jobs.press(1, 5.0)["ok"])
-	assert_almost_eq(jobs.fill(), 12.0 / 60.0, 0.001)
-	# The limit is per player: someone else's clicks still count.
-	economy.apply(2, 499, &"test")
-	assert_true(jobs.press(2, 5.0)["ok"])
-	assert_almost_eq(jobs.fill(), 13.0 / 60.0, 0.001)
-	# A second later about 12 more are allowed.
-	for i: int in 40:
-		jobs.press(1, 6.0)
-	assert_almost_eq(jobs.fill(), 25.0 / 60.0, 0.001)
+	assert_almost_eq(jobs.fill(), 40.0 / 60.0, 0.001)
+	for i: int in 19:
+		jobs.press(1, 5.0 + i * 0.001)
+	assert_almost_eq(jobs.fill(), 59.0 / 60.0, 0.001)
+	assert_eq(economy.balance(1), 499)
+	jobs.press(1, 5.02)
+	assert_eq(economy.balance(1), 549, "the 60th click in 20 ms fills the bar")
+
+
+func test_validator_lets_presses_through_at_any_rate() -> void:
+	var v := IntentValidator.new()
+	for i: int in 200:
+		assert_eq(v.check(1, Intents.make(&"odd_jobs_press"), Phase.Id.CASINO, 1.0, true), &"", "press %d" % i)
+	var limited: int = 0
+	for i: int in 200:
+		if v.check(1, Intents.make(&"emote", {"id": &"wave"}), Phase.Id.CASINO, 1.0, true) == &"rate_limited":
+			limited += 1
+	assert_gt(limited, 0, "other intents keep the generic limit")
 
 
 func test_bar_events_are_throttled() -> void:
@@ -163,7 +173,13 @@ func test_broke_line_is_the_house_comp_line() -> void:
 
 
 func test_cabinet_aim_ray() -> void:
-	var c := Vector3(1, 1, 0)
-	assert_true(OddJobsCabinet.ray_hits(Vector3(0, 1.5, 0), (c - Vector3(0, 1.5, 0)), c, 0.2))
-	assert_false(OddJobsCabinet.ray_hits(Vector3(0, 1.5, 0), Vector3(1, 0, 0), c, 0.2), "looking over it")
-	assert_false(OddJobsCabinet.ray_hits(Vector3(0, 1.5, 0), Vector3(-1, -0.5, 0), c, 0.2), "behind you")
+	var box: AABB = OddJobsCabinet.AIM_BOX
+	var eye := Vector3(-1.05, 1.6, 0)  # the stand spot, local
+	var deck_edge := Vector3(-0.45, 1.08, 0.45)  # the deck's front corner, far from the cap
+	assert_true(OddJobsCabinet.ray_hits(eye, OddJobsCabinet.BUTTON_POS - eye, box), "the button")
+	assert_true(OddJobsCabinet.ray_hits(eye, deck_edge - eye, box), "the deck's edge counts too")
+	assert_true(OddJobsCabinet.ray_hits(eye, Vector3(1, 0, 0), box), "straight ahead at the bar")
+	assert_gt(box.size.z, OddJobsCabinet.BUTTON_RADIUS * 5.0, "much wider than the cap")
+	assert_false(OddJobsCabinet.ray_hits(eye, Vector3(0, 0, 1), box), "looking along the room")
+	assert_false(OddJobsCabinet.ray_hits(eye, Vector3(-1, -0.5, 0), box), "behind you")
+	assert_false(OddJobsCabinet.ray_hits(eye, Vector3(1, 2, 0), box), "up at the ceiling")

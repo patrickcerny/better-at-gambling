@@ -5,10 +5,14 @@ extends Node3D
 ## the clicks/notes text, and the warm lamp strip + marquee bulbs that pulse while the local player
 ## is broke. Pure presentation: OddJobsController feeds it the server's numbers.
 
-## Button cap centre (local) and the radius the aim ray must pass within.
+## Button cap centre (local) and its radius.
 const BUTTON_POS: Vector3 = Vector3(-0.08, 1.17, 0.0)
 const BUTTON_RADIUS: float = 0.19
-const AIM_RADIUS: float = 0.24
+## The aim target (local, Patrick: "the red button click thing is too small its very hard to
+## target it"): the cabinet's whole front, the deck around the button with a lip past its edges,
+## the bar riser and the marquee, 1.1 m wide (~6 button radii) and 1.45 m tall. Any camera ray that
+## enters it counts; looking off to the side or back into the room does not.
+const AIM_BOX: AABB = AABB(Vector3(-0.55, 0.85, -0.55), Vector3(0.75, 1.45, 1.1))
 const DIP: float = 0.05
 ## The bar on the riser's room-facing side (x = 0.16 local), left (−z) to right (+z) as you face it.
 const BAR_X: float = 0.145
@@ -32,6 +36,8 @@ var _button_mesh: MeshInstance3D
 var _button_mat: StandardMaterial3D
 var _lamp_mat: StandardMaterial3D
 var _outline: ShaderMaterial
+## The cap, its dome and the gold bezel: outlined together while aimed or glowing.
+var _outlined: Array[MeshInstance3D] = []
 var _time: float = 0.0
 var _punch: float = 0.0
 var _note_until: float = 0.0
@@ -43,7 +49,7 @@ func _init() -> void:
 
 
 func _build() -> void:
-	GreyboxKit.cylinder(self, 0.25, 0.06, Vector3(BUTTON_POS.x, 1.11, 0), Palette.WARM_GOLD, "OddJobsBezel", false, 0.8)
+	var bezel: Node3D = GreyboxKit.cylinder(self, 0.25, 0.06, Vector3(BUTTON_POS.x, 1.11, 0), Palette.WARM_GOLD, "OddJobsBezel", false, 0.8)
 	# The button: a red cap with a domed top, its own material (it flashes on a click).
 	button = Node3D.new()
 	button.name = "OddJobsButton"
@@ -74,6 +80,7 @@ func _build() -> void:
 	dome_mi.material_override = _button_mat
 	dome_mi.position.y = 0.05
 	button.add_child(dome_mi)
+	_outlined = [_button_mesh, dome_mi, bezel.get_node("Mesh") as MeshInstance3D]
 	_outline = ShaderMaterial.new()
 	_outline.shader = OUTLINE_SHADER
 	_outline.set_shader_parameter(&"width", 0.012)
@@ -135,17 +142,15 @@ func button_center() -> Vector3:
 	return global_transform * (BUTTON_POS + Vector3(0, 0.08, 0))
 
 
-## True when the ray from `origin` along `dir` comes down onto the button's top (the horizontal
-## plane through `center`) within `radius` of it. Looking straight ahead over the deck is not aiming.
-static func ray_hits(origin: Vector3, dir: Vector3, center: Vector3, radius: float) -> bool:
-	if dir.y >= -0.0001 or origin.y <= center.y:
-		return false
-	var hit: Vector3 = origin + dir * ((center.y - origin.y) / dir.y)
-	return Vector2(hit.x - center.x, hit.z - center.z).length() <= radius
+## True when the ray from `origin` along `dir` (both local) enters `box` ahead of the origin.
+static func ray_hits(origin: Vector3, dir: Vector3, box: AABB) -> bool:
+	return dir.length_squared() > 0.0 and box.intersects_ray(origin, dir) != null
 
 
+## True when a world-space camera ray at `origin` along `dir` lands on the cabinet's front.
 func aimed_by(origin: Vector3, dir: Vector3) -> bool:
-	return ray_hits(origin, dir, button_center(), AIM_RADIUS)
+	var inv: Transform3D = global_transform.affine_inverse()
+	return ray_hits(inv * origin, inv.basis * dir, AIM_BOX)
 
 
 ## The server's shared bar (0..1).
@@ -191,9 +196,10 @@ func set_aimed(on: bool) -> void:
 func _update_outline() -> void:
 	if aimed or glowing:
 		_outline.set_shader_parameter(&"color", Palette.VIP_GOLD if aimed else Palette.WARM_GOLD.lerp(Palette.CASINO_RED, 0.3))
-		_button_mesh.material_overlay = _outline
-	else:
-		_button_mesh.material_overlay = null
+		if not glowing:
+			_outline.set_shader_parameter(&"width", 0.018)  # glowing pulses it in _process
+	for mi: MeshInstance3D in _outlined:
+		mi.material_overlay = _outline if aimed or glowing else null
 
 
 func _process(delta: float) -> void:

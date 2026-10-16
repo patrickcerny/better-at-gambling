@@ -10,7 +10,7 @@ OUT="$ROOT/assets/tutorial"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$OUT"
-ALL=(leaderboard hall table shop minigame rough jail lobby)
+ALL=(leaderboard hall table shop oddjobs minigame rough jail lobby)
 if [ $# -gt 0 ]; then NAMES=("$@"); else NAMES=("${ALL[@]}"); fi
 render() { # out scene extra-args...
 	local out="$1" scene="$2"; shift 2

@@ -157,6 +157,13 @@
   shared bar for the whole casino, each click adds that player's share, the click that fills it
   wins the $50; the cabinet glows and the button gets a warm outline when you are broke (below the
   House Comp line).
+- Odd Jobs, round two (Patrick: "the red button click thing is too small", "no rate limit", "Add
+  smash the button to the tutorial"): aiming counts anywhere on the cabinet's front
+  (`OddJobsCabinet.AIM_BOX`, 1.1 m wide by 1.45 m: deck, bar riser, marquee; was 0.24 m around
+  the cap) from up to 2 m around the stand spot, and the outline covers cap, dome and bezel. No rate
+  limit: the client's 14/s cap and the cabinet's 12/s per player are gone and `IntentValidator`
+  exempts `odd_jobs_press` from its 20/s limit; bar events stay throttled to 10/s. New tutorial page
+  SMASH THE BUTTON after ITEMS (9 pages; picture `assets/tutorial/oddjobs.webp`, view `oddjobs`).
 - Megaphone the right way round (bell forward, held in the fist; first person shows it in front of
   the camera); waiters hold the drinks tray on the palm (`AvatarVisuals.hold_right_arm`); dealers
   stand on the floor (`DealerLogic.OFFSETS` y 0.5 → 0).

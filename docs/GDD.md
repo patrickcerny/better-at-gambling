@@ -24,7 +24,8 @@ $750 after each minigame played, $900 from the fourth on (`BalanceConfig.comp_am
 **Odd Jobs** cabinet next to the Gift Shop (casino phases, not in minigames-only): look at its big
 red 3D button and click (or E). One bar shared by everyone; each click adds the clicker's share,
 1/presses where presses = 10 at $0 up to 60 at $499 (refused at $500+), and the click that fills
-the bar wins $50, then it starts over. Idle bar drains 0.1/s after 0.5 s; ~12 clicks/s per player.
+the bar wins $50, then it starts over. Idle bar drains 0.1/s after 0.5 s; no click rate limit.
+The aim target is the cabinet's whole front (deck, bar riser, marquee), not just the cap.
 The cabinet's lamps pulse and the button is outlined while you are below the House Comp line.
 
 ## Casino games (MVP)
