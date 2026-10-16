@@ -2486,6 +2486,7 @@ func _on_station_state(sid: StringName) -> void:
 		if node is BlackjackStation:
 			(node as BlackjackStation).show_round(st)
 		elif node is HorseRaceStation:
+			(node as HorseRaceStation).local_player = local_id  # outlines the horse you backed
 			(node as HorseRaceStation).show_state(st)
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
