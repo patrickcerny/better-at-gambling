@@ -188,7 +188,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
-	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()]]:
+	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"craps", CrapsUi.new()]]:
 		var ui: StationUi = pair[1]
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
@@ -2476,6 +2476,8 @@ func _on_station_state(sid: StringName) -> void:
 		elif node is HorseRaceStation:
 			(node as HorseRaceStation).local_player = local_id  # outlines the horse you backed
 			(node as HorseRaceStation).show_state(st)
+		elif node is CrapsStation:
+			(node as CrapsStation).show_state(st, func(pid: int) -> int: return _seat_index(sid, pid))
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 	_update_look_lock()
@@ -2615,6 +2617,8 @@ func _min_bet(st: StationBase) -> int:
 			base = cfg.plinko_bet_sizes[0]
 		&"horse_race":
 			base = cfg.horse_min_bet
+		&"craps":
+			base = cfg.craps_min_bet
 	return int(floor(base * mult))
 
 

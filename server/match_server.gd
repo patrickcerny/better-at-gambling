@@ -47,7 +47,7 @@ var odd_jobs: OddJobs
 ## The waiter NPC's trips and drink puddles, and the Megaphone prop by the bar (M7, npc/).
 var waiter: WaiterLogic
 var megaphone: MegaphoneLogic
-## Dealers at blackjack and roulette tables (v0.8.4, npc/): station_id → DealerLogic.
+## Dealers at blackjack, roulette and craps tables (v0.8.4, npc/): station_id → DealerLogic.
 var dealers: Dictionary[StringName, DealerLogic] = {}
 ## Online room: drops a kicked player's connection (`RoomHost.kick_player`; tests leave it unset).
 var kick_handler: Callable
@@ -179,11 +179,11 @@ func _build_match_systems(seed_value: int) -> void:
 	items.clear_jail = clear_catch_count  # Jail system (v0.8.3)
 	waiter = WaiterLogic.new(state.players, rules, world, SeededRng.new(seed_value ^ 0x3A11E5))
 	megaphone = MegaphoneLogic.new(state.players, rules, world)
-	# Initialize dealers for each blackjack and roulette station (v0.8.4)
+	# A dealer at each blackjack, roulette and craps station (v0.8.4; the craps stickman)
 	dealers.clear()
 	for sid: StringName in stations.logics:
 		var logic: StationLogicBase = stations.logics[sid]
-		if logic.game_id == &"blackjack" or logic.game_id == &"roulette":
+		if DealerLogic.OFFSETS.has(logic.game_id):
 			var dealer_rng: SeededRng = SeededRng.new(seed_value ^ StringName(sid).hash())
 			dealers[sid] = DealerLogic.new(sid, state.players, rules, world, dealer_rng, stations, map_def, DealerLogic.OFFSETS[logic.game_id])
 	minigames.reset()

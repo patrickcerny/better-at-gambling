@@ -18,7 +18,7 @@ var title: Label
 var status_label: Label
 var hint: Label
 var limits_mult: float = 1.0
-## Tip jar (blackjack and roulette): tip the dealer for a little luck at this table.
+## Tip jar (blackjack, roulette, craps): tip the dealer for a little luck at this table.
 var tip_button: Button = null
 ## Display name shown in the header.
 var game_title: String = "GAME"
@@ -181,7 +181,7 @@ func wants_camera_lock() -> bool:
 
 ## The tip jar is at the tables with a dealer to tip.
 func has_tip_jar() -> bool:
-	return game_title == "BLACKJACK" or game_title == "ROULETTE"
+	return game_title == "BLACKJACK" or game_title == "ROULETTE" or game_title == "CRAPS"
 
 
 func _build_tip_button() -> void:
@@ -272,4 +272,14 @@ static func rejection_text(error: StringName) -> String:
 			return "One horse per race"
 		&"invalid_horse":
 			return "Pick a horse"
+		&"point_is_on":
+			return "Line bets go down on the come-out roll"
+		&"one_side_only":
+			return "Pass or Don't Pass, not both"
+		&"not_shooter":
+			return "You're not the shooter"
+		&"no_bets":
+			return "Someone has to bet first"
+		&"wait_for_bets":
+			return "Give the table a moment to bet"
 	return String(error).capitalize()

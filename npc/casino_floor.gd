@@ -17,7 +17,7 @@ const PUDDLE_COLOR: Color = Color("#7A3B22")
 
 var scene: MatchScene
 var waiter: Waiter = null
-## Dealers at each blackjack and roulette table (v0.8.4): station_id → Dealer node.
+## Dealers at each blackjack, roulette and craps table (v0.8.4): station_id → Dealer node.
 var dealers: Dictionary[StringName, Dealer] = {}
 ## Start room and jail (0.8.19).
 var security: SecurityView = null
@@ -67,10 +67,10 @@ func _spawn_waiter() -> void:
 	scene.world_root.add_child(waiter)
 
 
-## Spawn dealers at each blackjack and roulette table (v0.8.4).
+## Spawn dealers at each blackjack, roulette and craps table (v0.8.4).
 func _spawn_dealers() -> void:
 	dealers.clear()
-	# One dealer per blackjack and roulette table, placed in the table's own frame (its yaw turns
+	# One dealer per blackjack, roulette and craps table, placed in the table's own frame (its yaw turns
 	# the offset) and facing the players. Dealers stand still, so online clients place them from
 	# the map too; a host (headless servers included) also reports them to the server's DealerLogic.
 	for sid: StringName in scene.map.stations:

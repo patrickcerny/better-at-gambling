@@ -14,11 +14,12 @@ const ATTACK_RANGE: float = 2.2
 ## x −1.5, the nearest stool is at x −0.2), flush against the table on the floor. The table's yaw
 ## turns these, so a mirrored table (roulette_2 at 180°) keeps its dealer by the wheel. y is 0:
 ## the dealer's origin is at its feet and the tables stand on the floor (at 0.5 they hovered).
-const OFFSETS: Dictionary = {&"blackjack": Vector3(0.0, 0.0, -1.2), &"roulette": Vector3(-1.5, 0.0, -1.4)}
+const OFFSETS: Dictionary = {&"blackjack": Vector3(0.0, 0.0, -1.2), &"roulette": Vector3(-1.5, 0.0, -1.4), &"craps": Vector3(0.0, 0.0, -1.55)}
 ## Which way the dealer faces in the table's frame: at the players (blackjack: +z, the stools;
-## roulette: diagonally across the wheel towards the layout, +x +z). Yaw 0 looks down −z, like
+## roulette: diagonally across the wheel towards the layout, +x +z; craps: +z across the felt).
+## Yaw 0 looks down −z, like
 ## every avatar.
-const FACINGS: Dictionary = {&"blackjack": PI, &"roulette": -PI * 0.75}
+const FACINGS: Dictionary = {&"blackjack": PI, &"roulette": -PI * 0.75, &"craps": PI}
 
 var station_id: StringName
 var players: Dictionary
