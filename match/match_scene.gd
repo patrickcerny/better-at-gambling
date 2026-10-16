@@ -188,7 +188,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
-	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"scratch", ScratchUi.new()]]:
+	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()]]:
 		var ui: StationUi = pair[1]
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
@@ -2475,8 +2475,12 @@ func _on_station_state(sid: StringName) -> void:
 		elif node is HorseRaceStation:
 			(node as HorseRaceStation).local_player = local_id  # outlines the horse you backed
 			(node as HorseRaceStation).show_state(st)
+		elif node is CrapsStation:
+			(node as CrapsStation).show_state(st, func(pid: int) -> int: return _seat_index(sid, pid))
 		elif node is WheelStation:
 			(node as WheelStation).show_state(st)
+		elif node is HiLoStation:
+			(node as HiLoStation).show_round(st)
 		elif node is ScratchStation:
 			(node as ScratchStation).show_state(st)
 	if current_ui != null and current_ui.station_id == sid:
@@ -2618,8 +2622,12 @@ func _min_bet(st: StationBase) -> int:
 			base = cfg.plinko_bet_sizes[0]
 		&"horse_race":
 			base = cfg.horse_min_bet
+		&"craps":
+			base = cfg.craps_min_bet
 		&"wheel":
 			base = cfg.wheel_min_bet
+		&"hilo":
+			base = cfg.hilo_min_bet
 		&"scratch":
 			base = cfg.scratch_prices[0]
 	return int(floor(base * mult))

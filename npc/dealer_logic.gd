@@ -16,11 +16,12 @@ const ATTACK_RANGE: float = 2.2
 ## the dealer's origin is at its feet and the tables stand on the floor (at 0.5 they hovered).
 ## The Wheel of Fortune's dealer stands beside the wheel on its east side (the cabinet runs to
 ## x 1.25, the betting table to z −0.65), close enough to give it a pull, facing the table.
-const OFFSETS: Dictionary = {&"blackjack": Vector3(0.0, 0.0, -1.2), &"roulette": Vector3(-1.5, 0.0, -1.4), &"wheel": Vector3(1.75, 0.0, -1.2)}
+const OFFSETS: Dictionary = {&"blackjack": Vector3(0.0, 0.0, -1.2), &"roulette": Vector3(-1.5, 0.0, -1.4), &"wheel": Vector3(1.75, 0.0, -1.2), &"craps": Vector3(0.0, 0.0, -1.55), &"hilo": Vector3(0.0, 0.0, -1.5)}
 ## Which way the dealer faces in the table's frame: at the players (blackjack: +z, the stools;
-## roulette: diagonally across the wheel towards the layout, +x +z). Yaw 0 looks down −z, like
-## every avatar.
-const FACINGS: Dictionary = {&"blackjack": PI, &"roulette": -PI * 0.75, &"wheel": 2.1719}  # wheel: atan2(1.75, −1.2), at the table's middle
+## roulette: diagonally across the wheel towards the layout, +x +z; craps: +z across the felt).
+## Hi-Lo: behind the middle of the oval's far side, by the deck (the rail ends at z −0.86),
+## facing the seats (+z). Yaw 0 looks down −z, like every avatar.
+const FACINGS: Dictionary = {&"blackjack": PI, &"roulette": -PI * 0.75, &"wheel": 2.1719, &"craps": PI, &"hilo": PI}  # wheel: atan2(1.75, −1.2), at the table's middle
 
 var station_id: StringName
 var players: Dictionary

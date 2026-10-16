@@ -47,7 +47,7 @@ var odd_jobs: OddJobs
 ## The waiter NPC's trips and drink puddles, and the Megaphone prop by the bar (M7, npc/).
 var waiter: WaiterLogic
 var megaphone: MegaphoneLogic
-## Dealers at blackjack and roulette tables (v0.8.4, npc/): station_id → DealerLogic.
+## Dealers at blackjack, roulette and craps tables (v0.8.4, npc/): station_id → DealerLogic.
 var dealers: Dictionary[StringName, DealerLogic] = {}
 ## Online room: drops a kicked player's connection (`RoomHost.kick_player`; tests leave it unset).
 var kick_handler: Callable
@@ -182,7 +182,7 @@ func _build_match_systems(seed_value: int) -> void:
 	items.clear_jail = clear_catch_count  # Jail system (v0.8.3)
 	waiter = WaiterLogic.new(state.players, rules, world, SeededRng.new(seed_value ^ 0x3A11E5))
 	megaphone = MegaphoneLogic.new(state.players, rules, world)
-	# Initialize dealers for every table with a dealer: blackjack, roulette, the wheel (v0.8.4)
+	# Initialize dealers for every table with a dealer: blackjack, roulette, the wheel (v0.8.4), craps (the stickman), Hi-Lo
 	dealers.clear()
 	for sid: StringName in stations.logics:
 		var logic: StationLogicBase = stations.logics[sid]

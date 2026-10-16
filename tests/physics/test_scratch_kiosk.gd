@@ -125,4 +125,6 @@ func test_sit_buy_reveal_through_the_scene() -> void:
 	var won: int = ScratchUi.prize_of(ui.shown_card, 0, 10)
 	if not scene.server.stations.hot.has(SID):
 		assert_eq(scene.server.economy.balance(scene.local_id), before + won, "the printed prize")
+	# The empty kiosk reaches the client with the next snapshot (later on a busy runner).
+	await wait_until(func() -> bool: return not st.card_mesh.visible, 2.0)
 	assert_false(st.card_mesh.visible, "the paid card is off the counter")

@@ -127,6 +127,29 @@ func test_horse_race_over_the_max_bets_the_max() -> void:
 	assert_eq(int(_last_bet_placed()["amount"]), lim.y)
 
 
+func test_hilo() -> void:
+	var sid: StringName = &"hilo_1"
+	_sit(sid)
+	var lim: Vector2i = (fx.server.stations.logics[sid] as HiLoLogic).limits()
+	_set_money(lim.x - 1)
+	assert_eq(_bet(sid, {"amount": lim.y})["error"], &"insufficient_funds", "under the minimum is still refused")
+	_check_all_in(sid, {"amount": lim.y}, lim.x + 6)
+	var h: Dictionary = HiLoStation.hand_of(fx.server.stations.logics[sid].get_public_state()["hands"], p)
+	assert_eq(int(h.get("stake", 0)), lim.x + 6, "the hand antes what went in")
+
+
+func test_hilo_over_the_max_bets_the_max() -> void:
+	var sid: StringName = &"hilo_1"
+	_sit(sid)
+	var lim: Vector2i = (fx.server.stations.logics[sid] as HiLoLogic).limits()
+	_set_money(lim.y * 4)
+	fx.events.clear()
+	assert_true(_bet(sid, {"amount": lim.y * 2})["ok"])
+	assert_eq(fx.server.economy.balance(p), lim.y * 3, "the table max went in")
+	assert_eq(int(_last_bet_placed()["amount"]), lim.y)
+	assert_false(bool((_last_bet_placed()["details"] as Dictionary).get("all_in", false)), "capped by the table, not all-in")
+
+
 func test_slots() -> void:
 	var sid: StringName = &"slot_1"
 	_sit(sid)
@@ -163,6 +186,30 @@ func test_below_min_request_is_refused() -> void:
 	assert_eq(_bet(sid, {"amount": lim.x - 1})["error"], &"below_min")
 
 
+
+func test_craps() -> void:
+	var sid: StringName = &"craps_1"
+	_sit(sid)
+	var logic: CrapsLogic = fx.server.stations.logics[sid]
+	var lim: Vector2i = logic.limits()
+	_set_money(lim.x - 1)
+	assert_eq(_bet(sid, {"type": &"pass", "amount": lim.x * 5})["error"], &"insufficient_funds")
+	_set_money(lim.x * 3)
+	assert_eq(_bet(sid, {"type": &"pass", "amount": lim.x - 1})["error"], &"below_min", "under the minimum is refused")
+	_check_all_in(sid, {"type": &"pass", "amount": lim.x * 5}, lim.x + 3)
+	assert_eq(logic.player_total(p), lim.x + 3, "the pass line holds the all-in stake")
+
+
+func test_craps_over_the_felt_total_bets_what_is_left() -> void:
+	var sid: StringName = &"craps_1"
+	_sit(sid)
+	var lim: Vector2i = (fx.server.stations.logics[sid] as CrapsLogic).limits()
+	_set_money(lim.y * 2)
+	assert_true(_bet(sid, {"type": &"pass", "amount": lim.y - lim.x * 2})["ok"])
+	fx.events.clear()
+	assert_true(_bet(sid, {"type": &"field", "amount": lim.y})["ok"], "over the max on the felt: what is left goes in")
+	assert_eq(int(_last_bet_placed()["amount"]), lim.x * 2)
+	assert_eq(_bet(sid, {"type": &"any_seven", "amount": lim.x})["error"], &"above_max", "a full felt refuses as before")
 func test_scratch_cards() -> void:
 	var sid: StringName = &"scratch_1"
 	_sit(sid)
