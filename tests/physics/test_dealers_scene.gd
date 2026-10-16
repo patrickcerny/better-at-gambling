@@ -34,8 +34,12 @@ func test_every_dealer_stands_clear_of_its_table_and_faces_it() -> void:
 		to_table.y = 0.0
 		assert_gt(dealer.forward().dot(to_table.normalized()), 0.9, "%s faces the table, not away from it" % sid)
 		assert_almost_eq(dealer.rotation.y, dealer.yaw, 0.001)
-	# The host reports every dealer spot to the server, where the shove/bat reach is judged.
+	# The host reports every dealer spot to the server, where the shove/bat reach is judged (the
+	# waiting room's play-money table has a dealer to look at but nothing to shove there).
 	for sid: StringName in dealers:
+		if FunRoom.is_fun(sid):
+			assert_false(scene.server.dealers.has(sid), "%s: no dealer logic at a play-money table" % sid)
+			continue
 		var logic: DealerLogic = scene.server.dealers[sid]
 		assert_almost_eq(logic.where(), (dealers[sid] as Dealer).global_position, Vector3.ONE * 0.05, "%s: server and scene agree" % sid)
 		assert_almost_eq(DealerLogic.new(sid, {}, scene.server.rules, scene.server.world, SeededRng.new(1), null, scene.server.map_def, logic.offset).where(), (dealers[sid] as Dealer).global_position, Vector3.ONE * 0.05, "%s: a headless server derives the same spot from the map" % sid)

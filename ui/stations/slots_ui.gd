@@ -288,9 +288,11 @@ func _process(delta: float) -> void:
 func _update_info() -> void:
 	if info_label == null:
 		return
-	var bal: int = state.balance(local_id) if state != null else 0
+	var bal: int = my_balance()
 	var stake: int = int(pub.get("stake", _last_stake))
-	info_label.text = "BALANCE %s   •   BET %s" % [money(bal), money(stake) if stake > 0 else "—"]
+	info_label.text = "%s %s   •   BET %s" % ["PLAY MONEY" if fun else "BALANCE", money(bal), money(stake) if stake > 0 else "—"]
+	if jackpot_label != null:
+		jackpot_label.visible = not fun  # play money never feeds or wins the progressive
 	if jackpot_label != null and state != null:
 		jackpot_label.text = "  + JACKPOT %s" % money(state.jackpot)
 

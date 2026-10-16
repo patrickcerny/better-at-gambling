@@ -22,6 +22,10 @@ var limits_mult: float = 1.0
 var tip_button: Button = null
 ## Display name shown in the header.
 var game_title: String = "GAME"
+## True at a waiting-room table (`FunRoom`): play money, shown as such under the title.
+var fun: bool = false
+## "PLAY MONEY $1,000" under the title at a waiting-room table (hidden elsewhere).
+var play_money_label: Label
 ## InputGlyphs.epoch the key hints were last written for.
 var _glyph_epoch: int = -1
 
@@ -62,6 +66,13 @@ func _ready() -> void:
 	title.text = game_title
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(title)
+	play_money_label = Label.new()
+	play_money_label.name = "PlayMoney"
+	play_money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	play_money_label.add_theme_font_size_override(&"font_size", 22)
+	play_money_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	play_money_label.visible = false
+	body.add_child(play_money_label)
 	status_label = Label.new()
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override(&"font_size", 26)
@@ -84,6 +95,12 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 	state = p_state
 	visible = true
 	pub = state.stations.get(station_id, {}) if state != null else {}
+	fun = FunRoom.is_fun(station_id)
+	title.text = game_title
+	play_money_label.visible = fun
+	if tip_button != null:
+		tip_button.visible = not fun  # no dealer to tip with play chips
+	_show_play_money()
 	var vip: bool = bool(pub.get("vip", false))
 	limits_mult = Registry.balance.limits_multiplier(state.segment_index if state != null else 0) * (3.0 if vip else 1.0)
 	_on_open()
@@ -108,6 +125,7 @@ func _input(event: InputEvent) -> void:
 func update_state(p_pub: Dictionary, p_priv: Dictionary) -> void:
 	pub = p_pub
 	priv = p_priv
+	_show_play_money()
 	if visible:
 		if _glyph_epoch != InputGlyphs.epoch:
 			_update_glyphs()
@@ -131,6 +149,19 @@ func send(type: StringName, payload: Dictionary = {}) -> bool:
 		rejected.emit(res["error"])
 		Audio.play(&"buzzer", &"UI", -16.0, 1.4)
 	return res["ok"]
+
+
+## The balance this table plays with: the waiting room's play money at a fun table, else the
+## real balance.
+func my_balance() -> int:
+	if state == null:
+		return 0
+	return state.fun_balance(local_id) if fun else state.balance(local_id)
+
+
+func _show_play_money() -> void:
+	if fun and play_money_label != null:
+		play_money_label.text = "PLAY MONEY  %s  ·  just for fun" % money(my_balance())
 
 
 ## Limit scaled like the server does.

@@ -22,6 +22,10 @@ signal peels_changed
 signal shop_changed
 ## Waiter puddles or the Megaphone holder changed (M7).
 signal floor_changed
+## Play money moved in the waiting room (`fun: true` money events; never the real balance).
+signal fun_money_changed(player: int, amount: int, balance: int, reason: StringName)
+## The waiting room's door opened (lobby) or shut (the match started).
+signal waiting_room_changed(open: bool)
 
 var phase: Phase.Id = Phase.Id.LOBBY
 var casino_time: float = 0.0
@@ -69,6 +73,9 @@ var shop_offers: Array = []
 ## the Megaphone (-1: on its stand).
 var puddles: Dictionary[int, Dictionary] = {}
 var megaphone_holder: int = -1
+## The waiting room (online lobby only): open or shut, and each player's play-money balance there.
+var waiting_room_open: bool = false
+var fun_balances: Dictionary[int, int] = {}
 ## Highest event sequence number ever applied. A resync (someone sits down, a gap) re-applies a
 ## cached snapshot and replays the events after it; the ones at or below this were already shown,
 ## so they rebuild the state without popping their money and feed lines again (Patrick: "a lot of
@@ -131,6 +138,12 @@ func apply_snapshot(snap: Dictionary) -> void:
 		puddles[int(p["puddle"])] = p
 	megaphone_holder = int((floor_state.get("megaphone", {}) as Dictionary).get("holder", -1))
 	floor_changed.emit()
+	var fun: Dictionary = snap.get("fun", {})
+	waiting_room_open = bool(fun.get("open", false))
+	fun_balances.clear()
+	for id: Variant in fun.get("balances", {}):
+		fun_balances[int(id)] = int(fun["balances"][id])
+	waiting_room_changed.emit(waiting_room_open)
 	if phase == Phase.Id.LOBBY:
 		last_call = false
 	players_changed.emit()
@@ -176,6 +189,12 @@ func _apply(ev: Dictionary) -> void:
 			last_call = true
 			_feed("LAST CALL! All winnings ×%.1f" % float(ev["multiplier"]), &"last_call")
 		&"money_changed":
+			if bool(ev.get("fun", false)):
+				# Waiting-room play money: its own balance, never the real one (HUD, leaderboard).
+				fun_balances[int(ev["player"])] = int(ev["balance"])
+				if not _replaying:
+					fun_money_changed.emit(int(ev["player"]), int(ev["amount"]), int(ev["balance"]), StringName(ev["reason"]))
+				return
 			balances[int(ev["player"])] = int(ev["balance"])
 			if not _replaying:
 				money_changed.emit(int(ev["player"]), int(ev["amount"]), int(ev["balance"]), StringName(ev["reason"]))
@@ -189,7 +208,7 @@ func _apply(ev: Dictionary) -> void:
 			players_changed.emit()
 		&"round_result":
 			var net: int = int(ev["net"])
-			if net != 0:
+			if net != 0 and not bool(ev.get("fun", false)):  # play money stays out of the feed
 				_feed("%s %s$%d at %s" % [player_name(int(ev["player"])), "+" if net > 0 else "−", absi(net), station_label(StringName(ev["station"]))], &"win" if net > 0 else &"loss")
 		&"jackpot_won":
 			_feed("%s hit the JACKPOT for $%d!" % [player_name(int(ev["player"])), int(ev["amount"])], &"jackpot")
@@ -276,8 +295,11 @@ func _apply(ev: Dictionary) -> void:
 			for pid: Variant in (ev.get("positions", {}) as Dictionary):
 				if players.has(int(pid)):
 					players[int(pid)]["pos"] = ev["positions"][pid]
+		&"waiting_room":
+			waiting_room_open = bool(ev["open"])
+			waiting_room_changed.emit(waiting_room_open)
 		&"bets_refunded":
-			if int(ev.get("amount", 0)) > 0:
+			if int(ev.get("amount", 0)) > 0 and not bool(ev.get("fun", false)):
 				_feed("%s got $%d back from %s" % [player_name(int(ev["player"])), int(ev["amount"]), station_label(StringName(ev["station"]))], &"info")
 		&"inventory_changed":
 			var pid: int = int(ev["player"])
@@ -440,6 +462,11 @@ func player_name(id: int) -> String:
 ## Balance of a player.
 func balance(id: int) -> int:
 	return balances.get(id, 0)
+
+
+## Play-money balance in the waiting room (0 before the first visit).
+func fun_balance(id: int) -> int:
+	return fun_balances.get(id, 0)
 
 
 ## Rank (1-based) of a player by money.
