@@ -30,6 +30,9 @@ extends Resource
 @export var bj_betting_window: float = 8.0
 @export var bj_action_time: float = 10.0
 @export var bj_result_time: float = 2.0
+## A split gives the splitting player this many extra decision clocks (x bj_action_time) on top
+## of what they had left, so both hands can be played (1.0 = the full decision time again).
+@export var bj_split_time_bonus: float = 1.0
 ## Profit ratio paid on winning hands when the dealer busts (1.0 = plain 1:1).
 @export var bj_dealer_bust_bonus: float = 1.07
 @export var bj_blackjack_ratio: float = 1.5

@@ -27,9 +27,13 @@ func _build_visuals() -> void:
 		_add_seat(pos + Vector3(0, 0.5, 0), angle)  # yaw = angle looks at the table centre
 		# Your cards land on the felt in front of you; your camera sits at your own stool.
 		var to_seat: Vector3 = (pos - ARC_CENTRE).normalized()
-		cards.spots[i] = [ARC_CENTRE + to_seat * CARD_RADIUS + Vector3(0, TABLE_TOP, 0), angle]
-		# A split's second hand: one row closer to the dealer, nudged right, so both stay readable.
-		cards.spots[i + SPLIT_KEY] = [ARC_CENTRE + to_seat * CARD_RADIUS + Basis(Vector3.UP, angle) * SPLIT_OFFSET + Vector3(0, TABLE_TOP, 0), angle]
+		var at: Vector3 = ARC_CENTRE + to_seat * CARD_RADIUS + Vector3(0, TABLE_TOP, 0)
+		var side: Vector3 = Basis(Vector3.UP, angle) * Vector3(SPLIT_SPREAD, 0.0, 0.0)
+		# One hand in the middle; after a split two hands side by side (first left, second right),
+		# their fans a little tighter so they never run into each other.
+		hand_spots.append([[at, angle], [at - side, angle, SPLIT_FAN], [at + side, angle, SPLIT_FAN]])
+		cards.spots[i] = hand_spots[i][0]
+		cards.spots[i + SPLIT_KEY] = hand_spots[i][2]
 		var eye := Node3D.new()
 		eye.name = "SeatCamera%d" % i
 		# Leaning in over the rail: your own cards low in view, the dealer's rack above them.
@@ -53,10 +57,12 @@ const ARC_CENTRE: Vector3 = Vector3(0, 0, -0.4)
 ## the padded rail, so the bet showed inside it.
 const CARD_RADIUS: float = 1.2
 const BET_RADIUS: float = 1.45
-## Card-spot key offset for a seat's second (split) hand, and where that hand lies relative to
-## the first one (seat-local: -z is towards the dealer).
+## Card-spot key offset for a seat's second (split) hand. After a split the two hands sit
+## SPLIT_SPREAD either side of the seat's card spot (seat-local x) with a tighter fan, and the
+## bets sit in front of them.
 const SPLIT_KEY: int = 10
-const SPLIT_OFFSET: Vector3 = Vector3(0.14, 0.0, -0.4)
+const SPLIT_SPREAD: float = 0.16
+const SPLIT_FAN: float = 0.06
 ## Seated eye: how far it leans in from the stool towards the table, its height and its pitch.
 const SEAT_EYE_LEAN: float = 0.5
 const SEAT_EYE_HEIGHT: float = 1.5
@@ -65,6 +71,14 @@ const SEAT_EYE_PITCH: float = deg_to_rad(-26.0)
 const SEAT_LOOK_AT: Vector3 = Vector3(0.0, 0.0, 0.2)
 
 var cards: TableCards
+## Per seat: the card spots [single hand, split hand 1, split hand 2] (TableCards spot arrays).
+var hand_spots: Array[Array] = []
+## After a split, per hand pile key: its value tag over the cards, and per seat the
+## "HAND 1" / "HAND 2" marker over the hand being played (client only, built on first use).
+var hand_tags: Dictionary[int, Label3D] = {}
+var hand_markers: Dictionary[int, Label3D] = {}
+const TAG_HEIGHT: float = 0.19
+const MARKER_HEIGHT: float = 0.28
 const HOT_CARD_LIGHT: float = 3.5
 ## The dealer's face-up total, floating over the dealer's cards (client only; built on first use).
 var dealer_total_label: Label3D
@@ -82,26 +96,120 @@ func set_viewer_seat(index: int) -> void:
 	cards.set_viewer(seat_cameras[index].position if index >= 0 and index < seat_cameras.size() else Vector3.INF)
 
 
-## Mirrors the round onto the felt (see `TableCards`).
+## Mirrors the round onto the felt (see `TableCards`). After a split the seat shows two hands
+## side by side, each with its value tag; the one being played (the server's `active`) is
+## outlined in gold with a "HAND n" marker over it, for everyone at the table.
 func show_round(pub: Dictionary) -> void:
 	var seat_ids: Array = pub.get("seats", [])
 	var hands: Dictionary = pub.get("hands", {})
+	var acting: bool = int(pub.get("state", 0)) == BlackjackLogic.State.ACTING
 	var by_seat: Dictionary = {}
+	var outlined: Array[int] = []
+	var split_seats: Dictionary[int, Dictionary] = {}
 	for i: int in seat_ids.size():
 		var pid: int = int(seat_ids[i])
-		if pid < 0:
+		var h: Dictionary = {}
+		if pid >= 0:
+			for k: Variant in hands:
+				if int(k) == pid:
+					h = hands[k]
+		var split: bool = h.has("split")
+		if i < hand_spots.size():
+			cards.move_pile(i, hand_spots[i][1] if split else hand_spots[i][0])
+		if h.is_empty():
 			continue
-		for k: Variant in hands:
-			if int(k) == pid:
-				var h: Dictionary = hands[k]
-				by_seat[i] = h.get("cards", [])
-				if h.has("split"):
-					by_seat[i + SPLIT_KEY] = (h["split"] as Dictionary).get("cards", [])
+		by_seat[i] = h.get("cards", [])
+		if split:
+			var second: Array = (h["split"] as Dictionary).get("cards", [])
+			if not second.is_empty():
+				cards.split_pile(i, i + SPLIT_KEY, int(second[0]))
+			by_seat[i + SPLIT_KEY] = second
+			split_seats[i] = h
+			if acting and not bool(h.get("done", true)):
+				outlined.append(i + SPLIT_KEY if int(h.get("active", 0)) == 1 else i)
 	var dealer: Array = (pub.get("dealer", []) as Array).duplicate()
 	_show_dealer_total(dealer)
-	if not bool(pub.get("dealer_revealed", false)) and dealer.size() == 1 and int(pub.get("state", 0)) == BlackjackLogic.State.ACTING:
+	if not bool(pub.get("dealer_revealed", false)) and dealer.size() == 1 and acting:
 		dealer.append(TableCards.FACE_DOWN)
+	cards.set_outlined(outlined)
 	cards.show_cards(by_seat, dealer)
+	_show_hand_tags(split_seats, outlined)
+
+
+## Value tags over both hands of every split seat, and the "HAND n" marker over the one being
+## played (`outlined` holds its pile key); everything else hidden.
+func _show_hand_tags(split_seats: Dictionary[int, Dictionary], outlined: Array[int]) -> void:
+	if not Vfx.enabled():
+		return
+	for i: int in hand_spots.size():
+		var split: bool = split_seats.has(i)
+		for hand: int in 2:
+			var key: int = i + hand * SPLIT_KEY
+			var tag: Label3D = hand_tags.get(key, null)
+			if not split:
+				if tag != null:
+					tag.visible = false
+				continue
+			if tag == null:
+				tag = _hand_label("HandTag%d" % key, 36, Palette.CREAM)
+				hand_tags[key] = tag
+			var h: Dictionary = split_seats[i] if hand == 0 else split_seats[i]["split"]
+			var total: int = HandEval.total(_ints(h.get("cards", [])))
+			tag.text = ("%d  BUST" % total) if total > 21 else str(total)
+			tag.modulate = Palette.VIP_GOLD if outlined.has(key) else Palette.CREAM
+			tag.position = _over_hand(key, TAG_HEIGHT)
+			tag.visible = total > 0
+		var playing: int = -1
+		for hand: int in 2:
+			if outlined.has(i + hand * SPLIT_KEY):
+				playing = hand
+		var marker: Label3D = hand_markers.get(i, null)
+		if playing < 0:
+			if marker != null:
+				marker.visible = false
+			continue
+		if marker == null:
+			marker = _hand_label("HandMarker%d" % i, 30, Palette.VIP_GOLD)
+			hand_markers[i] = marker
+		marker.text = "HAND %d" % (playing + 1)
+		marker.position = _over_hand(i + playing * SPLIT_KEY, MARKER_HEIGHT)
+		marker.visible = true
+
+
+## A point `height` over the middle of a hand's first two cards (local to the table).
+func _over_hand(key: int, height: float) -> Vector3:
+	return cards.card_position(key, 0).lerp(cards.card_position(key, 1), 0.5) + Vector3(0, height, 0)
+
+
+## Where a split hand's bet sits (local): in front of that hand (0 = first / left, 1 = second / right).
+func hand_bet_spot(seat: int, hand: int) -> Vector3:
+	var s: Node3D = seats[clampi(seat, 0, seats.size() - 1)]
+	var to_seat: Vector3 = Vector3(s.position.x, 0, s.position.z) - ARC_CENTRE
+	to_seat.y = 0.0
+	var side: Vector3 = Basis(Vector3.UP, s.rotation.y) * Vector3(SPLIT_SPREAD * (1.0 if hand == 1 else -1.0), 0.0, 0.0)
+	return ARC_CENTRE + to_seat.normalized() * BET_RADIUS + side + Vector3(0, TABLE_TOP, 0)
+
+
+func _hand_label(node_name: String, size: int, color: Color) -> Label3D:
+	var l := Label3D.new()
+	l.name = node_name
+	l.font = Vfx.font()
+	l.font_size = size
+	l.pixel_size = 0.0022
+	l.outline_size = 14
+	l.modulate = color
+	l.outline_modulate = Palette.CASINO_BLACK
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	add_child(l)
+	return l
+
+
+static func _ints(cards_in: Array) -> Array[int]:
+	var out: Array[int] = []
+	for c: Variant in cards_in:
+		out.append(int(c))
+	return out
 
 
 ## Total of the dealer's face-up cards (the hole card never reaches the client before the reveal);

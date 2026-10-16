@@ -25,5 +25,9 @@ func _ready() -> void:
 	cam.current = true
 	cam.fov = 85.0  # the game's default
 	st.set_viewer_seat(seat)
+	# Seat 2 (index 1, the default view) split and plays its second hand; seat 1 split and plays
+	# its first; seat 3 never split.
 	st.show_round({"state": BlackjackLogic.State.ACTING, "seats": [3, 1, 2, -1], "dealer_revealed": false, "dealer": [Card.make(10, 1)],
-		"hands": {1: {"cards": [Card.make(8, 0), Card.make(3, 2), Card.make(9, 1)], "split": {"cards": [Card.make(8, 2), Card.make(13, 3)]}}, 2: {"cards": [Card.make(13, 3), Card.make(5, 1), Card.make(4, 0)]}, 3: {"cards": [Card.make(7, 1), Card.make(4, 2), Card.make(6, 3)], "split": {"cards": [Card.make(7, 2), Card.make(10, 0)]}}}})
+		"hands": {1: {"stake": 50, "done": false, "active": 1, "cards": [Card.make(8, 0), Card.make(3, 2), Card.make(9, 1)], "split": {"stake": 50, "cards": [Card.make(8, 2), Card.make(13, 3)]}},
+			2: {"stake": 20, "done": false, "cards": [Card.make(13, 3), Card.make(5, 1), Card.make(4, 0)]},
+			3: {"stake": 30, "done": false, "active": 0, "cards": [Card.make(7, 1), Card.make(4, 2), Card.make(6, 3)], "split": {"stake": 30, "cards": [Card.make(7, 2)]}}}})

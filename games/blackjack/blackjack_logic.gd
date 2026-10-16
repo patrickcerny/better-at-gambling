@@ -1,10 +1,13 @@
 class_name BlackjackLogic
 extends StationLogicBase
 ## Blackjack table with simultaneous play (§2.5): IDLE → BETTING (window opens on the first bet)
-## → deal → ACTING (everyone at once, timeout = stand) → dealer (stands on soft 17) → PAYOUT → IDLE.
+## → deal → ACTING (everyone at once, each on their own decision clock; timeout = stand) → dealer
+## (stands on soft 17) → PAYOUT → IDLE.
 ## 3:2 blackjack, double on any first two cards (also after a split), one split per round of a
 ## first-two-card pair of equal value (split aces get one card each; 21 after a split is not a
-## blackjack), Dealer Bust Bonus on wins.
+## blackjack), Dealer Bust Bonus on wins. A split plays its hands one after the other: the first
+## hand gets its second card at once, the second hand when play moves on to it, and the splitting
+## player's clock gains `bj_split_time_bonus` decision times.
 
 enum State { IDLE, BETTING, ACTING, PAYOUT }
 
@@ -14,7 +17,8 @@ var state: State = State.IDLE
 var timer: float = 0.0
 ## player → {stake, cards: Array[int], done, doubled, blackjack, settled}; after a split also
 ## "split": {stake, cards, doubled} (the second hand) and "active": 0 / 1 (the hand being played).
-## `done` means the player is finished with every hand.
+## `done` means the player is finished with every hand; "clock" is the player's own decision time
+## left while ACTING (the table `timer` is then the longest clock still running).
 var hands: Dictionary[int, Dictionary] = {}
 var dealer: Array[int] = []
 var dealer_revealed: bool = false
@@ -95,9 +99,9 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 		&"hit":
 			_deal_card(p, cur["cards"])
 			if HandEval.total(cur["cards"]) >= 21:
-				_finish_active(h)
+				_finish_active(p, h)
 		&"stand":
-			_finish_active(h)
+			_finish_active(p, h)
 		&"double":
 			if (cur["cards"] as Array).size() != 2:
 				return fail(&"cannot_double")
@@ -107,7 +111,7 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 			cur["covered"] = int(cur.get("covered", 0)) + last_covered
 			cur["doubled"] = true
 			_deal_card(p, cur["cards"])
-			_finish_active(h)
+			_finish_active(p, h)
 		&"split":
 			if not can_split(h):
 				return fail(&"cannot_split")
@@ -117,13 +121,15 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 			var second: Array[int] = [first.pop_back()]
 			h["split"] = {"stake": int(h["stake"]), "cards": second, "doubled": false, "covered": last_covered}
 			h["active"] = 0
+			# Two hands to play: the clock gets extra decision time.
+			h["clock"] = maxf(float(h.get("clock", 0.0)), 0.0) + balance.bj_action_time * balance.bj_split_time_bonus
 			var aces: bool = Card.bj_value(first[0]) == 1
 			_deal_card(p, first)
-			_deal_card(p, second)
 			if aces:
+				_deal_card(p, second)
 				h["done"] = true  # one card on each ace, no more
 			elif HandEval.total(first) >= 21:
-				_finish_active(h)
+				_finish_active(p, h)
 		&"cut":
 			# Scissors: snip off your last card (not after doubling, at least 3 cards in hand).
 			if cur["doubled"] or (cur["cards"] as Array).size() < 3 or not modifiers.has_flag(p, &"scissors", game_id):
@@ -155,14 +161,22 @@ static func active_hand(h: Dictionary) -> Dictionary:
 	return h["split"] if h.has("split") and int(h.get("active", 0)) == 1 else h
 
 
-## The active hand is finished: move on to the split hand, or the player is done.
-static func _finish_active(h: Dictionary) -> void:
+## The active hand is finished: move on to the split hand (it gets its second card now), or the
+## player is done.
+func _finish_active(p: int, h: Dictionary) -> void:
 	if h.has("split") and int(h.get("active", 0)) == 0:
 		h["active"] = 1
+		_complete_split(p, h)
 		if HandEval.total(h["split"]["cards"]) >= 21:
 			h["done"] = true
 	else:
 		h["done"] = true
+
+
+## The second split hand still waiting for its second card gets it.
+func _complete_split(p: int, h: Dictionary) -> void:
+	if h.has("split") and (h["split"]["cards"] as Array).size() < 2:
+		_deal_card(p, h["split"]["cards"])
 
 
 func tick(delta: float) -> void:
@@ -174,15 +188,29 @@ func tick(delta: float) -> void:
 			if timer <= 0.0:
 				_deal()
 		State.ACTING:
-			timer -= delta
-			if timer <= 0.0:
-				for p: int in hands.keys():
-					hands[p]["done"] = true
-				_dealer_and_settle()
+			# Every player on their own clock (a split extends it); out of time = stand.
+			for p: int in hands.keys():
+				var h: Dictionary = hands[p]
+				if h["done"]:
+					continue
+				h["clock"] = float(h.get("clock", 0.0)) - delta
+				if float(h["clock"]) <= 0.0:
+					h["done"] = true
+			timer = _longest_clock()
+			_check_all_done()
 		State.PAYOUT:
 			timer -= delta
 			if timer <= 0.0:
 				_end_round()
+
+
+## The longest decision clock still running (0 when everyone is done).
+func _longest_clock() -> float:
+	var out: float = 0.0
+	for p: int in hands.keys():
+		if not hands[p]["done"]:
+			out = maxf(out, float(hands[p].get("clock", 0.0)))
+	return out
 
 
 func round_seconds() -> float:
@@ -234,6 +262,8 @@ func get_public_state() -> Dictionary:
 	for p: int in hands.keys():
 		var h: Dictionary = hands[p]
 		hs[p] = {"stake": h["stake"], "cards": (h["cards"] as Array).duplicate(), "done": h["done"], "total": HandEval.total(h["cards"])}
+		if state == State.ACTING and not h["done"]:
+			hs[p]["clock"] = maxf(float(h.get("clock", 0.0)), 0.0)
 		if h.has("split"):
 			var sh: Dictionary = h["split"]
 			hs[p]["active"] = int(h["active"])
@@ -284,6 +314,8 @@ func _deal() -> void:
 			_settle(p, stake, stake + int(floor(stake * balance.bj_blackjack_ratio)), {"outcome": &"blackjack", "cards": (h["cards"] as Array).duplicate()})
 	state = State.ACTING
 	timer = balance.bj_action_time
+	for p: int in hands.keys():
+		hands[p]["clock"] = balance.bj_action_time
 	_check_all_done()
 
 
@@ -311,6 +343,10 @@ func _check_all_done() -> void:
 
 
 func _dealer_and_settle() -> void:
+	# A second split hand cut short (timeout, leaving) still gets its second card.
+	for p: int in hands.keys():
+		if not hands[p]["settled"]:
+			_complete_split(p, hands[p])
 	dealer_revealed = true
 	var need_dealer: bool = false
 	for p: int in hands.keys():

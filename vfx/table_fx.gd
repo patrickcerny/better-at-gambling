@@ -93,6 +93,9 @@ func on_event(ev: Dictionary) -> void:
 			if ss != null:
 				_landing.append(sid)
 				_shown_at[sid] = Time.get_ticks_msec() + int(ss.stop_on(ev["line"], int(ev["player"]) == local_id) * 1000.0)
+		&"bj_action":
+			if StringName(ev.get("action", &"")) == &"split":
+				_on_bj_split(ev)
 		&"round_result":
 			_on_result(ev)
 		&"bets_refunded":
@@ -145,6 +148,27 @@ func _on_bet(ev: Dictionary) -> void:
 	stack.slide_to(st.to_global(target), 0.4, 0.12)
 	list.append({"stack": stack, "type": type, "value": value, "at": Time.get_ticks_msec()})
 	_bets[key] = list
+	Audio.play_at(&"chip_clack", stack, -10.0, randf_range(0.95, 1.1))
+
+
+## A blackjack split: the bet slides in front of the first hand and an equal stack (the second
+## stake) comes in from the rail in front of the second; each pays or goes to the house with its
+## own hand's result (`details.hand`).
+func _on_bj_split(ev: Dictionary) -> void:
+	var sid: StringName = StringName(ev["station"])
+	var st: BlackjackStation = stations.get(sid, null) as BlackjackStation
+	var pid: int = int(ev["player"])
+	var list: Array = _bets.get(_key(sid, pid), [])
+	if st == null or list.is_empty() or not is_instance_valid(list[0]["stack"]):
+		return
+	var first: ChipStack = list[0]["stack"]
+	var seat: int = _seat_index(st, pid)
+	first.slide_to(st.to_global(st.hand_bet_spot(seat, 0)), 0.3, 0.05)
+	var stack: ChipStack = ChipStack.make(first.amount, first.color, first.unit)
+	st.add_child(stack)
+	stack.position = _seat_edge(st, seat)
+	stack.slide_to(st.to_global(st.hand_bet_spot(seat, 1)), 0.4, 0.12)
+	list.append({"stack": stack, "type": &"split", "value": 1, "at": Time.get_ticks_msec()})
 	Audio.play_at(&"chip_clack", stack, -10.0, randf_range(0.95, 1.1))
 
 
@@ -312,7 +336,11 @@ func _take_stack(sid: StringName, pid: int, details: Dictionary) -> ChipStack:
 	if list.is_empty():
 		return null
 	var idx: int = 0
-	if details.has("type"):
+	if int(details.get("hand", 0)) == 1:  # a blackjack split's second hand
+		for i: int in list.size():
+			if StringName(list[i]["type"]) == &"split":
+				idx = i
+	elif details.has("type"):
 		for i: int in list.size():
 			if StringName(list[i]["type"]) == StringName(details["type"]) and int(list[i]["value"]) == int(details.get("value", 0)):
 				idx = i
