@@ -54,7 +54,7 @@ func test_every_emote_moves_the_bean_and_lets_go_after() -> void:
 	ids.append_array(Emotes.ANIMATED)
 	assert_eq(ids.size(), 10, "six wheel emotes and four on the number keys")
 	var v: AvatarVisuals = await _bean()
-	await wait_seconds(0.6)
+	await wait_process_frames(40)  # the springs settle by frames (1/30 s cap), not by the clock
 	var idle: PackedFloat32Array = _pose(v)
 	var poses: Dictionary = {}
 	for id: StringName in ids:
@@ -65,7 +65,9 @@ func test_every_emote_moves_the_bean_and_lets_go_after() -> void:
 		assert_gt(_distance(mid, idle), 0.6, "%s: mid-emote the bean is clearly out of its idle pose" % id)
 		poses[id] = mid
 		v.stop_emote()
-		await wait_seconds(0.8)
+		# The springs step at most 1/30 s per frame, so settling is a number of frames, not a
+		# wall-clock wait: under a loaded suite 0.8 s is too few frames and the lean is still easing.
+		await wait_process_frames(60)
 		assert_false(v.is_emoting())
 		assert_lt(_distance(_pose(v), idle), 0.2, "%s: back to idle afterwards" % id)
 	# Each emote is its own motion, not one shared wiggle.
@@ -76,13 +78,14 @@ func test_every_emote_moves_the_bean_and_lets_go_after() -> void:
 
 func test_an_emote_ends_on_its_own_and_the_pose_returns() -> void:
 	var v: AvatarVisuals = await _bean()
-	await wait_seconds(0.5)
+	await wait_process_frames(40)
 	var idle: PackedFloat32Array = _pose(v)
 	v.emote(&"wave")
 	await wait_seconds(1.0)
 	assert_gt(_distance(_pose(v), idle), 0.6, "waving")
-	await wait_seconds(Emotes.SECONDS - 1.0 + 0.8)
+	await wait_seconds(Emotes.SECONDS - 1.0 + 0.2)
 	assert_false(v.is_emoting(), "over after Emotes.SECONDS")
+	await wait_process_frames(60)  # the arms ease down over frames, not seconds
 	assert_lt(_distance(_pose(v), idle), 0.2, "arms down again")
 
 
