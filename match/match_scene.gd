@@ -70,7 +70,7 @@ var role: Role = Role.PRACTICE
 var net_world: NetWorld
 var lobby_panel: LobbyPanel
 var shop_panel: ShopPanel
-var odd_jobs_panel: OddJobsPanel
+var odd_jobs: OddJobsController
 var connection_label: Label
 ## Proximity voice (clients only; the dedicated server just relays in `Net`).
 var voice: VoiceChannel = null
@@ -212,13 +212,6 @@ func _ready() -> void:
 		if router.mode == InputRouter.Mode.MENU and results_panel == null:
 			router.set_play_mode(InputRouter.Mode.WALK))
 	ui_layer.add_child(shop_panel)
-	odd_jobs_panel = OddJobsPanel.new()
-	odd_jobs_panel.name = "OddJobsPanel"
-	odd_jobs_panel.closed.connect(func() -> void:
-		if router.mode == InputRouter.Mode.MENU and results_panel == null:
-			router.set_play_mode(InputRouter.Mode.WALK))
-	odd_jobs_panel.smashed.connect(_dip_odd_jobs_button)
-	ui_layer.add_child(odd_jobs_panel)
 	reward_panel = RewardPanel.new()
 	reward_panel.name = "RewardPanel"
 	ui_layer.add_child(reward_panel)
@@ -259,7 +252,6 @@ func _ready() -> void:
 	hud.bind(view.state, local_id)
 	lobby_panel.bind(view.state, local_id)
 	shop_panel.bind(view.state, local_id)
-	odd_jobs_panel.bind(view.state, local_id)
 	reward_panel.bind(view.state, local_id)
 	view.state.station_changed.connect(_on_station_state)
 	view.state.players_changed.connect(_sync_avatars)
@@ -268,6 +260,8 @@ func _ready() -> void:
 	view.state.effects_changed.connect(_refresh_effect_tag)
 	items_ctl = ItemController.new(self)
 	add_child(items_ctl)
+	odd_jobs = OddJobsController.new(self)
+	add_child(odd_jobs)
 	Net.event_received.connect(_on_event)
 	net_world = NetWorld.new()
 	net_world.name = "NetWorld"
@@ -1581,7 +1575,6 @@ func _stage_takes_screen(mode: InputRouter.Mode) -> void:
 	emote_wheel.visible = false
 	lobby_panel.close()
 	shop_panel.close_panel()
-	odd_jobs_panel.close_panel()
 	if pause_menu != null and pause_menu.visible:
 		pause_menu.close()
 	hud.visible = false
@@ -1982,9 +1975,7 @@ func _on_interact() -> void:
 		return
 	if casino_floor != null and casino_floor.interact():
 		return
-	if _near_odd_jobs():
-		router.set_mode(InputRouter.Mode.MENU)
-		odd_jobs_panel.open()
+	if odd_jobs.try_press():
 		return
 	if _near_shop():
 		router.set_mode(InputRouter.Mode.MENU)
@@ -2012,6 +2003,8 @@ func _on_grab() -> void:
 		return
 	if stage is WalkableStage and (stage as WalkableStage).on_grab_pressed():
 		return  # a walkable minigame's own use of the click (Bat Heist: the bat)
+	if odd_jobs.try_press():
+		return
 	grab_in_front()
 
 
@@ -2245,7 +2238,7 @@ func _update_prompt() -> void:
 		hud.set_prompt(floor_prompt)
 		return
 	if _near_odd_jobs():
-		hud.set_prompt(InputGlyphs.fill("ODD JOBS: {interact}"))
+		hud.set_prompt(InputGlyphs.fill("[{grab}] SMASH IT: the last click on the bar wins $%d" % OddJobs.PAYOUT) if odd_jobs.aimed else "ODD JOBS: look at the big red button")
 		return
 	if _near_shop():
 		hud.set_prompt(InputGlyphs.fill("[{interact}] Gift Shop: one item per round"))
@@ -2292,16 +2285,6 @@ func _near_odd_jobs() -> bool:
 	var d: float = Vector2(p.x - LuckyLounge.ODD_JOBS_POS.x, p.z - LuckyLounge.ODD_JOBS_POS.z).length()
 	var to_shop: float = Vector2(p.x - LuckyLounge.SHOP_POS.x, p.z - LuckyLounge.SHOP_POS.z).length()
 	return d < 1.6 and d < to_shop and absf(p.y - LuckyLounge.ODD_JOBS_POS.y) < 1.5  # the nearer kiosk wins
-
-
-## The cabinet's red cap dips under the local player's smash.
-func _dip_odd_jobs_button() -> void:
-	var b: Node3D = map.odd_jobs_button if map != null else null
-	if b == null:
-		return
-	var rest: float = LuckyLounge.ODD_JOBS_CABINET.y + 1.17
-	b.position.y = rest - 0.05
-	create_tween().tween_property(b, ^"position:y", rest, 0.12)
 
 
 func _check_vip_gate() -> void:
