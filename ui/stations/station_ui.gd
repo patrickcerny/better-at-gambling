@@ -272,4 +272,6 @@ static func rejection_text(error: StringName) -> String:
 			return "One horse per race"
 		&"invalid_horse":
 			return "Pick a horse"
+		&"invalid_symbol":
+			return "Pick a symbol"
 	return String(error).capitalize()

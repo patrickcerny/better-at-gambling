@@ -139,6 +139,24 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-16 / next build (Wheel of Fortune)
+- Patrick approved a Big Six money wheel as a new table: `wheel_1` on the casino floor east of the
+  blackjack lounge (11, 0, 5), registered as game `wheel` (data/registry/games.tres, map stations,
+  Hot Table candidate). 54 segments ($1 ×24, $2 ×15, $5 ×7, $10 ×4, $20 ×2, Joker, Logo), chips on
+  any symbols at the layout, honest odds on the table (1:1 … 20:1, Joker/Logo 40:1), $10 min, $200
+  per spin, 5 stools, a dealer beside the wheel (DealerLogic: shove/bat cancels and refunds, tip jar).
+  Round: the countdown (12 s) starts with the first bet, the dealer spins (3 s), the server announces
+  the segment (`wheel_result`) and every client slows the wheel onto it in 4.5 s (a cubic that keeps
+  the spin's speed and stops exactly on time; the clicker flaps on every peg); the bets pay as it
+  rests. House rule (0.9.6): a spin nobody would win is redrawn once with `wheel_favour` 0.31, then
+  each bettor's luck rerolls it by what it pays them; never on the wire. RTP alone at the wheel
+  98.8–104.9% by symbol, 101.3% over the seven (honest odds alone 76–89%), `tests/sim/test_wheel_rtp.gd`.
+- New events `wheel_spin_started {station}`, `wheel_result {station, segment, symbol, seconds}`; bet
+  shape `{symbol: 0..6, amount}`; public state adds `segment` (once it is told), `landing`, `history`.
+  Tests: unit `test_wheel.gd`, sim `test_wheel_rtp.gd`, integration `test_wheel_flow.gd`, ui
+  `test_wheel_ui.gd`, physics `test_wheel_table.gd` (the real casino: no overlaps, dealer, navmesh,
+  sit and bet). Dev shot: `tools/dev/wheel_shot.tscn`.
+
 ### 2026-10-16 / 0.9.9 (Patrick's feedback burst)
 - Voice: Patrick "Sound input works, but i do not hear myself". Playback now runs the generator at
   the sound card's mix rate and upsamples the 8 kHz voice itself (linear, phase kept between
