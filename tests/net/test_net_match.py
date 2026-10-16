@@ -233,17 +233,20 @@ def test_voice_from_one_client_is_relayed_by_the_dedicated_server_and_played_by_
     assert relay, ("no relay summary", server.log_path)
     got_at_server = int(re.search(rf"player {a_id} sent (\d+)", relay.group(1)).group(1))
     to_bob = int(re.search(rf"player {b_id} got (\d+)", relay.group(1)).group(1))
-    per_speaker = re.search(rf"voice from player {a_id}: received (\d+), played (\d+)", bob.log())
+    per_speaker = re.search(rf"voice from player {a_id}: received (\d+), played (\d+), late (\d+), overflowed (\d+), lost (\d+)", bob.log())
     assert per_speaker, ("no per-speaker line", bob.log_path)
-    bob_got, bob_played = int(per_speaker.group(1)), int(per_speaker.group(2))
+    bob_got, bob_played, late, overflowed, lost = (int(per_speaker.group(i)) for i in range(1, 6))
     dumped = int(re.search(rf"voice dump: (\d+) frames from player {a_id}", bob.log()).group(1))
-    hops = {"alice sent": sent, "server got": got_at_server, "server sent bob": to_bob, "bob got": bob_got, "bob played": bob_played, "dumped": dumped}
+    hops = {"alice sent": sent, "server got": got_at_server, "server sent bob": to_bob, "bob got": bob_got, "bob played": bob_played, "late": late, "overflowed": overflowed, "lost": lost, "dumped": dumped}
     print("voice hops:", hops)
     assert got_at_server >= sent * 0.98 - 2, hops  # loopback: nothing lost on the way up
     assert to_bob >= got_at_server * 0.9, hops  # Bob was in reach nearly all the time
     assert bob_got >= to_bob * 0.98 - 2, hops  # nothing lost on the way down
-    # Unplayed: at most what sat in Bob's jitter buffer (max 12 frames) when the match ended.
-    assert bob_played >= bob_got - 12, hops
+    # Every frame Bob got was played, or dropped on purpose by his jitter buffer (late, or the
+    # oldest of a burst after a stall so latency stays bounded), or was still queued (at most its
+    # 12-frame depth) when the match ended. Nothing just vanishes.
+    assert bob_played + late + overflowed >= bob_got - 12, hops
+    assert late + overflowed <= bob_got * 0.05, hops  # and the drops stay rare
     # One playback under Alice's avatar all match long (a resync used to respawn her avatar,
     # dropping the buffered audio each time).
     assert bob.log().count(f"first frame played for player {a_id} ") == 1, bob.log_path

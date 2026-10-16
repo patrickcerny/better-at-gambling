@@ -25,13 +25,14 @@ func _arm(v: AvatarVisuals, i: int) -> Vector3:
 	return (pivot.basis * Vector3.FORWARD).normalized()
 
 
-## A fingerprint of the whole pose: both arms, the body's tilt and offset, the rig's lift, the eyes.
+## A fingerprint of the whole pose: both arms, the body's tilt and offset, the rig's lift. Not the
+## eyes: the bean blinks at random every few seconds, and a sample taken mid-blink is 0.2 off.
 func _pose(v: AvatarVisuals) -> PackedFloat32Array:
 	var a: Vector3 = _arm(v, 0)
 	var b: Vector3 = _arm(v, 1)
 	var r: Vector3 = v.body.rotation
 	var o: Vector3 = v.body.position
-	return PackedFloat32Array([a.x, a.y, a.z, b.x, b.y, b.z, r.x, r.y, r.z, o.x, o.y, o.z, v.get_node("Rig").position.y, v.eye_l.scale.y, v.eye_r.scale.y])
+	return PackedFloat32Array([a.x, a.y, a.z, b.x, b.y, b.z, r.x, r.y, r.z, o.x, o.y, o.z, v.get_node("Rig").position.y])
 
 
 func _distance(p: PackedFloat32Array, q: PackedFloat32Array) -> float:

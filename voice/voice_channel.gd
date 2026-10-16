@@ -98,7 +98,14 @@ func _exit_tree() -> void:
 	if online:
 		Log.info(&"voice", "sent %d frames (%d bytes), received %d frames from %d speakers, played %d frames" % [capture.frames_sent, capture.bytes_sent, received_packets, playbacks.size(), VoicePlayback.total_frames_played - _played_at_start])
 		for pid: int in received_from:
-			Log.info(&"voice", "voice from player %d: received %d, played %d" % [pid, received_from[pid], played_from.get(pid, 0)])
+			# Frames received but never played were dropped on purpose by the jitter buffer: late
+			# (their slot had played), overflowed (a stall then a burst, the oldest go so latency
+			# stays bounded) or still queued when the match ended.
+			var pb: VoicePlayback = playbacks.get(pid, null)
+			var late: int = pb.buffer.late if pb != null else 0
+			var over: int = pb.buffer.overflowed if pb != null else 0
+			var lost: int = pb.buffer.lost if pb != null else 0
+			Log.info(&"voice", "voice from player %d: received %d, played %d, late %d, overflowed %d, lost %d" % [pid, received_from[pid], played_from.get(pid, 0), late, over, lost])
 	_write_dump()
 	if current == self:
 		current = null
