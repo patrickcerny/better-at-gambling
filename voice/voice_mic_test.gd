@@ -65,6 +65,7 @@ func start(live: VoiceCapture = null) -> void:
 	state = State.RECORDING
 	verdict = "Recording %d s: say something…" % roundi(RECORD_SECONDS)
 	Log.info(&"voice", "microphone test: recording %.0f s from \"%s\"" % [RECORD_SECONDS, _device])
+	Log.info(&"voice", VoiceChannel.audio_text())
 
 
 ## Stops whatever the test is doing (closing the panel).
@@ -113,8 +114,8 @@ func _process(delta: float) -> void:
 				_pushed += 1
 			var all_in: bool = _pushed >= frames.size()
 			if all_in and (playback.frames_played >= frames.size() or _t > frames.size() * VoiceCodec.FRAME_SECONDS + 1.0):
-				var played: int = playback.frames_played
-				_finish("%s Played it back: %d of %d frames. You should have heard yourself; if not, check Voice volume and your speakers." % [verdict_for("", frames.size(), peak), played, frames.size()])
+				Log.info(&"voice", "microphone test playback: %s" % playback.describe())
+				_finish("%s %s" % [verdict_for("", frames.size(), peak), playback_verdict(playback.frames_played, frames.size(), playback.failure, playback.audio_enabled, playback.output_rate)])
 
 
 func _end_recording() -> void:
@@ -167,6 +168,17 @@ func _finish(text: String) -> void:
 
 static func _peak_db(p: float) -> float:
 	return linear_to_db(p) if p > 0.00001 else -100.0
+
+
+## The plain-words result of playing `total` recorded frames back: `played` of them went into the
+## player, `failure` says why it could not make sound ("" when it could), `audio` is false where
+## there is no sound device (headless), `rate` is the output rate it played at.
+static func playback_verdict(played: int, total: int, failure: String, audio: bool, rate: float) -> String:
+	if failure != "":
+		return "Playback failed: %s (%d of %d frames). Please send the log file." % [failure, played, total]
+	if not audio:
+		return "Played it back: %d of %d frames (no sound device here)." % [played, total]
+	return "Played it back: %d of %d frames at %d Hz. You should have heard yourself; if not, check Voice volume and your speakers." % [played, total, roundi(rate)]
 
 
 ## The plain-words result for a microphone that would not open (`error`), or that delivered

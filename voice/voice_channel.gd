@@ -35,6 +35,8 @@ var played_from: Dictionary[int, int] = {}
 var last_error: String = ""
 ## Plays sound (VoicePlayback); tests turn it off.
 var audio_enabled: bool = true
+## Tests: called with every new `VoicePlayback` before it enters the tree (to give it a `sink`).
+var playback_setup: Callable = Callable()
 ## `--voice-dump`: where played frames go (empty: not dumping) and what each speaker played.
 var dump_path: String = ""
 var dumped: Dictionary[int, PackedFloat32Array] = {}
@@ -89,6 +91,7 @@ func _ready() -> void:
 		if not _test_samples.is_empty() and _mode != "off":
 			how = "open mic from the --voice-test WAV"
 		Log.info(&"voice", "voice chat: %s, player %d" % [how, local_id])
+		Log.info(&"voice", audio_text())
 
 
 func _exit_tree() -> void:
@@ -133,6 +136,16 @@ func mode_key() -> String:
 ## True while voice is on (online and not switched off).
 func is_active() -> bool:
 	return online and _mode != "off"
+
+
+## The audio driver, output device and mix rates in one line (what a Windows log needs to tell
+## why voice is silent).
+static func audio_text() -> String:
+	var voice: int = AudioServer.get_bus_index(VoicePlayback.BUS)
+	var bus: String = "missing" if voice < 0 else "%.1f dB%s" % [AudioServer.get_bus_volume_db(voice), ", MUTED" if AudioServer.is_bus_mute(voice) else ""]
+	return "audio: driver %s, output device \"%s\" at %d Hz (%s speakers), input device \"%s\" at %d Hz, Voice bus %s" % [
+		AudioServer.get_driver_name(), AudioServer.output_device, roundi(AudioServer.get_mix_rate()),
+		["stereo", "3.1", "5.1", "7.1"][clampi(AudioServer.get_speaker_mode(), 0, 3)], AudioServer.input_device, roundi(AudioServer.get_input_mix_rate()), bus]
 
 
 ## True when voice is on but the microphone would not start (see `capture.mic_error`); never
@@ -264,6 +277,8 @@ func playback_for(pid: int) -> VoicePlayback:
 	pb.name = "VoicePlayback"
 	pb.speaker = pid
 	pb.audio_enabled = audio_enabled
+	if playback_setup.is_valid():
+		playback_setup.call(pb)
 	a.add_child(pb)
 	playbacks[pid] = pb
 	pb.frame_played.connect(_on_played.bind(pid))
