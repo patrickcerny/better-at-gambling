@@ -78,3 +78,153 @@ func test_the_microphone_test_playback_is_not_positional() -> void:
 	pb.advance(VoiceCodec.FRAME_SECONDS)
 	assert_eq(pb.gain, 1.0, "full volume wherever the camera is")
 	assert_eq(pb.frames_played, 1)
+
+
+## Patrick (0.9.8, Windows): the microphone test recorded fine but played nothing back. Playback
+## now runs the generator at the output mix rate and upsamples the 8 kHz voice itself; `sink`
+## captures exactly what would be pushed to the generator.
+func _sink_playback(rate: float, out: Array[PackedVector2Array], positional: bool = false) -> VoicePlayback:
+	var pb := VoicePlayback.new()
+	pb.speaker = 2
+	pb.positional = positional
+	pb.output_rate = rate
+	pb.sink = func(block: PackedVector2Array) -> void: out.append(block)
+	head.add_child(pb)
+	return pb
+
+
+static func _left(blocks: Array[PackedVector2Array]) -> PackedFloat32Array:
+	var x := PackedFloat32Array()
+	for b: PackedVector2Array in blocks:
+		for v: Vector2 in b:
+			x.append(v.x)
+	return x
+
+
+## A continuous 440 Hz tone cut into `n` packets (the phase runs on across packets).
+func _tone_packets(n: int, amp: float = 0.4) -> Array[Dictionary]:
+	var all: PackedFloat32Array = VoiceWav.tone(440.0, n * VoiceCodec.FRAME_SECONDS, VoiceCodec.SAMPLE_RATE, amp)
+	var out: Array[Dictionary] = []
+	for i: int in n:
+		var f: PackedFloat32Array = all.slice(i * VoiceCodec.FRAME_SAMPLES, (i + 1) * VoiceCodec.FRAME_SAMPLES)
+		out.append({"seq": i, "flags": VoicePacket.FLAG_END if i == n - 1 else 0, "payload": codec.encode(f)})
+	return out
+
+
+static func _goertzel(x: PackedFloat32Array, hz: float, rate: float) -> float:
+	var c: float = 2.0 * cos(TAU * hz / rate)
+	var s1: float = 0.0
+	var s2: float = 0.0
+	for v: float in x:
+		var s0: float = v + c * s1 - s2
+		s2 = s1
+		s1 = s0
+	return sqrt(maxf(s1 * s1 + s2 * s2 - c * s1 * s2, 0.0)) * 2.0 / x.size()
+
+
+## Largest deviation from the 440 Hz sine recurrence x[n] = 2cos(w)x[n-1] - x[n-2]: a missing,
+## repeated or swapped frame (or a gap of silence) breaks it.
+static func _worst_break(x: PackedFloat32Array, rate: float) -> float:
+	var c: float = 2.0 * cos(TAU * 440.0 / rate)
+	var worst: float = 0.0
+	for n: int in range(2, x.size()):
+		worst = maxf(worst, absf(x[n] - (c * x[n - 1] - x[n - 2])))
+	return worst
+
+
+## Feeds `packets` one every 40 ms (up to 15 ms late, as the network delivers them) while the game
+## runs at an uneven 30–200 fps. Returns how often the jitter buffer stopped playing before the
+## last packet was in.
+func _feed_live(pb: VoicePlayback, packets: Array[Dictionary], extra_seconds: float = 0.5) -> int:
+	var t: float = 0.0
+	var next: int = 0
+	var steps: Array[float] = [0.016, 0.005, 0.033, 0.012, 0.021, 0.008, 0.016]
+	var tick: int = 0
+	var rebuffered: int = 0
+	var was_playing: bool = false
+	while next < packets.size() or t < packets.size() * VoiceCodec.FRAME_SECONDS + extra_seconds:
+		# The playback runs first, then the frame's packets arrive (as they do from the network).
+		var dt: float = steps[tick % steps.size()]
+		tick += 1
+		pb.advance(dt)
+		t += dt
+		while next < packets.size() and t >= next * VoiceCodec.FRAME_SECONDS + (next * 7 % 16) * 0.001:
+			pb.push_packet(packets[next])
+			next += 1
+		var playing: bool = pb.buffer.state == VoiceJitterBuffer.State.PLAYING
+		if was_playing and not playing and next < packets.size():
+			rebuffered += 1
+		was_playing = playing
+	return rebuffered
+
+
+func test_playback_pushes_at_the_output_rate_and_a_440hz_tone_stays_440hz() -> void:
+	for rate: float in [48000.0, 44100.0]:
+		var out: Array[PackedVector2Array] = []
+		var pb: VoicePlayback = _sink_playback(rate, out)
+		assert_true(pb.audio_enabled, "a sink plays even headless")
+		var prime: int = int(VoicePlayback.PRIME_SECONDS * rate)
+		assert_eq(pb.pushed_frames, prime, "%d Hz: primed with %d ms of silence" % [rate, roundi(VoicePlayback.PRIME_SECONDS * 1000.0)])
+		_feed_live(pb, _tone_packets(25))
+		assert_eq(pb.frames_played, 25, "%d Hz: frames_played counts 40 ms voice frames" % rate)
+		var x: PackedFloat32Array = _left(out)
+		var per_frame: float = VoiceCodec.FRAME_SAMPLES * rate / VoiceCodec.SAMPLE_RATE
+		assert_almost_eq(float(x.size() - prime), 25.0 * per_frame, 2.0, "%d Hz: %d output frames per 40 ms voice frame" % [rate, roundi(per_frame)])
+		assert_eq(_goertzel(x.slice(0, prime), 440.0, rate), 0.0, "the priming is silence")
+		var talk: PackedFloat32Array = x.slice(prime + roundi(per_frame), x.size() - roundi(per_frame))
+		var a440: float = _goertzel(talk, 440.0, rate)
+		assert_almost_eq(a440, 0.4, 0.03, "%d Hz: the 440 Hz tone at its level" % rate)
+		for hz: float in [300.0, 700.0, 1000.0, 2500.0, 7560.0, 8440.0]:
+			assert_lt(_goertzel(talk, hz, rate), a440 * 0.05, "%d Hz: nothing at %d Hz (no pitch shift, no 8 kHz images)" % [rate, roundi(hz)])
+		assert_lt(_worst_break(talk, rate), 0.03, "%d Hz: one continuous tone, frame after frame" % rate)
+		pb.free()
+
+
+func test_the_generator_lead_is_kept_in_output_frames() -> void:
+	var out: Array[PackedVector2Array] = []
+	var pb: VoicePlayback = _sink_playback(48000.0, out)
+	var prime: int = pb.pushed_frames
+	for p: Dictionary in _tone_packets(10):
+		pb.push_packet(p)
+	pb.advance(0.0)
+	assert_eq(pb.frames_played, 2, "80 ms queued ahead: 2 voice frames of 1920 output frames at 48 kHz")
+	assert_eq(pb.pushed_frames, prime + 2 * 1920)
+	pb.advance(VoiceCodec.FRAME_SECONDS)
+	assert_eq(pb.frames_played, 3, "40 ms later the next one")
+
+
+func test_a_spurt_is_not_cut_between_two_packets() -> void:
+	# The jitter buffer is empty for a moment between packets; popping it then ended the spurt and
+	# rebuffered 120 ms while the generator ran dry (heard on Linux: two gaps in 3 s).
+	var out: Array[PackedVector2Array] = []
+	var pb: VoicePlayback = _sink_playback(48000.0, out, true)
+	assert_eq(_feed_live(pb, _tone_packets(50)), 0, "the spurt plays through")
+	assert_eq(pb.frames_played, 50)
+	assert_eq(pb.buffer.lost + pb.buffer.late, 0)
+
+
+func test_the_microphone_test_says_when_playback_failed() -> void:
+	assert_string_contains(VoiceMicTest.playback_verdict(75, 75, "", true, 48000.0), "Played it back: 75 of 75 frames at 48000 Hz. You should have heard yourself")
+	var failed: String = VoiceMicTest.playback_verdict(75, 75, "the voice player is not playing", true, 48000.0)
+	assert_true(failed.begins_with("Playback failed: the voice player is not playing"), failed)
+	assert_false(failed.contains("should have heard"))
+	assert_string_contains(VoiceMicTest.playback_verdict(75, 75, "", false, 0.0), "no sound device here")
+
+
+func test_upsampler_is_continuous_across_any_cut() -> void:
+	var tone: PackedFloat32Array = VoiceWav.tone(440.0, 0.2, VoiceCodec.SAMPLE_RATE, 0.5)
+	var whole: PackedFloat32Array = VoiceResampler.new(VoiceCodec.SAMPLE_RATE, 48000.0).process(tone)
+	var r := VoiceResampler.new(VoiceCodec.SAMPLE_RATE, 48000.0)
+	var cut := PackedFloat32Array()
+	var pos: int = 0
+	for n: int in [1, 7, 320, 33, 320, 919]:
+		cut.append_array(r.process(tone.slice(pos, mini(pos + n, tone.size()))))
+		pos += n
+	cut.append_array(r.process(tone.slice(pos)))
+	assert_eq(whole.size(), tone.size() * 6, "8 → 48 kHz: exactly 6 per sample")
+	assert_eq(cut, whole, "the same in pieces as in one go")
+	var r44 := VoiceResampler.new(VoiceCodec.SAMPLE_RATE, 44100.0)
+	var total: int = 0
+	for i: int in 200:
+		total += r44.process(tone.slice(0, VoiceCodec.FRAME_SAMPLES)).size()
+	assert_eq(total, 200 * 1764, "8 → 44.1 kHz: 1764 per 40 ms frame, no drift")
