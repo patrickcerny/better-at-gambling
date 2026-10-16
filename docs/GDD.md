@@ -21,6 +21,12 @@ between them** (default 3, 1–6); duration = gambling minutes × (minigames + 1
 Timer counts casino time only. House Comp when broke (once per segment): $300, then $450, $600,
 $750 after each minigame played, $900 from the fourth on (`BalanceConfig.comp_amounts`).
 
+**Odd Jobs** cabinet next to the Gift Shop (casino phases, not in minigames-only): look at its big
+red 3D button and click (or E). One bar shared by everyone; each click adds the clicker's share,
+1/presses where presses = 10 at $0 up to 60 at $499 (refused at $500+), and the click that fills
+the bar wins $50, then it starts over. Idle bar drains 0.1/s after 0.5 s; ~12 clicks/s per player.
+The cabinet's lamps pulse and the button is outlined while you are below the House Comp line.
+
 ## Casino games (MVP)
 - **Blackjack:** 6-deck shoe, S17, 3:2, double any two (also after a split), split one pair once
   (aces get one card each), simultaneous play, Dealer Bust Bonus 1.07:1. Limits $10–$200.

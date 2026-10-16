@@ -1,6 +1,7 @@
 extends GutTest
-## Odd Jobs cabinet through the real MatchServer: a broke player smashes the button for $50, a rich
-## one is refused, and minigames-only matches have no odd jobs.
+## Odd Jobs cabinet through the real MatchServer: a broke player smashes the button for $50, two
+## players fill the one shared bar and the click that completes it is paid, a rich one is refused,
+## and minigames-only matches have no odd jobs.
 
 var fx: ServerFixture
 
@@ -37,6 +38,41 @@ func test_broke_player_smashes_for_50() -> void:
 	assert_eq(int(pay[0]["balance"]), before + 50)
 	var money: Array[Dictionary] = fx.of_type(&"money_changed").filter(func(e: Dictionary) -> bool: return e["reason"] == &"odd_jobs")
 	assert_eq(money.size(), 1, "paid through the normal balance path")
+
+
+func test_shared_bar_pays_the_player_whose_click_completes_it() -> void:
+	var alice: int = fx.player_ids[0]
+	var bob: int = fx.player_ids[1]
+	for p: int in [alice, bob]:
+		fx.server.economy.take_up_to(p, 1000000, &"test")
+	fx.run(0.2)  # House Comps may land first: put both back on known balances below the cap
+	fx.server.economy.take_up_to(alice, 1000000, &"test")
+	fx.server.economy.take_up_to(bob, 1000000, &"test")
+	fx.server.economy.apply(alice, 100, &"test")  # 20 clicks a bar for Alice
+	fx.server.economy.apply(bob, 250, &"test")  # 35 clicks a bar for Bob
+	var share_a: float = 1.0 / OddJobs.presses_needed(100)
+	var share_b: float = 1.0 / OddJobs.presses_needed(250)
+	# Alice fills most of it; Bob's clicks top it off.
+	var alice_clicks: int = 17
+	for i: int in alice_clicks:
+		assert_true(fx.intent(alice, &"odd_jobs_press")["ok"])
+		fx.run(0.05)
+	assert_almost_eq(fx.server.odd_jobs.fill(), alice_clicks * share_a, 0.001)
+	var bob_clicks: int = 0
+	while fx.server.economy.balance(bob) == 250 and bob_clicks < 20:
+		assert_true(fx.intent(bob, &"odd_jobs_press")["ok"])
+		bob_clicks += 1
+		fx.run(0.05)
+	assert_eq(bob_clicks, ceili((1.0 - alice_clicks * share_a) / share_b - 0.0001), "Bob's own share per click")
+	assert_eq(fx.server.economy.balance(bob), 300, "Bob's click completed the bar: Bob gets the $50")
+	assert_eq(fx.server.economy.balance(alice), 100, "Alice clicked more but not last: nothing")
+	var pay: Array[Dictionary] = fx.of_type(&"odd_jobs_payout")
+	assert_eq(pay.size(), 1)
+	assert_eq(int(pay[0]["player"]), bob)
+	assert_eq(fx.server.odd_jobs.fill(), 0.0, "the bar starts over")
+	var bars: Array[Dictionary] = fx.of_type(&"odd_jobs_bar")
+	assert_true(bars.any(func(e: Dictionary) -> bool: return int(e["player"]) == alice), "everyone sees Alice's clicks")
+	assert_eq(float(bars.back()["fill"]), 0.0)
 
 
 func test_rich_player_is_refused() -> void:

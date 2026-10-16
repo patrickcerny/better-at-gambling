@@ -1,6 +1,7 @@
 extends GutTest
-## Odd Jobs cabinet rules (server/odd_jobs.gd): presses per bar by money, $50 per full bar,
-## idle decay, refusal and freeze at $500+, the press rate limit.
+## Odd Jobs cabinet rules (server/odd_jobs.gd): ONE bar shared by every player, each click adds the
+## clicker's share (1 / presses needed at their money), the click that fills it is paid $50 and
+## the bar starts over; idle decay, refusal at $500+, the per-player rate limit.
 
 var economy: Economy
 var jobs: OddJobs
@@ -10,15 +11,16 @@ var now: float = 0.0
 func before_each() -> void:
 	economy = Economy.new()
 	economy.add_player(1, 0)
+	economy.add_player(2, 0)
 	jobs = OddJobs.new(economy)
 	now = 0.0
 
 
-## Presses at a steady 10/s (under the limit).
-func _press(n: int) -> void:
+## `player` clicks `n` times at a steady 10/s (under the limit).
+func _press(n: int, player: int = 1) -> void:
 	for i: int in n:
 		now += 0.1
-		assert_true(jobs.press(1, now)["ok"])
+		assert_true(jobs.press(player, now)["ok"])
 
 
 func _of(type: StringName) -> Array[Dictionary]:
@@ -37,58 +39,86 @@ func test_presses_needed_scale_with_money() -> void:
 func test_full_bar_pays_exactly_50_and_resets() -> void:
 	_press(9)
 	assert_eq(economy.balance(1), 0)
-	assert_almost_eq(jobs.fill(1), 0.9, 0.001)
+	assert_almost_eq(jobs.fill(), 0.9, 0.001)
 	_press(1)
 	assert_eq(economy.balance(1), 50)
-	assert_eq(jobs.fill(1), 0.0)
+	assert_eq(jobs.fill(), 0.0)
 	var pay: Array[Dictionary] = _of(&"odd_jobs_payout")
 	assert_eq(pay.size(), 1)
+	assert_eq(int(pay[0]["player"]), 1)
 	assert_eq(int(pay[0]["amount"]), 50)
 	assert_eq(int(pay[0]["balance"]), 50)
-	# At $50 the next bar takes more presses (15).
-	assert_eq(int(_of(&"odd_jobs_bar").back()["presses_needed"]), 15)
+	assert_eq(float(_of(&"odd_jobs_bar").back()["fill"]), 0.0, "the reset goes out at once")
+	# At $50 the next bar takes more of this player's clicks (15).
 	_press(14)
 	assert_eq(economy.balance(1), 50)
 	_press(1)
 	assert_eq(economy.balance(1), 100)
 
 
+func test_two_players_share_one_bar_and_the_last_click_wins() -> void:
+	economy.apply(2, 250, &"test")  # 35 clicks a bar for player 2, 10 for player 1
+	_press(5, 1)
+	assert_almost_eq(jobs.fill(), 0.5, 0.001)
+	_press(1, 2)
+	assert_almost_eq(jobs.fill(), 0.5 + 1.0 / 35.0, 0.001, "player 2 adds their own (smaller) share")
+	jobs.tick(0.05, now + 0.15)  # flush the throttled update
+	assert_eq(int(_of(&"odd_jobs_bar").back()["player"]), 2, "bar events say who clicked")
+	_press(4, 1)  # 0.5 + 0.029 + 0.4 = 0.929: not full yet
+	assert_eq(economy.balance(1), 0)
+	_press(3, 2)  # +0.086: player 2's click completes it
+	assert_eq(economy.balance(2), 300, "the completing click is paid")
+	assert_eq(economy.balance(1), 0, "the others' clicks earn nothing")
+	assert_eq(jobs.fill(), 0.0, "and the bar starts over")
+	var pay: Array[Dictionary] = _of(&"odd_jobs_payout")
+	assert_eq(pay.size(), 1)
+	assert_eq(int(pay[0]["player"]), 2)
+	assert_eq(int(pay[0]["balance"]), 300)
+
+
 func test_bar_decays_when_idle() -> void:
 	_press(5)
-	var f: float = jobs.fill(1)
+	var f: float = jobs.fill()
 	jobs.tick(0.3, now + 0.3)
-	assert_eq(jobs.fill(1), f, "no decay right after a press")
+	assert_eq(jobs.fill(), f, "no decay right after a press")
 	for i: int in 20:
 		jobs.tick(0.1, now + 0.4 + i * 0.1)
-	assert_lt(jobs.fill(1), f)
-	assert_gt(jobs.fill(1), 0.0, "slowly")
+	assert_lt(jobs.fill(), f)
+	assert_gt(jobs.fill(), 0.0, "slowly")
+	assert_eq(int(_of(&"odd_jobs_bar").back()["player"]), -1, "a drain update has no clicker")
 	for i: int in 100:
 		jobs.tick(0.1, now + 3.0 + i * 0.1)
-	assert_eq(jobs.fill(1), 0.0)
+	assert_eq(jobs.fill(), 0.0)
 	assert_eq(economy.balance(1), 0)
+
+
+func test_anyones_click_holds_off_the_decay() -> void:
+	_press(5, 1)
+	var f: float = jobs.fill()
+	jobs.tick(0.1, now + 0.4)
+	now += 0.4
+	_press(1, 2)  # player 2 keeps it going: no drain in between
+	assert_almost_eq(jobs.fill(), f + 0.1, 0.001)
 
 
 func test_refused_at_500() -> void:
 	economy.apply(1, 500, &"test")
-	var res: Dictionary = jobs.press(1, 1.0)
+	_press(3, 2)
+	var f: float = jobs.fill()
+	var res: Dictionary = jobs.press(1, now + 0.1)
 	assert_false(res["ok"])
 	assert_eq(res["error"], &"enough_money")
-	assert_eq(jobs.fill(1), 0.0)
-	assert_true(bool(_of(&"odd_jobs_bar").back()["enough"]))
+	assert_eq(jobs.fill(), f, "a refused click adds nothing")
 	assert_eq(economy.balance(1), 500)
 
 
-func test_bar_freezes_when_crossing_500() -> void:
-	economy.apply(1, 480, &"test")
-	_press(10)
-	var f: float = jobs.fill(1)
-	assert_gt(f, 0.0)
-	economy.apply(1, 30, &"test")  # won something elsewhere: $510
+func test_rich_player_cannot_snipe_the_last_click() -> void:
+	economy.apply(1, 600, &"test")
+	_press(9, 2)
 	assert_eq(jobs.press(1, now + 0.1)["error"], &"enough_money")
-	for i: int in 50:
-		jobs.tick(0.1, now + 1.0 + i * 0.1)
-	assert_eq(jobs.fill(1), f, "frozen, not draining")
-	assert_eq(economy.balance(1), 510)
+	assert_eq(economy.balance(1), 600)
+	_press(1, 2)
+	assert_eq(economy.balance(2), 50)
 
 
 func test_rate_limit_drops_extra_presses() -> void:
@@ -96,11 +126,15 @@ func test_rate_limit_drops_extra_presses() -> void:
 	economy.apply(1, 499, &"test")  # 60 presses a bar: nothing pays out here
 	for i: int in 40:
 		assert_true(jobs.press(1, 5.0)["ok"])
-	assert_almost_eq(jobs.fill(1), 12.0 / 60.0, 0.001)
+	assert_almost_eq(jobs.fill(), 12.0 / 60.0, 0.001)
+	# The limit is per player: someone else's clicks still count.
+	economy.apply(2, 499, &"test")
+	assert_true(jobs.press(2, 5.0)["ok"])
+	assert_almost_eq(jobs.fill(), 13.0 / 60.0, 0.001)
 	# A second later about 12 more are allowed.
 	for i: int in 40:
 		jobs.press(1, 6.0)
-	assert_almost_eq(jobs.fill(1), 24.0 / 60.0, 0.001)
+	assert_almost_eq(jobs.fill(), 25.0 / 60.0, 0.001)
 
 
 func test_bar_events_are_throttled() -> void:
@@ -122,13 +156,14 @@ func test_money_never_goes_negative() -> void:
 	assert_false(jobs.press(99, now)["ok"], "unknown player")
 
 
-## The panel sees every server event; `player_joined` carries the player as a dictionary and
-## must not be parsed as an id (0.9.4: "Nonexistent 'int' constructor" on every dedicated server).
-func test_panel_ignores_events_whose_player_is_not_an_id() -> void:
-	var panel := OddJobsPanel.new()
-	add_child_autofree(panel)
-	panel.local_id = 3
-	panel._on_event({"type": &"player_joined", "player": {"id": 3, "name": "Bob"}})
-	panel._on_event({"type": &"odd_jobs_bar", "player": 3, "fill": 0.5, "presses_needed": 20, "enough": false})
-	assert_eq(panel._needed, 20, "own bar events still land")
-	assert_eq(panel._fill, 0.5)
+func test_broke_line_is_the_house_comp_line() -> void:
+	var cfg: BalanceConfig = Registry.balance
+	assert_eq(OddJobsController.broke_line(cfg, 0), cfg.comp_threshold)
+	assert_gte(OddJobsController.broke_line(cfg, 3), cfg.comp_threshold, "scales with the table limits")
+
+
+func test_cabinet_aim_ray() -> void:
+	var c := Vector3(1, 1, 0)
+	assert_true(OddJobsCabinet.ray_hits(Vector3(0, 1.5, 0), (c - Vector3(0, 1.5, 0)), c, 0.2))
+	assert_false(OddJobsCabinet.ray_hits(Vector3(0, 1.5, 0), Vector3(1, 0, 0), c, 0.2), "looking over it")
+	assert_false(OddJobsCabinet.ray_hits(Vector3(0, 1.5, 0), Vector3(-1, -0.5, 0), c, 0.2), "behind you")

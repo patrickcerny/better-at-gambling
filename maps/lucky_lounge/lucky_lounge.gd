@@ -157,7 +157,8 @@ var _marker_time: float = 0.0
 var vip_gate_area: Area3D
 var nav_region: NavigationRegion3D
 var props_parent: Node3D
-## The Odd Jobs cabinet's red button cap (dips on the local player's presses).
+## The Odd Jobs cabinet's live parts (button, shared bar, lamps) and its red button.
+var odd_jobs: OddJobsCabinet
 var odd_jobs_button: Node3D
 var navmesh_ready: bool = false
 ## The lobby doors between the start room and the casino (§2.2): a solid barrier filling the
@@ -776,8 +777,9 @@ func _build_gift_shop() -> void:
 	add_child(kiosk)
 
 
-## The Odd Jobs cabinet: a low wooden arcade cabinet with one big red button on its deck and an
-## "ODD JOBS" marquee, its front to the room (−x). Solid like the shop counter.
+## The Odd Jobs cabinet: a low wooden arcade cabinet with one big red button on its deck, the shared
+## bar lit on the riser behind it and an "ODD JOBS" marquee, its front to the room (−x). Solid like
+## the shop counter. The live parts (button, bar, text, lamps) are an OddJobsCabinet.
 func _build_odd_jobs() -> void:
 	var c: Vector3 = ODD_JOBS_CABINET
 	var wood := Color("#3A2A1E")
@@ -786,19 +788,18 @@ func _build_odd_jobs() -> void:
 	GreyboxKit.box(self, Vector3(0.05, 0.05, 0.92), c + Vector3(-0.36, 0.98, 0), Palette.WARM_GOLD, "OddJobsTrim", false)
 	GreyboxKit.box(self, Vector3(0.05, 0.05, 0.92), c + Vector3(-0.36, 0.06, 0), Palette.WARM_GOLD, "OddJobsTrim", false)
 	GreyboxKit.box(self, Vector3(0.78, 0.08, 0.98), c + Vector3(-0.02, 1.04, 0), Palette.CASINO_BLACK, "OddJobsDeck", false)
-	# The button: gold bezel, red cap (the cap dips when the local player smashes it).
-	GreyboxKit.cylinder(self, 0.24, 0.06, c + Vector3(-0.08, 1.11, 0), Palette.WARM_GOLD, "OddJobsBezel", false, 0.8)
-	odd_jobs_button = GreyboxKit.cylinder(self, 0.19, 0.12, c + Vector3(-0.08, 1.17, 0), Palette.CASINO_RED, "OddJobsButton", false)
 	# Marquee on the back, with its sign facing the room.
 	GreyboxKit.box(self, Vector3(0.16, 1.2, 0.9), c + Vector3(0.24, 1.68, 0), wood, "OddJobsBack")
 	GreyboxKit.box(self, Vector3(0.04, 0.5, 0.84), c + Vector3(0.14, 1.95, 0), Palette.VIP_BURGUNDY, "OddJobsMarquee", false)
 	for y: float in [1.69, 2.21]:
 		GreyboxKit.box(self, Vector3(0.05, 0.04, 0.9), c + Vector3(0.13, y, 0), Palette.WARM_GOLD, "OddJobsTrim", false)
-	for i: int in 5:
-		GreyboxKit.sphere(self, 0.035, c + Vector3(0.12, 2.28, -0.36 + i * 0.18), Palette.CREAM, "OddJobsBulb")
 	var l: Label3D = _sign_label(c + Vector3(0.11, 2.0, 0), -PI / 2.0, "ODD JOBS", 32)
 	l.modulate = Palette.VIP_GOLD
 	_sign_label(c + Vector3(0.11, 1.8, 0), -PI / 2.0, "$50 A BAR", 22)
+	odd_jobs = OddJobsCabinet.new()
+	odd_jobs.position = c
+	add_child(odd_jobs)
+	odd_jobs_button = odd_jobs.button
 
 
 ## The VIP lounge: its own room behind the north door, on the casino's floor level. Parquet,
