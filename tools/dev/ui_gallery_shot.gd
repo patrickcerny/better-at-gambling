@@ -1,10 +1,11 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|shop|rewards|settings|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining`
+## `--panel lobby|players|players_lobby|shop|rewards|settings|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining`
 ## over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Big Wendy", "Snake Eyes"]
+const SKINS: Array[String] = ["king", "bean", "wizard", "business", "swat"]
 
 
 func _ready() -> void:
@@ -27,6 +28,13 @@ func _ready() -> void:
 			add_child(p)
 			p.bind(st, 1)
 			p.open()
+		"players", "players_lobby":
+			# The Tab list: standings (match) or ready states (lobby), with a talking-free roster.
+			st.phase = Phase.Id.LOBBY if which == "players_lobby" else Phase.Id.CASINO
+			var p := PlayerList.new()
+			add_child(p)
+			p.bind(st, 2)
+			p.show_list(true)
 		"shop":
 			var p := ShopPanel.new()
 			add_child(p)
@@ -97,7 +105,7 @@ func _state() -> ClientMatchState:
 	st.lobby_settings = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "mode": &"casino", "public": true}
 	for i: int in NAMES.size():
 		var pid: int = i + 1
-		st.players[pid] = {"id": pid, "name": NAMES[i], "color": i, "ready": i % 2 == 0, "skin": "bean", "connected": i != 3, "inventory": []}
+		st.players[pid] = {"id": pid, "name": NAMES[i], "color": i, "ready": i % 2 == 0, "skin": SKINS[i], "connected": i != 3, "inventory": []}
 		st.balances[pid] = [2840, 1950, 1200, 640, 90][i]
 	st.shop_offers = [
 		{"item": "lucky_clover", "price": 150, "rarity": 0}, {"item": "bodyguard", "price": 300, "rarity": 1},
