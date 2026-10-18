@@ -193,6 +193,34 @@ func test_the_generator_lead_is_kept_in_output_frames() -> void:
 	assert_eq(pb.frames_played, 3, "40 ms later the next one")
 
 
+## 0.9.12, a real client at 8 fps (Xvfb, PulseAudio): with a fixed 80 ms lead the generator ran
+## dry every 125 ms frame, voice played slower than it arrived and the jitter buffer threw half of
+## it away (received 1069, played 528, overflowed 540). Slow frames now queue enough to last.
+func test_a_slow_game_plays_every_frame_it_gets() -> void:
+	for dt: float in [0.125, 0.1, 0.07]:
+		var out: Array[PackedVector2Array] = []
+		var pb: VoicePlayback = _sink_playback(48000.0, out)
+		var packets: Array[Dictionary] = _tone_packets(100)
+		var t: float = 0.0
+		var next: int = 0
+		while t < packets.size() * VoiceCodec.FRAME_SECONDS + 1.0:
+			pb.advance(dt)
+			t += dt
+			while next < packets.size() and t >= next * VoiceCodec.FRAME_SECONDS:
+				pb.push_packet(packets[next])
+				next += 1
+		assert_eq(pb.buffer.overflowed, 0, "%d fps: nothing thrown away" % roundi(1.0 / dt))
+		assert_eq(pb.frames_played, packets.size(), "%d fps: every frame played" % roundi(1.0 / dt))
+		pb.free()
+
+
+func test_the_lead_grows_with_slow_frames_within_the_generator_buffer() -> void:
+	assert_eq(VoicePlayback.lead_seconds(0.0), VoicePlayback.LEAD_SECONDS, "fast frames: the usual 80 ms")
+	assert_eq(VoicePlayback.lead_seconds(0.016), VoicePlayback.LEAD_SECONDS)
+	assert_gt(VoicePlayback.lead_seconds(0.125), 0.125 + VoiceCodec.FRAME_SECONDS, "8 fps: lasts past the next frame")
+	assert_lte(VoicePlayback.lead_seconds(5.0), VoicePlayback.BUFFER_SECONDS * VoicePlayback.MAX_LEAD_SHARE, "a hitch never asks for more than the buffer holds")
+
+
 func test_a_spurt_is_not_cut_between_two_packets() -> void:
 	# The jitter buffer is empty for a moment between packets; popping it then ended the spurt and
 	# rebuffered 120 ms while the generator ran dry (heard on Linux: two gaps in 3 s).

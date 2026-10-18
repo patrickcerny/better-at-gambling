@@ -325,3 +325,16 @@ for $5), so 0.31 puts the seven-symbol mean at 101.3% with each symbol 98.8% ($5
 `tests/sim/test_wheel_rtp.gd` holds every symbol to 98–105% and the mean to 100.5–102%. With
 several bettors on different symbols the redraw fires less often, so a crowded wheel is a little
 less generous per player. Luck rerolls the segment by what it pays that player (monotonic in L).
+
+## 2026-10-18 — Voice: open mic by default, the lobby and regroup are global (0.9.12)
+Patrick, 0.9.11: "friends can't hear each other". The VPS relay log showed a whole casino round
+carrying 15 voice frames (0.6 s: push-to-talk was the default and nobody held T) and a lobby where
+every frame "reached nobody". Two rules change:
+- **Open mic is the default** (`Settings.DEFAULTS` voice/mode, `VoiceChannel.DEFAULT_MODE`), as
+  §2.22 says ("proximity voice is on by default") and as PEAK / R.E.P.O. do. A mode the player
+  saved (push to talk, off) stays; only players who never chose get open mic. The gate stays at
+  -45 dBFS with the 0.4 s hangover. Cost: a player on speakers instead of a headset can send the
+  game's sound back; Settings > Voice chat > Push to talk is one click away.
+- **LOBBY, INTRO and REGROUP are global voice** like the quiz, rewards and results: everyone is in
+  the entrance hall or the waiting room, waiting, and a waiting room where you cannot hear the
+  others is broken. Casino and the pre-minigame warning stay proximity (20 m, same table, megaphone).

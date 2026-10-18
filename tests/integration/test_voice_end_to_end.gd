@@ -132,3 +132,46 @@ func test_open_mic_needs_no_key() -> void:
 	assert_true(ch_a.capture.mic_active)
 	_run(1.0)
 	assert_gt(ch_b.received_packets, 20)
+
+
+## 0.9.12: push-to-talk was the default and almost nobody held T (15 frames of voice in a whole
+## casino round on the VPS). With nothing saved, voice is open mic and talking is enough.
+func test_a_fresh_install_talks_on_open_mic_without_a_key() -> void:
+	assert_eq(Settings.DEFAULTS["voice"]["mode"], "open_mic")
+	if Settings._cfg.has_section_key("voice", "mode"):
+		Settings._cfg.erase_section_key("voice", "mode")
+	Settings.changed.emit()
+	assert_eq(ch_a.mode_key(), "open_mic", "the default mode")
+	assert_eq(ch_a.capture.mode, VoiceCapture.Mode.OPEN_MIC)
+	assert_true(ch_a.capture.mic_active, "the microphone is open")
+	_run(1.0)
+	assert_gt(ch_a.capture.frames_sent, 20, "speech goes out with no key held")
+	assert_gt(ch_b.received_packets, 20, "and is heard nearby")
+
+
+func _key_t(pressed: bool) -> void:
+	var k := InputEventKey.new()
+	k.physical_keycode = KEY_T
+	k.pressed = pressed
+	Input.parse_input_event(k)
+	Input.flush_buffered_events()
+
+
+## The key itself (not `Input.action_press`): T held while a text field has the focus (a menu, the
+## lobby panel) still talks, and the HUD names the key.
+func test_holding_the_t_key_talks_even_with_a_focused_text_field() -> void:
+	var field := LineEdit.new()
+	add_child_autofree(field)
+	field.grab_focus()
+	_key_t(true)
+	_run(0.6)
+	assert_true(ch_a.capture.transmitting, "T held: transmitting")
+	assert_gt(ch_b.received_packets, 8)
+	_key_t(false)
+	_run(0.3)
+	assert_false(ch_a.capture.transmitting, "T up: quiet")
+	var hud := VoiceHud.new()
+	hud.channel = ch_a
+	add_child_autofree(hud)
+	hud._process(1.0)
+	assert_eq(hud._self_label.text, "Hold T to talk")

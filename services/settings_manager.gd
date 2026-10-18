@@ -16,7 +16,9 @@ const DEFAULTS: Dictionary = {
 	## Voice chat: "push_to_talk", "open_mic" or "off" (see `VoiceChannel.MODE_KEYS`), the
 	## microphone: a name from `AudioServer.get_input_device_list()` ("Default": the system's), and
 	## `mic_gain`: how loud your own voice goes out (0..`MAX_MIC_GAIN`, 1 = as the mic hears it).
-	"voice": {"mode": "push_to_talk", "input_device": "Default", "mic_gain": 1.0},
+	## Open mic by default (0.9.12; §2.22 "proximity voice is on by default"): with push-to-talk
+	## as the default almost nobody held T, and a whole casino round carried 15 frames of voice.
+	"voice": {"mode": "open_mic", "input_device": "Default", "mic_gain": 1.0},
 	## `stick_sensitivity` scales the gamepad's right-stick look.
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false, "stick_sensitivity": 1.0},
 	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},

@@ -4,7 +4,10 @@ extends RefCounted
 ## - within `HEARING_RADIUS` metres: heard, positioned in 3D (full volume within `FULL_VOLUME_RADIUS`,
 ##   fading to silence at the edge);
 ## - seated at the same table: heard at full volume regardless of distance;
-## - quiz, rewards and results: everyone hears everyone (game-show stage, podium gloating);
+## - lobby, intro and regroup (everyone in the entrance hall and the waiting room, waiting),
+##   minigames, rewards and results: everyone hears everyone (a waiting room where you cannot
+##   hear the others is broken: 0.9.10, a whole lobby of voice "reached nobody"; game-show stage,
+##   podium gloating);
 ## - whoever holds the Megaphone (M7, `MegaphoneLogic`) is heard by everyone at full volume.
 
 enum Reach { NONE, NEAR, TABLE, GLOBAL }
@@ -12,7 +15,7 @@ enum Reach { NONE, NEAR, TABLE, GLOBAL }
 const HEARING_RADIUS: float = 20.0
 const FULL_VOLUME_RADIUS: float = 4.0
 ## Phases where voice is global.
-const GLOBAL_PHASES: Array[Phase.Id] = [Phase.Id.MINIGAME, Phase.Id.REWARDS, Phase.Id.RESULTS]
+const GLOBAL_PHASES: Array[Phase.Id] = [Phase.Id.LOBBY, Phase.Id.INTRO, Phase.Id.MINIGAME, Phase.Id.REWARDS, Phase.Id.REGROUP, Phase.Id.RESULTS]
 
 
 static func is_global_phase(phase: Phase.Id) -> bool:

@@ -66,15 +66,34 @@ func test_hearing_radius_edge() -> void:
 	assert_false(_route(1.0).has(far))
 
 
-func test_everyone_hears_everyone_in_quiz_rewards_and_results() -> void:
-	for phase: Phase.Id in [Phase.Id.MINIGAME, Phase.Id.REWARDS, Phase.Id.RESULTS]:
+func test_everyone_hears_everyone_in_the_lobby_quiz_rewards_regroup_and_results() -> void:
+	for phase: Phase.Id in [Phase.Id.LOBBY, Phase.Id.INTRO, Phase.Id.MINIGAME, Phase.Id.REWARDS, Phase.Id.REGROUP, Phase.Id.RESULTS]:
 		fx.server.phases.phase = phase
 		var out: Dictionary[int, PackedByteArray] = _route(float(phase))
 		assert_true(out.has(near) and out.has(far), "%s: global voice" % Phase.name_of(phase))
 		assert_eq(VoicePacket.parse_down(out[far])["flags"], VoicePacket.FLAG_GLOBAL)
-	for phase: Phase.Id in [Phase.Id.LOBBY, Phase.Id.INTRO, Phase.Id.CASINO, Phase.Id.PRE_MINIGAME]:
+	for phase: Phase.Id in [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME]:
 		fx.server.phases.phase = phase
 		assert_false(_route(10.0 + float(phase)).has(far), "%s: proximity only" % Phase.name_of(phase))
+
+
+## 0.9.10 on the VPS: a player's 73 lobby packets all "reached nobody". The lobby is a waiting
+## room: a room that has not started yet relays every frame to everyone, wherever they stand
+## (the waiting room behind the start room, a pedestal, a fun table, not moved yet).
+func test_a_lobby_that_has_not_started_relays_to_everyone() -> void:
+	var lobby := ServerFixture.new(4, {"minigames": 2, "gamble_seconds": 100.0, "seed": 4})
+	assert_eq(lobby.server.phases.phase, Phase.Id.LOBBY)
+	var spots: Array[Vector3] = [Vector3(-9, 0, 11), Vector3(0, 0, 22.5), Vector3(9.6, 0, 15.1), Vector3.ZERO]
+	for i: int in lobby.player_ids.size():
+		lobby.server.world.set_transform(lobby.player_ids[i], spots[i] * 3.0, 0.0)  # even far apart
+	var r := VoiceRelay.new()
+	for s: int in lobby.player_ids:
+		var out: Dictionary[int, PackedByteArray] = r.route(lobby.server, s, _frame(1), float(s), lobby.player_ids)
+		for l: int in lobby.player_ids:
+			if l != s:
+				assert_true(out.has(l), "lobby: player %d hears player %d" % [l, s])
+	assert_eq(r.unheard_from.size(), 0, "nothing reached nobody")
+	lobby.server.free()
 
 
 func test_quiz_phase_reached_by_playing_is_global() -> void:

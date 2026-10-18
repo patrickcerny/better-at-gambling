@@ -17,7 +17,8 @@ extends Node3D
 ## global voice (flagged by the server) play at full volume wherever the speaker is.
 ## `positional = false` plays through a plain `AudioStreamPlayer` instead (the settings panel's
 ## microphone test). Headless there is no audio device: frames are still pulled on a 40 ms clock
-## so the mouth and talking state behave exactly as they would with sound.
+## so the mouth and talking state behave exactly as they would with sound (`force_audio` keeps the
+## real players headless, for tests that listen to the Voice bus).
 
 ## Every frame this playback plays (decoded samples at 8 kHz; `--voice-dump`, tests).
 signal frame_played(samples: PackedFloat32Array)
@@ -29,14 +30,19 @@ const HEAD_Y: float = 1.3
 const LEAD_SECONDS: float = VoiceCodec.FRAME_SECONDS * 2.0
 ## Silence pushed when the player starts, so its first mix never runs dry.
 const PRIME_SECONDS: float = 0.02
-## Generator buffer (at the output rate).
-const BUFFER_SECONDS: float = 0.3
+## Generator buffer (at the output rate): room for `LEAD_SECONDS` plus a slow frame's lead.
+const BUFFER_SECONDS: float = 0.5
+## The lead never asks for more than this share of the generator buffer.
+const MAX_LEAD_SHARE: float = 0.8
 ## A stopped player is restarted at most this often.
 const RESTART_SECONDS: float = 1.0
 
 ## Frames every playback has pulled out of its jitter buffer and played (or, headless, clocked
 ## through the mouth), for the end-of-match voice log line and the tests.
 static var total_frames_played: int = 0
+## Tests: real players (the `AudioServer` mixer, Dummy driver) even headless, where playback is
+## otherwise clocked silently. Lets a test hear what reaches the Voice bus.
+static var force_audio: bool = false
 
 var speaker: int = -1
 ## 40 ms voice frames this speaker's playback has played.
@@ -81,7 +87,7 @@ var _warned: Dictionary[String, bool] = {}
 
 func _ready() -> void:
 	position.y = HEAD_Y
-	if DisplayServer.get_name() == "headless" and not sink.is_valid():
+	if DisplayServer.get_name() == "headless" and not sink.is_valid() and not force_audio:
 		audio_enabled = false
 	if audio_enabled:
 		_rate_injected = output_rate > 0.0
@@ -214,7 +220,7 @@ func advance(delta: float) -> void:
 		_keep_alive(delta)
 	if audio_enabled and (_gen != null or sink.is_valid()):
 		var queued: int = _queued(delta)
-		var lead: int = ceili(LEAD_SECONDS * output_rate)
+		var lead: int = ceili(lead_seconds(delta) * output_rate)
 		while queued < lead:
 			# Between two packets of a spurt the jitter buffer is briefly empty: popping it then
 			# would end the spurt and rebuffer 120 ms while the generator runs dry (a gap every
@@ -238,6 +244,15 @@ func advance(delta: float) -> void:
 	mouth.update(delta)
 	if icon != null:
 		icon.visible = mouth.is_talking()
+
+
+## Audio to keep queued in the generator after a frame of `delta` seconds: `LEAD_SECONDS`, or
+## enough to last until the next frame and one voice frame more when frames are slow. With a
+## fixed 80 ms lead a game running under 12 fps let the generator run dry every frame, played
+## voice slower than it arrived and the jitter buffer threw half of it away (overflowed; found
+## with a real audio device at 8 fps, 0.9.12).
+static func lead_seconds(delta: float) -> float:
+	return clampf(delta * 1.5 + VoiceCodec.FRAME_SECONDS, LEAD_SECONDS, BUFFER_SECONDS * MAX_LEAD_SHARE)
 
 
 ## Output frames still waiting in the generator (or the test sink).

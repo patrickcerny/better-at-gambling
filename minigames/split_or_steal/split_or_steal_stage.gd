@@ -1307,12 +1307,12 @@ func _side_panel(root: Control, title: String, left: bool) -> VBoxContainer:
 func _voice_hint() -> String:
 	if VoiceChannel.current == null:
 		return "Voice chat is off here: plead with emotes."
-	var mode: String = str(Settings.get_value("voice", "mode", "push_to_talk"))
+	var mode: String = VoiceChannel.current.mode_key()
 	if mode == "off":
 		return "Your mic is off (Settings → Voice). Everyone can still talk to you."
 	if mode == "open_mic":
 		return "Mic open: everyone hears everyone during the show."
-	return "Hold T to talk: everyone hears everyone during the show."
+	return "Hold %s to talk: everyone hears everyone during the show." % Settings.binding_label(&"push_to_talk")
 
 
 func _label(text: String, size: int, color: Color, min_w: float = 0.0) -> Label:

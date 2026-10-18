@@ -139,6 +139,44 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-18 / 0.9.12 voice fixes
+Patrick: "other people online dont hear me", "no, friends can't hear each other". Every headless
+test was green because headless playback never makes a sound (it only clocks frames through the
+mouth), so this time a real windowed client ran under Xvfb with PulseAudio (null sink, its monitor
+recorded with `parec`) next to a headless server and a `--voice-test` speaker. That client did
+play voice; what kept real players from hearing each other were the rules and the defaults:
+- **Push-to-talk was the default and nobody held T.** The VPS log had 15 voice frames (0.6 s) in a
+  whole casino round. Open mic is the default now (`services/settings_manager.gd` DEFAULTS
+  voice/mode, `voice/voice_channel.gd` `DEFAULT_MODE`; `VoiceChannel` and the Split or Steal hint
+  used to pass their own "push_to_talk" fallback, which beat the defaults). A saved choice stays.
+- **The lobby was proximity voice.** 73 lobby frames "reached nobody". The lobby, the intro and the
+  regroup are global now (`voice/voice_proximity.gd` `GLOBAL_PHASES`); the casino and the
+  pre-minigame warning stay proximity. The server's positions were checked and are right (moves
+  in the lobby and casino, seats, rooms); the real client heard the speaker at 37% at 14 m in the
+  lobby before, 100% now.
+- **A slow client threw half the voice away.** With a fixed 80 ms generator lead, a frame longer
+  than 80 ms (the real client ran at 8 fps under Xvfb) let the generator run dry every frame, voice
+  played slower than it arrived and the jitter buffer overflowed: received 1069, played 528,
+  overflowed 540. `VoicePlayback.lead_seconds(delta)` queues a frame and a half plus 40 ms when
+  frames are slow (capped at 80% of the generator buffer, now 0.5 s): received 1080, played 982,
+  the rest dropped on load hitches.
+- Checked and fine on the real client: the Voice bus exists in the layout and at runtime
+  (-1.8 dB at the default 0.9 slider, unmuted, sends to Master), the pixel view's viewport has
+  `audio_listener_enable_3d`, the playback is created by player id under that player's avatar, the
+  3D player starts, the generator runs at the output mix rate, distance gain is from the local
+  camera, and table/global voice play at full volume.
+- New tests: `tests/ui/test_voice_heard_in_match.gd` (a real match scene; `VoicePlayback.force_audio`
+  keeps the real `AudioStreamPlayer3D` on headless, the Dummy driver mixes it and an
+  `AudioEffectCapture` on the Voice bus must hear the 440 Hz tone a relayed packet carries; the
+  Voice bus exists unmuted at the setting's volume; global voice full volume; a muted player is
+  silent; it fails with the listener switched off); `test_voice_relay.gd` (everyone hears everyone
+  in the lobby wherever they stand; lobby, intro, regroup global); `test_voice_playback.gd` (8, 10
+  and 14 fps play every frame with no overflow; the lead's bounds); `test_voice_end_to_end.gd` (a
+  fresh install talks on open mic with no key; the T key itself talks with a text field focused,
+  the HUD says "Hold T to talk").
+- Not verified: Windows WASAPI output and real microphones in a real online party; open-mic echo
+  from players on speakers.
+
 ### 2026-10-18 / 0.9.11 (built, held back: Patrick "do it now but dont push it")
 - PROTOCOL_VERSION 9 (the floor plan payload names the layout and carries positions).
 - Patrick's 2026-10-17/18 notes, all in: third-person camera straight behind the bean; scratch

@@ -12,6 +12,8 @@ extends Node
 
 const MODE_KEYS: Array[String] = ["push_to_talk", "open_mic", "off"]
 const MODE_LABELS: Array[String] = ["Push to talk (T)", "Open mic", "Off"]
+## The mode when the settings hold none (or an unknown one): `Settings.DEFAULTS` voice/mode.
+const DEFAULT_MODE: String = "open_mic"
 
 ## The live channel (the settings panel's mute list reads it); null outside a match.
 static var current: VoiceChannel = null
@@ -41,7 +43,7 @@ var playback_setup: Callable = Callable()
 var dump_path: String = ""
 var dumped: Dictionary[int, PackedFloat32Array] = {}
 
-var _mode: String = "push_to_talk"
+var _mode: String = DEFAULT_MODE
 var _test_samples: PackedFloat32Array = PackedFloat32Array()
 var _test_rate: int = 0
 var _test_pos: float = 0.0
@@ -118,9 +120,9 @@ func _exit_tree() -> void:
 
 
 func _apply_settings() -> void:
-	_mode = str(Settings.get_value("voice", "mode", "push_to_talk"))
+	_mode = str(Settings.get_value("voice", "mode"))
 	if not (_mode in MODE_KEYS):
-		_mode = "push_to_talk"
+		_mode = DEFAULT_MODE
 	var active: bool = online and _mode != "off"
 	if not _test_samples.is_empty():
 		capture.mode = VoiceCapture.Mode.OPEN_MIC if active else VoiceCapture.Mode.OFF
