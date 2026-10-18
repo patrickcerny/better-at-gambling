@@ -1213,15 +1213,22 @@ func _point_at_hot_table() -> void:
 	var cam: Camera3D = local.cam.camera
 	var target: Vector3 = node.global_position + Vector3(0, 2.0, 0)
 	var size: Vector2 = get_viewport().get_visible_rect().size
-	var on_screen: bool = not cam.is_position_behind(target)
-	var p: Vector2 = PixelView.to_canvas(cam, cam.unproject_position(target), hud)
-	if on_screen and Rect2(Vector2.ZERO, size).grow(-40.0).has_point(p):
-		hud.set_hot_pointer(false)
-		return
 	var centre: Vector2 = size * 0.5
-	var dir: Vector2 = (p - centre)
-	if not on_screen:
-		dir = -dir  # unproject mirrors points behind the camera
+	var dir: Vector2
+	var in_cam: Vector3 = cam.global_transform.affine_inverse() * target
+	if absf(in_cam.z) < 0.01:
+		# On the camera's own plane (a floor switch can put a table beside the head for a frame):
+		# unproject would divide by zero, so point along the camera's axes instead.
+		dir = Vector2(in_cam.x, -in_cam.y)
+	else:
+		var on_screen: bool = not cam.is_position_behind(target)
+		var p: Vector2 = PixelView.to_canvas(cam, cam.unproject_position(target), hud)
+		if on_screen and Rect2(Vector2.ZERO, size).grow(-40.0).has_point(p):
+			hud.set_hot_pointer(false)
+			return
+		dir = p - centre
+		if not on_screen:
+			dir = -dir  # unproject mirrors points behind the camera
 	if dir.length() < 1.0:
 		dir = Vector2.DOWN
 	dir = dir.normalized()
