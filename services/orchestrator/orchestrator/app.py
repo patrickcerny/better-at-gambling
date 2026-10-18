@@ -173,6 +173,9 @@ def create_app(
 
     @app.post("/v1/rooms")
     async def create_room(body: CreateRoomBody, request: Request) -> dict[str, object]:
+        # Logged before admission so a client that times out leaves a trace of whether its
+        # request ever arrived (no ticket, no secrets).
+        log("room_create_requested", ip=client_ip(request), build=body.build)
         ident = await admit(request, body)
         room, token = manager.create_room(ident)
         return room_reply(room, token)
