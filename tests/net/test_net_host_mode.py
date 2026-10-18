@@ -8,11 +8,16 @@ lobby, overlay) needs a Steam client and is covered in-process with a fake Steam
 
 from __future__ import annotations
 
+import math
 import re
+import struct
 import time
+import wave
 from pathlib import Path
 
+import pytest
 from conftest import LOG_DIR, free_port
+from test_net_match import _read_wav, _tone_amplitude
 
 HOST_UID = "steam:76561190000000101"
 FRIEND_UID = "steam:76561190000000102"
@@ -94,3 +99,87 @@ def test_hosted_room_closes_when_the_host_is_gone(procs):
     assert server.wait(30) == 0, server.log_path
     assert friend.wait(60) == 4, "the friend is told and leaves"
     assert server.errors() == [], server.errors()[:5]
+
+
+def _tone_wav(path, hz, amp=12000, rate=16000):
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"".join(struct.pack("<h", int(amp * math.sin(2 * math.pi * hz * i / rate))) for i in range(rate)))
+
+
+@pytest.mark.parametrize("via", ["loopback", "bridge"])
+def test_voice_goes_both_ways_between_the_host_and_a_friend_in_a_hosted_room(procs, tmp_path, via):
+    """Voice in a party hosted on the host's PC (Patrick, 0.9.10: "other people online dont hear
+    me"): the room is the `--server --host-mode` process `SteamParty` starts (loopback only,
+    admitted by uid, no orchestrator) and the host's own game talks to it as player `HOST_UID`.
+    The friend, a separate process, joins either straight to the room (`loopback`) or the way a
+    Steam friend does, through the host game's `HostBridge` (`bridge`: `--bridge-port`, the same
+    bridge with ENet in place of Steam's relay, one loopback link per friend to the room). Both
+    loop a tone into their real capture path (`--voice-test`, a different tone each) and dump what
+    they played (`--voice-dump`). Every hop is counted both ways, and each side must have played
+    the other's tone, not its own. Steam itself is covered in-process with a fake Steam
+    (tests/integration/test_voice_over_steam.gd, tests/unit/test_steam_transport.gd)."""
+    tones = {"host-voice-patrick": 440.0, "host-voice-friend": 1000.0}
+    amp = 12000 / 32768
+    port = free_port()
+    bridge_port = free_port()
+    server = _host_server(procs, f"host-voice-{via}-server", port, "--minigames", "0", "--gamble-seconds", "30", "--seed", "3")
+    clients = {}
+    for name, uid, extra in (("host-voice-patrick", HOST_UID, ["--bridge-port", str(bridge_port)] if via == "bridge" else []), ("host-voice-friend", FRIEND_UID, ["--autoplay-variant", "1"])):
+        _tone_wav(tmp_path / f"{name}.wav", tones[name])
+        args = ["--voice-test", str(tmp_path / f"{name}.wav"), "--voice-dump", str(tmp_path / f"{name}_heard.wav"), *extra]
+        if name == "host-voice-friend" and via == "bridge":
+            clients["host-voice-patrick"].wait_for(r"dev bridge: friends over ENet", 60)
+            clients[name] = procs(f"{name}-{via}", ["--connect", f"127.0.0.1:{bridge_port}", "--name", name, "--uid", uid, "--autoplay", "--quit-after-results", *args])
+        else:
+            clients[name] = procs(f"{name}-{via}", ["--connect", f"127.0.0.1:{port}", "--name", name, "--uid", uid, "--autoplay", "--quit-after-results", *args])
+    host, friend = clients["host-voice-patrick"], clients["host-voice-friend"]
+    assert host.wait(240) == 0, host.log_path
+    assert friend.wait(60) == 0, friend.log_path
+    assert server.wait(60) == 0, server.log_path
+    log = server.log()
+    assert "host mode: a party on a player's PC" in log
+    ids = {name: int(re.search(rf"{name} joined as player (\d+)", log).group(1)) for name in clients}
+    if via == "bridge":
+        assert "voice: first packet from friend peer" in host.log() and "voice: first packet from the room to friend peer" in host.log(), host.log_path
+    relay = re.search(r"voice relay: (.*)", log)
+    assert relay, ("no relay summary", server.log_path)
+    for speaker, listener in ((host, friend), (friend, host)):
+        s_id, l_id = ids[_base(speaker)], ids[_base(listener)]
+        assert int(re.search(r"welcomed as player (\d+)", speaker.log()).group(1)) == s_id
+        sent = int(re.search(r"sent (\d+) frames \(\d+ bytes\)", speaker.log()).group(1))
+        got_at_server, unheard = (int(x) for x in re.search(rf"player {s_id} sent (\d+) \((\d+) reached nobody", relay.group(1)).groups())
+        to_listener = int(re.search(rf"player {l_id} got (\d+)", relay.group(1)).group(1))
+        line = re.search(rf"voice from player {s_id}: received (\d+), played (\d+), late (\d+), overflowed (\d+), lost (\d+)", listener.log())
+        assert line, (listener.name, "never heard", speaker.name, listener.log_path)
+        got, played, late, overflowed, _ = (int(line.group(i)) for i in range(1, 6))
+        hops = {"sent": sent, "server got": got_at_server, "before the other joined": unheard, "server sent": to_listener, "got": got, "played": played, "late": late, "overflowed": overflowed}
+        print(f"{speaker.name} -> {listener.name}:", hops)
+        assert sent > 200, hops  # 25 frames/s on the casino floor
+        assert got_at_server >= sent * 0.98 - 2, hops
+        assert unheard < 200, hops  # only before the other one was in the room
+        assert to_listener >= (got_at_server - unheard) * 0.98 - 2, hops  # in reach all along
+        assert got >= to_listener * 0.98 - 2, hops
+        assert played + late + overflowed >= got - 12, hops
+        # The bridge forwards once per frame of the host's game, so the leg from the room to a
+        # bridged friend arrives in bursts; their jitter buffer drops the oldest of a burst on
+        # purpose (3-4% of it here, on that leg only).
+        assert late + overflowed <= got * (0.08 if via == "bridge" else 0.05), hops
+        rate, x = _read_wav(tmp_path / f"{_base(listener)}_heard_p{s_id}.wav")
+        assert rate == 8000 and len(x) == played * 320, (rate, len(x), played)
+        body = x[320 * 3:]
+        heard, own = _tone_amplitude(body, tones[_base(speaker)], rate), _tone_amplitude(body, tones[_base(listener)], rate)
+        print(f"{listener.name} heard {len(x) / rate:.1f} s of {speaker.name}: {heard:.3f} at {tones[_base(speaker)]:.0f} Hz, {own:.3f} at its own tone")
+        assert abs(heard - amp) < amp * 0.1, (heard, amp)
+        assert own < heard * 0.05, (own, heard)
+        # Nobody plays their own voice back.
+        assert not (tmp_path / f"{_base(listener)}_heard_p{l_id}.wav").exists()
+    for p in (server, host, friend):
+        assert p.errors() == [], (p.name, p.errors()[:5])
+
+
+def _base(p):
+    """The player name behind a process name ("host-voice-friend-bridge" -> "host-voice-friend")."""
+    return p.name.rsplit("-", 1)[0]

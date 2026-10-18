@@ -101,7 +101,9 @@ func _exit_tree() -> void:
 			# Frames received but never played were dropped on purpose by the jitter buffer: late
 			# (their slot had played), overflowed (a stall then a burst, the oldest go so latency
 			# stays bounded) or still queued when the match ended.
-			var pb: VoicePlayback = playbacks.get(pid, null)
+			# The speaker's avatar may be gone already (and its playback with it).
+			var v: Variant = playbacks.get(pid, null)
+			var pb: VoicePlayback = v if v != null and is_instance_valid(v) else null
 			var late: int = pb.buffer.late if pb != null else 0
 			var over: int = pb.buffer.overflowed if pb != null else 0
 			var lost: int = pb.buffer.lost if pb != null else 0

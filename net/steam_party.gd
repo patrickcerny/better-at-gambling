@@ -82,6 +82,22 @@ func start_hosting(display_name: String) -> int:
 	return server_port
 
 
+## Dev and the network tests (`--bridge-port`, Steam can't run there): the same `HostBridge` as
+## `start_hosting`, but friends arrive over ENet on loopback `listen_port` instead of Steam, and
+## each gets its own loopback connection to the room server on `room_port`. Their uid is
+## "bridge:<peer>", as Steam's would be "steam:<id>".
+func start_dev_bridge(listen_port: int, room_port: int) -> Error:
+	var outside := ENetTransport.new()
+	var err: Error = outside.listen(listen_port, Protocol.MAX_PLAYERS + 4, "127.0.0.1")
+	if err != OK:
+		return err
+	bridge = HostBridge.new(outside,
+		func() -> NetTransport: return TransportFactory.client("127.0.0.1", room_port),
+		func(peer: int) -> String: return "bridge:%d" % peer)
+	Log.info(&"host", "dev bridge: friends over ENet on loopback port %d -> room on port %d" % [listen_port, room_port])
+	return OK
+
+
 ## Step 4: this game joins its own room server (call through the menu's `_connect`).
 func join_own_party(display_name: String, cosmetics: Dictionary) -> Error:
 	var hello: Dictionary = {"name": display_name, "uid": "steam:%d" % SteamSvc.get_steam_id(), "color": int(cosmetics.get("color", -1)), "skin": StringName(cosmetics.get("skin", "bean"))}

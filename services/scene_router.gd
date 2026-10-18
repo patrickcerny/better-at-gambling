@@ -117,6 +117,10 @@ func _boot_client() -> void:
 		if cmdline.has("build"):
 			hello["build"] = cmdline.get_string("build")  # version-mismatch tests
 		err = Net.join_server(host, port, hello, net_opts())
+		# `--bridge-port P` (with `--connect` to a `--host-mode` room): this game also runs the
+		# host's bridge, friends joining over ENet on P (`SteamParty.start_dev_bridge`).
+		if err == OK and cmdline.has("bridge-port") and Net.steam_party.start_dev_bridge(cmdline.get_int("bridge-port", 0), port) != OK:
+			Log.warn(&"host", "dev bridge: could not listen on port %d" % cmdline.get_int("bridge-port", 0))
 	else:
 		var room: Dictionary
 		if cmdline.has_flag("create-room"):
