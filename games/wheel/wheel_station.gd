@@ -48,6 +48,13 @@ const FLAP_KICK: float = 0.42
 const FLAP_RETURN: float = 16.0
 ## The angle wraps back by this much (64 whole turns) once it gets this far.
 const WRAP: float = TAU * 64.0
+## The seat view: the eye high over the players' rail and right of the middle, looking at `SEAT_AIM`
+## so the wheel, the layout in front of it and the dealer beside it fill the left two thirds of the
+## screen (the overlay is a column down the right third). Each seat's eye moves `SEAT_EYE_SHIFT` of
+## its stool's x along, so the stools see the wheel from slightly different spots.
+const SEAT_EYE: Vector3 = Vector3(0.8, 2.8, 1.3)
+const SEAT_AIM: Vector3 = Vector3(0.99, 1.48, -1.39)
+const SEAT_EYE_SHIFT: float = 0.08
 ## Segment colours and the colour of the writing on them, by symbol.
 const SYMBOL_COLORS: Array[Color] = [Color("#F2E6C9"), Color("#275E49"), Color("#C83D3D"), Color("#24211F"), Color("#681F2C"), Color("#151414"), Color("#D6A84B")]
 const TEXT_COLORS: Array[Color] = [Color("#151414"), Color("#F2E6C9"), Color("#F2E6C9"), Color("#D6A84B"), Color("#E3B95C"), Color("#E3B95C"), Color("#151414")]
@@ -99,10 +106,11 @@ func _build_visuals() -> void:
 		var spot := Vector3(SEAT_XS[i], 0, SEAT_Z)
 		_stool(spot, "Stool%d" % i)
 		_add_seat(spot + Vector3(0, 0.5, 0), 0.0)
+		_add_seat_camera(SEAT_EYE + Vector3(SEAT_XS[i] * SEAT_EYE_SHIFT, 0, 0), SEAT_AIM)
 	camera_anchor = Node3D.new()
 	camera_anchor.name = "CameraAnchor"
-	camera_anchor.position = Vector3(0.0, 2.6, 3.4)  # behind the stools: the whole wheel and the layout
-	camera_anchor.rotation.x = deg_to_rad(-18.0)
+	camera_anchor.position = SEAT_EYE  # the middle seat view: the wheel and the layout, left of the overlay
+	camera_anchor.rotation = look_rotation(SEAT_EYE, SEAT_AIM)
 	add_child(camera_anchor)
 	if Vfx.enabled():
 		_build_table_dressing()

@@ -43,7 +43,11 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   face value to one ($1 1:1 … $20 20:1), Joker and Logo 40:1, exactly as printed on the layout. The
   dealer spins 12 s after the first bet; the server draws the segment (house rule: a spin no bet
   would win is redrawn once with 31% chance, then luck rerolls, never shown) and every client slows
-  the wheel onto it. 5 stools, a dealer. $10 min per bet, $200 per spin.
+  the wheel onto it. 5 stools, a dealer. $10 min per bet, $200 per spin. Seated, each stool's view
+  sits high over the rail and right of the middle so the wheel, the layout with the chips and the
+  dealer fill the left two thirds of the screen; the overlay is a column down the right third
+  (symbols with their odds, chips, status, result and last spins, your bets), the rules folded
+  under a HOW IT WORKS line.
 - **Craps** (casino floor, east of the roulette pit): two dice. Pass Line (come-out 7/11 win, 2/3/12
   lose, else the point, then the point before a 7) and Don't Pass (the other side, bar 12 pushes)
   1:1, ride until decided, go down only on a come-out; Field (2, 3, 4, 9, 10, 11 at 1:1, 2 and 12 at
@@ -53,7 +57,11 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   (a deterministic throw relabelled by a cube rotation, `CrapsDice`). The felt's odds are the real
   ones; the one-roll bets pay a bit better (Field 1.08 / 2.1, Any Seven 4.8) and a roll on which no
   bet wins and one would lose is redrawn with 5.5% chance, so every bet returns 101–101.6% to a
-  player alone. A stickman (shoves like a dealer). $10 min per bet, $200 on the felt.
+  player alone. A stickman (shoves like a dealer). $10 min per bet, $200 on the felt. Seated, each
+  stool's view looks down on the whole felt from high over the rail, right of the middle, so the
+  felt, every seat's chips and the stickman fill the left two thirds of the screen; the overlay is
+  a column down the right third (the four bets, chips, SHOOT, the point, the shooter or the last
+  roll), the rules folded under a HOW IT WORKS line.
 - **Hi-Lo** (casino floor, east of the roulette pit): oval card table, a dealer, 4 seats, one shared
   single deck (aces high, reshuffled under 15 cards). Everyone plays their own hand: ante, a card is
   turned up, call HIGHER or LOWER (a tie loses). Each call shows its true chance from the cards left

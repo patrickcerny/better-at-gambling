@@ -201,6 +201,24 @@ func _add_seat(local_pos: Vector3, yaw: float = 0.0) -> Node3D:
 	return s
 
 
+## A seat's own view: a camera anchor at `eye` (local) looking at `aim` (local), no roll, added to
+## `seat_cameras` (the player camera reads its pitch and yaw as the middle of the seated head turn).
+func _add_seat_camera(eye: Vector3, aim: Vector3) -> Node3D:
+	var a := Node3D.new()
+	a.name = "SeatCamera%d" % seat_cameras.size()
+	a.position = eye
+	a.rotation = look_rotation(eye, aim)
+	add_child(a)
+	seat_cameras.append(a)
+	return a
+
+
+## Euler rotation (pitch, yaw, no roll) of a view from `eye` towards `aim`.
+static func look_rotation(eye: Vector3, aim: Vector3) -> Vector3:
+	var look: Vector3 = aim - eye
+	return Vector3(atan2(look.y, Vector2(look.x, look.z).length()), atan2(-look.x, -look.z), 0.0)
+
+
 ## A bar stool (Patrick's model, collision kept from the greybox cylinder) with its seat on top.
 func _stool(local_pos: Vector3, name: String = "Stool") -> void:
 	var solid: Node3D = GreyboxKit.cylinder(self, 0.22, 0.5, local_pos + Vector3(0, 0.25, 0), Palette.CASINO_RED.darkened(0.3), name)

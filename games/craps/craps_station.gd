@@ -33,6 +33,13 @@ const HOUSE_SPOT: Vector3 = Vector3(0.0, RAIL_TOP + 0.01, -TABLE_D * 0.5 + 0.12)
 ## Where the dice wait for a shooter at a fresh table (in front of the stickman).
 const DICE_HOME: Vector3 = Vector3(1.0, FELT_Y + CrapsDice.HALF, -0.66)
 const FELT_COLOR: Color = Color("#22553F")
+## The seat view: the eye high over the players' rail, a little right of the middle and looking
+## down at `SEAT_AIM`, so the whole felt and the stickman fill the left two thirds of the screen
+## (the overlay is a column down the right third). Each seat's eye moves `SEAT_EYE_SHIFT` of its
+## stool's x along.
+const SEAT_EYE: Vector3 = Vector3(1.0, 3.2, 1.35)
+const SEAT_AIM: Vector3 = Vector3(1.0, 1.31, -0.98)
+const SEAT_EYE_SHIFT: float = 0.05
 
 ## Client-side presentation (empty on a headless server).
 var dice_nodes: Array[Node3D] = []
@@ -73,13 +80,14 @@ func _build_visuals() -> void:
 		var spot := Vector3(SEAT_XS[i], 0, SEAT_Z)
 		_stool(spot, "Stool%d" % i)
 		_add_seat(spot + Vector3(0, 0.5, 0), 0.0)
+		_add_seat_camera(SEAT_EYE + Vector3(SEAT_XS[i] * SEAT_EYE_SHIFT, 0, 0), SEAT_AIM)
 	# The sign's posts stand on the floor behind the stickman (solid; the sign is above heads).
 	for x: float in [-1.2, 1.2]:
 		GreyboxKit.cylinder(self, 0.05, 2.6, Vector3(x, 1.3, -TABLE_D * 0.5 - 0.95), Palette.WARM_GOLD, "SignPost", true, 0.8)
 	camera_anchor = Node3D.new()
 	camera_anchor.name = "CameraAnchor"
-	camera_anchor.position = Vector3(0.0, 2.7, 2.45)  # behind the stools, looking down over the rail
-	camera_anchor.rotation.x = deg_to_rad(-44.0)
+	camera_anchor.position = SEAT_EYE  # the middle seat view: the whole felt, left of the overlay
+	camera_anchor.rotation = look_rotation(SEAT_EYE, SEAT_AIM)
 	add_child(camera_anchor)
 	if Vfx.enabled():
 		_build_dressing()

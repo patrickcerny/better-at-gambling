@@ -3,7 +3,8 @@ extends Node3D
 ## scripts/screenshot.sh res://tools/dev/craps_shot.tscn craps 90 --pixel 1 --view floor|seat|dice
 ## [--at seconds] [--seed n] [--faces 6,1] [--point 6] (the dice frozen `--at` seconds into a seeded
 ## throw from seat 2 that rests on `--faces`; floor: the table and its stickman from the casino
-## floor; seat: a stool's view; dice: a close-up of the dice where they come to rest).
+## floor; seat: stool `--seat n`'s view at the default field of view with the overlay column on the
+## right; dice: a close-up of the dice where they come to rest).
 
 
 func _ready() -> void:
@@ -34,8 +35,9 @@ func _ready() -> void:
 	cam.fov = 50.0
 	match view:
 		"seat":
-			cam.fov = 75.0
-			cam.global_transform = cs.camera_anchor.global_transform
+			cam.fov = 85.0
+			cam.global_transform = cs.camera_for_seat(c.get_int("seat", 2)).global_transform
+			_overlay(c.get_int("point", 6))
 		"dice":
 			var mid: Vector3 = (cs.dice_nodes[0].global_position + cs.dice_nodes[1].global_position) * 0.5
 			cam.fov = 35.0
@@ -44,3 +46,17 @@ func _ready() -> void:
 		_:
 			cam.global_position = cs.global_position + Vector3(-3.4, 3.3, 5.2)
 			cam.look_at(cs.global_position + Vector3(0.2, 0.7, -0.4))
+
+
+## The seated overlay over the view, as at the table: you shoot, the point is on, chips down.
+func _overlay(point: int) -> void:
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	var ui := CrapsUi.new()
+	layer.add_child(ui)
+	var st := ClientMatchState.new()
+	st.players[1] = {"name": "Ada", "color": 0}
+	st.balances[1] = 1000
+	st.stations[&"craps_1"] = {"game": &"craps", "state": CrapsLogic.State.BETTING, "timer": 8.0, "counting": true, "players": [1], "shooter": 1,
+		"point": point, "bets": [{"player": 1, "type": &"pass", "amount": 25}, {"player": 1, "type": &"field", "amount": 10}], "dice": [], "shoot_in": 0.0}
+	ui.open(&"craps_1", 1, st)

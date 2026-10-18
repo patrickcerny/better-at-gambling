@@ -139,6 +139,29 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-17 / 0.9.11 (wheel and craps: closer table, overlay on the right)
+- Patrick (screenshot of the wheel seat view): "rather zoom in on this ... craps the same, closer
+  look at the table, and ui on the right (else you dont see anything)".
+- Seat views: both tables now give every stool its own view (`StationBase._add_seat_camera`, eye +
+  aim point, the player camera's `seated_look` head turn unchanged). Wheel: eye at (0.8, 2.8, 1.3)
+  local, 0.08 × the stool's x along, looking down 26° at the wheel; the wheel face spans ~30% of the
+  width (was 16%), wheel + layout ~50% of the width and over 80% of the height, dealer and chips in
+  view, all in the left two thirds. Craps: eye at (1.0, 3.2, 1.35), 0.05 × the stool's x along, looking straight
+  down the table at 39°; the felt spans 58–62% of the width (was 46%, centred under the old strip),
+  stickman, sign and every seat's chips in view, all in the left two thirds.
+- Overlays: `StationUi._dock_column` puts the panel in a 600 px column at the right edge, from under
+  the HUD clock (y 196) to over the HUD rank (104 px from the bottom). Wheel: symbols in a 4-wide
+  grid, chips, status, result / last spins, your bets. Craps: the four bets in a 2 × 2 grid, chips,
+  your bets, SHOOT, the point, the shooter / last roll. The explanation moved into a folded
+  HOW IT WORKS line (`_rules_text`, also its tooltip); key hints and shortcuts unchanged, the
+  camera lock unchanged.
+- Evidence: `tests/ui/test_wheel_ui.gd`, `tests/ui/test_craps_ui.gd` (panel in the right third,
+  under 40% wide, every visible control right of 2/3 of the width, in several states and with the
+  rules open), `tests/physics/test_wheel_table.gd`, `tests/physics/test_craps_table.gd` (per seat at
+  the default 85° FOV: wheel rim / felt corners, dealer, chips projected into the left two thirds,
+  screen extents, nothing solid between eye and bets). Dev shots `wheel_shot` / `craps_shot
+  --view seat --seat n` draw the overlay too.
+
 ### 2026-10-16 / 0.9.10 (four new games, random floor, Patrick's second feedback burst)
 - Released 2026-10-16. PROTOCOL_VERSION 8 (tipping gone from the wire, new station events, the
   floor plan in `match_started` / `regroup_started` / the snapshot, blackjack hands carry `clock`,
