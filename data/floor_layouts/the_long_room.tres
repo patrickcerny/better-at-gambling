@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="FloorLayout" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/defs/floor_layout.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"the_long_room"
+title = "The Long Room"
+stations = {
+&"plinko_1": [&"plinko", Vector3(-5.0, 0, -14.5), 0.0],
+&"plinko_2": [&"plinko", Vector3(5.0, 0, -14.5), 0.0],
+&"slot_1": [&"slots", Vector3(-21.0, 0, -13.5), 90.0],
+&"slot_2": [&"slots", Vector3(-21.0, 0, -12.2), 90.0],
+&"slot_3": [&"slots", Vector3(-21.0, 0, -10.9), 90.0],
+&"slot_4": [&"slots", Vector3(-21.0, 0, -9.6), 90.0],
+&"slot_5": [&"slots", Vector3(-21.0, 0, -6.1), 90.0],
+&"slot_6": [&"slots", Vector3(-21.0, 0, -4.8), 90.0],
+&"slot_7": [&"slots", Vector3(-21.0, 0, -3.5), 90.0],
+&"slot_8": [&"slots", Vector3(-21.0, 0, 1.5), 90.0],
+&"slot_9": [&"slots", Vector3(-21.0, 0, 2.8), 90.0],
+&"slot_10": [&"slots", Vector3(-21.0, 0, 4.1), 90.0],
+&"slot_11": [&"slots", Vector3(9.85, 0, -14.2), 90.0],
+&"slot_12": [&"slots", Vector3(9.85, 0, -12.9), 90.0],
+&"slot_13": [&"slots", Vector3(9.85, 0, -11.6), 90.0],
+&"slot_14": [&"slots", Vector3(9.85, 0, -10.3), 90.0],
+&"slot_15": [&"slots", Vector3(9.85, 0, -9.0), 90.0],
+&"slot_16": [&"slots", Vector3(9.85, 0, -7.7), 90.0],
+&"blackjack_1": [&"blackjack", Vector3(-8.6, 0, -9.7), 90.0],
+&"craps_1": [&"craps", Vector3(-8.4, 0, -5.3), 90.0],
+&"blackjack_2": [&"blackjack", Vector3(-8.6, 0, 1.6), 90.0],
+&"blackjack_3": [&"blackjack", Vector3(-8.6, 0, 5.9), 90.0],
+&"wheel_1": [&"wheel", Vector3(5.6, 0, -9.9), -90.0],
+&"roulette_1": [&"roulette", Vector3(5.0, 0, -4.7), -90.0],
+&"roulette_2": [&"roulette", Vector3(5.0, 0, 0.9), -90.0],
+&"hilo_1": [&"hilo", Vector3(6.0, 0, 6.05), -90.0],
+&"scratch_1": [&"scratch", Vector3(20.45, 0, 5.4), -90.0]
+}

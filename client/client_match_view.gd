@@ -79,7 +79,7 @@ func _on_event(ev: Dictionary) -> void:
 			resync()
 		return
 	if Net.is_client() and not (ev.get("floor_plan", {}) as Dictionary).is_empty() and ev["type"] != &"match_started":
-		# A new floor: the cached snapshot still lists the tables that closed (status updates only
+		# A new floor: the cached snapshot still lists the tables that went (status updates only
 		# ever add stations), so take a fresh one.
 		Net.request_fresh_snapshot()
 	if not ok:

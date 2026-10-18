@@ -7,8 +7,9 @@ extends Node
 ## gift shop open, items in the HUD slots), jail (two beans behind the bars, a guard outside),
 ## lobby (ready pedestals glowing in the start room), rough (a shove knockdown, from the brawl clip),
 ## leaderboard (the standings over the casino), oddjobs (broke at the Odd Jobs cabinet, aiming at the
-## glowing red button, the shared bar part full). Dev checks only: race, racehall, floorboard and
-## closed (the last two with `--floor random`).
+## glowing red button, the shared bar part full). Dev checks only: race, racehall, and floor (the
+## casino floor from just inside the lobby doors; `--floor <layout id>` picks the layout, e.g.
+## `--floor the_pit`, docs/FLOOR_PLAN.md; `--from x,y,z --to x,y,z` moves the camera).
 
 var _scene: MatchScene
 var _view: String = "hall"
@@ -17,6 +18,9 @@ var _at: float = 6.0
 var _t: float = 0.0
 var _staged: bool = false
 var _cam: Camera3D
+## Floor view: where the camera stands and looks (`--from`, `--to`).
+var _from: Vector3 = Vector3(0.0, 4.2, 7.6)
+var _to: Vector3 = Vector3(0.0, 0.0, -6.0)
 ## Lobby view: whose pedestal glows.
 var _ready_ids: Array[int] = []
 
@@ -24,6 +28,8 @@ var _ready_ids: Array[int] = []
 func _ready() -> void:
 	var c: Cmdline = Cmdline.parse(OS.get_cmdline_user_args())
 	_view = c.get_string("view", "hall")
+	_from = _vec3(c.get_string("from", ""), _from)
+	_to = _vec3(c.get_string("to", ""), _to)
 	_shot = c.get_string("shot", "/tmp/tutorial_%s.png" % _view)
 	_at = c.get_float("at", float({"table": 17.0, "rough": 7.4, "oddjobs": 9.0}.get(_view, 5.0)))
 	if _view == "rough":
@@ -95,19 +101,8 @@ func _stage() -> void:
 		"racehall":  # inside the Race Hall (dev check only)
 			_free_cam(Vector3(23.2, 2.8, -11.4), Vector3(30.0, 0.9, -19.0), 75.0)
 			_scene.hud.visible = false
-		"floorboard":  # the TONIGHT'S FLOOR board in the entrance hall (dev check; `--floor random`)
-			_free_cam(FloorProps.BOARD_POS + Vector3(-1.2, -0.6, 4.2), FloorProps.BOARD_POS, 60.0)
-			_scene.hud.visible = false
-		"closed":  # a closed table spot on tonight's floor (dev check; `--floor random`)
-			var spot: Node3D = null
-			for c: Node in _scene.map.closed_spots.get_children():
-				if spot == null and c.find_child("ClosedSign", true, false) != null:
-					spot = c as Node3D
-			if spot == null and _scene.map.closed_spots.get_child_count() > 0:
-				spot = _scene.map.closed_spots.get_child(0) as Node3D
-			var at: Vector3 = spot.global_position if spot != null else Vector3.ZERO
-			var back: Vector3 = Vector3(-at.x, 0.0, -at.z - 3.0).normalized()  # from the middle of the floor
-			_free_cam(at + back * 4.5 + Vector3(0.0, 2.4, 0.0), at + Vector3(0, 1.0, 0), 65.0)
+		"floor":  # the casino floor from just inside the lobby doors (dev check; `--floor <layout>`)
+			_free_cam(_from, _to, 85.0)
 			_scene.hud.visible = false
 		"jail":
 			var ids: Array[int] = _others()
@@ -164,6 +159,14 @@ func _place(pid: int, pos: Vector3, yaw: float) -> void:
 
 
 ## A free camera inside the pixel view's world (the match renders its 3D there).
+## "x,y,z" as a Vector3 (`fallback` when empty or malformed).
+static func _vec3(text: String, fallback: Vector3) -> Vector3:
+	var parts: PackedStringArray = text.split(",")
+	if parts.size() != 3:
+		return fallback
+	return Vector3(parts[0].to_float(), parts[1].to_float(), parts[2].to_float())
+
+
 func _free_cam(pos: Vector3, look: Vector3, fov: float) -> void:
 	_cam = Camera3D.new()
 	_cam.fov = fov

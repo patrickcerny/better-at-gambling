@@ -1,8 +1,8 @@
 class_name LoungeDecor
 extends Node3D
 ## Client-only dressing for the Lucky Lounge (docs/ART_DIRECTION.md): CC0 surface textures on the
-## greybox (wine-red casino carpet, checker marble entrance, herringbone parquet in the bar and
-## the VIP lounge, damask wallpaper over mahogany wainscoting with a brass rail (gold damask in
+## greybox (wine-red casino carpet, checker marble entrance, herringbone parquet in the VIP
+## lounge, damask wallpaper over mahogany wainscoting with a brass rail (gold damask in
 ## the VIP lounge), black marble counters and pillar bases, red velvet, coffered wood ceiling),
 ## classical columns, arched windows with velvet curtains, double doors, a baroque mirror,
 ## paintings, a bust and a horse statue in the VIP lounge, crystal chandeliers, sconces, marquee
@@ -139,11 +139,9 @@ func _floors() -> void:
 	# Wine-red casino carpet (gold lattice, in the palette) with the carpet-fibre normal.
 	_retexture("Carpet", _tex("casino_carpet", 2.2, Color(0.92, 0.9, 0.9), 0.35, 0.95))
 	_retexture("AnnexCarpet", _tex("casino_carpet", 2.2, Color(0.92, 0.9, 0.9), 0.35, 0.95))
-	# The VIP lounge and the bar stand on herringbone parquet.
+	# The VIP lounge stands on herringbone parquet.
 	var parquet: StandardMaterial3D = _tex("herringbone_parquet", 1.6, Color(0.72, 0.56, 0.44), 0.45, 0.5)
 	_retexture("VipCarpet", parquet)
-	var bar_floor := _plane(Vector2(8.6, 5.6), Vector3(LuckyLounge.BAR_X, 0.014, 4.6), parquet)
-	bar_floor.name = "BarFloor"
 	_lobby_floor()
 	# The game-area rugs: patterned carpet in the area colour with a brass edge, instead of the
 	# flat colour patches the greybox lays over the carpet.
@@ -392,10 +390,8 @@ func _vip_lounge() -> void:
 # --- Furniture and props ----------------------------------------------------------------------
 
 func _furniture() -> void:
-	# The shop counter in black marble, bar front in velvet, back bar in wood.
+	# The shop counter in black marble.
 	_retexture_solid("ShopCounter", _marble_mat)
-	_retexture_solid("Bar", _velvet_mat)
-	_retexture_solid("BackBar", _wood_mat)
 	_retexture_solid("JailBench", _wood_mat)
 	_retexture_solid("Plinth", _marble_mat)
 	_retexture_solid("Rope", _velvet_mat)

@@ -3,9 +3,9 @@ extends Node3D
 ## Greybox of "The Lucky Lounge" (§2.3, docs/ART_DIRECTION.md). Its rooms, all on one floor:
 ## - the start room (entrance hall, south): front entrance, the ready pedestals and the lobby
 ##   settings tablet, shut off from the casino by the lobby doors until the match starts;
-## - the casino floor: blackjack lounge, roulette pit, slot rows, Plinko wall, bar, gift shop and
-##   the barred jail cell where security locks people up, with the Race Hall (the horse race
-##   table) opening off its east wall through a wide archway;
+## - the casino floor: its games in one of the hand-made floor layouts (docs/FLOOR_PLAN.md), the
+##   gift shop, the Odd Jobs cabinet and the barred jail cell where security locks people up, with
+##   the Race Hall (the horse race table) opening off its east wall through a wide archway;
 ## - the VIP lounge (north), its own room behind the north door, where the bouncer checks you;
 ## - the waiting room (behind the start room, through the door between the pedestals): a blackjack
 ##   table and four slots on play money while an online room waits in its lobby.
@@ -15,29 +15,22 @@ const SIZE_X: float = 44.0
 const SIZE_Z: float = 32.0
 const WALL_H: float = 7.0
 
-## station id → [station kind, position, yaw degrees]
-const STATIONS: Dictionary = {
-	&"slot_1": [&"slots", Vector3(-20, 0, -13.5), 180], &"slot_2": [&"slots", Vector3(-17.5, 0, -13.5), 180],
-	&"slot_3": [&"slots", Vector3(-15, 0, -13.5), 180], &"slot_4": [&"slots", Vector3(-12.5, 0, -13.5), 180],
-	&"slot_5": [&"slots", Vector3(-10, 0, -13.5), 180], &"slot_6": [&"slots", Vector3(-7.5, 0, -13.5), 180],
-	&"slot_7": [&"slots", Vector3(-20, 0, -8.5), 0], &"slot_8": [&"slots", Vector3(-17.5, 0, -8.5), 0],
-	&"slot_9": [&"slots", Vector3(-15, 0, -8.5), 0], &"slot_10": [&"slots", Vector3(-12.5, 0, -8.5), 0],
-	&"slot_11": [&"slots", Vector3(-10, 0, -8.5), 0], &"slot_12": [&"slots", Vector3(-7.5, 0, -8.5), 0],
-	&"plinko_1": [&"plinko", Vector3(11, 0, -14.5), 0], &"plinko_2": [&"plinko", Vector3(17.5, 0, -14.5), 0],
+## The stations that never move with the floor layouts: the Race Hall's horse race and the VIP
+## lounge (the tables either side of the aisle from its door, the two slots against its back
+## wall). Station id → [station kind, position, yaw degrees].
+const FIXED_STATIONS: Dictionary = {
 	# The Race Hall (east annex): the long horse race table, stools on its south side.
 	&"horse_race_1": [&"horse_race", Vector3(29.0, 0, -19.0), 0],
-	&"hilo_1": [&"hilo", Vector3(18.6, 0, -4.8), 0],
-	&"craps_1": [&"craps", Vector3(14, 0, -6), 0],
-	&"scratch_1": [&"scratch", Vector3(-19, 0, 10), 90],
-	&"roulette_1": [&"roulette", Vector3(-6, 0, -3), 0], &"roulette_2": [&"roulette", Vector3(6, 0, -3), 180],
-	&"blackjack_1": [&"blackjack", Vector3(-16, 0, 4), 0], &"blackjack_2": [&"blackjack", Vector3(-9, 0, 4), 0],
-	&"blackjack_3": [&"blackjack", Vector3(-2, 0, 4), 0],
-	&"wheel_1": [&"wheel", Vector3(11, 0, 5), 0],
-	# VIP lounge (ground floor, behind the north door): the tables either side of the aisle from
-	# the door, the two slots against its back wall.
+	# VIP lounge (ground floor, behind the north door).
 	&"vip_blackjack_1": [&"blackjack", Vector3(-4.3, 0, -20.5), 0], &"vip_roulette_1": [&"roulette", Vector3(4.0, 0, -20.5), 0],
 	&"vip_slot_1": [&"slots", Vector3(-6.5, 0, -24.9), 0], &"vip_slot_2": [&"slots", Vector3(6.5, 0, -24.9), 0],
 }
+## The floor's layouts and their rotation (docs/FLOOR_PLAN.md); the first layout is the full floor.
+const FLOOR_CONFIG_PATH: String = "res://data/balance/floor_plan.tres"
+## Station id → [station kind, position, yaw degrees]: the full floor (Practice, the menu
+## panorama, the map as built), which is the first floor layout (`data/floor_layouts/
+## grand_hall.tres`) plus the fixed stations. One source of truth: the layout file.
+static var STATIONS: Dictionary = _full_floor_stations()
 const SPAWNS: Array[Vector3] = [  # start-room spots: in front of the pedestal stairs (z ≥ 12.95)
 	Vector3(-6, 0, 12.3), Vector3(-4, 0, 11.8), Vector3(-2, 0, 12.3), Vector3(2, 0, 12.3),
 	Vector3(4, 0, 11.8), Vector3(6, 0, 12.3), Vector3(-8, 0, 12.3), Vector3(8, 0, 12.3),
@@ -77,14 +70,12 @@ const LOBBY_SPAWNS: Array[Vector3] = [
 	Vector3(-7, 0, 10.0), Vector3(7, 0, 10.0), Vector3(-5, 0, 10.8), Vector3(5, 0, 10.8),
 	Vector3(-9, 0, 11.0), Vector3(9, 0, 11.0), Vector3(-7, 0, 11.6), Vector3(7, 0, 11.6),
 ]
-## Where players stand to shop at the Gift Shop kiosk (east wall, next to the bar).
+## Where players stand to shop at the Gift Shop kiosk (east wall).
 const SHOP_POS: Vector3 = Vector3(19.6, 0, 1.5)
 ## The Odd Jobs cabinet (button smash for broke players) against the east wall on the Gift Shop's
-## north side, away from the bar: its centre, and where players stand to use it.
+## north side: its centre, and where players stand to use it.
 const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -0.95)
 const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -0.95)
-const BAR_X: float = 17.7
-const BAR_W: float = 7.0
 ## The lobby settings tablet on its brass stand (0.9.4, Patrick: "settings tablet into the lobby
 ## room"), west of the middle of the start room by the host's spot: walk up and press E for the
 ## lobby settings. Where it stands, which way its screen faces (yaw), and how close you must be.
@@ -166,26 +157,25 @@ const JAIL_EXITS: Array[Vector3] = [Vector3(0.6, 0, 7.2), Vector3(1.4, 0, 7.2), 
 const JAIL_CAM_POS: Vector3 = Vector3(21.1, 4.4, -7.5)
 const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 
-## Where the floor plan may stand a table (world x, z rects; docs/FLOOR_PLAN.md): the casino floor,
-## the VIP lounge and the west end of the entrance hall (inner wall faces).
+## Where a floor layout may stand its games (world x, z rects; docs/FLOOR_PLAN.md): the casino
+## floor (inner wall faces). Never the entrance hall or the VIP lounge.
 const FLOOR_AREAS: Array[Rect2] = [
-	Rect2(-21.75, -15.75, 43.5, 23.9), Rect2(-8.75, -25.75, 17.5, 9.5), Rect2(-21.75, 8.65, 10.0, 6.0),
+	Rect2(-21.75, -15.75, 43.5, 23.9),
 ]
-## What a drawn table keeps clear of (`FloorGeometry`). Solid things that stand on the floor:
-## pillars, the bar and its stools, the megaphone stand, the Gift Shop, the Odd Jobs cabinet, a
-## plant, the VIP lounge's gold statues and marble busts, the settings tablet, the hall plant.
+## What a layout's games keep clear of (`FloorGeometry`). Solid things that stand on the floor:
+## the two pillars and the two in the lobby wall either side of the doors, a plant by the west
+## wall, the megaphone stand, the Gift Shop, the Odd Jobs cabinet and the plant beside it.
 const FLOOR_SOLIDS: Array[Rect2] = [
 	Rect2(-10.2, -1.6, 1.2, 1.2), Rect2(9.0, -1.6, 1.2, 1.2), Rect2(-20.6, -1.6, 1.2, 1.2),
-	Rect2(14.0, 3.1, 7.75, 5.0), Rect2(15.2, 1.7, 1.6, 1.6),
+	Rect2(-4.3, 7.85, 1.1, 0.3), Rect2(3.2, 7.85, 1.1, 0.3),
+	Rect2(15.2, 1.7, 1.6, 1.6),
 	Rect2(18.9, 0.1, 2.85, 3.6), Rect2(19.6, -1.7, 2.15, 1.5), Rect2(20.6, -3.0, 1.15, 1.0),
-	Rect2(-8.75, -17.8, 1.7, 1.0), Rect2(7.05, -17.8, 1.7, 1.0), Rect2(-8.75, -21.5, 1.0, 1.0), Rect2(7.75, -21.5, 1.0, 1.0),
-	Rect2(-11.4, 9.1, 1.6, 1.6), Rect2(-21.75, 11.3, 1.4, 1.4),
 ]
 ## Floor that has to stay open: the jail door, the Race Hall archway, the lobby and VIP doorways
-## (both sides), and a square round every guard and waiter route point.
+## (the casino side), and a square round every guard and waiter route point.
 const FLOOR_CLEAR: Array[Rect2] = [
 	Rect2(20.2, -8.4, 1.55, 1.7), Rect2(19.6, -15.75, 2.15, 5.0),
-	Rect2(-3.0, 6.5, 6.0, 1.65), Rect2(-2.7, -16.0, 5.4, 1.6), Rect2(-2.4, -17.6, 4.8, 1.6),
+	Rect2(-3.0, 6.5, 6.0, 1.65), Rect2(-2.7, -16.0, 5.4, 1.6),
 	# Patrol route points (guards, then the waiter).
 	Rect2(-12.45, -0.45, 0.9, 0.9), Rect2(-12.45, -11.45, 0.9, 0.9), Rect2(-0.45, -11.45, 0.9, 0.9), Rect2(-0.45, -0.45, 0.9, 0.9),
 	Rect2(11.55, 0.05, 0.9, 0.9), Rect2(17.55, -8.45, 0.9, 0.9), Rect2(7.55, -8.45, 0.9, 0.9), Rect2(1.55, 6.55, 0.9, 0.9),
@@ -196,9 +186,9 @@ const FLOOR_CLEAR: Array[Rect2] = [
 const NAV_RADIUS: float = 0.5
 const NAV_HEIGHT: float = 2.0
 const NAV_CLIMB: float = 0.25
-## Where people come into each floor area (x, z): inside the lobby doors, inside the VIP door,
-## and the open side of the entrance hall's west end. Every drawn chair must be walkable from here.
-const FLOOR_ENTRIES: Array[Vector2] = [Vector2(0.0, 7.2), Vector2(0.0, -17.0), Vector2(-12.4, 11.6)]
+## Where people come onto the casino floor (x, z): inside the lobby doors. Every chair of every
+## layout must be walkable from here.
+const FLOOR_ENTRIES: Array[Vector2] = [Vector2(0.0, 7.2)]
 
 var stations: Dictionary[StringName, StationBase] = {}
 ## Per ready pedestal: the name on its brass plate, the top slab (never changes), and the warm
@@ -245,12 +235,9 @@ var waiting_door: StaticBody3D
 var waiting_open: bool = false
 var _waiting_leaves: Array[Node3D] = []
 var _waiting_tween: Tween = null
-## The floor plan standing now (docs/FLOOR_PLAN.md), wire form {station id: [game, anchor id]}:
-## the full floor (every spot with its usual game, from STATIONS) until `apply_floor_plan`.
+## The floor layout standing now (docs/FLOOR_PLAN.md), wire form {station id: [game, [x, y, z],
+## yaw degrees]}: the full floor (the first layout) until `apply_floor_plan`.
 var floor_plan: Dictionary = {}
-## Closed spots' ropes and plants, and the list on the TONIGHT'S FLOOR board in the entrance hall.
-var closed_spots: Node3D
-var floor_board: Label3D
 ## True while a navmesh rebake after a floor change waits for its colliders.
 var _rebake_queued: bool = false
 
@@ -264,12 +251,7 @@ func _ready() -> void:
 	_build_jail()
 	_build_waiting_room()
 	_build_stations()
-	closed_spots = Node3D.new()
-	closed_spots.name = "ClosedSpots"
-	add_child(closed_spots)
-	floor_board = FloorProps.board(self)
 	floor_plan = full_floor_plan()
-	floor_board.text = FloorProps.board_text(floor_plan, floor_anchors(), fixed_games())
 	_build_props()
 	_build_lights()
 	if Vfx.enabled():
@@ -824,12 +806,6 @@ func _build_floor_areas() -> void:
 	_plane(Vector2(18, 8), Vector3(0, AREA_RUG_Y, -3), Palette.CASINO_RED.darkened(0.5), "RouletteRug")
 	_plane(Vector2(16, 9), Vector3(-13.5, AREA_RUG_Y, -11), Palette.WARM_GOLD.darkened(0.6), "SlotsRug")
 	_plane(Vector2(12, 5), Vector3(14, AREA_RUG_Y, -13), Palette.VIP_BURGUNDY.darkened(0.3), "PlinkoRug")
-	# Bar (south-east, against the start-room wall; decoration, also the quiz entry area later).
-	GreyboxKit.box(self, Vector3(BAR_W, 1.1, 1.2), Vector3(BAR_X, 0.55, 5.0), Color("#3A2A1E"), "Bar")
-	GreyboxKit.box(self, Vector3(BAR_W, 0.08, 1.3), Vector3(BAR_X, 1.14, 5.0), Palette.WARM_GOLD, "BarTop", false)
-	GreyboxKit.box(self, Vector3(BAR_W, 2.5, 0.4), Vector3(BAR_X, 1.25, 7.0), Color("#2A1E18"), "BackBar")
-	for i: int in 6:
-		GreyboxKit.box(self, Vector3(0.25, 0.4, 0.25), Vector3(BAR_X - BAR_W * 0.5 + 0.5 + i * 1.3, 1.6, 6.9), [Palette.CASINO_RED, Palette.WARM_GOLD, Palette.FELT_GREEN][i % 3], "Bottle", false)
 	_build_gift_shop()
 	_build_odd_jobs()
 	# Plants and a few obstacles for lanes.
@@ -1219,14 +1195,12 @@ func set_waiting_room_open(open: bool) -> void:
 
 
 func _build_stations() -> void:
-	var anchor_of: Dictionary = {}
-	for a: Dictionary in floor_anchors():
-		anchor_of[a["station"]] = a["id"]
+	var full: Dictionary = full_floor_plan()
 	for sid: StringName in STATIONS:
 		var entry: Array = STATIONS[sid]
 		var st: StationBase = _place_station(sid, entry[0], entry[1], deg_to_rad(float(entry[2])))
-		if anchor_of.has(sid):
-			st.set_meta(&"anchor", anchor_of[sid])
+		if full.has(sid):
+			st.set_meta(&"floor", full[sid])  # moves with the floor layouts
 
 
 func _place_station(sid: StringName, kind: StringName, pos: Vector3, yaw: float) -> StationBase:
@@ -1241,66 +1215,48 @@ func _place_station(sid: StringName, kind: StringName, pos: Vector3, yaw: float)
 	return st
 
 
-# --- Per-round floor plan (docs/FLOOR_PLAN.md) -------------------------------------------------
+# --- Floor layouts (docs/FLOOR_PLAN.md) --------------------------------------------------------
 
-## The floor's spots, from STATIONS: every station whose game isn't `fixed` (the horse race keeps
-## the Race Hall) is a spot of its game's size, numbered per area and size in STATIONS order
-## (t = table, c = cabinet, b = big; v in front for the VIP lounge): [{id, footprint, vip,
-## default (its game on the full floor), station (its id there), pos, yaw (radians)}]. A new
-## STATIONS line is a new spot.
-static func floor_anchors() -> Array:
-	var out: Array = []
-	var counts: Dictionary = {}
-	for sid: StringName in STATIONS:
-		var entry: Array = STATIONS[sid]
-		var game: StringName = entry[0]
-		var fp: StringName = footprint_of(game)
-		if fp == &"fixed":
-			continue
-		var vip: bool = String(sid).begins_with("vip_")
-		var key: String = ("v" if vip else "") + String(fp).left(1)
-		counts[key] = int(counts.get(key, 0)) + 1
-		out.append({"id": StringName("%s%d" % [key, counts[key]]), "footprint": fp, "vip": vip, "default": game, "station": sid, "pos": entry[1], "yaw": deg_to_rad(float(entry[2]))})
+## The casino floor's layouts in order (`FloorPlanConfig.layouts`); the first is the full floor.
+static func layouts() -> Array[FloorLayout]:
+	var out: Array[FloorLayout] = []
+	var cfg: FloorPlanConfig = load(FLOOR_CONFIG_PATH) as FloorPlanConfig
+	if cfg != null:
+		for l: FloorLayout in cfg.layouts:
+			if l != null:
+				out.append(l)
+	return out
+
+
+## `STATIONS`: the first layout's stations plus the fixed ones.
+static func _full_floor_stations() -> Dictionary:
+	var out: Dictionary = {}
+	var all: Array[FloorLayout] = layouts()
+	if not all.is_empty():
+		for sid: Variant in all[0].stations:
+			out[StringName(sid)] = (all[0].stations[sid] as Array).duplicate()
+	for sid: Variant in FIXED_STATIONS:
+		out[StringName(sid)] = FIXED_STATIONS[sid]
 	return out
 
 
 ## A game's size class on the floor (`GameDefinition.floor_footprint`; table when unregistered).
+## Only `fixed` matters to the layouts: such a game keeps its own place (the horse race).
 static func footprint_of(game: StringName) -> StringName:
 	var def: GameDefinition = Registry.games.get(game, null)
 	return def.floor_footprint if def != null else &"table"
 
 
-## Games that keep their own place whatever the plan (the horse race in the Race Hall).
-static func fixed_games() -> Array:
-	var out: Array = []
-	for sid: StringName in STATIONS:
-		var game: StringName = (STATIONS[sid] as Array)[0]
-		if footprint_of(game) == &"fixed" and not game in out:
-			out.append(game)
-	return out
-
-
-## The full floor in wire form: every spot with its usual game under its usual id.
+## The full floor in wire form (the first layout): station id → [game, [x, y, z], yaw degrees].
 static func full_floor_plan() -> Dictionary:
-	var out: Dictionary = {}
-	for a: Dictionary in floor_anchors():
-		out[a["station"]] = [a["default"], a["id"]]
-	return out
+	var all: Array[FloorLayout] = layouts()
+	return all[0].wire_stations() if not all.is_empty() else {}
 
 
-## Tells the server about the floor's spots and the station id stems (slots → slot).
+## Tells the server about the floor's layouts and the room they stand in: where games may stand,
+## what they keep clear of, where people come in and the patrol points that must stay walkable.
 static func describe_floor(def: MapDefinition) -> void:
-	def.floor_anchors = floor_anchors()
-	var prefixes: Dictionary = {}
-	for sid: StringName in STATIONS:
-		var game: StringName = (STATIONS[sid] as Array)[0]
-		var stem: String = String(sid).trim_prefix("vip_")
-		var cut: int = stem.rfind("_")
-		if cut > 0 and stem.substr(cut + 1).is_valid_int():
-			stem = stem.left(cut)
-		if not prefixes.has(game):
-			prefixes[game] = stem
-	def.floor_prefixes = prefixes
+	def.floor_layouts = layouts()
 	def.floor_areas = FLOOR_AREAS.duplicate()
 	def.floor_keep_out = FLOOR_SOLIDS + FLOOR_CLEAR
 	def.floor_entries = FLOOR_ENTRIES.duplicate()
@@ -1313,12 +1269,11 @@ static func describe_floor(def: MapDefinition) -> void:
 	def.floor_walk_points = walk
 
 
-## Measures the floor for the draw (`FloorGeometry`) by building every drawable game's station
-## once out of sight: how much floor it takes (table, chairs and dealer: `floor_rects`), where its
-## chairs are, and what of it the navmesh walks round (`floor_obstacles`); the same for a closed
-## spot's rope posts or plant pot; and everything else on the map the navmesh walks round
-## (`floor_blockers`: walls, bar, props, the fixed stations). Needs the map in the tree, on its
-## full floor.
+## Measures the floor for the layouts' fit check (`FloorGeometry`) by building every game's
+## station once out of sight: how much floor it takes (table, chairs and dealer: `floor_rects`),
+## where its chairs are, and what of it the navmesh walks round (`floor_obstacles`); and everything
+## else on the map the navmesh walks round (`floor_blockers`: walls, the shop, the fixed stations).
+## Needs the map in the tree.
 func measure_floor(def: MapDefinition) -> void:
 	var rects: Dictionary = {}
 	var seats: Dictionary = {}
@@ -1339,23 +1294,13 @@ func measure_floor(def: MapDefinition) -> void:
 		obstacles[game] = nav_obstacles(st, inv, [])
 		remove_child(st)
 		st.free()
-	var closed: Dictionary = {}
-	var holder := Node3D.new()
-	holder.position = Vector3(0, -40.0, 0)
-	add_child(holder)
-	for fp: StringName in [&"table", &"cabinet", &"big", &"kiosk"]:
-		var spot: Node3D = FloorProps.closed_spot(holder, {"id": fp, "footprint": fp, "pos": Vector3.ZERO, "yaw": 0.0})
-		closed[fp] = nav_obstacles(spot, spot.global_transform.affine_inverse(), [])
-	remove_child(holder)
-	holder.free()
-	var skip: Array[Node] = [closed_spots]
+	var skip: Array[Node] = []
 	for sid: StringName in stations:
-		if stations[sid].has_meta(&"anchor"):
+		if stations[sid].has_meta(&"floor"):
 			skip.append(stations[sid])
 	def.floor_rects = rects
 	def.floor_seats = seats
 	def.floor_obstacles = obstacles
-	def.floor_closed_obstacles = closed
 	def.floor_blockers = nav_obstacles(self, Transform3D.IDENTITY, skip)
 
 
@@ -1410,25 +1355,20 @@ static func station_rect(st: StationBase) -> Rect2:
 	return Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
 
 
-## Builds the floor of a plan (wire form; {} = the full floor): stations that stay on their spot
-## with the same game are kept, the others are taken down and the new ones built, closed spots get
-## their rope or plant, the hall board its list, and the navmesh is baked again (guards and the
+## Builds a floor layout (wire form {station id: [game, [x, y, z], yaw degrees]}; {} = the full
+## floor): stations that stay where they are with the same game are kept, the others are taken down
+## and the new ones built where the plan says, and the navmesh is baked again (guards and the
 ## waiter path round the new tables). Returns false when that plan is already standing.
 func apply_floor_plan(plan: Dictionary) -> bool:
 	var want: Dictionary = plan if not plan.is_empty() else full_floor_plan()
 	if want == floor_plan:
 		return false
 	floor_plan = want.duplicate(true)
-	var anchors: Array = floor_anchors()
-	var by_id: Dictionary = {}
-	for a: Dictionary in anchors:
-		by_id[a["id"]] = a
 	for sid: StringName in stations.keys():
 		var st: StationBase = stations[sid]
-		if not st.has_meta(&"anchor"):
-			continue  # the horse race and the waiting room's tables never move
-		var e: Variant = want.get(sid, null)
-		if e != null and StringName((e as Array)[0]) == st.game_id and StringName((e as Array)[1]) == StringName(st.get_meta(&"anchor")):
+		if not st.has_meta(&"floor"):
+			continue  # the horse race, the VIP lounge and the waiting room's tables never move
+		if want.get(sid, []) == st.get_meta(&"floor"):
 			continue
 		stations.erase(sid)
 		st.name = "%s_gone" % sid
@@ -1436,22 +1376,11 @@ func apply_floor_plan(plan: Dictionary) -> bool:
 		remove_child(st)
 		st.queue_free()
 	for sid: Variant in want:
-		var entry: Array = want[sid]
-		if stations.has(StringName(sid)) or not by_id.has(StringName(entry[1])):
+		if stations.has(StringName(sid)):
 			continue
-		var a: Dictionary = by_id[StringName(entry[1])]
-		var st: StationBase = _place_station(StringName(sid), StringName(entry[0]), a["pos"], float(a["yaw"]))
-		st.set_meta(&"anchor", a["id"])
-	var used: Dictionary = {}
-	for sid: Variant in want:
-		used[StringName((want[sid] as Array)[1])] = true
-	for c: Node in closed_spots.get_children():
-		closed_spots.remove_child(c)
-		c.queue_free()
-	for a: Dictionary in anchors:
-		if not used.has(a["id"]):
-			FloorProps.closed_spot(closed_spots, a)
-	floor_board.text = FloorProps.board_text(want, anchors, fixed_games())
+		var e: Array = want[sid]
+		var st: StationBase = _place_station(StringName(sid), FloorPlan.game_of(e), FloorPlan.pos_of(e), FloorPlan.yaw_of(e))
+		st.set_meta(&"floor", e.duplicate(true))
 	if bake_navmesh and nav_region != null:
 		rebake_navmesh()
 	return true
@@ -1505,40 +1434,7 @@ func _make_station(kind: StringName) -> StationBase:
 func _build_props() -> void:
 	props_parent = Node3D.new()
 	props_parent.name = "Props"
-	add_child(props_parent)
-	for i: int in 5:
-		_stool(Vector3(BAR_X - BAR_W * 0.5 + 0.3 + i * 1.5, 0.0, 3.6))
-
-
-func _stool(pos: Vector3) -> RigidBody3D:
-	var body := RigidBody3D.new()
-	body.name = "Stool"
-	body.mass = 6.0
-	body.collision_layer = 8  # props
-	body.collision_mask = 1 | 2 | 4 | 8
-	body.add_to_group(&"props")
-	body.set_meta(&"prop", &"stool")
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.22
-	mesh.bottom_radius = 0.22
-	mesh.height = 0.6
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = GreyboxKit.material(Palette.CASINO_RED.darkened(0.3))
-	mi.visible = false
-	body.add_child(mi)
-	var model: Node3D = PropModels.shade(PropModels.make(&"seat", 0.6), 0.7)
-	model.position.y = -0.3
-	body.add_child(model)
-	var cs := CollisionShape3D.new()
-	var sh := CylinderShape3D.new()
-	sh.radius = 0.22
-	sh.height = 0.6
-	cs.shape = sh
-	body.add_child(cs)
-	body.position = pos + Vector3(0, 0.3, 0)
-	props_parent.add_child(body)
-	return body
+	add_child(props_parent)  # loose physics props (synced by NetWorld); none stand on this map now
 
 
 func _build_lights() -> void:

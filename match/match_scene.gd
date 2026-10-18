@@ -26,8 +26,9 @@ static var test_dummies: int = 0
 static var test_briefing: float = -1.0
 ## Tests: the minigame curtain closes, holds and opens in a blink (see `curtain_times`).
 static var test_curtain_fast: bool = false
-## Tests: the `floor` setting ("random" draws a floor in Practice too, "full" never draws; "" =
-## `--floor`, else the FloorPlanConfig rule: online rooms draw, Practice keeps the full floor).
+## Tests: the `floor` setting ("random" rotates the floor layouts in Practice too, "full" never
+## does, a layout id puts that layout in; "" = `--floor`, else the FloorPlanConfig rule: online
+## rooms rotate, Practice keeps the full floor).
 static var test_floor: String = ""
 
 var map: LuckyLounge
@@ -423,9 +424,9 @@ func _on_server_floor(plan: Dictionary) -> void:
 	server.map_def.station_yaws = map.station_yaws()
 
 
-## Builds a floor plan (wire form {station id: [game, anchor id]}; {} = the full floor) on the
-## map: nobody stays on a chair that goes, the dealers follow their tables and the Last Call
-## spotlights hang over the new ones.
+## Builds a floor layout (wire form {station id: [game, [x, y, z], yaw degrees]}; {} = the full
+## floor) on the map: nobody stays on a chair that goes or moves, the dealers follow their tables
+## and the Last Call spotlights hang over the new ones.
 func _apply_floor(plan: Dictionary) -> void:
 	var want: Dictionary = plan if not plan.is_empty() else LuckyLounge.full_floor_plan()
 	if want == map.floor_plan:
@@ -435,7 +436,7 @@ func _apply_floor(plan: Dictionary) -> void:
 		if a.state != PlayerAvatar.State.SEATED or a.seat == null:
 			continue
 		var st: StationBase = a.seat.get_parent() as StationBase
-		if st != null and st.has_meta(&"anchor") and want.get(st.station_id, []) != map.floor_plan.get(st.station_id, []):
+		if st != null and st.has_meta(&"floor") and want.get(st.station_id, []) != map.floor_plan.get(st.station_id, []):
 			_unseat(pid)
 	map.apply_floor_plan(want)
 	nearest_station = null  # it may have closed; the next frame finds the nearest again

@@ -38,13 +38,13 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
 - **Horse Race** (Race Hall annex): 4 horses with names drawn from a pool each round, one horse per
   player per race, the first over the line pays 1:4. A seeded server race (~9 s, the lead changes)
   every client replays. $10–$100.
-- **Wheel of Fortune** (Big Six money wheel, casino floor by the lobby doors): 54 segments, $1 ×24,
+- **Wheel of Fortune** (Big Six money wheel, casino floor, its back to a wall in every layout): 54 segments, $1 ×24,
   $2 ×15, $5 ×7, $10 ×4, $20 ×2, Joker and Logo ×1 each. Chips on any symbols; a symbol pays its
   face value to one ($1 1:1 … $20 20:1), Joker and Logo 40:1, exactly as printed on the layout. The
   dealer spins 12 s after the first bet; the server draws the segment (house rule: a spin no bet
   would win is redrawn once with 31% chance, then luck rerolls, never shown) and every client slows
   the wheel onto it. 5 stools, a dealer. $10 min per bet, $200 per spin.
-- **Craps** (casino floor, east of the roulette pit): two dice. Pass Line (come-out 7/11 win, 2/3/12
+- **Craps** (casino floor; east of the roulette pit on the full floor): two dice. Pass Line (come-out 7/11 win, 2/3/12
   lose, else the point, then the point before a 7) and Don't Pass (the other side, bar 12 pushes)
   1:1, ride until decided, go down only on a come-out; Field (2, 3, 4, 9, 10, 11 at 1:1, 2 and 12 at
   2:1) and Any Seven (4:1) for one roll. The shooter is whoever has sat longest and keeps the dice
@@ -54,7 +54,7 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   ones; the one-roll bets pay a bit better (Field 1.08 / 2.1, Any Seven 4.8) and a roll on which no
   bet wins and one would lose is redrawn with 5.5% chance, so every bet returns 101–101.6% to a
   player alone. A stickman (shoves like a dealer). $10 min per bet, $200 on the felt.
-- **Hi-Lo** (casino floor, east of the roulette pit): oval card table, a dealer, 4 seats, one shared
+- **Hi-Lo** (casino floor; east of the roulette pit on the full floor): oval card table, a dealer, 4 seats, one shared
   single deck (aces high, reshuffled under 15 cards). Everyone plays their own hand: ante, a card is
   turned up, call HIGHER or LOWER (a tie loses). Each call shows its true chance from the cards left
   and its pay, locked when the card goes up: the fair odds less a small edge (×2.00 at 47% on an 8,
@@ -63,7 +63,7 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   or the match end: a won pot is cashed out, a fresh ante takes the likelier side. A minigame gives
   fresh antes back and banks won pots. House rule as at the horse race (0.9.6): a call that would
   lose has its card redrawn once with 15% chance, then luck rerolls it; never shown. $10–$100.
-- **Scratch Cards** (kiosk in the start room, west wall): one player at the counter at a time. Buy a
+- **Scratch Cards** (counter on the casino floor, by the Gift Shop on the full floor): one player at the counter at a time. Buy a
   $10 / $25 / $50 card (× limits); the server draws the whole card at purchase and sends it in one
   `scratch_card` event; the panel shows it big under foil, scratched with the mouse or REVEAL ALL,
   and it pays (`action reveal`) once bare, on walking away, or after 60 s. 3×3 symbols: three in a
@@ -76,17 +76,18 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
-**Floor plan** ([`FLOOR_PLAN.md`](FLOOR_PLAN.md)): in online matches every casino round starts on a
-new floor. The floor is a set of fixed spots (table-, slot- and Plinko-sized and the scratch card
-kiosk, on the floor, in the VIP lounge and the entrance hall); when the lobby opens and at every
-regroup (everyone shut in the entrance hall) each spot is redrawn from the match seed: a game of
-its size that fits there (measured floor, keep-outs, a gap to its neighbours, every chair still
-walkable for the guards and waiter) by weight, or closed tonight (velvet
-rope and a CLOSED TONIGHT sign, or a plant). Nothing is guaranteed; at least 60% of each area is
-open and at most 2 tables of one game per area (soft). The Race Hall, the waiting room, Odd Jobs,
-the shop and the jail never move. A TONIGHT'S FLOOR board in the entrance hall lists the games and
-the feed says "The floor has changed". Practice keeps the full floor. New table games join the
-draw on their own (`FloorPlanConfig`, `GameDefinition.floor_footprint`).
+**Floor layouts** ([`FLOOR_PLAN.md`](FLOOR_PLAN.md)): the casino floor has six hand-made layouts
+(`data/floor_layouts/*.tres`: The Grand Hall, Wheel Night, The Pit, The Arcade, The Long Room, The
+Salon). A layout moves and turns the games only (the wheel's back to a wall, craps players on a
+walkway, blackjack dealers backed by a wall or each other, Plinko on the north wall, the scratch
+counter by the Gift Shop or the lobby wall, nothing in the entrance hall); the room, the VIP
+lounge, the Race Hall, the waiting room, Odd Jobs, the shop and the jail never move. Online matches
+take the next layout from a shuffled bag (seeded, no repeats before the bag is empty, never the
+same twice in a row) when the lobby opens and at every regroup, while everyone is shut in the
+entrance hall; the feed says "The floor has changed!". A layout that needs a game that is off
+(weight 0) or does not fit the map is skipped and the next one goes in; there are no closed spots,
+ropes, signs or boards. Practice and the menu keep The Grand Hall. There is no bar on the casino
+floor (Patrick: "the casino bar (its useless)").
 
 ## Luck
 Luck L ∈ [−3, +3]. Single-player draws are rerolled with probability 0.12·|L| keeping the better
