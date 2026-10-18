@@ -1,33 +1,43 @@
 class_name FloorPlanConfig
 extends Resource
-## Tuning for the per-round casino floor (docs/FLOOR_PLAN.md, `FloorPlan`). Patrick's rules
-## (0.9.10): every spot is redrawn at every casino round start in online and host-on-PC matches,
-## nothing is guaranteed, Practice keeps the full floor.
+## The casino floor's layouts and their rotation (docs/FLOOR_PLAN.md, `FloorLayout`,
+## `FloorRotation`). Patrick (0.9.11): "have x amounts of rearrangements of the room (tested,
+## with a good usefull layout) and then rotate between these layouts", and no closed spots: a
+## layout that can't be used is skipped and another one is put in.
 
-## Which matches draw a random floor: online rooms (dedicated and host-on-PC both run a room
-## server) and Practice. Practice keeps the full floor (every spot with its usual game).
-@export var draw_in_rooms: bool = true
-@export var draw_in_practice: bool = false
-## At least this share of the spots in each area (casino floor, VIP lounge) has a game, so the
-## floor is never empty or silly. The rest may be closed (velvet rope or a plant).
-@export_range(0.0, 1.0) var min_filled: float = 0.6
-## Chance that a spot is closed tonight before the minimum above tops the floor back up.
-@export_range(0.0, 1.0) var empty_chance: float = 0.15
-## Soft cap: at most this many tables of one game per area (0 = no cap). Only broken when the
-## minimum fill can't be reached otherwise.
-@export var max_per_type: int = 2
-## Footprints the cap above applies to (slot machines come in rows, so not to cabinets).
-@export var capped_footprints: Array[StringName] = [&"table"]
-## Draw weight of a game on a spot of its size. Every registered game that isn't `fixed` is in
-## the pool with `default_weight` unless `weights` (game id → weight) says otherwise; 0 = never.
-@export var default_weight: float = 1.0
+## Which matches rotate the layouts: online rooms (dedicated and host-on-PC both run a room
+## server) and Practice. Practice keeps the first layout (the full floor).
+@export var rotate_in_rooms: bool = true
+@export var rotate_in_practice: bool = false
+## The layouts, in order. The first is the full floor: Practice, the menu panorama and
+## `LuckyLounge.STATIONS` stand on it, and it is the fallback when no other layout can be used.
+## Adding a layout is a new `data/floor_layouts/*.tres` listed here; nothing in code changes.
+@export var layouts: Array[FloorLayout] = []
+## Game id → weight; 0 takes a game off the floor, and every layout that needs it is skipped.
+## Games not listed are on (weight 1).
 @export var weights: Dictionary = {}
-## Least space between two drawn games, chair to chair, metres (`FloorGeometry`; 0.35 lets the
-## full floor's tightest pair, craps and Hi-Lo at 0.39 m, stand). That every chair can still be
-## walked to is checked over the whole floor on top of this.
+## Least space between two games of a layout, chair to chair, metres (`FloorGeometry`). Every
+## layout is checked against it, and against the walkway check, before it is used.
 @export var gap: float = 0.35
 
 
-## Draw weight of a game.
+## Weight of a game (1 unless `weights` says otherwise; never negative).
 func weight_of(game: StringName) -> float:
-	return maxf(float(weights.get(game, default_weight)), 0.0)
+	return maxf(float(weights.get(game, 1.0)), 0.0)
+
+
+## A layout by id (null when unknown).
+func layout(id: StringName) -> FloorLayout:
+	for l: FloorLayout in layouts:
+		if l != null and l.id == id:
+			return l
+	return null
+
+
+## Ids of the layouts in the rotation (enabled ones, in order).
+func enabled_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for l: FloorLayout in layouts:
+		if l != null and l.enabled:
+			out.append(l.id)
+	return out

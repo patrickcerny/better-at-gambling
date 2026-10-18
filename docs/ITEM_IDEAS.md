@@ -40,7 +40,7 @@ knockouts and falls keep the plain respawn.
   random). One tie replays, a second tie calls it off. Bots accept 70% of challenges.
 - **Out of Order:** hangs on the nearest table or machine within 4 m for 30 s; nobody can sit or
   bet there, rounds already running finish. A red sign and the prompt show the countdown.
-- **Gift Shop:** a kiosk on the east wall next to the bar, open in the casino. Four offers per
+- **Gift Shop:** a kiosk on the east wall, open in the casino. Four offers per
   segment (two common, one rare, one rare or legendary), the same for everyone, $150 / $400 / $900
   × table limits; one buy per player per segment. Restocks when each casino segment starts.
 - **Scissors** is a CUT button [C] at blackjack; **Beer** wobbles the camera only (movement stays

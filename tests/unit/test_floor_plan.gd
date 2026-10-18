@@ -1,213 +1,199 @@
 extends GutTest
-## The per-round casino floor draw (docs/FLOOR_PLAN.md, `FloorPlan`), on the Lucky Lounge's real
-## spots and the registered games: Patrick's rules (every spot redrawn every round, nothing
-## guaranteed, at least `min_filled` of each area open, soft cap per table game), seeded.
+## The casino floor's hand-made layouts and their rotation (docs/FLOOR_PLAN.md): the layout files,
+## `LuckyLounge.STATIONS` as the first layout, the wire form, the bag (`FloorRotation`: seeded, no
+## repeats before the bag is empty, never twice in a row, unusable layouts skipped, the full floor
+## when nothing else can stand), the skip rule (`FloorPlan.problems`) and the room geometry
+## (`FloorGeometry`).
 
-var anchors: Array
-var pool: Dictionary
 var cfg: FloorPlanConfig
 
 
 func before_each() -> void:
-	anchors = LuckyLounge.floor_anchors()
 	cfg = Registry.floor_plan.duplicate() as FloorPlanConfig
-	pool = FloorPlan.pool_of(Registry.game_footprints(), cfg)
 
 
-func _area(vip: bool) -> Array:
-	return anchors.filter(func(a: Dictionary) -> bool: return bool(a["vip"]) == vip)
+func _ids() -> Array[StringName]:
+	return cfg.enabled_ids()
 
 
-func _draws(n: int, seed_value: int = 7) -> Array[Dictionary]:
-	var rng := SeededRng.new(seed_value)
-	var out: Array[Dictionary] = []
-	for i: int in n:
-		out.append(FloorPlan.draw(anchors, pool, cfg, rng))
-	return out
-
-
-func test_the_spots_come_from_the_map_and_the_race_hall_stays_fixed() -> void:
-	assert_eq(anchors.size(), LuckyLounge.STATIONS.size() - 1, "every station but the horse race is a spot")
-	var ids: Dictionary = {}
-	for a: Dictionary in anchors:
-		assert_false(ids.has(a["id"]), "spot ids are unique")
-		ids[a["id"]] = true
-		assert_ne(StringName(a["default"]), &"horse_race")
-		assert_true(StringName(a["footprint"]) in [&"table", &"cabinet", &"big", &"kiosk"])
-	assert_eq(LuckyLounge.fixed_games(), [&"horse_race"])
-	assert_false(pool.get(&"table", {}).has(&"horse_race"), "the horse race is never drawn")
-	assert_true(pool[&"cabinet"].has(&"slots"))
-	assert_true(pool[&"big"].has(&"plinko"))
-	assert_eq(pool[&"kiosk"].keys(), [&"scratch"], "the scratch counter has a class of its own")
-	for g: StringName in [&"wheel", &"craps", &"hilo"]:
-		assert_true(pool[&"table"].has(g), "%s is drawn" % g)
-
-
-func test_the_full_floor_is_the_map_as_built() -> void:
-	var def := MapDefinition.new()
-	LuckyLounge.describe_floor(def)
-	assert_eq(def.floor_prefixes.get(&"slots", ""), "slot")
-	var full: Dictionary = FloorPlan.station_ids(anchors, FloorPlan.full(anchors), def.floor_prefixes)
-	assert_eq(full, LuckyLounge.full_floor_plan(), "numbering the full floor gives back the usual ids (slot_1, vip_blackjack_1, ...)")
-	for sid: StringName in full:
-		assert_true(LuckyLounge.STATIONS.has(sid), "%s is a STATIONS id" % sid)
-
-
-func test_same_seed_same_floors_and_every_round_is_drawn_afresh() -> void:
-	var a: Array[Dictionary] = _draws(6, 42)
-	var b: Array[Dictionary] = _draws(6, 42)
-	assert_eq(a, b, "deterministic per match seed")
-	var c: Array[Dictionary] = _draws(6, 43)
-	assert_ne(a, c, "another seed, other floors")
-	for i: int in range(1, a.size()):
-		assert_ne(a[i], a[i - 1], "round %d has a new floor" % i)
-
-
-func test_every_spot_gets_a_game_of_its_size_or_is_closed_and_the_areas_stay_open_enough() -> void:
-	for plan: Dictionary in _draws(400):
-		assert_eq(plan.size(), anchors.size(), "every spot is drawn")
-		for a: Dictionary in anchors:
-			var g: StringName = plan[a["id"]]
-			if g != FloorPlan.CLOSED:
-				assert_true((pool[a["footprint"]] as Dictionary).has(g), "%s fits spot %s" % [g, a["id"]])
-		for vip: bool in [false, true]:
-			var area: Array = _area(vip)
-			var need: int = ceili(area.size() * cfg.min_filled)
-			assert_true(FloorPlan.filled(area, plan) >= need, "at least %d of %d spots open (vip %s)" % [need, area.size(), vip])
-
-
-func test_soft_cap_holds_while_the_floor_can_be_filled_without_it() -> void:
-	for plan: Dictionary in _draws(400):
-		for vip: bool in [false, true]:
-			var counts: Dictionary = {}
-			for a: Dictionary in _area(vip):
-				var g: StringName = plan[a["id"]]
-				if g != FloorPlan.CLOSED and StringName(a["footprint"]) in cfg.capped_footprints:
-					counts[g] = int(counts.get(g, 0)) + 1
-			for g: StringName in counts:
-				assert_true(int(counts[g]) <= cfg.max_per_type, "at most %d × %s (vip %s)" % [cfg.max_per_type, g, vip])
-
-
-func test_the_cap_gives_way_before_the_floor_looks_empty() -> void:
-	cfg.empty_chance = 1.0  # every spot closed at first: the minimum reopens them
-	cfg.max_per_type = 1
-	var plan: Dictionary = FloorPlan.draw(anchors, pool, cfg, SeededRng.new(3))
-	for vip: bool in [false, true]:
-		var area: Array = _area(vip)
-		assert_eq(FloorPlan.filled(area, plan), ceili(area.size() * cfg.min_filled), "exactly the minimum (vip %s)" % vip)
-
-
-func test_nothing_is_guaranteed_and_closed_spots_are_capped() -> void:
-	var missing: Dictionary = {}
-	var most_closed: int = 0
-	for plan: Dictionary in _draws(1500, 11):
-		var on_floor: Dictionary = {}
-		var closed: int = 0
-		for a: Dictionary in _area(false):
-			if plan[a["id"]] == FloorPlan.CLOSED:
-				closed += 1
-			else:
-				on_floor[plan[a["id"]]] = true
-		most_closed = maxi(most_closed, closed)
-		for g: StringName in [&"blackjack", &"roulette", &"plinko"]:
-			if not on_floor.has(g):
-				missing[g] = true
-	assert_true(missing.has(&"plinko"), "a round can go without Plinko")
-	assert_true(missing.has(&"blackjack") or missing.has(&"roulette"), "no table game is guaranteed")
-	var area: int = _area(false).size()
-	assert_true(most_closed <= area - ceili(area * cfg.min_filled), "closed spots never pass the minimum fill")
-	assert_gt(most_closed, 0, "some rounds have closed spots")
-	# Weight 0 takes a game off the floor entirely: nothing forces it back.
-	cfg.weights = {&"blackjack": 0.0}
-	pool = FloorPlan.pool_of(Registry.game_footprints(), cfg)
-	for plan: Dictionary in _draws(50):
-		assert_false(plan.values().has(&"blackjack"))
-
-
-func test_every_registered_game_can_appear_and_a_new_table_game_joins_the_pool() -> void:
+func test_six_layouts_the_first_is_the_full_floor() -> void:
+	assert_eq(cfg.layouts.size(), 6, "six layouts to start (FLOOR_LAYOUTS.md)")
 	var seen: Dictionary = {}
-	for plan: Dictionary in _draws(300):
-		for g: Variant in plan.values():
-			seen[g] = true
-	for id: StringName in Registry.games:
-		if Registry.games[id].floor_footprint != &"fixed":
-			assert_true(seen.has(id), "%s shows up on some floor" % id)
-	# A game registered tomorrow (no footprint set: a table) is in the table pool with the default
-	# weight and gets drawn.
-	var footprints: Dictionary = Registry.game_footprints()
-	footprints[&"wheel_of_fortune"] = &"table"
-	var p2: Dictionary = FloorPlan.pool_of(footprints, cfg)
-	assert_eq(float(p2[&"table"][&"wheel_of_fortune"]), cfg.default_weight)
-	var rng := SeededRng.new(5)
-	var drawn: bool = false
-	for i: int in 50:
-		drawn = drawn or FloorPlan.draw(anchors, p2, cfg, rng).values().has(&"wheel_of_fortune")
-	assert_true(drawn)
+	for l: FloorLayout in cfg.layouts:
+		assert_not_null(l)
+		assert_ne(l.id, &"", "every layout has an id")
+		assert_ne(l.title, "", "and a name")
+		assert_false(seen.has(l.id), "%s once" % l.id)
+		seen[l.id] = true
+		assert_true(l.enabled)
+		assert_true(l.resource_path.begins_with("res://data/floor_layouts/"), "%s is a data file" % l.id)
+	assert_eq(cfg.layouts[0].id, &"grand_hall")
+	assert_eq(_ids().size(), 6, "all six rotate")
 
 
-func test_station_ids_are_numbered_per_game_and_area() -> void:
-	var def := MapDefinition.new()
-	LuckyLounge.describe_floor(def)
-	var plan: Dictionary = _draws(1)[0]
-	var ids: Dictionary = FloorPlan.station_ids(anchors, plan, def.floor_prefixes)
-	var per: Dictionary = {}
-	for sid: StringName in ids:
-		var entry: Array = ids[sid]
-		var a: Dictionary = def.floor_anchor(entry[1])
-		assert_eq(plan[entry[1]], entry[0])
-		assert_eq(String(sid).begins_with("vip_"), bool(a["vip"]), "%s: vip prefix" % sid)
-		var stem: String = String(sid).left(String(sid).rfind("_"))
-		per[stem] = int(per.get(stem, 0)) + 1
-		assert_eq(String(sid), "%s_%d" % [stem, per[stem]], "numbered in map order without gaps")
-	assert_eq(FloorPlan.assignment_of(ids, anchors), plan, "the wire form gives the plan back")
+func test_stations_are_the_first_layout_plus_the_fixed_ones() -> void:
+	var full: FloorLayout = cfg.layouts[0]
+	assert_eq(LuckyLounge.STATIONS.size(), full.stations.size() + LuckyLounge.FIXED_STATIONS.size())
+	for sid: Variant in full.stations:
+		assert_eq(LuckyLounge.STATIONS[StringName(sid)], full.stations[sid], "%s comes from the layout file" % sid)
+	for sid: Variant in LuckyLounge.FIXED_STATIONS:
+		assert_eq(LuckyLounge.STATIONS[StringName(sid)], LuckyLounge.FIXED_STATIONS[sid])
+	assert_eq(LuckyLounge.full_floor_plan(), full.wire_stations())
+	var def: MapDefinition = Registry.maps[&"lucky_lounge"]
+	for sid: StringName in LuckyLounge.STATIONS:
+		assert_eq(def.stations.get(sid, &""), (LuckyLounge.STATIONS[sid] as Array)[0], "%s listed in the map definition" % sid)
+	assert_eq(def.stations.size(), LuckyLounge.STATIONS.size())
 
 
-func test_the_geometry_keeps_big_games_off_tight_spots_and_apart() -> void:
-	# Two table spots 3 m apart and one turned spot far off; a small game (2 x 2 m) fits anywhere, a
-	# wide one (5 x 2 m) never stands next to another, nor where it would cross the keep-out.
-	var spots: Array = [
-		{"id": &"t1", "footprint": &"table", "vip": false, "default": &"small", "pos": Vector3(0, 0, 0), "yaw": 0.0},
-		{"id": &"t2", "footprint": &"table", "vip": false, "default": &"small", "pos": Vector3(3, 0, 0), "yaw": 0.0},
-		{"id": &"t3", "footprint": &"table", "vip": false, "default": &"small", "pos": Vector3(0, 0, 10), "yaw": PI * 0.5},
-	]
+func test_every_layout_uses_registered_games_on_the_casino_floor() -> void:
+	var floor_area: Rect2 = LuckyLounge.FLOOR_AREAS[0]
+	for l: FloorLayout in cfg.layouts:
+		assert_true(FloorPlan.problems(l, cfg, Registry.games).is_empty(), "%s: every game is on (%s)" % [l.id, FloorPlan.problems(l, cfg, Registry.games)])
+		var scratch: int = 0
+		for sid: Variant in l.stations:
+			var row: Array = l.stations[sid]
+			var game: StringName = row[0]
+			var pos: Vector3 = row[1]
+			assert_ne(LuckyLounge.footprint_of(game), &"fixed", "%s/%s: fixed games keep their own place" % [l.id, sid])
+			assert_false(LuckyLounge.FIXED_STATIONS.has(sid), "%s/%s: not a fixed station's id" % [l.id, sid])
+			assert_false(String(sid).begins_with("vip_"), "%s/%s: the VIP lounge does not rotate" % [l.id, sid])
+			assert_true(floor_area.has_point(Vector2(pos.x, pos.z)), "%s/%s stands on the casino floor (%s)" % [l.id, sid, pos])
+			assert_lt(pos.z, LuckyLounge.LOBBY_DOORS_Z, "%s/%s: nothing in the entrance hall" % [l.id, sid])
+			assert_true(String(sid).begins_with(String(game) + "_") or String(sid).begins_with(String(game).trim_suffix("s") + "_"), "%s/%s is named after its game" % [l.id, sid])
+			if game == &"scratch":
+				scratch += 1
+		assert_eq(scratch, 1, "%s: one scratch counter, on the casino floor" % l.id)
+
+
+func test_the_wire_form_round_trips() -> void:
+	var e: Array = FloorPlan.entry(&"wheel", Vector3(19.6, 0, 5.9), -90.0)
+	assert_eq(FloorPlan.game_of(e), &"wheel")
+	assert_almost_eq(FloorPlan.pos_of(e), Vector3(19.6, 0, 5.9), Vector3.ONE * 0.001)
+	assert_almost_eq(FloorPlan.yaw_of(e), -PI * 0.5, 0.0001)
+	var bytes: PackedByteArray = var_to_bytes({&"wheel_1": e})
+	assert_eq(bytes_to_var(bytes), {&"wheel_1": e}, "survives the wire unchanged")
+	var spots: Dictionary = FloorPlan.spots({&"wheel_1": e})
+	assert_almost_eq(spots[&"wheel_1"]["pos"] as Vector3, Vector3(19.6, 0, 5.9), Vector3.ONE * 0.001)
+
+
+func test_the_bag_is_seeded_and_has_no_repeats() -> void:
+	var always: Callable = func(_id: StringName) -> bool: return true
+	var a := FloorRotation.new(_ids(), SeededRng.new(42))
+	var b := FloorRotation.new(_ids(), SeededRng.new(42))
+	var c := FloorRotation.new(_ids(), SeededRng.new(43))
+	var seq_a: Array[StringName] = []
+	var seq_b: Array[StringName] = []
+	var seq_c: Array[StringName] = []
+	for i: int in 60:
+		seq_a.append(a.next(always))
+		seq_b.append(b.next(always))
+		seq_c.append(c.next(always))
+	assert_eq(seq_a, seq_b, "same seed, same rotation")
+	assert_ne(seq_a, seq_c, "another seed, another rotation")
+	for bag: int in 10:
+		var one: Array[StringName] = seq_a.slice(bag * 6, bag * 6 + 6)
+		var distinct: Dictionary = {}
+		for id: StringName in one:
+			distinct[id] = true
+		assert_eq(distinct.size(), 6, "bag %d: every layout once before any comes again (%s)" % [bag, one])
+	for i: int in range(1, seq_a.size()):
+		assert_ne(seq_a[i], seq_a[i - 1], "never the same layout twice in a row (at %d, across bag ends too)" % i)
+
+
+func test_the_bag_ends_never_repeat_over_many_seeds() -> void:
+	var always: Callable = func(_id: StringName) -> bool: return true
+	for s: int in 200:
+		var r := FloorRotation.new(_ids(), SeededRng.new(s))
+		var last: StringName = &""
+		for i: int in 13:
+			var id: StringName = r.next(always)
+			assert_ne(id, last, "seed %d step %d" % [s, i])
+			last = id
+
+
+func test_an_unusable_layout_is_skipped_and_the_next_one_taken() -> void:
+	var off: Array[StringName] = [&"the_pit", &"the_salon"]
+	var usable: Callable = func(id: StringName) -> bool: return not id in off
+	var r := FloorRotation.new(_ids(), SeededRng.new(7))
+	var seen: Array[StringName] = []
+	for i: int in 40:
+		var id: StringName = r.next(usable)
+		assert_false(id in off, "%s is never put in" % id)
+		seen.append(id)
+	for bag: int in 10:
+		var distinct: Dictionary = {}
+		for id: StringName in seen.slice(bag * 4, bag * 4 + 4):
+			distinct[id] = true
+		assert_eq(distinct.size(), 4, "the bag goes on with the four usable layouts")
+	# A layout that goes off in the middle of a bag drops out of it at once.
+	var r2 := FloorRotation.new(_ids(), SeededRng.new(9))
+	var first: StringName = r2.next(func(_id: StringName) -> bool: return true)
+	var left: Array[StringName] = r2.remaining()
+	assert_eq(left.size(), 5)
+	var gone: StringName = left[0]
+	var after: StringName = r2.next(func(id: StringName) -> bool: return id != gone)
+	assert_eq(after, left[1], "the one after the skipped layout comes instead")
+	assert_ne(after, first)
+	assert_false(gone in r2.remaining(), "the skipped layout is out of this bag")
+
+
+func test_nothing_usable_falls_back_to_the_full_floor() -> void:
+	var r := FloorRotation.new(_ids(), SeededRng.new(3), &"grand_hall")
+	for i: int in 3:
+		assert_eq(r.next(func(_id: StringName) -> bool: return false), &"grand_hall", "layout 1 when none can stand")
+	var only: Callable = func(id: StringName) -> bool: return id == &"the_arcade"
+	for i: int in 3:
+		assert_eq(r.next(only), &"the_arcade", "a single usable layout stands every round")
+
+
+func test_a_game_that_is_off_skips_every_layout_with_it() -> void:
+	cfg.weights = {&"craps": 0.0}
+	var skipped: Array[StringName] = []
+	for l: FloorLayout in cfg.layouts:
+		var why: Array[String] = FloorPlan.problems(l, cfg, Registry.games)
+		if &"craps" in l.games():
+			assert_false(why.is_empty(), "%s needs craps: skipped" % l.id)
+			assert_string_contains(why[0], "craps")
+			skipped.append(l.id)
+		else:
+			assert_true(why.is_empty(), "%s has no craps: still in" % l.id)
+	assert_gt(skipped.size(), 0)
+	assert_lt(skipped.size(), cfg.layouts.size(), "some layouts are craps-free (The Arcade, The Salon)")
+	var unknown := FloorLayout.new()
+	unknown.id = &"x"
+	unknown.stations = {&"pachinko_1": [&"pachinko", Vector3.ZERO, 0.0]}
+	assert_string_contains(FloorPlan.problems(unknown, cfg, Registry.games)[0], "no such game")
+	assert_false(FloorPlan.problems(FloorLayout.new(), cfg, Registry.games).is_empty(), "an empty layout is no layout")
+
+
+func test_the_geometry_keeps_games_apart_and_off_keep_outs() -> void:
+	# A small game (2 x 2 m) and a wide one (5 x 2 m): a turned spot turns the floor it takes, the
+	# wide one crosses a keep-out and comes too close to a neighbour.
 	var geo := FloorGeometry.new()
 	geo.rects = {&"small": Rect2(-1, -1, 2, 2), &"wide": Rect2(-2.5, -1, 5, 2)}
 	geo.areas.assign([Rect2(-10, -10, 20, 25)])
 	geo.keep_out.assign([Rect2(0.5, 7.0, 1.0, 1.0)])
 	geo.gap = 0.6
-	var by_id: Dictionary = {}
-	for a: Dictionary in spots:
-		by_id[a["id"]] = a
-	var turned: Rect2 = geo.world_rect(spots[2], &"wide")
+	var turned_spot: Dictionary = {"id": &"t3", "pos": Vector3(0, 0, 10), "yaw": PI * 0.5}
+	var turned: Rect2 = geo.world_rect(turned_spot, &"wide")
 	assert_almost_eq(turned.size, Vector2(2, 5), Vector2(0.01, 0.01), "a turned spot turns the game's floor")
-	assert_true(geo.fits(spots[0], &"wide"))
-	assert_false(geo.fits(spots[2], &"wide"), "crosses the keep-out")
-	assert_true(geo.fits(spots[2], &"small"))
+	assert_false(geo.fits(turned_spot, &"wide"), "crosses the keep-out")
+	assert_true(geo.fits(turned_spot, &"small"))
 	assert_false(geo.fits({"id": &"x", "pos": Vector3(9.5, 0, 0), "yaw": 0.0}, &"small"), "pokes out of the area")
-	assert_true(geo.clear_of(spots[1], &"small", {&"t1": &"small"}, by_id), "1 m between them, more than the gap")
-	assert_false(geo.clear_of(spots[1], &"wide", {&"t1": &"small"}, by_id), "too close")
-	var c := FloorPlanConfig.new()
-	c.min_filled = 1.0
-	c.empty_chance = 0.0
-	c.capped_footprints = []
-	var p: Dictionary = {&"table": {&"small": 1.0, &"wide": 3.0}}
-	var wide_seen: int = 0
-	for s: int in 40:
-		var plan: Dictionary = FloorPlan.draw(spots, p, c, SeededRng.new(s), geo)
-		assert_ne(plan[&"t3"], &"wide", "never where it doesn't fit")
-		assert_false(plan[&"t1"] == &"wide" and plan[&"t2"] != FloorPlan.CLOSED, "the walkway beats the minimum fill")
-		assert_false(plan[&"t2"] == &"wide" and plan[&"t1"] != FloorPlan.CLOSED)
-		if plan[&"t1"] == &"wide" or plan[&"t2"] == &"wide":
-			wide_seen += 1
-	assert_gt(wide_seen, 0, "the wide game still gets drawn where it fits")
+	var near: Dictionary = {&"a": FloorPlan.entry(&"small", Vector3(0, 0, 0), 0.0), &"b": FloorPlan.entry(&"small", Vector3(3, 0, 0), 0.0)}
+	assert_true(FloorPlan.fit_problems(near, geo).is_empty(), "1 m between them, more than the gap")
+	near[&"b"] = FloorPlan.entry(&"wide", Vector3(3, 0, 0), 0.0)
+	var why: Array[String] = FloorPlan.fit_problems(near, geo)
+	assert_eq(why.size(), 1, "too close: %s" % [why])
+	near[&"b"] = FloorPlan.entry(&"wide", Vector3(0, 0, 10), 90.0)
+	assert_string_contains(FloorPlan.fit_problems(near, geo)[0], "keep-out")
 
 
 func test_the_walkway_check_finds_a_chair_walled_off() -> void:
 	# A 10 x 10 m room entered at the bottom, a wall across the middle with an opening; one game
 	# (a 1 x 1 m block, its chair 1 m above it) behind the wall. A 0.6 m opening is too narrow for
 	# the navmesh's 0.5 m radius, a 3 m one is fine.
-	var spot: Dictionary = {"id": &"t1", "footprint": &"table", "vip": false, "default": &"box", "pos": Vector3(5, 0, 2), "yaw": 0.0}
-	var by_id: Dictionary = {&"t1": spot}
+	var plan: Dictionary = {&"box_1": FloorPlan.entry(&"box", Vector3(5, 0, 2), 0.0)}
 	for opening: float in [0.6, 3.0]:
 		var geo := FloorGeometry.new()
 		geo.rects = {&"box": Rect2(-0.5, -0.5, 1, 2)}
@@ -221,8 +207,11 @@ func test_the_walkway_check_finds_a_chair_walled_off() -> void:
 			Rect2(0, 5, 5 - half, 0.2), Rect2(5 + half, 5, 5 - half, 0.2),
 		])
 		assert_true(geo.can_walk())
-		var cut: Array[StringName] = geo.unreachable({&"t1": &"box"}, by_id)
+		var cut: Array[StringName] = geo.unreachable(FloorPlan.games_of(plan), FloorPlan.spots(plan))
+		var why: Array[String] = FloorPlan.fit_problems(plan, geo)
 		if opening < 1.0:
-			assert_eq(cut, [&"t1"] as Array[StringName], "a 0.6 m gap walls the chair off")
+			assert_eq(cut, [&"box_1"] as Array[StringName], "a 0.6 m gap walls the chair off")
+			assert_string_contains(why[0], "cut off")
 		else:
 			assert_true(cut.is_empty(), "a 3 m gap lets people through")
+			assert_true(why.is_empty())

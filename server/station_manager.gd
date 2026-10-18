@@ -57,15 +57,15 @@ func _add(station_id: StringName, game_id: StringName, is_vip: bool) -> void:
 		vip[station_id] = true
 
 
-## A new floor plan (docs/FLOOR_PLAN.md): `stations` (station id → game id) is every station from
-## now on. Stations that keep their id and game keep their logic (a blackjack shoe carries on);
-## the others close and the new ones open with the current limits. Nobody may be seated at a
-## station that goes (the server stands them up first); open bets were refunded at the minigame.
-## Returns the ids that closed.
-func apply_stations(stations: Dictionary, vip_ids: Array) -> Array[StringName]:
+## A new floor layout (docs/FLOOR_PLAN.md): `stations` (station id → game id) is every station from
+## now on. Stations that keep their id, game and place keep their logic (a blackjack shoe carries
+## on); the others close (open bets refunded) and the new ones open with the current limits, and
+## so do the ones in `moved` (same id and game, another place: a fresh table there). Nobody may be
+## seated at a station that goes (the server stands them up first). Returns the ids that closed.
+func apply_stations(stations: Dictionary, vip_ids: Array, moved: Array = []) -> Array[StringName]:
 	var closed: Array[StringName] = []
 	for sid: StringName in logics.keys():
-		if StringName(stations.get(sid, &"")) == game_of[sid] and (sid in vip_ids) == vip.get(sid, false):
+		if StringName(stations.get(sid, &"")) == game_of[sid] and (sid in vip_ids) == vip.get(sid, false) and not sid in moved:
 			continue
 		closed.append(sid)
 		logics[sid].refund_all()

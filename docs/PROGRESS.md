@@ -139,7 +139,7 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
-### 2026-10-18 / 0.9.11
+### 2026-10-18 / 0.9.11 (Jackpot Climb: a run, not a jump-and-run)
 - Jackpot Climb is a run now, not a jump-and-run (Patrick: "you can get stuck on climb game"): felt
   ramps and spiral walkways round the three tiers, a steady lane with no jumps and a bold lane with
   seven short hops in all; no pockets, ledges or gaps to get stuck in. Clean run 32.4 s steady,
@@ -147,6 +147,59 @@
   `PlayerAvatar` (via `tests/helpers/climb_runner.gd`) up every lane, from every flag spot, and
   from 604 dropped spots on a 1.25 m grid over the whole course: all reach the next checkpoint or
   are sent back to a flag (no trap); geometry checks in `tests/unit/test_jackpot_climb_logic.gd`.
+### 2026-10-18 / 0.9.11 (floor layouts: a different casino floor every round)
+- Patrick: "After every minigame, the games (and layout change)... rotate between these layouts",
+  "there shouldn't be an out of order sign... just another layout", "remove the tongiths floor its
+  stupid", "remove the bar", the scratch kiosk by the Gift Shop, the wheel turned round.
+- Six hand-made floor layouts (`FloorLayout`, `data/floor_layouts/*.tres`, listed in
+  `data/balance/floor_plan.tres`): The Grand Hall (the full floor; `LuckyLounge.STATIONS` is this
+  layout plus the fixed stations), Wheel Night, The Pit, The Arcade, The Long Room, The Salon.
+  Tables and the changes from the design sketches in `docs/FLOOR_PLAN.md`.
+- `FloorRotation`: a bag shuffled from the match seed, no repeats before it is empty, a fresh bag
+  never starts with the layout that just stood; a layout whose game has weight 0 or that fails the
+  fit check is skipped, and if none can be used The Grand Hall stands. Lobby opening, Play Again
+  (fresh bag) and every regroup take the next layout. Practice and the menu keep The Grand Hall.
+- No closed spots any more: ropes, CLOSED TONIGHT signs, plants on empty spots and the TONIGHT'S
+  FLOOR board are gone (`maps/lucky_lounge/floor_props.gd` deleted). The feed says "The floor has
+  changed!".
+- The bar is gone (counter, back bar, stools, parquet). The scratch counter stands on the casino
+  floor by the Gift Shop (never in the entrance hall); the Wheel of Fortune always has its back to
+  a wall or a slot bank.
+- Tables that move are fresh tables (`StationManager.apply_stations` `moved`): seated players are
+  stood up (`floor_changed`) and refunded, a hot table that moves cools.
+- PROTOCOL_VERSION 9: `floor_plan` is `{round, layout, stations: {station id: [game, [x, y, z],
+  yaw degrees]}}` in `match_started`, `regroup_started`, `match_reset` and the snapshot.
+- Dev: `--floor random|full|<layout id>`; `tools/dev/tutorial_shot.gd --view floor --floor <id>`
+  renders the floor from inside the lobby doors.
+- Tests: `tests/unit/test_floor_plan.gd` (rotation, layouts, wire, geometry),
+  `tests/integration/test_floor_plan_flow.gd` (through `ServerFixture`),
+  `tests/physics/test_floor_plan_scene.gd` (every layout in the real scene: no overlaps, every
+  chair reachable, patrol points and doors walkable), `tests/physics/test_scratch_kiosk.gd`.
+- Not verified: real online play with several clients across a layout change; the area rugs stay
+  where The Grand Hall puts them.
+### 2026-10-17 / 0.9.11 (wheel and craps: closer table, overlay on the right)
+- Patrick (screenshot of the wheel seat view): "rather zoom in on this ... craps the same, closer
+  look at the table, and ui on the right (else you dont see anything)".
+- Seat views: both tables now give every stool its own view (`StationBase._add_seat_camera`, eye +
+  aim point, the player camera's `seated_look` head turn unchanged). Wheel: eye at (0.8, 2.8, 1.3)
+  local, 0.08 × the stool's x along, looking down 26° at the wheel; the wheel face spans ~30% of the
+  width (was 16%), wheel + layout ~50% of the width and over 80% of the height, dealer and chips in
+  view, all in the left two thirds. Craps: eye at (1.0, 3.2, 1.35), 0.05 × the stool's x along, looking straight
+  down the table at 39°; the felt spans 58–62% of the width (was 46%, centred under the old strip),
+  stickman, sign and every seat's chips in view, all in the left two thirds.
+- Overlays: `StationUi._dock_column` puts the panel in a 600 px column at the right edge, from under
+  the HUD clock (y 196) to over the HUD rank (104 px from the bottom). Wheel: symbols in a 4-wide
+  grid, chips, status, result / last spins, your bets. Craps: the four bets in a 2 × 2 grid, chips,
+  your bets, SHOOT, the point, the shooter / last roll. The explanation moved into a folded
+  HOW IT WORKS line (`_rules_text`, also its tooltip); key hints and shortcuts unchanged, the
+  camera lock unchanged.
+- Evidence: `tests/ui/test_wheel_ui.gd`, `tests/ui/test_craps_ui.gd` (panel in the right third,
+  under 40% wide, every visible control right of 2/3 of the width, in several states and with the
+  rules open), `tests/physics/test_wheel_table.gd`, `tests/physics/test_craps_table.gd` (per seat at
+  the default 85° FOV: wheel rim / felt corners, dealer, chips projected into the left two thirds,
+  screen extents, nothing solid between eye and bets). Dev shots `wheel_shot` / `craps_shot
+  --view seat --seat n` draw the overlay too.
+
 ### 2026-10-16 / 0.9.10 (four new games, random floor, Patrick's second feedback burst)
 - Released 2026-10-16. PROTOCOL_VERSION 8 (tipping gone from the wire, new station events, the
   floor plan in `match_started` / `regroup_started` / the snapshot, blackjack hands carry `clock`,

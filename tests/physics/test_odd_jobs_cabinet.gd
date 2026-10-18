@@ -33,7 +33,7 @@ func test_cabinet_sits_next_to_the_gift_shop_without_overlaps() -> void:
 	assert_eq(mine.size(), 2, "cabinet body and its back")
 	var shop: Node3D = scene.map.find_child("ShopCounter", true, false)
 	assert_lt(Vector2(LuckyLounge.ODD_JOBS_CABINET.x - shop.global_position.x, LuckyLounge.ODD_JOBS_CABINET.z - shop.global_position.z).length(), 3.0, "next to the Gift Shop")
-	assert_lt(LuckyLounge.ODD_JOBS_CABINET.z, LuckyLounge.SHOP_POS.z, "on the shop's free (north) side, away from the bar")
+	assert_lt(LuckyLounge.ODD_JOBS_CABINET.z, LuckyLounge.SHOP_POS.z, "on the shop's north side")
 	for other: AABB in _boxes(scene.map, "OddJobs", false):
 		for a: AABB in mine:
 			assert_false(a.grow(-0.02).intersects(other), "cabinet overlaps a collider at %s" % other)

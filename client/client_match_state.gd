@@ -81,9 +81,11 @@ var megaphone_holder: int = -1
 ## The waiting room (online lobby only): open or shut, and each player's play-money balance there.
 var waiting_room_open: bool = false
 var fun_balances: Dictionary[int, int] = {}
-## The casino floor of this round, wire form {station id: [game, anchor id]} ({} = the map's full
-## floor), and the server's count of floors drawn this match.
+## The casino floor of this round (docs/FLOOR_PLAN.md): its stations in wire form {station id:
+## [game, [x, y, z], yaw degrees]} ({} = the map's full floor), the layout's id and the server's
+## count of floors put in this match.
 var floor_plan: Dictionary = {}
+var floor_layout: StringName = &""
 var floor_round: int = 0
 ## Highest event sequence number ever applied. A resync (someone sits down, a gap) re-applies a
 ## cached snapshot and replays the events after it; the ones at or below this were already shown,
@@ -305,7 +307,7 @@ func _apply(ev: Dictionary) -> void:
 			rewards = ev["rewards"]
 		&"regroup_started":
 			if _set_floor_plan(ev.get("floor_plan", {})):
-				_feed("The floor has changed! Tonight's games are on the board by the doors.", &"floor")
+				_feed("The floor has changed!", &"floor")
 			regroup_in = float(ev.get("seconds", 5.0))
 			rewards = []
 			for pid: Variant in (ev.get("positions", {}) as Dictionary):
@@ -415,8 +417,8 @@ func _apply(ev: Dictionary) -> void:
 
 
 ## A feed line, unless the event is a replay of one already shown.
-## Takes a floor from the wire ({round, stations}; {} = no news). Tables that closed drop out of
-## `stations`. Returns true when the floor changed.
+## Takes a floor from the wire ({round, layout, stations}; {} = no news). Tables that went or moved
+## drop out of `stations`. Returns true when the floor changed.
 func _set_floor_plan(wire: Variant) -> bool:
 	if typeof(wire) != TYPE_DICTIONARY or not (wire as Dictionary).has("stations"):
 		return false
@@ -425,6 +427,7 @@ func _set_floor_plan(wire: Variant) -> bool:
 		return false
 	var before: Dictionary = floor_plan
 	floor_plan = plan.duplicate(true)
+	floor_layout = StringName((wire as Dictionary).get("layout", &""))
 	floor_round = int((wire as Dictionary).get("round", 0))
 	for sid: Variant in before:
 		if not floor_plan.has(sid) or floor_plan[sid] != before[sid]:

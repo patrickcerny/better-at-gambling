@@ -1,11 +1,12 @@
 class_name MegaphoneLogic
 extends RefCounted
-## Server side of the Megaphone prop (M7): a megaphone on a stand by the bar. A player standing
+## Server side of the Megaphone prop (M7): a megaphone on a stand by the Gift Shop. A player standing
 ## next to it presses E (`megaphone` intent) and for `SECONDS` their voice reaches everyone at
 ## full volume (the voice relay asks `is_holder`). Then it goes back on the stand for a short
 ## cooldown. One holder at a time; money and rules are untouched.
 
-## Where the stand is (in front of the bar, between the stools and the floor, see `CasinoFloor`).
+## Where the stand is (south-west of the Gift Shop, see `CasinoFloor`; a keep-out for the floor
+## layouts, `LuckyLounge.FLOOR_SOLIDS`).
 const STAND_POS: Vector3 = Vector3(16.0, 0.0, 2.5)
 const RANGE: float = 2.2
 const SECONDS: float = 10.0

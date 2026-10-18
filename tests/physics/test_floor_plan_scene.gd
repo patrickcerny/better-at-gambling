@@ -1,9 +1,10 @@
 extends GutTest
-## The per-round casino floor in the real match scene (docs/FLOOR_PLAN.md), Practice with the
-## `floor` setting forced to "random" (Practice itself keeps the full floor): the map builds the
-## server's plan, rebuilds it behind the shut doors at every regroup, closed spots are dressed, the
-## tables never overlap anything, dealers stand at their tables, the navmesh reaches every table
-## and the guards' and waiter's routes stay walkable, and the hall board lists the games.
+## The casino floor's layouts in the real match scene (docs/FLOOR_PLAN.md), Practice with the
+## `floor` setting forced to "random" (Practice itself keeps the full floor): every layout is built
+## once against the real colliders and the navmesh and must fit (no overlaps, every chair reachable,
+## every guard and waiter route point walkable, the jail door, the Race Hall archway and the lobby
+## and VIP doorways clear); the map builds the server's layout and changes it behind the shut doors
+## at every regroup, dealers stand at their tables, and nothing marks a closed spot any more.
 
 var scene: MatchScene
 var events: Array[Dictionary] = []
@@ -50,43 +51,36 @@ func _wait_navmesh() -> void:
 	assert_true(scene.map.navmesh_ready, "navmesh baked again")
 
 
-## Everything the map shows matches the server's plan.
+## Everything the map shows matches the server's layout.
 func _check_floor() -> void:
 	var srv: MatchServer = scene.server
 	var map: LuckyLounge = scene.map
 	assert_eq(map.floor_plan, srv.floor_plan, "the map stands on the server's floor")
 	assert_eq(scene.view.state.floor_plan, srv.floor_plan, "and so does the replicated state")
-	var anchors: Dictionary = {}
-	for a: Dictionary in LuckyLounge.floor_anchors():
-		anchors[a["id"]] = a
-	var used: Dictionary = {}
+	assert_eq(scene.view.state.floor_layout, srv.floor_layout)
 	for sid: StringName in srv.floor_plan:
 		var entry: Array = srv.floor_plan[sid]
 		assert_true(map.stations.has(sid), "%s is built" % sid)
 		var st: StationBase = map.stations.get(sid, null)
 		if st == null:
 			continue
-		var a: Dictionary = anchors[entry[1]]
-		used[entry[1]] = true
-		assert_eq(st.game_id, StringName(entry[0]))
-		assert_almost_eq(st.global_position, a["pos"] as Vector3, Vector3.ONE * 0.01, "%s on spot %s" % [sid, entry[1]])
-		assert_eq(st.is_vip, bool(a["vip"]))
+		assert_eq(st.game_id, FloorPlan.game_of(entry))
+		assert_almost_eq(st.global_position, FloorPlan.pos_of(entry), Vector3.ONE * 0.01, "%s where the layout says" % sid)
+		assert_almost_eq(wrapf(st.global_rotation.y - FloorPlan.yaw_of(entry), -PI, PI), 0.0, 0.001, "%s faces where the layout says" % sid)
+		assert_false(st.is_vip)
 		assert_eq(Vector3(srv.map_def.station_seats[sid][0]), st.seat_position(0), "%s: the server seats people on the real chairs" % sid)
 	for sid: StringName in map.stations:
-		if map.stations[sid].has_meta(&"anchor"):
-			assert_true(srv.floor_plan.has(sid), "%s: no leftover table from an earlier floor" % sid)
-	assert_true(map.stations.has(&"horse_race_1"), "the Race Hall keeps its table")
+		if map.stations[sid].has_meta(&"floor"):
+			assert_true(srv.floor_plan.has(sid), "%s: no leftover table from an earlier layout" % sid)
+	for sid: Variant in LuckyLounge.FIXED_STATIONS:
+		assert_true(map.stations.has(StringName(sid)), "%s keeps its place" % sid)
 	assert_true(map.stations.has(&"fun_blackjack_1"), "the waiting room keeps its tables")
-	var closed: Array = []
-	for c: Node in map.closed_spots.get_children():
-		if not c.is_queued_for_deletion():
-			closed.append(StringName(c.get_meta(&"anchor")))
-	assert_eq(closed.size() + used.size(), anchors.size(), "every closed spot is dressed (rope or plant)")
-	for id: StringName in closed:
-		assert_false(used.has(id), "%s: no rope round an open table" % id)
-	# Dealers: one per blackjack and roulette table, at it, on both sides.
+	assert_null(map.find_child("ClosedSpots", true, false), "no closed spots")
+	assert_null(map.find_child("TonightsFloor", true, false), "no TONIGHT'S FLOOR board")
+	assert_null(map.find_child("ClosedSign", true, false), "no CLOSED TONIGHT sign")
+	# Dealers: one per table that has one, at it, on both sides.
 	for sid: StringName in srv.floor_plan:
-		var game: StringName = StringName(srv.floor_plan[sid][0])
+		var game: StringName = FloorPlan.game_of(srv.floor_plan[sid])
 		if not DealerLogic.OFFSETS.has(game):
 			continue
 		var d: Dealer = scene.casino_floor.dealers.get(sid, null)
@@ -97,23 +91,17 @@ func _check_floor() -> void:
 			var spot: Vector3 = st.global_position + (DealerLogic.OFFSETS[game] as Vector3).rotated(Vector3.UP, st.global_rotation.y)
 			assert_almost_eq(d.position_offset, spot, Vector3.ONE * 0.01, "%s's dealer stands at the table" % sid)
 	for sid: StringName in scene.casino_floor.dealers:
-		assert_true(is_instance_valid(scene.casino_floor.dealers[sid]) and map.stations.has(sid), "%s: no dealer left at a closed table" % sid)
-	for line: String in FloorProps.board_text(srv.floor_plan, LuckyLounge.floor_anchors(), LuckyLounge.fixed_games()).split("\n"):
-		assert_string_contains(map.floor_board.text, line)
+		assert_true(is_instance_valid(scene.casino_floor.dealers[sid]) and map.stations.has(sid), "%s: no dealer left at a table that went" % sid)
 
 
-## Static colliders of each table and closed spot touch nothing but their own parts and the floor.
-func _check_no_overlaps() -> void:
+## Static colliders of each floor table touch nothing but their own parts and the floor.
+func _check_no_overlaps(label: String) -> void:
 	var space: PhysicsDirectSpaceState3D = scene.map.get_world_3d().direct_space_state
-	var roots: Array[Node3D] = []
-	for sid: StringName in scene.map.stations:
-		if scene.map.stations[sid].has_meta(&"anchor"):
-			roots.append(scene.map.stations[sid])
-	for c: Node in scene.map.closed_spots.get_children():
-		if not c.is_queued_for_deletion():
-			roots.append(c as Node3D)
 	var checked: int = 0
-	for root: Node3D in roots:
+	for sid: StringName in scene.map.stations:
+		var root: StationBase = scene.map.stations[sid]
+		if not root.has_meta(&"floor"):
+			continue
 		for body: Node in root.find_children("*", "StaticBody3D", true, false):
 			for cs: Node in body.get_children():
 				if not cs is CollisionShape3D:
@@ -127,141 +115,87 @@ func _check_no_overlaps() -> void:
 					var other: Node = hit["collider"]
 					if root.is_ancestor_of(other) or other.name == "Floor":
 						continue
-					fail_test("%s/%s overlaps %s" % [root.name, body.name, other.get_path()])
-	assert_gt(checked, 20, "colliders checked")
+					fail_test("%s: %s/%s overlaps %s" % [label, root.name, body.name, other.get_path()])
+	assert_gt(checked, 20, "%s: colliders checked" % label)
 
 
-## The navmesh reaches every table there is from the middle of the floor, and the guards' and the
-## waiter's route points are on it.
-func _check_navmesh() -> void:
+## The navmesh reaches every chair of every table from just inside the lobby doors, the guards'
+## and the waiter's route points are on it, and so are the doorways and the jail door.
+func _check_navmesh(label: String) -> void:
 	var nav: RID = scene.map.nav_region.get_navigation_map()
 	var from: Vector3 = Vector3(0, 0, 6.5)
 	for sid: StringName in scene.map.floor_plan:
 		var st: StationBase = scene.map.stations[sid]
-		var target: Vector3 = st.seat_position(0)
-		var near: Vector3 = NavigationServer3D.map_get_closest_point(nav, target)
-		assert_lt(Vector2(near.x - target.x, near.z - target.z).length(), 1.2, "%s: walkable floor by its first chair (%s)" % [sid, near])
-		var path: PackedVector3Array = NavigationServer3D.map_get_path(nav, from, near, true)
-		assert_gt(path.size(), 1, "%s: a path to it" % sid)
-		if path.size() > 0:
-			assert_lt(path[path.size() - 1].distance_to(near), 0.3, "%s: the path gets there (%s at %s, seat %s, path ends %s)" % [sid, st.get_meta(&"anchor", &""), st.global_position, near, path[path.size() - 1]])
+		for i: int in st.seats.size():
+			# The floor by the chair (the table tops are baked too, a little island nobody walks to).
+			var target: Vector3 = st.seat_position(i) * Vector3(1, 0, 1)
+			var near: Vector3 = NavigationServer3D.map_get_closest_point(nav, target)
+			assert_lt(near.y, 0.8, "%s: %s chair %d: the nearest walkable floor is the floor, not a table top (%s)" % [label, sid, i, near])
+			assert_lt(Vector2(near.x - target.x, near.z - target.z).length(), 1.2, "%s: walkable floor by %s chair %d (%s)" % [label, sid, i, near])
+			var path: PackedVector3Array = NavigationServer3D.map_get_path(nav, from, near, true)
+			assert_gt(path.size(), 1, "%s: a path to %s chair %d" % [label, sid, i])
+			if path.size() > 0:
+				assert_lt(path[path.size() - 1].distance_to(near), 0.3, "%s: the path gets to %s chair %d (at %s, seat %s, path ends %s)" % [label, sid, i, st.global_position, near, path[path.size() - 1]])
 	var points: Array[Vector3] = []
 	points.append_array(CasinoFloor.WAITER_ROUTE)
 	for route: Array in LuckyLounge.GUARD_ROUTES:
 		for p: Vector3 in route:
 			points.append(p)
+	# The jail door (outside the gate), the Race Hall archway, inside the lobby doors, the VIP door
+	# from the casino side, and the megaphone stand.
+	for p: Vector3 in [Vector3(19.9, 0, -7.5), Vector3(21.0, 0, -13.25), Vector3(0, 0, 7.4), Vector3(0, 0, -15.0), MegaphoneLogic.STAND_POS + Vector3(-1.0, 0, 0)]:
+		points.append(p)
 	for p: Vector3 in points:
 		var near: Vector3 = NavigationServer3D.map_get_closest_point(nav, p)
-		assert_lt(Vector2(near.x - p.x, near.z - p.z).length(), 0.6, "route point %s stays walkable (%s)" % [p, near])
+		assert_lt(Vector2(near.x - p.x, near.z - p.z).length(), 0.6, "%s: %s stays walkable (%s)" % [label, p, near])
+		var path: PackedVector3Array = NavigationServer3D.map_get_path(nav, from, near, true)
+		if path.size() > 0:
+			assert_lt(path[path.size() - 1].distance_to(near), 0.3, "%s: and can be walked to from the doors (%s)" % [label, p])
+		else:
+			fail_test("%s: no path to %s" % [label, p])
 
 
-func test_the_floor_is_drawn_and_rebuilt_behind_the_doors_at_every_regroup() -> void:
-	var srv: MatchServer = scene.server
-	assert_eq(srv.floor_round, 1, "Practice drew a floor (forced random)")
-	_check_floor()
-	await _wait_navmesh()
-	_check_no_overlaps()
-	_check_navmesh()
-	for round_i: int in [2, 3]:
-		var before: Dictionary = srv.floor_plan.duplicate(true)
-		var money: int = srv.economy.balance(scene.local_id)
-		assert_true(_skip_until(func() -> bool: return srv.phases.phase == Phase.Id.REGROUP))
-		assert_eq(srv.floor_round, round_i)
-		assert_false(scene.map.lobby_open, "the doors are shut while the floor changes")
-		await wait_physics_frames(2)
-		_check_floor()
-		var feed: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == &"regroup_started")
-		assert_eq(int(feed[feed.size() - 1]["floor_plan"]["round"]), round_i)
-		await _wait_navmesh()
-		_check_no_overlaps()
-		_check_navmesh()
-		assert_eq(scene.local.state != PlayerAvatar.State.SEATED, true)
-		if before == srv.floor_plan:
-			gut.p("round %d drew the same floor by chance" % round_i)
-		assert_true(_skip_until(func() -> bool: return srv.phases.phase == Phase.Id.CASINO))
-		assert_true(srv.economy.balance(scene.local_id) >= 0)
-		assert_true(money >= 0)
-
-
-func test_every_game_fits_every_spot_the_draw_allows_it_on() -> void:
-	# The draw's geometry (`FloorGeometry`, from the map's measurements) says where each game fits;
-	# here each such game is built on each such spot with the real colliders, one game at a time,
-	# so a spot the draw has not hit yet can't overlap a wall, the bar or the jail either. Every
-	# spot's usual game fits it (the full floor is a possible draw).
+func test_every_layout_fits_the_real_floor() -> void:
 	var def: MapDefinition = scene.server.map_def
 	var geo: FloorGeometry = FloorGeometry.of_map(def, Registry.floor_plan.gap)
 	assert_not_null(geo, "the map measured its games")
-	var pool: Dictionary = FloorPlan.pool_of(Registry.game_footprints(), Registry.floor_plan)
-	var anchors: Array = def.floor_anchors
-	var full: Dictionary = FloorPlan.full(anchors)
-	var empty: Array[StringName] = []
-	assert_eq(geo.unreachable(full, _by_id(anchors)), empty, "the full floor passes the walkway check")
-	var t0: int = Time.get_ticks_usec()
-	FloorPlan.draw(anchors, pool, Registry.floor_plan, SeededRng.new(5), geo)
-	gut.p("one draw with the walkway check: %.1f ms" % ((Time.get_ticks_usec() - t0) / 1000.0))
-	for a: Dictionary in anchors:
-		assert_true(geo.fits(a, StringName(a["default"])), "%s fits spot %s %s" % [a["default"], a["id"], geo.why_not(a, StringName(a["default"]))])
-		assert_true(geo.clear_of(a, StringName(a["default"]), full, _by_id(anchors)), "the full floor keeps the walkway at %s (%s %s)" % [a["id"], a["default"], geo.world_rect(a, StringName(a["default"]))])
 	for game: StringName in Registry.games:
 		if not geo.rects.has(game):
 			continue
 		var r: Rect2 = geo.rects[game]
 		assert_gt(r.size.x * r.size.y, 0.5, "%s measured (%s)" % [game, r])
-	var layouts: int = 0
-	for fp: Variant in pool:
-		for g: Variant in (pool[fp] as Dictionary).keys():
-			var plan: Dictionary = {}
-			for a: Dictionary in anchors:
-				plan[a["id"]] = StringName(g) if a["footprint"] == fp and geo.fits(a, StringName(g)) else FloorPlan.CLOSED
-			# Neighbours on adjacent spots may clash (the draw keeps them apart); build every
-			# other fitting spot so each spot is checked on its own against the room.
-			for parity: int in 2:
-				var half: Dictionary = {}
-				var n: int = 0
-				for a: Dictionary in anchors:
-					half[a["id"]] = plan[a["id"]] if plan[a["id"]] != FloorPlan.CLOSED and n % 2 == parity else FloorPlan.CLOSED
-					if plan[a["id"]] != FloorPlan.CLOSED:
-						n += 1
-				for id: StringName in geo.unreachable(half, _by_id(anchors)):
-					half[id] = FloorPlan.CLOSED  # cut off: the draw closes it (`FloorPlan._keep_walkable`)
-				var wire: Dictionary = FloorPlan.station_ids(anchors, half, def.floor_prefixes)
-				for sid: Variant in wire.keys():
-					var a: Dictionary = def.floor_anchor(StringName(wire[sid][1]))
-					var others: Dictionary = half.duplicate()
-					if not geo.clear_of(a, StringName(wire[sid][0]), others, _by_id(anchors)):
-						wire.erase(sid)  # two of a kind side by side: the draw never does that
-				scene.map.apply_floor_plan(wire)
-				await _wait_navmesh()
-				_check_no_overlaps()
-				_check_navmesh()
-				layouts += 1
-	assert_gt(layouts, 4)
-
-
-## Whole drawn floors (the walkway check closing what it cuts off) against the real navmesh: no
-## overlaps, every first chair and patrol point reachable. Stressed by hand with 40 draws on two
-## more seeds (1234, 777) when the check was tuned.
-func test_drawn_floors_keep_the_walkways() -> void:
-	var def: MapDefinition = scene.server.map_def
-	var geo: FloorGeometry = FloorGeometry.of_map(def, Registry.floor_plan.gap)
-	var pool: Dictionary = FloorPlan.pool_of(Registry.game_footprints(), Registry.floor_plan)
-	var rng := SeededRng.new(99)
-	var short: int = 0
-	for i: int in 20:
-		var plan: Dictionary = FloorPlan.draw(def.floor_anchors, pool, Registry.floor_plan, rng, geo)
-		for vip: bool in [false, true]:
-			var area: Array = def.floor_anchors.filter(func(a: Dictionary) -> bool: return bool(a["vip"]) == vip)
-			if FloorPlan.filled(area, plan) < ceili(area.size() * Registry.floor_plan.min_filled):
-				short += 1
-		scene.map.apply_floor_plan(FloorPlan.station_ids(def.floor_anchors, plan, def.floor_prefixes))
+	assert_eq(def.floor_layouts.size(), 6)
+	for layout: FloorLayout in def.floor_layouts:
+		var t0: int = Time.get_ticks_usec()
+		var why: Array[String] = FloorPlan.problems(layout, Registry.floor_plan, Registry.games, geo)
+		gut.p("%s: fit check %.1f ms" % [layout.id, (Time.get_ticks_usec() - t0) / 1000.0])
+		assert_eq(why, [] as Array[String], "%s fits the map (overlap, keep-out and walkway check)" % layout.id)
+		assert_eq(scene.server.layout_problems(layout.id), [] as Array[String], "%s can stand on the server" % layout.id)
+		scene.map.apply_floor_plan(layout.wire_stations())
 		await _wait_navmesh()
-		_check_no_overlaps()
-		_check_navmesh()
-	assert_lt(short, 4, "the room rarely stops an area reaching its minimum fill (%d of 40)" % short)
+		_check_no_overlaps(String(layout.id))
+		_check_navmesh(String(layout.id))
 
 
-func _by_id(anchors: Array) -> Dictionary:
-	var out: Dictionary = {}
-	for a: Dictionary in anchors:
-		out[a["id"]] = a
-	return out
+func test_the_layout_changes_behind_the_doors_at_every_regroup() -> void:
+	var srv: MatchServer = scene.server
+	assert_eq(srv.floor_round, 1, "Practice put a layout in (forced rotation)")
+	_check_floor()
+	await _wait_navmesh()
+	_check_no_overlaps(String(srv.floor_layout))
+	for round_i: int in [2, 3]:
+		var before: StringName = srv.floor_layout
+		assert_true(_skip_until(func() -> bool: return srv.phases.phase == Phase.Id.REGROUP))
+		assert_eq(srv.floor_round, round_i)
+		assert_ne(srv.floor_layout, before, "another layout")
+		assert_false(scene.map.lobby_open, "the doors are shut while the floor changes")
+		await wait_physics_frames(2)
+		_check_floor()
+		var feed: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == &"regroup_started")
+		assert_eq(int(feed[feed.size() - 1]["floor_plan"]["round"]), round_i)
+		assert_eq(StringName(feed[feed.size() - 1]["floor_plan"]["layout"]), srv.floor_layout)
+		await _wait_navmesh()
+		_check_no_overlaps(String(srv.floor_layout))
+		assert_true(scene.local.state != PlayerAvatar.State.SEATED)
+		assert_true(_skip_until(func() -> bool: return srv.phases.phase == Phase.Id.CASINO))
+		assert_true(srv.economy.balance(scene.local_id) >= 0)

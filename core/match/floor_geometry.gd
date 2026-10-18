@@ -1,10 +1,13 @@
 class_name FloorGeometry
 extends RefCounted
-## Room for the floor plan's games (docs/FLOOR_PLAN.md), on the ground plane (x, z): how much floor
+## Room for a floor layout's games (docs/FLOOR_PLAN.md), on the ground plane (x, z): how much floor
 ## each game takes (its table, chairs and dealer, measured from its station by the map), where
-## tables may stand, what they must keep clear of (walls, bar, shop, jail, doors, patrol routes),
-## the gap between two tables, and a walkway check over the whole drawn floor (every chair and
-## patrol point still reachable). Pure (the map fills it in; tests without a map have none).
+## tables may stand, what they must keep clear of (pillars, shop, jail, doors, patrol routes), the
+## gap between two tables, and a walkway check over the whole layout (every chair and patrol point
+## still reachable). Pure (the map fills it in; tests without a map have none).
+##
+## A spot is a Dictionary {id, pos (Vector3), yaw (radians)}: where one station of a layout stands
+## (`FloorPlan.spots`). A plan here is station id → game id.
 
 ## Walkway grid cell, metres.
 const CELL: float = 0.25
@@ -16,7 +19,7 @@ const POINT_REACH: float = 0.6
 const MIN_ISLAND: int = 4
 ## How much farther than the reachable floor a pocket next to a chair must be, metres.
 const POCKET_MARGIN: float = 0.25
-## A cut-off patrol point blames the nearest drawn game within this range.
+## A cut-off patrol point blames the nearest game within this range.
 const BLAME_RANGE: float = 3.0
 ## Grid margin round an area, metres (its walls are among the blockers).
 const GRID_MARGIN: float = 1.0
@@ -25,10 +28,9 @@ const GRID_MARGIN: float = 1.0
 var rects: Dictionary = {}
 ## Game id → its chairs in its own frame (Array of Vector2 x, z).
 var seats: Dictionary = {}
-## Game id → what of it the navmesh walks round (Rect2s, own frame); footprint → the same for a
-## closed spot's dressing; everything else on the map the navmesh walks round (world Rect2s).
+## Game id → what of it the navmesh walks round (Rect2s, own frame); everything else on the map
+## the navmesh walks round (world Rect2s).
 var obstacles: Dictionary = {}
-var closed_obstacles: Dictionary = {}
 var blockers: Array[Rect2] = []
 ## World rects tables may stand in (a game must lie wholly inside one) and rects they keep out of.
 var areas: Array[Rect2] = []
@@ -52,7 +54,6 @@ static func of_map(def: MapDefinition, p_gap: float) -> FloorGeometry:
 	g.areas.assign(def.floor_areas)
 	g.keep_out.assign(def.floor_keep_out)
 	g.obstacles = def.floor_obstacles
-	g.closed_obstacles = def.floor_closed_obstacles
 	g.blockers.assign(def.floor_blockers)
 	g.entries.assign(def.floor_entries)
 	g.walk_points.assign(def.floor_walk_points)
@@ -61,7 +62,7 @@ static func of_map(def: MapDefinition, p_gap: float) -> FloorGeometry:
 
 
 ## A game's floor on a spot in world (x, z): its rect turned by the spot's yaw (the bounding box
-## of the turned rect; spots face the four walls, so it is exact there).
+## of the turned rect; layouts face the four walls, so it is exact there).
 func world_rect(anchor: Dictionary, game: StringName) -> Rect2:
 	return _turned(anchor, rects.get(game, Rect2()))
 
@@ -113,15 +114,15 @@ func why_not(anchor: Dictionary, game: StringName) -> String:
 	return ""
 
 
-## True when the game on `anchor` keeps `gap` to every game already on the other spots
-## (`placed`: anchor id → game, CLOSED for none; `by_id`: anchor id → anchor).
+## True when the game on `anchor` keeps `gap` to every game on the other spots (`placed`: spot
+## id → game; `by_id`: spot id → spot).
 func clear_of(anchor: Dictionary, game: StringName, placed: Dictionary, by_id: Dictionary) -> bool:
 	if not rects.has(game):
 		return true
 	var w: Rect2 = world_rect(anchor, game)
 	for id: Variant in placed:
 		var other: StringName = StringName(placed[id])
-		if other == FloorPlan.CLOSED or StringName(id) == StringName(anchor["id"]) or not rects.has(other):
+		if other == &"" or StringName(id) == StringName(anchor["id"]) or not rects.has(other):
 			continue
 		var o: Rect2 = world_rect(by_id[id], other)
 		if w.intersects(o) or separation(w, o) < gap:
@@ -130,10 +131,10 @@ func clear_of(anchor: Dictionary, game: StringName, placed: Dictionary, by_id: D
 
 
 ## The walkway check: can the guards and the waiter (and so anyone) still walk from an area's
-## entry to every drawn chair and every patrol point? It redoes the navmesh's bake on a coarse
-## grid (`CELL`, the bake's own cell): everything the navmesh walks round (the map's blockers, the
-## drawn games' colliders, the closed spots' posts and pots) grown by its agent radius, flooded from
-## the entries. True when the map gave what it needs (no check without).
+## entry to every chair and every patrol point? It redoes the navmesh's bake on a coarse grid
+## (`CELL`, the bake's own cell): everything the navmesh walks round (the map's blockers and the
+## layout's games' colliders) grown by its agent radius, flooded from the entries. True when the
+## map gave what it needs (no check without).
 func can_walk() -> bool:
 	return not entries.is_empty() and not obstacles.is_empty()
 
@@ -148,7 +149,7 @@ func world_seats(anchor: Dictionary, game: StringName) -> Array[Vector2]:
 	return out
 
 
-## Spots of `plan` (anchor id → game) whose game can't be walked to: a chair whose nearest open
+## Spots of `plan` (spot id → game) whose game can't be walked to: a chair whose nearest open
 ## floor nobody reaches from the entry (the navmesh's closest point would sit in a pocket), or the
 ## nearest game to a patrol point that was cut off. Empty when all is well.
 func unreachable(plan: Dictionary, by_id: Dictionary) -> Array[StringName]:
@@ -156,7 +157,7 @@ func unreachable(plan: Dictionary, by_id: Dictionary) -> Array[StringName]:
 	var placed: Dictionary = {}
 	for id: Variant in plan:
 		var g: StringName = StringName(plan[id])
-		if g != FloorPlan.CLOSED and rects.has(g):
+		if g != &"" and rects.has(g):
 			placed[StringName(id)] = world_rect(by_id[id], g)
 	for area: Rect2 in areas:
 		var grid: WalkGrid = _walk_grid(area, plan, by_id)
@@ -203,7 +204,7 @@ func _walk_grid(area: Rect2, plan: Dictionary, by_id: Dictionary) -> WalkGrid:
 	for id: Variant in plan:
 		var a: Dictionary = by_id[id]
 		var g: StringName = StringName(plan[id])
-		var local: Array = obstacles.get(g, []) if g != FloorPlan.CLOSED else closed_obstacles.get(StringName(a["footprint"]), [])
+		var local: Array = obstacles.get(g, [])
 		for lr: Rect2 in local:
 			var w: Rect2 = _turned(a, lr)
 			if bounds.intersects(w, true):

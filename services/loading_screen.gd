@@ -19,7 +19,7 @@ const TIPS: Array[String] = [
 	"The jackpot grows with every Slots and Plinko bet. Three Diamonds take it all.",
 	"The Casino Quiz pays the fastest correct answers best.",
 	"Out of Order signs close the nearest table for 30 seconds.",
-	"Press {interact} at the Gift Shop next to the bar: one purchase per round.",
+	"Press {interact} at the Gift Shop on the east wall: one purchase per round.",
 	"Spend items before the next minigame: everyone gets a new one after it, and you can only carry three.",
 	"At blackjack, {bj_hit} hits, {bj_stand} stands, {bj_double} doubles and {bj_split} splits a pair.",
 	"Settings live under {pause}, in game and in the menu.",

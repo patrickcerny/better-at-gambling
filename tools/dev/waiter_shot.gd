@@ -1,6 +1,6 @@
 extends Node3D
 ## Dev: the waiter NPC carrying his tray, a second one mid-trip next to his drink puddle, and the
-## Megaphone stand by the bar, in the Lucky Lounge. Run with tools/screenshot.gd
+## Megaphone stand by the Gift Shop, in the Lucky Lounge. Run with tools/screenshot.gd
 ## --scene res://tools/dev/waiter_shot.tscn (pass `-- --cam far` for the wide view).
 
 

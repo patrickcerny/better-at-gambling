@@ -1,141 +1,254 @@
-# Floor plan: a new casino floor every round
+# Floor layouts: a different casino floor every round
 
-Patrick: "Make it, that everytime the casino round starts, the games are randomized. So its not that
-everything is always there, its random."
+Patrick (0.9.11): "After every minigame, the games (and layout change). Dont think about the room
+as games with fixed spots, rather have x amounts of rearrangements of the room (tested, with a good
+usefull layout) and then rotate between these layouts." "There shouldn't be an out of order sign
+if a game is not available. There should be just another layout that gets put in."
 
-Every casino round of an online match (dedicated server or host-on-PC, both run a room server)
-starts on a freshly drawn floor. Practice keeps the full floor. Minigames-only matches have no
-casino floor, so nothing is drawn there.
+This replaces the random spot draw of 0.9.10. The design notes behind the layouts (how each game
+wants to stand, the first sketches) are in `FLOOR_LAYOUTS.md` in the project files.
 
-## What is fixed, what is drawn
+## What a layout is
 
-The Lucky Lounge's floor is a set of fixed **spots** (anchors). Each spot has a place, a facing and
-a size class, and the full floor (Practice, menu panorama) puts its usual game on each one.
+A layout (`FloorLayout`, `data/floor_layouts/<id>.tres`) is a list of stations: station id →
+[game, position, yaw degrees], the same form as `LuckyLounge.STATIONS`. It moves and turns the
+casino floor's games only. The room never changes: the walls, the lobby doors, the VIP lounge and
+its four stations, the Race Hall and its horse race (`LuckyLounge.FIXED_STATIONS`), the waiting
+room's play-money tables, the Gift Shop, Odd Jobs, the megaphone stand, the jail and the pillars.
+There is no bar any more (Patrick: "the casino bar (its useless)"), so its strip by the east wall is
+floor like any other.
 
-| Size class | Fits | Spots on the Lucky Lounge |
-|---|---|---|
-| `table` | blackjack, roulette, craps, Hi-Lo, the Wheel of Fortune, and any new table game (the default) | 8 on the floor, 2 in the VIP lounge |
-| `cabinet` | slot machines | 12 on the floor, 2 in the VIP lounge |
-| `big` | Plinko | 2 on the floor |
-| `kiosk` | the scratch card counter | 1, in the west end of the entrance hall |
+Yaw: 0 puts the players on the south side (+z) and the dealer or cabinet north; 180 flips it; 90
+puts the players east, −90 west (its back to the east wall).
 
-The spots come from `LuckyLounge.STATIONS`: every line whose game is not `fixed` is a spot of its
-game's size (`GameDefinition.floor_footprint`), so the full floor is always one possible outcome.
-Spot ids are `t1..t8`, `c1..c12`, `b1..b2`, `k1`, `vt1..vt2`, `vc1..vc2` (the first letter of the
-size class, numbered in STATIONS order).
+The layouts are listed, in order, in `data/balance/floor_plan.tres` (`FloorPlanConfig.layouts`).
+The first one, The Grand Hall, is the full floor: `LuckyLounge.STATIONS` is that layout plus the
+fixed stations (one source of truth, the layout file), and Practice, the menu panorama and the map
+as built stand on it. Adding a layout is a new `.tres` listed there; nothing in code changes.
 
+## How the games stand
 
+- **Wheel of Fortune**: a signboard that only reads from the front, so its back is always to a
+  wall or to the back of a slot bank, never to a walkway or the middle of the room.
+- **Craps**: the players' long side faces a walkway; the stickman's side is against another craps
+  table (The Pit) or open floor.
+- **Blackjack**: dealers backed by a wall or by each other (The Salon's triangle, Wheel Night's
+  table by the lobby wall), the round side to the open floor.
+- **Roulette**: an island; two of them mirrored (yaw 0 and 180) when they share an aisle.
+- **Hi-Lo**: corners and row ends.
+- **Slots**: banks of three or more, back to back or with their backs to a wall.
+- **Plinko**: on the north wall, where the drop is seen from far away.
+- **Scratch cards**: a services counter, beside the Gift Shop (south of it on the east wall, or
+  north of Odd Jobs) or against the lobby wall inside the casino. Never in the entrance hall.
 
-These never change: the Race Hall and its horse race (`floor_footprint = fixed`), the waiting
-room's play-money tables, the Odd Jobs cabinet, the Gift Shop, the bar, the settings tablet, the
-jail and the walls. Dealers follow their tables.
+## The layouts
 
-## The draw
+Centres are world (x, z), north is −z, the lobby doors are at z 8.4 (x −2.75..2.75).
 
-At every casino round start the server draws each spot afresh from its own seeded RNG (the match
-seed, so a match replays exactly). Per area (casino floor, VIP lounge):
+### The Grand Hall (`grand_hall`)
 
-1. Each spot is closed with `empty_chance` (15 %), otherwise it gets a game of its size by weight,
-   among the games that fit there (see "Room to stand" below).
-2. Soft cap: at most `max_per_type` (2) tables of one game per area (cabinets and the kiosk are not capped).
-3. If fewer than `min_filled` (60 %) of the area's spots are open, closed spots reopen until the
-   minimum is met; the cap only gives way if the minimum can't be met without it. The room rules
-   never give way: a spot where nothing fits stays closed.
-4. The walkway check runs over the whole drawn floor; a game it cuts off closes, and closed spots
-   are topped up again (towards the minimum) with games that keep everything walkable.
+blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 12, wheel 1
 
-## Room to stand
+| Station | Game | Centre (x, z) | Yaw |
+|---|---|---|---|
+| slot_1..6 | slots | x -20, -17.5, -15, -12.5, -10, -7.5; z -13.5 | 180 |
+| slot_7..12 | slots | x -20, -17.5, -15, -12.5, -10, -7.5; z -8.5 | 0 |
+| plinko_1 | plinko | (11, -14.5) | 0 |
+| plinko_2 | plinko | (17.5, -14.5) | 0 |
+| hilo_1 | hilo | (18.6, -4.8) | 0 |
+| craps_1 | craps | (14, -6) | 0 |
+| scratch_1 | scratch | (20.45, 4.85) | -90 |
+| roulette_1 | roulette | (-6, -3) | 0 |
+| roulette_2 | roulette | (6, -3) | 180 |
+| blackjack_1 | blackjack | (-16, 4) | 0 |
+| blackjack_2 | blackjack | (-9, 4) | 0 |
+| blackjack_3 | blackjack | (-2, 4) | 0 |
+| wheel_1 | wheel | (14.5, 6.2) | 180 |
 
-Tables are not all the same size (a craps table is 4.3 m long, the wheel stands on its own, the
-spots by the east wall are tight), so the size class alone can't say what fits where. The draw
-also checks the room (`FloorGeometry`):
+### Wheel Night (`wheel_night`)
 
-- **Measured games.** When the map loads (`LuckyLounge.measure_floor`) it builds each drawable game's
-  station once out of sight and takes the floor it covers in its own frame: its colliders, its
-  chairs (+-0.3 m) and its dealer (+-0.35 m). Nothing to keep up by hand; a new game is measured too.
-- **Floor areas** (`LuckyLounge.FLOOR_AREAS`): the casino floor, the VIP lounge and the west end of
-  the entrance hall. A game has to lie wholly inside one.
-- **Keep-outs** (`LuckyLounge.FLOOR_SOLIDS` and `FLOOR_CLEAR`): pillars, the bar and stools, the
-  Gift Shop, Odd Jobs, a plant, the VIP statues and busts, the settings tablet, the hall plant; and
-  floor that must stay open: the jail door, the Race Hall archway, the lobby and VIP doorways and a
-  square round every guard and waiter route point. A game's floor may not touch any of them.
-- **Gap** (`gap`, 0.35 m): two drawn games keep this much floor between their chairs. 0.35 m is the
-  tightest pair on the full floor (craps and Hi-Lo), so the full floor stays a possible draw.
-- **Walkway check.** Rects alone miss pockets made by several things together (on a test floor a
-  craps table in the VIP lounge left the strip by the west wall walkable but shut in between a
-  statue, the table and a slot machine, and the guards' navmesh had no way to its chairs). So the
-  draw redoes the navmesh bake on a coarse grid (0.25 m cells like the bake, `FloorGeometry`
-  `WalkGrid`): everything the navmesh walks round (the map's own colliders, measured once:
-  `floor_blockers`; each drawn game's colliders and each closed spot's posts or pot, measured once
-  in their own frame) grown by the agent radius, tiny islands dropped like the bake does, then
-  flooded from each area's entry (`LuckyLounge.FLOOR_ENTRIES`). A game is cut off when a chair's
-  nearest open floor isn't reached (a shut-in pocket about as close counts: the navmesh's closest
-  point would land there), or when it is the nearest game to a patrol point that was cut off. It
-  costs about 40 ms per draw on the server, once per round.
+blackjack 3, craps 1, plinko 2, roulette 2, scratch 1, slots 9, wheel 1
 
-The server only measures when a map scene is loaded (room servers and the host always have one);
-without measurements (unit and integration tests with a bare map definition) the size class alone
-decides.
+| Station | Game | Centre (x, z) | Yaw |
+|---|---|---|---|
+| wheel_1 | wheel | (5.4, -13.8) | 0 |
+| plinko_1 | plinko | (-6, -14.5) | 0 |
+| plinko_2 | plinko | (11.5, -14.5) | 0 |
+| slot_1..3 | slots | x -20, -18.7, -17.4; z -15.3 | 0 |
+| slot_4..6 | slots | x -21; z -11, -9.7, -8.4 | 90 |
+| slot_7..9 | slots | x -20, -18.7, -17.4; z 7.6 | 180 |
+| blackjack_1 | blackjack | (-12, -7.6) | 0 |
+| blackjack_2 | blackjack | (-5, -7.6) | 0 |
+| craps_1 | craps | (13, -7) | 0 |
+| roulette_1 | roulette | (-6.5, 3.6) | 0 |
+| roulette_2 | roulette | (7, 3.8) | 180 |
+| blackjack_3 | blackjack | (14, 6.3) | 180 |
+| scratch_1 | scratch | (20.45, 4.85) | -90 |
 
-The scratch card counter has a class of its own (`kiosk`). Tried as a cabinet it fitted the slot
-rows on paper, but its counter, stool and attendant closed the lanes to the slot chairs beside it,
-so it only ever stands on its own spot at the west end of the entrance hall, open or closed
-tonight like any other.
+### The Pit (`the_pit`)
 
-Nothing is guaranteed: any game may be missing in a round, and a spot may get the same game twice
-in a row by chance. A closed spot is never left bare: table and Plinko spots get a velvet rope on
-brass posts with a CLOSED TONIGHT sign, slot and kiosk spots a potted plant (`FloorProps`).
+blackjack 3, craps 2, hilo 1, plinko 2, roulette 1, scratch 1, slots 6, wheel 1
+
+| Station | Game | Centre (x, z) | Yaw |
+|---|---|---|---|
+| plinko_1 | plinko | (-17, -14.5) | 0 |
+| plinko_2 | plinko | (-11, -14.5) | 0 |
+| slot_1..6 | slots | x 4, 5.3, 6.6, 7.9, 9.2, 10.5; z -15.3 | 0 |
+| blackjack_1 | blackjack | (-9, -6.5) | 0 |
+| blackjack_2 | blackjack | (-2, -6.5) | 0 |
+| blackjack_3 | blackjack | (5, -6.5) | 0 |
+| craps_1 | craps | (15.2, -7.6) | 180 |
+| craps_2 | craps | (15.2, -3) | 0 |
+| wheel_1 | wheel | (-19.8, -4) | 90 |
+| roulette_1 | roulette | (-10, 3) | 0 |
+| hilo_1 | hilo | (8, 3.5) | 0 |
+| scratch_1 | scratch | (5.6, 6.85) | 180 |
+
+### The Arcade (`the_arcade`)
+
+blackjack 1, hilo 1, plinko 2, roulette 1, scratch 1, slots 18, wheel 1
+
+| Station | Game | Centre (x, z) | Yaw |
+|---|---|---|---|
+| hilo_1 | hilo | (-18, -13.8) | 0 |
+| wheel_1 | wheel | (-12.5, -13.8) | 0 |
+| slot_1..3 | slots | x 3.6, 4.9, 6.2; z -15.3 | 0 |
+| plinko_1 | plinko | (12.5, -14.5) | 0 |
+| plinko_2 | plinko | (17.5, -14.5) | 0 |
+| slot_4..6 | slots | x -20, -18.7, -17.4; z -9 | 180 |
+| slot_7..9 | slots | x -20, -18.7, -17.4; z -7.9 | 0 |
+| slot_10..12 | slots | x -10, -8.7, -7.4; z -9 | 180 |
+| slot_13..15 | slots | x -10, -8.7, -7.4; z -7.9 | 0 |
+| roulette_1 | roulette | (8, -5) | 0 |
+| blackjack_1 | blackjack | (-5, 3) | 0 |
+| slot_16..18 | slots | x 13, 14.3, 15.6; z 7.6 | 180 |
+| scratch_1 | scratch | (20.45, 5.4) | -90 |
+
+### The Long Room (`the_long_room`)
+
+blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 16, wheel 1
+
+| Station | Game | Centre (x, z) | Yaw |
+|---|---|---|---|
+| plinko_1 | plinko | (-5, -14.5) | 0 |
+| plinko_2 | plinko | (5, -14.5) | 0 |
+| slot_1..10 | slots | x -21; z -13.5, -12.2, -10.9, -9.6, -6.1, -4.8, -3.5, 1.5, 2.8, 4.1 | 90 |
+| slot_11..16 | slots | x 9.85; z -14.2, -12.9, -11.6, -10.3, -9, -7.7 | 90 |
+| blackjack_1 | blackjack | (-8.6, -9.7) | 90 |
+| craps_1 | craps | (-8.4, -5.3) | 90 |
+| blackjack_2 | blackjack | (-8.6, 1.6) | 90 |
+| blackjack_3 | blackjack | (-8.6, 5.9) | 90 |
+| wheel_1 | wheel | (5.6, -9.9) | -90 |
+| roulette_1 | roulette | (5, -4.7) | -90 |
+| roulette_2 | roulette | (5, 0.9) | -90 |
+| hilo_1 | hilo | (6, 6.05) | -90 |
+| scratch_1 | scratch | (20.45, 5.4) | -90 |
+
+### The Salon (`the_salon`)
+
+blackjack 3, hilo 2, roulette 2, scratch 1, slots 9, wheel 1
+
+| Station | Game | Centre (x, z) | Yaw |
+|---|---|---|---|
+| roulette_1 | roulette | (-7, -12.5) | 0 |
+| roulette_2 | roulette | (7, -12.5) | 180 |
+| hilo_1 | hilo | (-18, -9.5) | 0 |
+| hilo_2 | hilo | (16.5, -11.3) | 0 |
+| blackjack_1 | blackjack | (-3.5, -6.7) | 180 |
+| blackjack_2 | blackjack | (3.5, -6.7) | 180 |
+| blackjack_3 | blackjack | (0, -2.9) | 0 |
+| wheel_1 | wheel | (19.6, 5.9) | -90 |
+| slot_1..9 | slots | x -19, -17.7, -16.4, -9, -7.7, -6.4, 8, 9.3, 10.6; z 7.6 | 180 |
+| scratch_1 | scratch | (20.45, -4.4) | -90 |
+
+## Fitting the room (the proof)
+
+Every layout has to fit the real map before it can stand (`FloorPlan.problems`, `FloorGeometry`):
+
+- **Measured games.** When the map loads (`LuckyLounge.measure_floor`) it builds each game's station
+  once out of sight and takes the floor it covers in its own frame: its colliders, its chairs
+  (±0.3 m) and its dealer (±0.35 m).
+- **Floor area** (`LuckyLounge.FLOOR_AREAS`): the casino floor only. A game lies wholly inside it.
+- **Keep-outs** (`LuckyLounge.FLOOR_SOLIDS` and `FLOOR_CLEAR`): the pillars (two on the floor, two
+  in the lobby wall), a plant by the west wall, the megaphone stand, the Gift Shop, Odd Jobs and
+  the plant beside it; and floor that must stay open: the jail door, the Race Hall archway, the
+  lobby and VIP doorways and a square round every guard and waiter route point.
+- **Gap** (`gap`, 0.35 m): two games of a layout keep this much floor between their chairs.
+- **Walkway check.** The navmesh bake redone on a coarse grid (0.25 m cells), everything it walks
+  round grown by the agent radius and flooded from inside the lobby doors
+  (`LuckyLounge.FLOOR_ENTRIES`): every chair and every patrol point must be reached.
+
+The server checks each layout once per match (about 50–90 ms each) and skips one that fails, with a
+warning in the log. `tests/physics/test_floor_plan_scene.gd` builds every layout in the real match
+scene against the real colliders and the baked navmesh and fails on any overlap, any chair whose
+nearest walkable floor can't be walked to from the doors, a guard or waiter route point off the
+navmesh, or the jail door, the Race Hall archway, the lobby doors, the VIP door or the megaphone
+stand cut off. A layout that ships has passed it.
+
+## The rotation
+
+`FloorRotation`, like the minigame bag (`MinigameDirector`): the enabled layouts go into a bag
+shuffled from the match seed (its own stream, so the rotation never shifts the match's other
+random draws, and a match replays exactly).
+
+- The lobby opening (and Play Again, which starts a fresh bag) takes the first layout: it stands
+  behind the shut doors while people wait. Every regroup takes the next.
+- No layout comes twice before the bag is empty, and a fresh bag never starts with the layout that
+  just stood.
+- **No closed spots.** A layout that can't be used is skipped and the next one in the bag is taken:
+  a game it needs has weight 0 in `floor_plan.tres` (or is not registered), or it failed the fit
+  check on this map. If no layout can be used, the first one stands. There are no ropes, CLOSED
+  TONIGHT signs, plants on empty spots or boards any more.
+- Practice keeps The Grand Hall (`rotate_in_practice` false); minigames-only matches have no casino
+  floor and never change it.
 
 When it happens:
 
-- **Lobby opens** (and again on Play Again): the first round's floor stands behind the shut doors
-  and is on the board while people wait.
+- **Lobby opens** (and again on Play Again).
 - **Every regroup**: everyone is in the entrance hall behind the shut doors, the minigame already
   refunded every bet and stood everyone up, so the floor is switched there. Anyone still seated at
-  a table that goes is stood up (`player_stood`, reason `floor_changed`) and its open bets refunded.
+  a table that goes or moves is stood up (`player_stood`, reason `floor_changed`) and its open bets
+  refunded. A hot table that goes or moves cools down.
 
 ## Station ids
 
-Stations keep game-named ids, numbered per game in spot order: `blackjack_1`, `slot_4`,
-`vip_roulette_1`. A table keeps its logic (blackjack shoe and all) when its id and game stay; the
-others close and new ones open. This kept every id-based path (HUD labels, items, dealers, tests,
-autosit) unchanged. The waiting room (`fun_`) and the horse race keep their own ids.
+Stations keep game-named ids, numbered per game in each layout: `blackjack_1`, `slot_14`,
+`craps_2`. A table keeps its logic (blackjack shoe and all) only when its id, game, place and
+facing all stay; one that moves is a fresh table in its new place (`StationManager.apply_stations`
+`moved`). The VIP lounge (`vip_`), the waiting room (`fun_`) and the horse race keep their own ids
+and never move.
 
 ## Players see it
 
-- **TONIGHT'S FLOOR** board on the entrance hall's side of the lobby wall, right of the doors: the
-  games on the floor with their counts, the VIP lounge's games, the Race Hall and how many spots are
-  closed tonight.
-- Feed line at the regroup: "The floor has changed! Tonight's games are on the board by the doors."
+- The feed line at the regroup: "The floor has changed!"
+- The doors open on the new floor.
 
-## On the wire
+## On the wire (PROTOCOL_VERSION 9)
 
-- `match_started`, `regroup_started` and `match_reset` carry `floor_plan: {round, stations:
-  {station id: [game, spot id]}}` (`{}` in `regroup_started` when nothing was drawn).
-- The snapshot carries `floor_plan` (late joiners and reconnects build the floor from it).
-- Clients rebuild the map's stations, closed spots, dealers and board from it and take a fresh
-  snapshot so tables that closed drop out of their cached station states. The host's map rebuilds
-  synchronously from the server (`MatchServer.floor_changed`) so seats are known before anyone sits.
+- `match_started`, `regroup_started` and `match_reset` carry `floor_plan: {round, layout, stations:
+  {station id: [game, [x, y, z], yaw degrees]}}` (`{}` in `regroup_started` when the floor did not
+  change).
+- The snapshot carries `floor_plan` too (late joiners and reconnects build the floor from it).
+- Clients build the casino's stations from the payload's games, places and facings, not from
+  `STATIONS`, and take a fresh snapshot so tables that went drop out of their cached station states.
+  The host's map rebuilds synchronously from the server (`MatchServer.floor_changed`) so seats are
+  known before anyone sits.
 - The navmesh is baked again after each switch, so guards and the waiter path round the new tables.
 
 ## Tuning (data only)
 
-`data/balance/floor_plan.tres` (`FloorPlanConfig`): `draw_in_rooms`, `draw_in_practice`,
-`min_filled`, `empty_chance`, `max_per_type`, `capped_footprints`, `default_weight`, `weights`
-(game id → weight; 0 takes a game off the floor), `gap` (walkway between drawn games, metres).
-The floor areas, keep-outs and entries are the map's (`LuckyLounge.FLOOR_AREAS`, `FLOOR_SOLIDS`,
-`FLOOR_CLEAR`, `FLOOR_ENTRIES`). Dev and tests: `--floor random|full` or `MatchScene.test_floor`
-override the room/Practice rule.
+`data/balance/floor_plan.tres` (`FloorPlanConfig`): `rotate_in_rooms`, `rotate_in_practice`,
+`layouts` (in order; the first is the full floor), `weights` (game id → weight; 0 takes a game off
+the floor and every layout that needs it is skipped), `gap`. A layout's `enabled = false` takes it
+out of the rotation. Dev and tests: `--floor random|full|<layout id>` or `MatchScene.test_floor`
+override the room/Practice rule (a layout id puts that layout in every round);
+`tools/dev/tutorial_shot.gd --view floor --floor <layout id>` renders the floor from inside the
+lobby doors.
 
 ## Adding a table game
 
-Register it in `data/registry/games.tres` as usual and add one line to `LuckyLounge.STATIONS` where
-it stands on the full floor (that line becomes a new spot), plus its case in `_make_station` (or a
-`station_scene`). It joins the draw automatically with `default_weight`. If it is not table-sized,
-set `floor_footprint` in its `.tres` (`cabinet` for a slot-machine-sized box, `big` for something
-Plinko-sized): a game is only ever put on spots of its own size, and only where its measured floor
-fits and leaves everything walkable. If its own spot is next to a wall, door or patrol point,
-check the keep-outs. `tests/physics/test_floor_plan_scene.gd` checks that the full floor passes,
-builds every game on every spot the draw allows it on with the real colliders, and 20 whole drawn
-floors against the real navmesh, and fails on any overlap or a chair or patrol point the navmesh
-can't reach.
+Register it in `data/registry/games.tres` as usual, add its case in `LuckyLounge._make_station` (or a
+`station_scene`), and place it in the layouts where it should stand (at least The Grand Hall if it
+is on the full floor). `tests/physics/test_floor_plan_scene.gd` then proves every layout still fits.
+A game that keeps a place of its own (like the horse race) sets `floor_footprint = fixed` and goes
+in `LuckyLounge.FIXED_STATIONS` instead.

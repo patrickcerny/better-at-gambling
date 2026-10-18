@@ -9,7 +9,7 @@ var maps: Dictionary[StringName, MapDefinition] = {}
 var balance: BalanceConfig
 var presets: MatchPresets
 var loot: LootTableConfig
-## The per-round casino floor's tuning (docs/FLOOR_PLAN.md).
+## The casino floor's layouts and their rotation (docs/FLOOR_PLAN.md).
 var floor_plan: FloorPlanConfig
 ## Quiz questions (validated; invalid entries are logged and dropped).
 var quiz_bank: QuestionBank
@@ -45,14 +45,6 @@ static func load_question_bank(path: String) -> QuestionBank:
 	for e: String in QuestionBank.validate(data):
 		Log.error(&"registry", "%s: %s" % [path, e])
 	return QuestionBank.from_data(data)
-
-
-## Game id → floor size class (`GameDefinition.floor_footprint`), for the floor plan's pool.
-func game_footprints() -> Dictionary:
-	var out: Dictionary = {}
-	for id: StringName in games:
-		out[id] = games[id].floor_footprint
-	return out
 
 
 ## Game id → logic Script, for the StationManager.

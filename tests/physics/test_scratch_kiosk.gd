@@ -1,7 +1,7 @@
 extends GutTest
-## The scratch-card kiosk in the real match scene: the counter stands in the start room west of the
-## settings tablet, clear of every other collider, its attendant on the floor behind it; the spot
-## in front of the stool is free and reachable over the navmesh from the start room and the casino;
+## The scratch-card kiosk in the real match scene: on the full floor the counter stands on the casino
+## floor by the Gift Shop (never in the entrance hall), clear of every other collider, its attendant
+## on the floor behind it; the spot in front of the stool is free and reachable over the navmesh;
 ## sitting down opens the card panel, a bought card slides onto the counter and is gone once it has
 ## paid.
 
@@ -50,12 +50,12 @@ func _solids(root: Node, mine: Node, include_mine: bool) -> Array[AABB]:
 
 func test_kiosk_stands_where_the_map_says_without_overlaps() -> void:
 	var st: ScratchStation = _kiosk()
-	assert_not_null(st, "the kiosk is built from the STATIONS table")
+	assert_not_null(st, "the kiosk is built from the STATIONS table (the full floor's layout)")
 	assert_eq(st.game_id, &"scratch")
-	assert_almost_eq(st.global_position, Vector3(-19, 0, 10), Vector3.ONE * 0.001)
-	assert_almost_eq(st.rotation.y, PI * 0.5, 0.001, "the counter faces east into the room")
-	assert_lt(st.global_position.z, LuckyLounge.SIZE_Z * 0.5, "inside the start room")
-	assert_gt(st.global_position.z, LuckyLounge.LOBBY_DOORS_Z, "south of the lobby doors")
+	assert_almost_eq(st.global_position, LuckyLounge.STATIONS[SID][1] as Vector3, Vector3.ONE * 0.001)
+	assert_almost_eq(st.rotation.y, -PI * 0.5, 0.001, "its back to the east wall, the counter facing west into the room")
+	assert_lt(st.global_position.z, LuckyLounge.LOBBY_DOORS_Z, "on the casino floor, not in the entrance hall (Patrick)")
+	assert_lt(st.global_position.distance_to(LuckyLounge.SHOP_POS), 4.0, "by the Gift Shop")
 	var mine: Array[AABB] = _solids(scene.map, st, true)
 	assert_gte(mine.size(), 4, "counter, attendant, board posts and stool are solid")
 	for other: AABB in _solids(scene.map, st, false):

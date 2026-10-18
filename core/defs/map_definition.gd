@@ -41,25 +41,22 @@ extends Resource
 @export var fun_stations: Dictionary = {}
 ## The waiting room's inner volume (filled by the map scene).
 @export var waiting_area: AABB = AABB()
-## The casino floor's spots for the per-round floor plan (docs/FLOOR_PLAN.md; filled by the map
-## scene, empty = a fixed floor that never changes): [{id, footprint, vip, default, pos, yaw}] in
-## map order, `default` being the game the spot has on the full floor, `yaw` in radians.
-@export var floor_anchors: Array = []
-## Game id → station id stem (slots → slot) so the drawn stations keep the usual names.
-@export var floor_prefixes: Dictionary = {}
-## Room for the draw (`FloorGeometry`): game id → its floor in its own frame (Rect2 over x, z;
+## The casino floor's layouts (docs/FLOOR_PLAN.md, `FloorLayout`; filled by the map scene from
+## `FloorPlanConfig.layouts`, empty = a fixed floor that never changes), the first being the full
+## floor the map is built with.
+@export var floor_layouts: Array[FloorLayout] = []
+## Room for the layouts (`FloorGeometry`): game id → its floor in its own frame (Rect2 over x, z;
 ## measured by the map scene, empty = no geometry check), world rects tables may stand in, and
 ## world rects they keep clear of.
 @export var floor_rects: Dictionary = {}
 @export var floor_areas: Array = []
 @export var floor_keep_out: Array = []
 ## For the walkway check (measured by the map scene): game id → its chairs (Vector2 x, z) and
-## what of it the navmesh walks round (Rect2s), both in its own frame; footprint → a closed spot's
-## dressing the same way; everything else on the map the navmesh walks round (world Rect2s);
-## where people come into each area, and points the guards and waiter walk to.
+## what of it the navmesh walks round (Rect2s), both in its own frame; everything else on the map
+## the navmesh walks round (world Rect2s); where people come into each area, and points the guards
+## and waiter walk to.
 @export var floor_seats: Dictionary = {}
 @export var floor_obstacles: Dictionary = {}
-@export var floor_closed_obstacles: Dictionary = {}
 @export var floor_blockers: Array = []
 @export var floor_entries: Array = []
 @export var floor_walk_points: Array = []
@@ -110,14 +107,14 @@ func has_waiting_room() -> bool:
 	return not fun_stations.is_empty() and waiting_area.has_volume()
 
 
-## True when the map has spots for a per-round floor plan.
+## True when the map has floor layouts to rotate.
 func has_floor_plan() -> bool:
-	return not floor_anchors.is_empty()
+	return not floor_layouts.is_empty()
 
 
-## A floor spot by id ({} when unknown).
-func floor_anchor(anchor_id: StringName) -> Dictionary:
-	for a: Dictionary in floor_anchors:
-		if a["id"] == anchor_id:
-			return a
-	return {}
+## A floor layout by id (null when unknown).
+func floor_layout(layout_id: StringName) -> FloorLayout:
+	for l: FloorLayout in floor_layouts:
+		if l != null and l.id == layout_id:
+			return l
+	return null

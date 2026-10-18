@@ -1,13 +1,14 @@
 class_name CrapsUi
 extends StationUi
-## Craps overlay: a strip at the bottom so the felt and the dice stay in view. The come-out or the
-## point, who shoots and the throw countdown on top; the last roll under it; four bet buttons
-## (Pass Line, Don't Pass, Field, Any Seven) with the odds the felt prints, your stake on each and
-## a dot per other player; chips, clear, and the SHOOT button for the shooter. Click a bet to put
-## the selected chip on it, the bet key adds another chip to the bet you picked last.
+## Craps overlay: a column down the right third of the screen, so the felt and the dice fill the
+## rest (the seat camera frames them on the left). The come-out or the point and the throw
+## countdown on top; who shoots or the last roll under it; four bet buttons (Pass Line, Don't
+## Pass, Field, Any Seven) with the odds the felt prints, your stake on each and a dot per other
+## player; chips, clear, and the SHOOT button for the shooter. Click a bet to put the selected
+## chip on it, Enter adds another chip to the bet you picked last, the repeat key shoots. How it
+## works is folded away under the key hint.
 
-const STRIP_WIDTH: float = 880.0
-const BET_SIZE: Vector2 = Vector2(190, 74)
+const BET_SIZE: Vector2 = Vector2(268, 92)
 const BET_COLORS: Dictionary = {
 	&"pass": Color("#2E6B4E"), &"dont_pass": Color("#2B2422"), &"field": Color("#2F5A73"), &"any_seven": Color("#9A2F36"),
 }
@@ -30,8 +31,8 @@ func _init() -> void:
 	game_title = "CRAPS"
 
 
-func _panel_height() -> float:
-	return 268.0
+func _dock_column() -> bool:
+	return true
 
 
 ## Locked while bets are open; with the dice in the air you may look around.
@@ -40,39 +41,35 @@ func wants_camera_lock() -> bool:
 
 
 func _build() -> void:
-	panel.offset_left = -STRIP_WIDTH * 0.5
-	panel.offset_right = STRIP_WIDTH * 0.5
-	body.add_theme_constant_override(&"separation", 6)
+	body.add_theme_constant_override(&"separation", 10)
 	status_label.add_theme_font_size_override(&"font_size", 22)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.custom_minimum_size = Vector2(120, 0)
 	roll_label = Label.new()
 	roll_label.name = "Roll"
 	roll_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	roll_label.add_theme_font_size_override(&"font_size", 18)
+	roll_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	roll_label.custom_minimum_size = Vector2(120, 0)
+	roll_label.add_theme_font_size_override(&"font_size", 19)
 	roll_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
 	body.add_child(roll_label)
-	var row := HBoxContainer.new()
+	var row := GridContainer.new()
 	row.name = "Bets"
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override(&"separation", 8)
+	row.columns = 2
+	row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	row.add_theme_constant_override(&"h_separation", 8)
+	row.add_theme_constant_override(&"v_separation", 8)
 	body.add_child(row)
 	for t: StringName in CrapsLogic.BET_TYPES:
 		row.add_child(_bet_button(t))
-	var bets_row := HBoxContainer.new()
+	var bets_row := VBoxContainer.new()
 	bets_row.name = "BetsRow"
-	bets_row.add_theme_constant_override(&"separation", 10)
+	bets_row.add_theme_constant_override(&"separation", 8)
 	body.add_child(bets_row)
-	my_bets = Label.new()
-	my_bets.name = "MyBets"
-	my_bets.theme_type_variation = &"SmallLabel"
-	my_bets.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	my_bets.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	my_bets.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	my_bets.custom_minimum_size = Vector2(180, 0)
-	my_bets.add_theme_font_size_override(&"font_size", 15)
-	bets_row.add_child(my_bets)
 	bet_panel = BetPanel.new()
-	bet_panel.chip_size = Vector2(62, 42)
-	bet_panel.chip_gap = 6
+	bet_panel.chip_size = Vector2(66, 44)
+	bet_panel.chip_gap = 8
+	bet_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	bet_panel.add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
 	bet_panel.cleared.connect(func() -> void: send(&"clear_bets"))
 	bet_panel.confirmed.connect(func(_a: int) -> void:
@@ -82,11 +79,20 @@ func _build() -> void:
 		if shoot_button.visible and not shoot_button.disabled:
 			shoot())
 	bets_row.add_child(bet_panel)
+	my_bets = Label.new()
+	my_bets.name = "MyBets"
+	my_bets.theme_type_variation = &"SmallLabel"
+	my_bets.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	my_bets.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	my_bets.custom_minimum_size = Vector2(120, 0)
+	my_bets.add_theme_font_size_override(&"font_size", 16)
+	bets_row.add_child(my_bets)
 	shoot_button = Button.new()
 	shoot_button.name = "Shoot"
 	shoot_button.focus_mode = Control.FOCUS_NONE
-	shoot_button.custom_minimum_size = Vector2(150, 52)
-	shoot_button.add_theme_font_size_override(&"font_size", 20)
+	shoot_button.custom_minimum_size = Vector2(280, 58)
+	shoot_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	shoot_button.add_theme_font_size_override(&"font_size", 22)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Palette.WARM_GOLD
 	sb.set_corner_radius_all(8)
@@ -129,6 +135,13 @@ func shoot() -> bool:
 
 func _hint_text() -> String:
 	return "%s Stand up   ·   %s shoot when you have the dice" % [InputGlyphs.hint(&"leave_station"), InputGlyphs.hint(&"bet_repeat")]
+
+
+func _rules_text() -> String:
+	return ("Pick a chip, then click a bet. Pass Line and Don't Pass go down on the come-out roll only, one side each: "
+		+ "7 or 11 wins the Pass Line, 2, 3 or 12 loses it (Don't Pass wins on 2 and 3, 12 pushes), any other number becomes the point, and the line bets ride until "
+		+ "the point comes again (Pass wins) or a 7 (Don't Pass wins). Field and Any Seven are one-roll bets, open whenever bets are. "
+		+ "The shooter throws once someone has bet.")
 
 
 func _relabel() -> void:
@@ -234,7 +247,7 @@ func _bet_button(t: StringName) -> Button:
 	b.text = String(BET_LINES[t])
 	b.custom_minimum_size = BET_SIZE
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override(&"font_size", 15)
+	b.add_theme_font_size_override(&"font_size", 19)
 	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	for state_name: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color"]:
 		b.add_theme_color_override(state_name, Palette.CREAM)

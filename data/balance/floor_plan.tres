@@ -1,14 +1,18 @@
-[gd_resource type="Resource" script_class="FloorPlanConfig" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="FloorPlanConfig" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://core/defs/floor_plan_config.gd" id="1"]
+[ext_resource type="Script" path="res://core/defs/floor_layout.gd" id="2"]
+[ext_resource type="Resource" path="res://data/floor_layouts/grand_hall.tres" id="3"]
+[ext_resource type="Resource" path="res://data/floor_layouts/wheel_night.tres" id="4"]
+[ext_resource type="Resource" path="res://data/floor_layouts/the_pit.tres" id="5"]
+[ext_resource type="Resource" path="res://data/floor_layouts/the_arcade.tres" id="6"]
+[ext_resource type="Resource" path="res://data/floor_layouts/the_long_room.tres" id="7"]
+[ext_resource type="Resource" path="res://data/floor_layouts/the_salon.tres" id="8"]
 
 [resource]
 script = ExtResource("1")
-draw_in_rooms = true
-draw_in_practice = false
-min_filled = 0.6
-empty_chance = 0.15
-max_per_type = 2
-default_weight = 1.0
+rotate_in_rooms = true
+rotate_in_practice = false
+layouts = Array[ExtResource("2")]([ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8")])
 weights = {}
 gap = 0.35

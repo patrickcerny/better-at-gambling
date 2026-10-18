@@ -44,7 +44,7 @@ var loot: LootTables
 var items: ItemSystem
 ## The Odd Jobs button-smash cabinet next to the Gift Shop (broke players earn $50 a bar).
 var odd_jobs: OddJobs
-## The waiter NPC's trips and drink puddles, and the Megaphone prop by the bar (M7, npc/).
+## The waiter NPC's trips and drink puddles, and the Megaphone prop by the Gift Shop (M7, npc/).
 var waiter: WaiterLogic
 var megaphone: MegaphoneLogic
 ## Dealers at blackjack, roulette and craps tables (v0.8.4, npc/): station_id → DealerLogic.
@@ -99,19 +99,25 @@ var _room: WalkableLogicBase = null
 ## The waiting room's play-money games while an online room waits in LOBBY (null otherwise, and
 ## for maps without one). Its own ledger: see `FunRoom`.
 var fun_room: FunRoom = null
-## The casino floor of this round (docs/FLOOR_PLAN.md), wire form {station id: [game, anchor id]}
-## ({} on a map without floor spots), and how many floors this match has drawn. Online rooms draw
-## a new one when the lobby opens and at every regroup; Practice keeps the full floor.
+## The casino floor of this round (docs/FLOOR_PLAN.md): the layout standing (its id, &"" on a map
+## without layouts), its stations in wire form {station id: [game, [x, y, z], yaw degrees]}, and
+## how many floors this match has put in. Online rooms take the next layout from the rotation when
+## the lobby opens and at every regroup; Practice keeps the full floor (the first layout).
 var floor_plan: Dictionary = {}
+var floor_layout: StringName = &""
 var floor_round: int = 0
-## Tuning for the draw (Registry.floor_plan unless a test sets its own).
+## The layouts and their rules (Registry.floor_plan unless a test sets its own).
 var floor_config: FloorPlanConfig
 ## Called with the new plan right after the server switched floors (the host's map rebuilds and
 ## refills the station seats in `map_def`; tests leave it unset).
 var floor_changed: Callable
-## Stations that never move with the floor plan (the horse race): station id → game id.
+## Stations that never move with the floor layouts (the horse race, the VIP lounge): station id →
+## game id.
 var _fixed_stations: Dictionary = {}
-var _floor_rng: SeededRng
+## The shuffled bag of layouts (seeded from the match seed), and each layout's fit on this map
+## (layout id → its problems, `FloorPlan.problems`; measured once per match).
+var _floor_rotation: FloorRotation
+var _layout_fit: Dictionary = {}
 
 
 ## Wires balance/presets/registry data. Call before `add_player`/`start_match`.
@@ -145,8 +151,9 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	if floor_config == null:
 		floor_config = Registry.floor_plan
 	_fixed_stations = map_def.stations.duplicate()
-	for a: Dictionary in map_def.floor_anchors:
-		_fixed_stations.erase(StringName(a["station"]))
+	if map_def.has_floor_plan():
+		for sid: Variant in map_def.floor_layouts[0].stations:
+			_fixed_stations.erase(StringName(sid))
 	floor_plan = _full_floor()  # the map scene was built with the full floor
 	_build_match_systems(int(settings.get("seed", 0)))
 	Log.info(&"server", "configured: %d minigames, %.0f s gambling between, seed %d, %d stations" % [state.minigames, state.gamble_s, state.match_seed, stations.logics.size()])
@@ -178,12 +185,14 @@ func _build_match_systems(seed_value: int) -> void:
 	pickups = PickupSystem.new(economy)
 	interactions = InteractionResolver.new(rules, world, economy, pickups, rng.fork())
 	_build_schedule()
-	# The full floor first (a seed of its own, so the draws never shift the match's other streams);
-	# `_new_floor` below draws tonight's floor where the match does that.
-	_floor_rng = SeededRng.new(seed_value ^ 0xF1002)
+	# The full floor first; `_new_floor` below puts in the rotation's first layout where the match
+	# rotates them (a seed of its own, so the rotation never shifts the match's other streams).
+	_floor_rotation = FloorRotation.new(_rotation_ids(), SeededRng.new(seed_value ^ 0xF1002), _full_layout_id())
+	_layout_fit.clear()
 	floor_round = 0
 	if map_def.has_floor_plan():
 		_set_floor_stations(_full_floor())
+		floor_layout = _full_layout_id()
 	stations = StationManager.new()
 	stations.setup(map_def.stations, _logic_scripts, balance, economy, modifiers, rng.fork(), jackpot, _vip_ids())
 	hot_tables = HotTableDirector.new(stations, balance, rng.fork())
@@ -218,7 +227,7 @@ func _build_match_systems(seed_value: int) -> void:
 	if draws_floor():
 		_new_floor()
 	elif map_def.has_floor_plan() and floor_changed.is_valid():
-		floor_changed.call(floor_plan)  # Play Again without draws: back to the full floor
+		floor_changed.call(floor_plan)  # Play Again without a rotation: back to the full floor
 
 
 ## Dealers at each blackjack and roulette table (v0.8.4), again whenever the floor changes.
@@ -239,58 +248,105 @@ func _vip_ids() -> Array:
 	return vip_ids
 
 
-# --- Floor plan (docs/FLOOR_PLAN.md) -----------------------------------------------------------
+# --- Floor layouts (docs/FLOOR_PLAN.md) -------------------------------------------------------
 
-## True when this match draws a random floor at each casino round start: the map has floor spots,
-## and it is an online room (`FloorPlanConfig.draw_in_rooms`) or Practice with `draw_in_practice`.
-## The `floor` setting overrides: "random" always draws (dev/tests), "full" never does.
+## True when this match rotates the floor layouts at each casino round start: the map has layouts,
+## and it is an online room (`FloorPlanConfig.rotate_in_rooms`) or Practice with
+## `rotate_in_practice`. The `floor` setting overrides: "random" always rotates (dev/tests), "full"
+## never does, and a layout id puts that layout in every round (dev renders).
 func draws_floor() -> bool:
 	if not map_def.has_floor_plan():
 		return false
-	match String(settings.get("floor", "")):
+	var forced: String = String(settings.get("floor", ""))
+	match forced:
 		"random":
 			return true
 		"full":
 			return false
-	return floor_config.draw_in_rooms if room_mode else floor_config.draw_in_practice
+	if forced != "" and map_def.floor_layout(StringName(forced)) != null:
+		return true
+	return floor_config.rotate_in_rooms if room_mode else floor_config.rotate_in_practice
 
 
-## The full floor in wire form: every spot with its usual game under its usual id.
+## The full floor (the map's first layout) in wire form.
 func _full_floor() -> Dictionary:
-	var out: Dictionary = {}
-	for a: Dictionary in map_def.floor_anchors:
-		out[StringName(a["station"])] = [StringName(a["default"]), StringName(a["id"])]
+	return map_def.floor_layouts[0].wire_stations() if map_def.has_floor_plan() else {}
+
+
+func _full_layout_id() -> StringName:
+	return map_def.floor_layouts[0].id if map_def.has_floor_plan() else &""
+
+
+## The layouts in the rotation: the map's enabled ones, in order.
+func _rotation_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for l: FloorLayout in map_def.floor_layouts:
+		if l != null and l.enabled:
+			out.append(l.id)
 	return out
 
 
-## Draws tonight's floor from the match's floor RNG and switches to it.
+## Why a layout can't stand tonight (empty when it can): a game of it is off or unknown, or it
+## does not fit this map (`FloorPlan.problems`; the geometry is checked once per match).
+func layout_problems(layout_id: StringName) -> Array[String]:
+	var layout: FloorLayout = map_def.floor_layout(layout_id)
+	var out: Array[String] = FloorPlan.problems(layout, floor_config, Registry.games)
+	if layout == null or not out.is_empty():
+		return out
+	if not _layout_fit.has(layout_id):
+		var geo: FloorGeometry = FloorGeometry.of_map(map_def, floor_config.gap)
+		var fit: Array[String] = []
+		if geo != null:
+			fit = FloorPlan.fit_problems(layout.wire_stations(), geo)
+		_layout_fit[layout_id] = fit
+		for why: String in fit:
+			Log.warn(&"server", "floor layout %s skipped: %s" % [layout_id, why])
+	out.append_array(_layout_fit[layout_id] as Array[String])
+	return out
+
+
+## Puts in the next layout from the rotation (one that can be used tonight; a layout pinned by the
+## `floor` setting instead) and switches the casino to it.
 func _new_floor() -> void:
-	var pool: Dictionary = FloorPlan.pool_of(Registry.game_footprints(), floor_config)
-	var plan: Dictionary = FloorPlan.draw(map_def.floor_anchors, pool, floor_config, _floor_rng, FloorGeometry.of_map(map_def, floor_config.gap))
-	_apply_floor(FloorPlan.station_ids(map_def.floor_anchors, plan, map_def.floor_prefixes))
+	var pinned: StringName = StringName(String(settings.get("floor", "")))
+	var next: StringName
+	if map_def.floor_layout(pinned) != null:
+		next = pinned
+	else:
+		next = _floor_rotation.next(func(id: StringName) -> bool: return layout_problems(id).is_empty())
+	var layout: FloorLayout = map_def.floor_layout(next)
+	if layout == null:
+		layout = map_def.floor_layouts[0]
+	_apply_floor(layout.wire_stations(), layout.id)
 
 
-## Switches the casino to a floor plan (wire form). Anyone still seated at a table that closes or
-## moves is stood up first (nobody should be: bets are refunded and seats emptied when the minigame
-## starts, and again at the regroup); a hot table that closes goes cold.
-func _apply_floor(plan: Dictionary) -> void:
+## Switches the casino to a floor layout (wire form; `layout_id` names it). Anyone still seated at
+## a table that goes or moves is stood up first and their open bets refunded (nobody should be:
+## bets are refunded and seats emptied when the minigame starts, and again at the regroup); a
+## table that moves is a fresh table in its new place, and a hot table that goes or moves cools.
+func _apply_floor(plan: Dictionary, layout_id: StringName = &"") -> void:
 	for id: int in state.players:
 		var sid: StringName = stations.station_of(id)
 		if sid != &"" and not _fixed_stations.has(sid) and plan.get(sid, []) != floor_plan.get(sid, []):
 			stand_up(id, &"floor_changed")
+	var moved: Array[StringName] = []
+	for sid: Variant in plan:
+		if floor_plan.has(sid) and plan[sid] != floor_plan[sid]:
+			moved.append(StringName(sid))
 	_set_floor_stations(plan)
+	floor_layout = layout_id
 	floor_round += 1
-	stations.apply_stations(map_def.stations, _vip_ids())
-	if hot_tables != null and hot_tables.current != &"" and not stations.logics.has(hot_tables.current):
+	stations.apply_stations(map_def.stations, _vip_ids(), moved)
+	if hot_tables != null and hot_tables.current != &"" and (not stations.logics.has(hot_tables.current) or hot_tables.current in moved):
 		hot_tables.stop()
 	_build_dealers()
-	Log.info(&"server", "floor %d: %d stations" % [floor_round, plan.size()])
+	Log.info(&"server", "floor %d: layout %s, %d stations" % [floor_round, layout_id, plan.size()])
 	if floor_changed.is_valid():
 		floor_changed.call(floor_plan)
 
 
 ## Points the map definition at a plan: its stations (the fixed ones plus the plan's), where they
-## stand and face (from their spots) and their seats (kept for stations that stay put; the host's
+## stand and face (from the plan) and their seats (kept for stations that stay put; the host's
 ## map refills the rest through `floor_changed`).
 func _set_floor_stations(plan: Dictionary) -> void:
 	var all: Dictionary = _fixed_stations.duplicate()
@@ -303,12 +359,9 @@ func _set_floor_stations(plan: Dictionary) -> void:
 				pair[1][sid] = pair[0][sid]
 	for sid: Variant in plan:
 		var entry: Array = plan[sid]
-		var a: Dictionary = map_def.floor_anchor(StringName(entry[1]))
-		all[StringName(sid)] = StringName(entry[0])
-		if a.is_empty():
-			continue
-		positions[StringName(sid)] = a["pos"]
-		yaws[StringName(sid)] = float(a["yaw"])
+		all[StringName(sid)] = FloorPlan.game_of(entry)
+		positions[StringName(sid)] = FloorPlan.pos_of(entry)
+		yaws[StringName(sid)] = FloorPlan.yaw_of(entry)
 		if map_def.station_seats.has(sid) and floor_plan.get(sid, []) == entry:
 			seats[StringName(sid)] = map_def.station_seats[sid]
 	# New dictionaries: a duplicated MapDefinition shares them with the registry's.
@@ -319,9 +372,10 @@ func _set_floor_stations(plan: Dictionary) -> void:
 	floor_plan = plan.duplicate(true)
 
 
-## The floor for the wire (events, snapshot): {round, stations: {station id: [game, anchor id]}}.
+## The floor for the wire (events, snapshot): {round, layout, stations: {station id: [game,
+## [x, y, z], yaw degrees]}}. Clients build the casino's stations from it.
 func floor_wire() -> Dictionary:
-	return {"round": floor_round, "stations": floor_plan.duplicate(true)} if map_def.has_floor_plan() else {}
+	return {"round": floor_round, "layout": floor_layout, "stations": floor_plan.duplicate(true)} if map_def.has_floor_plan() else {}
 
 
 func _build_schedule() -> void:
@@ -335,7 +389,7 @@ func _build_schedule() -> void:
 func open_lobby() -> void:
 	room_mode = true
 	if draws_floor():
-		_new_floor()  # tonight's floor stands behind the shut doors (and on the hall board) already
+		_new_floor()  # tonight's layout stands behind the shut doors already
 	_open_fun_room()
 
 
@@ -721,7 +775,7 @@ func _refund_and_stand_everyone() -> void:
 ## After the rewards everyone is back in the entrance hall (Patrick's note #10): holds end,
 ## ragdolls and knockouts are over, bodies go to their hall spot and the doors stay shut for
 ## `regroup_time` seconds. `regroup_started {seconds, positions: {player: [x, y, z]}, floor_plan}`
-## (`floor_plan` is the new floor when this regroup drew one, else {}).
+## (`floor_plan` is the new layout when this regroup put one in, else {}).
 func _start_regroup() -> void:
 	if _room != null:
 		for id: int in _room.roster:
@@ -741,7 +795,7 @@ func _start_regroup() -> void:
 			set_server_position(id, spot)
 			positions[id] = Serializer.vec3(spot)
 	# The next casino round: everyone is in the hall behind the shut doors, nobody is seated, so
-	# the floor is redrawn now (Patrick: "everytime the casino round starts, the games are randomized").
+	# the next layout goes in now (Patrick: "After every minigame, the games (and layout change)").
 	var floor_now: Dictionary = {}
 	if draws_floor() and not MatchMode.is_minigames_only(settings):
 		_new_floor()
