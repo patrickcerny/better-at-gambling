@@ -1,19 +1,21 @@
 class_name WheelUi
 extends StationUi
-## Wheel of Fortune overlay: a slim strip at the bottom so the wheel stays in view. Pick a chip,
-## click a symbol (in the wheel's colours, with the odds it pays) to put the chip on it; Enter puts
-## another chip on the symbol you clicked last. Any number of symbols, up to the table maximum per
-## spin. Shows the countdown to the spin, the result, the last spins, your stake per symbol and a
-## dot per other player on each symbol.
+## Wheel of Fortune overlay: a column down the right third of the screen, so the wheel and the
+## layout fill the rest (the seat camera frames them on the left). Pick a chip, click a symbol (in
+## the wheel's colours, with the odds it pays) to put the chip on it; Enter puts another chip on
+## the symbol you clicked last. Any number of symbols, up to the table maximum per spin. Shows the
+## countdown to the spin, the result, the last spins, your stake per symbol and a dot per other
+## player on each symbol; how it works is folded away under the key hint.
 
-const STRIP_WIDTH: float = 900.0
-const SYMBOL_SIZE: Vector2 = Vector2(112, 70)
+## Symbol buttons: size and how many to a row in the column.
+const SYMBOL_SIZE: Vector2 = Vector2(128, 88)
+const SYMBOL_COLUMNS: int = 4
 
 var bet_panel: BetPanel
 var symbol_buttons: Array[Button] = []
 var result_label: Label
 ## Your stake and the chips.
-var bets_row: HBoxContainer
+var bets_row: VBoxContainer
 var my_bets: Label
 ## The symbol the local player clicked last (−1 = none yet); Enter adds a chip on it.
 var selected_symbol: int = -1
@@ -25,8 +27,8 @@ func _init() -> void:
 	game_title = "WHEEL OF FORTUNE"
 
 
-func _panel_height() -> float:
-	return 300.0
+func _dock_column() -> bool:
+	return true
 
 
 ## Locked while bets are open (the spin itself you may watch with the head free).
@@ -35,45 +37,49 @@ func wants_camera_lock() -> bool:
 
 
 func _build() -> void:
-	panel.offset_left = -STRIP_WIDTH * 0.5
-	panel.offset_right = STRIP_WIDTH * 0.5
-	body.add_theme_constant_override(&"separation", 6)
+	body.add_theme_constant_override(&"separation", 10)
 	status_label.add_theme_font_size_override(&"font_size", 22)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.custom_minimum_size = Vector2(120, 0)
 	result_label = Label.new()
 	result_label.name = "Result"
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_label.add_theme_font_size_override(&"font_size", 18)
+	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	result_label.custom_minimum_size = Vector2(120, 0)
+	result_label.add_theme_font_size_override(&"font_size", 19)
 	result_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
 	body.add_child(result_label)
-	var row := HBoxContainer.new()
+	var row := GridContainer.new()
 	row.name = "Symbols"
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override(&"separation", 6)
+	row.columns = SYMBOL_COLUMNS
+	row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	row.add_theme_constant_override(&"h_separation", 8)
+	row.add_theme_constant_override(&"v_separation", 8)
 	body.add_child(row)
 	for i: int in WheelLogic.SYMBOLS.size():
 		row.add_child(_symbol_button(i))
-	bets_row = HBoxContainer.new()
+	bets_row = VBoxContainer.new()
 	bets_row.name = "BetsRow"
-	bets_row.add_theme_constant_override(&"separation", 10)
+	bets_row.add_theme_constant_override(&"separation", 8)
 	body.add_child(bets_row)
-	my_bets = Label.new()
-	my_bets.name = "MyBets"
-	my_bets.theme_type_variation = &"SmallLabel"
-	my_bets.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	my_bets.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	my_bets.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	my_bets.custom_minimum_size = Vector2(220, 0)
-	my_bets.add_theme_font_size_override(&"font_size", 15)
-	bets_row.add_child(my_bets)
 	bet_panel = BetPanel.new()
-	bet_panel.chip_size = Vector2(62, 42)
-	bet_panel.chip_gap = 6
+	bet_panel.chip_size = Vector2(66, 44)
+	bet_panel.chip_gap = 8
+	bet_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	bet_panel.add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
 	bet_panel.cleared.connect(func() -> void: send(&"clear_bets"))
 	bet_panel.confirmed.connect(func(_a: int) -> void:
 		if selected_symbol >= 0:
 			bet_on(selected_symbol))
 	bets_row.add_child(bet_panel)
+	my_bets = Label.new()
+	my_bets.name = "MyBets"
+	my_bets.theme_type_variation = &"SmallLabel"
+	my_bets.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	my_bets.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	my_bets.custom_minimum_size = Vector2(120, 0)
+	my_bets.add_theme_font_size_override(&"font_size", 16)
+	bets_row.add_child(my_bets)
 
 
 func _on_open() -> void:
@@ -91,7 +97,12 @@ func bet_on(symbol: int) -> bool:
 
 
 func _hint_text() -> String:
-	return "%s Stand up   ·   chips on any symbols, the wheel pays the odds shown" % InputGlyphs.hint(&"leave_station")
+	return "%s Stand up   ·   %s another chip on your last symbol" % [InputGlyphs.hint(&"leave_station"), InputGlyphs.hint(&"bet_confirm")]
+
+
+func _rules_text() -> String:
+	return ("Pick a chip, then click a symbol to put it there; chips on as many symbols as you like, up to the table maximum per spin. "
+		+ "The dealer spins %d s after the first bet; the symbol under the clicker pays the odds on its button, the rest goes to the house.") % int(Registry.balance.wheel_countdown)
 
 
 func _refresh() -> void:
@@ -163,7 +174,7 @@ func _symbol_button(i: int) -> Button:
 	b.name = "Symbol%d" % i
 	b.custom_minimum_size = SYMBOL_SIZE
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override(&"font_size", 17)
+	b.add_theme_font_size_override(&"font_size", 21)
 	b.text = "%s\n%s" % [WheelLogic.LABELS[i], WheelLogic.odds_text(i)]
 	b.tooltip_text = "%s: %d of the 54 segments, pays %s" % [WheelLogic.LABELS[i], WheelLogic.COUNTS[i], WheelLogic.odds_text(i)]
 	var text_color: Color = WheelStation.TEXT_COLORS[i]

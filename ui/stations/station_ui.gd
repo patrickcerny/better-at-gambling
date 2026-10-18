@@ -20,12 +20,21 @@ var title: Label
 var status_label: Label
 var hint: Label
 var limits_mult: float = 1.0
+## Right-hand column (`_dock_column`): its width, its gap to the right and top edges (clear of the
+## HUD's clock), and its gap to the bottom (clear of the HUD's rank).
+const COLUMN_WIDTH: float = 600.0
+const COLUMN_MARGIN: Vector2 = Vector2(24.0, 196.0)
+const COLUMN_BOTTOM: float = 104.0
+
 ## Display name shown in the header.
 var game_title: String = "GAME"
 ## True at a waiting-room table (`FunRoom`): play money, shown as such under the title.
 var fun: bool = false
 ## "PLAY MONEY $1,000" under the title at a waiting-room table (hidden elsewhere).
 var play_money_label: Label
+## The folded "HOW IT WORKS" line and its text (null unless `_rules_text` gives one).
+var rules_toggle: Button
+var rules_label: Label
 ## InputGlyphs.epoch the key hints were last written for.
 var _glyph_epoch: int = -1
 
@@ -57,6 +66,19 @@ func _ready() -> void:
 		panel.offset_bottom = _panel_height() * 0.5
 		panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 		panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	if _dock_column():
+		# A column down the right third, under the HUD's clock and over its rank: the table fills
+		# the left two thirds of the screen (the seat camera frames it there).
+		panel.anchor_left = 1.0
+		panel.anchor_right = 1.0
+		panel.anchor_top = 0.0
+		panel.anchor_bottom = 1.0
+		panel.offset_left = -(COLUMN_WIDTH + COLUMN_MARGIN.x)
+		panel.offset_right = -COLUMN_MARGIN.x
+		panel.offset_top = COLUMN_MARGIN.y
+		panel.offset_bottom = -COLUMN_BOTTOM
+		panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	add_child(panel)
 	body = VBoxContainer.new()
 	body.add_theme_constant_override(&"separation", 10)
@@ -78,12 +100,22 @@ func _ready() -> void:
 	status_label.add_theme_font_size_override(&"font_size", 26)
 	body.add_child(status_label)
 	_build()
+	if _dock_column():
+		# The key hint and the folded rules sit at the foot of the column.
+		var push := Control.new()
+		push.name = "Push"
+		push.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		push.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		body.add_child(push)
 	hint = Label.new()
 	hint.theme_type_variation = &"SmallLabel"
 	hint.text = _hint_text()
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_color_override(&"font_color", Color("#9A8F7A"))
 	body.add_child(hint)
+	var how: String = _rules_text()
+	if not how.is_empty():
+		_add_rules(how)
 
 
 ## Shows the overlay for a station.
@@ -103,6 +135,36 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 	_on_open()
 	_update_glyphs()
 	_refresh()
+
+
+## How the game works, folded away under the key hint: one small "HOW IT WORKS" line that opens
+## the text (and shows it as its tooltip), so the explanation takes no screen space by default.
+func _add_rules(text: String) -> void:
+	rules_toggle = Button.new()
+	rules_toggle.name = "RulesToggle"
+	rules_toggle.flat = true
+	rules_toggle.toggle_mode = true
+	rules_toggle.focus_mode = Control.FOCUS_NONE
+	rules_toggle.text = "HOW IT WORKS  ▸"
+	rules_toggle.tooltip_text = text
+	rules_toggle.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rules_toggle.add_theme_font_size_override(&"font_size", 15)
+	for state_name: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color", &"font_hover_pressed_color"]:
+		rules_toggle.add_theme_color_override(state_name, Palette.WARM_GOLD)
+	body.add_child(rules_toggle)
+	rules_label = Label.new()
+	rules_label.name = "Rules"
+	rules_label.theme_type_variation = &"SmallLabel"
+	rules_label.text = text
+	rules_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rules_label.custom_minimum_size = Vector2(120, 0)
+	rules_label.add_theme_font_size_override(&"font_size", 15)
+	rules_label.add_theme_color_override(&"font_color", Palette.CREAM.darkened(0.15))
+	rules_label.visible = false
+	body.add_child(rules_label)
+	rules_toggle.toggled.connect(func(on: bool) -> void:
+		rules_label.visible = on
+		rules_toggle.text = "HOW IT WORKS  ▾" if on else "HOW IT WORKS  ▸")
 
 
 func close() -> void:
@@ -218,6 +280,17 @@ func wants_camera_lock() -> bool:
 ## True for overlays that sit at the right edge instead of over the middle of the screen.
 func _dock_right() -> bool:
 	return false
+
+
+## True for overlays that fill a column down the right third of the screen, top to bottom, so the
+## table (framed by the seat camera in the left two thirds) is never covered.
+func _dock_column() -> bool:
+	return false
+
+
+## Override: how the game works, folded away under the key hint ("" = no such line).
+func _rules_text() -> String:
+	return ""
 
 
 func _build() -> void:

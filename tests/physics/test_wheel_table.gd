@@ -2,7 +2,7 @@ extends GutTest
 ## The Wheel of Fortune on a client: the wheel spins up when the dealer spins, slows without a
 ## jolt onto the segment the server drew and stops with that segment under the clicker, exactly
 ## when the server pays; a late joiner catches up from the state. Chips go into the symbol's box
-## on the layout, the seat view sees wheel and layout, and in the real casino the table stands
+## on the layout, every seat's view frames wheel, layout and dealer left of the overlay, and in the real casino the table stands
 ## clear of everything with its dealer beside the wheel and the stools reachable on foot.
 
 var view: SubViewport
@@ -137,27 +137,57 @@ func test_the_angle_stays_precise_over_a_long_match() -> void:
 	assert_eq(WheelStation.pointer_segment(wh.angle), 31)
 
 
-func test_seat_camera_sees_the_wheel_and_the_layout() -> void:
+## Every stool's view at the default field of view: the whole wheel face (its frame ring and the
+## clicker), the layout with the chips in its boxes and the dealer beside the wheel, all in the
+## left two thirds of the screen (the overlay is a column down the right third), big enough to
+## read at the low pixel scale: the wheel and the layout in front of it span over half the width.
+func test_seat_camera_frames_the_wheel_left_of_the_overlay() -> void:
 	var cam := Camera3D.new()
-	cam.fov = 75.0
+	cam.fov = 85.0  # the default (Settings "video/fov")
 	view.add_child(cam)
-	cam.global_transform = wh.camera_anchor.global_transform
-	var rect := Rect2(Vector2.ZERO, Vector2(view.size))
-	# The overlay strip covers the bottom ~380 px: the layout's boxes stay above it.
-	var above_panel := Rect2(Vector2.ZERO, Vector2(view.size.x, view.size.y - 400))
-	var points: Array[Vector3] = [
-		Vector3(0, WheelStation.WHEEL_Y + WheelStation.WHEEL_R, WheelStation.WHEEL_Z),
-		Vector3(-WheelStation.WHEEL_R, WheelStation.WHEEL_Y, WheelStation.WHEEL_Z),
-		Vector3(WheelStation.WHEEL_R, WheelStation.WHEEL_Y, WheelStation.WHEEL_Z),
-		wh.pointer.position,
-	]
-	for p: Vector3 in points:
-		var g: Vector3 = wh.to_global(p)
-		assert_false(cam.is_position_behind(g))
-		assert_true(rect.has_point(cam.unproject_position(g)), "the seat sees %s" % p)
-	for s: int in [0, 6]:
-		var g: Vector3 = wh.to_global(WheelStation.bet_spot(s))
-		assert_true(above_panel.has_point(cam.unproject_position(g)), "symbol %d's box clear of the panel: %s" % [s, cam.unproject_position(g)])
+	var left := Rect2(Vector2.ZERO, Vector2(view.size.x * 2.0 / 3.0, view.size.y))
+	var rim_r: float = WheelStation.WHEEL_R + 0.16  # the frame ring with its bulbs
+	var dealer: Vector3 = DealerLogic.OFFSETS[&"wheel"]
+	assert_eq(wh.seat_cameras.size(), wh.seat_count, "a view per stool")
+	for seat: int in wh.seat_count:
+		cam.global_transform = wh.camera_for_seat(seat).global_transform
+		var rim: Array[Vector3] = []
+		for k: int in 24:
+			var a: float = TAU * k / 24.0
+			rim.append(Vector3(sin(a) * rim_r, WheelStation.WHEEL_Y + cos(a) * rim_r, WheelStation.WHEEL_Z))
+		var layout: Array[Vector3] = []
+		for s: int in [0, WheelLogic.SYMBOLS.size() - 1]:
+			for dz: float in [-0.5, 0.5]:
+				for dx: float in [-0.5, 0.5]:
+					layout.append(WheelStation.bet_spot(s) + Vector3(dx * WheelStation.SPOT_SIZE.x, 0.0, dz * WheelStation.SPOT_SIZE.y))
+		var others: Array[Vector3] = [wh.pointer.position, WheelStation.HOUSE_SPOT, dealer + Vector3(0, 0.9, 0), dealer + Vector3(0, 1.7, 0)]
+		for s: int in WheelLogic.SYMBOLS.size():
+			others.append(WheelStation.bet_spot(s) + Vector3(0, 0.05, 0))  # the chips in each box
+		var wheel_x := Vector2(INF, -INF)
+		var all_x := Vector2(INF, -INF)
+		var all_y := Vector2(INF, -INF)
+		for p: Vector3 in rim + layout + others:
+			var g: Vector3 = wh.to_global(p)
+			assert_false(cam.is_position_behind(g), "seat %d faces %s" % [seat, p])
+			var at: Vector2 = cam.unproject_position(g)
+			assert_true(left.has_point(at), "seat %d sees %s in the left two thirds: %s" % [seat, p, at])
+			if p in rim:
+				wheel_x = Vector2(minf(wheel_x.x, at.x), maxf(wheel_x.y, at.x))
+			if not p in others:
+				all_x = Vector2(minf(all_x.x, at.x), maxf(all_x.y, at.x))
+				all_y = Vector2(minf(all_y.x, at.y), maxf(all_y.y, at.y))
+		var w: float = view.size.x
+		assert_gt(all_x.y - all_x.x, w * 0.45, "seat %d: the wheel and its layout span %.0f%% of the width" % [seat, (all_x.y - all_x.x) / w * 100.0])
+		assert_gt(all_y.y - all_y.x, view.size.y * 0.75, "seat %d: and most of the height (%.0f px)" % [seat, all_y.y - all_y.x])
+		assert_gt(wheel_x.y - wheel_x.x, w * 0.25, "seat %d: the wheel face alone %.0f%% of the width (was 16%%)" % [seat, (wheel_x.y - wheel_x.x) / w * 100.0])
+	# Nothing solid between the eye and the boxes or the wheel's hub.
+	await wait_physics_frames(2)
+	var space: PhysicsDirectSpaceState3D = wh.get_world_3d().direct_space_state
+	for seat: int in wh.seat_count:
+		var eye: Vector3 = wh.camera_for_seat(seat).global_position
+		for p: Vector3 in [WheelStation.bet_spot(0), WheelStation.bet_spot(6), Vector3(0, WheelStation.WHEEL_Y, WheelStation.WHEEL_Z + 0.1)]:
+			var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(eye, wh.to_global(p + Vector3(0, 0.02, 0))))
+			assert_true(hit.is_empty(), "seat %d sees %s unblocked" % [seat, p])
 	cam.free()
 
 

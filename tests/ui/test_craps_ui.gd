@@ -1,7 +1,9 @@
 extends GutTest
 ## Craps overlay: four bet buttons with the felt's odds, line bets locked once a point is on (and
 ## the other side once you picked one), the SHOOT button only for the shooter and only when the
-## table may throw, the come-out / point line, the shooter's name and the last roll.
+## table may throw, the come-out / point line, the shooter's name and the last roll. The overlay
+## is a column in the right third of the screen (the felt fills the rest), with the rules folded
+## away under the key hint.
 
 var root: Control
 var ui: CrapsUi
@@ -27,6 +29,30 @@ func _pub() -> Dictionary:
 	return (st.stations[&"craps_1"] as Dictionary).duplicate(true)
 
 
+## The overlay is a column in the right third, top to bottom: nothing of it (no button, label or
+## chip) reaches into the left two thirds, where the seat camera frames the table.
+func _assert_right_column(what: String) -> void:
+	var r: Rect2 = ui.panel.get_global_rect()
+	assert_gt(r.position.x, 1920 * 0.6, "%s: the panel starts in the right third: %s" % [what, r])
+	assert_lt(r.size.x, 1920 * 0.4, "%s: about a third of the width: %s" % [what, r])
+	assert_lte(r.end.x, 1920.0, "%s: on screen" % what)
+	assert_gt(r.size.y, 1080 * 0.6, "%s: a column from top to bottom: %s" % [what, r])
+	assert_gte(r.position.y, 150.0, "%s: under the HUD's clock" % what)
+	assert_lte(r.end.y, 1080.0 - 90.0, "%s: over the HUD's rank" % what)
+	var reach: float = INF
+	var widest: String = ""
+	for n: Node in ui.panel.find_children("*", "Control", true, false):
+		var c: Control = n
+		if not c.is_visible_in_tree():
+			continue
+		var cr: Rect2 = c.get_global_rect()
+		if cr.position.x < reach:
+			reach = cr.position.x
+			widest = String(c.name)
+		assert_true(r.grow(0.5).encloses(cr), "%s: %s stays inside the panel (%s)" % [what, c.name, cr])
+	assert_gt(reach, 1920 * 2.0 / 3.0, "%s: nothing over the left two thirds (%s at %.0f)" % [what, widest, reach])
+
+
 func test_four_bets_with_the_felt_odds() -> void:
 	assert_eq(ui.bet_buttons.size(), 4)
 	assert_string_contains(ui.bet_buttons[&"pass"].text, "PASS LINE")
@@ -37,7 +63,7 @@ func test_four_bets_with_the_felt_odds() -> void:
 	for b: Button in ui.bet_buttons.values():
 		assert_false(b.disabled, "open for bets on the come-out")
 	assert_true(ui.wants_camera_lock(), "the head stays on the table while betting")
-	assert_lt(ui.panel.get_global_rect().size.y, 440.0, "a strip at the bottom, the felt stays in view")
+	_assert_right_column("come-out")
 	assert_eq(ui.bet_panel.chip_value(), Registry.balance.craps_min_bet, "the smallest chip first")
 	assert_string_contains(ui.status_label.text, "COME-OUT")
 	assert_string_contains(ui.roll_label.text, "YOU", "you have the dice")
@@ -63,6 +89,8 @@ func test_line_bets_lock_on_the_point_and_one_side_only() -> void:
 	assert_true(ui.bet_buttons[&"dont_pass"].disabled)
 	assert_false(ui.bet_buttons[&"field"].disabled, "one-roll bets any time")
 	assert_false(ui.bet_buttons[&"any_seven"].disabled)
+	await wait_process_frames(2)
+	_assert_right_column("point on, chips down")
 
 
 func test_shoot_button_for_the_shooter_only() -> void:
@@ -79,6 +107,8 @@ func test_shoot_button_for_the_shooter_only() -> void:
 	ui.update_state(pub, {})
 	assert_false(ui.shoot_button.disabled)
 	assert_string_contains(ui.shoot_button.text, "SHOOT")
+	await wait_process_frames(2)
+	_assert_right_column("SHOOT showing")
 	pub["state"] = CrapsLogic.State.ROLLING
 	ui.update_state(pub, {})
 	assert_true(ui.shoot_button.disabled, "the dice are out")
@@ -109,3 +139,19 @@ func test_the_last_roll_line() -> void:
 	assert_eq(ui.roll_label.text, "ROLLED 4 + 2 = 6  ·  THE POINT IS 6")
 	assert_eq(StationUi.rejection_text(&"point_is_on"), "Line bets go down on the come-out roll")
 	assert_eq(StationUi.rejection_text(&"not_shooter"), "You're not the shooter")
+	await wait_process_frames(2)
+	_assert_right_column("the last roll")
+
+
+func test_the_rules_fold_away() -> void:
+	assert_not_null(ui.rules_toggle, "a HOW IT WORKS line")
+	assert_false(ui.rules_label.visible, "folded by default: the explanation takes no space")
+	assert_string_contains(ui.rules_toggle.tooltip_text, "come-out", "and its tooltip explains")
+	ui.rules_toggle.button_pressed = true
+	await wait_process_frames(2)
+	assert_true(ui.rules_label.visible, "one click opens it")
+	assert_string_contains(ui.rules_label.text, "Field")
+	assert_eq(ui.panel.get_global_rect().size.y, 1080.0 - StationUi.COLUMN_MARGIN.y - StationUi.COLUMN_BOTTOM, "the open rules still fit the column")
+	_assert_right_column("rules open")
+	ui.rules_toggle.button_pressed = false
+	assert_false(ui.rules_label.visible)

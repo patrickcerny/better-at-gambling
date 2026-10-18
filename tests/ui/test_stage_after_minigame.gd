@@ -60,3 +60,23 @@ func test_rewards_show_above_the_finished_stage_and_the_hud_comes_back() -> void
 	assert_eq(_stage_layers().size(), 0, "with its UI layer")
 	assert_true(scene.hud.visible, "the HUD and its item bar are back")
 	assert_true(scene.hud.is_visible_in_tree())
+
+
+func test_the_hot_tables_arrow_is_hidden_while_a_minigame_plays() -> void:
+	# Patrick: "clear the hot marker when you are in minigames". The arrow and HOT label draw on top
+	# of everything (no depth test, fixed size), so they showed through the minigame room's walls.
+	var sid: StringName = scene.map.stations.keys()[0]
+	var table: StationBase = scene.map.stations[sid]
+	table.set_hot(true)
+	assert_true(table.hot_marker.visible, "hot on the floor: the arrow shows")
+	scene._open_stage({"minigame": &"vote_race", "players": _players()}, {})
+	assert_true(await _wait_for(func() -> bool: return scene.stage != null), "stage built")
+	assert_false(table.hot_marker.visible, "no arrow over the minigame")
+	table.set_hot(true)  # a station state update mid-game does not bring it back
+	assert_false(table.hot_marker.visible, "stays hidden while the stage is up")
+	scene._regroup()
+	await wait_process_frames(2)
+	assert_null(scene.stage)
+	assert_true(table.hot_marker.visible, "back once the floor is back, the table is still hot")
+	table.set_hot(false)
+	assert_false(table.hot_marker.visible)

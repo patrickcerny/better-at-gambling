@@ -210,39 +210,26 @@ func test_craps_over_the_felt_total_bets_what_is_left() -> void:
 	assert_true(_bet(sid, {"type": &"field", "amount": lim.y})["ok"], "over the max on the felt: what is left goes in")
 	assert_eq(int(_last_bet_placed()["amount"]), lim.x * 2)
 	assert_eq(_bet(sid, {"type": &"any_seven", "amount": lim.x})["error"], &"above_max", "a full felt refuses as before")
-func test_scratch_cards() -> void:
+func test_scratch_cards_never_go_all_in() -> void:
+	# Patrick 2026-10-17: "you can actually buy scratch tickets if you have $76 and the scratch
+	# ticket is 100 ... that shouldn't be enabled." Cards are fixed-price: over the balance is refused.
 	var sid: StringName = &"scratch_1"
 	_sit(sid)
 	var sc: ScratchLogic = fx.server.stations.logics[sid] as ScratchLogic
 	var prices: Array[int] = sc.prices()
 	_set_money(prices[0] - 1)
 	assert_eq(_bet(sid, {"tier": 1})["error"], &"insufficient_funds", "under the cheapest card")
-	_check_all_in(sid, {"tier": 2, "amount": prices[2]}, prices[1] + 3)
-	assert_eq(sc.tier, 2, "the card asked for")
-	assert_eq(sc.stake, prices[1] + 3, "sold for everything the player has")
-	var card: Array[int] = sc.card.duplicate()
+	_set_money(prices[1] + 3)
 	fx.events.clear()
-	assert_true(fx.intent(p, &"action", {"station": sid, "action": &"reveal"})["ok"])
-	var results: Array[Dictionary] = fx.of_type(&"round_result")
-	assert_eq(results.size(), 1)
-	assert_eq(int(results[0]["stake"]), prices[1] + 3, "it pays on the all-in stake")
-	var printed: int = ScratchLogic.prize(prices[1] + 3, ScratchLogic.card_multiplier(card, 2, Registry.balance))
-	if printed <= prices[1] + 3:
-		assert_eq(int(results[0]["returned"]), printed, "the prize printed for that stake")
-
-
-func test_scratch_tier_only_goes_all_in_too() -> void:
-	var sid: StringName = &"scratch_1"
-	_sit(sid)
-	var prices: Array[int] = (fx.server.stations.logics[sid] as ScratchLogic).prices()
-	_set_money(prices[0] + 5)
-	fx.events.clear()
-	assert_true(_bet(sid, {"tier": 1})["ok"], "the panel only sends the tier")
+	assert_eq(_bet(sid, {"tier": 2})["error"], &"insufficient_funds", "a dear card over the balance is refused, not cut down")
+	assert_eq(_bet(sid, {"tier": 2, "amount": prices[2]})["error"], &"insufficient_funds", "with the amount too")
+	assert_eq(fx.server.economy.balance(p), prices[1] + 3, "nothing taken")
+	assert_true(sc.card.is_empty(), "no card sold")
+	assert_true(_bet(sid, {"tier": 1})["ok"], "the card the balance covers sells at its price")
 	var ev: Dictionary = _last_bet_placed()
-	assert_eq(int(ev["amount"]), prices[0] + 5)
-	assert_true(bool((ev["details"] as Dictionary)["all_in"]))
-	assert_eq(int((ev["details"] as Dictionary)["requested"]), prices[1])
-	assert_eq(fx.server.economy.balance(p), 0)
+	assert_eq(int(ev["amount"]), prices[1])
+	assert_false((ev["details"] as Dictionary).has("all_in"), "never marked all-in")
+	assert_eq(fx.server.economy.balance(p), 3)
 
 
 func test_scratch_cannot_buy_a_dear_card_cheap() -> void:

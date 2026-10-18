@@ -1,8 +1,9 @@
 extends Node3D
 ## Dev: the Wheel of Fortune for screenshots. Run with
 ## scripts/screenshot.sh res://tools/dev/wheel_shot.tscn wheel 90 --pixel 1 --view front|seat|close|back
-## [--segment n] (the wheel at rest on segment n, chips on the layout; close: the clicker and the
-## top of the wheel; back: as seen from the casino floor).
+## [--segment n] [--seat n] (the wheel at rest on segment n, chips on the layout; seat: stool n's
+## view at the default field of view with the overlay column on the right; close: the clicker and
+## the top of the wheel; back: as seen from the casino floor).
 
 var _station: WheelStation
 
@@ -50,8 +51,9 @@ func _ready() -> void:
 	add_child(cam)
 	match view:
 		"seat":
-			cam.fov = 75.0
-			cam.global_transform = _station.camera_anchor.global_transform
+			cam.fov = 85.0
+			cam.global_transform = _station.camera_for_seat(c.get_int("seat", 2)).global_transform
+			_overlay()
 		"close":
 			var top: Vector3 = Vector3(0, WheelStation.WHEEL_Y + WheelStation.WHEEL_R, WheelStation.WHEEL_Z)
 			cam.fov = 40.0
@@ -64,3 +66,17 @@ func _ready() -> void:
 			cam.position = Vector3(1.6, 2.4, 5.6)
 			cam.look_at(Vector3(0, 1.7, -0.8))
 	cam.current = true
+
+
+## The seated overlay over the view, as at the table: bets open, chips on two symbols.
+func _overlay() -> void:
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	var ui := WheelUi.new()
+	layer.add_child(ui)
+	var st := ClientMatchState.new()
+	st.players[1] = {"name": "Ada", "color": 0}
+	st.balances[1] = 1000
+	st.stations[&"wheel_1"] = {"game": &"wheel", "state": WheelLogic.State.BETTING, "timer": 12.0, "counting": true, "players": [1],
+		"bets": [{"player": 1, "symbol": 0, "amount": 40}, {"player": 1, "symbol": 5, "amount": 10}], "segment": -1, "history": [5, 0, 1, 0, 2, 3]}
+	ui.open(&"wheel_1", 1, st)
