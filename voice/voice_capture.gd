@@ -25,6 +25,13 @@ const SILENT_WARN_SECONDS: float = 3.0
 ## A channel this much quieter than the other (energy ratio, -12 dB) counts as dead: a mic that
 ## only fills one side of a stereo stream would otherwise come out 6 dB quieter.
 const DEAD_CHANNEL_RATIO: float = 1.0 / 16.0
+## Seconds of sound that went nowhere (push-to-talk not held, or under the open-mic gate) before
+## a microphone that has never transmitted says so in the log, once (Patrick, 0.9.10: "other
+## people online dont hear me": the microphone test plays everything back, the gate never shows).
+const HELD_BACK_LOG_SECONDS: float = 2.0
+## Open mic: frames at least this loud but under the gate count as held back (room hiss sits
+## around -60 dBFS).
+const HELD_BACK_OPEN_MIC_DB: float = -55.0
 ## Seconds of steady microphone audio after which the delivered frame rate is compared with the
 ## rate the driver reports.
 const RATE_CHECK_SECONDS: float = 3.0
@@ -59,6 +66,11 @@ var mic_peak: float = 0.0
 var frame_age: float = 0.0
 ## Mouth flap for our own avatar (fed while transmitting).
 var mouth: VoiceMouth = VoiceMouth.new()
+## Seconds of sound the gate held back before anything was ever sent (see `HELD_BACK_LOG_SECONDS`).
+var held_back_seconds: float = 0.0
+## True once that was logged.
+var held_back_logged: bool = false
+var _held_back_peak: float = 0.0
 ## Frames delivered per second as measured over `RATE_CHECK_SECONDS` (0 until measured).
 var measured_rate: float = 0.0
 ## Rate the samples are resampled from when the device does not run at the rate it reports
@@ -168,6 +180,31 @@ func _process(delta: float) -> void:
 		Log.warn(&"voice", "microphone \"%s\" delivered %s in %.0f s (%d frames at %d Hz): muted, blocked in the Windows privacy settings, or the wrong device (Settings > Audio)" % [source.device(), what, _mic_for, mic_frames, roundi(source.rate())])
 
 
+## Counts a frame the gate kept back while nothing has been sent yet, and logs it once there was
+## `HELD_BACK_LOG_SECONDS` of it: loud enough to be speech with push-to-talk up, or audible but
+## under the open-mic gate.
+func _note_held_back(frame: PackedFloat32Array) -> void:
+	var db: float = VoiceCodec.rms_db(frame)
+	match mode:
+		Mode.PUSH_TO_TALK:
+			if db < OPEN_MIC_THRESHOLD_DB:
+				return
+		Mode.OPEN_MIC:
+			if db < HELD_BACK_OPEN_MIC_DB:
+				return
+		_:
+			return
+	held_back_seconds += VoiceCodec.FRAME_SECONDS
+	_held_back_peak = maxf(_held_back_peak, level)
+	if held_back_seconds < HELD_BACK_LOG_SECONDS:
+		return
+	held_back_logged = true
+	if mode == Mode.PUSH_TO_TALK:
+		Log.info(&"voice", "microphone: %.0f s of sound (loudest %s), but push-to-talk was not held: nothing sent yet" % [held_back_seconds, db_text(_held_back_peak)])
+	else:
+		Log.info(&"voice", "microphone: %.0f s of sound (loudest %s) under the open-mic gate (%d dB): nothing sent yet (Mic volume raises it)" % [held_back_seconds, db_text(_held_back_peak), int(OPEN_MIC_THRESHOLD_DB)])
+
+
 ## The rate the microphone's samples are resampled from: the driver's, unless the device was
 ## measured running at another one (see `_check_rate`).
 func input_rate() -> float:
@@ -197,6 +234,10 @@ func _check_rate(frames: int) -> void:
 	if snapped > 0 and absf(snapped - reported) > reported * 0.04:
 		rate_override = snapped
 		Log.warn(&"voice", "microphone \"%s\" delivers %d frames/s but reports %d Hz: resampling from %d Hz" % [source.device(), roundi(measured_rate), roundi(reported), snapped])
+	elif snapped == 0 and measured_rate < reported * 0.9:
+		# No real rate: audio went missing on the way. Godot's input buffer is a ring (93 ms with
+		# PulseAudio) that a slow frame laps; below ~12 fps most of the voice is lost.
+		Log.warn(&"voice", "microphone delivers only %d frames/s of %d Hz (%d%%): its audio is being lost (the game runs too slowly to read it in time?)" % [roundi(measured_rate), roundi(reported), roundi(measured_rate * 100.0 / maxf(reported, 1.0))])
 	else:
 		Log.info(&"voice", "microphone delivers %d frames/s (reported %d Hz)" % [roundi(measured_rate), roundi(reported)])
 
@@ -276,6 +317,8 @@ func _frame(raw: PackedFloat32Array) -> void:
 			_hang -= VoiceCodec.FRAME_SECONDS
 	if want:
 		mouth.feed(frame)
+	elif frames_sent == 0 and not held_back_logged:
+		_note_held_back(frame)
 	mouth.update(VoiceCodec.FRAME_SECONDS)
 	if not want and not transmitting:
 		return

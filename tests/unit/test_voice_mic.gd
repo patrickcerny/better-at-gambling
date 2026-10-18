@@ -124,6 +124,49 @@ func test_push_to_talk_gates_the_microphone() -> void:
 	assert_true(cap.transmitting)
 
 
+## Patrick, 0.9.10: "i can hear myself now, but other people online dont hear me". The microphone
+## test plays back everything the microphone hears; the gate in front of the network does not
+## show there. A microphone that hears speech but has never sent a frame says so in the log once.
+func test_speech_held_back_by_push_to_talk_is_noted_once_until_something_is_sent() -> void:
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.PUSH_TO_TALK
+	cap.ptt_pressed = false
+	_talk(1.0)
+	assert_almost_eq(cap.held_back_seconds, 1.0, 0.05, "a second of speech with T up")
+	assert_false(cap.held_back_logged)
+	_talk(1.2)
+	assert_true(cap.held_back_logged, "logged after 2 s")
+	assert_eq(packets.size(), 0)
+
+
+func test_hiss_with_push_to_talk_up_is_not_noted() -> void:
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.PUSH_TO_TALK
+	_talk(3.0, 48000.0, 0.001)  # -63 dBFS room hiss
+	assert_eq(cap.held_back_seconds, 0.0)
+	assert_false(cap.held_back_logged)
+
+
+func test_a_voice_under_the_open_mic_gate_is_noted() -> void:
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	_talk(2.2, 48000.0, 0.004)  # -51 dBFS RMS: audible, under the -45 dB gate
+	assert_eq(packets.size(), 0, "the gate stays shut")
+	assert_true(cap.held_back_logged)
+
+
+func test_nothing_is_noted_once_the_microphone_has_transmitted() -> void:
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.PUSH_TO_TALK
+	cap.ptt_pressed = true
+	_talk(0.5)
+	assert_gt(packets.size(), 8)
+	cap.ptt_pressed = false
+	_talk(3.0)
+	assert_eq(cap.held_back_seconds, 0.0, "it has talked before: letting go of T is normal")
+	assert_false(cap.held_back_logged)
+
+
 func test_stale_audio_after_a_stall_is_skipped() -> void:
 	cap.start_microphone()
 	mic.speak(2.0)  # a 2 s hitch (loading) left this much waiting
@@ -251,6 +294,22 @@ func test_a_device_at_its_reported_rate_is_left_alone() -> void:
 	assert_almost_eq(cap.measured_rate, 44100.0, 400.0)
 	assert_eq(cap.rate_override, 0.0)
 	assert_eq(VoiceCapture.nearest_common_rate(31000.0), 0, "a hitch's odd number is not a rate")
+
+
+## Measured on PulseAudio: a game below ~12 fps laps Godot's 93 ms input ring and keeps a few
+## thousand of 44100 frames a second. That is no real rate: no resampling, a warning instead.
+func test_a_microphone_losing_most_of_its_audio_is_not_taken_for_a_slow_rate() -> void:
+	mic.mic_rate = 44100.0
+	mic.deliver_rate = 3100.0
+	cap.start_microphone()
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	for i: int in int(4.0 / 0.016):
+		mic.speak(0.016)
+		now_usec += 16000
+		cap._process(0.016)
+	assert_almost_eq(cap.measured_rate, 3100.0, 200.0)
+	assert_eq(cap.rate_override, 0.0, "3100 is not a device rate")
+	assert_eq(cap.input_rate(), 44100.0)
 
 
 ## Patrick: "remove all of this unneeded microphone info": one short line each, details in the log.
