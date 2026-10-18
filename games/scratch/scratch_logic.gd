@@ -3,9 +3,9 @@ extends StationLogicBase
 ## Scratch-card kiosk: one player at the counter at a time (like a slot machine).
 ##
 ## Buying a card (`place_bet({tier})`, or `{amount}` = one of the card prices) takes the price and
-## decides the whole card at once on the server (all-in: a card the balance can't cover sells for
-## the balance, if that covers the cheapest card, and prints its prizes on that stake). An
-## outcome is drawn from the tier's odds (blank, a "$" or three in a line of one symbol), a blank gets the house rule's quiet second draw
+## decides the whole card at once on the server. A card is a fixed-price item: one the balance
+## can't cover is refused, never sold cheaper (Patrick 2026-10-17: the all-in rule of the tables
+## must not put a $76 balance into a $100 card). An outcome is drawn from the tier's odds (blank, a "$" or three in a line of one symbol), a blank gets the house rule's quiet second draw
 ## (`scratch_favour`), the player's luck rerolls the card like a slot line, and a 3×3 card that
 ## shows exactly that outcome is built. The card goes out in one `scratch_card` event and in the
 ## public state; the client only scratches the foil off. It pays (`round_result`) when the player
@@ -82,20 +82,21 @@ func prices() -> Array[int]:
 	return out
 
 
-## All-in: a `{tier}` bet is priced first, so a card the balance can't cover sells for everything
-## the player has (down to the cheapest card's price) and its prizes print on that stake.
-func clamp_bet(p: int, bet: Dictionary) -> Dictionary:
+## A `{tier}` bet is priced at the card's price; no all-in, so the base clamp is not used.
+func clamp_bet(_p: int, bet: Dictionary) -> Dictionary:
 	var priced: Dictionary = bet.duplicate()
+	priced.erase("all_in")
+	priced.erase("requested")
 	var list: Array[int] = prices()
 	var t: int = int(priced.get("tier", -1))
 	if t >= 0 and t < list.size() and not priced.has("amount"):
 		priced["amount"] = list[t]
-	return super.clamp_bet(p, priced)
+	return priced
 
 
-func bet_limits(_p: int, bet: Dictionary) -> Vector2i:
-	var list: Array[int] = prices()
-	return BetClamp.size_range(list) if int(bet.get("amount", 0)) in list else Vector2i(-1, -1)
+## Fixed prices: no range to cut a bet down into.
+func bet_limits(_p: int, _bet: Dictionary) -> Vector2i:
+	return Vector2i(-1, -1)
 
 
 func place_bet(p: int, bet: Dictionary) -> Dictionary:
@@ -108,9 +109,8 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	if t < 0 or t >= list.size():
 		return fail(&"invalid_amount")
 	var amount: int = int(bet.get("amount", list[t]))
-	# A card sells at its price, or cut down to the balance by an all-in (never above the price).
-	if amount != list[t] and not (amount < list[t] and bool(bet.get("all_in", false)) and size_allowed(amount, bet, list)):
-		return fail(&"invalid_amount")
+	if amount != list[t]:
+		return fail(&"invalid_amount")  # a card sells at its price, never cheaper
 	if not _take_stake(p, amount):
 		return fail(&"insufficient_funds")
 	stake = amount
@@ -124,7 +124,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	card = d.value
 	_flourish = (&"lucky" if lk > 0 else &"jinxed") if d.luck_changed else &""
 	last = {}
-	events.append(GameEvents.bet_placed(p, station_id, amount, with_all_in(bet, {"game": game_id, "tier": t})))
+	events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id, "tier": t}))
 	events.append(GameEvents.make(&"scratch_card", {"station": station_id, "player": p, "tier": t, "price": amount, "serial": serial, "card": card.duplicate()}))
 	return OK_RESULT
 

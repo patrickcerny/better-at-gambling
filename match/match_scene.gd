@@ -1626,9 +1626,18 @@ func _stage_takes_screen(mode: InputRouter.Mode) -> void:
 	if pause_menu != null and pause_menu.visible:
 		pause_menu.close()
 	hud.visible = false
+	_set_hot_markers_hidden(true)  # the arrow draws on top of everything, even the stage's walls
 	if local != null:
 		local.auto_target = Vector3.INF
 	Audio.play(&"whoosh", &"SFX", -4.0)
+
+
+## The hot table's arrow and label while a stage is on screen: hidden, back afterwards.
+func _set_hot_markers_hidden(hidden: bool) -> void:
+	if map == null:
+		return
+	for node: StationBase in map.stations.values():
+		node.set_hot_marker_hidden(hidden)
 
 
 ## Walkable minigames (W, minigames/common/walkable_stage.gd): the room is built and the bodies go
@@ -1850,6 +1859,7 @@ func _close_stage() -> void:
 	if stage != null:
 		stage.queue_free()
 		stage = null
+	_set_hot_markers_hidden(false)
 	if briefing != null and is_instance_valid(briefing):
 		briefing.queue_free()
 	briefing = null

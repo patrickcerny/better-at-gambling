@@ -201,9 +201,11 @@ func _update_base(speed: float, on_floor: bool, ragdolled: bool, delta: float) -
 		camera.look_at(eye, Vector3.UP)
 		return
 	if third:
+		# Straight behind the avatar (Patrick: "it should be directly in front"), not over a
+		# shoulder: the bean is in the middle of the screen and the view still orbits with the mouse.
 		spring.global_rotation = Vector3(pitch, yaw, 0.0)
 		var base: Vector3 = global_position + Vector3(0, EYE_HEIGHT + 0.3, 0)
-		var dir: Vector3 = up_rot * Vector3(0.6, 0.0, 1.0).normalized()
+		var dir: Vector3 = up_rot * Vector3(0.0, 0.0, 1.0)
 		var dist: float = spring.get_hit_length()
 		camera.global_position = base + dir * dist
 		camera.look_at(base + up_rot * Vector3(0, 0, -5), Vector3.UP)

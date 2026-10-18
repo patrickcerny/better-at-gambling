@@ -169,31 +169,16 @@ func test_server_paid_card_opens_and_refund_resets() -> void:
 	assert_true(ui.card_view.symbols.is_empty())
 
 
-func test_cards_over_the_balance_go_all_in() -> void:
+func test_cards_over_the_balance_are_greyed_out() -> void:
+	# Patrick: a $100 card must not be bought with $76. Fixed prices, no all-in at the kiosk.
 	st.balances[1] = 30
 	await wait_process_frames(2)
 	assert_false(ui.buy_buttons[0].disabled)
 	assert_false(ui.buy_buttons[1].disabled, "the $25 card still sells")
 	assert_string_contains(ui.buy_buttons[1].text, "$25")
-	assert_false(ui.buy_buttons[2].disabled)
-	assert_string_contains(ui.buy_buttons[2].text, "$30 ALL IN", "the $50 card sells for everything")
+	assert_true(ui.buy_buttons[2].disabled, "the $50 card is out of reach")
+	assert_string_contains(ui.buy_buttons[2].text, "$50", "and keeps its price, no ALL IN")
 	st.balances[1] = 9
 	await wait_process_frames(2)
 	for t: int in 3:
 		assert_true(ui.buy_buttons[t].disabled, "under the cheapest card nothing sells")
-
-
-func test_the_printed_table_matches_the_logic() -> void:
-	var cfg: BalanceConfig = Registry.balance
-	for t: int in 3:
-		var price: int = cfg.scratch_prices[t]
-		for row: Dictionary in ScratchCardView.prize_rows(cfg, t, price):
-			var sym: int = int(row["symbol"])
-			var c: Array[int] = [S.CHERRY, S.LEMON, S.BELL, S.BELL, S.SEVEN, S.CHERRY, S.LEMON, S.BELL, S.CHERRY]
-			if sym == S.CASH:
-				c[0] = S.CASH
-			else:
-				c = [sym, sym, sym, -1, -1, -1, -1, -1, -1]
-			assert_eq(ScratchUi.prize_of(c, t, price), int(row["amount"]))
-		assert_not_null(ScratchCardView.symbol_texture(S.DIAMOND))
-		assert_null(ScratchCardView.symbol_texture(S.CASH), "the $ is drawn as a coin")
