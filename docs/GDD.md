@@ -70,9 +70,8 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   row/column/diagonal pays that symbol's printed prize, a $ anywhere the instant prize. Prize tables
   (× price, cherry/lemon/bell/clover/seven/diamond, then $): $10 1/2/3/5/15/50, $0.5; $25
   1/2/4/8/25/100, $0.4; $50 1/3/5/10/40/200, $0.5. House rule: a blank is drawn again once with 25%
-  chance (`scratch_favour`), then luck rerolls the card; RTP 101.2% per tier. All-in: a card the
-  balance can't cover sells for the whole balance (as long as that covers the $10 card) and its
-  prizes print on that stake.
+  chance (`scratch_favour`), then luck rerolls the card; RTP 101.2% per tier. Fixed prices: a card
+  the balance can't cover is greyed out and refused, never sold cheaper (no all-in at the kiosk).
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
