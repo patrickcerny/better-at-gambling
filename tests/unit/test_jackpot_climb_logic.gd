@@ -1,11 +1,14 @@
 extends GutTest
-## Jackpot Climb (MINIGAME_IDEAS #11): the chip cake is a jump-and-run (every lane climbable
-## within the jump envelope, mostly short hops and a few wide running jumps), taller than the old
-## spiral with three checkpoint flags and two separate ways up, a fall after a flag puts you back on
-## that flag (never the floor), height is progress up the jackpot stack from the server's
-## positions, standing on the pad finishes in order (shared places on one tick), a bat swing knocks
-## a climber in reach down with a cooldown, finishers and the just-got-up grace are safe, the time
-## cap ranks by height with ties, dropouts, two players, grab blocked and shove allowed.
+## Jackpot Climb (MINIGAME_IDEAS #11): the chip cake is a run (0.9.11, Patrick: "its a run not a
+## jump and run"): every lane is a walkway that winds up its ring from one flag to the next, the
+## steady lanes without a single step, the bold ones shorter with a few hops onto chip tops; the
+## rings are filled (nothing to fall into, nothing to crawl under, headroom under every slab), three
+## checkpoint flags and two separate ways up, a fall after a flag puts you back on that flag (never
+## the floor), height is progress up the jackpot stack from the server's positions, standing on the
+## pad finishes in order (shared places on one tick), a bat swing knocks a climber in reach down
+## with a cooldown, finishers and the just-got-up grace are safe, the time cap ranks by height with
+## ties, dropouts, two players, grab blocked and shove allowed. (The real bean on the real
+## collision: `tests/physics/test_jackpot_climb_course.gd`.)
 
 const STEP: float = 0.05
 
@@ -35,18 +38,27 @@ func _of(evs: Array[Dictionary], type: StringName) -> Array[Dictionary]:
 	return evs.filter(func(e: Dictionary) -> bool: return e["type"] == type)
 
 
-## World position standing on stack `i` (offset `off` from its centre).
-func _on_stack(i: int, off: Vector3 = Vector3.ZERO) -> Vector3:
-	return WalkableLogicBase.ROOM_ORIGIN + (ChipTowers.stacks()[i]["pos"] as Vector3) + off
+## World position on segment `seg`'s `kind` lane, `f` of the way along it (offset `off`).
+func _on_lane(seg: int, kind: StringName, f: float, off: Vector3 = Vector3.ZERO) -> Vector3:
+	var l: Dictionary = ChipTowers.lane(seg, kind)
+	return WalkableLogicBase.ROOM_ORIGIN + ChipTowers.point(l, f * float(l["theta"]), float(l["rc"])) + off
 
 
 func _on_pad(x: float = 0.0) -> Vector3:
 	return WalkableLogicBase.ROOM_ORIGIN + ChipTowers.pad_center() + Vector3(x, 0.0, 0.0)
 
 
-## Puts `a` `dist` metres from `b` on stack `i`, facing them (yaw 0 faces -z).
-func _face(g: JackpotClimbLogic, a: int, b: int, dist: float, i: int = 5) -> void:
-	var at: Vector3 = _on_stack(i)
+## World position on the floor in the aisle round the first ring (the net).
+func _on_net(a: float = 0.0) -> Vector3:
+	var d: Vector3 = ChipTowers.dir(a) * (ChipTowers.ring_outer(0) + 0.7)
+	return WalkableLogicBase.ROOM_ORIGIN + Vector3(d.x, 0.0, ChipTowers.CENTER_Z + d.z)
+
+
+## Puts `a` `dist` metres from `b` at `at` (default: halfway up the steady lane round tier 2),
+## facing them (yaw 0 faces -z).
+func _face(g: JackpotClimbLogic, a: int, b: int, dist: float, at: Vector3 = Vector3.INF) -> void:
+	if at == Vector3.INF:
+		at = _on_lane(1, &"steady", 0.5)
 	g.world.set_transform(b, at, 0.0)
 	g.world.set_transform(a, at + Vector3(0, 0, dist), 0.0)
 
@@ -56,13 +68,6 @@ func _swing(g: JackpotClimbLogic, p: int, hint: int = -1) -> Dictionary:
 	if hint >= 0:
 		intent["target"] = hint
 	return g.submit(p, intent, 0.0)
-
-
-## Air between the rims of stacks `a` and `b` (flat).
-func _air(a: Dictionary, b: Dictionary) -> float:
-	var p: Vector3 = a["pos"]
-	var q: Vector3 = b["pos"]
-	return Vector2(p.x - q.x, p.z - q.z).length() - float(a["r"]) - float(b["r"])
 
 
 ## Flat distance of local `p` from the tower's axis.
@@ -75,78 +80,101 @@ func _on_checkpoint(k: int, i: int = 0) -> Vector3:
 	return WalkableLogicBase.ROOM_ORIGIN + ((ChipTowers.checkpoints()[k - 1]["spots"] as Array)[i] as Vector3)
 
 
-func test_every_lane_is_a_jump_and_run() -> void:
-	var all: Array[Dictionary] = ChipTowers.stacks()
-	assert_gt(all.size(), 50, "a real climb")
+func test_every_lane_is_a_run_up_its_ring() -> void:
+	var hops: int = 0
 	for seg: int in ChipTowers.SEGMENTS:
 		var y0: float = ChipTowers.level_y(seg)
 		var y1: float = ChipTowers.level_y(seg + 1)
-		var col_r: float = ChipTowers.level_r(seg + 1)
-		for side: int in [-1, 1]:
-			var ids: Array[int] = ChipTowers.lane(seg, side)
-			assert_gte(ids.size(), 4, "lane %d/%d has stacks" % [seg, side])
-			var prev_y: float = y0
-			for j: int in ids.size():
-				var s: Dictionary = all[ids[j]]
-				var p: Vector3 = s["pos"]
-				var tag: String = "seg %d side %d stack %d" % [seg, side, j]
-				assert_between(p.y - prev_y, 0.25, ChipTowers.MAX_RISE, "%s rises %.2f m" % [tag, p.y - prev_y])
-				if j > 0:
-					var gap: float = _air(all[ids[j - 1]], s)
-					assert_between(gap, 0.5, ChipTowers.MAX_GAP, "%s leaves %.2f m of air" % [tag, gap])
-					assert_eq(gap > ChipTowers.NORMAL_JUMP, bool(s["wide"]), "%s: only the planned wide gaps are wide (%.2f m)" % [tag, gap])
-					if j > 1:
-						# Skipping a stack is out of the jump: too far or too high.
-						var skip: float = _air(all[ids[j - 2]], s)
-						var up: float = p.y - (all[ids[j - 2]]["pos"] as Vector3).y
-						assert_true(skip > ChipTowers.MAX_GAP or up > 1.1, "%s: no skipping (%.2f m, %.2f up)" % [tag, skip, up])
-				# It stands on its level, clear of the column it winds round.
-				assert_almost_eq(float(s["base_y"]), y0, 0.001)
-				assert_gt(_flat(p) - float(s["r"]), col_r + 0.3, "%s clear of the column" % tag)
-				if seg > 0:
-					assert_lt(_flat(p) + float(s["r"]), ChipTowers.level_r(seg) - 0.2, "%s stands on tier %d" % [tag, seg])
-				assert_lt(absf(p.x) + float(s["r"]), ChipTowers.HALL_HALF_X - 0.5, "%s inside the hall" % tag)
-				assert_gt(p.z - float(s["r"]), ChipTowers.FAR_Z + 0.5, "%s inside the hall" % tag)
-				assert_lt(p.z + float(s["r"]), -1.0, "%s off the apron" % tag)
-				prev_y = p.y
-			var last: Dictionary = all[ids[ids.size() - 1]]
-			var top_rise: float = y1 - (last["pos"] as Vector3).y
-			assert_between(top_rise, 0.25, ChipTowers.MAX_RISE, "seg %d side %d: onto the next level (%.2f m)" % [seg, side, top_rise])
-			assert_lt(_flat(last["pos"]) - float(last["r"]) - col_r, 0.8, "the last stack is a hop from the next level")
-	# Stacks on one level never touch (lanes included).
-	for i: int in all.size():
-		for j: int in range(i + 1, all.size()):
-			if int(all[i]["seg"]) == int(all[j]["seg"]):
-				assert_gt(_air(all[i], all[j]), 0.4, "stacks %d and %d don't touch" % [i, j])
+		var steady: Dictionary = ChipTowers.lane(seg, &"steady")
+		var bold: Dictionary = ChipTowers.lane(seg, &"bold")
+		assert_false(steady.is_empty() or bold.is_empty(), "segment %d has both lanes" % seg)
+		for l: Dictionary in [steady, bold]:
+			var tag: String = "seg %d %s" % [seg, l["kind"]]
+			assert_almost_eq(ChipTowers.height(l, 0.0), y0, 0.001, "%s starts on its tier" % tag)
+			assert_almost_eq(ChipTowers.height(l, float(l["theta"])), y1, 0.001, "%s ends on the next level" % tag)
+			assert_almost_eq(float(l["a0"]), ChipTowers.flag_angle(seg), 0.001, "%s starts at its flag" % tag)
+			var end_a: float = float(l["a0"]) + float(l["dir"]) * float(l["theta"])
+			assert_almost_eq(absf(wrapf(end_a - ChipTowers.flag_angle(seg + 1), -PI, PI)), 0.0, 0.001, "%s ends where the next segment starts" % tag)
+			var kn: Array = l["knots"]
+			for j: int in range(1, kn.size()):
+				var a: Vector2 = kn[j - 1]
+				var b: Vector2 = kn[j]
+				assert_gte(b.x, a.x - 1e-6, "%s runs one way" % tag)
+				assert_gte(b.y, a.y - 1e-6, "%s only ever climbs" % tag)
+				if b.x - a.x > 1e-5:
+					# The steepest line is the inner edge.
+					var deg: float = rad_to_deg(atan2(b.y - a.y, (b.x - a.x) * float(l["r0"])))
+					assert_lte(deg, ChipTowers.MAX_SLOPE_DEG, "%s: a ramp you run up (%.1f deg)" % [tag, deg])
+			assert_lte(float(l["r1"]), ChipTowers.ring_outer(seg) + 0.001)
+			assert_gte(float(l["r0"]), ChipTowers.ring_inner(seg) - 0.001)
+			assert_gte(float(l["r1"]) - float(l["r0"]), 1.7, "%s is a walkway, not a ledge" % tag)
+		assert_eq(ChipTowers.risers(steady).size(), 0, "seg %d: the steady lane never needs a jump" % seg)
+		var rs: Array[float] = ChipTowers.risers(bold)
+		assert_between(rs.size(), 1, 2, "seg %d: the bold lane has a hop or two" % seg)
+		hops += rs.size()
+		for rt: float in rs:
+			var kn: Array = bold["knots"]
+			var up: float = 0.0
+			for j: int in range(1, kn.size()):
+				if absf((kn[j] as Vector2).x - rt) < 1e-6 and absf((kn[j - 1] as Vector2).x - rt) < 1e-6:
+					up = (kn[j] as Vector2).y - (kn[j - 1] as Vector2).y
+			assert_between(up, 0.4, cfg.jump_height - 0.3, "seg %d: a short hop (%.2f m) onto a chip top" % [seg, up])
+		assert_lt(ChipTowers.lane_length(bold), ChipTowers.lane_length(steady), "seg %d: the bold lane is the shorter way" % seg)
+	assert_between(hops, 5, 8, "only a few hops in all (%d)" % hops)
 	assert_almost_eq(ChipTowers.level_y(ChipTowers.SEGMENTS), ClimbRoom.TOWER_TOP_Y, 0.001, "the last level is the pad")
+	assert_lt(ChipTowers.ring_outer(0) + 1.4, ChipTowers.HALL_HALF_X, "an aisle between the first ring and the side walls")
+	assert_lt(ChipTowers.ring_outer(0) + 1.4, ChipTowers.CENTER_Z - ChipTowers.FAR_Z, "and the far wall")
+	assert_lt(ChipTowers.CENTER_Z + ChipTowers.ring_outer(0), -0.5, "the cake stays off the apron")
 	var layout: Dictionary = ClimbRoom.layout("towers")
 	assert_true((layout["arena"] as AABB).has_point(_on_pad() + Vector3(0, 1, 0)), "the pad is in the arena")
 	assert_true(ClimbRoom.on_top(_on_pad(), "towers"))
-	assert_false(ClimbRoom.on_top(_on_stack(all.size() - 1), "towers"), "the last stack is not the top")
+	assert_false(ClimbRoom.on_top(_on_lane(3, &"steady", 0.97), "towers"), "the end of the last lane is not the top")
+	# The entry onto the pad faces the apron, both last lanes arrive inside the rail's opening.
+	assert_almost_eq(ChipTowers.entry_dir().z, 1.0, 0.001)
 
 
-func test_stacks_are_close_with_only_a_few_wide_gaps() -> void:
-	var all: Array[Dictionary] = ChipTowers.stacks()
-	var gaps: Array[float] = []
-	var wide: int = 0
+func test_rings_are_filled_with_headroom_under_every_slab() -> void:
+	var points: int = 0
 	for seg: int in ChipTowers.SEGMENTS:
-		for side: int in [-1, 1]:
-			var ids: Array[int] = ChipTowers.lane(seg, side)
-			for j: int in range(1, ids.size()):
-				var gap: float = _air(all[ids[j - 1]], all[ids[j]])
-				gaps.append(gap)
-				if gap > ChipTowers.NORMAL_JUMP:
-					wide += 1
-					var rise: float = (all[ids[j]]["pos"] as Vector3).y - (all[ids[j - 1]]["pos"] as Vector3).y
-					assert_lte(rise, 0.45, "a running jump barely rises (%.2f m)" % rise)
-					assert_lte(gap, ChipTowers.MAX_GAP, "and stays in the walking jump's reach")
-	assert_between(wide, 2, 6, "a few wide gaps, not many (%d)" % wide)
-	var hops: int = gaps.filter(func(g: float) -> bool: return g <= 1.3).size()
-	assert_gte(float(hops) / float(gaps.size()), 0.9, "almost every gap is a short hop (%d of %d)" % [hops, gaps.size()])
-	var sum: float = 0.0
-	for g: float in gaps:
-		sum += g
-	assert_lt(sum / float(gaps.size()), 1.3, "stacks stand close (mean air %.2f m)" % (sum / float(gaps.size())))
+		var r0: float = ChipTowers.ring_inner(seg)
+		var r1: float = ChipTowers.ring_outer(seg)
+		var r: float = r0 + 0.1
+		while r < r1 - 0.05:
+			var a: float = -PI
+			while a < PI:
+				var d: Vector3 = ChipTowers.dir(a) * r
+				var p := Vector3(d.x, 50.0, ChipTowers.CENTER_Z + d.z)
+				var ys: Array[float] = []
+				for s: Dictionary in ChipTowers.surfaces_at(p):
+					ys.append(float(s["y"]))
+				ys.sort()
+				points += 1
+				var tag: String = "ring %d at r %.1f, angle %.2f" % [seg, r, a]
+				assert_gt(ys.size(), 0, "%s: a walkway (nothing to fall into)" % tag)
+				if ys.is_empty():
+					a += 0.05
+					continue
+				assert_gte(ys[0], ChipTowers.level_y(seg) - 0.001, "%s: on its tier" % tag)
+				assert_lte(ys[ys.size() - 1], ChipTowers.level_y(seg + 1) + 0.001, "%s: no higher than the next" % tag)
+				for i: int in range(1, ys.size()):
+					if ys[i] - ys[i - 1] > 0.01:
+						assert_gte(ys[i] - ChipTowers.SLAB_T - ys[i - 1], ChipTowers.MIN_HEADROOM, "%s: headroom under the slab" % tag)
+				a += 0.05
+			r += 0.4
+	gut.p("%d points over the rings" % points)
+	# The pieces: slabs only where a walkway runs underneath (so nothing to crawl under elsewhere).
+	for pc: Dictionary in ChipTowers.pieces():
+		if not bool(pc["slab"]):
+			continue
+		var l: Dictionary = ChipTowers.lanes()[int(pc["lane"])]
+		var mid: float = (float(pc["t0"]) + float(pc["t1"])) * 0.5
+		var p: Vector3 = ChipTowers.point(l, mid, float(l["rc"]))
+		var below: float = -INF
+		for s: Dictionary in ChipTowers.surfaces_at(p):
+			if float(s["y"]) < p.y - 0.01:
+				below = maxf(below, float(s["y"]))
+		assert_gt(below, -INF, "a slab of seg %d %s has a walkway under it" % [int(l["seg"]), l["kind"]])
+		assert_gte(p.y - ChipTowers.SLAB_T - below, ChipTowers.MIN_HEADROOM, "headroom under seg %d %s" % [int(l["seg"]), l["kind"]])
 
 
 func test_taller_with_checkpoint_flags() -> void:
@@ -165,73 +193,56 @@ func test_taller_with_checkpoint_flags() -> void:
 		for spot: Vector3 in cp["spots"]:
 			assert_eq(ChipTowers.checkpoint_at(spot), k, "respawn spot on tier %d" % k)
 			assert_lt(_flat(spot) + 0.45, ChipTowers.level_r(k), "the bean fits on the tier")
-			for s: Dictionary in ChipTowers.stacks():
-				var p: Vector3 = s["pos"]
-				if int(s["seg"]) == k:
-					assert_gt(Vector2(p.x - spot.x, p.z - spot.z).length(), float(s["r"]) + 0.4, "spot clear of the stacks")
-	assert_eq(ChipTowers.checkpoint_at(Vector3(0, 0, ChipTowers.CENTER_Z + 10.0)), 0, "the floor is no checkpoint")
+			# Level walkway all round the bean: no wall, no step, no edge within its reach.
+			for off: Vector3 in [Vector3.ZERO, Vector3(0.5, 0, 0), Vector3(-0.5, 0, 0), Vector3(0, 0, 0.5), Vector3(0, 0, -0.5)]:
+				var under: Dictionary = ChipTowers.lane_under(spot + off + Vector3(0, 0.05, 0))
+				assert_false(under.is_empty(), "flag %d: walkway round the spot" % k)
+				if not under.is_empty():
+					assert_almost_eq(float(under["y"]), y, 0.001, "flag %d: level round the spot" % k)
+				for s: Dictionary in ChipTowers.surfaces_at(spot + off):
+					var sy: float = float(s["y"])
+					assert_true(sy <= y + 0.001 or sy - ChipTowers.SLAB_T > y + ChipTowers.MIN_HEADROOM, "flag %d: nothing at head height over the spot" % k)
+	assert_eq(ChipTowers.checkpoint_at(Vector3(0, 0, ChipTowers.CENTER_Z + 14.0)), 0, "the floor is no checkpoint")
 	var flags: Array[int] = []
 	for cp: Dictionary in cps:
 		flags.append(ChipTowers.checkpoint_at(Vector3(0, float(cp["y"]) + 0.6, ChipTowers.CENTER_Z) + ChipTowers.dir(float(cp["angle"])) * (ChipTowers.level_r(int(cp["index"])) - 0.3)))
 	assert_eq(flags, [1, 2, 3], "anywhere on a tier's top counts, rim included")
 
 
-## True if the pad can be reached from the floor jumping only between `allowed` stacks (and the
-## tier tops), within the jump envelope.
-func _reaches_top(allowed: Dictionary) -> bool:
-	var all: Array[Dictionary] = ChipTowers.stacks()
-	var level: int = 0
-	var on: Array[int] = []
-	var seen: Dictionary = {}
-	while level < ChipTowers.SEGMENTS:
-		on.clear()
-		for i: int in allowed:
-			var p: Vector3 = all[i]["pos"]
-			if int(all[i]["seg"]) == level and p.y - ChipTowers.level_y(level) <= ChipTowers.MAX_RISE:
-				on.append(i)  # a hop from the level's top
-		var next_level: bool = false
-		while not on.is_empty():
-			var i: int = on.pop_back()
-			if seen.has(i):
-				continue
-			seen[i] = true
-			var p: Vector3 = all[i]["pos"]
-			var col_r: float = ChipTowers.level_r(level + 1)
-			if ChipTowers.level_y(level + 1) - p.y <= ChipTowers.MAX_RISE and _flat(p) - float(all[i]["r"]) - col_r <= ChipTowers.MAX_GAP:
-				next_level = true
-			for j: int in allowed:
-				var q: Vector3 = all[j]["pos"]
-				if not seen.has(j) and q.y - p.y <= ChipTowers.MAX_RISE and _air(all[i], all[j]) <= ChipTowers.MAX_GAP:
-					on.append(j)
-		if not next_level:
-			return false
-		level += 1
-	return true
-
-
 func test_two_separate_ways_up() -> void:
-	var left: Dictionary = {}
-	var right: Dictionary = {}
-	for side: int in [-1, 1]:
-		var route: Array[Dictionary] = ChipTowers.route([side, side, side, side])
-		assert_eq(String(route[route.size() - 1]["kind"]), "pad", "the route ends on the pad")
-		for seg: int in ChipTowers.SEGMENTS:
-			for i: int in ChipTowers.lane(seg, side):
-				(left if side < 0 else right)[i] = true
-	assert_eq(left.keys().filter(func(i: int) -> bool: return right.has(i)).size(), 0, "the two chains share no stack")
-	assert_true(_reaches_top(left), "the left chain alone reaches the jackpot")
-	assert_true(_reaches_top(right), "the right chain alone reaches the jackpot")
-	# Every tier forks: the lanes round each column go opposite ways from the flag.
 	for seg: int in ChipTowers.SEGMENTS:
-		var a: Vector3 = ChipTowers.stacks()[ChipTowers.lane(seg, -1)[1]]["pos"]
-		var b: Vector3 = ChipTowers.stacks()[ChipTowers.lane(seg, 1)[1]]["pos"]
-		assert_gt(Vector2(a.x - b.x, a.z - b.z).length(), 3.0, "segment %d forks at its flag" % seg)
-	# And either lane of a segment may follow either lane of the one before (they rejoin on the tier).
-	var mixed: Dictionary = {}
-	for seg: int in ChipTowers.SEGMENTS:
-		for i: int in ChipTowers.lane(seg, -1 if seg % 2 == 0 else 1):
-			mixed[i] = true
-	assert_true(_reaches_top(mixed), "a zig-zag of lanes reaches the jackpot too")
+		var s: Dictionary = ChipTowers.lane(seg, &"steady")
+		var b: Dictionary = ChipTowers.lane(seg, &"bold")
+		# The fork: from the flag the two lanes wind round opposite ways...
+		assert_eq(int(s["dir"]), -int(b["dir"]), "segment %d forks at its flag" % seg)
+		var ps: Vector3 = ChipTowers.point(s, 3.0 / float(s["rc"]), float(s["rc"]))
+		var pb: Vector3 = ChipTowers.point(b, 3.0 / float(b["rc"]), float(b["rc"]))
+		assert_gt(Vector2(ps.x - pb.x, ps.z - pb.z).length(), 4.0, "segment %d: two ways from the flag" % seg)
+		# ...and rejoin where they reach the next tier (the next flag, or the pad).
+		var es: Vector3 = ChipTowers.point(s, float(s["theta"]), float(s["r0"]))
+		var eb: Vector3 = ChipTowers.point(b, float(b["theta"]), float(b["r0"]))
+		assert_almost_eq(es.y, eb.y, 0.001)
+		assert_lt(Vector2(es.x - eb.x, es.z - eb.z).length(), 2.5, "segment %d: the lanes meet at the top" % seg)
+	# The guide takes a bean from the apron to the pad on either way, lane by lane (pure data).
+	for bold: bool in [false, true]:
+		var p: Vector3 = (ClimbRoom.layout("towers")["spawns"] as Array)[0] - WalkableLogicBase.ROOM_ORIGIN
+		var used: Dictionary = {}
+		var steps: int = 0
+		while not (_flat(p) < ChipTowers.PAD_R and p.y > ChipTowers.TOP_Y - 0.5) and steps < 4000:
+			var g: Dictionary = ChipTowers.guide(p, bold)
+			if int(g["lane"]) >= 0:
+				used[ChipTowers.lanes()[int(g["lane"])]["kind"]] = true
+			var to: Vector3 = g["to"]
+			var flat := Vector3(to.x - p.x, 0.0, to.z - p.z)
+			p += flat.limit_length(0.1)
+			var on: Dictionary = ChipTowers.lane_under(p + Vector3(0, 1.0, 0))
+			if _flat(p) < ChipTowers.PAD_R:
+				p.y = ChipTowers.TOP_Y
+			elif not on.is_empty():
+				p.y = float(on["y"])
+			steps += 1
+		assert_lt(steps, 4000, "%s: the guide leads to the pad" % ("bold" if bold else "steady"))
+		assert_true(used.has(&"bold") == bold, "%s way: %s" % ["bold" if bold else "steady", used.keys()])
 
 
 func test_a_fall_after_a_flag_respawns_at_that_flag() -> void:
@@ -249,11 +260,10 @@ func test_a_fall_after_a_flag_respawns_at_that_flag() -> void:
 	assert_eq(int(cps[1]["index"]), 2)
 	assert_eq(int(g.get_public_state()["checkpoints"][1]), 2, "in the state for the HUD")
 	# Knocked off from a stack over tier 2: they fall past tier 1 to the floor.
-	var above: int = ChipTowers.lane(2, 1)[3]
-	g.world.set_transform(1, _on_stack(above), 0.0)
+	g.world.set_transform(1, _on_lane(2, &"bold", 0.3), 0.0)
 	_run(g, 0.2)
-	assert_true(g.pending_moves.is_empty(), "up on the next stacks: nothing to do")
-	g.world.set_transform(1, WalkableLogicBase.ROOM_ORIGIN + Vector3(0, 0, ChipTowers.CENTER_Z + 10.5), 0.0)
+	assert_true(g.pending_moves.is_empty(), "up on the next ring: nothing to do")
+	g.world.set_transform(1, _on_net(), 0.0)
 	evs = _run(g, STEP)
 	var res: Array[Dictionary] = _of(evs, &"jackpot_climb_respawn")
 	assert_eq(res.size(), 1, "one respawn")
@@ -273,14 +283,13 @@ func test_a_fall_after_a_flag_respawns_at_that_flag() -> void:
 	evs = _run(g, 0.4)
 	assert_eq(g.checkpoint[1], 2)
 	assert_eq(_of(evs, &"jackpot_climb_respawn").size(), 1, "tier 1 is below flag 2")
-	# The server puts the body on the flag. A short drop onto the last stacks under it is fine.
+	# The server puts the body on the flag. A short drop onto the top of a lane below it is fine.
 	g.world.set_transform(1, g.pending_moves[1], 0.0)
 	g.pending_moves.clear()
 	_run(g, JackpotClimbLogic.RESPAWN_GRACE)
-	var under: Array[int] = ChipTowers.lane(1, -1)
-	g.world.set_transform(1, _on_stack(under[under.size() - 1]), 0.0)
+	g.world.set_transform(1, _on_lane(1, &"steady", 0.92), 0.0)
 	evs = _run(g, 0.2)
-	assert_true(_of(evs, &"jackpot_climb_respawn").is_empty(), "one stack down is still climbing")
+	assert_true(_of(evs, &"jackpot_climb_respawn").is_empty(), "near the top of the lane below is still climbing")
 	assert_eq(g.private_state(1)["checkpoint"], 2)
 	assert_eq(g.private_state(1)["respawns"], 2)
 
@@ -288,9 +297,9 @@ func test_a_fall_after_a_flag_respawns_at_that_flag() -> void:
 func test_before_the_first_flag_a_fall_is_just_physics() -> void:
 	var g: JackpotClimbLogic = _game([1, 2])
 	_run(g, STEP)
-	g.world.set_transform(2, _on_stack(ChipTowers.lane(0, -1)[8]), 0.0)
+	g.world.set_transform(2, _on_lane(0, &"bold", 0.5), 0.0)
 	_run(g, 0.2)
-	g.world.set_transform(2, WalkableLogicBase.ROOM_ORIGIN + Vector3(3.0, 0.0, -2.0), 0.0)
+	g.world.set_transform(2, _on_net(0.3), 0.0)
 	var evs: Array[Dictionary] = _run(g, 0.5)
 	assert_true(_of(evs, &"jackpot_climb_respawn").is_empty(), "no flag yet: climb again from the net")
 	assert_false(g.pending_moves.has(2))
@@ -303,13 +312,13 @@ func test_no_respawn_while_down() -> void:
 	_run(g, STEP)
 	g.world.set_transform(2, _on_checkpoint(1), 0.0)
 	_run(g, 0.2)
-	var at: Vector3 = _on_stack(ChipTowers.lane(1, 1)[2])
+	var at: Vector3 = _on_lane(1, &"bold", 0.2)
 	g.world.set_transform(2, at, 0.0)
 	g.world.set_transform(1, at + Vector3(0, 0, 1.0), 0.0)
 	_run(g, JackpotClimbLogic.SWING_COOLDOWN)
 	g.world.set_transform(1, g.world.get_position(2) + Vector3(0, 0, 1.0), 0.0)
 	assert_eq(_swing(g, 1)["result"], &"hit")
-	g.world.set_transform(2, WalkableLogicBase.ROOM_ORIGIN + Vector3(0, 0, -1.5), 0.0)  # the ragdoll on the floor
+	g.world.set_transform(2, _on_net(), 0.0)  # the ragdoll on the floor
 	var evs: Array[Dictionary] = _run(g, 0.5)
 	assert_true(_of(evs, &"jackpot_climb_respawn").is_empty(), "a ragdoll in flight is left alone")
 	g.on_player_got_up(2)
@@ -323,10 +332,10 @@ func test_progress_from_positions() -> void:
 	for p: int in [1, 2, 3]:
 		assert_true(g.arena.has_point(g.spawn_for(p)), "spawn %d in the arena" % p)
 		assert_almost_eq(ClimbRoom.progress(g.spawn_for(p), "towers"), 0.0, 0.001, "spawns at the bottom")
-	g.world.set_transform(1, _on_stack(10), 0.0)
-	g.world.set_transform(2, _on_stack(4), 0.0)
-	assert_almost_eq(g.height_of(1), (ChipTowers.stacks()[10]["pos"] as Vector3).y / ClimbRoom.TOWER_TOP_Y, 0.001)
-	assert_gt(g.height_of(1), g.height_of(2), "higher stack, more progress")
+	g.world.set_transform(1, _on_lane(1, &"steady", 0.5), 0.0)
+	g.world.set_transform(2, _on_lane(0, &"steady", 0.5), 0.0)
+	assert_almost_eq(g.height_of(1), (_on_lane(1, &"steady", 0.5) - WalkableLogicBase.ROOM_ORIGIN).y / ClimbRoom.TOWER_TOP_Y, 0.001)
+	assert_gt(g.height_of(1), g.height_of(2), "higher up, more progress")
 	assert_almost_eq(ClimbRoom.progress(_on_pad(), "towers"), 1.0, 0.001)
 	var st: Dictionary = g.get_public_state()
 	assert_almost_eq(float(st["heights"][1]), g.height_of(1), 0.002)
@@ -353,7 +362,7 @@ func test_finish_order_and_shared_places() -> void:
 		rank[int(r["player"])] = int(r["rank"])
 	assert_eq(rank, {2: 1, 3: 2, 4: 2, 1: 4})
 	assert_true(g.is_untouchable(2), "finishers can't be shoved")
-	var held: Vector3 = g.clamp_position(2, _on_stack(3))
+	var held: Vector3 = g.clamp_position(2, _on_lane(0, &"steady", 0.2))
 	assert_true(ClimbRoom.on_top(held, "towers"), "a finisher is held on the pad: %s" % held)
 
 
@@ -398,7 +407,7 @@ func test_cooldown() -> void:
 	_run(g, STEP)
 	_face(g, 1, 2, 3.5)
 	assert_eq(_swing(g, 1)["result"], &"miss", "a miss is fine")
-	_face(g, 1, 3, 1.0, 8)
+	_face(g, 1, 3, 1.0, _on_lane(2, &"steady", 0.4))
 	assert_eq(_swing(g, 1)["error"], &"cooldown", "a miss costs the cooldown")
 	_run(g, JackpotClimbLogic.SWING_COOLDOWN - 0.2)
 	assert_eq(_swing(g, 1)["error"], &"cooldown")
@@ -438,9 +447,9 @@ func test_no_hit_on_finishers_or_in_the_get_up_grace() -> void:
 func test_time_cap_ranks_by_height_with_ties() -> void:
 	var g: JackpotClimbLogic = _game([1, 2, 3, 4])
 	_run(g, STEP)
-	g.world.set_transform(1, _on_stack(12), 0.0)
-	g.world.set_transform(2, _on_stack(6), 0.0)
-	g.world.set_transform(3, _on_stack(6, Vector3(0.3, 0, 0)), 0.0)
+	g.world.set_transform(1, _on_lane(1, &"steady", 0.5), 0.0)
+	g.world.set_transform(2, _on_lane(0, &"steady", 0.5), 0.0)
+	g.world.set_transform(3, _on_lane(0, &"steady", 0.5, Vector3(0.3, 0, 0)), 0.0)
 	var evs: Array[Dictionary] = _run(g, JackpotClimbLogic.GAME_SECONDS + 0.2)
 	var over: Array[Dictionary] = _of(evs, &"jackpot_climb_over")
 	assert_eq(over.size(), 1)
@@ -465,7 +474,7 @@ func test_last_call_after_all_but_one() -> void:
 	g.world.set_transform(1, _on_pad(-0.8), 0.0)
 	_run(g, 1.0)
 	g.world.set_transform(3, _on_pad(0.8), 0.0)
-	g.world.set_transform(2, _on_stack(15), 0.0)
+	g.world.set_transform(2, _on_lane(2, &"steady", 0.3), 0.0)
 	var evs: Array[Dictionary] = _run(g, 0.2)
 	assert_eq(_of(evs, &"jackpot_climb_last_call").size(), 1)
 	evs = _run(g, JackpotClimbLogic.LAST_CALL - 0.5)

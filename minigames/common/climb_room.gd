@@ -12,7 +12,7 @@ extends RefCounted
 ##   brass slide chutes (`CHUTES`) that carry a bean back down a row. On top: a landing with a gold
 ##   WINNER rail, Lucky's podium and a brass gantry of hoppers that drop the hazards.
 ## - `"towers"` (Jackpot Climb): a cake of three giant-chip tiers with a checkpoint flag on each,
-##   climbed on two lanes of chip stacks round every tier (`ChipTowers`) up to the jackpot stack,
+##   run up on two lanes of ramps round every tier (`ChipTowers`) up to the jackpot stack,
 ##   whose gold pad (the finish box) waits at `TOWER_TOP_Y` under the JACKPOT sign. The hall is
 ##   wider here (`half_x`). A safety net covers the floor from the apron to the far wall. The climb
 ##   axis runs straight up the jackpot stack, so progress is height.

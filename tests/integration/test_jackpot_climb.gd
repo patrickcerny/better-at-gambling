@@ -35,8 +35,10 @@ func _to_game() -> JackpotClimbLogic:
 	return g
 
 
-func _on_stack(i: int) -> Vector3:
-	return WalkableLogicBase.ROOM_ORIGIN + (ChipTowers.stacks()[i]["pos"] as Vector3)
+## World position on segment `seg`'s `kind` lane, `f` of the way along it.
+func _on_lane(seg: int, kind: StringName, f: float) -> Vector3:
+	var l: Dictionary = ChipTowers.lane(seg, kind)
+	return WalkableLogicBase.ROOM_ORIGIN + ChipTowers.point(l, f * float(l["theta"]), float(l["rc"]))
 
 
 func test_room_opens_on_the_apron() -> void:
@@ -58,10 +60,10 @@ func test_room_opens_on_the_apron() -> void:
 func test_a_reported_step_onto_the_pad_finishes() -> void:
 	var g: JackpotClimbLogic = _to_game()
 	var a: int = fx.player_ids[0]
-	var last: Vector3 = _on_stack(ChipTowers.stacks().size() - 1)
+	var last: Vector3 = _on_lane(ChipTowers.SEGMENTS - 1, &"steady", 0.97)
 	fx.server.world.set_transform(a, last, 0.0)
 	fx.run(0.2)
-	assert_false(g.is_up(a), "the last stack is not the top")
+	assert_false(g.is_up(a), "the end of the last lane is not the top")
 	var pad: Vector3 = WalkableLogicBase.ROOM_ORIGIN + ChipTowers.pad_center() + ChipTowers.entry_dir() * 1.2
 	assert_true(fx.server.apply_move(a, pad, 0.0, false), "a jump onto the pad is a legal move")
 	fx.run(0.1)
@@ -76,7 +78,7 @@ func test_a_swing_knocks_a_neighbour_down() -> void:
 	var g: JackpotClimbLogic = _to_game()
 	var a: int = fx.player_ids[0]
 	var b: int = fx.player_ids[1]
-	var at: Vector3 = _on_stack(6)
+	var at: Vector3 = _on_lane(1, &"steady", 0.5)
 	fx.server.world.set_transform(b, at, 0.0)
 	# The client claims a hit from the floor: the server's positions say miss.
 	var res: Dictionary = fx.intent(a, &"minigame_action", {"kind": "swing", "target": b})
@@ -111,7 +113,7 @@ func test_a_fall_after_flag_two_comes_back_on_flag_two() -> void:
 	assert_eq(g.checkpoint.get(a, 0), 2, "flag 2 reached")
 	assert_eq(fx.of_type(&"jackpot_climb_checkpoint").size(), 2)
 	# Off the edge, all the way down to the net.
-	fx.server.world.set_transform(a, o + Vector3(-10.5, 0.0, ChipTowers.CENTER_Z), 0.0)
+	fx.server.world.set_transform(a, o + Vector3(-ChipTowers.ring_outer(0) - 0.7, 0.0, ChipTowers.CENTER_Z), 0.0)
 	fx.run(0.2)
 	assert_eq(fx.of_type(&"jackpot_climb_respawn").size(), 1)
 	var moved: Array[Dictionary] = fx.of_type(&"minigame_player_moved").filter(func(e: Dictionary) -> bool: return int(e["player"]) == a)
@@ -126,7 +128,7 @@ func test_grab_refused_shove_allowed() -> void:
 	_to_game()
 	var a: int = fx.player_ids[0]
 	var b: int = fx.player_ids[1]
-	var bp: Vector3 = _on_stack(2)
+	var bp: Vector3 = _on_lane(0, &"steady", 0.2)
 	fx.server.world.set_transform(b, bp, 0.0)
 	fx.server.world.set_transform(a, bp + Vector3(0, 0, 1.0), 0.0)
 	assert_eq(fx.intent(a, &"grab", {"target": b})["error"], &"minigame", "no grabbing")

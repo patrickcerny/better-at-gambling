@@ -1,80 +1,88 @@
 class_name ChipTowers
 extends RefCounted
-## The "towers" layout of the climb room (`ClimbRoom`, Jackpot Climb): a jump-and-run up a wedding
-## cake of giant casino chips. Three **tiers** (giant chip plateaus, each standing on the one below)
-## and the **jackpot stack** on top, whose gold pad (the finish) waits under the JACKPOT sign at
+## The "towers" layout of the climb room (`ClimbRoom`, Jackpot Climb): a run up a wedding cake of
+## giant casino chips. Three **tiers** (giant chip plateaus, each standing on the one below) and
+## the **jackpot stack** on top, whose gold pad (the finish) waits under the JACKPOT sign at
 ## `TOP_Y`. Every tier top is a **checkpoint** with a flag.
 ##
-## The climb is pure data (`stacks()`, local to the room's origin), computed once and the same for
-## everyone (no randomness: every client builds the same tower the server judges):
+## The climb is pure data (`lanes()`, local to the room's origin), computed once and the same for
+## everyone (no randomness: every client builds the same cake the server judges):
 ## - Four **segments**: segment `s` climbs from level `s` (0 the floor, 1..3 the tiers) to level
-##   `s + 1` (the next tier, or the pad) on chip stacks standing on level `s`, winding round level
-##   `s + 1`'s column at `LANE_OFF` outside it. It starts on the side of the previous flag and ends
-##   half a turn round on the opposite side, where the next flag stands (north, south, north; the
-##   pad is entered from the south, facing the gallery).
-## - Two **lanes** per segment, one round each side of the column (`side` -1 / +1): they fork at
-##   the flag and rejoin on the next tier. One lane is **steady** (short hops, `GAPS`, smaller
-##   rises, narrower stacks higher up), the other is **bold** (`BOLD_SIDE`: fewer stacks and
-##   `WIDE_COUNT` wide gaps from `WIDE_GAPS` that need a running jump, so it is shorter). The last
-##   segment round the jackpot stack is two steady lanes of narrow stacks.
-## - Gaps are air between rims; each lane's hop pattern is scaled so the lane exactly fills its
-##   half turn. Rises (the floor/tier to the first stack, stack to stack, the last stack onto the
-##   next tier) follow `RISES` scaled so each lane climbs exactly its segment; a wide jump only
-##   rises `WIDE_RISE`.
-## - Falling off a stack lands on the tier it stands on (the checkpoint) or further down; the
-##   server sends anyone who drops below their last checkpoint back to its flag
-##   (`JackpotClimbLogic`).
+##   `s + 1` (the next tier, or the pad) in the **ring** round level `s + 1`'s column: on top of
+##   tier `s` (the floor for `s` = 0, `FLOOR_RING_W` wide), from that column out to tier `s`'s rim.
+##   Every ring is filled with walkways (solid down to its tier: nothing to crawl under), so a bean
+##   that falls off a ring lands on the ring below, which runs up to the flag it fell from (or far
+##   enough below it that the server puts it back on that flag, `JackpotClimbLogic`).
+## - Each segment starts at its flag (`flag_angle`) and forks into two **lanes** that wind round
+##   the column in opposite directions and rejoin where both reach the next tier (its flag):
+##   - **steady** (green felt): one smooth ramp, no step anywhere (`STEADY_TURNS` of a turn; you
+##     never have to jump).
+##   - **bold** (burgundy felt): the other way round, shorter and steeper, with one or two wide chip
+##     tops `STEP_H` above the ramp to hop onto (`BOLD_STEPS`).
+## - `BANDS`: on the two lower rings both lanes share the ring (each takes its part of the turn).
+##   On the two upper rings (round tier 3 and round the jackpot stack) each lane has a band of its
+##   own: the steady lane spirals round the inner band more than a full turn, its second turn a
+##   slab over its first (`SLAB_T` thick, 3 m+ of headroom); the bold lane takes the outer band the
+##   other way; where the outer band is free (between the flag and the arrival) the steady lane's
+##   first turn is twice as wide (`wide`), and a slab over the inner band carries the bold lane's
+##   arrival onto the next tier (`bridge`).
+## - Every lane starts and ends on `FLAT` metres of level walkway (the flag landing, the arrival).
+## - `guide(pos)` says where a bean anywhere on the course runs next to climb (the dev bot and the
+##   no-trap test drive real beans with it).
 ##
-## `build(root, brass, ceiling_y)` makes the nodes in the room's local frame: collision cylinders
-## (`ClimbKit.column`) for tiers, stacks and the jackpot stack, all dressed in chips (`chip_mesh`:
-## flush edge spots, a bevelled rim, an inlay ring and spots on both faces; multimeshes per colour),
-## the flags (`Flag1`..`Flag3`, each with a `Cloth` the stage lights up), the gold pad and its rail
-## open to the south, the JACKPOT sign (warm marquee bulbs, `BulbsA`/`BulbsB` for the stage to chase,
-## `NameFront`/`NameBack` labels it fills) and the safety net.
+## `build(root, brass, ceiling_y)` makes the nodes in the room's local frame: collision (convex
+## prisms per walkway piece, `ClimbKit.column` for tiers and the jackpot stack), the walkways dressed
+## as stacked chips (a chip-edge texture up their sides, felt on top, gold edge trim and chevrons
+## pointing up the lane, a giant chip on every hop top), the tiers and the jackpot stack in chips
+## (`chip_mesh`: flush edge spots, a bevelled rim, an inlay ring and spots on both faces; multimeshes
+## per colour), the flags (`Flag1`..`Flag3`, each with a `Cloth` the stage lights up), the gold pad
+## and its rail open to the south, the JACKPOT sign (warm marquee bulbs, `BulbsA`/`BulbsB` for the
+## stage to chase, `NameFront`/`NameBack` labels it fills) and the safety net.
 
 ## Tower centre (local z) and the towers hall (wider and deeper than the board's).
-const CENTER_Z: float = -12.5
-const HALL_HALF_X: float = 12.0
-const FAR_Z: float = -25.0
+const CENTER_Z: float = -16.0
+const HALL_HALF_X: float = 16.3
+const FAR_Z: float = -32.5
 ## The tiers bottom to top: column radius and top height. Tier k stands on tier k - 1.
-const TIER_R: Array[float] = [9.2, 6.9, 4.6]
+const TIER_R: Array[float] = [12.2, 9.6, 6.0]
 const TIER_Y: Array[float] = [8.5, 16.0, 21.5]
-const PAD_R: float = 2.3
+const PAD_R: float = 2.4
 const TOP_Y: float = 26.0
 const SEGMENTS: int = 4
-## Lane centre line: this far outside the column it winds round (0.5 m of air for a full stack).
-const LANE_OFF: float = 1.2
-const CHIP_R: float = 0.7
-const NARROW_R: float = 0.58
-## Air between rims on the steady hops (cycled, then scaled to fill the lane: about 0.6-1.3 m).
-const GAPS: Array[float] = [0.75, 0.95, 0.6, 1.05, 0.8, 1.15, 0.7, 0.9]
-## The wide gaps of the bold lanes (a running jump; a walking jump reaches ~3.5 m).
-const WIDE_GAPS: Array[float] = [2.7, 2.9, 2.6, 2.8]
-## Rise weights per jump (cycled), and the rise of a wide jump.
-const RISES: Array[float] = [1.0, 0.85, 1.12, 0.94, 1.08, 0.9]
-const WIDE_RISE: float = 0.3
-## Per segment: the bold lane's side (0: none) and how many wide gaps it has.
-const BOLD_SIDE: Array[int] = [-1, 1, -1, 0]
-const WIDE_COUNT: Array[int] = [2, 1, 1, 0]
-## Radial wobble of the stacks off the lane line (cycled; the first and last stay on it).
-const WOBBLE: Array[float] = [0.0, 0.1, -0.08, 0.05, -0.1, 0.08, -0.04]
-## Air kept free on each side of a flag before a lane's first stack (the respawn spot), at the
-## apron's end of the floor segment, and between the two lanes' last stacks.
-const START_FREE: float = 1.3
-const FLOOR_FREE: float = 0.6
-const END_AIR: float = 0.6
-## Gaps up to this are a normal hop; wider ones need a running jump (the layout test counts them).
-const NORMAL_JUMP: float = 1.5
-## The jump envelope the route must stay inside (the bean jumps 1.1 m).
-const MAX_GAP: float = 3.0
-const MAX_RISE: float = 0.9
+## The first ring stands on the floor round tier 1: this wide (a 1.5 m aisle stays to the walls).
+const FLOOR_RING_W: float = 2.6
+## Per segment: 1 = both lanes share the ring, 2 = a band each (steady inner, bold outer).
+const BANDS: Array[int] = [1, 1, 2, 2]
+## Turns of the steady lane per segment (the bold lane winds the rest: 1 - t on a shared ring,
+## 2 - t on a ring with two bands), and which way it winds (+1: increasing angle).
+const STEADY_TURNS: Array[float] = [0.55, 0.55, 1.25, 1.25]
+const STEADY_DIR: Array[int] = [1, -1, 1, -1]
+## The bold lanes' hops: where (fraction along the lane) a chip top stands `STEP_H` above the ramp.
+const BOLD_STEPS: Array = [[0.34, 0.68], [0.34, 0.68], [0.3, 0.64], [0.5]]
+const STEP_H: float = 0.7
+## Length of a hop's chip top along the lane line, and the level walkway at each end of a lane.
+const STEP_TOP: float = 2.4
+const FLAT: float = 1.6
+## Thickness of a walkway over another one (the second turn of a spiral, the bridge).
+const SLAB_T: float = 0.4
+## Walkway pieces are at most this long on their outer edge (collision prisms, mesh quads).
+const PIECE_LEN: float = 0.7
+## The envelope the walkways must stay in (the layout test checks it): steepest ramp, the most a
+## bean can walk up without jumping (seams), least headroom under a slab.
+const MAX_SLOPE_DEG: float = 20.0
+const WALK_LIP: float = 0.02
+const MIN_HEADROOM: float = 2.8
+## A walkway this far above a bean's feet is not under it (a hop top ahead, a slab overhead).
+const FEET: float = 0.35
+## `guide`: how far ahead along a lane a bean aims, and how close a hop's riser is when it jumps.
+const LOOK: float = 2.2
+const HOP_AT: float = 1.1
 ## Checkpoint reach: on a tier's top (this far past its rim, from this far below its top).
 const CHECK_RIM: float = 0.25
 const CHECK_BELOW: float = 0.35
 ## Half size of the finish box over the pad (inside the pad's disc).
 const FINISH_HALF: float = 1.6
-## Chip thickness the stacks are built from (rounded per stack to fit its height); giant chips are
-## `GIANT_T` of their radius thick.
+## Giant chips are `GIANT_T` of their radius thick; the jackpot stack's chips `PAD_CHIP_T`.
 const CHIP_T: float = 0.12
 const GIANT_T: float = 0.16
 const PAD_CHIP_T: float = 0.46
@@ -85,10 +93,15 @@ const SIGN_H: float = 2.7
 const DENOMS: Array[String] = ["25", "100", "500", "1K", "5K"]
 ## Chip colours of the three tiers (giant chips) and their edge spots.
 const TIER_COLORS: Array[Color] = [Color("#2F6B52"), Color("#2A2522"), Color("#8E2A33")]
+## Height of one tile of the chip-edge texture up a walkway's side (four chips).
+const EDGE_TILE: float = 0.48
 
-static var _stacks: Array[Dictionary] = []
-## Vector2i(segment, side) → stack indices up that lane.
-static var _lanes: Dictionary = {}
+## Every lane: {seg, kind (&"steady", &"bold", &"wide", &"bridge"), a0 (start angle), dir (+1 / -1:
+## which way the angle runs), r0, r1 (its band), rc (its line), theta (how far it winds, radians),
+## knots (Array[Vector2]: (theta, height above its tier), a riser is two knots at one theta),
+## slab_from (pieces from this theta on are slabs over a walkway below; INF: none)}.
+static var _lanes: Array[Dictionary] = []
+static var _pieces: Array[Dictionary] = []
 static var _checkpoints: Array[Dictionary] = []
 ## "colour html:spots" → chip mesh with the materials set.
 static var _meshes: Dictionary[String, ArrayMesh] = {}
@@ -112,10 +125,27 @@ static func level_r(k: int) -> float:
 	return TIER_R[maxi(k, 1) - 1]
 
 
-## Where segment `seg` starts (its flag; angle round the centre, 0 = +z toward the apron). It ends
-## half a turn round, where the next segment starts.
+## Ring of segment `seg`: from the column it winds round out to the rim of the tier it stands on.
+static func ring_inner(seg: int) -> float:
+	return level_r(seg + 1)
+
+
+static func ring_outer(seg: int) -> float:
+	return level_r(1) + FLOOR_RING_W if seg <= 0 else level_r(seg)
+
+
+## Where segment `seg` starts (its flag; angle round the centre, 0 = +z toward the apron): the floor
+## segment at the apron, every other one where the steady lane of the one below arrives.
+static func flag_angle(seg: int) -> float:
+	var a: float = 0.0
+	for s: int in mini(seg, SEGMENTS):
+		a += float(STEADY_DIR[s]) * TAU * STEADY_TURNS[s]
+	return wrapf(a, -PI, PI)
+
+
+## Old name of `flag_angle`.
 static func start_angle(seg: int) -> float:
-	return 0.0 if seg % 2 == 0 else PI
+	return flag_angle(seg)
 
 
 ## Flat outward direction at angle `a` round the centre.
@@ -123,34 +153,185 @@ static func dir(a: float) -> Vector3:
 	return Vector3(sin(a), 0.0, cos(a))
 
 
-## Every stack, local: {pos: centre of the top face, r, base_y, seg, side, i (index up its lane),
-## wide (the gap before it is a wide one)}. Cached: don't modify.
-static func stacks() -> Array[Dictionary]:
-	if _stacks.is_empty():
+## Angle round the centre and flat distance from the tower's axis of local `pos`.
+static func angle_of(pos: Vector3) -> float:
+	return atan2(pos.x, pos.z - CENTER_Z)
+
+
+static func flat_r(pos: Vector3) -> float:
+	return Vector2(pos.x, pos.z - CENTER_Z).length()
+
+
+## Every lane (see `_lanes`), segment by segment. Cached: don't modify.
+static func lanes() -> Array[Dictionary]:
+	if _lanes.is_empty():
 		_make()
-	return _stacks
+	return _lanes
 
 
-## Stack indices up one lane, bottom to top (`side` -1 or +1).
-static func lane(seg: int, side: int) -> Array[int]:
-	stacks()
-	var out: Array[int] = []
-	out.assign(_lanes.get(Vector2i(seg, side), []))
+## Index into `lanes()` of segment `seg`'s lane of `kind` (-1 if it has none).
+static func lane_index(seg: int, kind: StringName) -> int:
+	var all: Array[Dictionary] = lanes()
+	for i: int in all.size():
+		if int(all[i]["seg"]) == seg and all[i]["kind"] == kind:
+			return i
+	return -1
+
+
+static func lane(seg: int, kind: StringName) -> Dictionary:
+	var i: int = lane_index(seg, kind)
+	return lanes()[i] if i >= 0 else {}
+
+
+## Height (local y) of lane `l` at `t` radians along it (a riser counts as its top).
+static func height(l: Dictionary, t: float) -> float:
+	return level_y(int(l["seg"])) + _eval(l["knots"], t)
+
+
+## Local point of lane `l` at `t` radians along it, `r` from the axis, on its walkway.
+static func point(l: Dictionary, t: float, r: float) -> Vector3:
+	var a: float = float(l["a0"]) + float(l["dir"]) * t
+	var d: Vector3 = dir(a) * r
+	return Vector3(d.x, height(l, t), CENTER_Z + d.z)
+
+
+## Length of lane `l` along its line (metres).
+static func lane_length(l: Dictionary) -> float:
+	return float(l["theta"]) * float(l["rc"])
+
+
+## The thetas of lane `l`'s risers (the hops), bottom to top.
+static func risers(l: Dictionary) -> Array[float]:
+	var out: Array[float] = []
+	var kn: Array = l["knots"]
+	for j: int in range(1, kn.size()):
+		var a: Vector2 = kn[j - 1]
+		var b: Vector2 = kn[j]
+		if b.x - a.x < 1e-5 and b.y - a.y > 1e-4:
+			out.append(b.x)
 	return out
 
 
-## The ledges of one way up, in order: for each segment the lane on `sides[seg]` then the level it
-## climbs onto ({pos, r, kind: "stack" / "tier" / "pad", index (stack) or level}). A tier's `pos` is
-## the centre of its top.
-static func route(sides: Array[int] = [-1, -1, -1, -1]) -> Array[Dictionary]:
+## Walkway pieces: {lane, t0, t1, y0, y1 (local heights at t0/t1), slab}. Cached: don't modify.
+static func pieces() -> Array[Dictionary]:
+	if _pieces.is_empty():
+		var all: Array[Dictionary] = lanes()
+		for i: int in all.size():
+			var l: Dictionary = all[i]
+			var kn: Array = l["knots"]
+			var base: float = level_y(int(l["seg"]))
+			for j: int in kn.size() - 1:
+				var a: Vector2 = kn[j]
+				var b: Vector2 = kn[j + 1]
+				if b.x - a.x < 1e-5:
+					continue
+				var n: int = maxi(ceili((b.x - a.x) * float(l["r1"]) / PIECE_LEN), 1)
+				for m: int in n:
+					var f0: float = float(m) / float(n)
+					var f1: float = float(m + 1) / float(n)
+					var t0: float = lerpf(a.x, b.x, f0)
+					_pieces.append({"lane": i, "t0": t0, "t1": lerpf(a.x, b.x, f1), "y0": base + lerpf(a.y, b.y, f0),
+						"y1": base + lerpf(a.y, b.y, f1), "slab": t0 >= float(l["slab_from"]) - 1e-5})
+	return _pieces
+
+
+## Every walkway at local `pos`'s spot (flat): [{lane, theta, y}], one per layer.
+static func surfaces_at(pos: Vector3) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	var all: Array[Dictionary] = stacks()
-	for seg: int in SEGMENTS:
-		for i: int in lane(seg, sides[seg] if seg < sides.size() else -1):
-			out.append({"pos": all[i]["pos"], "r": all[i]["r"], "kind": "stack", "index": i})
-		var k: int = seg + 1
-		out.append({"pos": Vector3(0.0, level_y(k), CENTER_Z), "r": level_r(k), "kind": "pad" if k == SEGMENTS else "tier", "level": k})
+	var rho: float = flat_r(pos)
+	var ang: float = angle_of(pos)
+	var all: Array[Dictionary] = lanes()
+	for i: int in all.size():
+		var l: Dictionary = all[i]
+		if rho < float(l["r0"]) - 0.02 or rho > float(l["r1"]) + 0.02:
+			continue
+		var t: float = fposmod(float(l["dir"]) * (ang - float(l["a0"])), TAU)
+		# On a start landing the other lane's side is a hair below zero.
+		if t > TAU - 0.02 / maxf(rho, 1.0):
+			t -= TAU
+		while t <= float(l["theta"]) + 1e-5:
+			if t >= -0.03:
+				out.append({"lane": i, "theta": clampf(t, 0.0, float(l["theta"])), "y": height(l, clampf(t, 0.0, float(l["theta"])))})
+			t += TAU
 	return out
+
+
+## The walkway a bean at local `pos` stands on: the highest one at most `FEET` above its feet
+## ({lane, theta, y}), {} on the floor, the pad or off the course.
+static func lane_under(pos: Vector3) -> Dictionary:
+	var best: Dictionary = {}
+	for s: Dictionary in surfaces_at(pos):
+		if float(s["y"]) <= pos.y + FEET and (best.is_empty() or float(s["y"]) > float(best["y"])):
+			best = s
+	return best
+
+
+## Where a bean at local `pos` runs next to climb: {to (local point to run at; its height doesn't
+## matter), lane (index, -1 off the walkways), hop (a hop's riser is right ahead: jump now)}.
+## Along the lane it stands on (a widened first turn leads back onto its spiral), across onto the
+## next tier at a lane's end, from the floor round the net to the start. At a fork (a flag landing)
+## it takes the steady lane, or the bold one if `bold`.
+static func guide(pos: Vector3, bold: bool = false) -> Dictionary:
+	if flat_r(pos) < PAD_R and pos.y > TOP_Y - FEET:
+		return {"to": pad_center(), "lane": -1, "hop": false}
+	var on: Dictionary = lane_under(pos)
+	if on.is_empty():
+		return {"to": _floor_target(pos), "lane": -1, "hop": false}
+	var idx: int = int(on["lane"])
+	var l: Dictionary = lanes()[idx]
+	var seg: int = int(l["seg"])
+	var t: float = float(on["theta"])
+	var kind: StringName = l["kind"]
+	if kind == &"bridge":
+		return {"to": _arrival_target(seg), "lane": idx, "hop": false}
+	if _on_start(l, t):
+		# A flag landing: pick the lane.
+		var want: int = lane_index(seg, &"bold" if bold else &"steady")
+		if want != idx:
+			idx = want
+			l = lanes()[idx]
+			t = 0.0
+			kind = l["kind"]
+	if kind == &"wide":
+		idx = lane_index(seg, &"steady")
+		l = lanes()[idx]
+	var rc: float = float(l["rc"])
+	var end: float = float(l["theta"])
+	if (end - t) * rc < FLAT * 0.6:
+		return {"to": _arrival_target(seg), "lane": idx, "hop": false}
+	var to: Vector3 = point(l, minf(t + LOOK / rc, end), rc)
+	var hop: bool = false
+	for rt: float in risers(l):
+		var ahead: float = (rt - t) * rc
+		if ahead > 0.05 and ahead < HOP_AT and pos.y < height(l, rt) - 0.3:
+			hop = true
+	return {"to": to, "lane": idx, "hop": hop}
+
+
+## True if `t` on lane `l` is on its start landing (where the lanes fork at the flag).
+static func _on_start(l: Dictionary, t: float) -> bool:
+	return l["kind"] in [&"steady", &"bold", &"wide"] and t * float(l["rc"]) <= FLAT
+
+
+## Where a lane of segment `seg` ends up: the next flag's landing, or the pad.
+static func _arrival_target(seg: int) -> Vector3:
+	if seg >= SEGMENTS - 1:
+		return pad_center()
+	return (checkpoints()[seg]["spots"] as Array)[0]
+
+
+## From the floor: round the aisle outside the first ring to the start, then onto it.
+static func _floor_target(pos: Vector3) -> Vector3:
+	var a0: float = flag_angle(0)
+	var start: Vector3 = Vector3(0.0, 0.0, CENTER_Z) + dir(a0) * ((ring_inner(0) + ring_outer(0)) * 0.5)
+	var rho: float = flat_r(pos)
+	var off: float = wrapf(angle_of(pos) - a0, -PI, PI)
+	if absf(off) * rho < FLAT * 0.6 or rho > ring_outer(0) + 3.0 and absf(off) < 0.5:
+		return start
+	var cr: float = ring_outer(0) + 0.75
+	var next: float = a0 + off - signf(off) * minf(LOOK / cr, absf(off))
+	var d: Vector3 = dir(next) * cr
+	return Vector3(d.x, 0.0, CENTER_Z + d.z)
 
 
 ## The pad's centre (top face), local.
@@ -159,19 +340,24 @@ static func pad_center() -> Vector3:
 
 
 ## The checkpoints (the tiers' tops), bottom to top: {index (1..3), y, r (the tier's radius),
-## angle, flag (local foot of the pole), spots (local respawn spots round the flag)}.
+## angle, flag (local foot of the pole), spots (local respawn spots on the flag landing)}.
 static func checkpoints() -> Array[Dictionary]:
 	if _checkpoints.is_empty():
 		for k: int in range(1, SEGMENTS):
-			var a: float = start_angle(k)
-			var inner: float = level_r(k + 1)
+			var a: float = flag_angle(k)
 			var y: float = level_y(k)
-			var c := Vector3(0.0, y, CENTER_Z)
+			var outer: float = ring_outer(k)
+			var inner: float = ring_inner(k)
+			# The landing's open band: the whole ring, or its outer band (no slab overhead).
+			var r0: float = inner if BANDS[k] == 1 else (inner + outer) * 0.5
+			var rs: float = (r0 + outer) * 0.5
 			var spots: Array[Vector3] = []
-			var rs: float = inner + LANE_OFF + 0.1
-			for arc: float in [0.0, -0.8, 0.8]:
-				spots.append(c + dir(a + arc / rs) * rs)
-			_checkpoints.append({"index": k, "y": y, "r": level_r(k), "angle": a, "flag": c + dir(a) * (inner + 0.5), "spots": spots})
+			for arc: float in [0.0, 0.9, -0.9]:
+				var d: Vector3 = dir(a + arc / rs) * rs
+				spots.append(Vector3(d.x, y, CENTER_Z + d.z))
+			var fd: Vector3 = dir(a) * (outer - 0.3)
+			_checkpoints.append({"index": k, "y": y, "r": level_r(k), "angle": a, "flag": Vector3(fd.x, y, CENTER_Z + fd.z),
+				"spots": spots, "band": outer - r0})
 	return _checkpoints
 
 
@@ -202,122 +388,108 @@ static func finish_spots(o: Vector3) -> Array[Vector3]:
 ## Direction (flat, local) from the pad's centre toward where both last lanes arrive: the rail's
 ## opening (south, toward the apron and the gallery).
 static func entry_dir() -> Vector3:
-	return dir(start_angle(SEGMENTS))
+	return dir(flag_angle(SEGMENTS))
 
 
 static func _make() -> void:
-	_stacks.clear()
 	_lanes.clear()
+	_pieces.clear()
 	for seg: int in SEGMENTS:
-		for side: int in [-1, 1]:
-			_make_lane(seg, side)
+		var a: float = flag_angle(seg)
+		var ds: int = STEADY_DIR[seg]
+		var h: float = level_y(seg + 1) - level_y(seg)
+		var rin: float = ring_inner(seg)
+		var rout: float = ring_outer(seg)
+		var ts: float = TAU * STEADY_TURNS[seg]
+		if BANDS[seg] == 1:
+			var rc: float = (rin + rout) * 0.5
+			_lanes.append(_lane(seg, &"steady", a, ds, rin, rout, ts, _profile(ts, rc, h, [])))
+			_lanes.append(_lane(seg, &"bold", a, -ds, rin, rout, TAU - ts, _profile(TAU - ts, rc, h, BOLD_STEPS[seg])))
+			continue
+		var mid: float = (rin + rout) * 0.5
+		var sk: Array[Vector2] = _profile(ts, (rin + mid) * 0.5, h, [])
+		# Split the spiral where its second turn (a slab over the first) starts.
+		var at: int = 0
+		while at < sk.size() and sk[at].x < TAU:
+			at += 1
+		sk.insert(at, Vector2(TAU, _eval(sk, TAU)))
+		var steady: Dictionary = _lane(seg, &"steady", a, ds, rin, mid, ts, sk)
+		steady["slab_from"] = TAU
+		_lanes.append(steady)
+		var tb: float = 2.0 * TAU - ts
+		var bold: Dictionary = _lane(seg, &"bold", a, -ds, mid, rout, tb, _profile(tb, (mid + rout) * 0.5, h, BOLD_STEPS[seg]))
+		_lanes.append(bold)
+		# The outer band between the flag and the arrival: the spiral's first turn, twice as wide.
+		var arr: float = ts - TAU
+		var wk: Array[Vector2] = []
+		for k: Vector2 in sk:
+			if k.x < arr - 1e-5:
+				wk.append(k)
+		wk.append(Vector2(arr, _eval(sk, arr)))
+		_lanes.append(_lane(seg, &"wide", a, ds, mid, rout, arr, wk))
+		# Over the inner band beside the bold lane's arrival: a slab across onto the next tier.
+		var fb: float = minf(FLAT / float(bold["rc"]), tb * 0.15)
+		var bridge: Dictionary = _lane(seg, &"bridge", a + float(ds) * arr, ds, rin, mid, fb, [Vector2(0.0, h), Vector2(fb, h)])
+		bridge["slab_from"] = 0.0
+		_lanes.append(bridge)
 
 
-## One lane: picks the stack count whose hop pattern fits the half turn best, places the stacks by
-## arc length and sets their heights.
-static func _make_lane(seg: int, side: int) -> void:
-	var rho: float = level_r(seg + 1) + LANE_OFF
-	var y0: float = level_y(seg)
-	var y1: float = level_y(seg + 1)
-	var bold: bool = BOLD_SIDE[seg] == side
-	var free0: float = FLOOR_FREE if seg == 0 else START_FREE
-	var best_n: int = -1
-	var best_k: float = INF
-	for n: int in range(3, 48):
-		var k: float = _fit(seg, side, bold, n, rho, free0)
-		if k > 0.0 and absf(k - 1.0) < absf(best_k - 1.0):
-			best_k = k
-			best_n = n
-	var n: int = best_n
-	var radii: Array[float] = _radii(seg, bold, n)
-	var wide_at: Array[int] = _wide_slots(n, WIDE_COUNT[seg] if bold else 0)
-	# Heights: jump j lands on stack j (j = n: onto the next level).
-	var weights: Array[float] = []
-	var total_w: float = 0.0
-	for j: int in n + 1:
-		var w: float = 0.0 if j in wide_at else RISES[(j + seg * 2 + (side + 1)) % RISES.size()]
-		weights.append(w)
-		total_w += w
-	var scale: float = (y1 - y0 - WIDE_RISE * float(wide_at.size())) / total_w
-	var s: float = (free0 + radii[0])
-	var y: float = y0
-	var idx: Array[int] = []
-	for i: int in n:
-		if i > 0:
-			var gap: float = WIDE_GAPS[(seg + i) % WIDE_GAPS.size()] if i in wide_at else GAPS[(i + seg * 3 + (side + 1)) % GAPS.size()] * best_k
-			s += radii[i - 1] + gap + radii[i]
-		y += WIDE_RISE if i in wide_at else weights[i] * scale
-		var wob: float = 0.0 if i == 0 or i == n - 1 else WOBBLE[(i + seg) % WOBBLE.size()]
-		var a: float = start_angle(seg) + float(side) * s / rho
-		var p: Vector3 = dir(a) * (rho + wob)
-		idx.append(_stacks.size())
-		_stacks.append({"pos": Vector3(p.x, y, CENTER_Z + p.z), "r": radii[i], "base_y": y0, "seg": seg, "side": side, "i": i, "wide": i in wide_at})
-	_lanes[Vector2i(seg, side)] = idx
+static func _lane(seg: int, kind: StringName, a0: float, d: int, r0: float, r1: float, theta: float, knots: Array[Vector2]) -> Dictionary:
+	return {"seg": seg, "kind": kind, "a0": a0, "dir": d, "r0": r0, "r1": r1, "rc": (r0 + r1) * 0.5, "theta": theta,
+		"knots": knots, "slab_from": INF}
 
 
-## The scale of the steady hops that makes `n` stacks fill the lane exactly (<= 0: they don't fit).
-static func _fit(seg: int, side: int, bold: bool, n: int, rho: float, free0: float) -> float:
-	var radii: Array[float] = _radii(seg, bold, n)
-	var wide_at: Array[int] = _wide_slots(n, WIDE_COUNT[seg] if bold else 0)
-	var arc: float = rho * PI - (free0 + radii[0]) - (radii[n - 1] + END_AIR * 0.5)
-	var fixed: float = 0.0
-	var hops: float = 0.0
-	for i: int in range(1, n):
-		fixed += radii[i - 1] + radii[i]
-		if i in wide_at:
-			fixed += WIDE_GAPS[(seg + i) % WIDE_GAPS.size()]
-		else:
-			hops += GAPS[(i + seg * 3 + (side + 1)) % GAPS.size()]
-	if hops <= 0.0 or arc <= fixed:
-		return -1.0
-	return (arc - fixed) / hops
-
-
-## Stack radii up a lane: narrow round the jackpot stack, every third narrow on the steady lanes
-## above the floor, full size on the bold lanes (they land the wide jumps).
-static func _radii(seg: int, bold: bool, n: int) -> Array[float]:
-	var out: Array[float] = []
-	for i: int in n:
-		var narrow: bool = seg == SEGMENTS - 1 or (not bold and seg >= 1 and i % 3 == 2)
-		out.append(NARROW_R if narrow else CHIP_R)
+## A lane's height profile: `FLAT` metres level at both ends, an even ramp between, and a riser of
+## `STEP_H` onto a `STEP_TOP` chip top at each of `steps` (fractions along the lane).
+static func _profile(span: float, rc: float, h: float, steps: Array) -> Array[Vector2]:
+	var f: float = minf(FLAT / rc, span * 0.15)
+	var top: float = STEP_TOP / rc
+	var ramp: float = span - 2.0 * f - float(steps.size()) * top
+	var rise: float = (h - STEP_H * float(steps.size())) / ramp
+	var out: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(f, 0.0)]
+	var t: float = f
+	var y: float = 0.0
+	for q: float in steps:
+		var at: float = maxf(f + q * (span - 2.0 * f), t)
+		y += (at - t) * rise
+		out.append(Vector2(at, y))
+		y += STEP_H
+		out.append(Vector2(at, y))
+		t = at + top
+		out.append(Vector2(t, y))
+	out.append(Vector2(span - f, h))
+	out.append(Vector2(span, h))
 	return out
 
 
-## Which stacks of `n` are reached by a wide jump (spread evenly, never the first).
-static func _wide_slots(n: int, count: int) -> Array[int]:
-	var out: Array[int] = []
-	for j: int in count:
-		var i: int = clampi(roundi(float(n) * float(j + 1) / float(count + 1)), 1, n - 1)
-		if i not in out:
-			out.append(i)
-	return out
+## Piecewise linear through `knots` (a riser takes its top).
+static func _eval(knots: Array, t: float) -> float:
+	var y: float = (knots[0] as Vector2).y
+	for j: int in range(1, knots.size()):
+		var a: Vector2 = knots[j - 1]
+		var b: Vector2 = knots[j]
+		if t >= a.x - 1e-6:
+			if b.x - a.x < 1e-6:
+				y = b.y
+			elif t <= b.x + 1e-6:
+				y = lerpf(a.y, b.y, clampf((t - a.x) / (b.x - a.x), 0.0, 1.0))
+			else:
+				y = b.y
+	return y
 
 
 # --- Build --------------------------------------------------------------------------------------
 
-## Builds the tiers, the stacks, the pad, the flags, the sign and the net under the room's `root`
+## Builds the tiers, the walkways, the pad, the flags, the sign and the net under the room's `root`
 ## (local frame). `ceiling_y` is where the sign's chains hang from.
 static func build(root: Node3D, brass: Material, ceiling_y: float) -> Node3D:
 	var n := Node3D.new()
 	n.name = "ChipTowers"
 	root.add_child(n)
 	var chips := _ChipBatch.new()
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7311
 	for k: int in range(1, SEGMENTS):
 		_tier(n, chips, k)
-	var i: int = 0
-	for s: Dictionary in stacks():
-		var top: Vector3 = s["pos"]
-		var r: float = s["r"]
-		var base: float = s["base_y"]
-		ClimbKit.column(n, r, top.y - base, Vector3(top.x, base, top.z), "Stack%d" % i)
-		var seg: int = int(s["seg"])
-		var from: Vector3 = Vector3(0.0, base, CENTER_Z) + dir(start_angle(seg)) * (level_r(seg + 1) + LANE_OFF)
-		if int(s["i"]) > 0:
-			from = stacks()[i - 1]["pos"]
-		_dress_stack(n, chips, rng, top, r, base, from)
-		i += 1
+	_walkways(n, chips)
 	_pad(n, chips, brass)
 	chips.commit(n)
 	for cp: Dictionary in checkpoints():
@@ -326,6 +498,239 @@ static func build(root: Node3D, brass: Material, ceiling_y: float) -> Node3D:
 	_net(n, brass)
 	_lights(n)
 	return n
+
+
+## Every lane: collision (two convex prisms per piece, solid down to its tier or a slab), one mesh
+## (felt top, chip-edge sides, a dark underside under slabs, a gold trim along the outer edge),
+## chevrons up the lane and a giant chip on every hop top.
+static func _walkways(parent: Node3D, chips: _ChipBatch) -> void:
+	var all: Array[Dictionary] = lanes()
+	var by_lane: Dictionary[int, Array] = {}
+	for p: Dictionary in pieces():
+		var i: int = int(p["lane"])
+		if not by_lane.has(i):
+			by_lane[i] = []
+		by_lane[i].append(p)
+	var edge: StandardMaterial3D = edge_material()
+	var steady_top: StandardMaterial3D = VaultArena._tex("velvet", 1.2, Palette.FELT_GREEN.lightened(0.12), 0.0, 0.92)
+	var bold_top: StandardMaterial3D = VaultArena._tex("velvet", 1.2, Palette.VIP_BURGUNDY.lightened(0.2), 0.0, 0.92)
+	var under: StandardMaterial3D = GreyboxKit.material(Palette.WARM_CHARCOAL.darkened(0.2), 0.0, 0.9)
+	var gold: StandardMaterial3D = GreyboxKit.material(Palette.VIP_GOLD, 0.85, 0.25)
+	var arrows: Array[Transform3D] = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7311
+	for i: int in all.size():
+		var l: Dictionary = all[i]
+		var ps: Array = by_lane.get(i, [])
+		var body := StaticBody3D.new()
+		body.name = "Lane%d_%s" % [int(l["seg"]), String(l["kind"])]
+		parent.add_child(body)
+		var top := SurfaceTool.new()
+		var side := SurfaceTool.new()
+		var bottom := SurfaceTool.new()
+		var trim := SurfaceTool.new()
+		for st: SurfaceTool in [top, side, bottom, trim]:
+			st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for j: int in ps.size():
+			var p: Dictionary = ps[j]
+			var prev: Dictionary = ps[j - 1] if j > 0 else {}
+			var next: Dictionary = ps[j + 1] if j + 1 < ps.size() else {}
+			_piece(body, l, p, prev, next, top, side, bottom, trim)
+		var mi := MeshInstance3D.new()
+		mi.name = "Mesh"
+		var mesh := ArrayMesh.new()
+		var mats: Array[Material] = [bold_top if l["kind"] == &"bold" else steady_top, edge, under, gold]
+		var tools: Array[SurfaceTool] = [top, side, bottom, trim]
+		for k: int in tools.size():
+			var arrays: Array = tools[k].commit_to_arrays()
+			if not (arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array) or (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+				continue
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			mesh.surface_set_material(mesh.get_surface_count() - 1, mats[k])
+		mi.mesh = mesh
+		body.add_child(mi)
+		if l["kind"] in [&"steady", &"bold"]:
+			_lane_arrows(l, arrows)
+		for rt: float in risers(l):
+			# A giant chip lying on the hop's top, its denomination reading from below.
+			var mid_t: float = rt + STEP_TOP * 0.5 / float(l["rc"])
+			var c: Vector3 = point(l, mid_t, float(l["rc"]))
+			var r: float = minf((float(l["r1"]) - float(l["r0"])) * 0.5, STEP_TOP * 0.5) - 0.06
+			var ci: int = rng.randi_range(0, ChipStack.TIER_COLORS.size() - 1)
+			chips.chip(c + Vector3(0, 0.012 - CHIP_T * 0.5, 0), r, CHIP_T, rng.randf() * TAU, ChipStack.TIER_COLORS[ci], 8)
+			var lab := Label3D.new()
+			lab.text = DENOMS[ci]
+			lab.font = Vfx.font()
+			lab.font_size = 96
+			lab.pixel_size = 0.0052 * r / 0.7
+			lab.modulate = ((ChipStack.materials_for(ChipStack.TIER_COLORS[ci])[2]) as StandardMaterial3D).albedo_color
+			lab.outline_size = 0
+			lab.shaded = true
+			lab.double_sided = false
+			var back: Vector3 = point(l, rt - 0.5 / float(l["rc"]), float(l["rc"])) - c
+			lab.rotation = Vector3(-PI * 0.5, atan2(back.x, back.z), 0.0)
+			lab.position = c + Vector3(0, 0.016, 0)
+			parent.add_child(lab)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	var pm := PrismMesh.new()
+	pm.size = Vector3(0.7, 0.55, 0.025)
+	mm.mesh = pm
+	mm.instance_count = arrows.size()
+	for i: int in arrows.size():
+		mm.set_instance_transform(i, arrows[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "LaneArrows"
+	mmi.multimesh = mm
+	mmi.material_override = GreyboxKit.material(Palette.CREAM.darkened(0.05), 0.0, 0.7)
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mmi)
+
+
+## One piece: its two prisms, its top, its outer (and, off a column, inner) side, the risers and
+## ends of the lane, a slab's underside, the trim.
+static func _piece(body: StaticBody3D, l: Dictionary, p: Dictionary, prev: Dictionary, next: Dictionary, top: SurfaceTool, side: SurfaceTool, bottom: SurfaceTool, trim: SurfaceTool) -> void:
+	var seg: int = int(l["seg"])
+	var on_column: bool = is_equal_approx(float(l["r0"]), ring_inner(seg))
+	var r0: float = float(l["r0"]) - (0.05 if on_column else 0.02)
+	var r1: float = float(l["r1"]) + (0.0 if is_equal_approx(float(l["r1"]), ring_outer(seg)) else 0.02)
+	var t0: float = p["t0"]
+	var t1: float = p["t1"]
+	var y0: float = p["y0"]
+	var y1: float = p["y1"]
+	var slab: bool = p["slab"]
+	var base: float = level_y(seg) - 0.05
+	var a: Vector3 = _at(l, t0, r0, y0)
+	var b: Vector3 = _at(l, t0, r1, y0)
+	var c: Vector3 = _at(l, t1, r1, y1)
+	var d: Vector3 = _at(l, t1, r0, y1)
+	for tri: Array in [[a, b, c], [a, c, d]]:
+		var pts := PackedVector3Array()
+		for v: Vector3 in tri:
+			pts.append(v)
+		for v: Vector3 in tri:
+			pts.append(Vector3(v.x, v.y - SLAB_T if slab else base, v.z))
+		var cs := CollisionShape3D.new()
+		var shape := ConvexPolygonShape3D.new()
+		shape.points = pts
+		cs.shape = shape
+		body.add_child(cs)
+	var a_lo: Vector3 = Vector3(a.x, y0 - SLAB_T if slab else base, a.z)
+	var b_lo: Vector3 = Vector3(b.x, y0 - SLAB_T if slab else base, b.z)
+	var c_lo: Vector3 = Vector3(c.x, y1 - SLAB_T if slab else base, c.z)
+	var d_lo: Vector3 = Vector3(d.x, y1 - SLAB_T if slab else base, d.z)
+	var up: Vector3 = (c - a).cross(b - a).normalized()
+	if up.y < 0.0:
+		up = -up
+	_face(top, a, b, c, d, up, Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1))
+	var out_n: Vector3 = (b + c) * 0.5 - Vector3(0, 0, CENTER_Z)
+	out_n.y = 0.0
+	out_n = out_n.normalized()
+	_side(side, b_lo, c_lo, c, b, out_n, t0 * r1, t1 * r1)
+	if not on_column:
+		_side(side, a_lo, d_lo, d, a, -out_n, t0 * r0, t1 * r0)
+	if slab:
+		_face(bottom, a_lo, b_lo, c_lo, d_lo, Vector3.DOWN, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO)
+	# Ends: the lane's start (off the floor of its tier) and end, a riser (the next piece starts
+	# higher), the solid first turn ending under the slab that carries on above it.
+	var fwd: Vector3 = (d + c - a - b)
+	fwd.y = 0.0
+	fwd = fwd.normalized()
+	if prev.is_empty() and y0 - a_lo.y > 0.06:
+		_side(side, b_lo, a_lo, a, b, -fwd, r1, r0)
+	if next.is_empty():
+		_side(side, d_lo, c_lo, c, d, fwd, r0, r1)
+	elif bool(next["slab"]) and not slab:
+		var hi: float = float(next["y0"]) - SLAB_T
+		_side(side, Vector3(d.x, base, d.z), Vector3(c.x, base, c.z), Vector3(c.x, hi, c.z), Vector3(d.x, hi, d.z), fwd, r0, r1)
+	elif float(next["y0"]) > y1 + 1e-4:
+		var rise_to: float = float(next["y0"])
+		_side(side, d, c, Vector3(c.x, rise_to, c.z), Vector3(d.x, rise_to, d.z), -fwd, r0, r1)
+	# Gold trim along the outer edge (a hair above the felt).
+	var inw: float = 0.09
+	var b_in: Vector3 = _at(l, t0, r1 - inw, y0)
+	var c_in: Vector3 = _at(l, t1, r1 - inw, y1)
+	var lift := Vector3(0, 0.012, 0)
+	_face(trim, b_in + lift, b + lift, c + lift, c_in + lift, up, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO)
+
+
+## Local point of lane `l` at `t`, radius `r`, height `y`.
+static func _at(l: Dictionary, t: float, r: float, y: float) -> Vector3:
+	var dd: Vector3 = dir(float(l["a0"]) + float(l["dir"]) * t) * r
+	return Vector3(dd.x, y, CENTER_Z + dd.z)
+
+
+## A side face (bottom edge a-b, top edge c-d... given as lo0, lo1, hi1, hi0) facing `n`, the
+## chip-edge texture running along it (`u0`..`u1` metres) and up it in world height.
+static func _side(st: SurfaceTool, lo0: Vector3, lo1: Vector3, hi1: Vector3, hi0: Vector3, n: Vector3, u0: float, u1: float) -> void:
+	if hi0.y - lo0.y < 0.005 and hi1.y - lo1.y < 0.005:
+		return
+	_face(st, lo0, lo1, hi1, hi0, n, Vector2(u0, -lo0.y / EDGE_TILE), Vector2(u1, -lo1.y / EDGE_TILE), Vector2(u1, -hi1.y / EDGE_TILE), Vector2(u0, -hi0.y / EDGE_TILE))
+
+
+## Quad a-b-c-d facing `n` (both triangles wound for it), with UVs.
+static func _face(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, n: Vector3, ua: Vector2, ub: Vector2, uc: Vector2, ud: Vector2) -> void:
+	for tri: Array in [[a, b, c, ua, ub, uc], [a, c, d, ua, uc, ud]]:
+		var p: Vector3 = tri[0]
+		var q: Vector3 = tri[1]
+		var r: Vector3 = tri[2]
+		var order: Array[int] = [0, 1, 2]
+		if (q - p).cross(r - p).dot(n) > 0.0:
+			order = [0, 2, 1]  # Godot: clockwise seen from the front
+		for k: int in order:
+			st.set_normal(n)
+			st.set_uv(tri[3 + k])
+			st.add_vertex(tri[k])
+
+
+## Chevrons lying on lane `l`, pointing up it, every ~4.5 m (not on the hop tops or risers).
+static func _lane_arrows(l: Dictionary, out: Array[Transform3D]) -> void:
+	var rc: float = float(l["rc"])
+	var length: float = lane_length(l)
+	var s: float = FLAT + 1.0
+	var rs: Array[float] = risers(l)
+	while s < length - FLAT:
+		var t: float = s / rc
+		var clear: bool = true
+		for rt: float in rs:
+			if t > rt - 0.9 / rc and t < rt + (STEP_TOP + 0.4) / rc:
+				clear = false
+		if clear:
+			var p: Vector3 = point(l, t, rc)
+			var q: Vector3 = point(l, t + 0.3 / rc, rc)
+			var fwd: Vector3 = (q - p).normalized()
+			var flat_side: Vector3 = fwd.cross(Vector3.UP).normalized()
+			var up: Vector3 = flat_side.cross(fwd).normalized()
+			if up.y < 0.0:
+				up = -up
+			var right: Vector3 = fwd.cross(up).normalized()
+			out.append(Transform3D(Basis(right, fwd, up), p + up * 0.02))
+		s += 4.5
+
+
+## The chip-edge texture up every walkway's side: four chips per tile, each a colour with cream (or
+## dark) edge spots staggered chip to chip and a dark seam between chips.
+static func edge_material() -> StandardMaterial3D:
+	var w: int = 128
+	var hgt: int = 64
+	var img := Image.create(w, hgt, false, Image.FORMAT_RGBA8)
+	var order: Array[int] = [2, 1, 4, 3]
+	var band: int = hgt / order.size()
+	for k: int in order.size():
+		var col: Color = ChipStack.TIER_COLORS[order[k]]
+		var spot: Color = Palette.WARM_CHARCOAL if ChipStack.is_light(col) else Palette.CREAM
+		var y0: int = k * band
+		img.fill_rect(Rect2i(0, y0, w, band), col)
+		for s: int in 4:
+			var x: int = (s * w / 4 + (k % 2) * w / 8) % w
+			img.fill_rect(Rect2i(x, y0 + 3, 12, band - 6), spot)
+		img.fill_rect(Rect2i(0, y0 + band - 1, w, 1), col.darkened(0.55))
+	img.generate_mipmaps()
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = ImageTexture.create_from_image(img)
+	m.roughness = 0.55
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	return m
 
 
 ## A tier: giant chips of its colour from the level below up to its top, the top chip's face is
@@ -343,37 +748,6 @@ static func _tier(parent: Node3D, chips: _ChipBatch, k: int) -> void:
 	chips.core(Vector3(0.0, y0, CENTER_Z), r * 0.985, y1 - y0 - t * 0.5)
 
 
-## Chips up a stack: runs of 3-7 chips of a colour with a hair of jitter, the top chip's
-## denomination lying on its face, reading from the stack you jump from.
-static func _dress_stack(parent: Node3D, chips: _ChipBatch, rng: RandomNumberGenerator, top: Vector3, r: float, base: float, from: Vector3) -> void:
-	var h: float = top.y - base
-	var count: int = maxi(roundi(h / CHIP_T), 2)
-	var t: float = h / float(count)
-	var colors: Array[Color] = ChipStack.TIER_COLORS
-	var ci: int = rng.randi_range(0, colors.size() - 1)
-	var run: int = rng.randi_range(3, 7)
-	for k: int in count:
-		run -= 1
-		if run < 0 or k == count - 1:
-			ci = (ci + rng.randi_range(1, colors.size() - 1)) % colors.size()
-			run = rng.randi_range(3, 7)
-		var off := Vector2(rng.randf_range(-0.012, 0.012), rng.randf_range(-0.012, 0.012)) if k < count - 1 else Vector2.ZERO
-		chips.chip(Vector3(top.x + off.x, base + t * (float(k) + 0.5), top.z + off.y), r, t, rng.randf() * TAU, colors[ci], 6)
-	chips.core(Vector3(top.x, base, top.z), r * 0.97, h - t * 0.5)
-	var mats: Array = ChipStack.materials_for(colors[ci])
-	var l := Label3D.new()
-	l.text = DENOMS[ci]
-	l.font = Vfx.font()
-	l.font_size = 96
-	l.pixel_size = (0.0042 if DENOMS[ci].length() > 2 else 0.0052) * r / CHIP_R
-	l.modulate = (mats[2] as StandardMaterial3D).albedo_color
-	l.outline_size = 0
-	l.shaded = true
-	l.double_sided = false
-	var d: Vector3 = top - from
-	l.rotation = Vector3(-PI * 0.5, atan2(-d.x, -d.z), 0.0)
-	l.position = top + Vector3(0, 0.006, 0)
-	parent.add_child(l)
 
 
 ## The jackpot stack on tier 3: big burgundy and gold chips up to the gold pad, a glowing rim,
@@ -512,8 +886,9 @@ static func _flag(parent: Node3D, cp: Dictionary, brass: Material) -> void:
 	# The gold ring round the respawn spot (in the tier's frame, not the flag's).
 	var ring := MeshInstance3D.new()
 	var tm := TorusMesh.new()
-	tm.inner_radius = 0.95
-	tm.outer_radius = 1.08
+	var ring_r: float = minf(1.08, float(cp["band"]) * 0.5 - 0.08)
+	tm.inner_radius = ring_r - 0.13
+	tm.outer_radius = ring_r
 	tm.rings = 32
 	tm.ring_segments = 4
 	ring.mesh = tm

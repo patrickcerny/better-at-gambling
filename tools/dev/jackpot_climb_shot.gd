@@ -1,7 +1,7 @@
 extends Node3D
-## Dev: Jackpot Climb 30 s in: the chip cake from the apron, beans on both lanes with their bats,
+## Dev: Jackpot Climb 30 s in: the chip cake from a high corner of the hall, beans on both lanes with their bats,
 ## one at checkpoint 2's flag, one on the pad, the JACKPOT sign, Lucky on his podium and the
-## overlay (render check). `--cam`/`--look` give close-ups of the chips. `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
+## overlay (render check; the screenshot tool's `--cam`/`--look` take world coordinates). `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
 ## res://tools/dev/jackpot_climb_shot.tscn --out /tmp/jc.png --frames 30 --pixel 1`.
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice"]
@@ -33,13 +33,16 @@ func _ready() -> void:
 	stage.on_event({"type": &"jackpot_climb_clock", "clock": 30.0})
 	stage.on_event({"type": &"jackpot_climb_top", "players": [4], "place": 1, "clock": 28.0})
 	var o: Vector3 = WalkableLogicBase.ROOM_ORIGIN
-	var stacks: Array[Dictionary] = ChipTowers.stacks()
 	stage.on_event({"type": &"jackpot_climb_checkpoint", "player": 1, "index": 1})
 	var cp2: Vector3 = (ChipTowers.checkpoints()[1]["spots"] as Array)[1]
-	for b: Array in [[1, ChipTowers.lane(0, 1)[2], 0.6], [2, ChipTowers.lane(0, -1)[4], -0.6], [3, -1, 0.0]]:
+	var steady: Dictionary = ChipTowers.lane(0, &"steady")
+	var bold: Dictionary = ChipTowers.lane(0, &"bold")
+	var on_steady: Vector3 = ChipTowers.point(steady, float(steady["theta"]) * 0.12, float(steady["rc"]))
+	var on_bold: Vector3 = ChipTowers.point(bold, float(bold["theta"]) * 0.2, float(bold["rc"]))
+	for b: Array in [[1, on_steady, 0.6], [2, on_bold, -0.6], [3, cp2, 0.0]]:
 		var v := AvatarVisuals.new()
 		add_child(v)
-		v.position = o + ((stacks[int(b[1])]["pos"] as Vector3) if int(b[1]) >= 0 else cp2)
+		v.position = o + (b[1] as Vector3)
 		v.rotation.y = b[2]
 		v.set_color(Palette.player_color(int(b[0]) - 1))
 		var bat: Node3D = ItemModels.make_held(&"baseball_bat")
@@ -51,6 +54,6 @@ func _ready() -> void:
 	var cam := Camera3D.new()
 	add_child(cam)
 	cam.fov = 70
-	cam.position = o + Vector3(2.0, 4.0, 9.0)
-	cam.look_at(o + Vector3(0, 11.0, -12.5))
+	cam.position = o + Vector3(14.0, 24.0, 3.0)
+	cam.look_at(o + Vector3(0.0, 8.0, ChipTowers.CENTER_Z))
 	cam.current = true

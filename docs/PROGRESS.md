@@ -139,6 +139,14 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-18 / 0.9.11
+- Jackpot Climb is a run now, not a jump-and-run (Patrick: "you can get stuck on climb game"): felt
+  ramps and spiral walkways round the three tiers, a steady lane with no jumps and a bold lane with
+  seven short hops in all; no pockets, ledges or gaps to get stuck in. Clean run 32.4 s steady,
+  27.3 s bold (was 31.5 s). Evidence: `tests/physics/test_jackpot_climb_course.gd` drives a real
+  `PlayerAvatar` (via `tests/helpers/climb_runner.gd`) up every lane, from every flag spot, and
+  from 604 dropped spots on a 1.25 m grid over the whole course: all reach the next checkpoint or
+  are sent back to a flag (no trap); geometry checks in `tests/unit/test_jackpot_climb_logic.gd`.
 ### 2026-10-16 / 0.9.10 (four new games, random floor, Patrick's second feedback burst)
 - Released 2026-10-16. PROTOCOL_VERSION 8 (tipping gone from the wire, new station events, the
   floor plan in `match_started` / `regroup_started` / the snapshot, blackjack hands carry `clock`,

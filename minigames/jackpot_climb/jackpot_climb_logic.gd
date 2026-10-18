@@ -1,10 +1,10 @@
 class_name JackpotClimbLogic
 extends WalkableLogicBase
-## "Jackpot Climb" (MINIGAME_IDEAS #11), a walkable jump-and-run in the climb room's "towers"
-## layout (`ClimbRoom`, `ChipTowers`): everyone starts on the apron and hops from chip stack to chip
-## stack up a cake of three giant-chip tiers to the gold pad on the jackpot stack under the JACKPOT
-## sign. Each tier has two lanes round it (a steady one of short hops, a bold one with a few wide
-## running jumps) and its top is a checkpoint flag. Everyone carries a baseball bat: a hit knocks
+## "Jackpot Climb" (MINIGAME_IDEAS #11), a walkable run in the climb room's "towers" layout
+## (`ClimbRoom`, `ChipTowers`): everyone starts on the apron and runs up felt ramps and spiral
+## walkways round a cake of three giant-chip tiers to the gold pad on the jackpot stack under the
+## JACKPOT sign. Each ring forks into two lanes (a steady one that is all running, a shorter bold
+## one with a couple of short hops onto chip tops) and each tier's top is a checkpoint flag. Everyone carries a baseball bat: a hit knocks
 ## the target off their ledge. Shove allowed, grab (and so throw) blocked. Order of reaching the top
 ## wins, then the rest by height.
 ##
@@ -37,8 +37,8 @@ const GAME_SECONDS: float = 150.0
 ## After all but one are up, the last climber gets this long.
 const LAST_CALL: float = 10.0
 const SWING_COOLDOWN: float = 1.2
-## Centre-to-centre reach of a swing (a bit longer than Bat Heist's: it reaches a bean standing
-## on the near rim of the next stack).
+## Centre-to-centre reach of a swing (a bit longer than Bat Heist's: it reaches a bean a stride
+## ahead on the ramp).
 const BAT_REACH: float = 2.4
 const KNOCK_SECONDS: float = 1.2
 const IMMUNE_SECONDS: float = 1.0

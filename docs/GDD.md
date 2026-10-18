@@ -102,16 +102,21 @@ per shake capped 8% / $400×mult. Seated players protected. Security guards thro
 within 8 m. Money never depends on physics.
 
 ## Minigames
-- **Jackpot Climb** (climb room "towers"): a jump-and-run up a 26 m cake of giant casino chips to
+- **Jackpot Climb** (climb room "towers"): mostly a run, up a 26 m cake of giant casino chips to
   the gold pad under the JACKPOT sign. Three giant-chip tiers (tops at 8.5, 16 and 21.5 m) each
-  carry a checkpoint flag; round every tier two lanes of chip stacks fork at the flag and rejoin
-  on the next tier: a steady side of short hops (0.6–1.2 m of air) and a bold side with one or two
-  wide running jumps (2.6–2.9 m), the last climb round the jackpot stack is two lanes of narrow
-  stacks. The layout is fixed, so everyone climbs the same tower. The server sets each bean's
-  checkpoint when it stands on a tier and puts anyone who drops 2.5 m below it back at that flag
-  (before the first flag a fall just lands on the net). Bats knock climbers off, shoving is on,
-  grabbing off. 150 s; first to the pad wins, then the order of arrival, then the rest by height
-  (never counted below their checkpoint), with a 10 s last call once all but one are up.
+  carry a checkpoint flag. From the apron and from every flag the way up forks into two felt lanes
+  that wind round the ring to the next tier: a steady lane (green felt, all running: even ramps of
+  6–12°, and on the two upper rings a spiral walkway of 1.25 turns under a wide outer band) and a
+  bold lane (burgundy felt, the other way round, about a fifth shorter, with one or two short hops
+  of 0.7 m up onto wide chip tops; seven hops in all). The last ring winds round the jackpot stack
+  to the pad. Chevron arrows on the felt point up the lane. Nowhere on the course can a bean get
+  stuck: every spot leads on uphill or drops far enough to be sent back to the flag, and a player
+  who never jumps finishes on the steady lanes. The layout is fixed, so everyone climbs the same
+  tower. The server sets each bean's checkpoint when it stands on a tier and puts anyone who
+  drops 2.5 m below it back at that flag (before the first flag a fall just lands on the net). Bats
+  knock climbers off, shoving is on, grabbing off. 150 s; first to the pad wins, then the order of
+  arrival, then the rest by height (never counted below their checkpoint), with a 10 s last call
+  once all but one are up.
 
 ## Online
 Dedicated Godot server per room on the owner's VPS, FastAPI room orchestrator, ENet over UDP,

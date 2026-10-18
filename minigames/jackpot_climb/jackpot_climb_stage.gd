@@ -69,7 +69,7 @@ func _build_game(_start: Dictionary) -> void:
 		_build_ladder()
 		_build_host_panel()
 	set_clock(JackpotClimbLogic.GAME_SECONDS)
-	_say("Welcome to the Jackpot Climb! Hop up the chips to my sign. Every tier has a flag to catch your fall. Bats are allowed, so mind the edge.", QuizHost.Pose.HAPPY)
+	_say("Welcome to the Jackpot Climb! Run up the ramps round the chips to my sign. Every tier has a flag to catch your fall. Bats are allowed, so mind the edge.", QuizHost.Pose.HAPPY)
 	_refresh_status()
 
 
@@ -416,15 +416,15 @@ func _update_prompt() -> void:
 	if t >= 0 and _cooldown <= 0.0:
 		set_prompt("[{interact}] SWING AT %s!" % player_name(t).to_upper())
 	elif h < 0.02 and me.global_position.z > WalkableLogicBase.ROOM_ORIGIN.z - 1.0 and clock < 15.0:
-		set_prompt("LEFT OR RIGHT ROUND THE CHIPS!  [{jump}] HOP TO THE NEXT STACK")
+		set_prompt("RUN UP THE RAMP: GREEN IS STEADY, RED HAS HOPS")
 	elif h < 0.02 and cp == 0:
-		set_prompt("ON THE NET: CLIMB AGAIN FROM THE FIRST STACK")
+		set_prompt("ON THE NET: RUN ROUND TO THE RAMP AGAIN")
 	elif h > 0.85:
 		set_prompt("ALMOST AT THE JACKPOT!")
 	elif cp > 0 and absf(h - ChipTowers.level_y(cp) / ClimbRoom.TOWER_TOP_Y) < 0.01:
-		set_prompt("CHECKPOINT %d: PICK A SIDE AND HOP ON" % cp)
+		set_prompt("CHECKPOINT %d: PICK A RAMP AND RUN ON" % cp)
 	else:
-		set_prompt("[{jump}] HOP TO THE NEXT STACK   [{interact}] SWING")
+		set_prompt("KEEP RUNNING UP   [{jump}] HOP   [{interact}] SWING")
 
 
 func _refresh_status() -> void:
