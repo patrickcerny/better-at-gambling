@@ -139,6 +139,32 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-18 / 0.9.11 (built, held back: Patrick "do it now but dont push it")
+- PROTOCOL_VERSION 9 (the floor plan payload names the layout and carries positions).
+- Patrick's 2026-10-17/18 notes, all in: third-person camera straight behind the bean; scratch
+  cards fixed price (no all-in: a $100 card is not sold for $76); the hot table's arrow and label
+  hidden while a minigame stage is up; wheel and craps seat cameras close on the table with the
+  overlay in a right-hand column; six hand-made floor layouts rotating every round with the bar,
+  the ropes, the CLOSED TONIGHT signs and the TONIGHT'S FLOOR board gone and the scratch kiosk on
+  the casino floor by the Gift Shop; Jackpot Climb a run with seven short hops and a 604-spot
+  no-trap test. Details in the three entries below.
+- Voice ("other people online dont hear me"): no broken path found. New net test
+  `test_voice_goes_both_ways_between_the_host_and_a_friend_in_a_hosted_room` (loopback and
+  through the host's `HostBridge`, `--bridge-port` dev flag) is green both ways. Fixed on the way:
+  `VoiceChannel._exit_tree` assigned a freed playback (SCRIPT ERROR at match end, skipped the voice
+  shutdown); `VoiceCapture._note_held_back` logs once when a mic heard 2 s of sound but nothing was
+  sent (push-to-talk not held, or under the open-mic gate); a mic losing audio is a warning. In a
+  match nobody hears their own voice; only Settings > TEST MICROPHONE plays you back.
+- Hot table HUD arrow: `_point_at_hot_table` guards a target on the camera plane (engine
+  `p.d == 0` errors after a floor switch); `tests/ui/test_hot_pointer.gd`.
+- Suite: lint ok; unit 820; sim 22; integration 244; physics 169; ui 273; smoke 4 + boot;
+  session; orchestrator 68; net 13/14 in the full run: `test_create_join_by_code_play_and_room_closes_when_empty`
+  timed out once creating the room (HTTPRequest result 13 after 8 s, the orchestrator logged no
+  request) and passed 3/3 on reruns; the orchestrator now logs `room_create_requested` on arrival
+  so a repeat shows whether the request got there.
+- Not verified: real online play of the new floor rotation and views with several clients; the
+  Steam relay; Windows WASAPI; whether Patrick held T or used open mic.
+
 ### 2026-10-18 / 0.9.11 (Jackpot Climb: a run, not a jump-and-run)
 - Jackpot Climb is a run now, not a jump-and-run (Patrick: "you can get stuck on climb game"): felt
   ramps and spiral walkways round the three tiers, a steady lane with no jumps and a bold lane with
