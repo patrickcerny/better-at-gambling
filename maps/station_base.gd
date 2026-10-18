@@ -20,6 +20,12 @@ var hot_light: OmniLight3D
 ## Big bouncing arrow over the hot table, drawn on top of everything so it reads across the floor.
 var hot_marker: Node3D
 const HOT_MARKER_Y: float = 4.2
+## Hot right now (the server says so).
+var hot: bool = false
+## The marker is drawn on top of everything, so it would show through a minigame room's walls:
+## the match scene hides it while a stage is open (Patrick: "clear the hot marker when you are in
+## minigames") and the table stays hot underneath.
+var hot_marker_hidden: bool = false
 ## Spotlight cone, embers and sparks while hot (client only, built on first use).
 var hot_fx: HotTableFx
 ## Middle of the table's footprint (local) for the hot spotlight and fire ring.
@@ -67,7 +73,8 @@ func hot_light_energy() -> float:
 
 
 ## Marks the station hot (spotlight and bouncing arrow) or not.
-func set_hot(hot: bool) -> void:
+func set_hot(is_hot: bool) -> void:
+	hot = is_hot
 	hot_light.light_energy = hot_light_energy() if hot else 0.0
 	if hot and hot_fx == null and Vfx.enabled():
 		hot_fx = HotTableFx.new()
@@ -79,8 +86,16 @@ func set_hot(hot: bool) -> void:
 	if hot and hot_marker == null:
 		_build_hot_marker()
 	if hot_marker != null:
-		hot_marker.visible = hot
+		hot_marker.visible = hot and not hot_marker_hidden
 	set_process(hot)
+
+
+## Hides the arrow and label while a minigame stage is on screen (they draw through its walls);
+## shows them again afterwards if the table is still hot.
+func set_hot_marker_hidden(hidden: bool) -> void:
+	hot_marker_hidden = hidden
+	if hot_marker != null:
+		hot_marker.visible = hot and not hidden
 
 
 func _process(delta: float) -> void:
