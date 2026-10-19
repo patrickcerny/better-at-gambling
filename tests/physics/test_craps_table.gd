@@ -109,9 +109,12 @@ func test_late_joiner_catches_the_throw_in_the_air() -> void:
 	assert_string_contains(cs.sign_point.text, "POINT  8")
 
 
-## Every stool's view at the default field of view: the whole felt, every seat's chips, the
-## stickman and his sign, all in the left two thirds of the screen (the overlay is a column down
-## the right third), the felt spanning over half the width so the dice read at the low pixel scale.
+## Every stool's view at the default field of view, from high over the felt (0.9.14, Patrick: "Even
+## closer on craps ... I just want to see the game ... almost the whole screen should be the game"):
+## every seat's chips, the point boxes, both ends of the felt where the dice land, the dice and the
+## stickman, all in the left two thirds of the screen (the overlay is a column down the right
+## third), the felt spanning over 55% of the width and 38% of the height. Only the corners of the
+## players' rail may run off the bottom; the sign behind the table is out of the picture.
 func test_seat_camera_frames_the_felt_left_of_the_overlay() -> void:
 	var cam := Camera3D.new()
 	cam.fov = 85.0  # the default (Settings "video/fov")
@@ -120,23 +123,33 @@ func test_seat_camera_frames_the_felt_left_of_the_overlay() -> void:
 	var stick: Vector3 = DealerLogic.OFFSETS[&"craps"]
 	var hx: float = CrapsStation.FELT_HX
 	var hz: float = CrapsStation.FELT_HZ
-	var felt: Array[Vector3] = [Vector3(-hx, CrapsStation.FELT_Y, hz), Vector3(hx, CrapsStation.FELT_Y, hz), Vector3(hx, CrapsStation.FELT_Y, -hz), Vector3(-hx, CrapsStation.FELT_Y, -hz)]
-	var others: Array[Vector3] = [stick + Vector3(0, 0.95, 0), stick + Vector3(0, 1.8, 0), Vector3(0.0, 2.15, -CrapsStation.TABLE_D * 0.5 - 0.95), CrapsStation.DICE_HOME, CrapsStation.HOUSE_SPOT]
+	var y: float = CrapsStation.FELT_Y
+	# The far corners and both ends of the felt (the dice bounce off them).
+	var felt: Array[Vector3] = [Vector3(hx, y, -hz), Vector3(-hx, y, -hz), Vector3(hx, y, -0.45), Vector3(-hx, y, -0.45), Vector3(hx, y, 0.15), Vector3(-hx, y, 0.15)]
+	var others: Array[Vector3] = [stick + Vector3(0, 0.95, 0), stick + Vector3(0, 1.8, 0), CrapsStation.DICE_HOME, CrapsStation.HOUSE_SPOT]
+	for n: int in CrapsLogic.POINTS:
+		others.append(CrapsStation.point_spot(n))
+	for seat: int in range(-1, CrapsStation.SEAT_XS.size()):
+		others.append(CrapsStation.throw_target(seat))
 	for seat: int in CrapsStation.SEAT_XS.size():
 		for t: StringName in CrapsLogic.BET_TYPES:
 			others.append(CrapsStation.bet_spot(t, seat) + Vector3(0, 0.05, 0))  # everyone's chips
+			others.append(CrapsStation.bet_spot(t, seat) + Vector3(0, 0.0, 0.06))  # and the near edge of their spot
 	assert_eq(cs.seat_cameras.size(), cs.seat_count, "a view per stool")
 	for seat: int in cs.seat_count:
 		cam.global_transform = cs.camera_for_seat(seat).global_transform
 		var span := Vector2(INF, -INF)
+		var span_y := Vector2(INF, -INF)
 		for p: Vector3 in felt + others:
 			var g: Vector3 = cs.to_global(p)
 			assert_false(cam.is_position_behind(g), "seat %d faces %s" % [seat, p])
 			var at: Vector2 = cam.unproject_position(g)
 			assert_true(left.has_point(at), "seat %d sees %s in the left two thirds: %s" % [seat, p, at])
-			if p in felt:
+			if p in felt or (p.y < y + 0.01 and p.z > 0.4):
 				span = Vector2(minf(span.x, at.x), maxf(span.y, at.x))
-		assert_gt(span.y - span.x, view.size.x * 0.45, "seat %d: the felt spans %.0f%% of the width" % [seat, (span.y - span.x) / view.size.x * 100.0])
+				span_y = Vector2(minf(span_y.x, at.y), maxf(span_y.y, at.y))
+		assert_gt(span.y - span.x, view.size.x * 0.55, "seat %d: the felt spans %.0f%% of the width" % [seat, (span.y - span.x) / view.size.x * 100.0])
+		assert_gt(span_y.y - span_y.x, view.size.y * 0.38, "seat %d: and %.0f%% of the height" % [seat, (span_y.y - span_y.x) / view.size.y * 100.0])
 	# The near rail hides none of the bets: nothing solid between any seat's eye and any printed
 	# spot (the players' own Pass Line included).
 	await wait_physics_frames(2)

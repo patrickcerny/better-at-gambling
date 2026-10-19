@@ -25,14 +25,15 @@ const STONE_TOP: float = TOP_Y + 0.2
 const BLADE_LEN: float = 0.82
 const BLADE_IN: float = 0.24
 const FREE_LIFT: float = 0.42
-## Where the player stands (the seat; no stool: `stand` meta) and their view over the right
-## shoulder, looking down on the sword and the ring with the pedestal in the left two thirds of the
-## screen (the overlay is a column down the right third).
+## Where the player stands (the seat; no stool: `stand` meta) and their view (0.9.14, Patrick:
+## "Even closer on ... sword tapper ... almost the whole screen should be the game"): right over
+## the pedestal's top, looking down at the ring so the gems and the stone fill most of the left two
+## thirds of the screen (the overlay is a column down the right third); the sword runs off the top.
 const STAND_Z: float = 1.15
-## Where the multiplier slams down: beside the raised sword on the seat camera's open side.
-const MULT_SPOT: Vector3 = Vector3(0.55, TOP_Y + 0.75, 0.1)
-const SEAT_EYE: Vector3 = Vector3(0.25, 2.45, 1.6)
-const SEAT_AIM: Vector3 = Vector3(0.38, 0.9, -0.05)
+## Where the multiplier slams down: just over the stone, in the middle of the ring in the seat view.
+const MULT_SPOT: Vector3 = Vector3(0.0, TOP_Y + 0.32, 0.1)
+const SEAT_EYE: Vector3 = Vector3(0.4, 1.66, 0.6)
+const SEAT_AIM: Vector3 = Vector3(0.4, 0.84, 0.1)
 ## The reveal, in seconds from the tap: the heave, the sword coming free, the first and last gem
 ## lighting, and the multiplier slam (all inside `sword_reveal_time`, when the pull pays).
 const HEAVE: float = 0.5

@@ -48,12 +48,14 @@ const FLAP_KICK: float = 0.42
 const FLAP_RETURN: float = 16.0
 ## The angle wraps back by this much (64 whole turns) once it gets this far.
 const WRAP: float = TAU * 64.0
-## The seat view: the eye high over the players' rail and right of the middle, looking at `SEAT_AIM`
-## so the wheel, the layout in front of it and the dealer beside it fill the left two thirds of the
-## screen (the overlay is a column down the right third). Each seat's eye moves `SEAT_EYE_SHIFT` of
+## The seat view (0.9.14, Patrick: "Same for fortune wheel. Like almost the whole screen should be
+## the game"): the eye over the layout and right of the middle, looking at `SEAT_AIM` so the wheel
+## (over half the screen's height), the chips in every box and the dealer beside it fill the left
+## two thirds of the screen (the overlay is a column down the right third); the layout's front edge
+## runs off the bottom. Each seat's eye moves `SEAT_EYE_SHIFT` of
 ## its stool's x along, so the stools see the wheel from slightly different spots.
-const SEAT_EYE: Vector3 = Vector3(0.8, 2.8, 1.3)
-const SEAT_AIM: Vector3 = Vector3(0.99, 1.48, -1.39)
+const SEAT_EYE: Vector3 = Vector3(0.7, 2.6, 0.9)
+const SEAT_AIM: Vector3 = Vector3(0.7, 1.7, -1.45)
 const SEAT_EYE_SHIFT: float = 0.08
 ## Segment colours and the colour of the writing on them, by symbol.
 const SYMBOL_COLORS: Array[Color] = [Color("#F2E6C9"), Color("#275E49"), Color("#C83D3D"), Color("#24211F"), Color("#681F2C"), Color("#151414"), Color("#D6A84B")]

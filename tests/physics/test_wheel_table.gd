@@ -137,10 +137,12 @@ func test_the_angle_stays_precise_over_a_long_match() -> void:
 	assert_eq(WheelStation.pointer_segment(wh.angle), 31)
 
 
-## Every stool's view at the default field of view: the whole wheel face (its frame ring and the
-## clicker), the layout with the chips in its boxes and the dealer beside the wheel, all in the
-## left two thirds of the screen (the overlay is a column down the right third), big enough to
-## read at the low pixel scale: the wheel and the layout in front of it span over half the width.
+## Every stool's view at the default field of view, close up (0.9.14, Patrick: "Same for fortune
+## wheel. Like almost the whole screen should be the game"): the whole wheel face (its frame ring
+## and the clicker), the chips in every box of the layout in front of it and the dealer beside the
+## wheel, all in the left two thirds of the screen (the overlay is a column down the right third);
+## the wheel face alone covers over half the height. Only the front edge of the layout (the side
+## nearest the players) may run off the bottom.
 func test_seat_camera_frames_the_wheel_left_of_the_overlay() -> void:
 	var cam := Camera3D.new()
 	cam.fov = 85.0  # the default (Settings "video/fov")
@@ -155,31 +157,31 @@ func test_seat_camera_frames_the_wheel_left_of_the_overlay() -> void:
 		for k: int in 24:
 			var a: float = TAU * k / 24.0
 			rim.append(Vector3(sin(a) * rim_r, WheelStation.WHEEL_Y + cos(a) * rim_r, WheelStation.WHEEL_Z))
-		var layout: Array[Vector3] = []
-		for s: int in [0, WheelLogic.SYMBOLS.size() - 1]:
-			for dz: float in [-0.5, 0.5]:
-				for dx: float in [-0.5, 0.5]:
-					layout.append(WheelStation.bet_spot(s) + Vector3(dx * WheelStation.SPOT_SIZE.x, 0.0, dz * WheelStation.SPOT_SIZE.y))
-		var others: Array[Vector3] = [wh.pointer.position, WheelStation.HOUSE_SPOT, dealer + Vector3(0, 0.9, 0), dealer + Vector3(0, 1.7, 0)]
+		var boxes: Array[Vector3] = []
 		for s: int in WheelLogic.SYMBOLS.size():
-			others.append(WheelStation.bet_spot(s) + Vector3(0, 0.05, 0))  # the chips in each box
+			for dx: float in [-0.4, 0.4]:
+				boxes.append(WheelStation.bet_spot(s) + Vector3(dx * WheelStation.SPOT_SIZE.x, 0.05, 0.0))  # the chips in each box
+		for s: int in [0, WheelLogic.SYMBOLS.size() - 1]:
+			for dx: float in [-0.5, 0.5]:
+				boxes.append(WheelStation.bet_spot(s) + Vector3(dx * WheelStation.SPOT_SIZE.x, 0.0, -0.5 * WheelStation.SPOT_SIZE.y))  # its back corners
+		var others: Array[Vector3] = [wh.pointer.position, WheelStation.HOUSE_SPOT, dealer + Vector3(0, 0.9, 0), dealer + Vector3(0, 1.7, 0)]
 		var wheel_x := Vector2(INF, -INF)
+		var wheel_y := Vector2(INF, -INF)
 		var all_x := Vector2(INF, -INF)
-		var all_y := Vector2(INF, -INF)
-		for p: Vector3 in rim + layout + others:
+		for p: Vector3 in rim + boxes + others:
 			var g: Vector3 = wh.to_global(p)
 			assert_false(cam.is_position_behind(g), "seat %d faces %s" % [seat, p])
 			var at: Vector2 = cam.unproject_position(g)
 			assert_true(left.has_point(at), "seat %d sees %s in the left two thirds: %s" % [seat, p, at])
 			if p in rim:
 				wheel_x = Vector2(minf(wheel_x.x, at.x), maxf(wheel_x.y, at.x))
+				wheel_y = Vector2(minf(wheel_y.x, at.y), maxf(wheel_y.y, at.y))
 			if not p in others:
 				all_x = Vector2(minf(all_x.x, at.x), maxf(all_x.y, at.x))
-				all_y = Vector2(minf(all_y.x, at.y), maxf(all_y.y, at.y))
 		var w: float = view.size.x
 		assert_gt(all_x.y - all_x.x, w * 0.45, "seat %d: the wheel and its layout span %.0f%% of the width" % [seat, (all_x.y - all_x.x) / w * 100.0])
-		assert_gt(all_y.y - all_y.x, view.size.y * 0.75, "seat %d: and most of the height (%.0f px)" % [seat, all_y.y - all_y.x])
-		assert_gt(wheel_x.y - wheel_x.x, w * 0.25, "seat %d: the wheel face alone %.0f%% of the width (was 16%%)" % [seat, (wheel_x.y - wheel_x.x) / w * 100.0])
+		assert_gt(wheel_y.y - wheel_y.x, view.size.y * 0.55, "seat %d: the wheel face alone %.0f%% of the height" % [seat, (wheel_y.y - wheel_y.x) / view.size.y * 100.0])
+		assert_gt(wheel_x.y - wheel_x.x, w * 0.3, "seat %d: and %.0f%% of the width (was 16%%, then 25%%)" % [seat, (wheel_x.y - wheel_x.x) / w * 100.0])
 	# Nothing solid between the eye and the boxes or the wheel's hub.
 	await wait_physics_frames(2)
 	var space: PhysicsDirectSpaceState3D = wh.get_world_3d().direct_space_state

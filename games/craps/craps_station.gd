@@ -33,12 +33,13 @@ const HOUSE_SPOT: Vector3 = Vector3(0.0, RAIL_TOP + 0.01, -TABLE_D * 0.5 + 0.12)
 ## Where the dice wait for a shooter at a fresh table (in front of the stickman).
 const DICE_HOME: Vector3 = Vector3(1.0, FELT_Y + CrapsDice.HALF, -0.66)
 const FELT_COLOR: Color = Color("#22553F")
-## The seat view: the eye high over the players' rail, a little right of the middle and looking
-## down at `SEAT_AIM`, so the whole felt and the stickman fill the left two thirds of the screen
-## (the overlay is a column down the right third). Each seat's eye moves `SEAT_EYE_SHIFT` of its
-## stool's x along.
-const SEAT_EYE: Vector3 = Vector3(1.0, 3.2, 1.35)
-const SEAT_AIM: Vector3 = Vector3(1.0, 1.31, -0.98)
+## The seat view (0.9.14, Patrick: "Even closer on craps ... I just want to see the game"): the eye
+## high over the felt itself, right of the middle, looking almost straight down at `SEAT_AIM`, so
+## the felt end to end (where the dice land), every bet spot and the stickman fill the left two
+## thirds of the screen (the overlay is a column down the right third); only the corners of the
+## players' rail run off the bottom. Each seat's eye moves `SEAT_EYE_SHIFT` of its stool's x along.
+const SEAT_EYE: Vector3 = Vector3(1.0, 2.9, 0.2)
+const SEAT_AIM: Vector3 = Vector3(1.0, 0.88, -0.5)
 const SEAT_EYE_SHIFT: float = 0.05
 
 ## Client-side presentation (empty on a headless server).
