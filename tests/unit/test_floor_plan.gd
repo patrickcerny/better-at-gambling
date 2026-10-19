@@ -5,6 +5,10 @@ extends GutTest
 ## when nothing else can stand), the skip rule (`FloorPlan.problems`) and the room geometry
 ## (`FloorGeometry`).
 
+## Games whose stations go by a short name instead of the game id: the Sword Tapper's pedestals
+## are `sword_1` and `sword_2`.
+const SHORT_IDS: Dictionary = {&"sword_tapper": "sword"}
+
 var cfg: FloorPlanConfig
 
 
@@ -50,6 +54,7 @@ func test_every_layout_uses_registered_games_on_the_casino_floor() -> void:
 	for l: FloorLayout in cfg.layouts:
 		assert_true(FloorPlan.problems(l, cfg, Registry.games).is_empty(), "%s: every game is on (%s)" % [l.id, FloorPlan.problems(l, cfg, Registry.games)])
 		var scratch: int = 0
+		var swords: Array[Vector2] = []
 		for sid: Variant in l.stations:
 			var row: Array = l.stations[sid]
 			var game: StringName = row[0]
@@ -59,10 +64,19 @@ func test_every_layout_uses_registered_games_on_the_casino_floor() -> void:
 			assert_false(String(sid).begins_with("vip_"), "%s/%s: the VIP lounge does not rotate" % [l.id, sid])
 			assert_true(floor_area.has_point(Vector2(pos.x, pos.z)), "%s/%s stands on the casino floor (%s)" % [l.id, sid, pos])
 			assert_lt(pos.z, LuckyLounge.LOBBY_DOORS_Z, "%s/%s: nothing in the entrance hall" % [l.id, sid])
-			assert_true(String(sid).begins_with(String(game) + "_") or String(sid).begins_with(String(game).trim_suffix("s") + "_"), "%s/%s is named after its game" % [l.id, sid])
+			var named: bool = String(sid).begins_with(String(game) + "_") or String(sid).begins_with(String(game).trim_suffix("s") + "_")
+			if SHORT_IDS.has(game):
+				var short: String = String(SHORT_IDS[game]) + "_"
+				named = String(sid).begins_with(short) and String(sid).trim_prefix(short).is_valid_int()
+			assert_true(named, "%s/%s is named after its game" % [l.id, sid])
 			if game == &"scratch":
 				scratch += 1
+			if game == &"sword_tapper":
+				swords.append(Vector2(pos.x, pos.z))
 		assert_eq(scratch, 1, "%s: one scratch counter, on the casino floor" % l.id)
+		assert_eq(swords.size(), 2, "%s: two Sword Tapper pedestals (sword_1, sword_2)" % l.id)
+		if swords.size() == 2:
+			assert_lt(swords[0].distance_to(swords[1]), 2.5, "%s: the two pedestals stand side by side" % l.id)
 
 
 func test_the_wire_form_round_trips() -> void:

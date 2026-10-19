@@ -225,6 +225,9 @@ func _apply(ev: Dictionary) -> void:
 			var net: int = int(ev["net"])
 			if net != 0 and not bool(ev.get("fun", false)):  # play money stays out of the feed
 				_feed("%s %s$%d at %s" % [player_name(int(ev["player"])), "+" if net > 0 else "−", absi(net), station_label(StringName(ev["station"]))], &"win" if net > 0 else &"loss")
+			if bool((ev.get("details", {}) as Dictionary).get("big", false)) and not bool(ev.get("fun", false)):
+				# A big pull at the Sword Tapper (≥ `sword_big_win` × the stake): the whole floor hears of it.
+				_feed("%s pulled the sword: $%s!" % [player_name(int(ev["player"])), WinFx.thousands(int(ev["returned"]))], &"jackpot")
 		&"jackpot_won":
 			_feed("%s hit the JACKPOT for $%d!" % [player_name(int(ev["player"])), int(ev["amount"])], &"jackpot")
 		&"jackpot_changed":
@@ -484,8 +487,10 @@ func _on_item_used(ev: Dictionary) -> void:
 	_feed(text, &"item")
 
 
-## "Blackjack 2" from "blackjack_2".
+## "Blackjack 2" from "blackjack_2" ("Sword Tapper 1" from the pedestal "sword_1").
 static func station_label(sid: StringName) -> String:
+	if String(sid).begins_with("sword_") and String(sid).trim_prefix("sword_").is_valid_int():
+		return "Sword Tapper %s" % String(sid).trim_prefix("sword_")
 	var parts: PackedStringArray = String(sid).split("_")
 	if parts.size() >= 2 and parts[-1].is_valid_int():
 		return "%s %s" % [" ".join(parts.slice(0, parts.size() - 1)).capitalize(), parts[-1]]

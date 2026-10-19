@@ -1,7 +1,8 @@
 class_name HotTableDirector
 extends RefCounted
 ## Hot Table event (§2.3): every 45-60 s of casino time one random station turns HOT for 30 s and
-## pays ×1.25 on winnings there. The next hot table is never announced early.
+## pays ×1.25 on winnings there. The next hot table is never announced early. Stations whose logic
+## says it is no candidate (`StationLogicBase.hot_table_candidate`, the Sword Tapper) are never drawn.
 
 var stations: StationManager
 var balance: BalanceConfig
@@ -51,7 +52,7 @@ func drain_events() -> Array[Dictionary]:
 
 
 func _start() -> void:
-	var ids: Array = stations.logics.keys()
+	var ids: Array = stations.logics.keys().filter(func(s: StringName) -> bool: return stations.logics[s].hot_table_candidate())
 	if ids.is_empty():
 		return
 	ids.sort()

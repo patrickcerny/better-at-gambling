@@ -137,6 +137,11 @@ func round_seconds() -> float:
 	return 0.0
 
 
+## False keeps the station out of the Hot Table draw (`HotTableDirector`).
+func hot_table_candidate() -> bool:
+	return true
+
+
 ## True while the player has money in play here (unsettled bet).
 func has_stake(_player: int) -> bool:
 	return false

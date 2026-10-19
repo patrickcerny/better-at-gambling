@@ -339,12 +339,13 @@ func release_held() -> void:
 	state = State.STANDING
 
 
-## Parks the bean on a seat facing the table; the camera eases to `anchor`.
+## Parks the bean on a seat facing the table; the camera eases to `anchor`. A seat with the
+## `stand` meta (the Sword Tapper pedestal) is a spot to stand at: the bean stays on its feet.
 func sit(p_seat: Node3D, anchor: Node3D) -> void:
 	seat = p_seat
 	state = State.SEATED
 	visuals.stop_emote()  # sitting down cuts an emote short (emote again in the seat)
-	visuals.sitting = true
+	visuals.sitting = not bool(p_seat.get_meta(&"stand", false))
 	velocity = Vector3.ZERO
 	push_velocity = Vector3.ZERO
 	_applied_push = Vector3.ZERO

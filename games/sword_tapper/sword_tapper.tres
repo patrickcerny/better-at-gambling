@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/game_definition.gd" id="1"]
+[ext_resource type="Script" path="res://games/sword_tapper/sword_tapper_logic.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"sword_tapper"
+display_name = "Sword Tapper"
+rules_text = "Pick a stake from $10 to $100 and tap PULL. The sword stays in the stone (you lose the stake) or comes free and lights 3 to 17 of the 17 gems around it: you win the sum of the lit gems. A win of 9 or fewer gems may be multiplied by ×2, ×3, ×5 or ×10. About 1 pull in 4 frees the sword."
+logic_script = ExtResource("2")
+rug_color = Color(0.408, 0.122, 0.173, 1)
+floor_footprint = &"kiosk"

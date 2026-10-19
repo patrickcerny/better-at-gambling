@@ -19,6 +19,8 @@ const PLINKO_DELAY: float = 0.15
 ## Bets older than this are swept off the felt when a new round starts (stale leftovers).
 const STALE_MS: int = 1500
 const PLAYER_HEAD: float = 2.3
+## Where a bean at a Sword Tapper pedestal reaches for the hilt (its own frame, front is −z).
+const HILT_REACH: Vector3 = Vector3(0.0, 1.45, -0.75)
 
 ## StringName -> StationBase.
 var stations: Dictionary = {}
@@ -125,8 +127,20 @@ func on_event(ev: Dictionary) -> void:
 			var sc: ScratchStation = stations.get(StringName(ev["station"]), null) as ScratchStation
 			if sc != null:
 				sc.dispense(int(ev.get("tier", 0)), int(ev.get("player", -1)) == local_id)
+		&"sword_pull":
+			# A pull at a Sword Tapper pedestal: the bean heaves at the sword and the reveal plays;
+			# the win (`round_result`) shows once it is over.
+			var sid: StringName = StringName(ev["station"])
+			var sw: SwordTapperStation = stations.get(sid, null) as SwordTapperStation
+			if sw != null:
+				sw.play_pull(ev, int(ev.get("player", -1)) == local_id)
+				_shown_at[sid] = Time.get_ticks_msec() + int(float(ev.get("seconds", Registry.balance.sword_reveal_time)) * 1000.0)
+				_heave(int(ev.get("player", -1)))
 		&"round_result":
 			_on_result(ev)
+			var sw: SwordTapperStation = stations.get(StringName(ev["station"]), null) as SwordTapperStation
+			if sw != null and bool((ev.get("details", {}) as Dictionary).get("big", false)):
+				_after(_delay_for(StringName(ev["station"])), sw.big_win_column)
 		&"bets_refunded":
 			_return_chips(StringName(ev["station"]), int(ev["player"]))
 		&"table_reset":
@@ -293,6 +307,21 @@ func _show_result(sid: StringName, pid: int) -> void:
 		WinFx.coin_burst(world, pos, clampi(6 + net / 15, 8, 26))
 
 
+## The puller's bean grabs the hilt with both arms and heaves back at it, then lets go.
+func _heave(pid: int) -> void:
+	var a: PlayerAvatar = avatar_of.call(pid) if avatar_of.is_valid() else null
+	if a == null or a.visuals == null:
+		return
+	a.visuals.reaching = true
+	a.visuals.reach_target = HILT_REACH
+	_after(SwordTapperStation.HEAVE * 0.6, func() -> void:
+		if is_instance_valid(a) and a.visuals != null:
+			a.visuals.hit(a.global_basis.z, 0.45))  # leans back on the tug
+	_after(SwordTapperStation.HEAVE + 0.35, func() -> void:
+		if is_instance_valid(a) and a.visuals != null:
+			a.visuals.reaching = false)
+
+
 func _jackpot(sid: StringName, pid: int, amount: int) -> void:
 	if world == null or not world.is_inside_tree():
 		return
@@ -410,6 +439,8 @@ func _fx_point(st: StationBase, pid: int) -> Vector3:
 			return st.to_global(Vector3(0, 1.5, 0.9))
 		if st is ScratchStation:
 			return st.to_global(ScratchStation.CARD_SPOT + Vector3(0, 0.45, 0.25))
+		if st is SwordTapperStation:
+			return st.to_global(Vector3(0, SwordTapperStation.TOP_Y + 0.55, 0.3))
 		var seat: int = _seat_index(st, pid)
 		return st.to_global(_seat_edge(st, seat).lerp(_bet_spot(st, seat, &"", 0), 0.5) + Vector3(0, 0.35, 0))
 	if a != null:

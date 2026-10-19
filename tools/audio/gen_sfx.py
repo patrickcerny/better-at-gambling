@@ -296,11 +296,48 @@ def scratch():
     return finish((rasp * grains + body) * env, peak_db=-6.0)
 
 
+def stone_grind():
+    """The Sword Tapper heave: a blade grinding in its stone, a low gritty scrape with stone
+    crumbs ticking off it, swelling and fading (the thud of a stuck sword is the recorded thud)."""
+    rng = np.random.default_rng(23)
+    n = int(0.75 * SR)
+    t = secs(n)
+    grit = np.repeat(rng.uniform(0.2, 1.0, n // 300 + 1), 300)[:n]  # the blade catching the rock
+    scrape = band(noise(n, rng), 140, 1400) * grit
+    rumble = band(noise(n, rng), 50, 220) * 0.8
+    wobble = 1.0 + 0.35 * np.sin(2 * np.pi * 7.5 * t)  # the heave, tug by tug
+    env = np.sin(np.pi * np.clip(t / 0.75, 0, 1)) ** 0.7
+    buf = (scrape + rumble) * wobble * env
+    for _ in range(14):  # crumbs
+        at = float(rng.uniform(0.05, 0.6))
+        m = int(0.02 * SR)
+        c = band(noise(m, rng), 1500, 5000) * np.exp(-secs(m) * 220)
+        put(buf, c, at, float(rng.uniform(0.15, 0.4)))
+    return finish(buf, peak_db=-5.0, hi=6000)
+
+
+def sword_ring():
+    """The sword comes free: a bright metal ring-out (inharmonic partials of a struck blade,
+    beating slightly) over a short whoosh of the pull."""
+    rng = np.random.default_rng(24)
+    buf = buffer(2.0)
+    n = len(buf)
+    t = secs(n)
+    f0 = 1180.0
+    for ratio, amp, decay in [(1.0, 1.0, 2.2), (1.003, 0.6, 2.4), (2.76, 0.45, 3.5), (5.4, 0.25, 5.0), (8.93, 0.12, 7.0)]:
+        buf += amp * np.sin(osc_phase(np.full(n, f0 * ratio), n)) * np.exp(-t * decay)
+    buf *= 1 - np.exp(-t * 400)
+    m = int(0.3 * SR)
+    swish = band(noise(m, rng), 900, 5000) * np.sin(np.pi * secs(m) / 0.3) * 0.5
+    put(buf, swish, 0.0)
+    return finish(S.reverb(buf, 0.2, 1.2), peak_db=-5.0)
+
+
 RECIPES = {
     "splash": splash, "whistle": whistle, "jackpot_siren": jackpot, "big_win": big_win,
     "loss_sting": loss_sting, "slip": slip, "tray_crash": tray_crash, "megaphone": megaphone,
     "last_call_bell": last_call_bell, "cash_register": cash_register, "hot_table": hot_table,
-    "chime": chime, "boing": boing, "scratch": scratch,
+    "chime": chime, "boing": boing, "scratch": scratch, "stone_grind": stone_grind, "sword_ring": sword_ring,
 }
 
 if __name__ == "__main__":

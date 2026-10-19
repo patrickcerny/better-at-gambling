@@ -484,6 +484,10 @@ static func in_play_text(st: ClientMatchState, pid: int) -> String:
 			&"scratch":
 				if int(pub.get("player", -1)) == pid and not (pub.get("card", []) as Array).is_empty():
 					amount += int(pub.get("stake", 0))
+			&"sword_tapper":
+				# The stake of the pull still being revealed (it pays when the reveal ends).
+				if int(pub.get("player", -1)) == pid and bool(pub.get("pulling", false)):
+					amount += int(pub.get("stake", 0))
 			&"blackjack":
 				if int(pub.get("state", 0)) != BlackjackLogic.State.PAYOUT:
 					var hands: Dictionary = pub.get("hands", {})

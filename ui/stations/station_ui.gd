@@ -365,4 +365,6 @@ static func rejection_text(error: StringName) -> String:
 			return "Scratch your card first"
 		&"no_card":
 			return "No card to scratch"
+		&"pulling":
+			return "The sword is still moving"
 	return String(error).capitalize()

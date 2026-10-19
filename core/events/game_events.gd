@@ -12,6 +12,7 @@ const SCHEMA: Dictionary = {
 	&"cards_dealt": ["station"],
 	&"luck_flourish": ["player", "station", "kind"],
 	&"jackpot_won": ["player", "station", "amount"],
+	&"sword_pull": ["station", "player", "stake", "serial", "free", "gems", "mult"],
 	&"jackpot_changed": ["amount"],
 	&"player_shoved": ["attacker", "target"],
 	&"player_knocked_down": ["target"],

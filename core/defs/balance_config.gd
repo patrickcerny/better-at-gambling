@@ -161,6 +161,35 @@ extends Resource
 ## Seconds an unscratched card may lie on the counter before it scratches itself and pays.
 @export var scratch_auto_reveal: float = 60.0
 
+@export_group("Sword Tapper")
+## Stake per pull (× table limits); chip buttons like Hi-Lo, all-in over the balance.
+@export var sword_min_bet: int = 10
+@export var sword_max_bet: int = 100
+## Chance that a pull frees the sword (the panel says "about 1 pull in 4"; tuned so the RTP at
+## neutral luck lands in 100.5–102%, `tests/sim/test_rtp_sword_tapper.gd`).
+@export var sword_pull_chance: float = 0.24
+## House rule (0.9.6): chance that a stuck pull is drawn again once, never shown or sent.
+@export var sword_favour: float = 0.08
+## The ring of 17 gem lamps, clockwise from the top (the big ruby): each pays this many times the
+## stake when the sword lights it (all 17 together are 11×).
+@export var sword_ring: PackedFloat32Array = PackedFloat32Array([5, 0.1, 0.2, 0.1, 0.5, 0.1, 0.3, 0.2, 1, 2, 0.2, 0.3, 0.1, 0.5, 0.1, 0.2, 0.1])
+## How many gems a freed sword lights, weights for 3, 4, … 17 gems (which ones is a uniform
+## random pick from the ring).
+@export var sword_count_weights: PackedFloat32Array = PackedFloat32Array([40, 24, 13, 8, 5, 3.5, 2.5, 1.4, 0.9, 0.6, 0.4, 0.3, 0.2, 0.15, 0.05])
+## The multiplier that may slam down on a win of `sword_mult_max_gems` gems or fewer, and its
+## weights (×1 = none).
+@export var sword_mult_values: PackedInt32Array = PackedInt32Array([1, 2, 3, 5, 10])
+@export var sword_mult_weights: PackedFloat32Array = PackedFloat32Array([80, 12, 5, 2.5, 0.5])
+@export var sword_mult_max_gems: int = 9
+## Safety clamp on one pull's win, times the stake (the best pull, the nine biggest gems × 10, is
+## exactly 100×: the clamp never cuts one).
+@export var sword_max_pay: float = 100.0
+## Seconds the reveal plays (sword, gems, multiplier) before the pull pays.
+@export var sword_reveal_time: float = 2.5
+## A pull paying at least this many times the stake is a big pull: a feed line and a golden light
+## column over the pedestal that the whole floor sees.
+@export var sword_big_win: float = 20.0
+
 @export_group("Plinko")
 @export var plinko_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var plinko_drop_cooldown: float = 2.5
