@@ -25,7 +25,7 @@ for id in "${IDS[@]}"; do
 	fi
 	xvfb-run -a -s "-screen 0 1920x1080x24" "$GODOT" --path "$ROOT" --rendering-driver opengl3 \
 		--rendering-method gl_compatibility --resolution 1920x1080 --audio-driver Dummy -s tools/screenshot.gd -- \
-		--scene "$scene" --out "$TMP/$id.png" --frames 60 --pixel 1 "${extra[@]}" >/dev/null 2>&1 || true
+		--scene "$scene" --out "$TMP/$id.png" --frames 60 "${extra[@]}" >/dev/null 2>&1 || true
 	if [ ! -f "$TMP/$id.png" ]; then
 		echo "$id: no render (the selector draws a placeholder card)" >&2
 		continue

@@ -11,7 +11,7 @@ const MAX_OFFSET: float = 0.22
 const DECAY: float = 1.5
 
 var trauma: float = 0.0
-## The viewport whose camera the shake moves (the pixel look draws the world in a sub viewport);
+## The viewport whose camera the shake moves (the match draws the world in a sub viewport, `PixelView`);
 ## null means this node's own viewport.
 var camera_viewport: Viewport = null
 var _stop_until_ms: int = 0

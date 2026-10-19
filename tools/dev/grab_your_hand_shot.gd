@@ -3,7 +3,7 @@ extends Node3D
 ## over their heads, Lucky at the dealer's table and the overlay with our hand bar (render check).
 ## `GYH_REVEAL=1` shows the showdown instead.
 ## `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
-## res://tools/dev/grab_your_hand_shot.tscn --out /tmp/gyh.png --frames 60 --pixel 1`.
+## res://tools/dev/grab_your_hand_shot.tscn --out /tmp/gyh.png --frames 60`.
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice"]
 

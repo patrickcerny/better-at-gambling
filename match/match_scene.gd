@@ -40,8 +40,8 @@ var emote_wheel: EmoteWheel
 var ui_layer: CanvasLayer
 ## The pause menu's own layer: above every stage's UI, below the curtain.
 var pause_layer: CanvasLayer = null
-## Everything 3D sits in here (the map, `world_root`, minigame stages, the results podium): the
-## pixel look renders it at a lower resolution while `ui_layer` stays sharp (`PixelView`).
+## Everything 3D sits in here (the map, `world_root`, minigame stages, the results podium): a
+## full-resolution sub viewport under `ui_layer` (`PixelView`).
 var pixel_view: PixelView
 var world_root: Node3D
 var local: PlayerAvatar = null
@@ -1580,7 +1580,7 @@ func _show_results(_standings: Array) -> void:
 	hud.visible = false
 	results_panel = ResultsStage.new()
 	results_panel.name = "Results"
-	results_panel.ui_host = self  # its 2D stays sharp outside the pixelated world
+	results_panel.ui_host = self  # its 2D goes on the window, outside the world's sub viewport
 	pixel_view.world.add_child(results_panel)
 	results_panel.setup(view.state, local_id, view.state.room_mode)
 	results_panel.play_again_pressed.connect(func() -> void:
@@ -1608,7 +1608,7 @@ func _open_stage(start: Dictionary, snapshot_state: Dictionary) -> void:
 	_curtain_sequence(def.display_name if def.display_name != "" else String(def.id).capitalize(), "MINIGAME", 0.0, func() -> void:
 		stage = def.stage_script.new() as MinigameStage
 		stage.name = "MinigameStage"
-		stage.ui_host = self  # its 2D stays sharp outside the pixelated world
+		stage.ui_host = self  # its 2D goes on the window, outside the world's sub viewport
 		pixel_view.world.add_child(stage)
 		stage.begin(view.state, local_id, start, snapshot_state)
 		var hold: Variant = start.get("briefing", snapshot_state.get("briefing", 0.0))

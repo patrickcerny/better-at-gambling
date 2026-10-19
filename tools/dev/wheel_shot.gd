@@ -1,6 +1,6 @@
 extends Node3D
 ## Dev: the Wheel of Fortune for screenshots. Run with
-## scripts/screenshot.sh res://tools/dev/wheel_shot.tscn wheel 90 --pixel 1 --view front|seat|close|back
+## scripts/screenshot.sh res://tools/dev/wheel_shot.tscn wheel 90 --view front|seat|close|back
 ## [--segment n] [--seat n] (the wheel at rest on segment n, chips on the layout; seat: stool n's
 ## view at the default field of view with the overlay column on the right; close: the clicker and
 ## the top of the wheel; back: as seen from the casino floor).

@@ -1,7 +1,7 @@
 extends Node
 ## Dev: the real match scene with the minigame curtain frozen at `--amount` (0 = closed showing
 ## `--title`, 0.5 = gathered at the tiebacks, 1 = open). Saves `--shot` at `--at` seconds and quits.
-## Run with tools/screenshot.gd --scene res://tools/dev/curtain_shot.tscn --frames 100000 --pixel 1
+## Run with tools/screenshot.gd --scene res://tools/dev/curtain_shot.tscn --frames 100000
 ## -- --shot out.png [--amount 0] [--title "Plinko"] [--kicker MINIGAME] [--at 2.5]
 
 var _scene: MatchScene

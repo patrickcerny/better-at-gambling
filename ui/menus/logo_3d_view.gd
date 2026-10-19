@@ -1,9 +1,8 @@
 class_name Logo3DView
 extends TextureRect
 ## The swaying 3D title logo (`Logo3D`) as a menu Control. It renders into its own transparent
-## SubViewport and, like the casino behind it, goes through the pixel look: under
-## `Settings.pixel_scale()` 2..4 it renders at that fraction of its on-screen pixels and is blown
-## back up with hard pixels. Nothing 3D is built when headless; the Control keeps its size.
+## SubViewport at its full on-screen resolution (4x MSAA, linear filtering). Nothing 3D is built
+## when headless; the Control keeps its size.
 ## The one way the game shows its logo: the main menu (main_menu.tscn), the loading screen and the
 ## joining screen (`Loading`) all use this view; build one in code with `make`.
 
@@ -36,7 +35,6 @@ func _ready() -> void:
 	_viewport.add_child(logo)
 	texture = _viewport.get_texture()
 	resized.connect(_fit)
-	Settings.changed.connect(_fit)
 	get_viewport().size_changed.connect(_fit)
 	_fit()
 
@@ -44,11 +42,10 @@ func _ready() -> void:
 func _fit() -> void:
 	if _viewport == null:
 		return
-	var shrink: int = Settings.pixel_scale()
 	# On-screen pixels: canvas units times the window's stretch.
 	var window: Window = get_window()
 	var stretch: Vector2 = Vector2(window.size) / get_viewport_rect().size if window != null else Vector2.ONE
 	var px: Vector2 = size * stretch
-	_viewport.size = Vector2i(maxi(int(px.x / shrink), 32), maxi(int(px.y / shrink), 16))
-	_viewport.msaa_3d = Viewport.MSAA_DISABLED if shrink > 1 else Viewport.MSAA_4X
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if shrink > 1 else CanvasItem.TEXTURE_FILTER_LINEAR
+	_viewport.size = Vector2i(maxi(int(px.x), 32), maxi(int(px.y), 16))
+	_viewport.msaa_3d = Viewport.MSAA_4X
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR

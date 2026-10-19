@@ -2,7 +2,7 @@ extends Node3D
 ## Dev: Roulette Sumo 20 s in: the wheel turned, the ball rolling across the deck, four beans
 ## pushing each other (no bats), Lucky on the dais and the overlay (render check).
 ## `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
-## res://tools/dev/roulette_sumo_shot.tscn --out /tmp/rs.png --frames 30 --pixel 1`.
+## res://tools/dev/roulette_sumo_shot.tscn --out /tmp/rs.png --frames 30`.
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice"]
 

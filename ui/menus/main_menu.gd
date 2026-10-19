@@ -6,8 +6,7 @@ extends Control
 ## again), the T-shirt (clothes) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
 ## the tutorial first (Patrick: "The Tutorial pops up when you click practise or play for the first
 ## time") and then carries on to what the player chose; `tutorial/seen` in user://settings.cfg
-## remembers it. The very first launch asks for the pixel look or the sharp look first
-## (`PixelLookPrompt`, saved as `video/pixel_look`).
+## remembers it.
 ## Joining shows the joining screen (`Loading`, with the logo) until the match has loaded;
 ## connection errors from the last online attempt are shown here when we return. There is no
 ## join-by-address (Patrick: "Remove join by ip and port"): parties are reached through the
@@ -56,8 +55,6 @@ var browser_list: VBoxContainer
 var browser_status: Label
 var _refresh_button: Button
 var _browser_seq: int = 0
-## The first-launch look question (`PixelLookPrompt`), over everything until a look is picked.
-var pixel_look_prompt: PixelLookPrompt = null
 ## Off in tests: PRACTICE stops at `practice_requested` instead of loading the match.
 var load_match: bool = true
 
@@ -169,12 +166,6 @@ func _ready() -> void:
 	SteamSvc.join_requested.connect(_on_steam_join_requested)
 	if SteamSvc.pending_lobby != 0:
 		_on_steam_join_requested.call_deferred(SteamSvc.pending_lobby)
-	if PixelLookPrompt.should_ask(get_tree(), SceneRouter.cmdline):
-		pixel_look_prompt = PixelLookPrompt.new()
-		add_child(pixel_look_prompt)
-		pixel_look_prompt.chosen.connect(func(_on: bool) -> void:
-			pixel_look_prompt = null
-			_practice.grab_focus())
 	Log.info(&"menu", "main menu ready")
 
 

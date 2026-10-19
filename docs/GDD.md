@@ -149,11 +149,9 @@ within 8 m. Money never depends on physics.
 
 ## Settings and first launch
 One settings file per PC (`user://settings.cfg`, never synced): GAME (field of view), VIDEO
-(fullscreen, VSync, frame limit, pixel look), AUDIO, CONTROLS (remappable keys). The **pixel look**
-renders the 3D world at a third of the window's resolution with hard nearest-neighbour pixels
-(the UI stays sharp); off, the world renders at full resolution with smooth filtering. The very
-first launch asks before the main menu: PIXEL LOOK or SHARP LOOK; the choice is saved and never
-asked again, and Settings > Video switches it live. **F11** (remappable) toggles fullscreen
+(fullscreen, VSync, frame limit), AUDIO, CONTROLS (remappable keys). The game always renders at
+the window's full resolution with smooth (linear) filtering, in menus, the match and minigames;
+the first launch goes straight to the main menu. **F11** (remappable) toggles fullscreen
 anywhere and saves it. The Hot Table's arrow over the table is the same size on screen from
 anywhere on the floor and shows through walls.
 

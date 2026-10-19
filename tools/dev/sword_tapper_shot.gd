@@ -1,6 +1,6 @@
 extends Node3D
 ## Dev: a Sword Tapper pedestal for screenshots. Run with
-## scripts/screenshot.sh res://tools/dev/sword_tapper_shot.tscn sword 90 --pixel 1 --view front|seat|close|floor
+## scripts/screenshot.sh res://tools/dev/sword_tapper_shot.tscn sword 90 --view front|seat|close|floor
 ## [--free 0|1] [--gems n] [--mult m] [--at seconds] [--stake n] [--column 1]
 ## The pull is frozen `at` seconds into its reveal (default: the end, every gem lit). seat: the
 ## seat camera with the bean at the pedestal and the overlay column on the right; close: the ring

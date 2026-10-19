@@ -78,7 +78,7 @@
   - Quiz host cat, confetti, results podium show, 12 awards (`test_awards.gd`), money-over-time graph, name tags.
   - Five generated lounge-jazz loops with mood crossfades by phase (`audio/music_mood.gd`), new SFX, every event sounded (`audio/event_sfx.gd`, table in GDD.md); music and SFX not yet listened to by a human.
   - Waiter NPC who trips (by himself, on bumps or shoves) and leaves slippery puddles; Megaphone at the bar (E, 10 s of full-volume voice). Protocol 4: old 0.6 clients are refused.
-  - Pixel look (Patrick: "the pixelated effect Yap Yap has"): `client/pixel_view.gd` renders the 3D world (casino, quiz set, podium, menu panorama) in a nearest-upscaled sub viewport at 1/2, 1/3 or 1/4 of the window's pixels; all 2D stays sharp. Now fixed at 1/3 for everyone (Patrick: "pixel look cannot be set"); old saved choices are dropped, `Settings.set_pixel_override` is for dev tools only. Never built on the dedicated server. `tests/ui/test_pixel_view.gd`, `tests/smoke/test_pixel_scenes.gd`; screenshots `screenshots/polish1/pixel/`. Not verified by a human eye on a real GPU (xvfb only); 3D audio relies on the sub viewport's listener flag.
+  - Pixel look: removed in 0.9.15 at Patrick's request (see the session log); the code is saved on the branch `pixel-look-saved` (commit 8c4ff3c). The 3D world still renders in `PixelView`'s sub viewport, now always at the window's full resolution with linear filtering. Tests: `tests/ui/test_pixel_view.gd`, `tests/smoke/test_world_view_scenes.gd`, `tests/unit/test_settings_removed_keys.gd`.
 
 ## Known bugs
 - (fixed 2026-10-06) The VIP mezzanine could not be reached on foot: the south-east pillar and the back bar
@@ -139,6 +139,28 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-19 / 0.9.15 Pixel look removed
+- **Pixel look removed** (Patrick: "OK no actually remove that filter overall. Save the code
+  though if i want to implement it again"): the game always renders at the window's full
+  resolution with linear filtering, in menus, the match and minigames. The whole feature as it
+  was in 0.9.14 lives on the GitHub branch `pixel-look-saved` (commit 8c4ff3c) for a later
+  return. Gone: the first-launch PIXEL LOOK / SHARP LOOK card (`PixelLookPrompt`), the "Pixel
+  look" toggle and hint in Settings > Video, the setting `video/pixel_look` (an old settings file
+  loses it and the older `video/pixel_scale` quietly on load, `Settings.drop_removed_keys`),
+  `Settings.pixel_scale()/pixel_look()/has_pixel_look_choice()/choose_pixel_look()/
+  set_pixel_override()/PIXEL_SCALE`, the "[video] pixel look" log line, the name tags' larger
+  minimum under a shrink, and the screenshot tool's `--pixel N` (still accepted on old command
+  lines, ignored with a note). Kept: `PixelView` itself (class and `pixel_view` names unchanged to
+  avoid churn), because the match's 3D lives in its sub viewport: the HUD and stage UIs sit on the
+  window outside it, Find the Lady maps clicks through it (`PixelView.to_canvas`, also needed
+  when the window is stretched), the dev shot tools put cameras in its `world`. It is now fixed at
+  stretch 1 with linear filtering and no longer listens to settings. The logo, the skin previews
+  and the menu panorama (still half resolution under its deliberate blur) no longer read a shrink.
+  Tests: deleted `test_settings_pixel_look.gd` and `test_pixel_look_prompt.gd`; rewrote
+  `tests/ui/test_pixel_view.gd` (full window size, linear filtering, unchanged by settings, no
+  Video toggle); `tests/smoke/test_pixel_scenes.gd` became `test_world_view_scenes.gd` (one run
+  at full resolution); new `tests/unit/test_settings_removed_keys.gd`; the Find the Lady click
+  test now simulates a stretched window (viewport at twice the canvas) instead of 1/3.
 ### 2026-10-19 / 0.9.14 Patrick's batch: hot arrow, closer seat views, pixel look choice, Sword Tapper panel, F11
 - **Hot arrow** ("a bit too big. Make it always the same size, wall see through is good"): the
   bouncing 3D arrow over the hot table (`StationBase` hot marker, not the HUD's screen-edge

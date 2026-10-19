@@ -1,8 +1,7 @@
 extends SceneTree
 ## Loads a scene, waits N frames, saves the viewport to a PNG, quits.
 ## Used by scripts/screenshot.sh (needs a display; Xvfb is fine).
-## `--pixel N` overrides the fixed pixel look (shrink 1..4, 1 = off) for this run only; the
-## log line also reports the mean frame time and the window's measured render time (CPU and GPU)
+## The log line also reports the mean frame time and the window's measured render time (CPU and GPU)
 ## over the last `--perf-frames` (default 60) frames; `--no-vsync` so a swap wait doesn't hide them.
 ## `--cam x,y,z --look x,y,z [--fov 70]` swaps in a free camera for the last frames (map shots).
 
@@ -37,8 +36,8 @@ func _initialize() -> void:
 
 
 func _start(packed: PackedScene, c: Cmdline) -> void:
-	if c.has("pixel"):  # the autoloads are up by now; a run-only override, never saved
-		_settings().call(&"set_pixel_override", c.get_int("pixel", 1))
+	if c.has("pixel"):  # the pixel look is gone (0.9.15); old command lines still run
+		print("screenshot: --pixel is ignored, the game always renders at full resolution")
 	if c.has_flag("no-vsync"):
 		_settings().set_value("video", "vsync", false)
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
@@ -62,7 +61,7 @@ func _process(delta: float) -> bool:
 		var cam := Camera3D.new()
 		cam.fov = _fov
 		cam.near = 0.05
-		# The match renders its 3D inside the pixel view's own viewport: the camera goes there.
+		# The match renders its 3D inside its `PixelView` sub viewport: the camera goes there.
 		var host: Node = root
 		for child: Node in root.get_children():
 			var pv: Variant = child.get("pixel_view")  # MatchScene (no class reference: this tool script loads before the game's)
@@ -76,7 +75,7 @@ func _process(delta: float) -> bool:
 		var img: Image = root.get_texture().get_image()
 		var err: Error = img.save_png(_out)
 		var n: int = maxi(_perf_n, 1)
-		print("screenshot %s (%dx%d) err=%d pixel=%d frame_ms=%.2f render_cpu_ms=%.2f render_gpu_ms=%.2f over %d frames" % [_out, img.get_width(), img.get_height(), err, _settings().pixel_scale(), _perf_sum_ms / n, _perf_cpu_ms / n, _perf_gpu_ms / n, _perf_n])
+		print("screenshot %s (%dx%d) err=%d frame_ms=%.2f render_cpu_ms=%.2f render_gpu_ms=%.2f over %d frames" % [_out, img.get_width(), img.get_height(), err, _perf_sum_ms / n, _perf_cpu_ms / n, _perf_gpu_ms / n, _perf_n])
 		quit(0 if err == OK else 1)
 	return false
 

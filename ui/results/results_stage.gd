@@ -40,8 +40,8 @@ var state: ClientMatchState
 var local_id: int = -1
 var camera: Camera3D
 var ui: CanvasLayer
-## Where the UI layer goes: the match scene points it outside the pixelated 3D view (`PixelView`)
-## so the 2D stays sharp; null keeps it under the stage. The stage frees it either way.
+## Where the UI layer goes: the match scene points it outside the 3D world's sub viewport
+## (`PixelView`) onto the window's canvas; null keeps it under the stage. The stage frees it either way.
 var ui_host: Node = null
 var play_button: Button
 var leave_button: Button

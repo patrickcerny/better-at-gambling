@@ -1,8 +1,8 @@
 extends GutTest
-## 3D title logo (Patrick, 0.8.15): it replaces the text logo in the main menu, goes through the
-## pixel look there, hangs once above the casino entrance in place of the "LUCKY LOUNGE" signs,
-## and the revolving door is gone. Later the sign became flat, in front of a big casino chip (Patrick:
-## "the 3d model but flat in front of a Casino coin").
+## 3D title logo (Patrick, 0.8.15): it replaces the text logo in the main menu, hangs once above
+## the casino entrance in place of the "LUCKY LOUNGE" signs, and the revolving door is gone. Later
+## the sign became flat, in front of a big casino chip (Patrick: "the 3d model but flat in front of
+## a Casino coin").
 
 var _old_force: bool
 

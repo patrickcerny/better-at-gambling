@@ -2,7 +2,7 @@ extends Node3D
 ## Dev: Jackpot Climb 30 s in: the chip cake from a high corner of the hall, beans on both lanes with their bats,
 ## one at checkpoint 2's flag, one on the pad, the JACKPOT sign, Lucky on his podium and the
 ## overlay (render check; the screenshot tool's `--cam`/`--look` take world coordinates). `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
-## res://tools/dev/jackpot_climb_shot.tscn --out /tmp/jc.png --frames 30 --pixel 1`.
+## res://tools/dev/jackpot_climb_shot.tscn --out /tmp/jc.png --frames 30`.
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice"]
 

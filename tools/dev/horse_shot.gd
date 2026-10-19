@@ -1,6 +1,6 @@
 extends Node3D
 ## Dev: the horse race miniatures for screenshots. Run with
-## scripts/screenshot.sh res://tools/dev/horse_shot.tscn horse 90 --pixel 1 --view side|field|front|track|seat|crown
+## scripts/screenshot.sh res://tools/dev/horse_shot.tscn horse 90 --view side|field|front|track|seat|crown
 ## [--at seconds] [--bet lane] (track/seat/crown: the race table running a seeded race from `--at`
 ## seconds in, the local player's money on `--bet` (outlined); crown: close-up on the leader).
 

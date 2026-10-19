@@ -1,6 +1,6 @@
 extends GutTest
 ## Find the Lady end to end (Patrick, 0.9.9: "YOU NEED TO BE ABLE TO CLICK THE CARDS"): the
-## authoritative server runs the minigame, the client stage sits inside the pixel view the way the
+## authoritative server runs the minigame, the client stage sits inside the `PixelView` the way the
 ## match scene builds it, and a mouse click on a card in the window is the pick the server counts.
 
 var fx: ServerFixture
@@ -39,7 +39,7 @@ func _to_pick() -> FindTheLadyLogic:
 	assert_eq(fx.of_type(&"minigame_started").size(), 1, "the minigame started")
 	var g: FindTheLadyLogic = fx.server.minigame as FindTheLadyLogic
 	assert_not_null(g, "Find the Lady is running")
-	# The stage inside the pixel view (1/3), its UI sharp in the window, like the match scene.
+	# The stage inside the world view (`PixelView`), its UI on the window, like the match scene.
 	pv = PixelView.new()
 	add_child_autofree(pv)
 	pv.setup(false)

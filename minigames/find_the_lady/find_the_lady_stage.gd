@@ -801,8 +801,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## A mouse position the stage was handed, on the UI canvas the card rectangles use. In the game the
-## stage sits inside the pixel view (a SubViewport drawn at 1/3), so its container hands it clicks
-## in viewport pixels, while `slot_rect` is in canvas pixels; outside a pixel view this is identity.
+## stage sits inside the match's `PixelView` (a SubViewport in window pixels), so its container
+## hands it clicks in viewport pixels, while `slot_rect` is in canvas pixels (they differ when the
+## window is stretched); outside a sub viewport this is identity.
 func _event_to_canvas(pos: Vector2) -> Vector2:
 	if camera == null or chip_layer == null:
 		return pos

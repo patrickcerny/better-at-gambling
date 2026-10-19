@@ -1,22 +1,17 @@
 class_name PixelView
 extends Node
-## The "pixel look" (Patrick: "this pixelated blur effect the game Yap Yap has ... a bit of 8-bit
-## style"): the 3D casino renders at 1/3 of the window's resolution and is blown back up with
-## hard, nearest-neighbour pixels, while every Control (HUD, menus, station overlays, the quiz and
-## results 2D) stays at full resolution on top. No dithering, no palette.
+## Holds the 3D world of the match scene: everything 3D (`world`) renders inside a `SubViewport`
+## at the window's full resolution with linear filtering, while every Control (HUD, menus, station
+## overlays, the quiz and results 2D) is drawn on the window on top. (It once drew the world at a
+## third of the resolution with hard pixels, "the pixel look"; removed in 0.9.15, the code lives on
+## the branch `pixel-look-saved`.)
 ##
-## The 3D world (`world`) lives inside a `SubViewport` that shares the window's `World3D`, so
-## physics, navigation, the environment and 3D audio are untouched; only the camera and the
-## pixels move. The container is sized in window pixels (not canvas units), so a shrink of 1
-## renders exactly the window's pixels, as the bare window would. Players turn the look on (1/3,
-## `Settings.PIXEL_SCALE`, nearest-neighbour) or off (full resolution, linear filtering) with
-## `video/pixel_look` (asked on the first launch, then Settings > Video); developer tools override
-## the shrink (`Settings.set_pixel_override`). Both apply live through `Settings.changed`. The
-## dedicated server never builds the viewport: `setup(true)` leaves a plain Node3D.
+## The sub viewport shares the window's `World3D`, so physics, navigation, the environment and 3D
+## audio are untouched. The container is sized in window pixels (not canvas units), so it renders
+## exactly the window's pixels, as the bare window would. The dedicated server never builds the
+## viewport: `setup(true)` leaves a plain Node3D.
 
-## Shrink factors the view supports (1 = off); players get `Settings.PIXEL_SCALE` or 1.
-const SCALES: Array[int] = [1, 2, 3, 4]
-## Window-level render settings the sub viewport copies so Off looks exactly like the bare window.
+## Window-level render settings the sub viewport copies so it draws exactly like the bare window.
 const COPIED_SETTINGS: Array[StringName] = [
 	&"msaa_3d", &"screen_space_aa", &"use_taa", &"use_debanding", &"use_occlusion_culling", &"mesh_lod_threshold",
 	&"scaling_3d_mode", &"scaling_3d_scale", &"texture_mipmap_bias", &"fsr_sharpness",
@@ -54,15 +49,10 @@ func setup(dedicated: bool) -> void:
 	viewport.add_child(world)
 	for p: StringName in COPIED_SETTINGS:
 		viewport.set(p, get_viewport().get(p))
-	_apply()
-	Settings.changed.connect(_apply)
+	container.stretch_shrink = 1
+	container.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	get_viewport().size_changed.connect(_fit)
 	_fit()
-
-
-## Current shrink factor (1 = off).
-func shrink() -> int:
-	return container.stretch_shrink if container != null else 1
 
 
 ## The viewport whose camera draws the world (the window itself on the server).
@@ -70,19 +60,8 @@ func world_viewport() -> Viewport:
 	return viewport if viewport != null else get_viewport()
 
 
-func _apply() -> void:
-	if container == null:
-		return
-	var s: int = Settings.pixel_scale()
-	# Hard pixels when shrunk; linear (the sharp look) at full resolution.
-	container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if s > 1 else CanvasItem.TEXTURE_FILTER_LINEAR
-	if s != container.stretch_shrink:
-		container.stretch_shrink = s
-		Log.info(&"video", "pixel look: 1/%d" % s if s > 1 else "pixel look: off (sharp)")
-
-
 ## Sizes the container in window pixels (the canvas may be scaled by the stretch mode), so each
-## pixel the viewport renders covers exactly `shrink` window pixels and Off is 1:1.
+## pixel the viewport renders is exactly one window pixel.
 func _fit() -> void:
 	if container == null or not is_inside_tree():
 		return
@@ -105,11 +84,3 @@ static func to_canvas(cam: Camera3D, p: Vector2, ui: CanvasItem) -> Vector2:
 		return p
 	return p * ui_vp.get_visible_rect().size / cam_vp.get_visible_rect().size
 
-
-## Shrink factor of the viewport `node` is drawn in (1 outside a pixel view).
-static func shrink_of(node: Node) -> int:
-	var vp: Viewport = node.get_viewport() if node.is_inside_tree() else null
-	if vp is SubViewport and vp.get_parent() is SubViewportContainer:
-		var c: SubViewportContainer = vp.get_parent()
-		return c.stretch_shrink if c.stretch else 1
-	return 1

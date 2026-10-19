@@ -1,6 +1,6 @@
 extends Node3D
 ## Dev: the craps table in the Lucky Lounge for screenshots. Run with
-## scripts/screenshot.sh res://tools/dev/craps_shot.tscn craps 90 --pixel 1 --view floor|seat|dice
+## scripts/screenshot.sh res://tools/dev/craps_shot.tscn craps 90 --view floor|seat|dice
 ## [--at seconds] [--seed n] [--faces 6,1] [--point 6] (the dice frozen `--at` seconds into a seeded
 ## throw from seat 2 that rests on `--faces`; floor: the table and its stickman from the casino
 ## floor; seat: stool `--seat n`'s view at the default field of view with the overlay column on the

@@ -2,7 +2,7 @@ extends Node3D
 ## Dev: Dodge the Dice 20 s in: the tilted roulette board from the apron, beans on the rows, a
 ## ball, a coin and a die rolling down, Lucky by the WINNER rail and the overlay (render check).
 ## `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
-## res://tools/dev/dodge_the_dice_shot.tscn --out /tmp/dd.png --frames 30 --pixel 1`.
+## res://tools/dev/dodge_the_dice_shot.tscn --out /tmp/dd.png --frames 30`.
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice"]
 

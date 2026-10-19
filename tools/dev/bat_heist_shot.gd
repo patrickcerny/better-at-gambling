@@ -2,7 +2,7 @@ extends Node3D
 ## Dev: the Bat Heist vault arena with a few beans holding bats, one knocked flat with a "STEAL!"
 ## coin badge, one shimmering with immunity, and the overlay (render check). `xvfb-run -a
 ## tools/godot/godot --path . -s tools/screenshot.gd -- --scene res://tools/dev/bat_heist_shot.tscn
-## --out /tmp/bh.png --frames 60 --pixel 1`.
+## --out /tmp/bh.png --frames 60`.
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice", "Big Wendy"]
 

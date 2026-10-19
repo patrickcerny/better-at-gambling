@@ -506,7 +506,7 @@ func _host_say(text: String, pose: QuizHost.Pose = QuizHost.Pose.IDLE, hold: flo
 func _place_bubble() -> void:
 	if bubble == null or not bubble.visible or camera == null or host == null:
 		return
-	# The camera may draw a pixelated sub viewport while the bubble sits on the sharp window.
+	# The camera may draw a sub viewport (`PixelView`) while the bubble sits on the window.
 	var p: Vector2 = PixelView.to_canvas(camera, camera.unproject_position(host.bubble_anchor()), bubble)
 	var vp: Vector2 = bubble.get_viewport_rect().size
 	bubble.reset_size()

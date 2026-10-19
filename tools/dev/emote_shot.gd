@@ -1,6 +1,6 @@
 extends Node3D
 ## Dev: an emote frozen part-way through, for look-dev screenshots. Run with
-## tools/screenshot.gd --scene res://tools/dev/emote_shot.tscn --frames 100000 --pixel 1 --
+## tools/screenshot.gd --scene res://tools/dev/emote_shot.tscn --frames 100000 --
 ## --emote six_seven --at 0.6 --shot out.png [--skins bean,king,wizard,regular] [--view row|camera]
 ## row: the bean and the listed skins side by side, facing the camera, all at `--at` seconds into
 ## the emote. camera: a local player in a seat-less room emoting, seen through their own camera

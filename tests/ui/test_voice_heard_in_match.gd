@@ -4,8 +4,8 @@ extends GutTest
 ## made a sound: it only clocked frames through the mouth). Here `VoicePlayback.force_audio` keeps
 ## the real `AudioStreamPlayer3D` + `AudioStreamGenerator` on, the Dummy audio driver mixes them,
 ## and an `AudioEffectCapture` on the Voice bus records what the listener's speakers would get.
-## A relayed packet is looked up by player id, played under that player's avatar inside the pixel
-## view's viewport, heard from the local camera, and must come out as the tone it carries.
+## A relayed packet is looked up by player id, played under that player's avatar inside the match's
+## world viewport (`PixelView`), heard from the local camera, and must come out as the tone it carries.
 
 const TONE_HZ: float = 440.0
 const AMP: float = 0.4
@@ -110,7 +110,7 @@ static func _tone(x: PackedFloat32Array, hz: float, rate: float) -> float:
 
 
 func _go_online() -> void:
-	# A Practice scene stands in for the online client: same scene, avatars, camera, pixel view.
+	# A Practice scene stands in for the online client: same scene, avatars, camera, world viewport.
 	scene.voice.online = true
 	scene.voice._apply_settings()
 	assert_true(scene.voice.is_active(), "voice is on")

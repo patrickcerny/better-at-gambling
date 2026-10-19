@@ -158,7 +158,7 @@ func _place(pid: int, pos: Vector3, yaw: float) -> void:
 	_scene.server.set_server_position(pid, pos)
 
 
-## A free camera inside the pixel view's world (the match renders its 3D there).
+## A free camera inside the `PixelView` world (the match renders its 3D there).
 ## "x,y,z" as a Vector3 (`fallback` when empty or malformed).
 static func _vec3(text: String, fallback: Vector3) -> Vector3:
 	var parts: PackedStringArray = text.split(",")

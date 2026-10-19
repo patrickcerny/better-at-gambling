@@ -2,7 +2,7 @@ extends Node3D
 ## Dev: the Last Seat parlor right after the music stopped: three stools out round the table, two
 ## beans already seated, two running, Lucky by the gramophone and the overlay (render check).
 ## `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
-## res://tools/dev/last_seat_shot.tscn --out /tmp/ls.png --frames 60 --pixel 1`.
+## res://tools/dev/last_seat_shot.tscn --out /tmp/ls.png --frames 60`.
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice"]
 

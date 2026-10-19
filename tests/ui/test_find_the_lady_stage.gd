@@ -211,22 +211,24 @@ func test_late_join_mid_shuffle() -> void:
 
 
 ## Patrick (0.9.9): "YOU NEED TO BE ABLE TO CLICK THE CARDS". In the game the stage sits inside
-## the pixel view (a SubViewport drawn at 1/3), while its UI stays sharp in the window, so a click
-## reaches the stage in viewport pixels and the card's screen rectangle is in canvas pixels.
-func test_click_through_the_pixel_view_picks_the_card() -> void:
+## the match's `PixelView` (a SubViewport in window pixels), while its UI sits on the window's
+## canvas, so a click reaches the stage in viewport pixels and the card's screen rectangle is in
+## canvas pixels; the two differ whenever the window is stretched (here: twice the canvas).
+func test_click_through_the_world_view_picks_the_card() -> void:
 	sent.clear()
 	if stage != null and is_instance_valid(stage):
 		stage.free()
 	var pv := PixelView.new()
 	add_child_autofree(pv)
 	pv.setup(false)
-	assert_eq(pv.shrink(), 3, "the game's pixel look")
-	# Headless there is no window to size the container from: give it the window's canvas size.
-	pv.container.size = get_viewport().get_visible_rect().size
-	pv.container.scale = Vector2.ONE
+	assert_eq(pv.container.stretch_shrink, 1, "full resolution")
+	# Headless there is no real window to size the container from: a window with twice the
+	# canvas's pixels, the container scaled back down over the canvas (as `PixelView._fit` does).
+	pv.container.size = get_viewport().get_visible_rect().size * 2.0
+	pv.container.scale = Vector2(0.5, 0.5)
 	var host := Control.new()
 	host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	host.mouse_filter = Control.MOUSE_FILTER_IGNORE  # like the match scene's layers over the pixel view
+	host.mouse_filter = Control.MOUSE_FILTER_IGNORE  # like the match scene's layers over the world view
 	add_child_autofree(host)
 	stage = FindTheLadyStage.new()
 	stage.ui_host = host
@@ -243,15 +245,15 @@ func test_click_through_the_pixel_view_picks_the_card() -> void:
 	assert_true(r.size.x > 0.0, "card 3 has a screen rectangle")
 	var canvas: Vector2 = stage.chip_layer.get_viewport().get_visible_rect().size
 	var view: Vector2 = stage.camera.get_viewport().get_visible_rect().size
-	assert_almost_eq(view.x * 3.0, canvas.x, 3.0, "the pixel view is drawn at a third of the canvas")
+	assert_almost_eq(view.x, canvas.x * 2.0, 2.0, "the world view renders the window's pixels, twice the canvas")
 	var view_r := Rect2(r.position * view / canvas, r.size * view / canvas)
-	# What the SubViewportContainer hands the stage: the click in the pixel viewport's pixels.
+	# What the SubViewportContainer hands the stage: the click in the world viewport's pixels.
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
 	click.position = view_r.get_center()
 	stage._unhandled_input(click)
-	assert_eq(sent.size(), 1, "a click on the card in the pixel view sends the pick")
+	assert_eq(sent.size(), 1, "a click on the card in the world view sends the pick")
 	if sent.size() == 1:
 		assert_eq(int(sent[0]["slot"]), 2)
 	# And the same click pushed through the window lands on the stage the same way (GUT's own
@@ -279,6 +281,6 @@ func test_click_through_the_pixel_view_picks_the_card() -> void:
 	for l: CanvasLayer in hidden:
 		if is_instance_valid(l):
 			l.visible = true
-	assert_eq(sent.size(), 1, "a window click on the card reaches the stage inside the pixel view")
+	assert_eq(sent.size(), 1, "a window click on the card reaches the stage inside the world view")
 	if sent.size() == 1:
 		assert_eq(int(sent[0]["slot"]), 2)

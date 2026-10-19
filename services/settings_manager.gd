@@ -21,19 +21,15 @@ const DEFAULTS: Dictionary = {
 	"voice": {"mode": "open_mic", "input_device": "Default", "mic_gain": 1.0},
 	## `stick_sensitivity` scales the gamepad's right-stick look.
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false, "stick_sensitivity": 1.0},
-	## `pixel_look`: the world at 1/`PIXEL_SCALE` resolution with hard pixels (on) or sharp at full
-	## resolution (off). Asked once on the first launch (`PixelLookPrompt`), then in Settings > Video.
-	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0, "pixel_look": true},
+	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
 }
 ## Frame limit choices (Settings > Video): 0 is off, `MATCH_MONITOR` follows the screen's refresh rate.
 const MATCH_MONITOR: int = -1
 const FPS_CAPS: Array[int] = [0, 30, 60, 90, 120, 144, 165, 240, MATCH_MONITOR]
 ## Mic volume goes up to 200 % (an amplifier for a quiet microphone).
 const MAX_MIC_GAIN: float = 2.0
-## The pixel look's one shrink (Patrick: "let it be for all users 1/3"): the world renders at a
-## third of the window's resolution. Players only turn it on or off (`video/pixel_look`; Patrick:
-## "leave an option to make the noise filter on the texture ... to disable it").
-const PIXEL_SCALE: int = 3
+## Keys of the `video` section older versions saved that mean nothing any more (`drop_removed_keys`).
+const REMOVED_VIDEO_KEYS: Array[String] = ["pixel_look", "pixel_scale"]
 ## Section of the settings file that holds remapped keys: action → "key:<physical keycode>" or
 ## "mouse:<button index>". Only actions the player changed are stored.
 const KEYBIND_SECTION: String = "keybinds"
@@ -48,8 +44,6 @@ const KEYBINDS: Dictionary[StringName, String] = {
 	&"toggle_fullscreen": "Toggle fullscreen",
 }
 
-## Developer override for the pixel look (screenshot tool, pixel tests); 0 = the player's choice. Never saved.
-var pixel_scale_override: int = 0
 var _cfg: ConfigFile = ConfigFile.new()
 ## Each remappable action's InputMap events as the project defines them (before any remap).
 var _default_events: Dictionary[StringName, Array] = {}
@@ -62,10 +56,7 @@ func _ready() -> void:
 		var err: Error = _cfg.load(PATH)
 		if err != OK:
 			Log.warn(&"settings", "could not load %s (error %d), using defaults" % [PATH, err])
-	if _cfg.has_section_key("video", "pixel_scale"):
-		# The old 1..4 shrink picker; only on/off (`pixel_look`) is a setting now, so drop it quietly.
-		_cfg.erase_section_key("video", "pixel_scale")
-		save()
+	drop_removed_keys()
 	for action: StringName in KEYBINDS:
 		if InputMap.has_action(action):
 			_default_events[action] = InputMap.action_get_events(action).duplicate()
@@ -119,34 +110,17 @@ func mouse_look() -> float:
 	return BASE_MOUSE * float(get_value("controls", "mouse_sensitivity"))
 
 
-## The pixel look's shrink factor: `PIXEL_SCALE` with the pixel look on, 1 (full resolution) with
-## it off, whatever an old settings file's shrink says; a developer override wins.
-func pixel_scale() -> int:
-	if pixel_scale_override > 0:
-		return clampi(pixel_scale_override, PixelView.SCALES[0], PixelView.SCALES[-1])
-	return PIXEL_SCALE if pixel_look() else 1
-
-
-## The player's pixel look choice (on until they pick).
-func pixel_look() -> bool:
-	return bool(get_value("video", "pixel_look"))
-
-
-## True once the player has picked the pixel look or the sharp look (the first-launch question).
-func has_pixel_look_choice() -> bool:
-	return _cfg.has_section_key("video", "pixel_look")
-
-
-## Saves the player's pixel look choice and applies it live (first-launch screen, Settings > Video).
-func choose_pixel_look(on: bool) -> void:
-	change("video", "pixel_look", on)
-	save()
-
-
-## Developer-only: renders the pixel look at `s` (0 = back to the player's choice) and announces it.
-func set_pixel_override(s: int) -> void:
-	pixel_scale_override = s
-	changed.emit()
+## Settings the game no longer has (the pixel look, removed in 0.9.15: `video/pixel_look` and the
+## older `video/pixel_scale`): erased quietly from a loaded file and saved; true when any was found.
+func drop_removed_keys() -> bool:
+	var dropped: bool = false
+	for key: String in REMOVED_VIDEO_KEYS:
+		if _cfg.has_section_key("video", key):
+			_cfg.erase_section_key("video", key)
+			dropped = true
+	if dropped:
+		save()
+	return dropped
 
 
 # --- Key bindings -----------------------------------------------------------------------------

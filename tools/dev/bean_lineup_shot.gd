@@ -1,6 +1,6 @@
 extends Node3D
 ## Dev: a row of beans in chosen poses for look-dev screenshots. Run with
-## tools/screenshot.gd --scene res://tools/dev/bean_lineup_shot.tscn --frames 100000 --pixel 1 --
+## tools/screenshot.gd --scene res://tools/dev/bean_lineup_shot.tscn --frames 100000 --
 ## --poses stand,walk,hit,jump --shot out.png [--at seconds] [--view front|side|close]
 ## Poses: stand, walk, run, hit, jump, win, big_win, loss, slip, ko, emote:<id> (Emotes.ANIMATED),
 ## and skin:<skin>:<pose> for a character skin. The scene saves the shot at `--at` seconds and quits.

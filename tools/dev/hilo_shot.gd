@@ -1,7 +1,7 @@
 extends Node3D
 ## Dev: the Hi-Lo table for screenshots, three hands on the felt (one riding up the ladder) and a
 ## stand-in dealer. Run with
-## scripts/screenshot.sh res://tools/dev/hilo_shot.tscn hilo 60 --pixel 1 --view close|seat|wide
+## scripts/screenshot.sh res://tools/dev/hilo_shot.tscn hilo 60 --view close|seat|wide
 
 var _station: HiLoStation
 

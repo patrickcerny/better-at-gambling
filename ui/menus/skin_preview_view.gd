@@ -1,8 +1,8 @@
 class_name SkinPreviewView
 extends TextureRect
 ## A bean wearing one character skin (`Cosmetics.SKINS`), turning gently on a transparent
-## SubViewport: the tiles of the `ClothesPanel`. Same pattern as `Logo3DView` (own world, pixel
-## look under `Settings.pixel_scale()`); nothing 3D is built when headless. `portrait` frames the
+## SubViewport: the tiles of the `ClothesPanel`. Same pattern as `Logo3DView` (own world, full
+## resolution); nothing 3D is built when headless. `portrait` frames the
 ## head and shoulders instead of the whole bean (the Tab list's player rows).
 
 var skin: StringName = &"bean"
@@ -76,7 +76,6 @@ func _ready() -> void:
 	texture = _viewport.get_texture()
 	_t = randf() * TAU
 	resized.connect(_fit)
-	Settings.changed.connect(_fit)
 	_fit()
 
 
@@ -89,10 +88,9 @@ func _process(delta: float) -> void:
 func _fit() -> void:
 	if _viewport == null:
 		return
-	var shrink: int = Settings.pixel_scale()
 	var window: Window = get_window()
 	var stretch: Vector2 = Vector2(window.size) / get_viewport_rect().size if window != null else Vector2.ONE
 	var px: Vector2 = size * stretch
-	_viewport.size = Vector2i(maxi(int(px.x / shrink), 32), maxi(int(px.y / shrink), 32))
-	_viewport.msaa_3d = Viewport.MSAA_DISABLED if shrink > 1 else Viewport.MSAA_4X
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if shrink > 1 else CanvasItem.TEXTURE_FILTER_LINEAR
+	_viewport.size = Vector2i(maxi(int(px.x), 32), maxi(int(px.y), 32))
+	_viewport.msaa_3d = Viewport.MSAA_4X
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR

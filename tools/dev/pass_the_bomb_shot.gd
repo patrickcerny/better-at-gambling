@@ -1,7 +1,7 @@
 extends Node3D
 ## Dev: the Pass the Bomb vault arena with a few beans, one holding the lit bomb, and the overlay
 ## (render check). `xvfb-run -a tools/godot/godot --path . -s tools/screenshot.gd -- --scene
-## res://tools/dev/pass_the_bomb_shot.tscn --out /tmp/ptb.png --frames 60 --pixel 1
+## res://tools/dev/pass_the_bomb_shot.tscn --out /tmp/ptb.png --frames 60
 ## [--cam=x,y,z --look=x,y,z]`. `--boom` adds the explosion; `--mine` gives the bomb to "you".
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice", "Big Wendy"]

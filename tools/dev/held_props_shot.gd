@@ -1,7 +1,7 @@
 extends Node3D
 ## Dev: close-ups of what NPCs and beans hold in their hand: the waiter's tray on his palm (one
 ## standing, one walking) and a bean with the megaphone, plus the megaphone in first person.
-## Run with scripts/screenshot.sh res://tools/dev/held_props_shot.tscn <name> 90 --pixel 1
+## Run with scripts/screenshot.sh res://tools/dev/held_props_shot.tscn <name> 90
 ## --view waiter_front|waiter_side|mega_side|mega_front|mega_first, or --view dealer
 ## --station blackjack_1 (any blackjack/roulette station: the Lucky Lounge with its dealers, a
 ## close-up of that table's dealer from the side).
