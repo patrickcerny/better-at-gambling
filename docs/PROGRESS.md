@@ -172,6 +172,13 @@ Casino games):
   `tests/unit/test_floor_plan.gd` (two pedestals per layout). Dev render
   `tools/dev/sword_tapper_shot.tscn` (`--view front|seat|close|floor|match`).
 
+### 2026-10-19 / 0.9.13 macOS .dmg
+Patrick: "allow mac dmg". The release now also carries `BetterAtGambling-macos.dmg` next to the
+zip: `tools/macos/package.sh` takes an optional third path and writes an ISO 9660 image (Rock
+Ridge + Apple extensions, `genisoimage`) of the signed .app, checking that the game binary kept its
+executable bit. Release notes point Mac players at the .dmg first. Tested here with a stand-in app
+and a stand-in signer; mounting on a real Mac is untested (no Mac available).
+
 ### 2026-10-19 / 0.9.13 voice net tests on a busy machine
 The two voice net tests (`test_voice_from_one_client...` in `test_net_match.py`,
 `test_voice_goes_both_ways...` in `test_net_host_mode.py`) failed with other suites running

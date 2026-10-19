@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Signs the exported macOS app and packs the release zip. Run by .github/workflows/release.yml; works
-# locally too. Usage: tools/macos/package.sh <Godot export .zip> <output .zip>
+# Signs the exported macOS app and packs the release zip, plus a .dmg when a third path is given. Run
+# by .github/workflows/release.yml; works locally too.
+# Usage: tools/macos/package.sh <Godot export .zip> <output .zip> [<output .dmg>]
+#
+# The .dmg is an ISO 9660 image with Rock Ridge and Apple extensions written by genisoimage (the
+# same recipe Bitcoin Core shipped its Mac builds with for years): macOS mounts it like any disk
+# image, keeps the executable bits, and the signed .app inside is what Gatekeeper checks, so the
+# image itself needs no signature.
 #
 # Godot's own rcodesign mode refuses apps with GDExtension libraries (GodotSteam), so the "macOS"
 # preset only ad-hoc signs (built-in signer) and this script re-signs the whole .app with rcodesign
@@ -19,10 +25,11 @@
 # that is deleted on exit, and nothing secret is printed.
 set -euo pipefail
 
-[[ $# -eq 2 ]] || { echo "usage: $0 <export.zip> <out.zip>" >&2; exit 2; }
+[[ $# -eq 2 || $# -eq 3 ]] || { echo "usage: $0 <export.zip> <out.zip> [<out.dmg>]" >&2; exit 2; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 IN_ZIP="$(realpath "$1")"
 OUT_ZIP="$(realpath -m "$2")"
+OUT_DMG="${3:+$(realpath -m "$3")}"
 RCODESIGN="${RCODESIGN:-rcodesign}"
 APP_NAME="Better at Gambling.app"
 ENTITLEMENTS="$ROOT/tools/macos/entitlements.plist"
@@ -92,5 +99,15 @@ mkdir -p "$(dirname "$OUT_ZIP")"
 rm -f "$OUT_ZIP"
 (cd "$TMP/out" && zip -q -r -y -9 "$OUT_ZIP" "$APP_NAME")
 echo "[macos] $(basename "$OUT_ZIP"): $(du -h "$OUT_ZIP" | cut -f1), signed=$signed"
+if [[ -n "$OUT_DMG" ]]; then
+	command -v genisoimage > /dev/null || { echo "::error::genisoimage is needed to write the .dmg" >&2; exit 1; }
+	rm -f "$OUT_DMG"
+	genisoimage -quiet -no-cache-inodes -D -l -probe -V "Better at Gambling" -no-pad -r -dir-mode 0755 \
+		-apple -o "$OUT_DMG" "$TMP/out"
+	# The image must list the app's binary as executable (Rock Ridge keeps the mode bits).
+	isoinfo -R -l -i "$OUT_DMG" | grep -q -- "-r-xr-xr-x.* Better at Gambling *$" \
+		|| { echo "::error::$(basename "$OUT_DMG") lost the executable bit on the game binary" >&2; exit 1; }
+	echo "[macos] $(basename "$OUT_DMG"): $(du -h "$OUT_DMG" | cut -f1)"
+fi
 [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "signed=$signed" >> "$GITHUB_OUTPUT"
 exit 0

@@ -6,7 +6,7 @@
 #   https://github.com/patrickcerny/better-at-gambling/releases/latest/download/BetterAtGambling-windows.zip
 # The VPS deploys the same commit on its own (deploy/install.sh cron, waits for empty rooms).
 #
-# macOS: exported from Linux as a universal .app (preset "macOS"), then tools/macos/package.sh
+# macOS: exported from Linux as a universal .app (preset "macOS"), then tools/macos/package.sh (zip + dmg)
 # re-signs it with rcodesign. Godot's own rcodesign signing refuses apps with GDExtension libraries
 # (GodotSteam), so the preset only ad-hoc signs and the real signature happens after the export.
 # With the repository secrets MACOS_CERT_P12 (base64 .p12, "Developer ID Application"),
@@ -48,7 +48,9 @@ jobs:
           key: godot-4.7.2-stable-v1
 
       - name: Toolchain
-        run: tools/setup_toolchain.sh
+        run: |
+          tools/setup_toolchain.sh
+          sudo apt-get install -y -qq genisoimage  # writes the macOS .dmg
 
       - name: Import project
         run: tools/godot/godot --headless --path . --import > import.log 2>&1 || (tail -50 import.log; exit 1)
@@ -111,7 +113,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         # Sets steps.macos.outputs.signed: true (Developer ID + notarized) or false (ad-hoc).
         run: |
-          tools/macos/package.sh build/macos/BetterAtGambling.zip dist/BetterAtGambling-macos.zip
+          tools/macos/package.sh build/macos/BetterAtGambling.zip dist/BetterAtGambling-macos.zip dist/BetterAtGambling-macos.dmg
           ls -la dist
 
       - name: Publish release
@@ -131,8 +133,8 @@ jobs:
             echo 'Or, with Steam running, Play Online → Host on this PC (Steam) and invite friends through Steam'
             echo '(keep the DLLs next to the exe; Steam shows the game as "Spacewar", the free test App ID).'
             echo
-            echo '**Mac:** download `BetterAtGambling-macos.zip`, unzip, drag `Better at Gambling.app` to Applications,'
-            echo 'double-click; first start asks for microphone access for voice chat.'
+            echo '**Mac:** download `BetterAtGambling-macos.dmg`, open it and drag `Better at Gambling.app` to Applications'
+            echo '(or download the `.zip` and unzip it), then double-click; first start asks for microphone access for voice chat.'
             if [[ "$MACOS_SIGNED" != "true" ]]; then
               echo 'This Mac build is not notarized by Apple yet, so the first double-click is refused ("cannot verify"):'
               echo 'click Done, then System Settings → Privacy & Security → "Open Anyway" (once; on macOS 14 and older'
@@ -145,9 +147,9 @@ jobs:
           } > notes.md
           if gh release view "$tag" >/dev/null 2>&1; then
             # Same version, newer commit: refresh the downloads and notes, keep it the latest release.
-            gh release upload "$tag" dist/*.zip --clobber
+            gh release upload "$tag" dist/*.zip dist/*.dmg --clobber
             gh release edit "$tag" --notes-file notes.md --latest
           else
-            gh release create "$tag" dist/*.zip --target "$GITHUB_SHA" \
+            gh release create "$tag" dist/*.zip dist/*.dmg --target "$GITHUB_SHA" \
               --title "Better at Gambling ${build_id}" --notes-file notes.md --latest
           fi

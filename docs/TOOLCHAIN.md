@@ -30,4 +30,8 @@ rcodesign mode refuses apps with GDExtension libraries); `tools/macos/package.sh
 with rcodesign: Developer ID + hardened runtime + `tools/macos/entitlements.plist`, then
 notarization and stapling when the six Apple secrets are set (see the header of `release.yml`),
 ad-hoc otherwise. Keep the preset's `codesign/entitlements/*` switches and the plist in sync.
+The release carries the app twice: `BetterAtGambling-macos.zip` and `BetterAtGambling-macos.dmg`.
+The .dmg is an ISO 9660 image with Rock Ridge and Apple extensions written by `genisoimage`
+(installed in the workflow; the recipe Bitcoin Core used for its Mac builds), which macOS mounts
+like any disk image; the image itself is unsigned, Gatekeeper judges the signed .app inside it.
 Launching the app, Gatekeeper, the microphone prompt, Steam and host mode can only be tested on a Mac.
