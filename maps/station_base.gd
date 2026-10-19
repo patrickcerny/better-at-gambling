@@ -17,9 +17,18 @@ var camera_anchor: Node3D
 var seat_cameras: Array[Node3D] = []
 var interaction_area: Area3D
 var hot_light: OmniLight3D
-## Big bouncing arrow over the hot table, drawn on top of everything so it reads across the floor.
+## Bouncing arrow over the hot table, drawn on top of everything (through walls) so it reads across
+## the floor, and always the same size on screen (Patrick: "a bit too big. Make it always the same
+## size, wall see through is good"): `hot_marker_scale` follows the camera's distance and FOV.
 var hot_marker: Node3D
+## "HOT ×1.25" over the arrow.
+var hot_label: Label3D
 const HOT_MARKER_Y: float = 4.2
+## The arrow's height (tip to tail, `HOT_ARROW_LENGTH` m at scale 1) as a share of the screen height.
+const HOT_MARKER_SCREEN: float = 0.12
+const HOT_ARROW_LENGTH: float = 1.5
+## Bounce height in arrow lengths.
+const HOT_MARKER_BOUNCE: float = 0.35
 ## Hot right now (the server says so).
 var hot: bool = false
 ## The marker is drawn on top of everything, so it would show through a minigame room's walls:
@@ -101,13 +110,23 @@ func set_hot_marker_hidden(hidden: bool) -> void:
 func _process(delta: float) -> void:
 	if hot_marker != null and hot_marker.visible:
 		_hot_time += delta
-		hot_marker.position.y = HOT_MARKER_Y + absf(sin(_hot_time * 4.0)) * 1.0
 		hot_marker.rotation.y += delta * 1.5
-		# Grows with distance so it reads from across the floor.
+		var k: float = 1.0
 		var cam: Camera3D = get_viewport().get_camera_3d()
 		if cam != null:
-			var d: float = cam.global_position.distance_to(hot_marker.global_position)
-			hot_marker.scale = Vector3.ONE * clampf(d / 6.0, 1.0, 5.0)
+			k = hot_marker_scale(cam.global_position.distance_to(global_position + Vector3(0, HOT_MARKER_Y, 0)), cam.fov)
+		hot_marker.scale = Vector3.ONE * k
+		# The label is `fixed_size` (already the same on screen): undo the marker's scale for it.
+		hot_label.scale = Vector3.ONE / k
+		# The bounce scales too, so it looks the same from anywhere.
+		hot_marker.position.y = HOT_MARKER_Y + absf(sin(_hot_time * 4.0)) * HOT_MARKER_BOUNCE * HOT_ARROW_LENGTH * k
+
+
+## Scale for the arrow seen from `distance` metres with a vertical `fov_deg`, so it covers
+## `HOT_MARKER_SCREEN` of the screen's height wherever the camera is.
+static func hot_marker_scale(distance: float, fov_deg: float) -> float:
+	var view_h: float = 2.0 * maxf(distance, 0.5) * tan(deg_to_rad(fov_deg) * 0.5)
+	return HOT_MARKER_SCREEN * view_h / HOT_ARROW_LENGTH
 
 
 func _build_hot_marker() -> void:
@@ -137,18 +156,19 @@ func _build_hot_marker() -> void:
 	shaft.material_override = mat
 	shaft.position.y = 1.1
 	hot_marker.add_child(shaft)
-	var label := Label3D.new()
-	label.text = "HOT ×%.2f" % Registry.balance.hot_table_multiplier
-	label.font_size = 64
-	label.pixel_size = 0.00045
-	label.fixed_size = true  # same size on screen from anywhere on the floor
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	label.modulate = Palette.VIP_GOLD
-	label.outline_modulate = Palette.CASINO_BLACK
-	label.outline_size = 18
-	label.position.y = 2.1
-	hot_marker.add_child(label)
+	hot_label = Label3D.new()
+	hot_label.name = "HotLabel"
+	hot_label.text = "HOT ×%.2f" % Registry.balance.hot_table_multiplier
+	hot_label.font_size = 64
+	hot_label.pixel_size = 0.0009
+	hot_label.fixed_size = true  # same size on screen from anywhere on the floor
+	hot_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	hot_label.no_depth_test = true
+	hot_label.modulate = Palette.VIP_GOLD
+	hot_label.outline_modulate = Palette.CASINO_BLACK
+	hot_label.outline_size = 18
+	hot_label.position.y = 2.0
+	hot_marker.add_child(hot_label)
 
 
 ## The camera view for a seat.
