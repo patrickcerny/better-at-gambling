@@ -40,6 +40,10 @@ as built stand on it. Adding a layout is a new `.tres` listed there; nothing in 
 - **Plinko**: on the north wall, where the drop is seen from far away.
 - **Scratch cards**: a services counter, beside the Gift Shop (south of it on the east wall, or
   north of Odd Jobs) or against the lobby wall inside the casino. Never in the entrance hall.
+- **Sword Tapper**: two round pedestals (`sword_1`, `sword_2`) side by side, 1.8 m apart, both
+  facing the same way, the player standing on the open side. Against the lobby wall with their
+  backs to it, or a pair in open floor in front of a slot bank, so a big pull's light column is
+  seen across the room. Never in the entrance hall.
 
 ## The layouts
 
@@ -47,7 +51,7 @@ Centres are world (x, z), north is −z, the lobby doors are at z 8.4 (x −2.75
 
 ### The Grand Hall (`grand_hall`)
 
-blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 12, wheel 1
+blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 12, sword_tapper 2, wheel 1
 
 | Station | Game | Centre (x, z) | Yaw |
 |---|---|---|---|
@@ -64,10 +68,12 @@ blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 12, wheel 1
 | blackjack_2 | blackjack | (-9, 4) | 0 |
 | blackjack_3 | blackjack | (-2, 4) | 0 |
 | wheel_1 | wheel | (14.5, 6.2) | 180 |
+| sword_1 | sword_tapper | (6.2, 6.9) | 180 |
+| sword_2 | sword_tapper | (8, 6.9) | 180 |
 
 ### Wheel Night (`wheel_night`)
 
-blackjack 3, craps 1, plinko 2, roulette 2, scratch 1, slots 9, wheel 1
+blackjack 3, craps 1, plinko 2, roulette 2, scratch 1, slots 9, sword_tapper 2, wheel 1
 
 | Station | Game | Centre (x, z) | Yaw |
 |---|---|---|---|
@@ -84,10 +90,12 @@ blackjack 3, craps 1, plinko 2, roulette 2, scratch 1, slots 9, wheel 1
 | roulette_2 | roulette | (7, 3.8) | 180 |
 | blackjack_3 | blackjack | (14, 6.3) | 180 |
 | scratch_1 | scratch | (20.45, 4.85) | -90 |
+| sword_1 | sword_tapper | (15.5, -3.2) | 0 |
+| sword_2 | sword_tapper | (17.3, -3.2) | 0 |
 
 ### The Pit (`the_pit`)
 
-blackjack 3, craps 2, hilo 1, plinko 2, roulette 1, scratch 1, slots 6, wheel 1
+blackjack 3, craps 2, hilo 1, plinko 2, roulette 1, scratch 1, slots 6, sword_tapper 2, wheel 1
 
 | Station | Game | Centre (x, z) | Yaw |
 |---|---|---|---|
@@ -103,10 +111,12 @@ blackjack 3, craps 2, hilo 1, plinko 2, roulette 1, scratch 1, slots 6, wheel 1
 | roulette_1 | roulette | (-10, 3) | 0 |
 | hilo_1 | hilo | (8, 3.5) | 0 |
 | scratch_1 | scratch | (5.6, 6.85) | 180 |
+| sword_1 | sword_tapper | (15.3, 6.8) | 180 |
+| sword_2 | sword_tapper | (17.1, 6.8) | 180 |
 
 ### The Arcade (`the_arcade`)
 
-blackjack 1, hilo 1, plinko 2, roulette 1, scratch 1, slots 18, wheel 1
+blackjack 1, hilo 1, plinko 2, roulette 1, scratch 1, slots 18, sword_tapper 2, wheel 1
 
 | Station | Game | Centre (x, z) | Yaw |
 |---|---|---|---|
@@ -123,10 +133,12 @@ blackjack 1, hilo 1, plinko 2, roulette 1, scratch 1, slots 18, wheel 1
 | blackjack_1 | blackjack | (-5, 3) | 0 |
 | slot_16..18 | slots | x 13, 14.3, 15.6; z 7.6 | 180 |
 | scratch_1 | scratch | (20.45, 5.4) | -90 |
+| sword_1 | sword_tapper | (9, 4.2) | 0 |
+| sword_2 | sword_tapper | (10.8, 4.2) | 0 |
 
 ### The Long Room (`the_long_room`)
 
-blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 16, wheel 1
+blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 16, sword_tapper 2, wheel 1
 
 | Station | Game | Centre (x, z) | Yaw |
 |---|---|---|---|
@@ -143,10 +155,12 @@ blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 16, wheel 1
 | roulette_2 | roulette | (5, 0.9) | -90 |
 | hilo_1 | hilo | (6, 6.05) | -90 |
 | scratch_1 | scratch | (20.45, 5.4) | -90 |
+| sword_1 | sword_tapper | (13.5, -5) | 0 |
+| sword_2 | sword_tapper | (15.3, -5) | 0 |
 
 ### The Salon (`the_salon`)
 
-blackjack 3, hilo 2, roulette 2, scratch 1, slots 9, wheel 1
+blackjack 3, hilo 2, roulette 2, scratch 1, slots 9, sword_tapper 2, wheel 1
 
 | Station | Game | Centre (x, z) | Yaw |
 |---|---|---|---|
@@ -160,6 +174,8 @@ blackjack 3, hilo 2, roulette 2, scratch 1, slots 9, wheel 1
 | wheel_1 | wheel | (19.6, 5.9) | -90 |
 | slot_1..9 | slots | x -19, -17.7, -16.4, -9, -7.7, -6.4, 8, 9.3, 10.6; z 7.6 | 180 |
 | scratch_1 | scratch | (20.45, -4.4) | -90 |
+| sword_1 | sword_tapper | (4, 3.5) | 0 |
+| sword_2 | sword_tapper | (5.8, 3.5) | 0 |
 
 ## Fitting the room (the proof)
 
@@ -213,9 +229,9 @@ When it happens:
 ## Station ids
 
 Stations keep game-named ids, numbered per game in each layout: `blackjack_1`, `slot_14`,
-`craps_2`. A table keeps its logic (blackjack shoe and all) only when its id, game, place and
-facing all stay; one that moves is a fresh table in its new place (`StationManager.apply_stations`
-`moved`). The VIP lounge (`vip_`), the waiting room (`fun_`) and the horse race keep their own ids
+`craps_2`; the Sword Tapper's pedestals go by the short name `sword_1`, `sword_2`. A table keeps
+its logic (blackjack shoe and all) only when its id, game, place and facing all stay; one that
+moves is a fresh table in its new place (`StationManager.apply_stations` `moved`). The VIP lounge (`vip_`), the waiting room (`fun_`) and the horse race keep their own ids
 and never move.
 
 ## Players see it

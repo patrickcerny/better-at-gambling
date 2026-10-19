@@ -47,8 +47,8 @@ func _ready() -> void:
 	floor_mesh.mesh = pm
 	floor_mesh.material_override = GreyboxKit.material(Palette.CASINO_RED.darkened(0.6))
 	add_child(floor_mesh)
-	GreyboxKit.lamp(self, Vector3(-2, 4.5, 1.5), 2.5, 12.0)
-	GreyboxKit.lamp(self, Vector3(2, 4.5, 1.5), 2.5, 12.0)
+	GreyboxKit.lamp(self, Vector3(-1.2, 3.6, 1.2), 1.0, 7.0)
+	GreyboxKit.lamp(self, Vector3(1.2, 3.6, 1.2), 1.0, 7.0)
 	Vfx.force_enabled = true
 	_station = SwordTapperStation.new()
 	_station.station_id = &"sword_1"
@@ -74,6 +74,7 @@ func _ready() -> void:
 	add_child(cam)
 	match view:
 		"seat":
+			bean.visible = false  # your own bean (and its crown) is hidden in the seat view
 			cam.fov = 85.0
 			cam.global_transform = _station.camera_for_seat(0).global_transform
 			_overlay(stake)
@@ -111,10 +112,6 @@ func _process(delta: float) -> void:
 		var img: Image = get_viewport().get_texture().get_image()
 		img.save_png(_shot)
 		print("sword tapper shot %s" % _shot)
-		for n: Node in get_tree().root.find_children("*", "MeshInstance3D", true, false):
-			var mi: MeshInstance3D = n
-			if mi.is_visible_in_tree() and mi.global_position.distance_to(get_viewport().get_camera_3d().global_position) < 3.0 and not "sword_" in str(mi.get_path()):
-				print("TMPDBG ", mi.get_path(), " ", mi.global_position)
 		_shot = ""
 		get_tree().quit(0)
 

@@ -80,6 +80,25 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   1/2/4/8/25/100, $0.4; $50 1/3/5/10/40/200, $0.5. House rule: a blank is drawn again once with 25%
   chance (`scratch_favour`), then luck rerolls the card; RTP 101.2% per tier. Fixed prices: a card
   the balance can't cover is greyed out and refused, never sold cheaper (no all-in at the kiosk).
+- **Sword Tapper** (two pedestals `sword_1` / `sword_2` side by side on the casino floor; modelled
+  on Greentube's Lucky Sword – Tapper): a marble plinth with a gold sword in a grey stone, ringed by
+  17 gem lamps on burgundy velvet, each printed with its prize for the stake. One player per
+  pedestal, standing (no stool). Pick a $10–$100 stake (× limits, chip buttons, all-in over the
+  balance) and tap PULL (Space / E / gamepad A pulls again with the same stake): the sword stays
+  (stake lost; thud, dust puff) or comes free and lights 3 to 17 gems (a uniform pick from the
+  ring), paying their sum; a win of 9 or fewer gems may get ×2 / ×3 / ×5 / ×10. Ring (× stake):
+  6 × 0.1, 4 × 0.2, 2 × 0.3, 2 × 0.5, 1, 2 and the ruby 5 at the top (all 17 = 11×; best pull the
+  nine biggest × 10 = 100×, `sword_max_pay` 100× is only a clamp). Free at 24%
+  (`sword_pull_chance`); house rule (0.9.6): a stuck pull is drawn again once with 8%
+  (`sword_favour`), then luck rerolls the whole pull like a slot line; neither is shown or sent.
+  The panel says "about 1 pull in 4 frees the sword". Exact RTP 100.9% at luck 0 (95.1% without
+  the house rule); free 25.5%, ≥ 1× 19.6%, ≥ 10× 1 in 59, ≥ 50× 1 in 3,200. Decided at the tap
+  (one `sword_pull` event), paid when the 2.5 s reveal ends, or at once on walking away, being
+  knocked off, the casino closing or a minigame starting (never refunded); a pull later than 3 s
+  before closing is refused. A pull paying ≥ 20× posts "X pulled the sword: $N!" in the feed and
+  raises a golden light column over the pedestal. Seat view over the right shoulder, overlay
+  column on the right (chips, PULL, the ring's prizes, the multiplier rule, last 8 pulls, HOW IT
+  WORKS). Not a Hot Table candidate; slot-only items do not touch it.
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
@@ -177,6 +196,7 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | wheel_result | — (the clicker slows down); reel_stop, low, as the wheel rests on the segment |
 | hilo_dealt / hilo_call | card_deal as the card slides out of the deck onto the seat's spot (TableCards) |
 | hilo_reshuffle | — (the deck on the table is full again) |
+| sword_pull | stone_grind as the bean heaves; stuck: thud, low, and a dust puff; free: sword_ring (metal ring-out) and a ring of light, plink per lit gem (pitch rising), thud + coin as a multiplier slams down; stone_grind, high and quiet, as the sword sinks back (big win: the round_result fanfare and the golden light column) |
 | scratch_card | card_deal as the card slides out of the kiosk's dispenser; scratching plays the scratch rasp per stroke (pitch varied) and a higher one as each cell's foil pops off |
 | jackpot_won | jackpot_siren (bell arpeggio, coin shower, held chord) |
 | last_call | last_call_bell (brass hand bell ×3) + Last Call music |
