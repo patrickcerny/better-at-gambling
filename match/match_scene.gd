@@ -2315,8 +2315,6 @@ func _update_prompt() -> void:
 		var st: StationBase = map.stations[sid]
 		if FunRoom.is_fun(sid) != in_waiting_room:
 			continue  # the waiting room's tables only from inside it (never through its wall)
-		if st.global_position.z < LuckyLounge.LOBBY_DOORS_Z and local.global_position.z > LuckyLounge.LOBBY_DOORS_Z:
-			continue  # nor a casino game from the entrance hall (the Sword Tapper pedestals stand right behind the lobby wall)
 		var d: float = Vector3(st.global_position.x - local.global_position.x, 0.0, st.global_position.z - local.global_position.z).length()
 		if absf(st.global_position.y - local.global_position.y) > 1.5:
 			continue

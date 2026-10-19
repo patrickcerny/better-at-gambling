@@ -41,9 +41,10 @@ as built stand on it. Adding a layout is a new `.tres` listed there; nothing in 
 - **Scratch cards**: a services counter, beside the Gift Shop (south of it on the east wall, or
   north of Odd Jobs) or against the lobby wall inside the casino. Never in the entrance hall.
 - **Sword Tapper**: two round pedestals (`sword_1`, `sword_2`) side by side, 1.8 m apart, both
-  facing the same way, the player standing on the open side. Against the lobby wall with their
+  facing the same way, the player standing on the open side. By the lobby wall with their
   backs to it, or a pair in open floor in front of a slot bank, so a big pull's light column is
-  seen across the room. Never in the entrance hall.
+  seen across the room; more than 3.5 m (the interact range) from the entrance-hall spawns, so E
+  in the lobby never steps up to one through the wall. Never in the entrance hall.
 
 ## The layouts
 
@@ -68,8 +69,8 @@ blackjack 3, craps 1, hilo 1, plinko 2, roulette 2, scratch 1, slots 12, sword_t
 | blackjack_2 | blackjack | (-9, 4) | 0 |
 | blackjack_3 | blackjack | (-2, 4) | 0 |
 | wheel_1 | wheel | (14.5, 6.2) | 180 |
-| sword_1 | sword_tapper | (6.2, 6.9) | 180 |
-| sword_2 | sword_tapper | (8, 6.9) | 180 |
+| sword_1 | sword_tapper | (6.2, 5.9) | 180 |
+| sword_2 | sword_tapper | (8, 5.9) | 180 |
 
 ### Wheel Night (`wheel_night`)
 

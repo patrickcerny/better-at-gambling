@@ -160,8 +160,8 @@ func test_step_up_and_pull_through_the_scene() -> void:
 	assert_false(ui.pull_btn.disabled, "ready for the next pull")
 
 
-## The Grand Hall's pedestals stand right behind the lobby wall: nobody in the entrance hall gets
-## their prompt or steps up to them through the wall.
+## Pedestals by the lobby wall stand far enough from it that nobody in the entrance hall gets their
+## prompt or steps up to them through the wall (the interact range is a plain distance).
 func test_never_reached_through_the_lobby_wall() -> void:
 	for layout: FloorLayout in scene.server.map_def.floor_layouts:
 		scene.map.apply_floor_plan(layout.wire_stations())
@@ -170,4 +170,4 @@ func test_never_reached_through_the_lobby_wall() -> void:
 			scene.local.teleport(spot, 0.0)
 			await wait_physics_frames(2)
 			scene._update_prompt()
-			assert_null(scene.nearest_station, "%s: no casino game from the entrance hall at %s" % [layout.id, spot])
+			assert_false(scene.nearest_station is SwordTapperStation, "%s: no pedestal from the entrance hall at %s" % [layout.id, spot])

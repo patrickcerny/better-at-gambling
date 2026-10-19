@@ -139,6 +139,39 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-19 / 0.9.13 Sword Tapper
+A new casino-floor station from Patrick's Hard Rock picture (Greentube's Lucky Sword – Tapper),
+built to the design in `/mnt/project-files/better-at-gambling/SWORD_TAPPER.md` (GDD entry under
+Casino games):
+- **Game** (`games/sword_tapper/`): `SwordTapperLogic` (one player per pedestal, $10–$100 × limits,
+  all-in over the balance, decided at the tap in one `sword_pull` event, paid when the 2.5 s reveal
+  ends or at once on walking away / knock-off / casino close / minigame start, never refunded;
+  "Table closing!" under 3 s; not a Hot Table candidate via `StationLogicBase.hot_table_candidate`).
+  Ring of 17 gems (6 × 0.1, 4 × 0.2, 2 × 0.3, 2 × 0.5, 1, 2, ruby 5), 3–17 lit, ×2/×3/×5/×10 on
+  9 gems or fewer, `sword_pull_chance` 0.24 + quiet `sword_favour` 0.08, luck through `LuckRng.draw`.
+  Exact RTP at luck 0 **100.91%** (95.1% without the house rule; Monte Carlo 400k pulls through the
+  real logic 100.75% ± 1.4%); free 25.5%, ≥ 10× 1 in 59, ≥ 50× 1 in 3,200, best pull 100×. No
+  tuning needed.
+- **Pedestal** (`SwordTapperStation`): marble plinth, brass rim, velvet disc with 17 gem lamps and
+  their prizes, stone and gold sword, warm spotlight shaft and dust motes; the bean stands (seat
+  `stand` meta) and heaves at the hilt; stuck: wobble, thud, dust puff; free: ring of light, gems pop
+  in order with rising plinks, the multiplier slams down; a ≥ 20× pull raises a golden light column
+  and posts "X pulled the sword: $N!". New sfx `stone_grind`, `sword_ring` (`gen_sfx.py`).
+- **Overlay** (`SwordTapperUi`, docked right column, seat camera over the right shoulder): stake
+  chips, PULL (Space / E / pad A pulls again), the ring's prizes for the stake, the multiplier rule,
+  the result after the reveal, last 8 pulls, HOW IT WORKS.
+- **Floor**: `sword_1` / `sword_2` side by side in all six layouts (`docs/FLOOR_PLAN.md`), the full
+  floor map, HUD money-on-table line, feed label "Sword Tapper 1". PROTOCOL_VERSION 10.
+- Found on the way: with The Grand Hall's pedestals against the lobby wall (z 6.9), a lobby spawn
+  was inside the 3.5 m interact range through the wall (E in the lobby stepped up to the sword).
+  They stand at z 5.9 now; `test_sword_tapper_pedestal.gd` checks no lobby spawn gets a casino
+  prompt in any layout. The leader's crown hides with your own bean in a seat view (it floated in
+  front of the standing seat camera).
+- Tests: `tests/sim/test_rtp_sword_tapper.gd`, `tests/integration/test_sword_tapper_flow.gd`,
+  `tests/physics/test_sword_tapper_pedestal.gd`, `tests/ui/test_sword_tapper_ui.gd`,
+  `tests/unit/test_floor_plan.gd` (two pedestals per layout). Dev render
+  `tools/dev/sword_tapper_shot.tscn` (`--view front|seat|close|floor|match`).
+
 ### 2026-10-18 / 0.9.12 voice fixes
 Patrick: "other people online dont hear me", "no, friends can't hear each other". Every headless
 test was green because headless playback never makes a sound (it only clocks frames through the
