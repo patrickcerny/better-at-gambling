@@ -113,6 +113,19 @@ func test_burst_after_a_stall_is_bounded() -> void:
 	assert_eq(_id(jb.pop()), 12, "the newest frames are kept")
 
 
+## The net voice tests tell the backlog of a listener whose match was still loading (dropped before
+## anything played) from drops while playing, which must stay rare.
+func test_a_backlog_before_the_first_frame_is_told_from_drops_while_playing() -> void:
+	var jb := VoiceJitterBuffer.new(3, 8)
+	for s: int in 20:
+		jb.push(s, _frame(s))
+	assert_eq([jb.overflowed, jb.overflowed_before_start], [12, 12], "nothing had played yet")
+	assert_eq(_id(jb.pop()), 12)
+	for s: int in range(20, 25):
+		jb.push(s, _frame(s))
+	assert_eq([jb.overflowed, jb.overflowed_before_start], [16, 12], "a burst while playing is a real drop")
+
+
 func test_sequence_wraps_around() -> void:
 	var jb := VoiceJitterBuffer.new(3)
 	for s: int in [65534, 65535, 0, 1]:

@@ -9,7 +9,8 @@ extends RefCounted
 ## - A frame for a slot that already played is late and dropped; duplicates are dropped.
 ## - Running dry ends the spurt: the buffer refills to `target_depth` before playing again.
 ## - More than `max_depth` queued frames (a stall followed by a burst) drops the oldest so latency
-##   doesn't grow without bound.
+##   doesn't grow without bound. Before anything has played, that is the backlog of a listener
+##   whose game was not running yet (`overflowed_before_start`).
 
 enum State { BUFFERING, PLAYING }
 
@@ -23,6 +24,10 @@ var lost: int = 0
 var late: int = 0
 var duplicates: int = 0
 var overflowed: int = 0
+## Of `overflowed`, the frames dropped before this buffer ever played one: a backlog that queued
+## up while the listener's game was not running its frames yet (a match scene still loading on a
+## slow or busy PC), trimmed to the newest `max_depth` so the speaker is not heard late all match.
+var overflowed_before_start: int = 0
 
 ## seq → frame (decoded samples).
 var _frames: Dictionary[int, PackedFloat32Array] = {}
@@ -54,6 +59,8 @@ func push(seq: int, frame: PackedFloat32Array, end: bool = false) -> void:
 		_frames.erase(oldest)
 		_end_seqs.erase(oldest)
 		overflowed += 1
+		if played == 0:
+			overflowed_before_start += 1
 		if state == State.PLAYING and VoicePacket.seq_diff(oldest, _next) >= 0:
 			_next = (oldest + 1) & 0xFFFF
 

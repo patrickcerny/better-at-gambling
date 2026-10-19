@@ -172,6 +172,43 @@ Casino games):
   `tests/unit/test_floor_plan.gd` (two pedestals per layout). Dev render
   `tools/dev/sword_tapper_shot.tscn` (`--view front|seat|close|floor|match`).
 
+### 2026-10-19 / 0.9.13 voice net tests on a busy machine
+The two voice net tests (`test_voice_from_one_client...` in `test_net_match.py`,
+`test_voice_goes_both_ways...` in `test_net_host_mode.py`) failed with other suites running
+("heard 0.219 vs 0.366", "0.323"). Reproduced next to a looping net test and busy loops (0.182),
+and every time by freezing the listening client twice for 0.7 s mid-match (SIGSTOP/SIGCONT, the
+way a busy machine stalls it): 0.108 and 0.068 vs 0.366. Three causes in the tests, no voice fault:
+- **The level was one Goertzel over the whole dump**, which reads it only while the tone stays in
+  phase. A stall makes a burst, the jitter buffer drops its oldest frames on purpose (35 in the
+  frozen run), the tone jumps phase there and the parts cancel: every played frame (942)
+  was the tone at 0.363–0.367, the whole dump read 0.108. The tests now check the tone frame by
+  frame (`_tone_frames`): every played frame at the speaker's level unless the buffer concealed
+  it, no more phase jumps than counted missing frames (none when nothing is missing), the other
+  tones and the RMS over the whole dump as before. Doctored dumps (half or 85% level, two frames
+  swapped, frames dropped, a 1000 Hz tone, every other frame silent) all fail it.
+- **Voice said while the listener's match was still loading** waits in their socket (the room
+  relays to a joined player whose game is still loading the scene), arrives in one burst and the
+  jitter buffer keeps the newest 12 frames: up to 84 frames dropped on the busy machine, all before
+  the first frame played (instrumented: the 96 frames came in 1.35 s), over the 5% "drops stay
+  rare" bound. Right for players (otherwise that speaker is late all match).
+  `VoiceJitterBuffer.overflowed_before_start` counts it, the voice summary says "overflowed N (M
+  before the first frame played)", and the bound is on the drops while playing. The bridged
+  friend's "3-4% burst drops" were this backlog too (0-1 drops while playing in 5 runs), so that
+  leg is held to 5% now instead of 8%.
+- **"reached nobody" < 200** timed how long the host talked before the bridged friend joined
+  (119-170 quiet, 210-239 busy). The room now logs the count when it first relays to a listener
+  ("relaying player 1's voice to player(s) [2] (lobby, after 170 that reached nobody)") and the test
+  wants every unheard frame to be from before that.
+- Checked, not a playback bug for players: the game clock kept up with the wall clock under load
+  (delta sum within 0.1 s of wall time over 39 s), no spurt ever ran dry, and real-audio playback
+  paces itself by the generator, not by `delta`. Headless playback is clocked by `delta`, which
+  Godot caps after a long frame (8 physics steps), so a frozen headless listener drops a little
+  more than a real one would; the counts cover it.
+- Runs (each a whole test, 60-80 s): before the fix, frozen listener: match 0.108, host loopback
+  0.068 (fail). After: frozen listener 3/3 match, 3/3 host loopback; next to a looping net test and
+  five busy loops on two pinned cores 3/3 match, 3/3 host loopback, 3/3 host bridge; quiet machine
+  2/2 of all three. `scripts/test.sh unit`, `integration`, `lint` green.
+
 ### 2026-10-18 / 0.9.12 voice fixes
 Patrick: "other people online dont hear me", "no, friends can't hear each other". Every headless
 test was green because headless playback never makes a sound (it only clocks frames through the

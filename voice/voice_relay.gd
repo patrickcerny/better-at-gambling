@@ -74,7 +74,7 @@ func route(server: MatchServer, speaker: int, data: PackedByteArray, now: float,
 				first.append(l)
 			delivered_to[l] = delivered_to.get(l, 0) + 1
 		if not first.is_empty():
-			Log.info(&"voice", "relaying player %d's voice to player(s) %s (%s)" % [speaker, str(first), Phase.name_of(phase)])
+			Log.info(&"voice", "relaying player %d's voice to player(s) %s (%s, after %d that reached nobody)" % [speaker, str(first), Phase.name_of(phase), unheard_from.get(speaker, 0)])
 	else:
 		if not unheard_from.has(speaker):
 			Log.info(&"voice", "player %d talks but nobody is in reach (%s, %d other player(s))" % [speaker, Phase.name_of(phase), listeners.size() - (1 if listeners.has(speaker) else 0)])

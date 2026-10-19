@@ -102,14 +102,16 @@ func _exit_tree() -> void:
 		for pid: int in received_from:
 			# Frames received but never played were dropped on purpose by the jitter buffer: late
 			# (their slot had played), overflowed (a stall then a burst, the oldest go so latency
-			# stays bounded) or still queued when the match ended.
+			# stays bounded; "before the first frame played": what queued up while this game was
+			# still loading the match) or still queued when the match ended.
 			# The speaker's avatar may be gone already (and its playback with it).
 			var v: Variant = playbacks.get(pid, null)
 			var pb: VoicePlayback = v if v != null and is_instance_valid(v) else null
 			var late: int = pb.buffer.late if pb != null else 0
 			var over: int = pb.buffer.overflowed if pb != null else 0
 			var lost: int = pb.buffer.lost if pb != null else 0
-			Log.info(&"voice", "voice from player %d: received %d, played %d, late %d, overflowed %d, lost %d" % [pid, received_from[pid], played_from.get(pid, 0), late, over, lost])
+			var backlog: int = pb.buffer.overflowed_before_start if pb != null else 0
+			Log.info(&"voice", "voice from player %d: received %d, played %d, late %d, overflowed %d (%d before the first frame played), lost %d" % [pid, received_from[pid], played_from.get(pid, 0), late, over, backlog, lost])
 	_write_dump()
 	if current == self:
 		current = null

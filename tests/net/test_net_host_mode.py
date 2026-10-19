@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 from conftest import LOG_DIR, free_port
-from test_net_match import _read_wav, _tone_amplitude
+from test_net_match import _read_wav, _tone_amplitude, _tone_frames
 
 HOST_UID = "steam:76561190000000101"
 FRIEND_UID = "steam:76561190000000102"
@@ -152,28 +152,39 @@ def test_voice_goes_both_ways_between_the_host_and_a_friend_in_a_hosted_room(pro
         sent = int(re.search(r"sent (\d+) frames \(\d+ bytes\)", speaker.log()).group(1))
         got_at_server, unheard = (int(x) for x in re.search(rf"player {s_id} sent (\d+) \((\d+) reached nobody", relay.group(1)).groups())
         to_listener = int(re.search(rf"player {l_id} got (\d+)", relay.group(1)).group(1))
-        line = re.search(rf"voice from player {s_id}: received (\d+), played (\d+), late (\d+), overflowed (\d+), lost (\d+)", listener.log())
+        line = re.search(rf"voice from player {s_id}: received (\d+), played (\d+), late (\d+), overflowed (\d+) \((\d+) before the first frame played\), lost (\d+)", listener.log())
         assert line, (listener.name, "never heard", speaker.name, listener.log_path)
-        got, played, late, overflowed, _ = (int(line.group(i)) for i in range(1, 6))
-        hops = {"sent": sent, "server got": got_at_server, "before the other joined": unheard, "server sent": to_listener, "got": got, "played": played, "late": late, "overflowed": overflowed}
+        got, played, late, overflowed, backlog, lost = (int(line.group(i)) for i in range(1, 7))
+        hops = {"sent": sent, "server got": got_at_server, "before the other joined": unheard, "server sent": to_listener, "got": got, "played": played, "late": late, "overflowed": overflowed, "of them before the first frame played": backlog}
         print(f"{speaker.name} -> {listener.name}:", hops)
         assert sent > 200, hops  # 25 frames/s on the casino floor
         assert got_at_server >= sent * 0.98 - 2, hops
-        assert unheard < 200, hops  # only before the other one was in the room
+        # What reached nobody was all said before the other one was in the room (the server
+        # counts it when it first relays to them; the host's game may start talking seconds
+        # before the friend's has joined, more on a busy machine: 237 frames, 0.9.13).
+        before = re.search(rf"relaying player {s_id}'s voice to player\(s\) \[{l_id}\] \([^,]*, after (\d+) that reached nobody\)", log)
+        assert before and unheard == int(before.group(1)), (hops, before and before.group(0))
         assert to_listener >= (got_at_server - unheard) * 0.98 - 2, hops  # in reach all along
         assert got >= to_listener * 0.98 - 2, hops
         assert played + late + overflowed >= got - 12, hops
-        # The bridge forwards once per frame of the host's game, so the leg from the room to a
-        # bridged friend arrives in bursts; their jitter buffer drops the oldest of a burst on
-        # purpose (3-4% of it here, on that leg only).
-        assert late + overflowed <= got * (0.08 if via == "bridge" else 0.05), hops
+        # The drops while playing stay rare. What queued up while the listener's match was still
+        # loading is trimmed to the newest 12 frames before their first frame plays: the bridged
+        # friend joins seconds after the host started talking, and their 3-4% "burst" drops on
+        # that leg were all this backlog (0-1 frames dropped while playing, 0.9.13).
+        assert late + overflowed - backlog <= got * 0.05, hops
         rate, x = _read_wav(tmp_path / f"{_base(listener)}_heard_p{s_id}.wav")
         assert rate == 8000 and len(x) == played * 320, (rate, len(x), played)
+        # Every frame played is the speaker's tone at their level (only concealed frames may be
+        # off), in one phase except where a counted frame went missing on the way.
         body = x[320 * 3:]
-        heard, own = _tone_amplitude(body, tones[_base(speaker)], rate), _tone_amplitude(body, tones[_base(listener)], rate)
-        print(f"{listener.name} heard {len(x) / rate:.1f} s of {speaker.name}: {heard:.3f} at {tones[_base(speaker)]:.0f} Hz, {own:.3f} at its own tone")
-        assert abs(heard - amp) < amp * 0.1, (heard, amp)
-        assert own < heard * 0.05, (own, heard)
+        amps, jumps = _tone_frames(body, tones[_base(speaker)], rate)
+        off = [round(a, 3) for a in amps if abs(a - amp) >= amp * 0.1]
+        missing = late + overflowed - backlog + lost + (sent - got_at_server) + max(got_at_server - unheard - to_listener, 0) + (to_listener - got)
+        own = _tone_amplitude(body, tones[_base(listener)], rate)
+        print(f"{listener.name} heard {len(x) / rate:.1f} s of {speaker.name}: {sorted(amps)[len(amps) // 2]:.3f} at {tones[_base(speaker)]:.0f} Hz (median of {len(amps)} frames, {len(off)} off level, {jumps} phase jumps for {missing} missing frames), {own:.3f} at its own tone")
+        assert len(off) <= lost, (off[:20], lost)
+        assert jumps <= missing, (jumps, hops)
+        assert own < amp * 0.05, (own, amp)
         # Nobody plays their own voice back.
         assert not (tmp_path / f"{_base(listener)}_heard_p{l_id}.wav").exists()
     for p in (server, host, friend):

@@ -194,6 +194,34 @@ def _tone_amplitude(x, hz, rate):
     return math.sqrt(max(s1 * s1 + s2 * s2 - c * s1 * s2, 0.0)) * 2.0 / len(x)
 
 
+def _tone_frames(x, hz, rate, frame=320):
+    """The `hz` component of every 40 ms frame of `x`: (amplitudes, phase jumps). The phase is
+    taken against one clock for the whole dump, so a tone played without a break keeps one phase
+    from frame to frame; a frame missing in between (dropped on purpose by the jitter buffer,
+    concealed, or never relayed) shows up as a jump, unless the missing stretch held whole cycles.
+
+    A single Goertzel over the whole dump reads the level only while the tone stays in phase:
+    after each drop the rest of the dump arrives in another phase and partly cancels what came
+    before (0.9.13: a listener stalled twice for 0.7 s dropped 35 frames in three places, every
+    played frame was the tone at 0.363-0.367, the whole dump read 0.108)."""
+    amps, phases = [], []
+    w = 2.0 * math.pi * hz / rate
+    for k in range(len(x) // frame):
+        re = im = 0.0
+        for i in range(k * frame, (k + 1) * frame):
+            re += x[i] * math.cos(w * i)
+            im += x[i] * math.sin(w * i)
+        amps.append(2.0 * math.hypot(re, im) / frame)
+        phases.append(math.atan2(im, re))
+    floor = max(amps, default=0.0) * 0.5
+    jumps = 0
+    for k in range(1, len(amps)):
+        turn = (phases[k] - phases[k - 1] + math.pi) % (2.0 * math.pi) - math.pi
+        if amps[k] >= floor and amps[k - 1] >= floor and abs(turn) > 0.5:
+            jumps += 1
+    return amps, jumps
+
+
 def test_voice_from_one_client_is_relayed_by_the_dedicated_server_and_played_by_the_other(procs, tmp_path):
     """Proximity voice end to end (Patrick: "think of a way to test it if the other user received
     it"): Alice loops a 440 Hz WAV into her capture path (`--voice-test`, open mic), the headless
@@ -233,11 +261,11 @@ def test_voice_from_one_client_is_relayed_by_the_dedicated_server_and_played_by_
     assert relay, ("no relay summary", server.log_path)
     got_at_server = int(re.search(rf"player {a_id} sent (\d+)", relay.group(1)).group(1))
     to_bob = int(re.search(rf"player {b_id} got (\d+)", relay.group(1)).group(1))
-    per_speaker = re.search(rf"voice from player {a_id}: received (\d+), played (\d+), late (\d+), overflowed (\d+), lost (\d+)", bob.log())
+    per_speaker = re.search(rf"voice from player {a_id}: received (\d+), played (\d+), late (\d+), overflowed (\d+) \((\d+) before the first frame played\), lost (\d+)", bob.log())
     assert per_speaker, ("no per-speaker line", bob.log_path)
-    bob_got, bob_played, late, overflowed, lost = (int(per_speaker.group(i)) for i in range(1, 6))
+    bob_got, bob_played, late, overflowed, backlog, lost = (int(per_speaker.group(i)) for i in range(1, 7))
     dumped = int(re.search(rf"voice dump: (\d+) frames from player {a_id}", bob.log()).group(1))
-    hops = {"alice sent": sent, "server got": got_at_server, "server sent bob": to_bob, "bob got": bob_got, "bob played": bob_played, "late": late, "overflowed": overflowed, "lost": lost, "dumped": dumped}
+    hops = {"alice sent": sent, "server got": got_at_server, "server sent bob": to_bob, "bob got": bob_got, "bob played": bob_played, "late": late, "overflowed": overflowed, "of them before Bob played": backlog, "lost": lost, "dumped": dumped}
     print("voice hops:", hops)
     assert got_at_server >= sent * 0.98 - 2, hops  # loopback: nothing lost on the way up
     assert to_bob >= got_at_server * 0.9, hops  # Bob was in reach nearly all the time
@@ -246,21 +274,29 @@ def test_voice_from_one_client_is_relayed_by_the_dedicated_server_and_played_by_
     # oldest of a burst after a stall so latency stays bounded), or was still queued (at most its
     # 12-frame depth) when the match ended. Nothing just vanishes.
     assert bob_played + late + overflowed >= bob_got - 12, hops
-    assert late + overflowed <= bob_got * 0.05, hops  # and the drops stay rare
+    # And the drops while playing stay rare. What Alice said while Bob's match was still loading
+    # queued up unheard and was trimmed to the newest 12 frames before his first frame played (on
+    # a busy machine his load runs seconds behind hers: 70 frames, 0.9.13).
+    assert late + overflowed - backlog <= bob_got * 0.05, hops
     # One playback under Alice's avatar all match long (a resync used to respawn her avatar,
     # dropping the buffered audio each time).
     assert bob.log().count(f"first frame played for player {a_id} ") == 1, bob.log_path
     assert dumped == bob_played, hops
-    # What Bob played is Alice's tone, at Alice's level, for as long as he got it.
+    # What Bob played is Alice's tone, at Alice's level, frame by frame for as long as he got it:
+    # only the frames his jitter buffer concealed may be off, and the tone runs on in one phase
+    # except where a counted frame went missing on the way.
     rate, x = _read_wav(dump.with_name(f"bob_heard_p{a_id}.wav"))
     assert rate == 8000 and len(x) == dumped * 320, (rate, len(x), dumped)
     body = x[320 * 3:]
-    at_tone = _tone_amplitude(body, tone_hz, rate)
+    amps, jumps = _tone_frames(body, tone_hz, rate)
+    off = [round(a, 3) for a in amps if abs(a - amp) >= amp * 0.1]
+    missing = late + overflowed - backlog + lost + (sent - got_at_server) + (got_at_server - to_bob) + (to_bob - bob_got)
     others = {hz: _tone_amplitude(body, hz, rate) for hz in (300.0, 700.0, 1000.0, 2000.0)}
-    print(f"bob heard {len(x) / rate:.1f} s: {tone_hz:.0f} Hz at {at_tone:.3f}, others {others}")
+    print(f"bob heard {len(x) / rate:.1f} s: {tone_hz:.0f} Hz at {sorted(amps)[len(amps) // 2]:.3f} (median of {len(amps)} frames, {len(off)} off level, {jumps} phase jumps for {missing} missing frames), others {others}")
     assert len(x) / rate > 5.0
-    assert all(v < at_tone * 0.05 for v in others.values()), (at_tone, others)
-    assert abs(at_tone - amp) < amp * 0.1, (at_tone, amp)
+    assert len(off) <= lost, (off[:20], lost)
+    assert jumps <= missing, (jumps, hops)
+    assert all(v < amp * 0.05 for v in others.values()), (amp, others)
     rms = math.sqrt(sum(v * v for v in body) / len(body))
     assert abs(rms - amp / math.sqrt(2)) < amp / math.sqrt(2) * 0.1, (rms, amp)
     for p in (server, alice, bob):
