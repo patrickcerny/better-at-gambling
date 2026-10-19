@@ -8,12 +8,13 @@ extends Node
 ## The 3D world (`world`) lives inside a `SubViewport` that shares the window's `World3D`, so
 ## physics, navigation, the environment and 3D audio are untouched; only the camera and the
 ## pixels move. The container is sized in window pixels (not canvas units), so a shrink of 1
-## renders exactly the window's pixels, as the bare window would. The shrink is fixed for every
-## player (`Settings.pixel_scale()`, 3; Patrick: "pixel look cannot be set"); only developer tools
-## override it (`Settings.set_pixel_override`), live through `Settings.changed`. The dedicated
-## server never builds the viewport: `setup(true)` leaves a plain Node3D.
+## renders exactly the window's pixels, as the bare window would. Players turn the look on (1/3,
+## `Settings.PIXEL_SCALE`, nearest-neighbour) or off (full resolution, linear filtering) with
+## `video/pixel_look` (asked on the first launch, then Settings > Video); developer tools override
+## the shrink (`Settings.set_pixel_override`). Both apply live through `Settings.changed`. The
+## dedicated server never builds the viewport: `setup(true)` leaves a plain Node3D.
 
-## Shrink factors the view supports (1 = off); players always get `Settings.PIXEL_SCALE`.
+## Shrink factors the view supports (1 = off); players get `Settings.PIXEL_SCALE` or 1.
 const SCALES: Array[int] = [1, 2, 3, 4]
 ## Window-level render settings the sub viewport copies so Off looks exactly like the bare window.
 const COPIED_SETTINGS: Array[StringName] = [
@@ -41,7 +42,6 @@ func setup(dedicated: bool) -> void:
 	container = SubViewportContainer.new()
 	container.name = "PixelContainer"
 	container.stretch = true
-	container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	container.mouse_filter = Control.MOUSE_FILTER_PASS  # forwards into the viewport, then on to the router
 	container.focus_mode = Control.FOCUS_NONE
 	add_child(container)
@@ -74,9 +74,11 @@ func _apply() -> void:
 	if container == null:
 		return
 	var s: int = Settings.pixel_scale()
+	# Hard pixels when shrunk; linear (the sharp look) at full resolution.
+	container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if s > 1 else CanvasItem.TEXTURE_FILTER_LINEAR
 	if s != container.stretch_shrink:
 		container.stretch_shrink = s
-		Log.info(&"video", "pixel look: 1/%d" % s)
+		Log.info(&"video", "pixel look: 1/%d" % s if s > 1 else "pixel look: off (sharp)")
 
 
 ## Sizes the container in window pixels (the canvas may be scaled by the stretch mode), so each

@@ -48,6 +48,8 @@ var pad_labels: Dictionary[StringName, Label] = {}
 var control_headings: Dictionary[String, Label] = {}
 ## VIDEO tab: the frame limit list (`Settings.FPS_CAPS` order).
 var fps_option: OptionButton
+## VIDEO tab: the pixel look on/off (`video/pixel_look`, switches the world's resolution live).
+var pixel_look_check: CheckButton
 ## AUDIO tab: voice mode, microphone choice (`input_devices[i]` is item i), mic volume and the
 ## small input level meter next to TEST MICROPHONE.
 var voice_mode: OptionButton
@@ -156,6 +158,15 @@ func _build_video(page: VBoxContainer) -> void:
 	fps_option.item_selected.connect(func(i: int) -> void: Settings.change("video", "max_fps", Settings.FPS_CAPS[i]))
 	fps_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fps_row.add_child(fps_option)
+	page.add_child(_heading("LOOK"))
+	pixel_look_check = _check(page, "Pixel look", "video", "pixel_look")
+	pixel_look_check.name = "PixelLook"
+	var hint := Label.new()
+	hint.name = "PixelLookHint"
+	hint.text = "On: the casino in big, chunky pixels (retro). Off: full resolution, smooth and crisp."
+	hint.theme_type_variation = &"MutedLabel"
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	page.add_child(hint)
 
 
 func _build_audio(page: VBoxContainer) -> void:
