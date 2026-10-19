@@ -47,10 +47,10 @@ static func leader_of(balances: Dictionary) -> int:
 func track(balances: Dictionary, avatars: Dictionary) -> void:
 	var lead: int = leader_of(balances)
 	var a: PlayerAvatar = avatars.get(lead, null) as PlayerAvatar
-	# Your own bean is hidden in first person and in a seat view (`PlayerCamera.shows_body`): its
-	# crown goes with it, or it would float right in front of the camera.
+	# Your own bean is hidden in a seat view (`PlayerCamera.shows_body`): its crown goes with it, or
+	# it would float right in front of the seat camera (the Sword Tapper's standing view).
 	var shown: bool = a != null and is_instance_valid(a) and a.is_visible_in_tree() and a.state != PlayerAvatar.State.AWAY \
-		and (a.visuals == null or a.visuals.visible)
+		and not (a.state == PlayerAvatar.State.SEATED and a.visuals != null and not a.visuals.visible)
 	if not shown:
 		leader_id = -1 if a == null else lead
 		visible = false

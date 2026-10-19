@@ -158,3 +158,16 @@ func test_step_up_and_pull_through_the_scene() -> void:
 	await wait_until(func() -> bool: return ui.result_label.text != "", 2.0)
 	assert_ne(ui.result_label.text, "", "the result shows once the reveal is over")
 	assert_false(ui.pull_btn.disabled, "ready for the next pull")
+
+
+## The Grand Hall's pedestals stand right behind the lobby wall: nobody in the entrance hall gets
+## their prompt or steps up to them through the wall.
+func test_never_reached_through_the_lobby_wall() -> void:
+	for layout: FloorLayout in scene.server.map_def.floor_layouts:
+		scene.map.apply_floor_plan(layout.wire_stations())
+		await wait_physics_frames(2)
+		for spot: Vector3 in LuckyLounge.LOBBY_SPAWNS:
+			scene.local.teleport(spot, 0.0)
+			await wait_physics_frames(2)
+			scene._update_prompt()
+			assert_null(scene.nearest_station, "%s: no casino game from the entrance hall at %s" % [layout.id, spot])
