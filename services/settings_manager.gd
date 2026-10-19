@@ -45,6 +45,7 @@ const KEYBINDS: Dictionary[StringName, String] = {
 	&"emote_1": "Emote: 67", &"emote_2": "Emote: thumbs up", &"emote_3": "Emote: thumbs down", &"emote_4": "Emote: default dance",
 	&"leaderboard": "Leaderboard", &"ping": "Ping", &"toggle_camera": "Toggle camera",
 	&"leave_station": "Leave station", &"pause": "Pause menu", &"push_to_talk": "Push to talk",
+	&"toggle_fullscreen": "Toggle fullscreen",
 }
 
 ## Developer override for the pixel look (screenshot tool, pixel tests); 0 = the player's choice. Never saved.
@@ -77,6 +78,21 @@ func get_value(section: String, key: String, default: Variant = null) -> Variant
 	if default == null and DEFAULTS.has(section):
 		default = (DEFAULTS[section] as Dictionary).get(key, null)
 	return _cfg.get_value(section, key, default)
+
+
+## F11 (`toggle_fullscreen`, remappable) flips fullscreen everywhere: the menus, a match, a
+## minigame, the pause menu. Handled here in `_input`, before any focused control can take the key.
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"toggle_fullscreen") and not event.is_echo():
+		toggle_fullscreen()
+		get_viewport().set_input_as_handled()
+
+
+## Flips `video/fullscreen`, applies it (the window follows) and saves it; Settings > Video shows it.
+func toggle_fullscreen() -> void:
+	change("video", "fullscreen", not bool(get_value("video", "fullscreen")))
+	save()
+	Log.info(&"video", "fullscreen %s" % ("on" if bool(get_value("video", "fullscreen")) else "off"))
 
 
 ## Writes a setting in memory; call `save()` to persist.
@@ -258,13 +274,20 @@ func apply() -> void:
 	Engine.max_fps = fps_limit(int(get_value("video", "max_fps")), DisplayServer.screen_get_refresh_rate())
 	if DisplayServer.get_name() == "headless":
 		return
-	var fs: bool = bool(get_value("video", "fullscreen"))
-	var mode: DisplayServer.WindowMode = DisplayServer.window_get_mode()
-	if fs and mode != DisplayServer.WINDOW_MODE_FULLSCREEN:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-	elif not fs and mode == DisplayServer.WINDOW_MODE_FULLSCREEN:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	var want: int = window_mode_for(bool(get_value("video", "fullscreen")), DisplayServer.window_get_mode())
+	if want >= 0:
+		DisplayServer.window_set_mode(want as DisplayServer.WindowMode)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if bool(get_value("video", "vsync")) else DisplayServer.VSYNC_DISABLED)
+
+
+## The window mode to switch to for the `fullscreen` setting from the `current` one, or −1 to leave
+## it (already right; a maximized or minimized window stays as it is while windowed).
+static func window_mode_for(fullscreen: bool, current: DisplayServer.WindowMode) -> int:
+	if fullscreen and current != DisplayServer.WINDOW_MODE_FULLSCREEN:
+		return DisplayServer.WINDOW_MODE_FULLSCREEN
+	if not fullscreen and current == DisplayServer.WINDOW_MODE_FULLSCREEN:
+		return DisplayServer.WINDOW_MODE_WINDOWED
+	return -1
 
 
 ## The `Engine.max_fps` for a frame limit choice (`FPS_CAPS`): `MATCH_MONITOR` rounds the screen's

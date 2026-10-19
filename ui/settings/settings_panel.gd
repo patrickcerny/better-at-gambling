@@ -25,7 +25,7 @@ const CONTROL_SECTIONS: Dictionary[String, Array] = {
 	"MOVEMENT": [&"move_forward", &"move_back", &"move_left", &"move_right", &"sprint", &"jump"],
 	"INTERACTION": [&"interact", &"grab", &"shove", &"shake", &"item_1", &"item_2", &"item_3", &"leave_station"],
 	"SOCIAL": [&"emote_wheel", &"emote_1", &"emote_2", &"emote_3", &"emote_4", &"push_to_talk", &"ping", &"leaderboard"],
-	"CAMERA & SYSTEM": [&"toggle_camera", &"pause"],
+	"CAMERA & SYSTEM": [&"toggle_camera", &"toggle_fullscreen", &"pause"],
 }
 
 var in_game: bool = false
@@ -50,6 +50,8 @@ var control_headings: Dictionary[String, Label] = {}
 var fps_option: OptionButton
 ## VIDEO tab: the pixel look on/off (`video/pixel_look`, switches the world's resolution live).
 var pixel_look_check: CheckButton
+## Every on/off row, by "section/key", kept in step with the settings (F11 flips fullscreen anywhere).
+var checks: Dictionary[String, CheckButton] = {}
 ## AUDIO tab: voice mode, microphone choice (`input_devices[i]` is item i), mic volume and the
 ## small input level meter next to TEST MICROPHONE.
 var voice_mode: OptionButton
@@ -138,6 +140,7 @@ func _ready() -> void:
 		resume_requested.emit())
 	_resume.theme_type_variation = &"ActionButton"
 	select_tab(0)
+	Settings.changed.connect(_sync_checks)
 
 
 func _build_game(page: VBoxContainer) -> void:
@@ -558,7 +561,15 @@ func _check(parent: Control, text: String, section: String, key: String) -> Chec
 	c.button_pressed = bool(Settings.get_value(section, key))
 	c.toggled.connect(func(on: bool) -> void: Settings.change(section, key, on))
 	h.add_child(c)
+	checks["%s/%s" % [section, key]] = c
 	return c
+
+
+## Shows each on/off row as the setting stands (changed elsewhere, e.g. F11 for fullscreen).
+func _sync_checks() -> void:
+	for path: String in checks:
+		var parts: PackedStringArray = path.split("/")
+		checks[path].set_pressed_no_signal(bool(Settings.get_value(parts[0], parts[1])))
 
 
 func _button(parent: Control, text: String, cb: Callable) -> Button:
