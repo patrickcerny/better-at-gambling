@@ -73,12 +73,17 @@ func _ready() -> void:
 		panel.anchor_right = 1.0
 		panel.anchor_top = 0.0
 		panel.anchor_bottom = 1.0
-		panel.offset_left = -(COLUMN_WIDTH + COLUMN_MARGIN.x)
+		panel.offset_left = -(_column_width() + COLUMN_MARGIN.x)
 		panel.offset_right = -COLUMN_MARGIN.x
 		panel.offset_top = COLUMN_MARGIN.y
 		panel.offset_bottom = -COLUMN_BOTTOM
 		panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 		panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		if not _column_fills_height():
+			# Only as tall as its content, from the top of the column down.
+			panel.anchor_bottom = 0.0
+			panel.offset_bottom = COLUMN_MARGIN.y
+			panel.grow_vertical = Control.GROW_DIRECTION_END
 	add_child(panel)
 	body = VBoxContainer.new()
 	body.add_theme_constant_override(&"separation", 10)
@@ -100,7 +105,7 @@ func _ready() -> void:
 	status_label.add_theme_font_size_override(&"font_size", 26)
 	body.add_child(status_label)
 	_build()
-	if _dock_column():
+	if _dock_column() and _column_fills_height():
 		# The key hint and the folded rules sit at the foot of the column.
 		var push := Control.new()
 		push.name = "Push"
@@ -286,6 +291,16 @@ func _dock_right() -> bool:
 ## table (framed by the seat camera in the left two thirds) is never covered.
 func _dock_column() -> bool:
 	return false
+
+
+## The column's width (`_dock_column`); a compact overlay narrows it.
+func _column_width() -> float:
+	return COLUMN_WIDTH
+
+
+## False for a compact column (`_dock_column`): only as tall as its content, not down to the rank.
+func _column_fills_height() -> bool:
+	return true
 
 
 ## Override: how the game works, folded away under the key hint ("" = no such line).

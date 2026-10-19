@@ -30,8 +30,8 @@ const FREE_LIFT: float = 0.42
 ## the pedestal's top, looking down at the ring so the gems and the stone fill most of the left two
 ## thirds of the screen (the overlay is a column down the right third); the sword runs off the top.
 const STAND_Z: float = 1.15
-## Where the multiplier slams down: just over the stone, in the middle of the ring in the seat view.
-const MULT_SPOT: Vector3 = Vector3(0.0, TOP_Y + 0.32, 0.1)
+## Where the multiplier slams down: past the far rim, so the seat view sees it over the ring, not on it.
+const MULT_SPOT: Vector3 = Vector3(-0.3, TOP_Y + 0.18, -0.95)
 const SEAT_EYE: Vector3 = Vector3(0.4, 1.66, 0.6)
 const SEAT_AIM: Vector3 = Vector3(0.4, 0.84, 0.1)
 ## The reveal, in seconds from the tap: the heave, the sword coming free, the first and last gem
@@ -297,10 +297,22 @@ func _light_gem(i: int, on: bool) -> void:
 
 
 func _is_ruby(i: int) -> bool:
+	return is_ruby(i)
+
+
+## True for the ring's top prize (the ruby).
+static func is_ruby(i: int) -> bool:
 	var top: float = 0.0
 	for v: float in Registry.balance.sword_ring:
 		top = maxf(top, v)
 	return Registry.balance.sword_ring[i] >= top
+
+
+## Radius (m) of gem `i`'s lamp: the ruby biggest, then smaller with the prize (the overlay's ring
+## draws its dots to the same sizes).
+static func gem_radius(i: int) -> float:
+	var v: float = Registry.balance.sword_ring[i]
+	return 0.06 if is_ruby(i) else (0.05 if v >= 2.0 else (0.044 if v >= 1.0 else (0.039 if v >= 0.5 else 0.034)))
 
 
 ## A gem lamp's place on the ring (index 0 at the top, far side as the player sees it; clockwise).
@@ -388,7 +400,7 @@ func _build_ring(brass: Material) -> void:
 	var cfg: BalanceConfig = Registry.balance
 	for i: int in cfg.sword_ring.size():
 		var v: float = cfg.sword_ring[i]
-		var r: float = 0.06 if _is_ruby(i) else (0.05 if v >= 2.0 else (0.044 if v >= 1.0 else (0.039 if v >= 0.5 else 0.034)))
+		var r: float = gem_radius(i)
 		var p: Vector3 = gem_spot(i)
 		_part_mesh(_disc(r + 0.016, 0.022), Vector3(p.x, TOP_Y + 0.016, p.z), brass, "Setting%d" % i)
 		var gem := SphereMesh.new()

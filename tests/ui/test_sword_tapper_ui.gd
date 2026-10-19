@@ -1,8 +1,12 @@
 extends GutTest
-## Sword Tapper overlay: a column in the right third of the screen (the pedestal fills the rest)
-## with the stake chips, PULL, the ring's prizes for the picked stake, the multiplier rule, the
-## result of your last pull once its reveal is over and the last pulls. PULL greys out while the
-## sword moves and under the minimum; a chip worth more than you have pulls with everything (all-in).
+## Sword Tapper overlay: a compact column at the right of the screen (the pedestal fills the rest;
+## 0.9.14, Patrick: "this ui field of sword tapper is very weird. make it better, probably also a
+## bit smaller (make the ui the same as the game / the 3d model)") with the pedestal top drawn as
+## it is (the gems round the ring, sized like the lamps, the ruby at the top, the prize for the
+## picked stake beside each, the multiplier rule on the stone, the pedestal's lit gems lit), then
+## the stake chips and PULL, the result of your last pull once its reveal is over and the last
+## pulls. PULL greys out while the sword moves and under the minimum; a chip worth more than you
+## have pulls with everything (all-in).
 
 const SID: StringName = &"sword_1"
 
@@ -60,18 +64,19 @@ func test_chips_pull_and_the_ring() -> void:
 	assert_string_contains(ui.pull_btn.text, "PULL  $25")
 	assert_true(ui.wants_camera_lock(), "the head stays on the pedestal while picking a stake")
 	assert_string_contains(ui.status_label.text, "PULL")
-	assert_eq(ui.tiers.size(), 7, "seven prize tiers on the ring")
-	assert_true(bool(ui.tiers[0]["ruby"]), "the ruby first")
-	assert_eq(ui.tier_labels[0].text, "$125", "the ruby pays 5× on $25")
-	assert_eq(ui.tier_labels[6].text, "$2.50  ×6", "six gems of 0.1×")
-	assert_string_contains(ui.ring_title.text, "$25 PULL")
-	assert_string_contains(ui.mult_label.text, "9 or fewer gems")
-	assert_string_contains(ui.mult_label.text, "×10")
+	var n: int = Registry.balance.sword_ring.size()
+	assert_eq(ui.ring.prizes.size(), n, "a prize beside every gem of the ring")
+	assert_true(SwordTapperStation.is_ruby(0), "the ruby is gem 0")
+	assert_eq(ui.ring.prizes[0], "$125", "the ruby pays 5× on $25")
+	assert_eq(ui.ring.prizes.count("$2.50"), 6, "six gems of 0.1×")
+	assert_eq(ui.ring_title.text, "PRIZES AT $25", "short")
+	assert_string_contains(ui.ring.centre_text, "≤9 GEMS", "the multiplier rule on the stone")
+	assert_string_contains(ui.ring.centre_text, "×10")
 	assert_eq(ui.result_label.text, "", "no result before the first pull")
 	ui.bet_panel.select_chip(3)
 	assert_eq(ui.stake(), 100)
-	assert_eq(ui.tier_labels[0].text, "$500", "the ring follows the stake")
-	assert_eq(ui.tier_labels[6].text, "$10  ×6")
+	assert_eq(ui.ring.prizes[0], "$500", "the ring follows the stake")
+	assert_eq(ui.ring.prizes.count("$10"), 6)
 	assert_string_contains(ui.pull_btn.text, "$100")
 
 
@@ -111,7 +116,7 @@ func test_a_chip_over_the_balance_goes_all_in() -> void:
 	assert_eq(ui.stake(), 60, "pulls with everything you have")
 	assert_string_contains(ui.pull_btn.text, "PULL  $60")
 	assert_eq(ui.pull_btn.tooltip_text, StationUi.all_in_text(60))
-	assert_eq(ui.tier_labels[0].text, "$300", "the ring prints the prizes for what goes in")
+	assert_eq(ui.ring.prizes[0], "$300", "the ring prints the prizes for what goes in")
 	Net.stop()
 	watch_signals(ui)
 	ui.pull()
@@ -128,9 +133,13 @@ func test_the_result_shows_after_the_reveal() -> void:
 	var history: Array = [{"free": true, "gems": 7, "mult": 3, "stake": 25, "returned": 445}, {"free": false, "gems": 0, "mult": 1, "stake": 25, "returned": 0}]
 	ui.update_state(_pub(false, _free_last(1), history, 1), {})
 	assert_eq(ui.result_label.text, "FREE!  7 GEMS  ×3  +$420")
-	assert_eq(ui.history_label.text, "LAST PULLS   $445 ×3   —")
+	assert_eq(ui.history_label.text, "LAST PULLS  $445 ×3  —")
+	assert_eq(ui.ring.lit, [0, 3, 8, 9, 12, 14, 16] as Array[int], "the pull's gems lit on the ring")
+	assert_true(ui.result_label.visible)
 	ui.update_state(_pub(true, _free_last(1), history, 2), {})
 	assert_eq(ui.result_label.text, "", "the next pull hides it again")
+	assert_false(ui.result_label.visible, "no empty line")
+	assert_eq(ui.ring.lit, [] as Array[int], "the ring goes dark for the next pull")
 	ui.update_state(_pub(false, {"pull": SwordTapperLogic.stuck(), "stake": 25, "returned": 0, "serial": 2}, history, 2), {})
 	assert_eq(ui.result_label.text, "STUCK!  −$25")
 	await wait_process_frames(2)
@@ -149,9 +158,49 @@ func test_texts() -> void:
 	assert_eq(SwordTapperUi.result_text({"pull": {"free": true, "gems": [1, 2, 3], "mult": 1}, "stake": 100, "returned": 40}), "FREE!  3 GEMS  −$60")
 	assert_eq(SwordTapperUi.result_text({"pull": {"free": true, "gems": [1, 2, 3, 4], "mult": 1}, "stake": 10, "returned": 10}), "FREE!  4 GEMS  stake back")
 	assert_eq(SwordTapperUi.history_text([]), "")
-	var counted: int = 0
-	for t: Dictionary in SwordTapperUi.ring_tiers(Registry.balance):
-		counted += int(t["count"])
-	assert_eq(counted, SwordTapperLogic.RING_SIZE, "every gem is in a tier")
+	assert_eq(SwordTapperUi.stone_text(Registry.balance), "≤9 GEMS\n×2 ×3 ×5 ×10")
+	assert_eq(SwordTapperUi.lit_gems({"pull": SwordTapperLogic.stuck()}), [] as Array[int])
 	assert_eq(SwordTapperStation.cents_text(1000), "$10")
 	assert_eq(SwordTapperStation.cents_text(250), "$2.50")
+
+
+## The panel is smaller than the old full-height column and draws the ring like the pedestal:
+## every dot where its lamp is, the ruby the biggest and red, the others warm white, gold when lit;
+## the dots never cover each other or the prizes.
+func test_the_ring_looks_like_the_pedestal() -> void:
+	await wait_process_frames(2)
+	var r: Rect2 = ui.panel.get_global_rect()
+	assert_lte(r.size.x, SwordTapperUi.PANEL_WIDTH + 1.0, "narrower than the old 600 px column")
+	assert_lt(r.size.y, 1080.0 - StationUi.COLUMN_MARGIN.y - StationUi.COLUMN_BOTTOM, "only as tall as it needs")
+	var ring: SwordRingView = ui.ring
+	var n: int = Registry.balance.sword_ring.size()
+	var c: Vector2 = ring.size * 0.5
+	var top: Vector2 = ring.gem_point(0)
+	assert_almost_eq(top.x, c.x, 0.5, "the ruby at the top, as on the pedestal")
+	assert_lt(top.y, c.y)
+	assert_gt(ring.gem_point(n / 4).x, c.x, "then clockwise")
+	for i: int in n:
+		if i > 0:
+			assert_lte(ring.gem_px(i), ring.gem_px(0), "the ruby is the biggest (gem %d)" % i)
+			assert_eq(ring.gem_color(i), SwordTapperStation.GEM_IDLE.darkened(0.25), "warm white while dark")
+		var j: int = (i + 1) % n
+		assert_gt(ring.gem_point(i).distance_to(ring.gem_point(j)), ring.gem_px(i) + ring.gem_px(j), "dots %d and %d apart" % [i, j])
+	assert_eq(ring.gem_color(0), SwordTapperStation.RUBY, "the ruby is red")
+	assert_gt(ring.gem_px(0), ring.gem_px(n - 1), "bigger than the small prizes")
+	ring.set_lit([2] as Array[int])
+	assert_eq(ring.gem_color(2), SwordTapperStation.GEM_LIT, "lit gold")
+	_assert_right_column("compact")
+
+
+## A pull on the pedestal lights the same gems in the panel, as they light.
+func test_lit_gems_follow_the_pedestal() -> void:
+	Vfx.force_enabled = true  # a client's pedestal, lamps and all
+	var node := SwordTapperStation.new()
+	node.station_id = SID
+	add_child_autofree(node)
+	Vfx.force_enabled = false
+	await wait_process_frames(1)
+	node.play_pull({"free": true, "gems": [0, 5, 9], "mult": 1, "serial": 7, "stake": 25}, true, SwordTapperStation.gem_time(1, 3) + 0.01)
+	await wait_process_frames(1)
+	assert_eq(ui.ring.lit, node.lit, "the panel shows what the pedestal shows")
+	assert_eq(ui.ring.lit, [0, 5] as Array[int], "two of three lit so far")
