@@ -399,7 +399,6 @@ func _build_sword(brass: Material) -> void:
 func _build_ring(brass: Material) -> void:
 	var cfg: BalanceConfig = Registry.balance
 	for i: int in cfg.sword_ring.size():
-		var v: float = cfg.sword_ring[i]
 		var r: float = gem_radius(i)
 		var p: Vector3 = gem_spot(i)
 		_part_mesh(_disc(r + 0.016, 0.022), Vector3(p.x, TOP_Y + 0.016, p.z), brass, "Setting%d" % i)
