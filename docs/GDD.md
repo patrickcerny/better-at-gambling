@@ -44,8 +44,8 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   dealer spins 12 s after the first bet; the server draws the segment (house rule: a spin no bet
   would win is redrawn once with 31% chance, then luck rerolls, never shown) and every client slows
   the wheel onto it. 5 stools, a dealer. $10 min per bet, $200 per spin. Seated, each stool's view
-  sits high over the rail and right of the middle so the wheel, the layout with the chips and the
-  dealer fill the left two thirds of the screen; the overlay is a column down the right third
+  sits close over the layout and right of the middle so the wheel (over half the screen's height),
+  the chips in every box and the dealer fill the left two thirds of the screen; the overlay is a column down the right third
   (symbols with their odds, chips, status, result and last spins, your bets), the rules folded
   under a HOW IT WORKS line.
 - **Craps** (casino floor; east of the roulette pit on the full floor): two dice. Pass Line (come-out 7/11 win, 2/3/12
@@ -58,8 +58,8 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   ones; the one-roll bets pay a bit better (Field 1.08 / 2.1, Any Seven 4.8) and a roll on which no
   bet wins and one would lose is redrawn with 5.5% chance, so every bet returns 101–101.6% to a
   player alone. A stickman (shoves like a dealer). $10 min per bet, $200 on the felt. Seated, each
-  stool's view looks down on the whole felt from high over the rail, right of the middle, so the
-  felt, every seat's chips and the stickman fill the left two thirds of the screen; the overlay is
+  stool's view looks almost straight down from high over the felt, right of the middle, so the
+  felt end to end, every seat's chips and the stickman fill the left two thirds of the screen; the overlay is
   a column down the right third (the four bets, chips, SHOOT, the point, the shooter or the last
   roll), the rules folded under a HOW IT WORKS line.
 - **Hi-Lo** (casino floor; east of the roulette pit on the full floor): oval card table, a dealer, 4 seats, one shared
@@ -96,9 +96,11 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   (one `sword_pull` event), paid when the 2.5 s reveal ends, or at once on walking away, being
   knocked off, the casino closing or a minigame starting (never refunded); a pull later than 3 s
   before closing is refused. A pull paying ≥ 20× posts "X pulled the sword: $N!" in the feed and
-  raises a golden light column over the pedestal. Seat view over the right shoulder, overlay
-  column on the right (chips, PULL, the ring's prizes, the multiplier rule, last 8 pulls, HOW IT
-  WORKS). Not a Hot Table candidate; slot-only items do not touch it.
+  raises a golden light column over the pedestal. Seat view right over the pedestal's top, the
+  ring of gems and the stone filling most of the screen; a compact overlay on the right draws the
+  same ring (gem dots sized and coloured like the lamps, the ruby at the top, the prize for the
+  stake beside each, the multiplier rule on the stone, lit as the pedestal lights them), then the
+  chips, PULL, the last pulls and HOW IT WORKS. Not a Hot Table candidate; slot-only items do not touch it.
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
@@ -144,6 +146,16 @@ within 8 m. Money never depends on physics.
   knock climbers off, shoving is on, grabbing off. 150 s; first to the pad wins, then the order of
   arrival, then the rest by height (never counted below their checkpoint), with a 10 s last call
   once all but one are up.
+
+## Settings and first launch
+One settings file per PC (`user://settings.cfg`, never synced): GAME (field of view), VIDEO
+(fullscreen, VSync, frame limit, pixel look), AUDIO, CONTROLS (remappable keys). The **pixel look**
+renders the 3D world at a third of the window's resolution with hard nearest-neighbour pixels
+(the UI stays sharp); off, the world renders at full resolution with smooth filtering. The very
+first launch asks before the main menu: PIXEL LOOK or SHARP LOOK; the choice is saved and never
+asked again, and Settings > Video switches it live. **F11** (remappable) toggles fullscreen
+anywhere and saves it. The Hot Table's arrow over the table is the same size on screen from
+anywhere on the floor and shows through walls.
 
 ## Online
 Dedicated Godot server per room on the owner's VPS, FastAPI room orchestrator, ENet over UDP,

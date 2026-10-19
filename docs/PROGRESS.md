@@ -139,6 +139,50 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-19 / 0.9.14 Patrick's batch: hot arrow, closer seat views, pixel look choice, Sword Tapper panel, F11
+- **Hot arrow** ("a bit too big. Make it always the same size, wall see through is good"): the
+  bouncing 3D arrow over the hot table (`StationBase` hot marker, not the HUD's screen-edge
+  pointer) grew with distance (`d / 6`, clamped 1..5), so it was 1/4 of the screen up close and a
+  speck beyond 30 m. Its scale now follows the camera's distance and field of view
+  (`StationBase.hot_marker_scale`): always 12% of the screen's height (the old one was ~19% at
+  mid range), the bounce scaled with it, the fixed-size "HOT ×1.25" label no longer scaled twice;
+  still drawn through walls. Test in `tests/ui/test_hot_pointer.gd`.
+- **Closer seat views** ("Even closer on craps and sword tapper ... almost the whole screen should
+  be the game"; "Same for fortune wheel"): craps looks almost straight down from over the felt
+  (the felt end to end, every bet spot, the dice and the stickman in the left two thirds; the
+  sign behind the table is out of the picture), the wheel view sits close over the layout (the
+  wheel over half the screen's height, every box's chips and the dealer in view, the layout's front
+  edge cut), the Sword Tapper view is right over the pedestal top (the ring ~65% of the height,
+  like Patrick's crop); its multiplier now slams down past the far rim so it never covers the
+  gems. Default FOV 85; the overlay column untouched. Framing tests: `test_craps_table.gd`,
+  `test_wheel_table.gd` (updated to the new framing: the sign / the layout's front corners
+  dropped, bigger minimum spans), new `tests/physics/test_sword_tapper_view.gd`.
+- **Pixel look choice** ("leave an option to make the noise filter on the texture ... to disable
+  it. When first started the game, give an option"): the only filter that makes the textures
+  grainy is the pixel look (`PixelView`: the world at 1/3 resolution, nearest-neighbour); there is
+  no film grain, dither or noise post effect (the casino floor's noise is its material). New
+  setting `video/pixel_look` (default on): off renders at full resolution with linear filtering.
+  First launch: `PixelLookPrompt` over the main menu (PIXEL LOOK / SHARP LOOK), shown only while no
+  choice is saved and the game booted normally (never under `--smoke-test`, the dev/test boot
+  flags, headless, GUT or the screenshot tool); Settings > Video has the toggle and switches it
+  live. The developer override (`Settings.set_pixel_override`, `--pixel N`) still wins. Tests:
+  `tests/unit/test_settings_pixel_look.gd`, `tests/ui/test_pixel_look_prompt.gd`,
+  `tests/ui/test_pixel_view.gd` (live toggle; its "no pixel option" test now checks the single
+  on/off toggle).
+- **Sword Tapper panel** ("this ui field of sword tapper is very weird. make it better, probably
+  also a bit smaller (make the ui the same as the game / the 3d model)"): a compact column (470 px,
+  only as tall as its content; `StationUi._column_width` / `_column_fills_height`) that draws the
+  pedestal top (`SwordRingView`): gem dots where the lamps are, sized like them
+  (`SwordTapperStation.gem_radius`, the ruby biggest and red at the top), the prize for the stake
+  beside each, the multiplier rule on the stone, and the pedestal's lit gems lit as they light;
+  "PRIZES AT $25", chips and PULL under it, compact last pulls. Test: `tests/ui/test_sword_tapper_ui.gd`.
+- **F11** ("On f11 press fullscreen toggle"): new action `toggle_fullscreen` (F11, remappable in
+  Controls > Camera & system), handled in the `Settings` autoload's `_input` so it works in the
+  menus, a match, minigames and the pause menu; it flips and saves `video/fullscreen` and the
+  Video tab's box follows (`SettingsPanel.checks` resync on `Settings.changed`). F11 was unbound;
+  Esc stays pause. Test: `tests/unit/test_fullscreen_toggle.gd` (headless: the setting and the
+  window mode asked for, `Settings.window_mode_for`).
+
 ### 2026-10-19 / 0.9.13 Sword Tapper
 A new casino-floor station from Patrick's Hard Rock picture (Greentube's Lucky Sword – Tapper),
 built to the design in `/mnt/project-files/better-at-gambling/SWORD_TAPPER.md` (GDD entry under

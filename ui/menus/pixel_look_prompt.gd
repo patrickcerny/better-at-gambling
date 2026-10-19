@@ -12,8 +12,8 @@ extends Control
 ## A look was picked (`pixel_look` true for the pixel look), saved and applied; the prompt is gone.
 signal chosen(pixel_look: bool)
 
-const PIXEL_TEXT: String = "Pixel look: the casino is drawn in big, chunky pixels for a retro, slightly grainy style."
-const SHARP_TEXT: String = "Sharp look: the casino is drawn at your screen's full resolution, smooth and crisp."
+const PIXEL_TEXT: String = "The casino in big, chunky pixels: a retro, slightly grainy style."
+const SHARP_TEXT: String = "The casino at your screen's full resolution: smooth and crisp."
 ## Command-line flags that boot past the menu or only run it for a test: never ask then.
 const SKIP_FLAGS: Array[String] = ["smoke-test", "server", "practice", "autoplay", "create-room"]
 const SKIP_VALUES: Array[String] = ["connect", "join-code"]
