@@ -124,3 +124,39 @@ func test_comp_runs_before_the_prize_and_lands_on_the_row() -> void:
 	assert_false(rows[0].has("comp"))
 	assert_eq(int(rows[1]["comp"]), 450)
 	assert_eq(eco.balance(2), 450 + 100)
+
+
+func test_the_money_leader_never_draws_a_leader_only_item() -> void:
+	# Robin Hood only works against a richer player; a leader who drew it could never use it
+	# (seen online: every use refused with you_lead). Pool of only Rares so the rarity roll
+	# cannot dodge the question; the leader must get the other Rare every time.
+	var rares: Dictionary[StringName, int] = {&"robin_hood": R.RARE, &"mirror": R.RARE}
+	var lt: LootTables = LootTables.new(load("res://data/items/loot_tables.tres"), rares)
+	lt.leader_only.append(&"robin_hood")
+	for seed_value: int in 40:
+		var s: Array = _setup(3)
+		var eco: Economy = s[0]
+		var players: Dictionary[int, PlayerState] = s[1]
+		eco.apply(2, 5000, &"test", &"test")  # player 2 leads the money whatever place they took
+		var rd := RewardDirector.new()
+		rd.start(_ranking(3), eco, lt, true, 1.0, cfg, SeededRng.new(seed_value), players)
+		var rows: Array = rd.drain_events()[0]["rewards"]
+		for row: Dictionary in rows:
+			if int(row["player"]) == 2:
+				assert_eq(StringName(row["item"]), &"mirror", "leader skips Robin Hood (seed %d)" % seed_value)
+				assert_ne(StringName(row.get("bonus", &"")), &"robin_hood", "nor as the Underdog bonus")
+			else:
+				assert_true(rares.has(StringName(row["item"])), "others draw from the whole pool")
+
+
+func test_prizes_count_before_the_leader_check() -> void:
+	# Everyone starts level; first place's prize makes them the leader, so they skip Robin Hood.
+	var rares: Dictionary[StringName, int] = {&"robin_hood": R.RARE, &"mirror": R.RARE}
+	var lt: LootTables = LootTables.new(load("res://data/items/loot_tables.tres"), rares)
+	lt.leader_only.append(&"robin_hood")
+	for seed_value: int in 40:
+		var s: Array = _setup(2)
+		var rd := RewardDirector.new()
+		rd.start(_ranking(2), s[0], lt, true, 1.0, cfg, SeededRng.new(seed_value), s[1])
+		var rows: Array = rd.drain_events()[0]["rewards"]
+		assert_eq(StringName(rows[0]["item"]), &"mirror", "winner leads after the prize (seed %d)" % seed_value)

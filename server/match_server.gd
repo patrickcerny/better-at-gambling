@@ -145,6 +145,9 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 		if Registry.items[id].in_loot:
 			rarities[id] = Registry.items[id].rarity
 	loot = LootTables.new(Registry.loot, rarities)
+	for id: StringName in rarities:
+		if Registry.items[id].target_mode == ItemDefinition.TargetMode.LEADER:
+			loot.leader_only.append(id)
 	lobby.settings["items_enabled"] = bool(settings.get("items_enabled", true))
 	if MatchMode.is_minigames_only(settings):
 		settings["items_enabled"] = false  # no casino to use them in

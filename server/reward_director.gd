@@ -45,12 +45,17 @@ func start(ranking: Array[Dictionary], economy: Economy, loot: LootTables, items
 		out["cash"] = cash
 		if cash > 0:
 			economy.apply(p, cash, &"minigame_prize", &"rewards")
-		if items_enabled and loot != null:
-			out["item"] = loot.roll(placement, ranking.size(), rng)
-			var extra: StringName = loot.underdog(placement, worst, ranking.size(), rng)
+		rows.append(out)
+	# Items after every prize is paid, so "leads the money" counts the prizes just handed out.
+	if items_enabled and loot != null:
+		for out: Dictionary in rows:
+			var p: int = int(out["player"])
+			var placement: int = int(out["placement"])
+			var leads: bool = _leads(p, ranking, economy)
+			out["item"] = loot.roll(placement, ranking.size(), rng, leads)
+			var extra: StringName = loot.underdog(placement, worst, ranking.size(), rng, leads)
 			if extra != &"":
 				out["bonus"] = extra
-		rows.append(out)
 	for out: Dictionary in rows:
 		for key: String in ["item", "bonus"]:
 			if StringName(out.get(key, &"")) != &"":
@@ -93,6 +98,17 @@ func drain_events() -> Array[Dictionary]:
 	var out: Array[Dictionary] = events
 	events = []
 	return out
+
+
+## True when nobody else in the ranking has more money than `player` (a Robin Hood would be
+## useless to them).
+static func _leads(player: int, ranking: Array[Dictionary], economy: Economy) -> bool:
+	var mine: int = economy.balance(player)
+	for row: Dictionary in ranking:
+		var other: int = int(row["player"])
+		if other != player and economy.balance(other) > mine:
+			return false
+	return true
 
 
 func _give(p: int, item: StringName, players: Dictionary[int, PlayerState]) -> void:

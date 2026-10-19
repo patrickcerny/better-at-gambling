@@ -183,6 +183,12 @@
   Esc stays pause. Test: `tests/unit/test_fullscreen_toggle.gd` (headless: the setting and the
   window mode asked for, `Settings.window_mode_for`).
 
+Reward items: the player who leads the money never draws a leader-only item (Robin Hood) any
+more, as the main or the Underdog item. The full-suite net run for 0.9.14 showed Bob leading,
+drawing Robin Hood after both quizzes and having every use refused with `you_lead`, so the
+"items get used online" check failed; the roll is now made after every prize is paid and skips
+`LootTables.leader_only` for the leader (`RewardDirector._leads`). Tests in test_rewards.gd.
+
 ### 2026-10-19 / 0.9.13 Sword Tapper
 A new casino-floor station from Patrick's Hard Rock picture (Greentube's Lucky Sword – Tapper),
 built to the design in `/mnt/project-files/better-at-gambling/SWORD_TAPPER.md` (GDD entry under
