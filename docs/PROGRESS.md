@@ -161,6 +161,13 @@
   Video toggle); `tests/smoke/test_pixel_scenes.gd` became `test_world_view_scenes.gd` (one run
   at full resolution); new `tests/unit/test_settings_removed_keys.gd`; the Find the Lady click
   test now simulates a stretched window (viewport at twice the canvas) instead of 1/3.
+
+Voice relay: "reached nobody" now tells "with nobody else in the room" apart from out of reach
+(`VoiceRelay.alone_from`, in the summary and the first-relay log line). The hosted-room voice net
+tests had failed on one last frame said after the friend left the room, which the 0.9.13 check
+read as a reach problem; they now require only that no frame was out of reach while the other
+player was present.
+
 ### 2026-10-19 / 0.9.14 Patrick's batch: hot arrow, closer seat views, pixel look choice, Sword Tapper panel, F11
 - **Hot arrow** ("a bit too big. Make it always the same size, wall see through is good"): the
   bouncing 3D arrow over the hot table (`StationBase` hot marker, not the HUD's screen-edge

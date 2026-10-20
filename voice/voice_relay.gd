@@ -11,9 +11,11 @@ const BURST_SECONDS: float = 0.5
 
 var relayed_packets: int = 0
 var dropped_packets: int = 0
-## Per speaker: packets received, packets that reached nobody (out of reach), packets over the cap.
+## Per speaker: packets received, packets that reached nobody (out of reach, or said with nobody
+## else in the room: `alone_from`, a subset of `unheard_from`), packets over the cap.
 var received_from: Dictionary[int, int] = {}
 var unheard_from: Dictionary[int, int] = {}
+var alone_from: Dictionary[int, int] = {}
 var dropped_from: Dictionary[int, int] = {}
 ## Per listener: packets sent on.
 var delivered_to: Dictionary[int, int] = {}
@@ -74,11 +76,14 @@ func route(server: MatchServer, speaker: int, data: PackedByteArray, now: float,
 				first.append(l)
 			delivered_to[l] = delivered_to.get(l, 0) + 1
 		if not first.is_empty():
-			Log.info(&"voice", "relaying player %d's voice to player(s) %s (%s, after %d that reached nobody)" % [speaker, str(first), Phase.name_of(phase), unheard_from.get(speaker, 0)])
+			Log.info(&"voice", "relaying player %d's voice to player(s) %s (%s, after %d that reached nobody, %d of them with nobody else in the room)" % [speaker, str(first), Phase.name_of(phase), unheard_from.get(speaker, 0), alone_from.get(speaker, 0)])
 	else:
+		var others: int = listeners.size() - (1 if listeners.has(speaker) else 0)
 		if not unheard_from.has(speaker):
-			Log.info(&"voice", "player %d talks but nobody is in reach (%s, %d other player(s))" % [speaker, Phase.name_of(phase), listeners.size() - (1 if listeners.has(speaker) else 0)])
+			Log.info(&"voice", "player %d talks but nobody is in reach (%s, %d other player(s))" % [speaker, Phase.name_of(phase), others])
 		unheard_from[speaker] = unheard_from.get(speaker, 0) + 1
+		if others == 0:
+			alone_from[speaker] = alone_from.get(speaker, 0) + 1
 	return out
 
 
@@ -86,7 +91,7 @@ func route(server: MatchServer, speaker: int, data: PackedByteArray, now: float,
 func summary() -> String:
 	var parts: Array[String] = []
 	for s: int in received_from:
-		parts.append("player %d sent %d (%d reached nobody, %d over the cap)" % [s, received_from[s], unheard_from.get(s, 0), dropped_from.get(s, 0)])
+		parts.append("player %d sent %d (%d reached nobody, %d of them with nobody else in the room, %d over the cap)" % [s, received_from[s], unheard_from.get(s, 0), alone_from.get(s, 0), dropped_from.get(s, 0)])
 	for l: int in delivered_to:
 		parts.append("player %d got %d" % [l, delivered_to[l]])
 	return "voice relay: " + ("; ".join(parts) if not parts.is_empty() else "no voice")

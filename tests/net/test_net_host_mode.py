@@ -150,7 +150,7 @@ def test_voice_goes_both_ways_between_the_host_and_a_friend_in_a_hosted_room(pro
         s_id, l_id = ids[_base(speaker)], ids[_base(listener)]
         assert int(re.search(r"welcomed as player (\d+)", speaker.log()).group(1)) == s_id
         sent = int(re.search(r"sent (\d+) frames \(\d+ bytes\)", speaker.log()).group(1))
-        got_at_server, unheard = (int(x) for x in re.search(rf"player {s_id} sent (\d+) \((\d+) reached nobody", relay.group(1)).groups())
+        got_at_server, unheard, alone = (int(x) for x in re.search(rf"player {s_id} sent (\d+) \((\d+) reached nobody, (\d+) of them with nobody else in the room", relay.group(1)).groups())
         to_listener = int(re.search(rf"player {l_id} got (\d+)", relay.group(1)).group(1))
         line = re.search(rf"voice from player {s_id}: received (\d+), played (\d+), late (\d+), overflowed (\d+) \((\d+) before the first frame played\), lost (\d+)", listener.log())
         assert line, (listener.name, "never heard", speaker.name, listener.log_path)
@@ -159,11 +159,16 @@ def test_voice_goes_both_ways_between_the_host_and_a_friend_in_a_hosted_room(pro
         print(f"{speaker.name} -> {listener.name}:", hops)
         assert sent > 200, hops  # 25 frames/s on the casino floor
         assert got_at_server >= sent * 0.98 - 2, hops
-        # What reached nobody was all said before the other one was in the room (the server
-        # counts it when it first relays to them; the host's game may start talking seconds
-        # before the friend's has joined, more on a busy machine: 237 frames, 0.9.13).
-        before = re.search(rf"relaying player {s_id}'s voice to player\(s\) \[{l_id}\] \([^,]*, after (\d+) that reached nobody\)", log)
-        assert before and unheard == int(before.group(1)), (hops, before and before.group(0))
+        # What reached nobody was said with nobody else in the room: before the other one joined
+        # (the host's game may start talking seconds before the friend's has joined, more on a
+        # busy machine: 237 frames, 0.9.13) or after they left (the last frame or two, 0.9.15).
+        # Out of reach while the other was present would be a relay bug: the server counts both
+        # kinds when it first relays to them, and the totals must not grow apart afterwards.
+        before = re.search(rf"relaying player {s_id}'s voice to player\(s\) \[{l_id}\] \([^,]*, after (\d+) that reached nobody, (\d+) of them with nobody else in the room\)", log)
+        assert before, (hops, log[-2000:])
+        before_unheard, before_alone = int(before.group(1)), int(before.group(2))
+        assert before_unheard == before_alone, (hops, before.group(0))
+        assert unheard == alone, (hops, before.group(0))
         assert to_listener >= (got_at_server - unheard) * 0.98 - 2, hops  # in reach all along
         assert got >= to_listener * 0.98 - 2, hops
         assert played + late + overflowed >= got - 12, hops

@@ -43,8 +43,8 @@ func _frame(seq: int = 0, flags: int = 0) -> PackedByteArray:
 	return VoicePacket.make_up(seq, flags, payload)
 
 
-func _route(t: float = 0.0, data: PackedByteArray = PackedByteArray()) -> Dictionary[int, PackedByteArray]:
-	return relay.route(fx.server, speaker, data if not data.is_empty() else _frame(), t, fx.player_ids)
+func _route(t: float = 0.0, data: PackedByteArray = PackedByteArray(), listeners: Array[int] = []) -> Dictionary[int, PackedByteArray]:
+	return relay.route(fx.server, speaker, data if not data.is_empty() else _frame(), t, listeners if not listeners.is_empty() else fx.player_ids)
 
 
 func test_speaker_at_3m_is_relayed_and_at_25m_is_not() -> void:
@@ -249,9 +249,26 @@ func test_relay_counts_what_each_speaker_sent_and_each_listener_got() -> void:
 	assert_eq(relay.delivered_to[near], 4)
 	assert_false(relay.delivered_to.has(far))
 	assert_eq(relay.unheard_from[speaker], 1)
+	assert_false(relay.alone_from.has(speaker), "the others were in the room, just out of reach")
 	var line: String = relay.summary()
-	assert_string_contains(line, "player %d sent 5 (1 reached nobody, 0 over the cap)" % speaker)
+	assert_string_contains(line, "player %d sent 5 (1 reached nobody, 0 of them with nobody else in the room, 0 over the cap)" % speaker)
 	assert_string_contains(line, "player %d got 4" % near)
+
+
+func test_relay_tells_out_of_reach_from_talking_alone() -> void:
+	# A host talks before the friend has joined and again after the friend left: both reach
+	# nobody, but neither is a reach problem. The net tests use the split to prove that no frame
+	# went missing while the other one was in the room.
+	_route(0.0, _frame(0), [speaker])
+	assert_eq(relay.unheard_from[speaker], 1)
+	assert_eq(relay.alone_from[speaker], 1)
+	_route(VoiceCodec.FRAME_SECONDS, _frame(1))
+	assert_eq(relay.delivered_to[near], 1)
+	fx.server.world.set_transform(near, Vector3(0, 0, 30), 0.0)
+	_route(2 * VoiceCodec.FRAME_SECONDS, _frame(2))
+	assert_eq(relay.unheard_from[speaker], 2)
+	assert_eq(relay.alone_from[speaker], 1, "out of reach with others present is not alone")
+	assert_string_contains(relay.summary(), "player %d sent 3 (2 reached nobody, 1 of them with nobody else in the room, 0 over the cap)" % speaker)
 
 
 func test_client_channel_says_why_voice_is_ignored_and_what_it_heard() -> void:
