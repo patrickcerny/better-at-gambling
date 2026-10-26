@@ -112,6 +112,13 @@ func test_bets_shoot_and_payout() -> void:
 
 
 func test_point_rounds_and_the_dice_passing_on() -> void:
+	# Up to 80 rolls of about 7 s each: a casino round long enough that the first minigame can't
+	# close the table half way (with the 100 s rounds of the other tests it came after ~27 rolls,
+	# so whether two seven-outs came in time hung on how the table's dice stream fell).
+	fx.server.free()
+	fx = ServerFixture.new(4, {"minigames": 2, "gamble_seconds": 600.0, "seed": 11})
+	fx.server.start_match()
+	fx.run(3.1)
 	_sit(3)
 	var cr: CrapsLogic = _logic()
 	var order: Array[int] = [fx.player_ids[0], fx.player_ids[1], fx.player_ids[2]]
