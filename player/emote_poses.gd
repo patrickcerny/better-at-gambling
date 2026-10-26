@@ -18,8 +18,9 @@ extends RefCounted
 ## - feet: `feet` Vector4 (left x/z, right x/z offsets), `step` Vector2 (left/right foot lift).
 ## - face: `smile` (-1 frown .. 1 grin), `open` (mouth), `round` (`O` mouth), `smirk` (one corner
 ##   up), `eyes` (how open), `wink` (+1 shuts the left eye, -1 the right), `brow` Vector2 (raise,
-##   worry), `brow_side` (+ raises the right brow, lowers the left), `look` (pupils: yaw right, pitch
-##   up; leave it out to keep eye contact with whoever watches), `pupil` (size), `tears`, `blush`.
+##   worry), `brow_side` (+ raises the right brow, lowers the left), `look` (pupils: yaw right,
+##   pitch up; leave it out to keep eye contact with whoever watches), `pupil` (size), `tears`,
+##   `blush`.
 ## - `skin`: upper-arm and forearm directions (left, then right) for character skins' arm bones.
 
 ## Easing curves for `curve` / `track`.
@@ -250,10 +251,10 @@ static func _wave(t: float) -> Dictionary:
 	return p
 
 
-## Laugh (pointing and laughing at you): a snort as the bean scrunches up, then the right fist jabs
-## out at whoever watches and the bean rocks back cackling "ha-ha-ha", eyes squeezed shut and the
-## mouth wide; then it doubles over clutching its belly with both hands, stamping a foot, tears of
-## joy running; and comes up again with a happy sigh, still holding its belly.
+## Laugh (pointing and laughing at you): a snort as the bean scrunches up, then a pointing finger
+## jabs out at whoever watches and the bean rocks back cackling "ha-ha-ha", eyes squeezed shut and
+## the mouth wide; then it doubles over clutching its belly with both hands, stamping a foot, tears
+## of joy running; and comes up again with a happy sigh, still holding its belly.
 static func _laugh(t: float) -> Dictionary:
 	var p: Dictionary = {}
 	var ha: float = sin(t * TAU * 6.0) * span(t, 0.16, 0.3) * (1.0 - span(t, 2.2, 2.4))
