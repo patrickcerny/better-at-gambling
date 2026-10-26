@@ -55,8 +55,8 @@ func _plaque() -> void:
 	var cam := Camera3D.new()
 	add_child(cam)
 	var plaque: Vector3 = map.color_plaques[0].global_position
-	cam.global_position = plaque + Vector3(-0.9, 1.25, -1.5)
-	cam.look_at(plaque + Vector3(0.0, 0.6, 0.2))
+	cam.global_position = plaque + Vector3(0.9, 1.35, -1.3)
+	cam.look_at(plaque + Vector3(-0.2, 0.8, 0.0))
 	cam.fov = 60.0
 	cam.current = true
 
