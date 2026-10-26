@@ -155,6 +155,51 @@ the first launch goes straight to the main menu. **F11** (remappable) toggles fu
 anywhere and saves it. The Hot Table's arrow over the table is the same size on screen from
 anywhere on the floor and shows through walls.
 
+## Progression
+Out-of-match progress (Patrick: "Create a XP level and an ingame currency"), kept per PC in
+`user://profile.cfg` by the `ProfileManager` autoload (`PlayerProfile`): XP and level, **Coins**,
+owned and preferred cosmetics, lifetime stats (matches, wins, biggest single win). No accounts:
+loading clamps every value (level always recomputed from XP, unknown items dropped), no DRM.
+- **XP per match**, computed by the server from match data and sent per player in `match_ended`
+  (`progress`, with a `match_id`), so every screen shows the same numbers; each client adds only
+  its own row, once per match id. Clients never send XP. Data: `data/progression/progression.tres`.
+  Match played 100, placement 120 / 80 / 50 / 30 / 20 (5th and below), 30 per minigame won,
+  1 per $20 of profit (max 100), 2 per table hand (max 60), at most 2,000. Practice earns half.
+  A typical match (2nd, one minigame, +$600, 20 hands) is about 280 XP.
+- **Level curve**: level L → L+1 costs 100 + 35 × (L − 1) XP up to level 10 (2,160 XP in all,
+  about 8 matches), then 450 + 50 × (L − 10), so levels 10 → 20 take about 24 more matches.
+  Level 99 is the cap.
+- **Coins** (the gold coin; "chips" are the casino's): a tenth of the match's XP plus 50 per
+  level gained. Earned only by playing, never bought, never spendable at the tables: the in-match
+  $ is separate and starts fresh every match, and the UI says so wherever Coins show.
+- **UI**: the main menu's top-left line (LEVEL n, XP bar, Coins); on the results screen every
+  standings row shows "+N XP" and YOUR PROGRESS (bottom corners) lists where the XP came from,
+  the Coins (with the level-up bonus) and fills the level bar ("LEVEL 7 → 8"). Nothing new in the
+  HUD.
+
+## Cosmetics shop
+The bean is the only body (Patrick: "Remove all other skins"; the six poly.pizza character skins
+went in 0.9.16); what players choose is its colour.
+- **Colours**: 16 (`Cosmetics.COLOR_COUNT`, `Palette.PLAYER_COLORS`). The first 8 are the
+  colourblind-safe player colours, free and always owned; Ruby, Mint, Lavender, Teal, Lime, Onyx,
+  Silver and Gold cost 150–400 Coins (`data/progression/cosmetics_shop.tres`).
+- **Slot colour vs bean colour**: the server still hands every player one of the 8 free colours
+  (first free, unique): it marks them on the HUD, the name plates and their ready pedestal. The
+  bean wears the player's **preferred colour** (profile, sent in the hello) when no other bean
+  wears it; otherwise their slot colour; if even that is worn, the first colour nobody wears. Two
+  beans never share a colour. The server checks only the index (ownership is local).
+- **The shop**: COSMETICS in the main menu (also the T-shirt button, and COSMETICS on the lobby
+  settings tablet's panel). A turning bean previews the picked colour; BUY spends Coins ("Not
+  enough Coins: N more to go" otherwise), WEAR makes it the preferred colour (in a lobby it goes on
+  the bean at once). One tab per kind of cosmetic in stock: `CosmeticDef` (kind colour | hat | …,
+  price, id) in the `CosmeticShop` list, so hats and the like slot in later; only colours exist now.
+- **Pedestal colour panel** (Patrick: "under the podest should be a color panel you can click"):
+  a brass plaque at the foot of every ready pedestal. Yours shows the colours you own, the one you
+  wear framed and the ones other beans wear dimmed; look at a swatch and click (or E) to wear it:
+  `set_color` → the server checks it is free → `player_color` recolours your bean for everyone,
+  and it becomes your preferred colour. Other players' panels don't work for you. Lobby only.
+- The Tab list ("THE TABLE") shows each player's bean in its colour as the portrait.
+
 ## Online
 Dedicated Godot server per room on the owner's VPS, FastAPI room orchestrator, ENet over UDP,
 5-character room codes, Steam lobbies for invites/presence (M8).
@@ -176,7 +221,7 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | player_joined / player_rejoined | ui_click (soft) |
 | player_left | ui_hover, low |
 | player_removed | — (follows player_left) |
-| player_skin | pickup pop at the avatar |
+| player_color | pickup pop at the avatar |
 | match_started / phase INTRO | chime (lounge vibes roll) |
 | phase PRE_MINIGAME | countdown_beep (+ HUD per-second beeps) |
 | phase CASINO after rewards | chime |
