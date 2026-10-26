@@ -17,10 +17,17 @@ func test_schema_needs_the_emote() -> void:
 
 
 func test_the_four_animated_emotes_in_key_order() -> void:
-	assert_eq(Emotes.ANIMATED, [&"six_seven", &"thumbs_up", &"thumbs_down", &"default_dance"] as Array[StringName])
+	assert_eq(Emotes.ANIMATED, [&"thumbs_up", &"thumbs_down", &"six_seven", &"default_dance"] as Array[StringName], "6-7 on the 6 key")
 	for id: StringName in Emotes.ANIMATED:
 		assert_true(Emotes.is_animated(id), String(id))
 	assert_false(Emotes.is_animated(&"wave"), "the wheel's emotes are a separate list")
+	assert_true(Emotes.has(&"six_seven"), "6-7 is on the wheel too")
+	assert_eq(Emotes.LIST[0][0], &"six_seven", "at the top of the wheel")
+	assert_eq(Emotes.bubble_text(&"six_seven"), "🤲 6-7")
+	for row: Array in Emotes.LIST:
+		assert_between(Emotes.length(row[0] as StringName), 2.0, Emotes.MAX_SECONDS, String(row[0]))
+	for id: StringName in Emotes.ANIMATED:
+		assert_between(Emotes.length(id), 2.0, Emotes.MAX_SECONDS, String(id))
 	for i: int in 4:
 		assert_true(InputMap.has_action(StringName("emote_%d" % (i + 1))), "emote_%d is an input action" % (i + 1))
 		assert_true(Settings.KEYBINDS.has(StringName("emote_%d" % (i + 1))), "emote_%d can be remapped" % (i + 1))

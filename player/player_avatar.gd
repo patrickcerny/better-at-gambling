@@ -74,6 +74,8 @@ var _step_timer: float = 0.0
 var _bubble_until: float = -INF
 var _collision: CollisionShape3D
 var _clock: float = 0.0
+## The cue of the emote playing now (`EmoteWheel.present`); stopped when the emote ends early.
+var _emote_sound: AudioStreamPlayer3D = null
 
 
 func _ready() -> void:
@@ -209,7 +211,7 @@ func say(text: String, seconds: float = 2.0) -> void:
 
 
 ## Acts out an emote (the wheel's or a number key's, `Emotes`) on the bean, standing or
-## in a seat. Wheel emotes always show their bubble ("👋 WAVE"); "67" says "6 7" when it plays.
+## in a seat. Wheel emotes always show their bubble ("👋 WAVE", "🤲 6-7"), from the wheel or a key.
 ## Our own emote swings the camera round to watch it (`PlayerCamera.begin_emote_view`) unless it
 ## is a replay (`at` > 0: a late joiner catching up on one already playing). Returns whether the
 ## body acts it out (not while ragdolled, held, carried or knocked out).
@@ -222,9 +224,15 @@ func play_emote(id: StringName, at: float = 0.0) -> bool:
 		return false
 	if cam != null and at <= 0.0:
 		cam.begin_emote_view()  # our own emote: watch it in third person
-	if id == &"six_seven":
-		say("6 7", Emotes.SECONDS - at)
 	return true
+
+
+## The emote's sound cue (`EmoteWheel.present`): replaces (and stops) the one before.
+func set_emote_sound(player: AudioStreamPlayer3D) -> void:
+	if _emote_sound != null and is_instance_valid(_emote_sound) and _emote_sound != player:
+		_emote_sound.stop()
+		_emote_sound.queue_free()
+	_emote_sound = player
 
 
 ## Swaps the body for a ragdoll launched with `velocity`. Returns the ragdoll (parented to our parent).
@@ -413,6 +421,8 @@ func _physics_process(delta: float) -> void:
 		bubble.visible = false
 	if cam != null and cam.emote_view and not visuals.is_emoting():
 		cam.end_emote_view()
+	if _emote_sound != null and not visuals.is_emoting():
+		set_emote_sound(null)  # walked off, hit, or over: the cue stops with it
 	match state:
 		State.RAGDOLL, State.AWAY:
 			if ragdoll != null and is_instance_valid(ragdoll):

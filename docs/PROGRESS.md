@@ -139,6 +139,42 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-26 / 0.9.16 emotes
+- Patrick: "The animation is good for the emotes, but make them even better. add a 67 emote.
+  Really take your time on these to make them good." The 67 existed (key 4 since 0.9.5) but was
+  off the wheel and weak: both hands straight out, a small symmetric wobble, a "6 7" bubble.
+  Now **6-7** sits at the top of the emote wheel ("🤲 6-7") and on the **6** key (number keys:
+  4 thumbs up, 5 thumbs down, 6 6-7, 7 default dance; the settings labels follow), and plays the
+  meme: palms up at chest height, weighing "six… seven" in anti-phase eight times with a hold at
+  each end, a bounce on every word, tilt to the lower hand, eyes on the hand going up, mouthing
+  the words, then a shrug.
+- Every emote rebuilt in beats (`player/emote_poses.gd`, `EmotePoses`): wind-ups, key poses
+  reached with an eased overshoot and held, arm arcs (directions swung along the sphere instead
+  of lerped pitch/splay), squash and bounce, crisp head tilts (`tilt`), whole-body hops and turns
+  (`lift`, `spin`: the disco's twirl, the taunt's bum wiggle with its back turned), rubber-hose
+  arm stretch (`reach`) and a pointing finger (`point`), and per-emote faces (`smirk`,
+  `brow_side`, `round`, `pupil`, `blush`, right-eye `wink`). What each one does: docs/GDD.md
+  "Emotes". `AvatarVisuals` only gained the hooks for the new keys; the choreography lives in the
+  new file. Designed for the plain bean body.
+- Lengths per emote (`Emotes.LENGTHS`, 2.2–3.4 s; the server keeps an emote in the snapshot for
+  its own length), and a sound cue per emote timed to its beats (`tools/audio/gen_sfx.py`
+  `emote_*`, ten new `audio/sfx/emote_<id>.wav`), now also for the number-key emotes; the cue
+  stops when the emote is cut short (`PlayerAvatar.set_emote_sound`, `AudioDirector.play_at`
+  returns its player).
+- Dev: `tools/dev/emote_shot.gd --view strip [--times a,b,…] [--angle deg]` renders one bean per
+  moment of an emote, driving the clock itself (a slow software-rendered frame used to push the
+  frozen pose a quarter second on).
+- Tests: `tests/physics/test_emote_animations.gd` (14): each emote travels through its beats and
+  ends at rest with no NaN; nothing pops between frames (arm ≤ 0.55 rad, glove ≤ 1 rad per 60 fps
+  frame); 6-7 eight words in anti-phase with palms up and a shrug; the disco hops and twirls; the
+  taunt turns its back and comes round; faces (laugh squint, cry tears and frown, taunt wink);
+  walking cancels only after the first moment and the cue stops. Updated for the new key order
+  and lengths: `test_play_emote.gd`, `test_avatar_emotes.gd` (key 6 = 6-7), `test_emote_camera.gd`,
+  `test_emote_replication.gd`.
+- Emote wheel: seven pills at radius 250 (the bottom pair overlapped when lit at 220), and the
+  stick picks again (a full stick throw fell inside the mouse's 40 px dead zone, so pointing and
+  releasing sent nothing). `tests/ui/test_emote_wheel.gd`: seven pills, 6-7 on top, no overlap
+  when lit, stick up then release sends 6-7.
 ### 2026-10-26 / 0.9.16 XP, Coins, colours
 - **XP and levels** (Patrick: "Create a XP level and an ingame currency. There will be a shop for
   cosmetics."): a local profile (`ProfileManager` autoload, `PlayerProfile`, `user://profile.cfg`,
@@ -174,9 +210,10 @@
 - Tests: new `test_progression`, `test_player_profile`, `test_bean_colors` (unit),
   `test_progress_results` (integration), `test_cosmetics_shop`, `test_color_panel` (ui), more in
   `test_results_stage`; skin tests deleted or rewritten; the main menu test lists COSMETICS. Dev
-  shot `tools/dev/cosmetics_shot.tscn` (shop, menu, plaque, results). Suites: lint ok; unit 850,
-  ui 291, integration 261, physics 170, smoke 4 + boot, session green.
-
+  shot `tools/dev/cosmetics_shot.tscn` (shop, menu, plaque, results). Merged over the new emotes: the
+  `skin` arm directions and skin-only emote tests went, `emote_shot` takes `--colors`. Suites
+  after the merge: lint ok; unit 850, physics 177, ui 292, integration 261 (before it also smoke 4
+  + boot, session and net 14 green).
 ### 2026-10-19 / 0.9.15 Pixel look removed
 - **Pixel look removed** (Patrick: "OK no actually remove that filter overall. Save the code
   though if i want to implement it again"): the game always renders at the window's full

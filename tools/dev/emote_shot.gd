@@ -1,10 +1,13 @@
 extends Node3D
 ## Dev: an emote frozen part-way through, for look-dev screenshots. Run with
 ## tools/screenshot.gd --scene res://tools/dev/emote_shot.tscn --frames 100000 --
-## --emote six_seven --at 0.6 --shot out.png [--colors 0,9,13,15] [--view row|camera]
+## --emote six_seven --at 0.6 --shot out.png [--colors 0,9,13,15] [--view row|camera|strip]
 ## row: beans in the listed colours (`Palette.player_color`) side by side, facing the camera, all at `--at` seconds into
 ## the emote. camera: a local player in a seat-less room emoting, seen through their own camera
-## (the emote view). The scene saves the shot after `--wait` seconds (default 1.2) and quits.
+## (the emote view). strip: one bean per moment of the emote (`--times 0.1,0.4,...`, default eight
+## steps across `Emotes.length`), so a whole emote reads left to right; `--angle` (degrees) turns
+## the beans (0 = facing the camera, 90 = side on). The scene saves the shot after `--wait` seconds
+## (default 1.2) and quits.
 
 var _beans: Array[AvatarVisuals] = []
 var _emote: StringName = &"six_seven"
@@ -13,6 +16,8 @@ var _shot: String = ""
 var _wait: float = 1.2
 var _t: float = 0.0
 var _player: PlayerAvatar
+## Per bean: the moment of the emote it is frozen at (row: all `_at`).
+var _times: Array[float] = []
 
 
 func _ready() -> void:
@@ -56,15 +61,32 @@ func _ready() -> void:
 		_player.cam.activate()
 		return
 	var colors: PackedStringArray = c.get_string("colors", "0,9,13,15").split(",")
+	if c.get_string("view", "row") == "strip":
+		colors = PackedStringArray()
+		var spec: String = c.get_string("times", "")
+		if spec == "":
+			for k: int in 8:
+				_times.append(snappedf((k + 0.5) * Emotes.length(_emote) / 8.0, 0.01))
+		else:
+			for part: String in spec.split(","):
+				_times.append(float(part))
+		for k: int in _times.size():
+			colors.append(str(k % 8))
+	else:
+		for k: int in colors.size():
+			_times.append(_at)
+	var angle: float = deg_to_rad(c.get_float("angle", 0.0))
+	var gap: float = 1.8 if colors.size() <= 5 else 1.3
 	for i: int in colors.size():
 		var v := AvatarVisuals.new()
-		v.position = Vector3((i - (colors.size() - 1) * 0.5) * 1.8, 0, 0)
-		v.rotation.y = PI
+		v.position = Vector3((i - (colors.size() - 1) * 0.5) * gap, 0, 0)
+		v.rotation.y = PI + angle
 		add_child(v)
-		v.set_color(Palette.player_color(int(colors[i])))
+		var ci: int = int(colors[i])
+		v.set_color(Palette.player_color(ci))
 		_beans.append(v)
 		var tag := Label3D.new()
-		tag.text = "%s · %s @ %.2fs" % [Palette.PLAYER_COLOR_NAMES[posmod(int(colors[i]), Palette.PLAYER_COLOR_NAMES.size())], _emote, _at]
+		tag.text = ("%.2fs" % _times[i]) if _times.size() > 5 else "%s · %s @ %.2fs" % [Palette.PLAYER_COLOR_NAMES[posmod(ci, Palette.PLAYER_COLOR_NAMES.size())], _emote, _times[i]]
 		tag.font_size = 32
 		tag.pixel_size = 0.005
 		tag.position = v.position + Vector3(0, 0.02, 0.9)
@@ -75,8 +97,8 @@ func _ready() -> void:
 	add_child(cam)
 	cam.current = true
 	cam.fov = 50
-	cam.position = Vector3(0, 1.6, 6.2)
-	cam.look_at(Vector3(0, 0.95, 0))
+	cam.position = Vector3(0, 1.6, 6.2) if colors.size() <= 5 else Vector3(0, 1.45, 7.6)
+	cam.look_at(Vector3(0, 0.95, 0) if colors.size() <= 5 else Vector3(0, 0.85, 0))
 
 
 func _process(delta: float) -> void:
@@ -86,11 +108,15 @@ func _process(delta: float) -> void:
 			_player.play_emote(_emote)
 		if _player.visuals.is_emoting():
 			_player.visuals.emote_time = minf(_player.visuals.emote_time, _at)
-	for v: AvatarVisuals in _beans:
+	for i: int in _beans.size():
+		var v: AvatarVisuals = _beans[i]
 		if v.emote_id != _emote:
 			v.emote(_emote)
-		v.emote_time = _at  # frozen: the springs settle into the pose at that moment
+			v.set_process(false)  # driven here: a slow software-rendered frame must not move the clock
 		v.update_motion(Vector3.ZERO, true, delta)
+		for k: int in 3:  # frozen: the springs settle into the pose at that moment
+			v.emote_time = _times[i]
+			v._animate(1.0 / 60.0)
 	if _shot != "" and _t >= _wait:
 		var img: Image = get_viewport().get_texture().get_image()
 		img.save_png(_shot)

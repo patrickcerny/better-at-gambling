@@ -1332,7 +1332,7 @@ func _emotes_wire() -> Dictionary:
 	var out: Dictionary = {}
 	for pid: int in _emotes.keys():
 		var t: float = _uptime - float(_emotes[pid][1])
-		if t >= Emotes.SECONDS or not state.players.has(pid):
+		if t >= Emotes.length(StringName(_emotes[pid][0])) or not state.players.has(pid):
 			_emotes.erase(pid)
 			continue
 		out[pid] = {"id": _emotes[pid][0], "t": snappedf(t, 0.01)}

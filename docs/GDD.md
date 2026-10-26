@@ -130,6 +130,32 @@ Grab/hold, shove (2 hits in 1.5 s or 3 in 4 s → knockdown/KO), throw, knockout
 per shake capped 8% / $400×mult. Seated players protected. Security guards throw out attackers seen
 within 8 m. Money never depends on physics.
 
+## Emotes
+Seven on the wheel (hold **G** / D-pad down, point, release): **6-7** (top slot), wave, laugh,
+taunt, cry, dance, GG; and on the number keys while walking: **4** thumbs up, **5** thumbs down,
+**6** 6-7, **7** the default dance (remappable, Settings > Controls). Every emote is sent as an
+intent and played on every client from its id (`Emotes`; a late joiner picks one up part-way
+through), shows its bubble ("🤲 6-7", "👋 WAVE") when it is a wheel emote, and is acted out by the
+bean in beats (`EmotePoses`): a wind-up, key poses reached with a small overshoot and held, the
+body squashing, bouncing and tilting along, arms swinging in arcs (and stretching like rubber
+hoses on a reach), and the face playing its part. Each has its own length (2.2–3.4 s,
+`Emotes.LENGTHS`) and a sound cue timed to its beats (`emote_<id>.wav`), which stops if the emote
+is cut short. Walking off (after the first 0.3 s), a hit, a shove, a ragdoll, sitting down or a
+new emote ends one; our own emote swings the camera round to watch it (emote cam).
+
+| Emote | What the bean does |
+|---|---|
+| 6-7 | Hands come up in front at chest height, palms up, and weigh "six… seven" up and down in turn like scales: eight words, snapping to the top and bottom and holding a beat, the body bouncing on every word and tilting to the lower hand, eyes on the hand going up, mouthing the words. Ends in a shrug: hands out to the sides, shoulders up, head cocked, brows up, mouth flat. Cue: a woodblock "six" and "se-ven" on each word, a muted-trumpet "meh" on the shrug. |
+| Wave | A little crouch, a hop as the right arm swings up in an arc and stretches, then big waves with the wrist flicking behind the arm, the body swaying along, the left foot kicked up behind, a "hiii" grin with bouncing brows. Cue: slide whistle up, a "hel-lo" whistle. |
+| Laugh | Scrunches up with a snort, then jabs a pointing finger at you and rocks back cackling "ha-ha-ha", eyes squeezed shut; doubles over clutching its belly, stamping a foot, tears of joy; comes up with a happy sigh. Cue: a muted-trumpet cackle, a wheezing "hee-hee", a sigh. |
+| Taunt | Crouch and pop, thumbs at the temples with the fingers waggling, head tilting side to side, a wink and the tongue out; a half turn to wiggle its bum at you with two slaps; turns back for a smug finish (arms crossed, chin up, one brow raised, side glance). Cue: kazoo "nyah-nyah na-nyah-nyah", two slaps, whooshes on the turns. |
+| Cry | Lip wobbles and the eyes go big and wet, a wail with the head thrown back and the arms flung up, then fists rubbing the eyes in turn while the shoulders hitch with every sob, foot stamps, tears running; a big sniff and a slump. Cue: a muted-trumpet "waaah", a sob on every hitch, a sniff. |
+| Dance | The disco: on every beat the right hand stabs a finger up to the ceiling and down across to the other hip, snapping there and holding, hips swaying and the knees bouncing; a hop into a full twirl with the arms out; a finger-to-the-sky finish with a wink. Cue: four-on-the-floor kick and bass, a riser into the twirl, a vibes "ta-da". |
+| GG | A wind-up and the hand shoots out for a handshake, a step in, three firm pumps with the other hand on top; hand to the belly, the other behind the back, a slow deep bow with the eyes shut; a hop back up with a thumbs up and a wink. Cue: soft pats on the pumps, a warm chord on the bow, a "ding" and coins on the thumbs up. |
+| Thumbs up | The fist pulls in, punches out thumb up with a pop and a wink, a confident nod; the other hand joins with a hop and both pump while the brows waggle. Cue: a click and a "ding!", a higher one for the second thumb. |
+| Thumbs down | Thumb up first with a hopeful face, then it turns slowly over as the smile sinks into a frown; three "boo" pumps downwards with the other hand joining, head shaking. Cue: a sinking slide whistle, three muted-trumpet "boo"s. |
+| Default dance | The Fortnite default dance, a pose on every beat: fists punch down across the hips in turn, then both arms swing up over the head to one side and the other, hips swaying, knees giving, a foot kicking out, a hop at the end of each bar. Cue: kick-and-snare beat with a walking bass at the dance's tempo. |
+
 ## Minigames
 - **Jackpot Climb** (climb room "towers"): mostly a run, up a 26 m cake of giant casino chips to
   the gold pad under the JACKPOT sign. Three giant-chip tiers (tops at 8.5, 16 and 21.5 m) each
@@ -239,7 +265,7 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | chips_shaken_out | coin |
 | player_sat (you) / player_stood (you) | ui_click / ui_hover |
 | player_thrown_out | whistle (pea-whistle tweet-tweeet) |
-| emote | jump, high |
+| emote / player_emote | the emote's own cue `emote_<id>` at the bean (see Emotes), cut off with the emote |
 | intent_rejected | buzzer for VIP denied; soft buzzer for other refusals with a toast |
 | round_result | money pop: chip_clack (stake), coin, big_win (≥ $200); your loss: loss_sting (muted trumpet, at most every 6 s) |
 | bet_placed | chip_clack (HUD stake) |
