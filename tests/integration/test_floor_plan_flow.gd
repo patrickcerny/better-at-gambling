@@ -1,10 +1,10 @@
 extends GutTest
-## The casino floor's layouts on the authoritative server (docs/FLOOR_PLAN.md): online rooms take
-## the next layout from a seeded bag when the lobby opens and at every regroup, Practice keeps the
-## full floor, the layout is on the wire (match_started, regroup_started, snapshot) with every
-## station's game, place and facing, stations/dealers/hot table follow it, nobody stays seated at
-## a table that goes or moves (stood up, bets refunded), no money moves, and a layout whose game is
-## off is skipped.
+## The casino floor on the authoritative server (docs/FLOOR_PLAN.md): online rooms draw a floor from
+## the match seed when the lobby opens and at every regroup, Practice keeps the full floor, the
+## floor is on the wire (match_started, regroup_started, snapshot) with every station's game, place
+## and facing, stations/dealers/hot table follow it, nobody stays seated at a table that goes or
+## moves (stood up, bets refunded), no money moves, a game that is off is never drawn, and a floor
+## the `floor` setting names stands every round.
 
 var fx: ServerFixture
 
@@ -40,13 +40,28 @@ func _expected_stations() -> Dictionary:
 	return out
 
 
+## The floor the server's layout id stands for: the full floor, the canonical draw over tonight's
+## games (the fallback, under the full floor's id), or a drawn floor rebuilt from its seed.
+func _layout_of(srv: MatchServer) -> FloorLayout:
+	var full: FloorLayout = srv.full_floor_layout()
+	if srv.floor_layout == full.id:
+		if srv.floor_plan == full.wire_stations():
+			return full
+		return FloorGenerator.full(srv.map_def.floor_site, srv._floor_games(true), null, srv.floor_config)
+	var seed_value: int = FloorGenerator.seed_of(String(srv.floor_layout))
+	if seed_value < 0:
+		return null
+	return FloorGenerator.draw(srv.map_def.floor_site, srv._floor_games(true), srv._floor_geo, srv.floor_config, seed_value)
+
+
 func _check_server_follows_layout() -> void:
 	var srv: MatchServer = fx.server
-	var layout: FloorLayout = srv.map_def.floor_layout(srv.floor_layout)
+	var layout: FloorLayout = _layout_of(srv)
 	assert_not_null(layout, "a known layout stands (%s)" % srv.floor_layout)
 	if layout == null:
 		return
-	assert_eq(srv.floor_plan, layout.wire_stations(), "the floor is exactly the layout's file")
+	assert_eq(srv.floor_plan, layout.wire_stations(), "the floor is exactly the layout its id names")
+	assert_eq(srv.floor_problems(layout), [] as Array[String], "%s passes every check" % layout.id)
 	var want: Dictionary = _expected_stations()
 	assert_eq(srv.map_def.stations, want, "the map definition lists tonight's stations")
 	var logics: Array = srv.stations.logics.keys()
@@ -110,6 +125,7 @@ func test_a_room_changes_the_layout_at_every_regroup() -> void:
 		assert_eq(StringName(ev["floor_plan"]["layout"]), srv.floor_layout)
 		assert_eq(ev["floor_plan"]["stations"], srv.floor_plan)
 		assert_ne(srv.floor_layout, layouts[layouts.size() - 1], "the layout changes at every regroup")
+		assert_true(FloorGenerator.seed_of(String(srv.floor_layout)) >= 0, "a drawn floor, not the fallback (%s)" % srv.floor_layout)
 		for p: int in fx.player_ids:
 			assert_eq(srv.economy.balance(p), int(before[p]), "the new layout moves no money")
 			assert_false(srv.stations.is_seated(p), "nobody is seated across the switch")
@@ -127,7 +143,7 @@ func test_a_room_changes_the_layout_at_every_regroup() -> void:
 	var distinct: Dictionary = {}
 	for id: StringName in layouts:
 		distinct[id] = true
-	assert_eq(distinct.size(), layouts.size(), "five rounds, five different layouts (no repeats in a bag of six): %s" % [layouts])
+	assert_eq(distinct.size(), layouts.size(), "five rounds, five different floors: %s" % [layouts])
 
 
 func test_same_seed_same_layouts() -> void:
@@ -135,16 +151,19 @@ func test_same_seed_same_layouts() -> void:
 	for i: int in 2:
 		_room(77)
 		fx.server.start_match()
-		var ids: Array = [fx.server.floor_layout]
+		var ids: Array = [fx.server.floor_layout, fx.server.floor_plan]
 		assert_true(_step_until(func() -> bool: return fx.server.floor_round >= 3))
 		ids.append(fx.server.floor_layout)
+		ids.append(fx.server.floor_plan)
 		seen.append(ids)
 		fx.server.free()
 		fx = null
 	assert_eq(seen[0], seen[1], "deterministic per match seed")
+	_room(78)
+	assert_ne(fx.server.floor_plan, seen[0][1], "another seed, another floor")
 
 
-func test_play_again_starts_a_fresh_bag() -> void:
+func test_play_again_draws_a_fresh_floor() -> void:
 	_room(12, {"minigames": 1})
 	var srv: MatchServer = fx.server
 	var first: StringName = srv.floor_layout
@@ -152,7 +171,6 @@ func test_play_again_starts_a_fresh_bag() -> void:
 	assert_true(_step_until(func() -> bool: return srv.phases.phase == Phase.Id.RESULTS, 4000.0))
 	srv.return_to_lobby()
 	assert_eq(srv.floor_round, 1, "the new match counts from its first layout")
-	assert_true(srv.map_def.floor_layout(srv.floor_layout) != null)
 	var resets: Array[Dictionary] = fx.of_type(&"match_reset")
 	assert_eq(StringName(resets[resets.size() - 1]["floor_plan"]["layout"]), srv.floor_layout, "match_reset names the layout")
 	_check_server_follows_layout()
@@ -164,7 +182,7 @@ func test_a_seated_player_at_a_table_that_moves_is_stood_up_and_refunded() -> vo
 	var srv: MatchServer = fx.server
 	srv.start_match()
 	assert_true(_step_until(func() -> bool: return srv.phases.phase == Phase.Id.CASINO))
-	var sid: StringName = &"roulette_1"  # every layout has it, each in a different place
+	var sid: StringName = &"roulette_1"  # every floor has it (every table game is drawn once at least)
 	assert_true(srv.floor_plan.has(sid))
 	var p: int = fx.player_ids[0]
 	srv.set_server_position(p, srv.map_def.station_positions[sid])
@@ -200,7 +218,7 @@ func test_a_table_that_goes_takes_nobody_and_its_hot_table_cools() -> void:
 	assert_false(fx.intent(p, &"sit", {"station": hot})["ok"], "the table that went takes nobody")
 
 
-func test_a_layout_with_a_game_that_is_off_is_skipped() -> void:
+func test_a_game_that_is_off_is_never_drawn() -> void:
 	_room(21)
 	var srv: MatchServer = fx.server
 	var off: FloorPlanConfig = Registry.floor_plan.duplicate() as FloorPlanConfig
@@ -211,22 +229,32 @@ func test_a_layout_with_a_game_that_is_off_is_skipped() -> void:
 	for i: int in 8:
 		srv._new_floor()
 		seen.append(srv.floor_layout)
-		assert_false(&"craps" in srv.map_def.floor_layout(srv.floor_layout).games(), "%s has no craps table" % srv.floor_layout)
-		assert_false(srv.map_def.stations.values().has(&"craps"), "no craps anywhere tonight")
+		assert_true(FloorGenerator.seed_of(String(srv.floor_layout)) >= 0, "%s is a drawn floor" % srv.floor_layout)
+		assert_false(srv.map_def.stations.values().has(&"craps"), "no craps anywhere tonight (%s)" % srv.floor_layout)
+		_check_server_follows_layout()
 	for i: int in range(1, seen.size()):
-		assert_ne(seen[i], seen[i - 1], "still never the same layout twice in a row")
+		assert_ne(seen[i], seen[i - 1], "still never the same floor twice in a row")
 	off.weights = {&"craps": 0.0, &"slots": 0.0, &"blackjack": 0.0}
 	srv._new_floor()
-	assert_eq(srv.floor_layout, &"grand_hall", "nothing usable: the full floor")
+	for g: StringName in [&"craps", &"slots", &"blackjack"]:
+		assert_false(srv.floor_plan.values().any(func(e: Array) -> bool: return FloorPlan.game_of(e) == g), "no %s on %s" % [g, srv.floor_layout])
+	_check_server_follows_layout()
 
 
 func test_a_pinned_layout_stands_every_round() -> void:
-	_room(2, {"floor": "the_salon"})
-	var srv: MatchServer = fx.server
-	assert_eq(srv.floor_layout, &"the_salon")
-	srv.start_match()
-	assert_true(_step_until(func() -> bool: return srv.floor_round >= 2))
-	assert_eq(srv.floor_layout, &"the_salon")
+	for pin: String in ["floor_4242", "4242", "grand_hall"]:
+		_room(2, {"floor": pin})
+		var srv: MatchServer = fx.server
+		var want: StringName = &"grand_hall" if pin == "grand_hall" else &"floor_4242"
+		assert_eq(srv.floor_layout, want, "%s pins %s" % [pin, want])
+		var plan: Dictionary = srv.floor_plan
+		_check_server_follows_layout()
+		srv.start_match()
+		assert_true(_step_until(func() -> bool: return srv.floor_round >= 2))
+		assert_eq(srv.floor_layout, want)
+		assert_eq(srv.floor_plan, plan, "the same floor again")
+		fx.server.free()
+		fx = null
 
 
 func test_minigames_only_keeps_its_floor() -> void:

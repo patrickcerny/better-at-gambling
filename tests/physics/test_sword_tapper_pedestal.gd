@@ -95,12 +95,19 @@ func _check_stand_spot(label: String, st: StationBase) -> void:
 		assert_lt(path[path.size() - 1].distance_to(near), 0.3, "%s: and it gets to %s" % [label, st.station_id])
 
 
+## The full floor and a few drawn ones (docs/FLOOR_PLAN.md).
+func _floors() -> Array[FloorLayout]:
+	var out: Array[FloorLayout] = [scene.server.full_floor_layout()]
+	for s: int in [11, 22, 33, 44, 55]:
+		out.append(scene.server.draw_floor(s))
+	return out
+
+
 func test_both_pedestals_fit_and_are_reachable_in_every_layout() -> void:
 	var def: MapDefinition = scene.server.map_def
 	var geo: FloorGeometry = FloorGeometry.of_map(def, Registry.floor_plan.gap)
 	assert_true(geo.rects.has(&"sword_tapper"), "the pedestal is measured for the fit check")
-	assert_eq(def.floor_layouts.size(), 6)
-	for layout: FloorLayout in def.floor_layouts:
+	for layout: FloorLayout in _floors():
 		var label: String = String(layout.id)
 		assert_eq(FloorPlan.problems(layout, Registry.floor_plan, Registry.games, geo), [] as Array[String], "%s fits" % label)
 		scene.map.apply_floor_plan(layout.wire_stations())
@@ -163,7 +170,7 @@ func test_step_up_and_pull_through_the_scene() -> void:
 ## Pedestals by the lobby wall stand far enough from it that nobody in the entrance hall gets their
 ## prompt or steps up to them through the wall (the interact range is a plain distance).
 func test_never_reached_through_the_lobby_wall() -> void:
-	for layout: FloorLayout in scene.server.map_def.floor_layouts:
+	for layout: FloorLayout in _floors():
 		scene.map.apply_floor_plan(layout.wire_stations())
 		await wait_physics_frames(2)
 		for spot: Vector3 in LuckyLounge.LOBBY_SPAWNS:

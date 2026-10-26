@@ -286,6 +286,11 @@ func _full_layout_id() -> StringName:
 	return _full_layout.id if _full_layout != null else &""
 
 
+## The full floor (null on a map without a floor site).
+func full_floor_layout() -> FloorLayout:
+	return _full_layout
+
+
 ## The games the floor generator places (game id → footprint): every registered game but the fixed
 ## ones, and with `only_on` only those whose weight is above 0 (`FloorPlanConfig.weights`).
 func _floor_games(only_on: bool) -> Dictionary:

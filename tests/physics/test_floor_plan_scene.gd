@@ -1,10 +1,11 @@
 extends GutTest
-## The casino floor's layouts in the real match scene (docs/FLOOR_PLAN.md), Practice with the
-## `floor` setting forced to "random" (Practice itself keeps the full floor): every layout is built
-## once against the real colliders and the navmesh and must fit (no overlaps, every chair reachable,
-## every guard and waiter route point walkable, the jail door, the Race Hall archway and the lobby
-## and VIP doorways clear); the map builds the server's layout and changes it behind the shut doors
-## at every regroup, dealers stand at their tables, and nothing marks a closed spot any more.
+## The casino floor in the real match scene (docs/FLOOR_PLAN.md), Practice with the `floor` setting
+## forced to "random" (Practice itself keeps the full floor): the full floor and a few drawn floors
+## are built against the real colliders and the navmesh and must fit (no overlaps, every chair
+## reachable, every guard and waiter route point walkable, the jail door, the Race Hall archway and
+## the lobby and VIP doorways clear); the map builds the server's floor and draws a new one behind
+## the shut doors at every regroup, dealers stand at their tables, and nothing marks a closed spot.
+## How well the floors walk: tests/physics/test_floor_walkability.gd.
 
 var scene: MatchScene
 var events: Array[Dictionary] = []
@@ -155,7 +156,7 @@ func _check_navmesh(label: String) -> void:
 			fail_test("%s: no path to %s" % [label, p])
 
 
-func test_every_layout_fits_the_real_floor() -> void:
+func test_the_full_floor_and_drawn_floors_fit_the_real_floor() -> void:
 	var def: MapDefinition = scene.server.map_def
 	var geo: FloorGeometry = FloorGeometry.of_map(def, Registry.floor_plan.gap)
 	assert_not_null(geo, "the map measured its games")
@@ -164,13 +165,17 @@ func test_every_layout_fits_the_real_floor() -> void:
 			continue
 		var r: Rect2 = geo.rects[game]
 		assert_gt(r.size.x * r.size.y, 0.5, "%s measured (%s)" % [game, r])
-	assert_eq(def.floor_layouts.size(), 6)
-	for layout: FloorLayout in def.floor_layouts:
+	var floors: Array[FloorLayout] = [scene.server.full_floor_layout()]
+	for s: int in [7, 70, 700, 7000]:
+		var t0: int = Time.get_ticks_usec()
+		floors.append(scene.server.draw_floor(s))
+		gut.p("draw %d: %.1f ms with its checks" % [s, (Time.get_ticks_usec() - t0) / 1000.0])
+	for layout: FloorLayout in floors:
 		var t0: int = Time.get_ticks_usec()
 		var why: Array[String] = FloorPlan.problems(layout, Registry.floor_plan, Registry.games, geo)
 		gut.p("%s: fit check %.1f ms" % [layout.id, (Time.get_ticks_usec() - t0) / 1000.0])
-		assert_eq(why, [] as Array[String], "%s fits the map (overlap, keep-out and walkway check)" % layout.id)
-		assert_eq(scene.server.layout_problems(layout.id), [] as Array[String], "%s can stand on the server" % layout.id)
+		assert_eq(why, [] as Array[String], "%s fits the map (overlap, keep-out and walkway checks)" % layout.id)
+		assert_eq(scene.server.floor_problems(layout), [] as Array[String], "%s can stand on the server" % layout.id)
 		scene.map.apply_floor_plan(layout.wire_stations())
 		await _wait_navmesh()
 		_check_no_overlaps(String(layout.id))
@@ -187,7 +192,7 @@ func test_the_layout_changes_behind_the_doors_at_every_regroup() -> void:
 		var before: StringName = srv.floor_layout
 		assert_true(_skip_until(func() -> bool: return srv.phases.phase == Phase.Id.REGROUP))
 		assert_eq(srv.floor_round, round_i)
-		assert_ne(srv.floor_layout, before, "another layout")
+		assert_ne(srv.floor_layout, before, "another floor")
 		assert_false(scene.map.lobby_open, "the doors are shut while the floor changes")
 		await wait_physics_frames(2)
 		_check_floor()
