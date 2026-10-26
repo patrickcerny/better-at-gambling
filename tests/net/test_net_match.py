@@ -62,7 +62,10 @@ def test_two_clients_play_a_match_and_agree_on_every_balance(procs):
 def test_shoves_grab_throw_and_knockout_agree_at_150ms_and_2pct_loss(procs):
     port = free_port()
     lag = ["--net-latency", "150", "--net-loss", "0.02"]
-    server = _server(procs, "phys-server", port, "--minigames", "0", "--gamble-seconds", "60", "--seed", "9")
+    # The scripted brawl needs the open plaza inside the lobby doors (THROW_SPOT and the throw east
+    # of it): the full floor keeps it open (a drawn floor may stand a slot island there), and no
+    # guard patrols, so whether one walks past and jails the thrower is not down to timing.
+    server = _server(procs, "phys-server", port, "--minigames", "0", "--gamble-seconds", "60", "--seed", "9", "--floor", "full", "--guards", "0")
     server.wait_for(r"server listening", 30)
     thrower = _client(procs, "phys-thrower", port, "--autoplay-script", "thrower", *lag)
     victim = _client(procs, "phys-victim", port, "--autoplay-script", "victim", *lag)

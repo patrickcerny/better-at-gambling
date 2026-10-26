@@ -607,7 +607,10 @@ func _spawn_guards() -> void:
 			await get_tree().physics_frame
 		if not is_inside_tree():
 			return
-	for i: int in LuckyLounge.GUARD_ROUTES.size():
+	# Dev and tests: `--guards N` puts only the first N on patrol (a scripted brawl that a guard's
+	# timing must not decide).
+	var n: int = clampi(Cmdline.parse(OS.get_cmdline_user_args()).get_int("guards", LuckyLounge.GUARD_ROUTES.size()), 0, LuckyLounge.GUARD_ROUTES.size())
+	for i: int in n:
 		var g := Guard.new()
 		g.name = "Guard%d" % (i + 1)
 		g.guard_id = StringName("guard_%d" % (i + 1))
