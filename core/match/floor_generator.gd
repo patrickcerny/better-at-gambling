@@ -46,9 +46,10 @@ const NOMINAL_SOLID: Dictionary = {
 	&"scratch": Rect2(-0.8, -1.255, 1.6, 2.355),
 	&"sword_tapper": Rect2(-0.7, -0.7, 1.4, 1.4),
 }
-## A game nobody measured yet, by footprint: the biggest of its kind and some.
+## A game nobody measured yet, by footprint: the biggest of its kind (a table as wide as roulette
+## and as deep as the pit lets a row be).
 const UNKNOWN: Dictionary = {
-	&"table": Rect2(-2.6, -2.1, 5.2, 4.55),
+	&"table": Rect2(-2.6, -1.85, 5.2, 4.3),
 	&"cabinet": Rect2(-0.5, -0.4, 1.0, 1.7),
 	&"big": Rect2(-2.1, -0.4, 4.2, 3.0),
 	&"kiosk": Rect2(-0.8, -1.3, 1.6, 2.5),
