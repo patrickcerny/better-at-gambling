@@ -193,6 +193,10 @@ func test_chips_land_on_the_seat_spot_of_each_bet() -> void:
 
 func test_the_table_stands_clear_in_the_casino() -> void:
 	Vfx.force_enabled = false
+	# The bare table `before_each` stands at the world origin is no part of the casino: off with it,
+	# or the casino's navmesh bake (every "navsource" in the tree) walks round it too.
+	cs.free()
+	cs = null
 	Net.stop()
 	var scene: MatchScene = (load("res://match/match_scene.tscn") as PackedScene).instantiate()
 	add_child_autofree(scene)
