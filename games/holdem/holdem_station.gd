@@ -35,9 +35,9 @@ const HOUSE_SPOT: Vector3 = Vector3(-0.8, TABLE_TOP + 0.05, -0.52)
 ## the players' side of the felt and right of the middle, so the board, the dealer's cards, the
 ## seat's own cards and spots fill the left two thirds of the screen (the overlay is a column down
 ## the right third). Each seat's eye moves `SEAT_EYE_SHIFT` of its stool's x along.
-const SEAT_EYE: Vector3 = Vector3(0.55, 2.35, 1.15)
-const SEAT_AIM: Vector3 = Vector3(0.55, TABLE_TOP, -0.12)
-const SEAT_EYE_SHIFT: float = 0.18
+const SEAT_EYE: Vector3 = Vector3(0.3, 1.9, 0.96)
+const SEAT_AIM: Vector3 = Vector3(0.5, TABLE_TOP, -0.02)
+const SEAT_EYE_SHIFT: float = 0.58
 const FELT_COLOR: Color = Color("#1F5A43")
 const PRINT_COLOR: Color = Color("#D6A84B")
 const RAIL_COLOR: Color = Color("#2B1B16")
@@ -177,6 +177,8 @@ func _show_hand_label(i: int, h: Dictionary) -> void:
 		return
 	l.visible = true
 	var outcome: StringName = StringName(h.get("outcome", &""))
+	if StringName(h.get("decision", &"")) == HoldemLogic.FOLD:
+		outcome = &"fold"
 	l.text = String(h.get("hand", ""))
 	l.modulate = Palette.CREAM
 	match outcome:
