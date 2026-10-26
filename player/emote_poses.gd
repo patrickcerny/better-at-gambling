@@ -189,7 +189,7 @@ static func _six_seven(t: float) -> Dictionary:
 	var thumbs: Array[Vector3] = []
 	for side: float in [-1.0, 1.0]:
 		var pitch: float = -0.05 - side * amp * sh  # left up when sh > 0
-		var weigh: Vector3 = Vector3(side * 0.2, sin(pitch), -cos(pitch))
+		var weigh: Vector3 = Vector3(side * 0.28, sin(pitch), -cos(pitch))
 		var out: Vector3 = Vector3(side * 0.85, 0.5, -0.25)
 		dirs.append(swing(swing(rest(side), weigh, into), out, shrug))
 		thumbs.append(Vector3(side, 0.0, 0.0).slerp(Vector3(side * 0.2, 0.0, 1.0).normalized(), clampf(shrug, 0.0, 1.0)))
