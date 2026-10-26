@@ -26,9 +26,10 @@ static var test_dummies: int = 0
 static var test_briefing: float = -1.0
 ## Tests: the minigame curtain closes, holds and opens in a blink (see `curtain_times`).
 static var test_curtain_fast: bool = false
-## Tests: the `floor` setting ("random" rotates the floor layouts in Practice too, "full" never
-## does, a layout id puts that layout in; "" = `--floor`, else the FloorPlanConfig rule: online
-## rooms rotate, Practice keeps the full floor).
+## Tests: the `floor` setting ("random" draws a floor every round in Practice too, "full" never
+## does, a layout id (`grand_hall`, or a drawn floor's `floor_<seed>`) puts that floor in every
+## round; "" = `--floor`, else the FloorPlanConfig rule: online rooms draw, Practice keeps the full
+## floor).
 static var test_floor: String = ""
 
 var map: LuckyLounge

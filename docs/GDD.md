@@ -104,17 +104,18 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
 - **Progressive jackpot:** 1% of slots and Plinko bets.
 - Limits multiplier `1 + 0.5 × segment_index` (cap 3). All games tuned to RTP 100.5–102%.
 
-**Floor layouts** ([`FLOOR_PLAN.md`](FLOOR_PLAN.md)): the casino floor has six hand-made layouts
-(`data/floor_layouts/*.tres`: The Grand Hall, Wheel Night, The Pit, The Arcade, The Long Room, The
-Salon). A layout moves and turns the games only (the wheel's back to a wall, craps players on a
-walkway, blackjack dealers backed by a wall or each other, Plinko on the north wall, the scratch
-counter by the Gift Shop or the lobby wall, nothing in the entrance hall); the room, the VIP
-lounge, the Race Hall, the waiting room, Odd Jobs, the shop and the jail never move. Online matches
-take the next layout from a shuffled bag (seeded, no repeats before the bag is empty, never the
-same twice in a row) when the lobby opens and at every regroup, while everyone is shut in the
-entrance hall; the feed says "The floor has changed!". A layout that needs a game that is off
-(weight 0) or does not fit the map is skipped and the next one goes in; there are no closed spots,
-ropes, signs or boards. Practice and the menu keep The Grand Hall. There is no bar on the casino
+**Floor layouts** ([`FLOOR_PLAN.md`](FLOOR_PLAN.md)): every round's casino floor is drawn from the
+match seed (`FloorGenerator`). The table games stand in the pit, two rows either side of a lane
+two beans wide with the dealers inside and the players outside; cabinets (slots, Sword Tapper)
+line the walls in banks or stand as islands, and the big and kiosk games (wheel, Plinko, scratch)
+take the remaining wall and island slots. Neighbouring tables stand tight or two beans apart, never
+a one-bean squeeze. Every draw is checked (overlaps, keep-outs, two-bean walkways to every chair)
+and tests/physics/test_floor_walkability.gd walks it on the real navmesh; a draw that fails is
+redrawn, then the canonical floor stands. The room, the VIP lounge, the Race Hall, the waiting
+room, Odd Jobs, the shop and the jail never move. Online matches draw a floor when the lobby opens
+and at every regroup, while everyone is shut in the entrance hall; the feed says "The floor has
+changed!". A game that is off (weight 0) is never drawn; there are no closed spots, ropes, signs or
+boards. Practice and the menu keep the full floor (The Grand Hall). There is no bar on the casino
 floor (Patrick: "the casino bar (its useless)").
 
 ## Luck

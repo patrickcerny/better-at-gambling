@@ -8,8 +8,9 @@ extends Node
 ## lobby (ready pedestals glowing in the start room), rough (a shove knockdown, from the brawl clip),
 ## leaderboard (the standings over the casino), oddjobs (broke at the Odd Jobs cabinet, aiming at the
 ## glowing red button, the shared bar part full). Dev checks only: race, racehall, and floor (the
-## casino floor from just inside the lobby doors; `--floor <layout id>` picks the layout, e.g.
-## `--floor the_pit`, docs/FLOOR_PLAN.md; `--from x,y,z --to x,y,z` moves the camera).
+## casino floor from just inside the lobby doors; `--floor <layout id>` picks the floor, e.g.
+## `--floor floor_1234` (a drawn floor by its seed), `--floor random` or `--floor grand_hall`,
+## docs/FLOOR_PLAN.md; `--from x,y,z --to x,y,z` moves the camera).
 
 var _scene: MatchScene
 var _view: String = "hall"

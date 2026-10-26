@@ -10,7 +10,8 @@ extends Resource
 @export var ui_scene: PackedScene
 @export var rug_color: Color = Color.WHITE
 ## Its size class on the casino floor (docs/FLOOR_PLAN.md): &"table" (the default), &"cabinet",
-## &"big", &"kiosk", or &"fixed": the game keeps a place of its own and is never in a floor
-## layout (the horse race in the Race Hall). Only `fixed` changes anything: where every other game
-## stands is up to the hand-made layouts (`FloorLayout`).
+## &"big", &"kiosk", or &"fixed": the game keeps a place of its own and is never on the drawn
+## floor (the horse race in the Race Hall). The floor generator (`FloorGenerator`) puts `table`
+## games in the pit rows, `cabinet` games in wall banks and islands, and `big` and `kiosk` games in
+## the wall and island slots that take them (`FloorSite`), so a new game needs no layout edits.
 @export var floor_footprint: StringName = &"table"
