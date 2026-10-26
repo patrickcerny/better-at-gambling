@@ -44,7 +44,7 @@ const RAIL_COLOR: Color = Color("#2B1B16")
 const WOOD_COLOR: Color = Color("#3A2A1E")
 const ARC_SEGMENTS: int = 14
 const HOT_CARD_LIGHT: float = 3.5
-const LABEL_HEIGHT: float = 0.3
+const LABEL_HEIGHT: float = 0.06
 
 var cards: TableCards
 ## Per seat: the hand-name label over its cards (client only).
@@ -334,7 +334,7 @@ func _felt_text(text: String, pos: Vector3, size: int, pixel: float, node_name: 
 func _build_labels() -> void:
 	for i: int in seat_count:
 		var l := _float_label("HandName%d" % i, 40)
-		l.position = card_spot(i) + Vector3(0.05, LABEL_HEIGHT, 0.0)
+		l.position = card_spot(i) + Vector3(0.05, LABEL_HEIGHT, -0.12)  # the far edge of the cards, short of the board
 		hand_labels.append(l)
 	dealer_label = _float_label("DealerHand", 44)
 	dealer_label.position = DEALER_SPOT + Vector3(0.1, 0.62, 0.0)
