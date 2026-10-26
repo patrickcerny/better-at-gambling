@@ -179,6 +179,10 @@ The 321 countdown on the door is enough. [...] Group the tablegames and make ran
   wall runs either side of the jail stand off it. `test_floor_plan_scene.gd` now also checks 120
   draws against every static collider of the room. Before the fix, 136 parts hit the jail and
   nothing else.
+- **Test fixes found on the way.** The craps table's physics test left a bare table at the world
+  origin that the casino's navmesh walked round. The craps dice-passing test now has a casino round
+  long enough for its 80 rolls. The net brawl test pins the full floor and runs without guards (new
+  dev flag `--guards N`), so a patrol's timing can't jail the thrower.
 - **Other floor changes.** The VIP blackjack moved 0.6 m north. The guard and waiter routes now run
   along the new aisles.
 - **Door toasts removed.** These are gone:
