@@ -22,7 +22,7 @@ const FIXED_STATIONS: Dictionary = {
 	# The Race Hall (east annex): the long horse race table, stools on its south side.
 	&"horse_race_1": [&"horse_race", Vector3(29.0, 0, -19.0), 0],
 	# VIP lounge (ground floor, behind the north door).
-	&"vip_blackjack_1": [&"blackjack", Vector3(-4.3, 0, -20.5), 0], &"vip_roulette_1": [&"roulette", Vector3(4.0, 0, -20.5), 0],
+	&"vip_blackjack_1": [&"blackjack", Vector3(-4.3, 0, -21.1), 0], &"vip_roulette_1": [&"roulette", Vector3(4.0, 0, -20.5), 0],
 	&"vip_slot_1": [&"slots", Vector3(-6.5, 0, -24.9), 0], &"vip_slot_2": [&"slots", Vector3(6.5, 0, -24.9), 0],
 }
 ## The floor's config (docs/FLOOR_PLAN.md): how the generator fills a round's floor.
@@ -1253,6 +1253,7 @@ static func floor_site() -> FloorSite:
 	s.full_title = "The Grand Hall"
 	s.lane_z = PIT_LANE_Z
 	s.lane = PIT_LANE
+	s.bean_width = PlayerAvatar.BODY_RADIUS * 2.0
 	s.pit_north = PIT_NORTH
 	s.pit_south = PIT_SOUTH
 	s.pit_styles = PIT_STYLES.duplicate(true)
@@ -1296,7 +1297,7 @@ static func registered_footprints() -> Dictionary:
 static func full_floor_plan() -> Dictionary:
 	if _full_plan.is_empty():
 		var cfg: FloorPlanConfig = load(FLOOR_CONFIG_PATH) as FloorPlanConfig
-		var full: FloorLayout = FloorGenerator.full(floor_site(), registered_footprints(), {}, cfg)
+		var full: FloorLayout = FloorGenerator.full(floor_site(), registered_footprints(), null, cfg)
 		if full != null:
 			_full_plan = full.wire_stations()
 	return _full_plan.duplicate(true)

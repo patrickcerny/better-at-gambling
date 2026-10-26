@@ -18,6 +18,9 @@ extends Resource
 ## south (z of their outer edges).
 @export var lane_z: float = 0.0
 @export var lane: float = 2.0
+## How wide a bean is: two tables side by side in a row stand either closer than this, solid to
+## solid (nobody squeezes through), or a lane's width apart (two beans side by side).
+@export var bean_width: float = 0.84
 @export var pit_north: float = -INF
 @export var pit_south: float = INF
 ## The pit's block styles: each a list of x intervals (Vector2 from, to), one block each; aisles

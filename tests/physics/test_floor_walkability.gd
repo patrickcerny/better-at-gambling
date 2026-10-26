@@ -26,7 +26,7 @@ const ARRIVE: float = 0.3
 const NEIGHBOURS: int = 3
 const DETOUR: float = 1.6
 const DETOUR_MIN: float = 2.0
-## Rays for "in plain sight": over the stools, into the tables.
+## Height of the bean swept along a straight line (`_in_sight`): its ball reaches down to the stools.
 const SIGHT_Y: float = 0.7
 ## Drawn floors walked, from the floor stream of this match seed.
 const DRAWS: int = 16
@@ -68,7 +68,7 @@ func _layouts() -> Array[Array]:
 	var out: Array[Array] = [["full floor", LuckyLounge.full_floor_plan()]]
 	var games: Dictionary = srv._floor_games(true)
 	games.erase(&"craps")
-	var canon: FloorLayout = FloorGenerator.full(srv.map_def.floor_site, games, {}, srv.floor_config)
+	var canon: FloorLayout = FloorGenerator.full(srv.map_def.floor_site, games, null, srv.floor_config)
 	out.append(["canonical floor without craps", canon.wire_stations()])
 	var rotation := FloorRotation.new(SeededRng.new(SEED ^ 0xF1002))
 	for i: int in DRAWS:
@@ -98,7 +98,6 @@ func _bake(radius: float) -> RID:
 	fresh.vertices = nm.get_vertices()
 	for i: int in nm.get_polygon_count():
 		fresh.add_polygon(nm.get_polygon(i))
-	gut.p("bake r=%.2f: %d polygons" % [radius, fresh.get_polygon_count()])
 	var m: RID = NavigationServer3D.map_create()
 	NavigationServer3D.map_set_cell_size(m, CELL)
 	NavigationServer3D.map_set_cell_height(m, nm.cell_height)
@@ -109,6 +108,13 @@ func _bake(radius: float) -> RID:
 	_maps.append(r)
 	_maps.append(m)
 	return m
+
+
+## True once `nav` has synchronised with its region's mesh (it has floor in the entrance hall).
+static func _synced(nav: RID) -> bool:
+	if NavigationServer3D.map_get_iteration_id(nav) == 0:
+		return false
+	return _flat(NavigationServer3D.map_get_closest_point(nav, HALL)).distance_to(_flat(HALL)) <= 0.5
 
 
 static func _flat(v: Vector3) -> Vector2:
@@ -137,6 +143,19 @@ static func _floor_near(nav: RID, p: Vector3, reach: float) -> Vector3:
 	if near.y > 0.8 or _flat(near).distance_to(_flat(p)) > reach:
 		return Vector3.INF
 	return near
+
+
+## How close to `p` a walk from `from` on `nav` gets (the floor nearest `p` that can be walked to
+## from there: a pocket of walkable floor nobody can get into doesn't count). Vector3.INF when
+## that is farther than `reach`, or a table top.
+static func _reach(nav: RID, from: Vector3, p: Vector3, reach: float) -> Vector3:
+	var path: PackedVector3Array = NavigationServer3D.map_get_path(nav, from, p * Vector3(1, 0, 1), true)
+	if path.is_empty():
+		return Vector3.INF
+	var end: Vector3 = path[path.size() - 1]
+	if end.y > 0.8 or _flat(end).distance_to(_flat(p)) > reach:
+		return Vector3.INF
+	return end
 
 
 ## Every station of the floor that people walk to: the layout's, plus the VIP lounge and the Race
@@ -174,8 +193,9 @@ func _walk_problems(label: String) -> Array[String]:
 	var game_nav: RID = scene.map.nav_region.get_navigation_map()
 	var bean_nav: RID = _bake(PlayerAvatar.BODY_RADIUS)
 	var pair_nav: RID = _bake(PlayerAvatar.BODY_RADIUS * 2.0)
+	# Wait for both maps to take their meshes in (a query before a map's first sync is an error).
 	var waited: int = 0
-	while waited < 120 and (_flat(NavigationServer3D.map_get_closest_point(bean_nav, HALL)).distance_to(_flat(HALL)) > 0.5 or _flat(NavigationServer3D.map_get_closest_point(pair_nav, HALL)).distance_to(_flat(HALL)) > 0.5):
+	while waited < 120 and not (_synced(bean_nav) and _synced(pair_nav)):
 		await wait_physics_frames(1)
 		waited += 1
 	var navs: Dictionary = {"game": game_nav, "bean": bean_nav}
@@ -207,11 +227,9 @@ func _walk_problems(label: String) -> Array[String]:
 					out.append("%s: %s chair %d: no way back to the hall (%s mesh)" % [label, sid, i, k])
 				elif k == "bean":
 					(spots[sid] as Array[Vector3]).append(near)
-			var wide: Vector3 = _floor_near(pair_nav, seats[i], PAIR_REACH)
+			var wide: Vector3 = _reach(pair_nav, hall["pair"], seats[i], PAIR_REACH)
 			if wide == Vector3.INF:
-				out.append("%s: %s chair %d: no walkway two beans wide within %.2f m" % [label, sid, i, PAIR_REACH])
-			elif _walk(pair_nav, hall["pair"], wide).is_empty():
-				out.append("%s: %s chair %d: its walkway is cut off from the hall for two beans side by side" % [label, sid, i])
+				out.append("%s: %s chair %d: no walkway two beans wide from the hall within %.2f m" % [label, sid, i, PAIR_REACH])
 			else:
 				(fronts[sid] as Array[Vector3]).append(wide)
 	# From every chair to every other station (the bean's mesh).
@@ -226,8 +244,7 @@ func _walk_problems(label: String) -> Array[String]:
 	var doors: Dictionary = _doorways()
 	for name: String in doors:
 		var p: Vector3 = doors[name]
-		var near: Vector3 = _floor_near(pair_nav, p, 0.6)
-		if near == Vector3.INF or _walk(pair_nav, hall["pair"], near).is_empty():
+		if _reach(pair_nav, hall["pair"], p, 0.6) == Vector3.INF:
 			out.append("%s: the %s is not open two beans wide from the hall" % [label, name])
 	# The guards' and the waiter's route points (the game's mesh).
 	var points: Array[Vector3] = []
@@ -274,9 +291,8 @@ func _detours(label: String, pair_nav: RID, fronts: Dictionary) -> Array[String]
 			var b: StringName = n[1]
 			var pa: Vector3 = n[2]
 			var pb: Vector3 = n[3]
-			var q := PhysicsRayQueryParameters3D.create(Vector3(pa.x, SIGHT_Y, pa.z), Vector3(pb.x, SIGHT_Y, pb.z), 1)
-			if not space.intersect_ray(q).is_empty():
-				continue  # not in plain sight: not a neighbour
+			if not _in_sight(space, pa, pb):
+				continue  # a bean can't walk straight there: not a neighbour
 			taken += 1
 			var key: String = "%s|%s" % ([a, b] if String(a) < String(b) else [b, a])
 			if seen.has(key):
@@ -291,6 +307,20 @@ func _detours(label: String, pair_nav: RID, fronts: Dictionary) -> Array[String]
 			if walked > DETOUR * maxf(straight, DETOUR_MIN):
 				out.append("%s: %s to %s is %.1f m walked for %.1f m straight (more than %.1fx)" % [label, a, b, walked, straight, DETOUR])
 	return out
+
+
+## True when a bean could walk the straight line from `a` to `b` (a bean-wide sphere swept along
+## it at waist height touches nothing standing on the floor).
+static func _in_sight(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> bool:
+	var q := PhysicsShapeQueryParameters3D.new()
+	var ball := SphereShape3D.new()
+	ball.radius = PlayerAvatar.BODY_RADIUS
+	q.shape = ball
+	q.collision_mask = 1
+	q.transform = Transform3D(Basis.IDENTITY, Vector3(a.x, SIGHT_Y, a.z))
+	q.motion = Vector3(b.x - a.x, 0.0, b.z - a.z)
+	var hit: PackedFloat32Array = space.cast_motion(q)
+	return hit.size() == 2 and hit[0] >= 1.0
 
 
 func test_every_layout_can_be_walked() -> void:
@@ -308,3 +338,19 @@ func test_every_layout_can_be_walked() -> void:
 			gut.p("  " + w)
 		assert_eq(why.size(), 0, "%s can be walked (%s)" % [label, "; ".join(why.slice(0, 6))])
 		after_each()
+
+
+## The full floor is drawn before any map measures its games (`FloorGenerator.NOMINAL`): those
+## sizes are the measured ones.
+func test_the_nominal_sizes_are_the_measured_ones() -> void:
+	var geo: FloorGeometry = FloorGeometry.of_map(scene.server.map_def, Registry.floor_plan.gap)
+	var measured := FloorGenerator.new(null, {}, geo, null, null)
+	var nominal := FloorGenerator.new(null, {}, null, null, null)
+	for game: StringName in FloorGenerator.NOMINAL:
+		assert_true(geo.rects.has(game), "%s measured" % game)
+		assert_lt(_diff(measured.size_of(game), nominal.size_of(game)), 0.03, "%s: nominal floor %s is the measured %s" % [game, nominal.size_of(game), measured.size_of(game)])
+		assert_lt(_diff(measured.solid_of(game), nominal.solid_of(game)), 0.03, "%s: nominal solid part %s is the measured %s" % [game, nominal.solid_of(game), measured.solid_of(game)])
+
+
+static func _diff(a: Rect2, b: Rect2) -> float:
+	return maxf(maxf(absf(a.position.x - b.position.x), absf(a.position.y - b.position.y)), maxf(absf(a.end.x - b.end.x), absf(a.end.y - b.end.y)))

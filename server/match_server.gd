@@ -161,7 +161,7 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 		for sid: Variant in map_def.stations:
 			if not StringName(sid) in map_def.floor_site.fixed:
 				_fixed_stations.erase(sid)
-		_full_layout = FloorGenerator.full(map_def.floor_site, _floor_games(false), {}, floor_config)
+		_full_layout = FloorGenerator.full(map_def.floor_site, _floor_games(false), null, floor_config)
 		_floor_geo = FloorGeometry.of_map(map_def, floor_config.gap)
 	floor_plan = _full_floor()  # the map scene was built with the full floor
 	_build_match_systems(int(settings.get("seed", 0)))
@@ -308,12 +308,7 @@ func _pinned_floor(forced: String) -> FloorLayout:
 	var seed_value: int = FloorGenerator.seed_of(forced)
 	if seed_value < 0:
 		return null
-	return FloorGenerator.draw(map_def.floor_site, _floor_games(true), _floor_sizes(), floor_config, seed_value)
-
-
-## Each game's measured floor (empty without the map's measurements: the generator's nominal ones).
-func _floor_sizes() -> Dictionary:
-	return _floor_geo.rects if _floor_geo != null else {}
+	return FloorGenerator.draw(map_def.floor_site, _floor_games(true), _floor_geo, floor_config, seed_value)
 
 
 ## Why a floor can't stand tonight (empty when it can): a game of it is off or unknown, or it does
@@ -329,7 +324,7 @@ func draw_floor(seed_value: int) -> FloorLayout:
 	var games: Dictionary = _floor_games(true)
 	for i: int in maxi(floor_config.draws, 1):
 		var s: int = (seed_value + i) % FloorRotation.SEED_RANGE
-		var drawn: FloorLayout = FloorGenerator.draw(map_def.floor_site, games, _floor_sizes(), floor_config, s)
+		var drawn: FloorLayout = FloorGenerator.draw(map_def.floor_site, games, _floor_geo, floor_config, s)
 		if drawn == null:
 			Log.info(&"server", "floor draw %d seats no floor" % s)
 			continue
@@ -342,7 +337,7 @@ func draw_floor(seed_value: int) -> FloorLayout:
 
 ## The canonical draw over tonight's games, or the full floor when that fails too.
 func _fallback_floor(games: Dictionary) -> FloorLayout:
-	var canon: FloorLayout = FloorGenerator.full(map_def.floor_site, games, {}, floor_config)
+	var canon: FloorLayout = FloorGenerator.full(map_def.floor_site, games, null, floor_config)
 	if canon != null and floor_problems(canon).is_empty():
 		Log.warn(&"server", "no floor draw passed its checks: the canonical floor stands")
 		return canon

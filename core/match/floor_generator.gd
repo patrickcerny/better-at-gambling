@@ -33,6 +33,19 @@ const NOMINAL: Dictionary = {
 	&"scratch": Rect2(-0.8, -1.255, 1.6, 2.435),
 	&"sword_tapper": Rect2(-0.7, -0.7, 1.4, 2.15),
 }
+## The solid part of each game in its own frame (what people walk round: its colliders, stools
+## included; `FloorGeometry.obstacles`), when the map has measured nothing.
+const NOMINAL_SOLID: Dictionary = {
+	&"blackjack": Rect2(-1.78, -1.7, 3.56, 4.05),
+	&"roulette": Rect2(-2.5, -1.72, 5.2, 3.44),
+	&"wheel": Rect2(-1.62, -1.9, 3.24, 3.42),
+	&"hilo": Rect2(-2.06, -0.86, 4.12, 2.4),
+	&"craps": Rect2(-2.15, -2.1, 4.3, 3.82),
+	&"slots": Rect2(-0.45, -0.35, 0.9, 1.47),
+	&"plinko": Rect2(-2.05, -0.35, 4.1, 2.77),
+	&"scratch": Rect2(-0.8, -1.255, 1.6, 2.355),
+	&"sword_tapper": Rect2(-0.7, -0.7, 1.4, 1.4),
+}
 ## A game nobody measured yet, by footprint: the biggest of its kind and some.
 const UNKNOWN: Dictionary = {
 	&"table": Rect2(-2.6, -2.1, 5.2, 4.55),
@@ -55,9 +68,11 @@ const ID_PREFIX: String = "floor_"
 
 var site: FloorSite
 var cfg: FloorPlanConfig
-## Game id → footprint (the games on tonight's floor) and game id → its floor in its own frame.
+## Game id → footprint (the games on tonight's floor), game id → its floor in its own frame and
+## game id → its solid part in its own frame (both measured; empty = the nominal ones).
 var games: Dictionary = {}
 var sizes: Dictionary = {}
+var solids: Dictionary = {}
 ## Null for the canonical draw.
 var rng: SeededRng
 ## Station id → [game, position, yaw degrees], and the next number per prefix.
@@ -67,18 +82,18 @@ var _gap: float = 0.35
 
 
 ## A round's floor from `seed_value` (null when this draw can't seat every game). `games`: game id →
-## footprint (`GameDefinition.floor_footprint`; fixed ones are ignored); `sizes`: game id → its
-## measured floor (`FloorGeometry.rects`; empty = `NOMINAL`).
-static func draw(p_site: FloorSite, p_games: Dictionary, p_sizes: Dictionary, p_cfg: FloorPlanConfig, seed_value: int) -> FloorLayout:
-	var g := FloorGenerator.new(p_site, p_games, p_sizes, p_cfg, SeededRng.new(seed_value))
+## footprint (`GameDefinition.floor_footprint`; fixed ones are ignored); `geo`: the map's
+## measurements (each game's floor and solid part; null = `NOMINAL`, `NOMINAL_SOLID`).
+static func draw(p_site: FloorSite, p_games: Dictionary, geo: FloorGeometry, p_cfg: FloorPlanConfig, seed_value: int) -> FloorLayout:
+	var g := FloorGenerator.new(p_site, p_games, geo, p_cfg, SeededRng.new(seed_value))
 	if not g._build():
 		return null
 	return g._layout(StringName(ID_PREFIX + str(seed_value)), "Floor %d" % seed_value)
 
 
 ## The canonical draw (no dice): the full floor when `games` are all the games.
-static func full(p_site: FloorSite, p_games: Dictionary, p_sizes: Dictionary, p_cfg: FloorPlanConfig) -> FloorLayout:
-	var g := FloorGenerator.new(p_site, p_games, p_sizes, p_cfg, null)
+static func full(p_site: FloorSite, p_games: Dictionary, geo: FloorGeometry, p_cfg: FloorPlanConfig) -> FloorLayout:
+	var g := FloorGenerator.new(p_site, p_games, geo, p_cfg, null)
 	if not g._build():
 		return null
 	return g._layout(p_site.full_id, p_site.full_title)
@@ -90,13 +105,22 @@ static func seed_of(layout_id: String) -> int:
 	return int(s) if s.is_valid_int() and int(s) >= 0 else -1
 
 
-func _init(p_site: FloorSite, p_games: Dictionary, p_sizes: Dictionary, p_cfg: FloorPlanConfig, p_rng: SeededRng) -> void:
+func _init(p_site: FloorSite, p_games: Dictionary, geo: FloorGeometry, p_cfg: FloorPlanConfig, p_rng: SeededRng) -> void:
 	site = p_site
 	cfg = p_cfg if p_cfg != null else FloorPlanConfig.new()
 	for g: Variant in p_games:
 		if StringName(p_games[g]) != &"fixed":
 			games[StringName(g)] = StringName(p_games[g])
-	sizes = p_sizes
+	if geo != null:
+		sizes = geo.rects
+		for g: Variant in geo.obstacles:
+			var u := Rect2()
+			var first: bool = true
+			for r: Rect2 in geo.obstacles[g]:
+				u = r if first else u.merge(r)
+				first = false
+			if not first:
+				solids[StringName(g)] = u
 	rng = p_rng
 	_gap = cfg.gap + SLACK
 
@@ -116,6 +140,15 @@ func size_of(game: StringName) -> Rect2:
 	if NOMINAL.has(game):
 		return NOMINAL[game]
 	return UNKNOWN.get(games.get(game, &"table"), UNKNOWN[&"table"])
+
+
+## A game's solid part in its own frame (its whole floor when nobody measured it).
+func solid_of(game: StringName) -> Rect2:
+	if solids.has(game):
+		return solids[game]
+	if not sizes.has(game) and NOMINAL_SOLID.has(game):
+		return NOMINAL_SOLID[game]
+	return size_of(game)
 
 
 ## The games of a footprint, sorted.
@@ -170,21 +203,21 @@ func _build() -> bool:
 
 # --- The pit ---------------------------------------------------------------------------------
 
-## One row of a pit block: its x interval, which way its players face, its tables in order.
+## One row of a pit block: its x interval, which way its players face, its tables (in the order
+## they stand once `order` has been called).
 class Row:
 	var x0: float
 	var x1: float
 	var yaw: float
 	var tables: Array[StringName] = []
-	var used: float = 0.0
 
 	func _init(p_x0: float, p_x1: float, p_yaw: float) -> void:
 		x0 = p_x0
 		x1 = p_x1
 		yaw = p_yaw
 
-	func free_length() -> float:
-		return (x1 - x0) - used
+	func length() -> float:
+		return x1 - x0
 
 
 func _build_pit() -> bool:
@@ -236,26 +269,29 @@ func _extra_tables(tables: Array[StringName]) -> Array[StringName]:
 ## False when no row has room.
 func _seat_table(rows: Array[Row], game: StringName) -> bool:
 	var fits: Array[Row] = []
+	var spare: Array[float] = []
 	for row: Row in rows:
 		var w: Rect2 = turned(size_of(game), row.yaw)
-		var need: float = w.size.x + (_gap if not row.tables.is_empty() else 0.0)
-		if need > row.free_length() + 0.0001:
-			continue
 		var z: float = _row_z(row, w)
 		if (row.yaw == 180.0 and z + w.position.y < site.pit_north - 0.0001) or (row.yaw == 0.0 and z + w.end.y > site.pit_south + 0.0001):
 			continue
+		var with: Array[StringName] = row.tables.duplicate()
+		with.append(game)
+		var orders: Array = _orders(with, row)
+		if orders.is_empty():
+			continue
 		fits.append(row)
+		spare.append(row.length() - _row_length(orders[0], row.yaw))
 	if fits.is_empty():
 		return false
-	var pick: Row = fits[0]
+	var k: int = 0
 	if rng == null:
-		for row: Row in fits:
-			if row.free_length() > pick.free_length() + 0.0001:
-				pick = row
+		for i: int in fits.size():
+			if spare[i] > spare[k] + 0.0001:
+				k = i
 	else:
-		pick = fits[rng.range_int(0, fits.size() - 1)]
-	pick.used += turned(size_of(game), pick.yaw).size.x + (_gap if not pick.tables.is_empty() else 0.0)
-	pick.tables.append(game)
+		k = rng.range_int(0, fits.size() - 1)
+	fits[k].tables.append(game)
 	return true
 
 
@@ -266,16 +302,67 @@ func _row_z(row: Row, w: Rect2) -> float:
 	return site.lane_z + site.lane * 0.5 - w.position.y
 
 
+## Floor between two tables standing side by side in a row (`a` west of `b`, rect to rect): the gap
+## when that leaves their solid parts closer than a bean is wide (nobody squeezes through), or else
+## enough for two beans side by side (the lane's width) between their solid parts: never a gap one
+## bean only just fits through.
+func _spacing(a: StringName, b: StringName, yaw: float) -> float:
+	var ma: float = turned(size_of(a), yaw).end.x - turned(solid_of(a), yaw).end.x
+	var mb: float = turned(solid_of(b), yaw).position.x - turned(size_of(b), yaw).position.x
+	if _gap + ma + mb < site.bean_width:
+		return _gap
+	return maxf(_gap, site.lane - ma - mb)
+
+
+## How long a row of tables in this order is, west to east.
+func _row_length(order: Array, yaw: float) -> float:
+	var out: float = 0.0
+	for i: int in order.size():
+		out += turned(size_of(order[i]), yaw).size.x
+		if i > 0:
+			out += _spacing(order[i - 1], order[i], yaw)
+	return out
+
+
+## The orders the tables fit the row in (each an Array of game ids; the given order first).
+func _orders(tables: Array[StringName], row: Row) -> Array:
+	var out: Array = []
+	for order: Array in _permutations(tables):
+		if _row_length(order, row.yaw) <= row.length() + 0.0001:
+			out.append(order)
+	return out
+
+
+static func _permutations(items: Array) -> Array:
+	if items.size() <= 1:
+		return [items.duplicate()]
+	var out: Array = []
+	for i: int in items.size():
+		var rest: Array = items.duplicate()
+		var first: Variant = rest.pop_at(i)
+		for tail: Array in _permutations(rest):
+			out.append([first] + tail)
+	return out
+
+
+## Stands a row's tables: in an order they fit (the first for the canonical draw, any for a draw),
+## the spare length before and after (half each for the canonical draw, at random otherwise).
 func _lay_row(row: Row) -> void:
 	if row.tables.is_empty():
 		return
-	_shuffle(row.tables)
-	var slack: float = maxf(row.free_length(), 0.0)
+	var orders: Array = _orders(row.tables, row)
+	if orders.is_empty():
+		return
+	var order: Array = orders[0] if rng == null else orders[rng.range_int(0, orders.size() - 1)]
+	var slack: float = maxf(row.length() - _row_length(order, row.yaw), 0.0)
 	var x: float = row.x0 + (slack * 0.5 if rng == null else rng.range_float(0.0, slack))
-	for g: StringName in row.tables:
+	for i: int in order.size():
+		var g: StringName = order[i]
+		if i > 0:
+			x += _spacing(order[i - 1], g, row.yaw)
 		var w: Rect2 = turned(size_of(g), row.yaw)
 		_add(g, Vector2(x - w.position.x, _row_z(row, w)), row.yaw)
-		x += w.size.x + _gap
+		x += w.size.x
 
 
 # --- Wall runs and islands -------------------------------------------------------------------
