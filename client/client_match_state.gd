@@ -48,6 +48,10 @@ var jackpot: int = 0
 var last_seq: int = 0
 var piles: Dictionary[int, Dictionary] = {}
 var standings: Array = []
+## XP and Coins per player for the match that ended (`Progression.breakdown`, player → row) and
+## that match's id (`PlayerProfile.apply_match` adds the local row once per id).
+var progress: Dictionary = {}
+var match_id: String = ""
 ## Seated station of each player.
 var seat_of: Dictionary[int, StringName] = {}
 ## Online lobby: party leader, host settings, start countdown (-1 = none), room or Practice.
@@ -134,6 +138,8 @@ func apply_snapshot(snap: Dictionary) -> void:
 	rewards = (snap.get("rewards", {}) as Dictionary).get("rewards", [])
 	standings = snap.get("standings", [])
 	awards = snap.get("awards", [])
+	progress = snap.get("progress", {})
+	match_id = str(snap.get("match_id", ""))
 	results_return_in = float(snap.get("results_return_in", -1.0))
 	effects.clear()
 	for id: Variant in snap.get("effects", {}):
@@ -246,9 +252,9 @@ func _apply(ev: Dictionary) -> void:
 			if players.has(int(ev["player"])):
 				players[int(ev["player"])]["ready"] = bool(ev["ready"])
 			lobby_changed.emit()
-		&"player_skin":
+		&"player_color":
 			if players.has(int(ev["player"])):
-				players[int(ev["player"])]["skin"] = StringName(ev["skin"])
+				players[int(ev["player"])]["bean_color"] = int(ev["bean_color"])
 			players_changed.emit()
 			lobby_changed.emit()
 		&"leader_changed":
@@ -285,6 +291,8 @@ func _apply(ev: Dictionary) -> void:
 		&"match_ended":
 			standings = ev["standings"]
 			awards = ev.get("awards", [])
+			progress = ev.get("progress", {})
+			match_id = str(ev.get("match_id", ""))
 			results_return_in = float(ev.get("return_in", -1.0))
 			phase = Phase.Id.RESULTS
 			hot_station = &""
@@ -413,6 +421,7 @@ func _apply(ev: Dictionary) -> void:
 			last_call = false
 			standings = []
 			awards = []
+			progress = {}
 			results_return_in = -1.0
 			phase_changed.emit(phase)
 	if ev.has("station") and stations.has(ev["station"]):

@@ -25,6 +25,7 @@ driver/enable_input=true
 
 Log="*res://services/log.gd"
 Settings="*res://services/settings_manager.gd"
+ProfileManager="*res://services/profile_manager.gd"
 SceneRouter="*res://services/scene_router.gd"
 Registry="*res://services/registry.gd"
 Net="*res://net/net_session.gd"

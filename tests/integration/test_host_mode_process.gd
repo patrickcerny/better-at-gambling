@@ -19,7 +19,7 @@ func test_the_room_server_process_starts_admits_the_host_and_stops_with_the_sess
 	assert_true(party.hosting)
 	var pid: int = party.server_pid
 	assert_true(_alive(pid), "the room server runs")
-	assert_eq(party.join_own_party("Patrick", {"color": 2, "skin": &"bean"}), OK)
+	assert_eq(party.join_own_party("Patrick", {"color": 2}), OK)
 	var welcomed: Array[bool] = [false]
 	Net.connected.connect(func() -> void: welcomed[0] = true, CONNECT_ONE_SHOT)
 	var waited: float = 0.0

@@ -24,7 +24,7 @@ const PHASES: Dictionary = {
 	&"minigame_action": [Phase.Id.MINIGAME],
 	&"set_ready": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"lobby_setting": [Phase.Id.LOBBY, Phase.Id.RESULTS],
-	&"set_skin": [Phase.Id.LOBBY, Phase.Id.RESULTS],
+	&"set_color": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"return_to_lobby": [Phase.Id.RESULTS],
 	&"megaphone": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 }

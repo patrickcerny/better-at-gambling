@@ -100,7 +100,7 @@ func start_dev_bridge(listen_port: int, room_port: int) -> Error:
 
 ## Step 4: this game joins its own room server (call through the menu's `_connect`).
 func join_own_party(display_name: String, cosmetics: Dictionary) -> Error:
-	var hello: Dictionary = {"name": display_name, "uid": "steam:%d" % SteamSvc.get_steam_id(), "color": int(cosmetics.get("color", -1)), "skin": StringName(cosmetics.get("skin", "bean"))}
+	var hello: Dictionary = {"name": display_name, "uid": "steam:%d" % SteamSvc.get_steam_id(), "color": int(cosmetics.get("color", -1))}
 	var err: Error = Net.join_server("127.0.0.1", server_port, hello)
 	if err == OK:
 		Net.room = {"host": "127.0.0.1", "port": server_port, "steam_lobby": SteamSvc.lobby_id, "host_mode": true}
@@ -130,7 +130,7 @@ func enter_lobby(lobby_id: int) -> int:
 
 ## Connects to the lobby owner's game over Steam (call through the menu's `_connect`).
 func join_host(host_steam_id: int, display_name: String, cosmetics: Dictionary) -> Error:
-	var hello: Dictionary = {"name": display_name, "color": int(cosmetics.get("color", -1)), "skin": StringName(cosmetics.get("skin", "bean"))}
+	var hello: Dictionary = {"name": display_name, "color": int(cosmetics.get("color", -1))}
 	var err: Error = Net.join_server("steam:%d" % host_steam_id, 0, hello, {"transport": "steam", "steam_id": host_steam_id})
 	if err == OK:
 		Net.room = {"host": "steam:%d" % host_steam_id, "port": 0, "steam_lobby": SteamSvc.lobby_id}

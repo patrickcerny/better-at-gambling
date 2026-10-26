@@ -153,10 +153,9 @@ func test_aim_outline_grows_in_world_space() -> void:
 	assert_true(code.contains("skip_vertex_transform"), "the vertex shader places the hull itself")
 	assert_true(code.contains("MODEL_NORMAL_MATRIX"), "normals grown in world space")
 	assert_true(code.contains("cull_front"))
-	# Every mesh of a scaled skin takes the overlay without errors.
+	# Every mesh of the bean takes the overlay without errors.
 	var v := AvatarVisuals.new()
 	add_child_autofree(v)
-	v.set_skin(&"warrior")
 	var n: int = 0
 	for g: Node in v.find_children("*", "MeshInstance3D", true, false):
 		(g as MeshInstance3D).material_overlay = sm

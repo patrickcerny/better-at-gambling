@@ -77,7 +77,7 @@ func on_event(ev: Dictionary) -> void:
 			Audio.play(&"ui_click", &"UI", -14.0, 1.2)
 		&"player_left":
 			Audio.play(&"ui_hover", &"UI", -12.0, 0.7)
-		&"player_skin":
+		&"player_color":
 			_at(int(ev["player"]), &"pickup", -10.0, 1.2)
 		&"player_got_up":
 			_at(int(ev["player"]), &"jump", -16.0, 0.8)

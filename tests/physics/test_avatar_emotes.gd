@@ -1,7 +1,6 @@
 extends GutTest
 ## The new bean (AvatarVisuals) and its number-key emotes: an emote plays for ~2.5 s and ends on
-## its own (or when the bean is hit or walks off), the right hand has a slot for held items that
-## follows a character skin, and in the real match scene key 5 sends `play_emote` and everyone's
+## its own (or when the bean is hit or walks off), the right hand has a slot for held items, and in the real match scene key 5 sends `play_emote` and everyone's
 ## copy of our bean plays it (ours watched in third person), and a wheel emote from someone else
 ## plays on their bean without touching our camera. (Camera: test_emote_camera.gd; every emote's
 ## motion: test_emote_animations.gd.)
@@ -55,22 +54,6 @@ func test_hits_and_walking_off_cut_an_emote_short() -> void:
 	assert_false(v.is_emoting(), "walking off ends it")
 	v.set_knocked_out(true)
 	assert_false(v.emote(&"thumbs_down"), "no emotes while knocked out")
-
-
-func test_emotes_play_on_skins_and_the_hand_slot_follows() -> void:
-	var v: AvatarVisuals = await _bean()
-	var slot: Node3D = v.hand_node()
-	v.set_skin(&"king")
-	assert_eq(v.hand_node(), slot, "same slot, so a held item stays attached")
-	assert_true(v.skin_root.is_ancestor_of(slot), "on the skin's right hand")
-	assert_true(v.emote(&"thumbs_up"))
-	v.update_motion(Vector3.ZERO, true, 0.016)
-	await wait_seconds(AvatarVisuals.EMOTE_SECONDS + 0.3)
-	assert_false(v.is_emoting())
-	v.set_skin(&"wizard")
-	assert_true(v.emote(&"six_seven"), "skins with arm bones but no clips emote too")
-	v.set_skin(&"bean")
-	assert_true(v.hand_r.is_ancestor_of(slot), "back in the glove")
 
 
 func test_key_sends_the_emote_and_the_bean_plays_it() -> void:

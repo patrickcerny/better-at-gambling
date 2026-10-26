@@ -677,8 +677,7 @@ func _build_set() -> void:
 		bean.position = Vector3(0, 1.06, -0.15)
 		bean.rotation.y = PI  # face the camera
 		root.add_child(bean)
-		bean.set_color(_player_color(pid))
-		bean.set_skin(StringName(state.players.get(pid, {}).get("skin", "bean")))
+		bean.set_color(Palette.bean_color(state.players.get(pid, {"color": pid - 1})))
 		var puppet: BeanPuppet = BeanPuppet.attach(bean)
 		puppet.cheer_height = 0.22  # stays under the "+850" over the head
 		var name_l := Label3D.new()

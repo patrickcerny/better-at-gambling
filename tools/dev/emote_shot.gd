@@ -1,8 +1,8 @@
 extends Node3D
 ## Dev: an emote frozen part-way through, for look-dev screenshots. Run with
 ## tools/screenshot.gd --scene res://tools/dev/emote_shot.tscn --frames 100000 --
-## --emote six_seven --at 0.6 --shot out.png [--skins bean,king,wizard,regular] [--view row|camera]
-## row: the bean and the listed skins side by side, facing the camera, all at `--at` seconds into
+## --emote six_seven --at 0.6 --shot out.png [--colors 0,9,13,15] [--view row|camera]
+## row: beans in the listed colours (`Palette.player_color`) side by side, facing the camera, all at `--at` seconds into
 ## the emote. camera: a local player in a seat-less room emoting, seen through their own camera
 ## (the emote view). The scene saves the shot after `--wait` seconds (default 1.2) and quits.
 
@@ -55,17 +55,16 @@ func _ready() -> void:
 		_player.teleport(Vector3.ZERO, 0.0)
 		_player.cam.activate()
 		return
-	var skins: PackedStringArray = c.get_string("skins", "bean,king,wizard,regular").split(",")
-	for i: int in skins.size():
+	var colors: PackedStringArray = c.get_string("colors", "0,9,13,15").split(",")
+	for i: int in colors.size():
 		var v := AvatarVisuals.new()
-		v.position = Vector3((i - (skins.size() - 1) * 0.5) * 1.8, 0, 0)
+		v.position = Vector3((i - (colors.size() - 1) * 0.5) * 1.8, 0, 0)
 		v.rotation.y = PI
 		add_child(v)
-		v.set_color(Palette.player_color(i))
-		v.set_skin(StringName(skins[i]))
+		v.set_color(Palette.player_color(int(colors[i])))
 		_beans.append(v)
 		var tag := Label3D.new()
-		tag.text = "%s · %s @ %.2fs" % [skins[i], _emote, _at]
+		tag.text = "%s · %s @ %.2fs" % [Palette.PLAYER_COLOR_NAMES[posmod(int(colors[i]), Palette.PLAYER_COLOR_NAMES.size())], _emote, _at]
 		tag.font_size = 32
 		tag.pixel_size = 0.005
 		tag.position = v.position + Vector3(0, 0.02, 0.9)
@@ -91,7 +90,7 @@ func _process(delta: float) -> void:
 		if v.emote_id != _emote:
 			v.emote(_emote)
 		v.emote_time = _at  # frozen: the springs settle into the pose at that moment
-		v.update_motion(Vector3.ZERO, true, delta)  # skins pick their emote clip here
+		v.update_motion(Vector3.ZERO, true, delta)
 	if _shot != "" and _t >= _wait:
 		var img: Image = get_viewport().get_texture().get_image()
 		img.save_png(_shot)

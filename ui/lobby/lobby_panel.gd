@@ -1,7 +1,7 @@
 class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
-## accessibility: the 8 slots (name, color, skin, ready, leader) and — for the party leader — the mode (casino or minigames only), match length (minigames,
+## accessibility: the 8 slots (name, color, ready, leader) and — for the party leader — the mode (casino or minigames only), match length (minigames,
 ## gambling minutes between them), items, which minigames are on (MinigameSelector), PUBLIC (listed in the server browser) and a KICK button
 ## next to every other player (press twice: KICK → SURE?). Every button sends an intent; the panel
 ## only redraws from the ClientMatchState mirror. There is no READY button: players get ready

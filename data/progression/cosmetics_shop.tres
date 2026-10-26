@@ -1,0 +1,136 @@
+[gd_resource type="Resource" script_class="CosmeticShop" load_steps=19 format=3]
+
+[ext_resource type="Script" path="res://core/defs/cosmetic_shop.gd" id="1"]
+[ext_resource type="Script" path="res://core/defs/cosmetic_def.gd" id="2"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2")
+id = &"color_orange"
+kind = &"color"
+display_name = "Orange"
+price = 0
+color_index = 0
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2")
+id = &"color_sky"
+kind = &"color"
+display_name = "Sky"
+price = 0
+color_index = 1
+
+[sub_resource type="Resource" id="c2"]
+script = ExtResource("2")
+id = &"color_green"
+kind = &"color"
+display_name = "Green"
+price = 0
+color_index = 2
+
+[sub_resource type="Resource" id="c3"]
+script = ExtResource("2")
+id = &"color_yellow"
+kind = &"color"
+display_name = "Yellow"
+price = 0
+color_index = 3
+
+[sub_resource type="Resource" id="c4"]
+script = ExtResource("2")
+id = &"color_blue"
+kind = &"color"
+display_name = "Blue"
+price = 0
+color_index = 4
+
+[sub_resource type="Resource" id="c5"]
+script = ExtResource("2")
+id = &"color_vermilion"
+kind = &"color"
+display_name = "Vermilion"
+price = 0
+color_index = 5
+
+[sub_resource type="Resource" id="c6"]
+script = ExtResource("2")
+id = &"color_pink"
+kind = &"color"
+display_name = "Pink"
+price = 0
+color_index = 6
+
+[sub_resource type="Resource" id="c7"]
+script = ExtResource("2")
+id = &"color_cream"
+kind = &"color"
+display_name = "Cream"
+price = 0
+color_index = 7
+
+[sub_resource type="Resource" id="c8"]
+script = ExtResource("2")
+id = &"color_ruby"
+kind = &"color"
+display_name = "Ruby"
+price = 150
+color_index = 8
+
+[sub_resource type="Resource" id="c9"]
+script = ExtResource("2")
+id = &"color_mint"
+kind = &"color"
+display_name = "Mint"
+price = 150
+color_index = 9
+
+[sub_resource type="Resource" id="c10"]
+script = ExtResource("2")
+id = &"color_lavender"
+kind = &"color"
+display_name = "Lavender"
+price = 200
+color_index = 10
+
+[sub_resource type="Resource" id="c11"]
+script = ExtResource("2")
+id = &"color_teal"
+kind = &"color"
+display_name = "Teal"
+price = 200
+color_index = 11
+
+[sub_resource type="Resource" id="c12"]
+script = ExtResource("2")
+id = &"color_lime"
+kind = &"color"
+display_name = "Lime"
+price = 250
+color_index = 12
+
+[sub_resource type="Resource" id="c13"]
+script = ExtResource("2")
+id = &"color_onyx"
+kind = &"color"
+display_name = "Onyx"
+price = 250
+color_index = 13
+
+[sub_resource type="Resource" id="c14"]
+script = ExtResource("2")
+id = &"color_silver"
+kind = &"color"
+display_name = "Silver"
+price = 300
+color_index = 14
+
+[sub_resource type="Resource" id="c15"]
+script = ExtResource("2")
+id = &"color_gold"
+kind = &"color"
+display_name = "Gold"
+price = 400
+color_index = 15
+
+[resource]
+script = ExtResource("1")
+items = Array[ExtResource("2")]([SubResource("c0"), SubResource("c1"), SubResource("c2"), SubResource("c3"), SubResource("c4"), SubResource("c5"), SubResource("c6"), SubResource("c7"), SubResource("c8"), SubResource("c9"), SubResource("c10"), SubResource("c11"), SubResource("c12"), SubResource("c13"), SubResource("c14"), SubResource("c15")])

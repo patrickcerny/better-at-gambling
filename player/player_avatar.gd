@@ -30,7 +30,6 @@ const CARRIED_HEIGHT: float = 1.62
 var player_id: int = -1
 var display_name: String = "Player"
 var color: Color = Palette.CREAM
-var skin: StringName = &"bean"
 var is_local: bool = false
 var state: State = State.STANDING
 var drive: Drive = Drive.SIM
@@ -100,7 +99,6 @@ func _ready() -> void:
 	visuals.name = "Visuals"
 	add_child(visuals)
 	visuals.set_color(color)
-	visuals.set_skin(skin)
 	nametag = NameTag.new()  # clamps its on-screen size by distance
 	nametag.name = "Nametag"
 	nametag.text = display_name
@@ -131,13 +129,6 @@ func _ready() -> void:
 		cam.yaw = yaw
 	target_position = global_position
 	target_yaw = yaw
-
-
-## Puts on a character skin (`Cosmetics.SKINS`).
-func set_skin(id: StringName) -> void:
-	skin = id
-	if visuals != null:
-		visuals.set_skin(id)
 
 
 ## Sets the player colour on the bean.
@@ -217,7 +208,7 @@ func say(text: String, seconds: float = 2.0) -> void:
 	_bubble_until = _clock + seconds
 
 
-## Acts out an emote (the wheel's or a number key's, `Emotes`) on the bean or skin, standing or
+## Acts out an emote (the wheel's or a number key's, `Emotes`) on the bean, standing or
 ## in a seat. Wheel emotes always show their bubble ("👋 WAVE"); "67" says "6 7" when it plays.
 ## Our own emote swings the camera round to watch it (`PlayerCamera.begin_emote_view`) unless it
 ## is a replay (`at` > 0: a late joiner catching up on one already playing). Returns whether the
@@ -249,7 +240,6 @@ func start_ragdoll(velocity: Vector3, max_time: float = 2.5, puppet: bool = fals
 	ragdoll = RagdollBody.new()
 	ragdoll.name = "Ragdoll%d" % player_id
 	ragdoll.color = color
-	ragdoll.skin = skin
 	ragdoll.player_id = player_id
 	ragdoll.max_time = max_time
 	ragdoll.puppet = puppet

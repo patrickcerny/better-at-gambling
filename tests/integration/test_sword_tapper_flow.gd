@@ -57,7 +57,7 @@ func _event_pull(ev: Dictionary) -> Dictionary:
 func test_registered_on_the_map() -> void:
 	assert_true(Registry.games.has(&"sword_tapper"))
 	assert_eq(Registry.games[&"sword_tapper"].logic_script, SwordTapperLogic)
-	assert_eq(Protocol.PROTOCOL_VERSION, 10, "the new event and state bumped the protocol")
+	assert_gte(Protocol.PROTOCOL_VERSION, 10, "the new event and state bumped the protocol")
 	for sid: StringName in SWORDS:
 		assert_eq(fx.server.map_def.stations.get(sid, &""), &"sword_tapper")
 		assert_true(fx.server.stations.logics[sid] is SwordTapperLogic)

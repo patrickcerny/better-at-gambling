@@ -77,7 +77,7 @@ func _depth(n: int) -> float:
 	return float(maxi(n, 2)) * LANE_W + 0.5
 
 
-## Who races in which lane and who sits on the bench; `info` is player → {name, color, skin, steps}.
+## Who races in which lane and who sits on the bench; `info` is player → {name, color, bean (its bean colour), steps}.
 ## Beans for new racers are placed on their step at once; racers who left are removed.
 func set_racers(p_lanes: Array[int], p_bench: Array[int], info: Dictionary) -> void:
 	lanes = p_lanes.duplicate()
@@ -333,13 +333,12 @@ func _make_bean(p: int, d: Dictionary) -> void:
 	var root := Node3D.new()
 	root.name = "Racer%d" % p
 	add_child(root)
-	var color: Color = d.get("color", Palette.CREAM)
+	var color: Color = d.get("bean", d.get("color", Palette.CREAM))
 	var bean := AvatarVisuals.new()
 	bean.scale = Vector3.ONE * BEAN_SCALE
 	bean.rotation.y = PI + 0.55  # face the audience, turned towards the cashier
 	root.add_child(bean)
 	bean.set_color(color)
-	bean.set_skin(StringName(d.get("skin", "bean")))
 	var puppet: BeanPuppet = BeanPuppet.attach(bean)
 	puppet.cheer_height = 0.25
 	# A disc in their colour under their feet (gold ring for you).

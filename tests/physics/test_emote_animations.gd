@@ -3,18 +3,15 @@ extends GutTest
 ## characters depending on the emote (should be real emotes so 67 does the 67 gesture)". Every
 ## emote (wheel and number keys) moves the bean away from its idle pose while it plays and lets go
 ## afterwards; 67 holds both hands out in front and weighs them up and down in turn; ragdolls,
-## sitting down and new emotes cut one short; character skins act them out too (their own clip or
-## driven arm bones), and an item held in the right hand keeps its arm.
+## sitting down and new emotes cut one short, and an item held in the right hand keeps its arm.
 
 const STEP: float = 1.0 / 60.0
 
 
-func _bean(skin: StringName = &"bean") -> AvatarVisuals:
+func _bean() -> AvatarVisuals:
 	var v := AvatarVisuals.new()
 	v.animate_headless = true
 	add_child_autofree(v)
-	if skin != &"bean":
-		v.set_skin(skin)
 	await wait_process_frames(2)
 	return v
 
@@ -145,55 +142,7 @@ func test_ragdoll_sitting_and_a_new_emote_cut_it_short() -> void:
 	assert_false(a.play_emote(&"gg"), "knocked out: no emote")
 
 
-func test_skins_act_emotes_out_too() -> void:
-	for skin: StringName in SkinLibrary.SKINS:
-		var v: AvatarVisuals = await _bean(skin)
-		assert_not_null(v.skin_root, String(skin))
-		await wait_seconds(0.3)
-		var rest_twist: float = v.skin_root.rotation.y
-		var rest_dirs: Array[Vector3] = []
-		if v.arm_driver != null:
-			rest_dirs = [v.arm_driver.measured_forearm[0], v.arm_driver.measured_forearm[1]]
-		assert_true(v.emote(&"six_seven"), "%s emotes" % skin)
-		await _at(v, 0.875)
-		await wait_process_frames(2)
-		if v.arm_driver == null:
-			# No arm bones (the warrior): the whole body still sways with the gesture.
-			assert_eq(skin, &"warrior", "only the boneless skin has no arm driver")
-			assert_gt(absf(v.skin_root.rotation.y - rest_twist) + absf(v.skin_root.position.y), 0.03, "%s moves with the emote" % skin)
-		else:
-			assert_gt(v.arm_driver.weight[0], 0.9, "%s: arms driven" % skin)
-			# Elbows at the sides, forearms out in front doing the weighing.
-			var l: Vector3 = v.arm_driver.measured_forearm[0]
-			var r: Vector3 = v.arm_driver.measured_forearm[1]
-			assert_lt(l.z, -0.5, "%s: left forearm out in front (%s)" % [skin, l])
-			assert_lt(r.z, -0.5, "%s: right forearm out in front (%s)" % [skin, r])
-			assert_lt(v.arm_driver.measured[0].y, -0.3, "%s: elbows down by the sides" % skin)
-			assert_gt(absf(l.y - r.y), 0.3, "%s: one hand up, one down" % skin)
-			assert_gt(l.distance_to(rest_dirs[0]) + r.distance_to(rest_dirs[1]), 1.0, "%s: away from the idle arms" % skin)
-			v.stop_emote()
-			await wait_process_frames(3)
-			assert_lt(v.arm_driver.weight[0], 0.01, "%s: arms let go after" % skin)
-			assert_lt(v.arm_driver.measured_forearm[0].distance_to(rest_dirs[0]), 0.35, "%s: left arm back down" % skin)
-		v.queue_free()
-
-
-func test_skins_with_a_fitting_clip_play_it() -> void:
-	var v: AvatarVisuals = await _bean(&"business")  # has a Wave clip
-	v.emote(&"wave")
-	v.update_motion(Vector3.ZERO, true, STEP)
-	await wait_process_frames(2)
-	var ap: AnimationPlayer = SkinLibrary.animation_player(v.skin_root)
-	assert_true(String(ap.current_animation).ends_with("|Wave"), "its own wave clip: %s" % ap.current_animation)
-	assert_lt(v.arm_driver.weight[1], 0.01, "the clip moves the arms, not the driver")
-	v.emote(&"laugh")  # no laugh clip: driven arms over the idle clip
-	v.update_motion(Vector3.ZERO, true, STEP)
-	await _at(v, 1.0)
-	assert_true(String(ap.current_animation).ends_with("|Idle"), "idle underneath: %s" % ap.current_animation)
-	assert_gt(v.arm_driver.weight[0], 0.9)
-
-
-## Megaphone, tray, any held item: the right arm keeps its pose through an emote (bean and skin).
+## Megaphone, tray, any held item: the right arm keeps its pose through an emote.
 func test_held_item_arm_wins_over_the_emote() -> void:
 	var v: AvatarVisuals = await _bean()
 	v.hold_right_arm(CasinoFloor.HOLD_ARM)
@@ -204,13 +153,6 @@ func test_held_item_arm_wins_over_the_emote() -> void:
 	assert_gt(_arm(v, 0).distance_to(AvatarVisuals.arm_direction(AvatarVisuals.ARM_REST, -0.38, -1.0)), 0.05, "the left arm still waves along")
 	var slot: Node3D = v.hand_node()
 	assert_true(v.hand_r.is_ancestor_of(slot), "the item rides in the right glove")
-	v.set_skin(&"king")
-	v.emote(&"six_seven")
-	await _at(v, 0.875)
-	await wait_process_frames(2)
-	assert_almost_eq(v.arm_driver.weight[1], 1.0, 0.001)
-	assert_almost_eq(v.arm_driver.upper_dir[1].distance_to(want), 0.0, 0.01, "skin: the holding arm keeps its pose")
-	assert_true(v.skin_root.is_ancestor_of(slot), "and the item follows the skin's hand")
 
 
 func test_arm_pose_round_trips() -> void:

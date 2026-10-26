@@ -27,8 +27,6 @@ var hand_l: RigidBody3D
 var hand_r: RigidBody3D
 var hips: RigidBody3D
 var color: Color = Palette.CREAM
-## Character skin: when it has a model, that model rides the torso instead of the bean parts.
-var skin: StringName = &"bean"
 var max_time: float = 2.5
 ## Player this ragdoll belongs to.
 var player_id: int = -1
@@ -44,14 +42,13 @@ var _still: float = 0.0
 var _done: bool = false
 var _prev_vel: Vector3 = Vector3.ZERO
 
-## Visual-only flail layer (built only with a display, and only for the bean).
+## Visual-only flail layer (built only with a display).
 var _arm_meshes: Array[MeshInstance3D] = []
 var _hand_meshes: Array[MeshInstance3D] = []
 var _leg_pivots: Array[Node3D] = []
 var _eyes: Array[MeshInstance3D] = []
 var _x_eyes: Array[Node3D] = []
 var _dazed: bool = false
-var _skinned: bool = false
 var _vis_t: float = 0.0
 var _vis_prev: Vector3 = Vector3.INF
 var _vis_speed: float = 0.0
@@ -173,8 +170,7 @@ func _build() -> void:
 		pupil.position = Vector3(0.0, 0.0, -AvatarVisuals.EYE_RADIUS * 0.82)
 		e.add_child(pupil)
 		_eyes.append(e)
-	_skinned = _wear_skin()
-	if not _skinned and DisplayServer.get_name() != "headless":
+	if DisplayServer.get_name() != "headless":
 		_build_flail(mat, dark)
 	set_dazed(_dazed)
 
@@ -183,7 +179,7 @@ func _build() -> void:
 func set_dazed(on: bool) -> void:
 	_dazed = on
 	for e: MeshInstance3D in _eyes:
-		e.visible = not on and not _skinned
+		e.visible = not on
 	for x: Node3D in _x_eyes:
 		x.visible = on
 
@@ -264,26 +260,6 @@ func _process(delta: float) -> void:
 		arm.global_transform = Transform3D(Basis(side_axis, up * length, fwd), shoulder + span * 0.5)
 	for i: int in _leg_pivots.size():
 		_leg_pivots[i].rotation.x = sin(_vis_t * 21.0 + i * PI) * 0.9 * flail
-
-
-## Hides the bean parts and pins the skin model to the torso (it tumbles stiffly, in its idle pose).
-## Returns whether a skin model is worn.
-func _wear_skin() -> bool:
-	var model: Node3D = SkinLibrary.instantiate(skin)
-	if model == null:
-		return false
-	for b: RigidBody3D in [torso, head, hand_l, hand_r, hips]:
-		for mi: Node in b.find_children("*", "MeshInstance3D", true, false):
-			(mi as MeshInstance3D).visible = false
-	torso.add_child(model)
-	model.position.y = -0.9
-	SkinLibrary.relax_pose(model)
-	var ap: AnimationPlayer = SkinLibrary.animation_player(model)
-	if ap != null:
-		var hit: StringName = SkinLibrary.clip(ap, &"idle")
-		if hit != &"":
-			ap.play(hit)
-	return true
 
 
 func _body(name: String, pos: Vector3, mesh: Mesh, mat: Material, mass: float) -> RigidBody3D:

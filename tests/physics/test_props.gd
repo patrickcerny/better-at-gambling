@@ -1,6 +1,6 @@
 extends GutTest
 ## Patrick's poly.pizza props on the stations: stools under every seat, cones while out of order,
-## money piles beside Plinko once the jackpot is big, and skins replacing the bean.
+## money piles beside Plinko once the jackpot is big, and the bean taking a new colour.
 
 
 func _station(st: StationBase) -> StationBase:
@@ -42,14 +42,12 @@ func test_money_piles_grow_with_the_jackpot() -> void:
 	assert_gt(st._money_piles[0].scale.x, 1.0)
 
 
-func test_skin_replaces_the_bean_and_back() -> void:
+func test_the_bean_is_the_only_body_and_takes_its_colour() -> void:
 	var v := AvatarVisuals.new()
 	add_child_autofree(v)
 	await wait_process_frames(1)
-	v.set_skin(&"king")
-	assert_not_null(v.skin_root)
-	assert_false(v.body.visible)
+	assert_false(v.has_method("set_skin"), "the character skins are gone")
+	v.set_color(Palette.player_color(12))
+	assert_eq(v.color, Palette.player_color(12))
 	v.update_motion(Vector3(2, 0, 0), true, 0.016)
-	v.set_skin(&"bean")
-	assert_null(v.skin_root)
 	assert_true(v.body.visible)

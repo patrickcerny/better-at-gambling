@@ -5,7 +5,7 @@ extends Control
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Big Wendy", "Snake Eyes"]
-const SKINS: Array[String] = ["king", "bean", "wizard", "business", "swat"]
+const BEAN_COLORS: Array[int] = [15, 1, 9, 3, 13]
 
 
 func _ready() -> void:
@@ -105,7 +105,7 @@ func _state() -> ClientMatchState:
 	st.lobby_settings = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "mode": &"casino", "public": true}
 	for i: int in NAMES.size():
 		var pid: int = i + 1
-		st.players[pid] = {"id": pid, "name": NAMES[i], "color": i, "ready": i % 2 == 0, "skin": SKINS[i], "connected": i != 3, "inventory": []}
+		st.players[pid] = {"id": pid, "name": NAMES[i], "color": i, "ready": i % 2 == 0, "bean_color": BEAN_COLORS[i], "connected": i != 3, "inventory": []}
 		st.balances[pid] = [2840, 1950, 1200, 640, 90][i]
 	st.shop_offers = [
 		{"item": "lucky_clover", "price": 150, "rarity": 0}, {"item": "bodyguard", "price": 300, "rarity": 1},

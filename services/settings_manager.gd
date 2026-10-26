@@ -30,6 +30,8 @@ const FPS_CAPS: Array[int] = [0, 30, 60, 90, 120, 144, 165, 240, MATCH_MONITOR]
 const MAX_MIC_GAIN: float = 2.0
 ## Keys of the `video` section older versions saved that mean nothing any more (`drop_removed_keys`).
 const REMOVED_VIDEO_KEYS: Array[String] = ["pixel_look", "pixel_scale"]
+## Keys of the `profile` section older versions saved that mean nothing any more.
+const REMOVED_PROFILE_KEYS: Array[String] = ["skin"]
 ## Section of the settings file that holds remapped keys: action → "key:<physical keycode>" or
 ## "mouse:<button index>". Only actions the player changed are stored.
 const KEYBIND_SECTION: String = "keybinds"
@@ -117,6 +119,11 @@ func drop_removed_keys() -> bool:
 	for key: String in REMOVED_VIDEO_KEYS:
 		if _cfg.has_section_key("video", key):
 			_cfg.erase_section_key("video", key)
+			dropped = true
+	# The character skins are gone (0.9.16); the bean's colour lives in user://profile.cfg.
+	for key: String in REMOVED_PROFILE_KEYS:
+		if _cfg.has_section_key("profile", key):
+			_cfg.erase_section_key("profile", key)
 			dropped = true
 	if dropped:
 		save()

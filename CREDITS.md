@@ -13,12 +13,6 @@ CC-BY models must keep their author named here.
 
 | File | Model | id | Author | License |
 |---|---|---|---|---|
-| skin_01.glb | Wizardus Maximus | 6oDxK0wqyL | madtrollstudio | CC-BY 3.0 |
-| skin_02.glb | Business Man | JFrLIKqvCH | Quaternius | CC0 (Quaternius rig and clips) |
-| skin_03.glb | Warrior | RaWl2GJ0NZ | mastjie | CC0 |
-| skin_04.glb | King | I1gTjmuK2m | Quaternius | CC0 (Quaternius rig and clips) |
-| skin_05.glb | Man | HMnuH5geEG | Quaternius | CC0 (Quaternius rig and clips) |
-| skin_06.glb | SWAT | Btfn3G5Xv4 | Quaternius | CC0 (Quaternius rig and clips) |
 | poker_chip.glb | Poker chip | 2T3RWLeAudL | Poly by Google | CC-BY 3.0 |
 | money_pile.glb | Cash Money - Big Pile | dZPTS7VMmqP | Evol-Love | CC-BY 3.0 |
 | beer_empty.glb | Beer Mug | Zkyui3QLc9 | MilkAndBanana | CC0 |

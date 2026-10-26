@@ -3,14 +3,14 @@ extends Node3D
 ## The bean: a chubby jelly bean in the player colour with a glossy shine, big googly eyes whose
 ## pupils follow the camera (or make eye contact with whoever watches), eyebrows, a mouth that
 ## grins, frowns, gasps `O` and talks with the voice (`-`/`o`/`O`), stubby arms with oversized
-## cartoon gloves, and little feet that paddle when walking. Or a character skin.
+## cartoon gloves, and little feet that paddle when walking. It is the only body there is (the
+## character skins were removed in 0.9.16); its colour is the player's bean colour (`PlayerState.bean_color`).
 ## Procedural animation (M7): spring lean on acceleration, squash on landing and stretch in the
 ## air, a squash and gasp when hit, idle bob, blinking, a banana slip, cheering / sulking / big-win
 ## reactions with matching faces, flailing while carried, a wobbly get-up after a ragdoll,
 ## knockout birdies, and every emote (`emote`): the wheel's wave, laugh, taunt, cry, dance and GG
 ## and the number keys' 67, thumbs up, thumbs down and default dance, each its own motion of the
-## arms, body, feet and face. Character skins act them out too: a fitting clip of their own when
-## they have one, else their arm bones are driven to the same pose (`SkinArmModifier`).
+## arms, body, feet and face.
 ## (docs/ART_DIRECTION.md)
 ##
 ## `update_motion` feeds movement in; everything is drawn once per frame in `_process`, so beans
@@ -78,11 +78,7 @@ var hat_slot: Node3D
 ## Knockout stars and birdies (a `KnockoutOrbit`); visible while knocked out.
 var stars: Node3D
 var color: Color = Palette.CREAM
-## Character skin (`Cosmetics.SKINS`); &"bean" shows the procedural bean.
-var skin_id: StringName = &"bean"
-## The skin model while one is worn (bean parts are hidden then).
-var skin_root: Node3D
-## Set while the player sits at a station (skins with a sitting clip use it).
+## Set while the player sits at a station.
 var sitting: bool = false
 ## Set while a guard carries this bean out over their head (lies flat and flails).
 var carried: bool = false
@@ -110,8 +106,6 @@ var emote_time: float = 0.0
 var hold_arm_r: Vector3 = Vector3.INF
 ## Run the animation headless too (tests read the pose; servers never set it).
 var animate_headless: bool = false
-## The skin's arm driver (null for the bean and skins without arm bones).
-var arm_driver: SkinArmModifier = null
 
 var _rig: Node3D
 var _lean: Vector2 = Vector2.ZERO
@@ -147,17 +141,9 @@ var _pupils: Array[Node3D] = []
 var _thumbs: Array[MeshInstance3D] = []
 var _cheeks: Array[MeshInstance3D] = []
 var _hand_slot: Node3D
-var _hand_slot_bone: BoneAttachment3D
 var _look: Vector2 = Vector2.ZERO
 var _saccade: Vector2 = Vector2.ZERO
 var _saccade_in: float = 1.0
-var _anim: AnimationPlayer
-var _motion: StringName = &""
-## Player-colored ring at the feet: skins hide the bean, so this keeps who-is-who readable.
-var _ring: MeshInstance3D
-var _ring_mat: StandardMaterial3D
-## The current emote uses the skin's own clip (`SkinLibrary.CLIPS`) instead of driven arms.
-var _emote_clip: bool = false
 ## Whole-body offset from the emote (hops), added on the rig.
 var _emote_lift: Vector3 = Vector3.ZERO
 var _tears: Array[MeshInstance3D] = []
@@ -167,10 +153,6 @@ var _headless: bool = false
 func _ready() -> void:
 	_headless = DisplayServer.get_name() == "headless"
 	_build()
-	if skin_id != &"bean":
-		var id: StringName = skin_id
-		skin_id = &"bean"
-		set_skin(id)
 
 
 ## Applies the player colour.
@@ -178,78 +160,12 @@ func set_color(c: Color) -> void:
 	color = c
 	if _body_mat != null:
 		ToonMaterial.set_color(_body_mat, c)
-	if _ring_mat != null:
-		_ring_mat.albedo_color = c
 
 
-## The right hand: a node at the glove (or at a skin's right wrist) for held items. Its -Z points
+## The right hand: a node at the glove for held items. Its -Z points
 ## out of the fist along the arm and +Y along the thumb.
 func hand_node() -> Node3D:
 	return _hand_slot
-
-
-## Swaps between the bean and a character skin (see `SkinLibrary`).
-func set_skin(id: StringName) -> void:
-	if id == skin_id:
-		return
-	skin_id = id
-	if body == null:
-		return  # applied in _ready
-	_reparent_hand_slot(null)
-	if skin_root != null:
-		skin_root.queue_free()
-		skin_root = null
-	_anim = null
-	_motion = &""
-	arm_driver = null
-	var model: Node3D = SkinLibrary.instantiate(id)
-	if model != null:
-		_rig.add_child(model)
-		skin_root = model
-		SkinLibrary.relax_pose(model)
-		_anim = SkinLibrary.animation_player(model)
-		_play(&"idle")
-		_reparent_hand_slot(model)
-		arm_driver = SkinLibrary.arm_driver(model)
-	_emote_clip = emote_id != &"" and _anim != null and SkinLibrary.clip(_anim, emote_id) != &""
-	var bean: bool = skin_root == null
-	body.visible = bean
-	arm_l.visible = bean
-	arm_r.visible = bean
-	for leg: MeshInstance3D in _legs:
-		leg.visible = bean
-	_ring.visible = not bean and _rig.visible
-
-
-## Moves the hand slot onto a skin's right wrist bone (or back onto the glove when `model` is null).
-func _reparent_hand_slot(model: Node3D) -> void:
-	if _hand_slot == null:
-		return
-	var target: Node3D = hand_r
-	var xf: Transform3D = Transform3D.IDENTITY
-	if model != null:
-		var bone_attach: BoneAttachment3D = SkinLibrary.right_hand(model)
-		if bone_attach != null:
-			_hand_slot_bone = bone_attach
-			target = bone_attach
-		else:
-			target = model
-			xf = Transform3D(Basis.IDENTITY, Vector3(0.38, 0.75, -0.1))
-	_hand_slot.get_parent().remove_child(_hand_slot)
-	target.add_child(_hand_slot)
-	_hand_slot.transform = xf
-
-
-func _play(motion: StringName) -> void:
-	if _anim == null or motion == _motion:
-		return
-	var a: StringName = SkinLibrary.clip(_anim, motion)
-	if a == &"" and motion == &"sit":
-		a = SkinLibrary.clip(_anim, &"idle")
-	if a == &"":
-		return
-	_motion = motion
-	_anim.play(a, 0.2)
 
 
 ## Half-transparent "away" look for disconnected players.
@@ -272,18 +188,6 @@ func update_motion(velocity: Vector3, on_floor: bool, delta: float) -> void:
 	_on_floor = on_floor
 	_velocity = velocity
 	_prev_velocity = velocity
-	if skin_root != null:
-		var speed: float = Vector2(velocity.x, velocity.z).length()
-		if emote_id != &"" and speed <= EMOTE_CANCEL_SPEED:
-			_play(emote_id if _emote_clip and not sitting else (&"sit" if sitting else &"idle"))
-		elif sitting:
-			_play(&"sit")
-		elif speed > 4.2:
-			_play(&"run")
-		elif speed > 0.4:
-			_play(&"walk")
-		else:
-			_play(&"idle")
 
 
 ## Plays a reaction: &"win" (cheer, eyes wide), &"loss" / &"lose" (sulk, eyes droop), &"big_win"
@@ -341,8 +245,6 @@ func emote(id: StringName, at: float = 0.0) -> bool:
 	emote_time = maxf(at, 0.0)
 	if reaction != &"big_win":
 		reaction = &""
-	_motion = &""
-	_emote_clip = _anim != null and SkinLibrary.clip(_anim, id) != &""
 	return true
 
 
@@ -363,9 +265,7 @@ func stop_emote() -> void:
 		return
 	emote_id = &""
 	emote_time = 0.0
-	_emote_clip = false
 	_emote_lift = Vector3.ZERO
-	_motion = &""  # skins pick their walk/idle clip again
 
 
 ## The reaction for a round's net result.
@@ -391,7 +291,6 @@ func set_knocked_out(ko: bool) -> void:
 func set_ragdoll(rb: RagdollBody) -> void:
 	_ragdoll = rb
 	_rig.visible = rb == null
-	_ring.visible = rb == null and skin_root != null
 	if rb != null:
 		stop_emote()
 	var orbit: KnockoutOrbit = stars as KnockoutOrbit
@@ -475,43 +374,12 @@ func _animate(frame_delta: float) -> void:
 	var sq: Vector3 = Vector3(1.0 / sqrt(_squash), _squash * bob, 1.0 / sqrt(_squash))
 	body.scale = sq
 	body.position = Vector3(0.0, BODY_BOTTOM + BODY_HEIGHT * 0.5 * sq.y, 0.0) + (em.get("shift", Vector3.ZERO) as Vector3)
-	if skin_root != null:
-		skin_root.rotation = Vector3(_lean.x * 0.6, float(em.get("twist", 0.0)), -_lean.y * 0.6)
-		skin_root.scale = Vector3(sq.x, _squash * bob, sq.z)
-		skin_root.position = em.get("shift", Vector3.ZERO) as Vector3
-		_drive_skin_arms(em)
 	_animate_rig()
 	_animate_arms(walk, em)
 	_animate_legs(walk, em)
 	_animate_face(delta, em)
 	if reaching and not is_swinging():
 		_point_arms(reach_target)
-
-
-## Points a skin's arms like the bean's: the emote's pose (its `skin` directions when it has
-## them: upper arm and forearm per side, for gestures that need an elbow), and the held-item arm.
-func _drive_skin_arms(em: Dictionary) -> void:
-	if arm_driver == null:
-		return
-	var w: float = 0.0 if em.is_empty() or (_emote_clip and not sitting) else float(em["w"])
-	var arms: Vector4 = em.get("arms", Vector4(ARM_REST, -0.38, ARM_REST, -0.38)) as Vector4
-	var dirs: Array = em.get("skin", []) as Array
-	for i: int in 2:
-		var side: float = -1.0 if i == 0 else 1.0
-		var pose: Vector2 = Vector2(arms.x, arms.y) if i == 0 else Vector2(arms.z, arms.w)
-		var upper: Vector3 = arm_direction(pose.x, pose.y, side)
-		var lower: Vector3 = upper
-		if dirs.size() == 4:
-			upper = (dirs[i * 2] as Vector3).normalized()
-			lower = (dirs[i * 2 + 1] as Vector3).normalized()
-		var arm_w: float = w
-		if i == 1 and hold_arm_r != Vector3.INF and not carried:
-			upper = arm_direction(hold_arm_r.x, hold_arm_r.y, side)
-			lower = upper
-			arm_w = 1.0
-		arm_driver.upper_dir[i] = upper
-		arm_driver.lower_dir[i] = lower
-		arm_driver.weight[i] = arm_w
 
 
 ## Where a bean arm posed (`pitch`, `splay`) points, in the rig's space (-Z forward); `side` -1
@@ -602,8 +470,7 @@ func _slip_curve(t: float) -> float:
 ## left pitch, left splay, right pitch, right splay), `rolls` (Vector2: glove roll left/right,
 ## 0 = thumb forward), `fists` (right, 0..1), `fists_l`, `flat` (open hands), `feet` (Vector4:
 ## left x/z, right x/z offsets), `step` (foot lifts), face `smile`, `open`, `brow` (raise, worry),
-## `look` (pupil offset), `eyes` (how open), `wink` (left eye shut), `tears`, and for skins `skin`
-## (upper-arm and forearm directions, left then right, when a gesture needs bent elbows).
+## `look` (pupil offset), `eyes` (how open), `wink` (left eye shut) and `tears`.
 ## Empty when no emote plays. Each one eases in and out over ~0.2 s.
 func _emote_pose() -> Dictionary:
 	if emote_id == &"":
@@ -615,13 +482,11 @@ func _emote_pose() -> Dictionary:
 	match emote_id:
 		&"six_seven":
 			# The 67 meme: both hands straight out in front, palms up, weighing "six... seven" up
-			# and down in turn like a pair of scales, the head tilting along. Skins bend their
-			# elbows at their sides with the forearms doing the weighing.
+			# and down in turn like a pair of scales, the head tilting along.
 			var s: float = sin(t * TAU * 2.0)
 			var lp: float = -0.1 + s * 0.5
 			var rp: float = -0.1 - s * 0.5
 			p["arms"] = Vector4(lp, 0.0, rp, 0.0)
-			p["skin"] = [Vector3(-0.12, -0.95, 0.2), Vector3(-0.05, sin(lp), -cos(lp)), Vector3(0.12, -0.95, 0.2), Vector3(0.05, sin(rp), -cos(rp))]
 			p["rolls"] = Vector2(-PI * 0.5, PI * 0.5)  # thumbs point out: palms up
 			p["flat"] = 1.0  # open, flat hands
 			p["lean"] = Vector2(0.04, s * 0.14)
@@ -706,7 +571,6 @@ func _wave(t: float) -> Dictionary:
 	p["open"] = 0.55
 	p["brow"] = Vector2(0.9, 0.0)
 	p["look"] = Vector2(0.0, 0.1)
-	p["skin"] = [Vector3(-0.2, -1.0, 0.0), Vector3(-0.1, -1.0, -0.1), Vector3(0.9, 0.35, -0.15), right]
 	return p
 
 
@@ -729,8 +593,6 @@ func _laugh(t: float) -> Dictionary:
 	p["eyes"] = 0.18
 	p["brow"] = Vector2(0.8, -0.2)
 	p["look"] = Vector2(0.0, lerpf(0.35, -0.2, over))
-	var point: Vector3 = arm_direction(p["arms"].z, 0.0, 1.0)
-	p["skin"] = [Vector3(-0.2, -0.85, -0.5), Vector3(0.8, 0.0, -0.6), point, point]
 	return p
 
 
@@ -753,7 +615,6 @@ func _cry(t: float) -> Dictionary:
 	p["brow"] = Vector2(-0.1, 1.0)
 	p["look"] = Vector2(0.0, -0.3)
 	p["tears"] = 1.0
-	p["skin"] = [Vector3(0.2, -0.6, -0.75), Vector3(0.35, 0.95 + rub * 0.1, -0.1), Vector3(-0.2, -0.6, -0.75), Vector3(-0.35, 0.95 - rub * 0.1, -0.1)]
 	return p
 
 
@@ -776,7 +637,6 @@ func _taunt(t: float) -> Dictionary:
 	p["wink"] = 1.0
 	p["brow"] = Vector2(0.8, -0.4)
 	p["look"] = Vector2(0.0, 0.0)
-	p["skin"] = [Vector3(-1.0, 0.3, -0.1), Vector3(0.8, 0.6, -0.1), Vector3(1.0, 0.3, -0.1), Vector3(-0.8, 0.6, -0.1)]
 	return p
 
 
@@ -807,7 +667,6 @@ func _disco(t: float) -> Dictionary:
 	p["open"] = 0.35
 	p["brow"] = Vector2(0.6, 0.0)
 	p["look"] = Vector2(right.x * 0.4, right.y * 0.4)
-	p["skin"] = [Vector3(-0.9, -0.4, 0.2), Vector3(0.6, -0.3, -0.3), right, right]
 	return p
 
 
@@ -819,7 +678,6 @@ func _gg(t: float) -> Dictionary:
 	var shake: Vector2 = Vector2(-0.2 + pump * 0.14, 0.0)  # straight out, thumb up
 	var chest: Vector2 = arm_pose(Vector3(-0.55, -0.45, -0.7), 1.0)
 	var r: Vector2 = shake.lerp(chest, smoothstep(1.0, 1.3, t))
-	var right: Vector3 = arm_direction(r.x, r.y, 1.0)
 	var l: Vector2 = arm_pose(Vector3(-0.2, -0.9, 0.35), -1.0)
 	var p: Dictionary = {}
 	p["arms"] = Vector4(l.x, l.y, r.x, r.y)
@@ -832,7 +690,6 @@ func _gg(t: float) -> Dictionary:
 	p["eyes"] = lerpf(1.0, 0.15, bow)
 	p["brow"] = Vector2(0.5, 0.0)
 	p["look"] = Vector2(0.0, -0.2 * bow)
-	p["skin"] = [Vector3(-0.1, -1.0, 0.3), Vector3(-0.1, -1.0, 0.3), right, right]
 	return p
 
 
@@ -1330,23 +1187,6 @@ func _build() -> void:
 	for side: float in [-1.0, 1.0]:
 		var foot: MeshInstance3D = _blob(_rig, Vector3(side * 0.17, 0.065, -0.05), Vector3(0.11, 0.075, 0.16), shoe, "FootL" if side < 0.0 else "FootR")
 		_legs.append(foot)
-	_ring_mat = StandardMaterial3D.new()
-	_ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_ring_mat.albedo_color = color
-	_ring = MeshInstance3D.new()
-	_ring.name = "ColorRing"
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.36
-	torus.outer_radius = 0.44
-	torus.rings = 24
-	torus.ring_segments = 6
-	_ring.mesh = torus
-	_ring.material_override = _ring_mat
-	_ring.scale = Vector3(1.0, 0.15, 1.0)
-	_ring.position.y = 0.02
-	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_ring.visible = false
-	add_child(_ring)
 	hat_slot = Node3D.new()
 	hat_slot.name = "HatSlot"
 	hat_slot.position.y = BODY_HEIGHT * 0.5 - 0.05

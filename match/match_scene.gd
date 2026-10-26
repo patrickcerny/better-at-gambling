@@ -476,20 +476,19 @@ func _start_local(cmd: Cmdline) -> void:
 	var player_name: String = str(Settings.get_value("profile", "name", "You"))
 	var id: int = Net.start_local(server, player_name)
 	server.set_server_position(id, def.spawn_points[0])
-	if cmd.has("skin"):  # dev/screenshots
-		(server.state.players[id] as PlayerState).skin = StringName(cmd.get_string("skin"))
+	if cmd.has("bean-color"):  # dev/screenshots
+		(server.state.players[id] as PlayerState).bean_color = posmod(cmd.get_int("bean-color", 0), Cosmetics.COLOR_COUNT)
 	for i: int in clampi(cmd.get_int("dummies", test_dummies), 0, 7):
-		# Dev/screenshots: `--dummy-skins` dresses the dummies in the character skins.
-		var skin: StringName = Cosmetics.SKINS[(i + 1) % Cosmetics.SKINS.size()] if cmd.has_flag("dummy-skins") else &"bean"
-		var did: int = _add_dummy(i, skin)
+		# Dev/screenshots: `--dummy-colors` dresses the dummies in the colours bought with Coins.
+		var did: int = _add_dummy(i, Cosmetics.SLOT_COLORS + i if cmd.has_flag("dummy-colors") else -1)
 		# A step ahead of the spawn, still in the start room (clear of its north wall at z 8.4).
 		server.set_server_position(did, def.spawn_points[(i + 1) % def.spawn_points.size()] + Vector3(0, 0, -1.5))
 
 
 ## Test/screenshot dummy: a ready player with no client that only stands where it is put (or
 ## where physics throws it). Simulated by whoever hosts the server.
-func _add_dummy(i: int, skin: StringName = &"bean") -> int:
-	var did: int = server.add_player("dummy-%d" % (i + 1), DUMMY_NAMES[i % DUMMY_NAMES.size()], -1, skin)
+func _add_dummy(i: int, bean_color: int = -1) -> int:
+	var did: int = server.add_player("dummy-%d" % (i + 1), DUMMY_NAMES[i % DUMMY_NAMES.size()], bean_color)
 	server.lobby.set_panel_ready(did, true)
 	dummies[did] = true
 	return did
@@ -514,7 +513,7 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.name = "Player%d" % pid
 	a.player_id = pid
 	a.display_name = str(p.get("name", "Player"))
-	a.color = Palette.player_color(int(p.get("color", pid - 1)))
+	a.color = Palette.player_color(int(p.get("bean_color", p.get("color", pid - 1))))
 	a.is_local = pid == local_id
 	a.cfg = cfg
 	a.router = router if a.is_local else null
@@ -537,7 +536,6 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.ragdoll_impact.connect(func(strength: float, wall: bool) -> void: _on_ragdoll_impact(pid, strength, wall))
 	a.ragdoll_settled.connect(func() -> void: _on_ragdoll_settled(pid))
 	avatars[pid] = a
-	a.set_skin(StringName(p.get("skin", "bean")))
 	if not bool(p.get("connected", true)):
 		a.set_connection_away(true)
 	# Already at a table when we learn about them (joining late, reconnecting): put them in their
@@ -910,10 +908,10 @@ func _on_event(ev: Dictionary) -> void:
 			if a != null:
 				a.queue_free()
 				avatars.erase(int(ev["player"]))
-		&"player_skin":
+		&"player_color":
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null:
-				a.set_skin(StringName(ev["skin"]))
+				a.set_color(Palette.player_color(int(ev["bean_color"])))
 		&"player_left", &"player_rejoined":
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null and int(ev["player"]) != local_id:
@@ -2276,8 +2274,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 # --- World checks ------------------------------------------------------------------------------
 
-## &"settings" when the local player stands at the settings tablet in the lobby (skins are picked
-## in the main menu's Clothes menu).
+## &"settings" when the local player stands at the settings tablet in the lobby.
 func _lobby_spot() -> StringName:
 	if local == null or not view.state.room_mode or view.state.phase != Phase.Id.LOBBY:
 		return &""

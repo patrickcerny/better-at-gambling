@@ -3,7 +3,7 @@ extends Node3D
 ## tools/screenshot.gd --scene res://tools/dev/bean_shot.tscn --frames 100000 -- [--view faces|chaos]
 ## --shot out.png [--at seconds]. The scene saves the shot itself at `--at` seconds and quits.
 ## faces: idle with the leader crown, win, big win, loss, slip. chaos: a guard carrying a bean
-## out, a knocked-out ragdoll with birdies, a fountain splash, a skinned bean slipping.
+## out, a knocked-out ragdoll with birdies, a fountain splash, a Gold bean slipping.
 
 ## Seconds into each reaction the poses are frozen at (faces view).
 const PHASES: Dictionary = {&"win": 0.28, &"big_win": 0.75, &"loss": 0.9, &"slip": 0.33}
@@ -91,10 +91,10 @@ func _chaos(cam: Camera3D) -> void:
 	_guard = Guard.new()
 	add_child(_guard)
 	_guard.global_position = Vector3(-2.2, 0, 0)
-	_carried = _avatar(1, Vector3(-2.0, 0, 0.5), &"bean")
-	_ko = _avatar(2, Vector3(1.4, 0, 0.5), &"bean")
-	var skinned: PlayerAvatar = _avatar(3, Vector3(4.0, 0, -0.5), &"king")
-	_beans[&"skin"] = skinned.visuals
+	_carried = _avatar(1, Vector3(-2.0, 0, 0.5))
+	_ko = _avatar(2, Vector3(1.4, 0, 0.5))
+	var slipper: PlayerAvatar = _avatar(15, Vector3(4.0, 0, -0.5))
+	_beans[&"slipper"] = slipper.visuals
 	var basin := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 1.6
@@ -109,11 +109,10 @@ func _chaos(cam: Camera3D) -> void:
 	cam.fov = 60
 
 
-func _avatar(pid: int, pos: Vector3, skin: StringName) -> PlayerAvatar:
+func _avatar(pid: int, pos: Vector3) -> PlayerAvatar:
 	var a := PlayerAvatar.new()
 	a.player_id = pid
 	a.color = Palette.player_color(pid)
-	a.skin = skin
 	add_child(a)
 	a.teleport(pos, PI)
 	return a
@@ -138,7 +137,7 @@ func _process(delta: float) -> void:
 			_splashed = true
 			FountainSplash.spawn(self, Vector3(-0.2, FountainSplash.WATER_Y, -3.5), true)
 		if _frame >= 3:
-			var sv: AvatarVisuals = _beans[&"skin"]
+			var sv: AvatarVisuals = _beans[&"slipper"]
 			if sv.reaction != &"slip":
 				sv.react(&"slip")
 			sv.reaction_time = 0.3

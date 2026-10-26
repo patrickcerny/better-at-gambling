@@ -1,11 +1,10 @@
-class_name SkinPreviewView
+class_name BeanPreviewView
 extends TextureRect
-## A bean wearing one character skin (`Cosmetics.SKINS`), turning gently on a transparent
-## SubViewport: the tiles of the `ClothesPanel`. Same pattern as `Logo3DView` (own world, full
-## resolution); nothing 3D is built when headless. `portrait` frames the
-## head and shoulders instead of the whole bean (the Tab list's player rows).
+## A bean in one colour turning gently on a transparent SubViewport: the cosmetics shop's preview
+## and the Tab list's player portraits. Same pattern as `Logo3DView` (own world, full
+## resolution); nothing 3D is built when headless. `portrait` frames the head and shoulders
+## instead of the whole bean (the Tab list's player rows).
 
-var skin: StringName = &"bean"
 var color: Color = Palette.player_color(0)
 var portrait: bool = false
 var visuals: AvatarVisuals
@@ -13,20 +12,18 @@ var _viewport: SubViewport
 var _t: float = 0.0
 
 
-static func make(p_skin: StringName, min_size: Vector2 = Vector2(150, 180)) -> SkinPreviewView:
-	var v := SkinPreviewView.new()
+static func make(p_color: Color, min_size: Vector2 = Vector2(150, 180)) -> BeanPreviewView:
+	var v := BeanPreviewView.new()
 	v.name = "Preview"
-	v.skin = p_skin
+	v.color = p_color
 	v.custom_minimum_size = min_size
 	return v
 
 
-## Re-dresses the bean (a player changed skin or colour) without rebuilding the viewport.
-func set_look(p_skin: StringName, p_color: Color) -> void:
-	skin = p_skin
+## Recolours the bean without rebuilding the viewport.
+func set_bean_color(p_color: Color) -> void:
 	color = p_color
 	if visuals != null:
-		visuals.set_skin(skin)
 		visuals.set_color(color)
 
 
@@ -46,7 +43,6 @@ func _ready() -> void:
 	var root := Node3D.new()
 	_viewport.add_child(root)
 	visuals = AvatarVisuals.new()
-	visuals.skin_id = skin
 	root.add_child(visuals)
 	visuals.set_color(color)
 	var cam := Camera3D.new()

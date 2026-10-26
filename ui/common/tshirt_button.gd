@@ -1,12 +1,13 @@
 class_name TShirtButton
 extends GearButton
-## The clothes button (Patrick: "put in clothes menu (T-shirt icon next to settings gear)"): the
-## gear's square button with a T-shirt drawn in code instead of the cog. Opens the `ClothesPanel`.
+## The cosmetics button (first the clothes menu, Patrick: "T-shirt icon next to settings gear"):
+## the gear's square button with a T-shirt drawn in code instead of the cog. Opens the
+## `CosmeticsPanel` (the cosmetics shop).
 
 
 func _init() -> void:
 	super()
-	tooltip_text = "Clothes"
+	tooltip_text = "Cosmetics"
 
 
 func _draw() -> void:

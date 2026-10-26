@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="ProgressionConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/defs/progression_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+xp_match = 100
+xp_by_rank = PackedInt32Array(120, 80, 50, 30, 20)
+xp_per_minigame_win = 30
+money_per_xp = 20
+xp_money_cap = 100
+xp_per_hand = 2
+xp_hands_cap = 60
+practice_rate = 0.5
+early_base = 100
+early_step = 35
+soft_cap_level = 10
+late_base = 450
+late_step = 50
+max_level = 99
+coins_per_xp = 0.1
+level_up_coins = 50

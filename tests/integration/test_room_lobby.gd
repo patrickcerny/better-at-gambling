@@ -33,18 +33,29 @@ func _tick(seconds: float) -> void:
 		t += 0.05
 
 
-func test_colors_are_fixed_and_unique_and_skins_are_picked() -> void:
-	var a: int = server.add_player("dev:a", "A", 3, &"cowboy")
-	var b: int = server.add_player("dev:b", "B", 3, &"king")
-	assert_eq(server.state.players[a].color_index, 0, "wishes ignored: first free color")
+func test_slot_colors_are_fixed_and_beans_wear_the_preferred_colour() -> void:
+	var a: int = server.add_player("dev:a", "A", 9)
+	var b: int = server.add_player("dev:b", "B", 9)
+	assert_eq(server.state.players[a].color_index, 0, "slot colours are not picked: first free one")
 	assert_eq(server.state.players[b].color_index, 1)
-	assert_eq(server.state.players[a].skin, &"bean", "unknown skins fall back to the bean")
-	assert_eq(server.state.players[b].skin, &"king", "saved skin is kept")
-	assert_false(_intent(b, &"set_cosmetics", {"color": 6, "hat": &"cowboy"})["ok"], "no color picker any more")
-	assert_true(_intent(a, &"set_skin", {"skin": &"swat"})["ok"])
-	assert_eq(server.state.players[a].skin, &"swat")
-	assert_false(_intent(a, &"set_skin", {"skin": &"dragon"})["ok"])
-	assert_eq(server.state.players[a].skin, &"swat")
+	assert_eq(server.state.players[a].bean_color, 9, "the preferred colour wins while free")
+	assert_eq(server.state.players[b].bean_color, 1, "taken: the slot colour instead")
+	assert_false(_intent(b, &"set_cosmetics", {"color": 6, "hat": &"cowboy"})["ok"], "no old cosmetics intent")
+	assert_false(_intent(a, &"set_skin", {"skin": &"swat"})["ok"], "the skins are gone")
+	assert_true(_intent(a, &"set_color", {"color": 12})["ok"])
+	assert_eq(server.state.players[a].bean_color, 12)
+	assert_eq(server.state.players[a].color_index, 0, "the slot colour stays")
+	assert_eq(_intent(b, &"set_color", {"color": 12})["error"], &"color_taken", "two beans never share a colour")
+	assert_eq(server.state.players[b].bean_color, 1)
+	assert_false(_intent(a, &"set_color", {"color": Cosmetics.COLOR_COUNT})["ok"], "out of range")
+	assert_false(_intent(a, &"set_color", {"color": "red"})["ok"])
+	assert_eq(server.state.players[a].bean_color, 12)
+	assert_true(_intent(b, &"set_color", {"color": 9})["ok"], "a colour let go is free again")
+	var colored: Array = server.event_log.filter(func(e: Dictionary) -> bool: return e["type"] == &"player_color")
+	assert_eq(colored.size(), 2, "every change is broadcast")
+	assert_eq(int(colored[-1]["bean_color"]), 9)
+	assert_eq(int(server.state.players[b].to_wire()["bean_color"]), 9, "on the wire")
+	assert_false(server.state.players[b].to_wire().has("skin"))
 
 
 func test_not_ready_wins_over_the_pad_and_reconnect_starts_not_ready() -> void:

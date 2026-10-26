@@ -198,7 +198,7 @@ func test_question_mark_in_the_main_menu() -> void:
 	Settings.set_value("tutorial", "seen", true)
 	var menu: Control = await _menu()
 	var help: HelpButton = menu.find_child("HelpButton", true, false) as HelpButton
-	var tshirt: Button = menu.find_child("ClothesButton", true, false) as Button
+	var tshirt: Button = menu.find_child("CosmeticsButton", true, false) as Button
 	var gear: Button = menu.find_child("SettingsButton", true, false) as Button
 	assert_not_null(help, "? button in the main menu")
 	if help == null:

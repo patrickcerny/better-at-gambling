@@ -50,12 +50,11 @@ func profile_name() -> String:
 	return n
 
 
-## Saved look: {color, skin}.
+## Saved look for the hello: {color: the preferred bean colour from the profile (-1 = none),
+## `--color N` overrides it}.
 func profile_cosmetics() -> Dictionary:
-	return {
-		"color": cmdline.get_int("color", int(Settings.get_value("profile", "color", -1))) if cmdline != null else -1,
-		"skin": StringName(cmdline.get_string("skin", str(Settings.get_value("profile", "skin", "bean")))) if cmdline != null else &"bean",
-	}
+	var preferred: int = ProfileManager.profile.preferred_color if ProfileManager.profile != null else -1
+	return {"color": cmdline.get_int("color", preferred) if cmdline != null else preferred}
 
 
 ## Network test options from the command line ({latency_ms, loss, seed}).

@@ -125,8 +125,6 @@ func _process(delta: float) -> void:
 	if _bean.body != null:
 		_bean.body.rotation = _tilt
 		_bean.body.scale = Vector3(1.0 / sqrt(squash), squash, 1.0 / sqrt(squash))
-	if _bean.skin_root != null:
-		_bean.skin_root.rotation = _tilt * 0.7
 	if _bean.arm_l != null and _bean.arm_r != null:
 		var flap: float = sin(_t * 11.0) * 0.5 if mood == Mood.CHEER else 0.0
 		_bean.arm_l.basis = Basis(Vector3.BACK, _arm.y) * Basis(Vector3.RIGHT, _arm.x)

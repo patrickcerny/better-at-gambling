@@ -93,6 +93,12 @@ layout_mode = 2
 theme_type_variation = &"MenuEntry"
 text = "TUTORIAL"
 
+[node name="Cosmetics" type="Button" parent="Center/Column/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MenuEntry"
+text = "COSMETICS"
+
 [node name="Quit" type="Button" parent="Center/Column/VBox"]
 unique_name_in_owner = true
 layout_mode = 2

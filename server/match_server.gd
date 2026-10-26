@@ -59,6 +59,13 @@ var stats: Dictionary[int, Dictionary] = {}
 var money_history: MoneyHistory = MoneyHistory.new()
 ## Results screen: seconds until an online room goes back to its lobby on its own.
 var results_return_in: float = -1.0
+## The last finished match's XP/Coins rows, player → `Progression.breakdown` (in `match_ended`
+## and the results snapshot), and its id: clients add their row to their profile once per id.
+var progress: Dictionary = {}
+var match_id: String = ""
+var _matches_finished: int = 0
+## Tells this server's matches apart from another run's (`match_id`).
+var _instance_token: int = Time.get_ticks_usec() ^ int(Time.get_unix_time_from_system())
 ## Time acceleration for sims/tests.
 var timescale: float = 1.0
 ## Match seconds elapsed (all phases), the server clock.
@@ -396,18 +403,18 @@ func open_lobby() -> void:
 	_open_fun_room()
 
 
-## Adds a participant and returns its player id. Colors are fixed and unique; `skin` is the
-## player's saved character skin.
-func add_player(uid: String, display_name: String, color_index: int = -1, skin: StringName = &"bean") -> int:
+## Adds a participant and returns its player id. The slot colour is fixed and unique; `bean_color`
+## is the player's preferred bean colour from their profile (`Cosmetics.bean_color_for`).
+func add_player(uid: String, display_name: String, bean_color: int = -1) -> int:
 	var p := PlayerState.new()
 	p.id = _next_player_id
 	_next_player_id += 1
 	p.uid = uid
 	p.display_name = display_name
-	# No color picker (Patrick, 2026-10-05): everyone gets the first free color and the client's
-	# `color_index` wish is ignored. Skins are the only look players choose.
+	# Slot colours are not picked (Patrick, 2026-10-05): everyone gets the first free one. The bean
+	# wears the preferred colour when no other bean does (0.9.16, the pedestal colour panel).
 	p.color_index = lobby.free_color(_taken_colors(), -1)
-	p.skin = skin if Cosmetics.is_valid_skin(skin) else &"bean"
+	p.bean_color = Cosmetics.bean_color_for(bean_color, p.color_index, _worn_bean_colors(-1))
 	state.add_player(p)
 	economy.add_player(p.id, balance.start_money)
 	_reset_stats(p.id)
@@ -509,11 +516,26 @@ func player_reconnected(player: int) -> void:
 	if not state.players.has(player):
 		return
 	state.players[player].connected = true
+	# Someone who joined meanwhile may wear our bean colour now: two beans never share one.
+	var ps: PlayerState = state.players[player]
+	var worn: Array[int] = _worn_bean_colors(player)
+	if ps.bean_color in worn:
+		ps.bean_color = Cosmetics.bean_color_for(-1, ps.color_index, worn)
+		_emit(GameEvents.make(&"player_color", {"player": player, "bean_color": ps.bean_color}))
 	rules.status(player).away = false
 	lobby.set_connected(player, true, _uptime)
 	_emit(GameEvents.make(&"player_rejoined", {"player": player}))
 	_check_leader()
 	_flush()
+
+
+## Bean colours the connected players other than `except` wear.
+func _worn_bean_colors(except: int) -> Array[int]:
+	var out: Array[int] = []
+	for id: int in state.players:
+		if id != except and state.players[id].connected:
+			out.append(state.players[id].bean_color)
+	return out
 
 
 func _taken_colors() -> Array[int]:
@@ -629,6 +651,8 @@ func get_snapshot() -> Dictionary:
 	if phases.phase == Phase.Id.RESULTS:
 		snap["standings"] = get_standings()
 		snap["awards"] = get_awards()
+		snap["progress"] = progress.duplicate(true)
+		snap["match_id"] = match_id
 		snap["results_return_in"] = snappedf(results_return_in, 0.01)
 	return snap
 
@@ -819,7 +843,25 @@ func _finish_match() -> void:
 	var standings: Array[Dictionary] = get_standings()
 	if room_mode:
 		results_return_in = balance.results_return_time
-	_emit(GameEvents.make(&"match_ended", {"standings": standings, "awards": get_awards(), "jackpot": jackpot.pot, "return_in": results_return_in}))
+	_matches_finished += 1
+	match_id = "%d-%d" % [_instance_token, _matches_finished]
+	progress = progress_rows(standings)
+	_emit(GameEvents.make(&"match_ended", {"standings": standings, "awards": get_awards(), "jackpot": jackpot.pot, "return_in": results_return_in,
+		"progress": progress.duplicate(true), "match_id": match_id}))
+
+
+## XP and Coins per player for the match that just ended (`Progression.breakdown`, data in
+## data/progression/progression.tres): placement, minigames won, money won and hands played.
+## Practice (no online room) earns at the practice rate.
+func progress_rows(standings: Array[Dictionary]) -> Dictionary:
+	var cfg: ProgressionConfig = ProgressionConfig.default()
+	var out: Dictionary = {}
+	for row: Dictionary in standings:
+		var id: int = int(row["player"])
+		var st: Dictionary = stats.get(id, {})
+		out[id] = Progression.breakdown(cfg, int(row.get("rank", 1)), int(st.get("minigames_won", 0)),
+			economy.balance(id) - balance.start_money, int(st.get("hands", 0)), not room_mode, int(st.get("biggest_win", 0)))
+	return out
 
 
 # --- Minigames & rewards -----------------------------------------------------------------------
@@ -885,6 +927,10 @@ func _finish_minigame() -> void:
 	_flush()
 	minigame = null
 	minigames.end()
+	for i: int in ranking.size():
+		var winner: int = int(ranking[i]["player"])
+		if int(ranking[i].get("rank", i + 1)) == 1 and stats.has(winner):
+			stats[winner]["minigames_won"] = int(stats[winner].get("minigames_won", 0)) + 1
 	_emit(GameEvents.make(&"minigame_finished", {"ranking": ranking}))
 	phases.minigame_finished()
 	var played_segment: int = maxi(phases.segment_index() - 1, 0)
@@ -1016,7 +1062,8 @@ func return_to_lobby() -> void:
 func _reset_stats(id: int) -> void:
 	stats[id] = {"won_by_game": {}, "biggest_bet": 0, "biggest_win": 0, "biggest_loss": 0, "knockouts_suffered": 0,
 		"thrown_out": 0, "shaken_out": 0, "quiz_points": 0, "comps": 0, "lowest_rank": 1, "final_rank": 1,
-		"jackpot_won": 0, "knockouts_dealt": 0, "times_shoved": 0, "loss_streak": 0, "losing_now": 0}
+		"jackpot_won": 0, "knockouts_dealt": 0, "times_shoved": 0, "loss_streak": 0, "losing_now": 0,
+		"hands": 0, "minigames_won": 0}
 
 
 ## Final ranking: money, then quiz points, then biggest win; ties share placement.
@@ -1244,12 +1291,17 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			lobby.set_panel_ready(player, bool(intent["ready"]))
 			_sync_ready(player)
 			return StationLogicBase.OK_RESULT
-		&"set_skin":
-			var skin: StringName = StringName(intent["skin"])
-			if not Cosmetics.is_valid_skin(skin):
+		&"set_color":
+			var c: Variant = intent["color"]
+			if not (typeof(c) in [TYPE_INT, TYPE_FLOAT]) or not Cosmetics.is_valid_color(int(c)):
 				return StationLogicBase.fail(&"bad_value")
-			(state.players[player] as PlayerState).skin = skin
-			_emit(GameEvents.make(&"player_skin", {"player": player, "skin": skin}))
+			var ps: PlayerState = state.players[player]
+			if int(c) == ps.bean_color:
+				return StationLogicBase.OK_RESULT
+			if int(c) in _worn_bean_colors(player):
+				return StationLogicBase.fail(&"color_taken")
+			ps.bean_color = int(c)
+			_emit(GameEvents.make(&"player_color", {"player": player, "bean_color": ps.bean_color}))
 			return StationLogicBase.OK_RESULT
 		&"lobby_setting":
 			var err: StringName = lobby.set_setting(player, str(intent["key"]), intent["value"])
@@ -1462,6 +1514,7 @@ func _track_stats(ev: Dictionary) -> void:
 			if state.players.has(p):
 				state.players[p].biggest_win = maxi(state.players[p].biggest_win, net)
 			var st: Dictionary = stats[p]
+			st["hands"] = int(st.get("hands", 0)) + 1
 			st["biggest_win"] = maxi(int(st["biggest_win"]), net)
 			st["biggest_loss"] = maxi(int(st["biggest_loss"]), -net)
 			st["losing_now"] = int(st["losing_now"]) + 1 if net < 0 else 0 if net > 0 else int(st["losing_now"])
