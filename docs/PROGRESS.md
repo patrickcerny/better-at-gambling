@@ -139,6 +139,62 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-26 / 0.9.16 floor layouts
+Patrick: "The floorlayouts are sometimes stupid to walk through. test them. [...] sometimes the
+the doors should open text (or other text) dont disappear (mainly the one after the 321 countdown).
+The 321 countdown on the door is enough. [...] Group the tablegames and make random layouts."
+- **Walk test** (`tests/physics/test_floor_walkability.gd`). It bakes NavigationServer navmeshes for
+  the game's agent, for one bean (0.42 m, now `PlayerAvatar.BODY_RADIUS`) and for two beans side by
+  side (0.84 m). It walks from the hall spawn to every chair and back, from every chair to every
+  other station, the patrol routes and the doorways. Between neighbouring stations no walk may be
+  longer than 1.6 × the straight line.
+- **What the walk test found in the six old layouts.** In all six, the VIP lounge's blackjack and
+  roulette chairs were squeezed against the door wall. On top of that:
+  - The Grand Hall: the north slot bank had a one-bean strip behind it.
+  - Plinko stools were pinned in three layouts.
+  - The Pit and The Arcade: walks between neighbours were 15.7 m for 1.9 m and 13.3 m for 4.7 m.
+  - The Long Room: the whole east half sat behind a gap narrower than two beans.
+  - The Salon: the VIP door was blocked by its roulettes.
+
+  Details are in `FLOOR_LAYOUTS.md` in the project files.
+- **Drawn floor.** The six hand-made layouts (`data/floor_layouts/`) are gone. `FloorGenerator`
+  draws every round's floor from the match seed over the map's `FloorSite`:
+  - Table games stand in a pit of two rows either side of a two-bean lane, dealers inside and
+    players outside. Neighbours stand tight or two beans apart.
+  - Slot banks, the Plinkos, the scratch counter and the Sword Tapper pair go in wall runs and
+    islands.
+  - Every draw passes the fit checks, now including a two-bean walkway to every chair and doorway
+    and no station within reach of the hall through the lobby wall.
+  - A failing draw is redrawn (up to 6 seeds). After that the canonical floor stands, then the full
+    floor.
+
+  The full floor is the generator's canonical draw ("The Grand Hall"). Practice keeps it, and
+  minigames-only still has no floor. `--floor random|full|grand_hall|floor_<seed>` pins a floor.
+  The wire is unchanged: `floor_plan: {round, layout, stations}` with layout `floor_<seed>`. Hold'em
+  (`holdem`, footprint `table`) will be placed in the pit with no layout edits.
+- **Other floor changes.** The VIP blackjack moved 0.6 m north. The guard and waiter routes now run
+  along the new aisles.
+- **Door toasts removed.** These are gone:
+  - "Everyone's ready! Doors open in N…"
+  - "Back in the hall! The doors open in…"
+  - "Doors are open! Back to the tables…"
+  - the HUD's "Everyone back in the hall! Doors open in N…"
+
+  The 3-2-1 on the doors stays, and spawn protection is now a feed line.
+- **Text that didn't go.** The HUD toast itself always cleared on time in every path that could be
+  driven headless. What looked stuck was the door texts:
+  - On clients the lobby countdown toast was frozen on "3…" while the doors counted 3-2-1.
+  - The regroup line sat on "Doors open in 1…" past zero.
+  - The regroup toast still said "5…" while the doors counted down.
+
+  These are fixed:
+  - A banner that replaces another now gets its full time (the old one's fade took the new one
+    down early).
+  - An empty toast hides at once.
+  - Feed lines carry their own expiry.
+  - The Last Call banner goes when last call is over.
+
+  Tests: `tests/ui/test_hud_toasts.gd`.
 ### 2026-10-19 / 0.9.15 Pixel look removed
 - **Pixel look removed** (Patrick: "OK no actually remove that filter overall. Save the code
   though if i want to implement it again"): the game always renders at the window's full
