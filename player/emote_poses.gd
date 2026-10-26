@@ -76,7 +76,7 @@ static func bump(t: float, a: float, b: float) -> float:
 	return sin(span(t, a, b) * PI)
 
 
-## Shapes a 0..1 progress: ease in and out, ease out, ease in, or back (overshoots ~10% and
+## Shapes a 0..1 progress: ease in and out, ease out, ease in, or back (overshoots ~8% and
 ## settles, for poses that snap into place).
 static func curve(x: float, kind: int) -> float:
 	match kind:
@@ -87,8 +87,9 @@ static func curve(x: float, kind: int) -> float:
 		IN:
 			return x * x * x
 		BACK:
-			var u: float = x - 1.0
-			return 1.0 + 2.7 * u * u * u + 1.7 * u * u
+			# Eases in, overshoots ~8% near the end and settles: never faster than twice the
+			# average speed, so even a quick snap has in-betweens instead of popping.
+			return x * x * (3.0 - 2.0 * x) + 0.5 * sin(PI * x) * x * x
 	return x
 
 
@@ -148,7 +149,10 @@ static func thumb_roll(arm: Vector2, side: float, thumb: Vector3) -> float:
 	var splay: float = arm.y if side < 0.0 else -arm.y
 	var basis: Basis = Basis(Vector3.BACK, splay) * Basis(Vector3.RIGHT, arm.x)
 	var local: Vector3 = basis.inverse() * thumb
-	return atan2(local.x, local.y)
+	# A thumb asked to point along the arm has no roll to give: lean towards thumb-up as it gets
+	# close, so the glove never flips round in a frame.
+	var across: float = Vector2(local.x, local.y).length()
+	return atan2(local.x, local.y + maxf(0.4 - across, 0.0) * 2.0)
 
 
 ## Points the arms along `left` / `right` (rig space, -Z forward, +X the bean's right) with the
@@ -226,7 +230,7 @@ static func _wave(t: float) -> Dictionary:
 	var right: Vector3 = arc(t, [[0.0, rest(1.0)], [0.13, Vector3(0.4, -0.8, 0.45)], [0.4, Vector3(0.45, 0.85, -0.25), BACK]])
 	right = swing(right, centre, span(t, 0.38, 0.5))
 	var left: Vector3 = Vector3(-0.38, -0.9, 0.05 - 0.12 * wav)
-	var thumb_r: Vector3 = _flick(Vector3(-1.0, 0.0, 0.0), right, 0.55 * cos(phi) * span(t, 0.4, 0.6))
+	var thumb_r: Vector3 = _flick(Vector3.FORWARD.slerp(Vector3.LEFT, span(t, 0.25, 0.42)), right, 0.55 * cos(phi) * span(t, 0.4, 0.6))
 	_hands(p, left, right, Vector3(-0.2, 0.0, -1.0), thumb_r)
 	p["flat"] = 1.0
 	p["reach"] = Vector2(1.0, float(track(t, [[0.13, 1.0], [0.4, 1.45, OUT], [0.6, 1.35]])))
@@ -295,8 +299,8 @@ static func _taunt(t: float) -> Dictionary:
 	var tilt_lr: float = sin((t - 0.2) * TAU * 2.0)
 	var temple_l: Vector3 = Vector3(-0.38, 0.92, -0.12)
 	var temple_r: Vector3 = Vector3(0.38, 0.92, -0.12)
-	var cross_l: Vector3 = Vector3(0.62, -0.28, -0.73)
-	var cross_r: Vector3 = Vector3(-0.58, -0.18, -0.79)
+	var cross_l: Vector3 = Vector3(0.48, -0.18, -0.86)
+	var cross_r: Vector3 = Vector3(-0.44, -0.04, -0.9)
 	var slap: float = bump(t, 1.52, 1.66) + bump(t, 1.76, 1.9)
 	var bum_r: Vector3 = Vector3(0.45, -0.6, 0.66)
 	var left: Vector3 = arc(t, [[0.0, rest(-1.0)], [0.2, Vector3(-0.85, -0.2, 0.0), OUT], [0.42, temple_l, BACK], [1.18, temple_l], [1.35, rest(-1.0)], [2.15, rest(-1.0)], [2.4, cross_l, BACK]])
@@ -304,9 +308,11 @@ static func _taunt(t: float) -> Dictionary:
 	right = swing(right, bum_r, clampf(slap, 0.0, 1.0) * 0.8)
 	var at_temples: float = span(t, 0.3, 0.42) * (1.0 - span(t, 1.15, 1.25))
 	var crossed: float = span(t, 2.2, 2.35)
-	var thumb_l: Vector3 = _flick(Vector3(1.0, 0.0, 0.0), left, 0.7 * wag * at_temples).lerp(Vector3(0.0, 1.0, 0.0), crossed)
-	var thumb_r: Vector3 = _flick(Vector3(-1.0, 0.0, 0.0), right, -0.7 * wag * at_temples).lerp(Vector3(0.0, 1.0, 0.0), crossed)
+	var raise: float = span(t, 0.1, 0.42) * (1.0 - span(t, 1.15, 1.35))
+	var thumb_l: Vector3 = _flick(Vector3.FORWARD.slerp(Vector3.RIGHT, raise), left, 0.7 * wag * at_temples).lerp(Vector3.UP, crossed)
+	var thumb_r: Vector3 = _flick(Vector3.FORWARD.slerp(Vector3.LEFT, raise), right, -0.7 * wag * at_temples).lerp(Vector3.UP, crossed)
 	_hands(p, left, right, thumb_l, thumb_r)
+	p["reach"] = Vector2.ONE * (1.0 + 0.3 * crossed)
 	p["flat"] = at_temples
 	p["fists"] = crossed
 	p["fists_l"] = crossed
@@ -392,9 +398,9 @@ static func _disco(t: float) -> Dictionary:
 	var hip_l: Vector3 = Vector3(-0.78, -0.58, 0.22)
 	var beats_end: float = DISCO_SPIN.x
 	var beat: float = maxf(t - 0.15, 0.0) / DISCO_BEAT
-	var n: int = int(floor(beat))
-	var f: float = beat - floor(beat)
-	var k: float = curve(span(f, 0.0, 0.3), BACK)
+	var n: int = mini(int(floor(beat)), 3)  # four stabs, the last one held into the twirl
+	var f: float = beat - floor(beat) if beat < 4.0 else 1.0
+	var k: float = curve(span(f, 0.0, 0.4), BACK)
 	var prev: Vector3 = (up_dir if n % 2 == 1 else down_dir) if n > 0 else rest(1.0)
 	var target: Vector3 = up_dir if n % 2 == 0 else down_dir
 	var right: Vector3 = swing(prev, target, k)
@@ -410,7 +416,8 @@ static func _disco(t: float) -> Dictionary:
 	left = swing(left, Vector3(-0.95, 0.28, 0.0), twirl)
 	right = swing(right, up_dir, finale)
 	left = swing(left, hip_l, finale)
-	_hands(p, left, right, Vector3(0.0, 0.0, -1.0), Vector3(-0.3, 0.0, -1.0))
+	# The thumb sticks out of the plane the arm stabs in, so the glove never turns over mid-stab.
+	_hands(p, left, right, Vector3(0.0, 0.0, -1.0), up_dir.cross(down_dir).normalized())
 	var stab_up: float = (k if n % 2 == 0 else 1.0 - k) * dancing
 	p["point"] = Vector2(0.0, maxf(stab_up, finale))
 	p["reach"] = Vector2(1.0, 1.0 + 0.3 * maxf(stab_up, finale))
@@ -542,50 +549,48 @@ static func _thumbs_down(t: float) -> Dictionary:
 	return p
 
 
-## The Fortnite default dance, two bars of four beats: (1, 2) a fist punches down across the hips
-## and snaps back while the other elbow swings up, the hips sway towards the punch and the knees
-## bounce; (3, 4) both arms swing up over the head in turn with a foot kicking out and a little hop
-## on the fourth beat.
+## The Fortnite default dance, two bars of four beats, hitting a pose on every beat and swinging
+## through to the next: (1) the right fist punches down across to the left hip with the left elbow
+## up, (2) the same mirrored, (3) both arms swing up over the head to the right, (4) and to the left;
+## the hips sway towards the punch, the knees give on every beat, a foot kicks out on the arm swings
+## and there is a little hop at the end of each bar.
 static func _default_dance(t: float) -> Dictionary:
 	var p: Dictionary = {}
 	var beat: float = t * DANCE_BPS
-	var b: int = int(floor(beat)) % 4
+	var n: int = int(floor(beat))
+	var b: int = n % 4
 	var f: float = beat - floor(beat)
-	var punch: float = curve(span(f, 0.0, 0.3), OUT) * (1.0 - curve(span(f, 0.55, 1.0), IO))
-	var bounce: float = 1.0 - curve(span(f, 0.0, 0.5), OUT)
-	var side: float = 1.0 if b == 0 or b == 2 else -1.0
-	var left: Vector3 = rest(-1.0)
-	var right: Vector3 = rest(1.0)
-	if b < 2:
-		var across: Vector3 = Vector3(-side * 0.55, -0.75, -0.5)  # down across to the other hip
-		var start: Vector3 = Vector3(side * 0.7, -0.2, -0.5)
-		var elbow: Vector3 = Vector3(-side * 0.8, 0.45, -0.3)
-		var punching: Vector3 = swing(start, across, punch)
-		var other: Vector3 = swing(Vector3(-side * 0.7, -0.6, -0.3), elbow, punch)
-		left = punching if side < 0.0 else other
-		right = punching if side > 0.0 else other
-	else:
-		var up: Vector3 = Vector3(side * 0.25, 0.95, -0.25)
-		var down: Vector3 = Vector3(side * 0.6, -0.5, -0.5)
-		var lead: Vector3 = swing(down, up, punch)
-		var trail: Vector3 = swing(Vector3(-side * 0.35, 0.9, -0.25), Vector3(-side * 0.7, -0.4, -0.5), punch)
-		left = lead if side < 0.0 else trail
-		right = lead if side > 0.0 else trail
-	_hands(p, left, right, Vector3(1.0, 0.0, 0.0), Vector3(-1.0, 0.0, 0.0))
+	var hit: float = curve(span(f, 0.0, 0.4), BACK)  # swings into the beat's pose and holds it
+	var poses: Array[Array] = [
+		[Vector3(-0.8, 0.45, -0.3), Vector3(-0.55, -0.75, -0.45)],  # right punches across
+		[Vector3(0.55, -0.75, -0.45), Vector3(0.8, 0.45, -0.3)],  # left punches across
+		[Vector3(0.3, 0.92, -0.25), Vector3(0.75, 0.62, -0.25)],  # both up, to the right
+		[Vector3(-0.75, 0.62, -0.25), Vector3(-0.3, 0.92, -0.25)],  # both up, to the left
+	]
+	var from: Array = poses[(b + 3) % 4] if n > 0 else [rest(-1.0), rest(1.0)]
+	var to: Array = poses[b]
+	var left: Vector3 = swing(from[0] as Vector3, to[0] as Vector3, hit)
+	var right: Vector3 = swing(from[1] as Vector3, to[1] as Vector3, hit)
+	_hands(p, left, right, Vector3(0.0, 0.0, -1.0), Vector3(0.0, 0.0, -1.0))
 	p["fists"] = 1.0
 	p["fists_l"] = 1.0
-	p["lean"] = Vector2(-0.05, side * 0.14 * punch)
-	p["tilt"] = Vector2(0.0, side * 0.08 * punch)
-	p["twist"] = side * 0.3 * punch
-	p["shift"] = Vector3(side * 0.08 * punch, -0.06 * bounce, 0.0)
-	p["squash"] = -0.08 * bounce
-	var kick: float = punch if b >= 2 else 0.0
-	p["feet"] = Vector4(-0.05 * punch if side < 0.0 else 0.0, -0.1 * kick if side < 0.0 else 0.0, 0.05 * punch if side > 0.0 else 0.0, -0.1 * kick if side > 0.0 else 0.0)
-	p["step"] = Vector2(punch if side < 0.0 else 0.0, punch if side > 0.0 else 0.0)
-	p["lift"] = Vector3(0.0, 0.1 * sin(f * PI) if b == 3 else 0.0, 0.0)
+	p["reach"] = Vector2.ONE * (1.0 + 0.15 * (hit if b >= 2 else 0.0))
+	var side: float = 1.0 if b == 0 or b == 2 else -1.0  # where the hips go: towards the move
+	var prev_side: float = -side if n > 0 else 0.0
+	var sway: float = lerpf(prev_side, side, curve(span(f, 0.0, 0.45), IO))
+	var give: float = 1.0 - curve(span(f, 0.0, 0.55), OUT)  # the knees give on the beat
+	p["lean"] = Vector2(-0.05, 0.12 * sway)
+	p["tilt"] = Vector2(0.0, 0.07 * sway)
+	p["twist"] = -0.3 * sway if b < 2 else 0.15 * sway
+	p["shift"] = Vector3(0.08 * sway, -0.06 * give, 0.0)
+	p["squash"] = -0.08 * give
+	var kick: float = bump(f, 0.05, 0.75) if b >= 2 else 0.0
+	p["feet"] = Vector4(-0.05 * kick if side < 0.0 else 0.0, -0.1 * kick if side < 0.0 else 0.0, 0.05 * kick if side > 0.0 else 0.0, -0.1 * kick if side > 0.0 else 0.0)
+	p["step"] = Vector2(maxf(-sway, 0.0) * 0.5 + (kick if side < 0.0 else 0.0), maxf(sway, 0.0) * 0.5 + (kick if side > 0.0 else 0.0))
+	p["lift"] = Vector3(0.0, 0.1 * bump(f, 0.1, 0.9) if b == 3 else 0.0, 0.0)
 	p["smile"] = 0.9
 	p["open"] = 0.3
 	p["brow"] = Vector2(0.5, 0.0)
 	p["smirk"] = 0.3
-	p["look"] = Vector2(side * 0.15, 0.0)
+	p["look"] = Vector2(0.15 * sway, 0.1 if b >= 2 else -0.05)
 	return p

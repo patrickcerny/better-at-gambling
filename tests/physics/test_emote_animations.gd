@@ -150,6 +150,37 @@ func test_each_emote_plays_through_its_beats_and_ends_at_rest() -> void:
 		assert_lt(_distance(_pose(v), idle), 0.2, "%s: back at rest" % id)
 
 
+## Nothing pops: frame to frame (60 fps) no arm swings more than ~30 degrees and no glove turns over
+## (the arcs ease in, and a thumb never flips round its arm).
+func test_no_emote_pops_between_frames() -> void:
+	for id: StringName in _ids():
+		var prev: Dictionary = {}
+		var t: float = 0.0
+		while t < Emotes.length(id):
+			var p: Dictionary = EmotePoses.pose(id, t)
+			if not prev.is_empty():
+				var a: Vector4 = p["arms"]
+				var b: Vector4 = prev["arms"]
+				var ra: Vector2 = p.get("rolls", Vector2.ZERO)
+				var rb: Vector2 = prev.get("rolls", Vector2.ZERO)
+				for i: int in 2:
+					var side: float = -1.0 if i == 0 else 1.0
+					var now: Basis = _glove_basis(Vector2(a.x, a.y) if i == 0 else Vector2(a.z, a.w), ra.x if i == 0 else ra.y, side)
+					var before: Basis = _glove_basis(Vector2(b.x, b.y) if i == 0 else Vector2(b.z, b.w), rb.x if i == 0 else rb.y, side)
+					var swing: float = (now * Vector3.FORWARD).angle_to(before * Vector3.FORWARD)
+					assert_lt(swing, 0.55, "%s at %.2f s: arm %d jumps %.2f rad in a frame" % [id, t, i, swing])
+					var turn: float = Quaternion(now).angle_to(Quaternion(before))
+					assert_lt(turn, 1.0, "%s at %.2f s: glove %d turns %.2f rad in a frame" % [id, t, i, turn])
+			prev = p
+			t += 1.0 / 60.0
+
+
+## A glove's orientation in rig space for an arm (pitch, splay) and glove roll (`_set_arm`).
+func _glove_basis(arm: Vector2, roll: float, side: float) -> Basis:
+	var splay: float = arm.y if side < 0.0 else -arm.y
+	return (Basis(Vector3.BACK, splay) * Basis(Vector3.RIGHT, arm.x) * Basis(Vector3.BACK, -roll)).orthonormalized()
+
+
 ## The 6-7 meme: both hands out in front at chest height, palms up, weighing "six... seven" up and
 ## down in turn like scales, always one up and one down, eight words; then a shrug.
 func test_six_seven_weighs_the_hands_in_turn_and_shrugs() -> void:

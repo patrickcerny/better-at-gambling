@@ -112,8 +112,11 @@ func _process(delta: float) -> void:
 		var v: AvatarVisuals = _beans[i]
 		if v.emote_id != _emote:
 			v.emote(_emote)
-		v.emote_time = _times[i]  # frozen: the springs settle into the pose at that moment
+			v.set_process(false)  # driven here: a slow software-rendered frame must not move the clock
 		v.update_motion(Vector3.ZERO, true, delta)  # skins pick their emote clip here
+		for k: int in 3:  # frozen: the springs settle into the pose at that moment
+			v.emote_time = _times[i]
+			v._animate(1.0 / 60.0)
 	if _shot != "" and _t >= _wait:
 		var img: Image = get_viewport().get_texture().get_image()
 		img.save_png(_shot)
