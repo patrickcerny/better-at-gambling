@@ -139,6 +139,44 @@
 - Rooms: `minigames/common/{vault_arena,parlor_room,card_hall,wheel_room,climb_room,chip_towers}.gd`,
   climbing helpers in `climb_kit.gd`. Each game has its own unit test and an integration test through
   `ServerFixture` with `minigame_pool`.
+### 2026-10-26 / 0.9.16 XP, Coins, colours
+- **XP and levels** (Patrick: "Create a XP level and an ingame currency. There will be a shop for
+  cosmetics."): a local profile (`ProfileManager` autoload, `PlayerProfile`, `user://profile.cfg`,
+  every value clamped on load, no DRM) keeps XP, level, Coins, owned and preferred cosmetics and
+  lifetime stats. The server works out each player's XP from the match (`Progression.breakdown`,
+  numbers in `data/progression/progression.tres`): match played 100, placement 120/80/50/30/20,
+  30 per minigame won, 1 per $20 profit (max 100), 2 per table hand (max 60); Practice half. It
+  sends the rows in `match_ended` (`progress`, `match_id`, also in the RESULTS snapshot) and each
+  client adds its own row once per match id. Level L→L+1 costs 100 + 35(L−1) up to level 10
+  (2,160 XP, about 8 typical ~280 XP matches), then 450 + 50(L−10); cap 99.
+- **Coins**: a tenth of the match's XP plus 50 per level gained, a drawn gold coin icon
+  (`CoinIcon`). Only for cosmetics, never at the tables; the UI says the $ starts fresh each match.
+  Main menu: a LEVEL / XP bar / Coins line top left (`ProfileBadge`). Results: "+N XP" on every
+  standings row, YOUR XP breakdown bottom left and the level bar filling with the Coins bottom right.
+- **Cosmetics shop** (COSMETICS in the main menu, the T-shirt button and the lobby tablet,
+  `CosmeticsPanel`): 16 bean colours, the 8 player colours free, Ruby, Mint, Lavender, Teal, Lime,
+  Onyx, Silver, Gold 150–400 Coins (`data/progression/cosmetics_shop.tres`, `CosmeticDef` with a
+  kind so hats can follow); a turning bean preview, BUY and WEAR.
+- **Bean colour vs slot colour**: the server still gives every player one of the 8 slot colours
+  (HUD, name plate, pedestal). The bean wears the preferred colour from the hello when no other
+  bean wears it, else the slot colour, else the first free one (`Cosmetics.bean_color_for`); two
+  beans never match. `PlayerState.bean_color` on the wire, intent `set_color`, event
+  `player_color`, error `color_taken`.
+- **Pedestal colour panel** (Patrick: "under the podest should be a color panel you can click"):
+  a brass lectern beside every ready pedestal with a 4×4 swatch plaque (`ColorPlaque`,
+  `ColorPanelController`); look at a swatch on your own and click or press E to wear it (lobby
+  only); it also becomes your preferred colour. Worn colours dimmed, yours framed.
+- **Skins removed** ("Remove all other skins"): the six poly.pizza skin models, `SkinLibrary`,
+  `SkinArmModifier`, the skin preview view, the clothes panel, `Cosmetics.SKINS`, the `skin` field
+  in the hello and player state, `set_skin`/`player_skin`, the skin parts of `AvatarVisuals`,
+  `RagdollBody` and `PlayerAvatar`, and the skin rows in CREDITS and MODELS. The Tab list's
+  portraits are now the player's bean in its colour. `PROTOCOL_VERSION` 10 → 11.
+- Tests: new `test_progression`, `test_player_profile`, `test_bean_colors` (unit),
+  `test_progress_results` (integration), `test_cosmetics_shop`, `test_color_panel` (ui), more in
+  `test_results_stage`; skin tests deleted or rewritten; the main menu test lists COSMETICS. Dev
+  shot `tools/dev/cosmetics_shot.tscn` (shop, menu, plaque, results). Suites: lint ok; unit 850,
+  ui 291, integration 261, physics 170, smoke 4 + boot, session green.
+
 ### 2026-10-19 / 0.9.15 Pixel look removed
 - **Pixel look removed** (Patrick: "OK no actually remove that filter overall. Save the code
   though if i want to implement it again"): the game always renders at the window's full
