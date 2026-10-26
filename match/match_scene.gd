@@ -75,6 +75,10 @@ var net_world: NetWorld
 var lobby_panel: LobbyPanel
 var shop_panel: ShopPanel
 var odd_jobs: OddJobsController
+## The colour panels at the pedestals' feet (`ColorPlaque`): yours sets your bean's colour.
+var color_panel: ColorPanelController
+## The cosmetics shop, opened from the lobby panel.
+var cosmetics_panel: CosmeticsPanel
 var connection_label: Label
 ## Proximity voice (clients only; the dedicated server just relays in `Net`).
 var voice: VoiceChannel = null
@@ -126,6 +130,8 @@ var _pad_timer: float = 0.0
 var _pedestal_timer: float = 0.0
 var _countdown_shown: int = -1
 var _match_over: bool = false
+## What the local profile took from the last `match_ended` (`ProfileManager.apply_results`).
+var _progress_summary: Dictionary = {}
 ## Predicted local actions awaiting the server: intent type → give-up time.
 var _predicted: Dictionary[StringName, float] = {}
 const PREDICTION_TIMEOUT: float = 0.6
@@ -212,6 +218,19 @@ func _ready() -> void:
 			router.set_play_mode(InputRouter.Mode.WALK))
 	lobby_panel.leave_requested.connect(_leave_to_menu)
 	ui_layer.add_child(lobby_panel)
+	# The cosmetics shop from the lobby's settings tablet: a colour put on there goes on the bean
+	# at once (`set_color`), like one picked at the pedestal's colour panel.
+	cosmetics_panel = CosmeticsPanel.new()
+	ui_layer.add_child(cosmetics_panel)
+	cosmetics_panel.color_worn.connect(func(c: int) -> void:
+		if color_panel != null and view.state.phase == Phase.Id.LOBBY:
+			color_panel.choose(c))
+	cosmetics_panel.closed.connect(func() -> void:
+		if router.mode == InputRouter.Mode.MENU and results_panel == null:
+			router.set_play_mode(InputRouter.Mode.WALK))
+	lobby_panel.cosmetics_requested.connect(func() -> void:
+		lobby_panel.visible = false  # hidden, not closed: the menu mode stays for the shop
+		cosmetics_panel.open())
 	shop_panel = ShopPanel.new()
 	shop_panel.name = "ShopPanel"
 	shop_panel.closed.connect(func() -> void:
@@ -268,6 +287,8 @@ func _ready() -> void:
 	add_child(items_ctl)
 	odd_jobs = OddJobsController.new(self)
 	add_child(odd_jobs)
+	color_panel = ColorPanelController.new(self)
+	add_child(color_panel)
 	Net.event_received.connect(_on_event)
 	net_world = NetWorld.new()
 	net_world.name = "NetWorld"
@@ -1115,6 +1136,9 @@ func _on_event(ev: Dictionary) -> void:
 				Audio.play(&"cash_register", &"SFX", -4.0)
 		&"match_ended":
 			_match_over = true
+			# Our row of the XP/Coins breakdown goes into the local profile (once per match).
+			if role != Role.SERVER and local_id >= 0:
+				_progress_summary = ProfileManager.apply_results(ev, local_id)
 			_show_results(ev["standings"])
 			_log_digest()
 		&"match_reset":
@@ -1580,6 +1604,7 @@ func _show_results(_standings: Array) -> void:
 	results_panel.name = "Results"
 	results_panel.ui_host = self  # its 2D goes on the window, outside the world's sub viewport
 	pixel_view.world.add_child(results_panel)
+	results_panel.progress_summary = _progress_summary
 	results_panel.setup(view.state, local_id, view.state.room_mode)
 	results_panel.play_again_pressed.connect(func() -> void:
 		if view.state.room_mode:
@@ -2033,6 +2058,8 @@ func _on_interact() -> void:
 		return
 	if local == null or not local.is_standing():
 		return
+	if color_panel.try_press():
+		return
 	var lobby_spot: StringName = _lobby_spot()
 	if lobby_spot != &"":
 		_open_lobby_panel(lobby_spot)
@@ -2068,6 +2095,8 @@ func _on_grab() -> void:
 	if stage is WalkableStage and (stage as WalkableStage).on_grab_pressed():
 		return  # a walkable minigame's own use of the click (Bat Heist: the bat)
 	if odd_jobs.try_press():
+		return
+	if color_panel.try_press():
 		return
 	grab_in_front()
 
@@ -2296,6 +2325,10 @@ func _update_prompt() -> void:
 		&"settings":
 			hud.set_prompt(InputGlyphs.fill("[{interact}] Lobby settings" if view.state.leader == local_id else "[{interact}] Lobby settings (only the leader ★ can change them)"))
 			return
+	var color_prompt: String = color_panel.prompt()
+	if color_prompt != "":
+		hud.set_prompt(color_prompt)
+		return
 	var floor_prompt: String = casino_floor.prompt() if casino_floor != null else ""
 	if floor_prompt != "":
 		hud.set_prompt(floor_prompt)

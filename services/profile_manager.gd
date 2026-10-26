@@ -4,6 +4,8 @@ extends Node
 ## user://settings.cfg. Every change saves at once and fires `changed`. The match scene hands it
 ## the results event (`apply_results`), the cosmetics shop buys and equips through it, and the
 ## pedestal colour panel sets the preferred colour.
+## Test runs never touch the player's real file: under GUT and in `--autoplay` game clients
+## (network tests, bots) the profile starts fresh and stays in memory only.
 
 signal changed
 
@@ -12,22 +14,35 @@ const PATH: String = "user://profile.cfg"
 var profile: PlayerProfile
 ## Where this one saves (tests point it elsewhere).
 var path: String = PATH
+## Off: nothing is read or written, the profile lives in memory (tests, autoplay clients).
+var persist: bool = true
 
 
 func _ready() -> void:
+	persist = not is_test_run()
 	reload()
 
 
-## Reads the file again (missing: a fresh profile).
+## GUT or an `--autoplay` client: keep the player's real profile out of it.
+static func is_test_run() -> bool:
+	for a: String in OS.get_cmdline_args():
+		if a.ends_with("gut_cmdln.gd") or a == "--autoplay":
+			return true
+	return false
+
+
+## Reads the file again (missing, or not persisting: a fresh profile).
 func reload() -> void:
 	profile = PlayerProfile.new()
-	var err: Error = profile.load_from(path)
+	var err: Error = profile.load_from(path) if persist else ERR_FILE_NOT_FOUND
 	if err != OK and err != ERR_FILE_NOT_FOUND:
 		Log.warn(&"profile", "could not load %s (error %d), starting fresh" % [path, err])
 	changed.emit()
 
 
 func save() -> void:
+	if not persist:
+		return
 	var err: Error = profile.save(path)
 	if err != OK:
 		Log.warn(&"profile", "could not save %s (error %d)" % [path, err])

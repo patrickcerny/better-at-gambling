@@ -199,6 +199,8 @@ var pedestal_tops: Array[MeshInstance3D] = []
 var pedestal_lights: Array[SpotLight3D] = []
 var pedestal_glows: Array[Node3D] = []
 var _pedestal_state: Array = []
+## Per ready pedestal: the colour panel at its foot (`ColorPlaque`, `ColorPanelController`).
+var color_plaques: Array[ColorPlaque] = []
 ## 0..1 per pedestal: how far its glow has faded in, and the fade under way.
 var _glow_level: Array[float] = []
 var _glow_tweens: Array[Tween] = []
@@ -682,6 +684,11 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 		(step.get_node("Mesh") as MeshInstance3D).material_override = marble if k % 2 == 0 else marble_dark
 	pedestal_labels.append(_build_name_plate(root, i))
 	pedestal_tops.append(top_mesh)
+	# The colour panel beside the bottom step (Patrick: "under the podest should be a color panel").
+	var plaque := ColorPlaque.new()
+	plaque.position = ColorPlaque.OFFSET
+	root.add_child(plaque)
+	color_plaques.append(plaque)
 	_build_glow(root)
 	_pedestal_state.append(["", false])
 	_glow_level.append(0.0)
