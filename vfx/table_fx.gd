@@ -162,7 +162,7 @@ func _on_bet(ev: Dictionary) -> void:
 	if st is SlotsStation:
 		(st as SlotsStation).start_spin(pid == local_id)
 		return
-	if not (st is RouletteStation or st is BlackjackStation or st is HorseRaceStation or st is WheelStation or st is CrapsStation or st is HiLoStation):
+	if not (st is RouletteStation or st is BlackjackStation or st is HorseRaceStation or st is WheelStation or st is CrapsStation or st is HiLoStation or st is HoldemStation):
 		return  # Plinko drops its own chip
 	var seat: int = _seat_index(st, pid)
 	var start: Vector3 = _seat_edge(st, seat)
@@ -250,12 +250,17 @@ func _on_result(ev: Dictionary) -> void:
 		_shown_at[sid] = Time.get_ticks_msec() + int(t * 1000.0)
 	elif st is PlinkoStation:
 		_shown_at[sid] = Time.get_ticks_msec() + int(PLINKO_DELAY * 1000.0)
-	elif st is BlackjackStation or st is HiLoStation:
+	elif st is BlackjackStation or st is HiLoStation or st is HoldemStation:
 		_shown_at[sid] = Time.get_ticks_msec() + int(BLACKJACK_DELAY * 1000.0)  # the card lands first
 	var delay: float = _delay_for(sid)
 	var stack: ChipStack = _take_stack(sid, pid, details)
 	if stack != null:
 		_after(delay, func() -> void: _settle_chips(st, pid, stack, net, stake))
+	if st is HoldemStation and StringName(details.get("type", &"")) == HoldemLogic.ANTE:
+		# Ante and call settle as one hand: the call's chips go where the ante's go.
+		var call_stack: ChipStack = _take_stack(sid, pid, {"type": HoldemLogic.CALL_BET, "value": 0}, true)
+		if call_stack != null:
+			_after(delay, func() -> void: _settle_chips(st, pid, call_stack, 0 if net >= 0 else -1, stake))
 	# Several results for one player at once (roulette bets) show as one total.
 	var key: String = _key(sid, pid)
 	if _pending.has(key):
@@ -395,12 +400,12 @@ func _sweep_stale(sid: StringName) -> void:
 
 
 ## The chip stack a result settles: the matching roulette bet, else the oldest one.
-func _take_stack(sid: StringName, pid: int, details: Dictionary) -> ChipStack:
+func _take_stack(sid: StringName, pid: int, details: Dictionary, exact: bool = false) -> ChipStack:
 	var key: String = _key(sid, pid)
 	var list: Array = _bets.get(key, [])
 	if list.is_empty():
 		return null
-	var idx: int = 0
+	var idx: int = -1 if exact else 0
 	if int(details.get("hand", 0)) == 1:  # a blackjack split's second hand
 		for i: int in list.size():
 			if StringName(list[i]["type"]) == &"split":
@@ -410,6 +415,8 @@ func _take_stack(sid: StringName, pid: int, details: Dictionary) -> ChipStack:
 			if StringName(list[i]["type"]) == StringName(details["type"]) and int(list[i]["value"]) == int(details.get("value", 0)):
 				idx = i
 				break
+	if idx < 0:
+		return null  # `exact`: no stack of that type
 	var b: Dictionary = list[idx]
 	list.remove_at(idx)
 	_bets[key] = list
@@ -477,6 +484,8 @@ static func _seat_edge(st: StationBase, seat: int) -> Vector3:
 		return Vector3(p.x, WheelStation.FELT_Y, WheelStation.LEDGE_Z)
 	if st is HiLoStation:
 		return Vector3(p.x, HiLoStation.TABLE_TOP + 0.12, HiLoStation.RAIL_OUTER)  # over the rail
+	if st is HoldemStation:
+		return Vector3(p.x, HoldemStation.TABLE_TOP + 0.12, HoldemStation.RAIL_OUTER)
 	if st is BlackjackStation:
 		# Over the padded rail (not inside it): the stack arcs from here down onto the felt.
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
@@ -505,6 +514,8 @@ static func _bet_spot(st: StationBase, seat: int, type: StringName, value: int) 
 		return WheelStation.bet_spot(value)
 	if st is HiLoStation:
 		return HiLoStation.bet_spot(seat)  # the gold ante ring in front of the seat
+	if st is HoldemStation:
+		return HoldemStation.bet_spot(seat, type if type != &"" else HoldemLogic.ANTE)  # its printed BONUS / ANTE / CALL spot
 	if st is BlackjackStation and not st.seats.is_empty():
 		var p: Vector3 = st.seats[clampi(seat, 0, st.seats.size() - 1)].position
 		var to_seat: Vector3 = Vector3(p.x, 0, p.z) - BlackjackStation.ARC_CENTRE
@@ -524,6 +535,8 @@ static func _house_spot(st: StationBase) -> Vector3:
 		return WheelStation.HOUSE_SPOT
 	if st is HiLoStation:
 		return HiLoStation.HOUSE_SPOT
+	if st is HoldemStation:
+		return HoldemStation.HOUSE_SPOT
 	if st is BlackjackStation:
 		return Vector3(0.75, 1.0, -0.22)  # the dealer's chip rack
 	return Vector3(0, 0.95, 0)

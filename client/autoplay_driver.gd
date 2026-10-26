@@ -162,6 +162,14 @@ func _build_steps() -> void:
 		["intent", &"action", {"station": _st(&"blackjack_3"), "action": &"hit"}], ["wait", 0.5],
 		["intent", &"action", {"station": _st(&"blackjack_3"), "action": &"stand"}], ["wait", 3.5],
 		["intent", &"leave", {}], ["wait", 0.5],
+		# Casino Hold'em: ante + AA Bonus, fold or call by the simple strategy; then a fold.
+		["walk_station", &"holdem_1", Vector3(0.45, 0, 2.3)],
+		["sit", &"holdem_1"], ["wait", 0.5],
+		["intent", &"place_bet", {"station": &"holdem_1", "bet": {"amount": 20, "bonus": 10}}], ["wait", 9.0],
+		["holdem_play", &"holdem_1"], ["wait", 5.0],
+		["intent", &"place_bet", {"station": &"holdem_1", "bet": {"amount": 20}}], ["wait", 9.0],
+		["intent", &"action", {"station": &"holdem_1", "action": &"fold"}], ["wait", 4.5],
+		["intent", &"leave", {}], ["wait", 0.5],
 		["walk_station", _st(&"roulette_1"), Vector3(1.0, 0, 2.0)],
 		["sit", _st(&"roulette_1")], ["wait", 1.0],
 		["intent", &"place_bet", {"station": _st(&"roulette_1"), "bet": {"type": &"red", "value": 0, "amount": 25}}],
@@ -369,6 +377,22 @@ func _process(delta: float) -> void:
 					return
 			var res: Dictionary = Net.send_intent(Intents.make(step[1], payload))
 			Log.info(&"autoplay", "%s %s -> %s" % [step[1], payload, res])
+		"holdem_play":
+			# Fold or call from the cards on the felt (the strategy the RTP sim plays).
+			var at: StringName = _actual(step[1])
+			if at == &"":
+				return
+			var pub: Dictionary = scene.view.state.stations.get(at, {})
+			var mine: Dictionary = HoldemStation.hand_of(pub.get("hands", {}), scene.local_id)
+			var hole: Array[int] = []
+			for c: Variant in mine.get("hole", []):
+				hole.append(int(c))
+			var board: Array[int] = []
+			for c: Variant in pub.get("board", []):
+				board.append(int(c))
+			var act: StringName = HoldemLogic.CALL if hole.size() == 2 and HoldemLogic.simple_call(hole, board) else HoldemLogic.FOLD
+			var res: Dictionary = Net.send_intent(Intents.make(&"action", {"station": at, "action": act}))
+			Log.info(&"autoplay", "holdem %s %s -> %s" % [mine.get("hand", "?"), act, res])
 		"approach_partner":
 			var partner: PlayerAvatar = scene.avatars.get(int(step[1]), null)
 			if partner != null:
