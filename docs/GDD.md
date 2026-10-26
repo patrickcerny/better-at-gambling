@@ -71,6 +71,25 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   or the match end: a won pot is cashed out, a fresh ante takes the likelier side. A minigame gives
   fresh antes back and banks won pots. House rule as at the horse race (0.9.6): a call that would
   lose has its card redrawn once with 15% chance, then luck rerolls it; never shown. $10–$100.
+- **Casino Hold'em** (casino floor; only in The Grand Hall layout until the layout generator places it): oval card table, a
+  dealer, 4 seats, one fresh deck per hand (Evolution's / bwin's Casino Hold'em). ANTE ($10–$100)
+  plus an optional AA BONUS (up to $50), 8 s betting window; two hole cards each, the dealer two
+  face down, the flop. FOLD (the ante is lost) or CALL for twice the ante on your own 15 s clock
+  (out of time, standing up or the match end = fold); the balance must cover the call when you
+  ante. Turn and river, best five of seven. The dealer qualifies with a pair of 4s or better: if
+  not, the ante pays by the table and the call comes back; if so, a win pays the ante by the table
+  and the call 1:1, a tie gives both back. Ante table: royal 100, straight flush 20, quads 10, full
+  house 3, flush 2, straight or lower 1. AA Bonus on your two cards and the flop, paid at the flop
+  even if you fold: pair of aces to straight 7, flush 20, full house 30, quads 40, straight flush
+  50, royal 100. House rules (never shown): the turn, river and dealer's cards are drawn again once
+  with 12% when nobody would win and someone would lose; a flop on which no bonus bet pays is drawn
+  again once with 9.5%; luck rerolls hole cards, flop and showdown through `LuckRng`. A lone
+  player with the simple strategy (call any pair, an ace or king in the hole, or a flush/straight
+  draw) gets about 101.1% back; the AA Bonus 101.1% (93.7% plain). A minigame gives the open ante
+  and call back (a bonus the flop settled stays). The overlay is a column down the right third
+  (ante chips, AA BONUS sizes, DEAL; FOLD / CALL with amounts, the hand named live, the dealer's
+  hand, the result), the paytables folded under HOW IT WORKS; each stool's view frames the board,
+  the dealer and the seat's own cards and spots in the left two thirds.
 - **Scratch Cards** (counter on the casino floor, by the Gift Shop on the full floor): one player at the counter at a time. Buy a
   $10 / $25 / $50 card (× limits); the server draws the whole card at purchase and sends it in one
   `scratch_card` event; the panel shows it big under foil, scratched with the mouse or REVEAL ALL,
@@ -206,6 +225,8 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | wheel_result | — (the clicker slows down); reel_stop, low, as the wheel rests on the segment |
 | hilo_dealt / hilo_call | card_deal as the card slides out of the deck onto the seat's spot (TableCards) |
 | hilo_reshuffle | — (the deck on the table is full again) |
+| holdem_action | — (the ante and the AA Bonus are chips: bet_placed plays chip_clack; a fold slides the hand into the muck) |
+| holdem_showdown | card_deal as the turn, the river and the dealer's two go over (TableCards) |
 | sword_pull | stone_grind as the bean heaves; stuck: thud, low, and a dust puff; free: sword_ring (metal ring-out) and a ring of light, plink per lit gem (pitch rising), thud + coin as a multiplier slams down; stone_grind, high and quiet, as the sword sinks back (big win: the round_result fanfare and the golden light column) |
 | scratch_card | card_deal as the card slides out of the kiosk's dispenser; scratching plays the scratch rasp per stroke (pitch varied) and a higher one as each cell's foil pops off |
 | jackpot_won | jackpot_siren (bell arpeggio, coin shower, held chord) |
