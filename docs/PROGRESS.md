@@ -171,7 +171,9 @@ The 321 countdown on the door is enough. [...] Group the tablegames and make ran
   The full floor is the generator's canonical draw ("The Grand Hall"). Practice keeps it, and
   minigames-only still has no floor. `--floor random|full|grand_hall|floor_<seed>` pins a floor.
   The wire is unchanged: `floor_plan: {round, layout, stations}` with layout `floor_<seed>`. Hold'em
-  (`holdem`, footprint `table`) will be placed in the pit with no layout edits.
+  (`holdem`, footprint `table`) stands in the pit on every floor with no layout edits; its spot
+  from main (`data/floor_layouts/grand_hall.tres`) went with the layout files. Ten tables fit on the
+  full floor (blackjack ×3, roulette ×2, craps, Hi-Lo, the wheel, Hold'em).
 - **Jail bars.** The physics suite caught a drawn floor with its scratch counter in the jail bars'
   collider, which reaches 0.15 m into the casino and wasn't a keep-out. It is one now, and the east
   wall runs either side of the jail stand off it. `test_floor_plan_scene.gd` now also checks 120

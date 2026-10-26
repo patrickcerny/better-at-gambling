@@ -27,7 +27,7 @@ the lobby doors are at z 8.4 (x −2.75..2.75).
 ## The site: where things may stand (`FloorSite`, `LuckyLounge.floor_site()`)
 
 Each game names its size class (`GameDefinition.floor_footprint`): `table` (blackjack, roulette,
-craps, Hi-Lo, the wheel, and Hold'em when it registers), `cabinet` (slots), `big` (Plinko), `kiosk`
+craps, Hi-Lo, the wheel, Casino Hold'em), `cabinet` (slots), `big` (Plinko), `kiosk`
 (scratch cards, the Sword Tapper) or `fixed` (the horse race; never on the drawn floor). The site
 is the map's data, with no code path per game:
 
@@ -65,19 +65,20 @@ is the map's data, with no code path per game:
 
 The **full floor** (`FloorGenerator.full`, id `grand_hall`, "The Grand Hall") is the same generator
 with no dice: every game, the first pit style, each table in the freest row, the extras of
-`full_extras` (blackjack, roulette, blackjack), the run and island preferences of the site's `full`
+`full_extras` (roulette, blackjack, blackjack), the run and island preferences of the site's `full`
 lists, the spare length split evenly. Practice, the menu panorama and the map as built stand on it,
 and `LuckyLounge.STATIONS` is it plus the fixed stations. Today it is:
 
 | Station | Game | Centre (x, z) | Yaw |
 |---|---|---|---|
 | blackjack_1 | blackjack | (−14.8, −8.3) | 180 |
-| blackjack_2 | blackjack | (−14.8, −2.9) | 0 |
-| hilo_1 | hilo | (−2.78, −8.45) | 180 |
-| roulette_1 | roulette | (2.35, −8.4) | 180 |
-| craps_1 | craps | (−4.87, −2.5) | 0 |
-| roulette_2 | roulette | (0.15, −2.8) | 0 |
-| wheel_1 | wheel | (4.92, −2.7) | 0 |
+| roulette_1 | roulette | (−14.9, −2.8) | 0 |
+| wheel_1 | wheel | (−4.89, −8.5) | 180 |
+| holdem_1 | holdem | (−0.7, −8.5) | 180 |
+| roulette_2 | roulette | (4.49, −8.4) | 180 |
+| hilo_1 | hilo | (−4.38, −2.75) | 0 |
+| craps_1 | craps | (0.2, −2.5) | 0 |
+| blackjack_2 | blackjack | (4.58, −2.9) | 0 |
 | blackjack_3 | blackjack | (14.3, −8.3) | 180 |
 | slot_1..12 | slots | x −20.58 .. −4.22 (banks of 4, 1.3 m apart), z −15.38 | 0 |
 | slot_13..15 | slots | x −21.38; z −5.9, −7.2, −8.5 | 90 |
@@ -85,9 +86,10 @@ and `LuckyLounge.STATIONS` is it plus the fixed stations. Today it is:
 | scratch_1 | scratch | (20.48, 5.13) | −90 |
 | sword_1, sword_2 | sword_tapper | (−12.2, 3.55), (−10.4, 3.55) | 0 |
 
-A **new table game** (Hold'em registers as `holdem`, footprint `table`) needs no layout edits: the
-generator puts it in the pit like the others, sized by the map's measurement of it (or a nominal
-table, 5.2 × 4.3 m, until the map has measured it).
+A **new table game** needs no layout edits: Hold'em (`holdem`, footprint `table`) came in that way.
+The generator puts a new game in the pit like the others, sized by the map's measurement of it (or
+a nominal table, 5.2 × 4.3 m, until the map has measured it; add its measured size to
+`FloorGenerator.NOMINAL` and `NOMINAL_SOLID`, which `test_floor_walkability.gd` compares).
 
 ## Fitting the room (the proof)
 
