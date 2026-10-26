@@ -99,8 +99,8 @@ Every floor has to fit the real map before it can stand (`FloorPlan.problems`,
   ±0.3 m, its dealer ±0.35 m) and its solid part (what people walk round).
 - **Floor area** (`LuckyLounge.FLOOR_AREAS`): the casino floor only. A game lies wholly inside it.
 - **Keep-outs** (`FLOOR_SOLIDS`, `FLOOR_CLEAR`): the pillars, a plant by the west wall, the
-  megaphone stand, the Gift Shop, Odd Jobs and the plant beside it; the jail door, the Race Hall
-  archway and the lobby and VIP doorways; a 0.9 m square round every guard and waiter route point
+  megaphone stand, the Gift Shop, Odd Jobs and the plant beside it, the jail bars' collider; the
+  jail door, the Race Hall archway and the lobby and VIP doorways; a 0.9 m square round every guard and waiter route point
   (`PATROL_CLEAR`); and no station origin in reach of the hall (`FLOOR_HALL_REACH`).
 - **Gap** (`gap`, 0.35 m): two games keep this much floor between their chairs.
 - **Walkway checks.** The navmesh bake redone on a coarse grid (0.25 m cells), flooded from inside
@@ -115,7 +115,9 @@ station, along the guard and waiter routes and through the doorways. Between nei
 no walk may be longer than 1.6 × the straight line (or 1.6 × 2 m when they stand closer).
 `tests/physics/test_floor_plan_scene.gd` builds the full floor and drawn floors in the real match
 scene. It fails on any overlap of colliders, on a chair the doors can't reach on the baked navmesh,
-and on a route point, door or archway that is cut off.
+and on a route point, door or archway that is cut off. It also checks 120 more draws against the
+room's real colliders (each game's measured solid parts where the draw puts them) without
+building them.
 
 ## The draw each round
 

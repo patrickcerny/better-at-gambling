@@ -182,6 +182,51 @@ func test_the_full_floor_and_drawn_floors_fit_the_real_floor() -> void:
 		_check_navmesh(String(layout.id))
 
 
+## Many draws against the room's real colliders without building them: each game's solid parts
+## (as measured, `FloorGeometry.obstacles`) where the draw puts them must touch no static collider of
+## the room (walls, jail bars, pillars, shop, plants), only the floor. Catches what the fit check's
+## keep-out list doesn't know about (0.9.16: a scratch counter in the jail bars).
+func test_drawn_floors_clear_the_room_s_colliders() -> void:
+	var srv: MatchServer = scene.server
+	var geo: FloorGeometry = FloorGeometry.of_map(srv.map_def, Registry.floor_plan.gap)
+	var space: PhysicsDirectSpaceState3D = scene.map.get_world_3d().direct_space_state
+	var rotation := FloorRotation.new(SeededRng.new(0x5EED))
+	var checked: int = 0
+	for i: int in 120:
+		var layout: FloorLayout = srv.draw_floor(rotation.next_seed())
+		var plan: Dictionary = layout.wire_stations()
+		for sid: StringName in plan:
+			var entry: Array = plan[sid]
+			var game: StringName = FloorPlan.game_of(entry)
+			var at: Vector3 = FloorPlan.pos_of(entry)
+			for r: Rect2 in geo.obstacles.get(game, []):
+				var w: Rect2 = FloorGenerator.turned(r, float(entry[2])).grow(-0.03)
+				if w.size.x <= 0.0 or w.size.y <= 0.0:
+					continue
+				var box := BoxShape3D.new()
+				box.size = Vector3(w.size.x, 1.2, w.size.y)
+				var q := PhysicsShapeQueryParameters3D.new()
+				q.shape = box
+				q.transform = Transform3D(Basis(), Vector3(at.x + w.get_center().x, 0.75, at.z + w.get_center().y))
+				q.collision_mask = 1
+				checked += 1
+				for hit: Dictionary in space.intersect_shape(q, 16):
+					var other: Node = hit["collider"]
+					if not other is StaticBody3D or other.name == "Floor" or _on_a_station(other):
+						continue
+					fail_test("%s: %s (%s) runs into %s" % [layout.id, sid, game, other.get_path()])
+	gut.p("%d solid parts checked" % checked)
+	assert_gt(checked, 1000)
+
+
+## True for a collider that belongs to a station (the tables standing now, which the draws replace).
+func _on_a_station(n: Node) -> bool:
+	for sid: StringName in scene.map.stations:
+		if (scene.map.stations[sid] as Node).is_ancestor_of(n):
+			return true
+	return false
+
+
 func test_the_layout_changes_behind_the_doors_at_every_regroup() -> void:
 	var srv: MatchServer = scene.server
 	assert_eq(srv.floor_round, 1, "Practice put a layout in (forced rotation)")

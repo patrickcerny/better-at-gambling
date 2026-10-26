@@ -166,14 +166,19 @@ const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 const FLOOR_AREAS: Array[Rect2] = [
 	Rect2(-21.75, -15.75, 43.5, 23.9),
 ]
+## Where the wall runs either side of the jail have their backs: off the jail bars' collider (0.3 m
+## thick on the wall's inner face, so it reaches 0.15 m into the casino).
+const JAIL_BARS_X: float = 21.55
 ## What the floor's games keep clear of (`FloorGeometry`). Solid things that stand on the floor:
 ## the two pillars and the two in the lobby wall either side of the doors, a plant by the west
-## wall, the megaphone stand, the Gift Shop, the Odd Jobs cabinet and the plant beside it.
+## wall, the megaphone stand, the Gift Shop, the Odd Jobs cabinet and the plant beside it, and the
+## jail bars' collider where it reaches into the casino.
 const FLOOR_SOLIDS: Array[Rect2] = [
 	Rect2(-10.2, -1.6, 1.2, 1.2), Rect2(9.0, -1.6, 1.2, 1.2), Rect2(-20.6, -1.6, 1.2, 1.2),
 	Rect2(-4.3, 7.85, 1.1, 0.3), Rect2(3.2, 7.85, 1.1, 0.3),
 	Rect2(15.2, 1.7, 1.6, 1.6),
 	Rect2(18.9, 0.1, 2.85, 3.6), Rect2(19.6, -1.7, 2.15, 1.5), Rect2(20.6, -3.0, 1.15, 1.0),
+	Rect2(21.6, -9.3, 0.15, 3.6),
 ]
 ## Floor that has to stay open: the jail door, the Race Hall archway, the lobby and VIP doorways
 ## (the casino side). `describe_floor` adds a square round every guard and waiter route point.
@@ -1266,8 +1271,10 @@ static func floor_site() -> FloorSite:
 		{"from": Vector2(-x1, z0), "to": Vector2(-3.05, z0), "yaw": 0.0, "kinds": big, "full": [&"slots"]},
 		{"from": Vector2(-x1, -12.4), "to": Vector2(-x1, -2.0), "yaw": 90.0, "kinds": [&"cabinet"], "full": [&"slots"]},
 		{"from": Vector2(-x1, -0.05), "to": Vector2(-x1, 5.85), "yaw": 90.0, "kinds": [&"cabinet"]},
-		{"from": Vector2(x1, -6.35), "to": Vector2(x1, -3.35), "yaw": -90.0, "kinds": [&"cabinet", &"kiosk"]},
-		{"from": Vector2(x1, -10.4), "to": Vector2(x1, -8.75), "yaw": -90.0, "kinds": [&"kiosk"]},
+		# Either side of the jail: their backs off the jail bars' collider (x 21.6..21.9 over the
+		# jail's z), which a game in these runs would otherwise reach.
+		{"from": Vector2(JAIL_BARS_X, -6.35), "to": Vector2(JAIL_BARS_X, -3.35), "yaw": -90.0, "kinds": [&"cabinet", &"kiosk"]},
+		{"from": Vector2(JAIL_BARS_X, -10.4), "to": Vector2(JAIL_BARS_X, -8.75), "yaw": -90.0, "kinds": [&"kiosk"]},
 	]
 	s.islands = [
 		{"rect": Rect2(-17.6, 1.75, 12.6, 4.35), "yaws": [0.0, 180.0], "kinds": [&"kiosk", &"cabinet"], "full": [&"sword_tapper"]},

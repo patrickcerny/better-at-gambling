@@ -172,6 +172,11 @@ The 321 countdown on the door is enough. [...] Group the tablegames and make ran
   minigames-only still has no floor. `--floor random|full|grand_hall|floor_<seed>` pins a floor.
   The wire is unchanged: `floor_plan: {round, layout, stations}` with layout `floor_<seed>`. Hold'em
   (`holdem`, footprint `table`) will be placed in the pit with no layout edits.
+- **Jail bars.** The physics suite caught a drawn floor with its scratch counter in the jail bars'
+  collider, which reaches 0.15 m into the casino and wasn't a keep-out. It is one now, and the east
+  wall runs either side of the jail stand off it. `test_floor_plan_scene.gd` now also checks 120
+  draws against every static collider of the room. Before the fix, 136 parts hit the jail and
+  nothing else.
 - **Other floor changes.** The VIP blackjack moved 0.6 m north. The guard and waiter routes now run
   along the new aisles.
 - **Door toasts removed.** These are gone:
