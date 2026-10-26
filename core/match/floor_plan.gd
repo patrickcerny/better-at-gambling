@@ -1,9 +1,9 @@
 class_name FloorPlan
 extends RefCounted
-## The casino floor of one round (docs/FLOOR_PLAN.md): one of the hand-made layouts
-## (`FloorLayout`), in wire form {station id: [game, [x, y, z], yaw degrees]}. Pure helpers: the
-## server picks the layout (`FloorRotation`), every client builds the stations straight from the
-## wire form, and `problems` says whether a layout fits the map (`FloorGeometry`).
+## The casino floor of one round (docs/FLOOR_PLAN.md): a drawn layout (`FloorGenerator`,
+## `FloorLayout`), in wire form {station id: [game, [x, y, z], yaw degrees]}. Pure helpers: the
+## server draws the floor (`FloorRotation` hands out the seeds), every client builds the stations
+## straight from the wire form, and `problems` says whether a layout fits the map (`FloorGeometry`).
 
 
 ## One station of a plan in wire form.
@@ -49,8 +49,9 @@ static func games_of(plan: Dictionary) -> Dictionary:
 
 ## Why a layout can't be used tonight (empty when it can): a game it needs is not registered or
 ## has weight 0 (`FloorPlanConfig.weights`), or, with `geo` (the map's measurements), a game stands
-## outside the floor or on a keep-out, two games come closer than the gap, or the walkway check
-## finds a chair or patrol point nobody can walk to.
+## outside the floor or on a keep-out, two games come closer than the gap, or the walkway checks
+## find a chair or patrol point nobody can walk to, or a chair or doorway two beans side by side
+## can't get to.
 static func problems(layout: FloorLayout, cfg: FloorPlanConfig, known_games: Dictionary, geo: FloorGeometry = null) -> Array[String]:
 	var out: Array[String] = []
 	if layout == null or layout.stations.is_empty():
@@ -88,4 +89,5 @@ static func fit_problems(plan: Dictionary, geo: FloorGeometry) -> Array[String]:
 	if geo.can_walk():
 		for sid: StringName in geo.unreachable(games, by_id):
 			out.append("%s (%s): cut off from the walkways" % [sid, games[sid]])
+		out.append_array(geo.too_narrow(games, by_id))
 	return out

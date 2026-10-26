@@ -1,55 +1,31 @@
 class_name FloorRotation
 extends RefCounted
-## Which floor layout comes next (docs/FLOOR_PLAN.md), like the minigame bag (`MinigameDirector`):
-## the layouts go into a shuffled bag; each casino round takes the next one, none comes twice
-## before the bag is empty, and a fresh bag never starts with the layout that just stood. A layout
-## that can't be used tonight (`usable` says no) is skipped and the next one is taken; when none
-## can be used, the first layout (the full floor) stands. Pure and seeded: the server's floor RNG.
+## Which floor comes next (docs/FLOOR_PLAN.md): every casino round a fresh floor is drawn
+## (`FloorGenerator.draw`), and this hands out the seeds of those draws, one per round, from the
+## server's floor stream (its own seed, so the floor never shifts the match's other random draws
+## and a match replays exactly). Never the same seed twice in a row. A generated floor's id names
+## its seed (`floor_123`), so any round's floor can be put in again with `--floor floor_123`.
 
-## Layout ids in rotation order, and the one that stands when none of them can (the full floor;
-## the first id unless given).
-var ids: Array[StringName] = []
-var fallback: StringName = &""
+## Seeds stay below this (six digits read well in logs and on the command line).
+const SEED_RANGE: int = 1000000
+
 var _rng: SeededRng
-var _bag: Array[StringName] = []
-var _last: StringName = &""
+var _last: int = -1
 
 
-func _init(p_ids: Array[StringName], rng: SeededRng, p_fallback: StringName = &"") -> void:
-	ids = p_ids.duplicate()
+func _init(rng: SeededRng) -> void:
 	_rng = rng
-	fallback = p_fallback if p_fallback != &"" or ids.is_empty() else ids[0]
 
 
-## The next layout id. `usable(id) -> bool` filters out the layouts that can't stand tonight.
-func next(usable: Callable) -> StringName:
-	var ok: Array[StringName] = []
-	for id: StringName in ids:
-		if usable.call(id):
-			ok.append(id)
-	if ok.is_empty():
-		_last = fallback
-		_bag.clear()
-		return _last
-	# Skipped layouts drop out of this bag.
-	_bag = _bag.filter(func(id: StringName) -> bool: return id in ok)
-	if _bag.is_empty():
-		_bag = ok.duplicate()
-		_rng.shuffle(_bag)
-		# Never the same layout twice in a row across bag ends (unless it is the only one).
-		if _bag.size() > 1 and _bag[0] == _last:
-			var j: int = _rng.range_int(1, _bag.size() - 1)
-			_bag[0] = _bag[j]
-			_bag[j] = _last
-	_last = _bag.pop_front()
+## The seed of the next round's floor.
+func next_seed() -> int:
+	var s: int = _rng.range_int(0, SEED_RANGE - 1)
+	if s == _last:
+		s = (s + 1) % SEED_RANGE
+	_last = s
+	return s
+
+
+## The seed handed out last (-1 before the first).
+func current() -> int:
 	return _last
-
-
-## The layout that stands now (&"" before the first `next`).
-func current() -> StringName:
-	return _last
-
-
-## Layouts still in this bag, in the order they come.
-func remaining() -> Array[StringName]:
-	return _bag.duplicate()

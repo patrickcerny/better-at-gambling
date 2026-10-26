@@ -41,10 +41,10 @@ extends Resource
 @export var fun_stations: Dictionary = {}
 ## The waiting room's inner volume (filled by the map scene).
 @export var waiting_area: AABB = AABB()
-## The casino floor's layouts (docs/FLOOR_PLAN.md, `FloorLayout`; filled by the map scene from
-## `FloorPlanConfig.layouts`, empty = a fixed floor that never changes), the first being the full
-## floor the map is built with.
-@export var floor_layouts: Array[FloorLayout] = []
+## Where the casino floor's games may stand each round (docs/FLOOR_PLAN.md, `FloorSite`; filled by
+## the map scene, null = a fixed floor that never changes): the floor generator draws the round's
+## floor in it, and its canonical draw is the full floor the map is built with.
+@export var floor_site: FloorSite
 ## Room for the layouts (`FloorGeometry`): game id → its floor in its own frame (Rect2 over x, z;
 ## measured by the map scene, empty = no geometry check), world rects tables may stand in, and
 ## world rects they keep clear of.
@@ -60,6 +60,12 @@ extends Resource
 @export var floor_blockers: Array = []
 @export var floor_entries: Array = []
 @export var floor_walk_points: Array = []
+## No station's origin stands in these world rects (within reach of somewhere it must not be
+## used from: the entrance hall through its wall); points that must stay open two beans wide from
+## the entry (doorways, the shop); and the radius of an agent that wide (twice a bean's).
+@export var floor_origin_keep_out: Array = []
+@export var floor_doorways: Array = []
+@export var floor_pair_radius: float = 0.0
 
 
 ## Entrance-hall spot for a player id (Vector3.INF when the map has none).
@@ -107,14 +113,6 @@ func has_waiting_room() -> bool:
 	return not fun_stations.is_empty() and waiting_area.has_volume()
 
 
-## True when the map has floor layouts to rotate.
+## True when the map draws a new casino floor every round.
 func has_floor_plan() -> bool:
-	return not floor_layouts.is_empty()
-
-
-## A floor layout by id (null when unknown).
-func floor_layout(layout_id: StringName) -> FloorLayout:
-	for l: FloorLayout in floor_layouts:
-		if l != null and l.id == layout_id:
-			return l
-	return null
+	return floor_site != null

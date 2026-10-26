@@ -28,6 +28,9 @@ const DETOUR: float = 1.6
 const DETOUR_MIN: float = 2.0
 ## Rays for "in plain sight": over the stools, into the tables.
 const SIGHT_Y: float = 0.7
+## Drawn floors walked, from the floor stream of this match seed.
+const DRAWS: int = 16
+const SEED: int = 9160
 
 static var scene: MatchScene
 var _maps: Array[RID] = []
@@ -57,10 +60,19 @@ func after_each() -> void:
 	_maps.clear()
 
 
-## The layouts under test: label → plan (wire form).
+## The floors under test, [label, plan (wire form)]: the full floor, the canonical floor without a
+## table game (what stands when every draw of a round fails), and DRAWS rounds' floors as the
+## server draws them (`MatchServer.draw_floor`, seeds from the floor stream of match seed SEED).
 func _layouts() -> Array[Array]:
-	var out: Array[Array] = []
-	for l: FloorLayout in scene.server.map_def.floor_layouts:
+	var srv: MatchServer = scene.server
+	var out: Array[Array] = [["full floor", LuckyLounge.full_floor_plan()]]
+	var games: Dictionary = srv._floor_games(true)
+	games.erase(&"craps")
+	var canon: FloorLayout = FloorGenerator.full(srv.map_def.floor_site, games, {}, srv.floor_config)
+	out.append(["canonical floor without craps", canon.wire_stations()])
+	var rotation := FloorRotation.new(SeededRng.new(SEED ^ 0xF1002))
+	for i: int in DRAWS:
+		var l: FloorLayout = srv.draw_floor(rotation.next_seed())
 		out.append([String(l.id), l.wire_stations()])
 	return out
 

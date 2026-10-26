@@ -15,6 +15,12 @@ const CELL: float = 0.25
 ## entry (the physics test asks the navmesh the same), and a patrol point when it is this close.
 const SEAT_REACH: float = 1.2
 const POINT_REACH: float = 0.6
+## Two beans side by side (`pair_radius`): every chair has a walkway that wide within PAIR_REACH,
+## and every doorway one within DOOR_REACH. The walkway test asks 1.35 m and 0.6 m of navmeshes
+## baked for two beans (tests/physics/test_floor_walkability.gd); this grid measures from cell
+## centres a cell coarser, so it allows that cell more.
+const PAIR_REACH: float = 1.35 + CELL
+const DOOR_REACH: float = 0.6 + CELL
 ## Open islands smaller than this many cells don't count (the bake's region_min_size 2, squared).
 const MIN_ISLAND: int = 4
 ## How much farther than the reachable floor a pocket next to a chair must be, metres.
@@ -38,6 +44,11 @@ var keep_out: Array[Rect2] = []
 ## Where people come into each area, and the points the guards and waiter walk to.
 var entries: Array[Vector2] = []
 var walk_points: Array[Vector2] = []
+## No game's origin stands in these (world rects), and points that stay open two beans wide.
+var origin_keep_out: Array[Rect2] = []
+var doorways: Array[Vector2] = []
+## Radius of an agent two beans wide (0 = no such check).
+var pair_radius: float = 0.0
 ## Space between two tables (chair to chair), metres.
 var gap: float = 0.35
 ## How far the navmesh keeps off walls and tables (its agent radius), metres.
@@ -57,6 +68,9 @@ static func of_map(def: MapDefinition, p_gap: float) -> FloorGeometry:
 	g.blockers.assign(def.floor_blockers)
 	g.entries.assign(def.floor_entries)
 	g.walk_points.assign(def.floor_walk_points)
+	g.origin_keep_out.assign(def.floor_origin_keep_out)
+	g.doorways.assign(def.floor_doorways)
+	g.pair_radius = def.floor_pair_radius
 	g.gap = p_gap
 	return g
 
@@ -99,6 +113,10 @@ func fits(anchor: Dictionary, game: StringName) -> bool:
 
 ## Why the game does not fit the spot ("" when it does), for test messages.
 func why_not(anchor: Dictionary, game: StringName) -> String:
+	var pos: Vector3 = anchor["pos"]
+	for k: Rect2 in origin_keep_out:
+		if k.has_point(Vector2(pos.x, pos.z)):
+			return "stands at %s, inside %s" % [Vector2(pos.x, pos.z), k]
 	if not rects.has(game):
 		return ""  # unmeasured: trust the size class
 	var w: Rect2 = world_rect(anchor, game)
@@ -185,7 +203,34 @@ func unreachable(plan: Dictionary, by_id: Dictionary) -> Array[StringName]:
 	return out
 
 
-func _walk_grid(area: Rect2, plan: Dictionary, by_id: Dictionary) -> WalkGrid:
+## Where two beans side by side can't walk (empty when they can everywhere): a chair of `plan`
+## (spot id → game) with no walkway that wide within PAIR_REACH joined to the entry, or a doorway
+## not open that wide. The walkway check again with twice a bean's radius.
+func too_narrow(plan: Dictionary, by_id: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	if pair_radius <= 0.0:
+		return out
+	var ids: Array = plan.keys()
+	ids.sort()
+	for area: Rect2 in areas:
+		var grid: WalkGrid = _walk_grid(area, plan, by_id, pair_radius)
+		if grid == null:
+			continue
+		for id: Variant in ids:
+			var g: StringName = StringName(plan[id])
+			if not rects.has(g) or not area.encloses(world_rect(by_id[id], g)):
+				continue
+			var seats_w: Array[Vector2] = world_seats(by_id[id], g)
+			for i: int in seats_w.size():
+				if not grid.reached_any(seats_w[i], PAIR_REACH):
+					out.append("%s (%s): no walkway two beans wide by chair %d" % [id, g, i])
+		for d: Vector2 in doorways:
+			if area.has_point(d) and not grid.reached_any(d, DOOR_REACH):
+				out.append("%s is not open two beans wide" % d)
+	return out
+
+
+func _walk_grid(area: Rect2, plan: Dictionary, by_id: Dictionary, radius: float = -1.0) -> WalkGrid:
 	var starts: Array[Vector2] = []
 	for e: Vector2 in entries:
 		if area.has_point(e):
@@ -196,7 +241,7 @@ func _walk_grid(area: Rect2, plan: Dictionary, by_id: Dictionary) -> WalkGrid:
 	var grid := WalkGrid.new(area.grow(GRID_MARGIN))
 	# The bake marks every cell an obstacle touches, then keeps the radius off: about half a cell
 	# more than the radius from the obstacle itself.
-	var r: float = agent_radius + CELL * 0.5
+	var r: float = (agent_radius if radius < 0.0 else radius) + CELL * 0.5
 	var bounds: Rect2 = grid.area.grow(r)
 	for b: Rect2 in blockers:
 		if bounds.intersects(b, true):
@@ -314,6 +359,18 @@ class WalkGrid:
 		if k + cols < cols * rows:
 			out.append(k + cols)
 		return out
+
+	## True when any floor within `radius` of `p` is reached from the entry.
+	func reached_any(p: Vector2, radius: float) -> bool:
+		var i0: int = maxi(0, floori((p.x - radius - area.position.x) / CELL))
+		var i1: int = mini(cols - 1, floori((p.x + radius - area.position.x) / CELL))
+		var j0: int = maxi(0, floori((p.y - radius - area.position.y) / CELL))
+		var j1: int = mini(rows - 1, floori((p.y + radius - area.position.y) / CELL))
+		for j: int in range(j0, j1 + 1):
+			for i: int in range(i0, i1 + 1):
+				if reach[j * cols + i] == 1 and center(i, j).distance_to(p) <= radius:
+					return true
+		return false
 
 	## True when the open floor nearest `p` (within `radius`) is reached from the entry: someone
 	## walking to `p` heads for the nearest open floor, so a pocket nobody can get into counts as

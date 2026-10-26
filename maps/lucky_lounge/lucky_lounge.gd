@@ -25,19 +25,23 @@ const FIXED_STATIONS: Dictionary = {
 	&"vip_blackjack_1": [&"blackjack", Vector3(-4.3, 0, -20.5), 0], &"vip_roulette_1": [&"roulette", Vector3(4.0, 0, -20.5), 0],
 	&"vip_slot_1": [&"slots", Vector3(-6.5, 0, -24.9), 0], &"vip_slot_2": [&"slots", Vector3(6.5, 0, -24.9), 0],
 }
-## The floor's layouts and their rotation (docs/FLOOR_PLAN.md); the first layout is the full floor.
+## The floor's config (docs/FLOOR_PLAN.md): how the generator fills a round's floor.
 const FLOOR_CONFIG_PATH: String = "res://data/balance/floor_plan.tres"
+const GAMES_PATH: String = "res://data/registry/games.tres"
 ## Station id → [station kind, position, yaw degrees]: the full floor (Practice, the menu
-## panorama, the map as built), which is the first floor layout (`data/floor_layouts/
-## grand_hall.tres`) plus the fixed stations. One source of truth: the layout file.
+## panorama, the map as built: the floor generator's canonical draw over every registered game,
+## `full_floor_plan`) plus the fixed stations.
+static var _full_plan: Dictionary = {}
 static var STATIONS: Dictionary = _full_floor_stations()
 const SPAWNS: Array[Vector3] = [  # start-room spots: in front of the pedestal stairs (z ≥ 12.95)
 	Vector3(-6, 0, 12.3), Vector3(-4, 0, 11.8), Vector3(-2, 0, 12.3), Vector3(2, 0, 12.3),
 	Vector3(4, 0, 11.8), Vector3(6, 0, 12.3), Vector3(-8, 0, 12.3), Vector3(8, 0, 12.3),
 ]
+## The guards' rounds, along the aisles every floor keeps open (docs/FLOOR_PLAN.md): the west
+## and the east half of the floor, each round its pit block and along the walls.
 const GUARD_ROUTES: Array = [
-	[Vector3(-12, 0, 0), Vector3(-12, 0, -11), Vector3(0, 0, -11), Vector3(0, 0, 0)],
-	[Vector3(12, 0, 0.5), Vector3(18, 0, -8), Vector3(8, 0, -8), Vector3(2, 0, 7)],
+	[Vector3(-11.1, 0, 0.6), Vector3(-18.9, 0, 0.6), Vector3(-18.9, 0, -11.8), Vector3(-11.1, 0, -11.8)],
+	[Vector3(11.1, 0, 0.6), Vector3(11.1, 0, -11.8), Vector3(18.4, 0, -11.8), Vector3(18.4, 0, -7.5), Vector3(18.4, 0, -1.0), Vector3(2.0, 0, 5.0)],
 ]
 ## The VIP lounge: its own room north of the casino, inner faces x −9..9, z −26..−16 (the casino's
 ## north wall is its south wall). One door in the middle of that wall.
@@ -157,12 +161,12 @@ const JAIL_EXITS: Array[Vector3] = [Vector3(0.6, 0, 7.2), Vector3(1.4, 0, 7.2), 
 const JAIL_CAM_POS: Vector3 = Vector3(21.1, 4.4, -7.5)
 const JAIL_CAM_LOOK: Vector3 = Vector3(3.0, 0.4, -4.0)
 
-## Where a floor layout may stand its games (world x, z rects; docs/FLOOR_PLAN.md): the casino
-## floor (inner wall faces). Never the entrance hall or the VIP lounge.
+## Where the floor's games may stand (world x, z rects; docs/FLOOR_PLAN.md): the casino floor
+## (inner wall faces). Never the entrance hall or the VIP lounge.
 const FLOOR_AREAS: Array[Rect2] = [
 	Rect2(-21.75, -15.75, 43.5, 23.9),
 ]
-## What a layout's games keep clear of (`FloorGeometry`). Solid things that stand on the floor:
+## What the floor's games keep clear of (`FloorGeometry`). Solid things that stand on the floor:
 ## the two pillars and the two in the lobby wall either side of the doors, a plant by the west
 ## wall, the megaphone stand, the Gift Shop, the Odd Jobs cabinet and the plant beside it.
 const FLOOR_SOLIDS: Array[Rect2] = [
@@ -172,15 +176,22 @@ const FLOOR_SOLIDS: Array[Rect2] = [
 	Rect2(18.9, 0.1, 2.85, 3.6), Rect2(19.6, -1.7, 2.15, 1.5), Rect2(20.6, -3.0, 1.15, 1.0),
 ]
 ## Floor that has to stay open: the jail door, the Race Hall archway, the lobby and VIP doorways
-## (the casino side), and a square round every guard and waiter route point.
+## (the casino side). `describe_floor` adds a square round every guard and waiter route point.
 const FLOOR_CLEAR: Array[Rect2] = [
 	Rect2(20.2, -8.4, 1.55, 1.7), Rect2(19.6, -15.75, 2.15, 5.0),
 	Rect2(-3.0, 6.5, 6.0, 1.65), Rect2(-2.7, -16.0, 5.4, 1.6),
-	# Patrol route points (guards, then the waiter).
-	Rect2(-12.45, -0.45, 0.9, 0.9), Rect2(-12.45, -11.45, 0.9, 0.9), Rect2(-0.45, -11.45, 0.9, 0.9), Rect2(-0.45, -0.45, 0.9, 0.9),
-	Rect2(11.55, 0.05, 0.9, 0.9), Rect2(17.55, -8.45, 0.9, 0.9), Rect2(7.55, -8.45, 0.9, 0.9), Rect2(1.55, 6.55, 0.9, 0.9),
-	Rect2(13.55, 1.15, 0.9, 0.9), Rect2(2.05, 1.75, 0.9, 0.9), Rect2(-5.45, 0.15, 0.9, 0.9), Rect2(-12.95, -5.05, 0.9, 0.9),
-	Rect2(-1.45, -10.95, 0.9, 0.9), Rect2(8.55, -9.45, 0.9, 0.9), Rect2(12.05, -2.45, 0.9, 0.9),
+]
+## Half the side of the open square round a patrol route point.
+const PATROL_CLEAR: float = 0.45
+## No station stands here (its origin): within the interact range (3.5 m) of a bean in the entrance
+## hall, through the lobby wall (z 8.15..8.65; a bean's middle is 0.42 m off it), E would sit them
+## down at the table on the other side.
+const FLOOR_HALL_REACH: Array[Rect2] = [Rect2(-22.0, 5.45, 44.0, 3.0)]
+## Points that stay open two beans side by side from the hall (`FloorGeometry.doorways`; the
+## walkway test walks to them too): inside the lobby doors, the VIP door, the Race Hall archway,
+## outside the jail gate, the Gift Shop and Odd Jobs spots.
+const FLOOR_DOORWAYS: Array[Vector2] = [
+	Vector2(0.0, 7.4), Vector2(0.0, -15.0), Vector2(21.0, -13.25), Vector2(19.95, -7.5), Vector2(19.6, 1.5), Vector2(20.3, -0.95),
 ]
 ## The navmesh's agent (`nav_template`; the floor plan's walkway check uses the same).
 const NAV_RADIUS: float = 0.5
@@ -188,8 +199,19 @@ const NAV_HEIGHT: float = 2.0
 const NAV_CLIMB: float = 0.25
 const NAV_CELL: float = 0.25
 ## Where people come onto the casino floor (x, z): inside the lobby doors. Every chair of every
-## layout must be walkable from here.
+## floor must be walkable from here.
 const FLOOR_ENTRIES: Array[Vector2] = [Vector2(0.0, 7.2)]
+## The table pit (`FloorSite`): the middle of its dealers' lane (z) and its width, how far its
+## rows reach north and south, and its block styles (x intervals): three blocks between the
+## pillars' aisles, or four with an aisle from the lobby doors to the VIP door down the middle.
+const PIT_LANE_Z: float = -5.6
+const PIT_LANE: float = 2.0
+const PIT_NORTH: float = -10.9
+const PIT_SOUTH: float = -0.3
+const PIT_STYLES: Array = [
+	[Vector2(-17.6, -12.0), Vector2(-7.2, 7.2), Vector2(12.0, 16.6)],
+	[Vector2(-17.6, -12.0), Vector2(-7.2, -1.1), Vector2(1.1, 7.2), Vector2(12.0, 16.6)],
+]
 
 var stations: Dictionary[StringName, StationBase] = {}
 ## Per ready pedestal: the name on its brass plate, the top slab (never changes), and the warm
@@ -1218,56 +1240,108 @@ func _place_station(sid: StringName, kind: StringName, pos: Vector3, yaw: float)
 
 # --- Floor layouts (docs/FLOOR_PLAN.md) --------------------------------------------------------
 
-## The casino floor's layouts in order (`FloorPlanConfig.layouts`); the first is the full floor.
-static func layouts() -> Array[FloorLayout]:
-	var out: Array[FloorLayout] = []
-	var cfg: FloorPlanConfig = load(FLOOR_CONFIG_PATH) as FloorPlanConfig
-	if cfg != null:
-		for l: FloorLayout in cfg.layouts:
-			if l != null:
-				out.append(l)
+## Where the floor generator may put the casino floor's games (`FloorGenerator`, docs/FLOOR_PLAN.md):
+## the pit; the wall runs (north wall either side of the VIP door, the west wall either side of the
+## plant, the east wall between the Race Hall archway, the jail door, the plant and south of the
+## Gift Shop), each with what may stand there; and the two islands of the plaza inside the lobby
+## doors. The canonical draw (the full floor) puts Plinko on the north-east wall, the slot banks on
+## the north-west and west walls, the scratch counter beside the Gift Shop and the Sword Tapper's
+## pedestals on the west island.
+static func floor_site() -> FloorSite:
+	var s := FloorSite.new()
+	s.full_id = &"grand_hall"
+	s.full_title = "The Grand Hall"
+	s.lane_z = PIT_LANE_Z
+	s.lane = PIT_LANE
+	s.pit_north = PIT_NORTH
+	s.pit_south = PIT_SOUTH
+	s.pit_styles = PIT_STYLES.duplicate(true)
+	var x1: float = SIZE_X * 0.5 - 0.25  # inner face of the side walls
+	var z0: float = -SIZE_Z * 0.5 + 0.25  # inner face of the north wall
+	var big: Array = [&"big", &"cabinet", &"kiosk"]
+	s.walls = [
+		{"from": Vector2(3.05, z0), "to": Vector2(19.25, z0), "yaw": 0.0, "kinds": big, "full": [&"plinko"]},
+		{"from": Vector2(x1, 4.05), "to": Vector2(x1, 6.2), "yaw": -90.0, "kinds": [&"kiosk"], "full": [&"scratch"]},
+		{"from": Vector2(-x1, z0), "to": Vector2(-3.05, z0), "yaw": 0.0, "kinds": big, "full": [&"slots"]},
+		{"from": Vector2(-x1, -12.4), "to": Vector2(-x1, -2.0), "yaw": 90.0, "kinds": [&"cabinet"], "full": [&"slots"]},
+		{"from": Vector2(-x1, -0.05), "to": Vector2(-x1, 5.85), "yaw": 90.0, "kinds": [&"cabinet"]},
+		{"from": Vector2(x1, -6.35), "to": Vector2(x1, -3.35), "yaw": -90.0, "kinds": [&"cabinet", &"kiosk"]},
+		{"from": Vector2(x1, -10.4), "to": Vector2(x1, -8.75), "yaw": -90.0, "kinds": [&"kiosk"]},
+	]
+	s.islands = [
+		{"rect": Rect2(-17.6, 1.75, 12.6, 4.35), "yaws": [0.0, 180.0], "kinds": [&"kiosk", &"cabinet"], "full": [&"sword_tapper"]},
+		{"rect": Rect2(5.0, 1.75, 8.2, 4.35), "yaws": [0.0, 180.0], "kinds": [&"kiosk", &"cabinet"]},
+	]
+	for sid: Variant in FIXED_STATIONS:
+		s.fixed.append(StringName(sid))
+	return s
+
+
+## Every registered game's floor footprint (game id → `GameDefinition.floor_footprint`), straight
+## from the registry file (the full floor is built before the `Registry` autoload may be up).
+static func registered_footprints() -> Dictionary:
+	var out: Dictionary = {}
+	var list: RegistryList = load(GAMES_PATH) as RegistryList
+	if list == null:
+		return out
+	for e: Resource in list.entries:
+		var def: GameDefinition = e as GameDefinition
+		if def != null:
+			out[def.id] = def.floor_footprint
 	return out
 
 
-## `STATIONS`: the first layout's stations plus the fixed ones.
+## The full floor in wire form: the floor generator's canonical draw over every registered game
+## (station id → [game, [x, y, z], yaw degrees]).
+static func full_floor_plan() -> Dictionary:
+	if _full_plan.is_empty():
+		var cfg: FloorPlanConfig = load(FLOOR_CONFIG_PATH) as FloorPlanConfig
+		var full: FloorLayout = FloorGenerator.full(floor_site(), registered_footprints(), {}, cfg)
+		if full != null:
+			_full_plan = full.wire_stations()
+	return _full_plan.duplicate(true)
+
+
+## `STATIONS`: the full floor plus the fixed stations.
 static func _full_floor_stations() -> Dictionary:
 	var out: Dictionary = {}
-	var all: Array[FloorLayout] = layouts()
-	if not all.is_empty():
-		for sid: Variant in all[0].stations:
-			out[StringName(sid)] = (all[0].stations[sid] as Array).duplicate()
+	var full: Dictionary = full_floor_plan()
+	for sid: StringName in full:
+		var e: Array = full[sid]
+		out[sid] = [FloorPlan.game_of(e), FloorPlan.pos_of(e), float(e[2])]
 	for sid: Variant in FIXED_STATIONS:
 		out[StringName(sid)] = FIXED_STATIONS[sid]
 	return out
 
 
 ## A game's size class on the floor (`GameDefinition.floor_footprint`; table when unregistered).
-## Only `fixed` matters to the layouts: such a game keeps its own place (the horse race).
+## A `fixed` game keeps its own place (the horse race); the floor generator places the others.
 static func footprint_of(game: StringName) -> StringName:
 	var def: GameDefinition = Registry.games.get(game, null)
 	return def.floor_footprint if def != null else &"table"
 
 
-## The full floor in wire form (the first layout): station id → [game, [x, y, z], yaw degrees].
-static func full_floor_plan() -> Dictionary:
-	var all: Array[FloorLayout] = layouts()
-	return all[0].wire_stations() if not all.is_empty() else {}
-
-
-## Tells the server about the floor's layouts and the room they stand in: where games may stand,
-## what they keep clear of, where people come in and the patrol points that must stay walkable.
+## Tells the server about the floor and the room it stands in: where the generator may put the
+## games (`floor_site`), where games may stand, what they keep clear of, where people come in,
+## the patrol points and doorways that must stay walkable, and how wide two beans are.
 static func describe_floor(def: MapDefinition) -> void:
-	def.floor_layouts = layouts()
+	def.floor_site = floor_site()
 	def.floor_areas = FLOOR_AREAS.duplicate()
-	def.floor_keep_out = FLOOR_SOLIDS + FLOOR_CLEAR
-	def.floor_entries = FLOOR_ENTRIES.duplicate()
 	var walk: Array[Vector2] = []
 	for p: Vector3 in CasinoFloor.WAITER_ROUTE:
 		walk.append(Vector2(p.x, p.z))
 	for route: Array in GUARD_ROUTES:
 		for p: Vector3 in route:
 			walk.append(Vector2(p.x, p.z))
+	var keep_out: Array = FLOOR_SOLIDS + FLOOR_CLEAR
+	for p: Vector2 in walk:
+		keep_out.append(Rect2(p - Vector2.ONE * PATROL_CLEAR, Vector2.ONE * PATROL_CLEAR * 2.0))
+	def.floor_keep_out = keep_out
+	def.floor_origin_keep_out = FLOOR_HALL_REACH.duplicate()
+	def.floor_entries = FLOOR_ENTRIES.duplicate()
 	def.floor_walk_points = walk
+	def.floor_doorways = FLOOR_DOORWAYS.duplicate()
+	def.floor_pair_radius = PlayerAvatar.BODY_RADIUS * 2.0
 
 
 ## Measures the floor for the layouts' fit check (`FloorGeometry`) by building every game's

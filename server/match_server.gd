@@ -99,25 +99,26 @@ var _room: WalkableLogicBase = null
 ## The waiting room's play-money games while an online room waits in LOBBY (null otherwise, and
 ## for maps without one). Its own ledger: see `FunRoom`.
 var fun_room: FunRoom = null
-## The casino floor of this round (docs/FLOOR_PLAN.md): the layout standing (its id, &"" on a map
-## without layouts), its stations in wire form {station id: [game, [x, y, z], yaw degrees]}, and
-## how many floors this match has put in. Online rooms take the next layout from the rotation when
-## the lobby opens and at every regroup; Practice keeps the full floor (the first layout).
+## The casino floor of this round (docs/FLOOR_PLAN.md): the layout standing (its id: the full
+## floor's, or `floor_<seed>` for a drawn one; &"" on a map without a floor site), its stations in
+## wire form {station id: [game, [x, y, z], yaw degrees]}, and how many floors this match has put
+## in. Online rooms draw a fresh floor when the lobby opens and at every regroup; Practice keeps
+## the full floor.
 var floor_plan: Dictionary = {}
 var floor_layout: StringName = &""
 var floor_round: int = 0
-## The layouts and their rules (Registry.floor_plan unless a test sets its own).
+## How the floor is drawn (Registry.floor_plan unless a test sets its own).
 var floor_config: FloorPlanConfig
 ## Called with the new plan right after the server switched floors (the host's map rebuilds and
 ## refills the station seats in `map_def`; tests leave it unset).
 var floor_changed: Callable
-## Stations that never move with the floor layouts (the horse race, the VIP lounge): station id →
-## game id.
+## Stations that never move with the floor (the horse race, the VIP lounge): station id → game id.
 var _fixed_stations: Dictionary = {}
-## The shuffled bag of layouts (seeded from the match seed), and each layout's fit on this map
-## (layout id → its problems, `FloorPlan.problems`; measured once per match).
+## The seeds of the rounds' floors (from the match seed), the full floor (the canonical draw over
+## every game, as the map was built), and the map's measurements for the checks (null without).
 var _floor_rotation: FloorRotation
-var _layout_fit: Dictionary = {}
+var _full_layout: FloorLayout
+var _floor_geo: FloorGeometry
 
 
 ## Wires balance/presets/registry data. Call before `add_player`/`start_match`.
@@ -154,9 +155,14 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 	if floor_config == null:
 		floor_config = Registry.floor_plan
 	_fixed_stations = map_def.stations.duplicate()
+	_full_layout = null
+	_floor_geo = null
 	if map_def.has_floor_plan():
-		for sid: Variant in map_def.floor_layouts[0].stations:
-			_fixed_stations.erase(StringName(sid))
+		for sid: Variant in map_def.stations:
+			if not StringName(sid) in map_def.floor_site.fixed:
+				_fixed_stations.erase(sid)
+		_full_layout = FloorGenerator.full(map_def.floor_site, _floor_games(false), {}, floor_config)
+		_floor_geo = FloorGeometry.of_map(map_def, floor_config.gap)
 	floor_plan = _full_floor()  # the map scene was built with the full floor
 	_build_match_systems(int(settings.get("seed", 0)))
 	Log.info(&"server", "configured: %d minigames, %.0f s gambling between, seed %d, %d stations" % [state.minigames, state.gamble_s, state.match_seed, stations.logics.size()])
@@ -188,10 +194,9 @@ func _build_match_systems(seed_value: int) -> void:
 	pickups = PickupSystem.new(economy)
 	interactions = InteractionResolver.new(rules, world, economy, pickups, rng.fork())
 	_build_schedule()
-	# The full floor first; `_new_floor` below puts in the rotation's first layout where the match
-	# rotates them (a seed of its own, so the rotation never shifts the match's other streams).
-	_floor_rotation = FloorRotation.new(_rotation_ids(), SeededRng.new(seed_value ^ 0xF1002), _full_layout_id())
-	_layout_fit.clear()
+	# The full floor first; `_new_floor` below draws the round's floor where the match does (a seed
+	# of its own, so the floor never shifts the match's other streams).
+	_floor_rotation = FloorRotation.new(SeededRng.new(seed_value ^ 0xF1002))
 	floor_round = 0
 	if map_def.has_floor_plan():
 		_set_floor_stations(_full_floor())
@@ -251,12 +256,13 @@ func _vip_ids() -> Array:
 	return vip_ids
 
 
-# --- Floor layouts (docs/FLOOR_PLAN.md) -------------------------------------------------------
+# --- The casino floor (docs/FLOOR_PLAN.md) -----------------------------------------------------
 
-## True when this match rotates the floor layouts at each casino round start: the map has layouts,
+## True when this match draws a new floor at each casino round start: the map has a floor site,
 ## and it is an online room (`FloorPlanConfig.rotate_in_rooms`) or Practice with
-## `rotate_in_practice`. The `floor` setting overrides: "random" always rotates (dev/tests), "full"
-## never does, and a layout id puts that layout in every round (dev renders).
+## `rotate_in_practice`. The `floor` setting overrides: "random" always draws (dev/tests), "full"
+## never does, and a layout id (the full floor's, or a drawn floor's `floor_<seed>`) puts that
+## floor in every round (dev renders).
 func draws_floor() -> bool:
 	if not map_def.has_floor_plan():
 		return false
@@ -266,60 +272,97 @@ func draws_floor() -> bool:
 			return true
 		"full":
 			return false
-	if forced != "" and map_def.floor_layout(StringName(forced)) != null:
+	if _pinned_floor(forced) != null:
 		return true
 	return floor_config.rotate_in_rooms if room_mode else floor_config.rotate_in_practice
 
 
-## The full floor (the map's first layout) in wire form.
+## The full floor (the canonical draw over every game) in wire form.
 func _full_floor() -> Dictionary:
-	return map_def.floor_layouts[0].wire_stations() if map_def.has_floor_plan() else {}
+	return _full_layout.wire_stations() if _full_layout != null else {}
 
 
 func _full_layout_id() -> StringName:
-	return map_def.floor_layouts[0].id if map_def.has_floor_plan() else &""
+	return _full_layout.id if _full_layout != null else &""
 
 
-## The layouts in the rotation: the map's enabled ones, in order.
-func _rotation_ids() -> Array[StringName]:
-	var out: Array[StringName] = []
-	for l: FloorLayout in map_def.floor_layouts:
-		if l != null and l.enabled:
-			out.append(l.id)
+## The games the floor generator places (game id → footprint): every registered game but the fixed
+## ones, and with `only_on` only those whose weight is above 0 (`FloorPlanConfig.weights`).
+func _floor_games(only_on: bool) -> Dictionary:
+	var out: Dictionary = {}
+	for id: StringName in Registry.games:
+		var fp: StringName = Registry.games[id].floor_footprint
+		if fp == &"fixed" or (only_on and floor_config.weight_of(id) <= 0.0):
+			continue
+		out[id] = fp
 	return out
 
 
-## Why a layout can't stand tonight (empty when it can): a game of it is off or unknown, or it
-## does not fit this map (`FloorPlan.problems`; the geometry is checked once per match).
-func layout_problems(layout_id: StringName) -> Array[String]:
-	var layout: FloorLayout = map_def.floor_layout(layout_id)
-	var out: Array[String] = FloorPlan.problems(layout, floor_config, Registry.games)
-	if layout == null or not out.is_empty():
-		return out
-	if not _layout_fit.has(layout_id):
-		var geo: FloorGeometry = FloorGeometry.of_map(map_def, floor_config.gap)
-		var fit: Array[String] = []
-		if geo != null:
-			fit = FloorPlan.fit_problems(layout.wire_stations(), geo)
-		_layout_fit[layout_id] = fit
-		for why: String in fit:
-			Log.warn(&"server", "floor layout %s skipped: %s" % [layout_id, why])
-	out.append_array(_layout_fit[layout_id] as Array[String])
-	return out
+## The floor a `floor` setting names (null when it names none): the full floor's id, or a drawn
+## floor's `floor_<seed>` (a bare number works too).
+func _pinned_floor(forced: String) -> FloorLayout:
+	if forced == "" or not map_def.has_floor_plan():
+		return null
+	if _full_layout != null and forced == String(_full_layout.id):
+		return _full_layout
+	var seed_value: int = FloorGenerator.seed_of(forced)
+	if seed_value < 0:
+		return null
+	return FloorGenerator.draw(map_def.floor_site, _floor_games(true), _floor_sizes(), floor_config, seed_value)
 
 
-## Puts in the next layout from the rotation (one that can be used tonight; a layout pinned by the
-## `floor` setting instead) and switches the casino to it.
+## Each game's measured floor (empty without the map's measurements: the generator's nominal ones).
+func _floor_sizes() -> Dictionary:
+	return _floor_geo.rects if _floor_geo != null else {}
+
+
+## Why a floor can't stand tonight (empty when it can): a game of it is off or unknown, or it does
+## not fit this map (`FloorPlan.problems`: overlaps, keep-outs, the walkway checks).
+func floor_problems(layout: FloorLayout) -> Array[String]:
+	return FloorPlan.problems(layout, floor_config, Registry.games, _floor_geo)
+
+
+## Draws the round's floor from `seed_value`: up to `FloorPlanConfig.draws` draws (seeds
+## `seed_value`, `seed_value + 1`, ...), the first that passes every check stands. When none does,
+## the canonical draw over tonight's games stands, and when even that fails, the full floor.
+func draw_floor(seed_value: int) -> FloorLayout:
+	var games: Dictionary = _floor_games(true)
+	for i: int in maxi(floor_config.draws, 1):
+		var s: int = (seed_value + i) % FloorRotation.SEED_RANGE
+		var drawn: FloorLayout = FloorGenerator.draw(map_def.floor_site, games, _floor_sizes(), floor_config, s)
+		if drawn == null:
+			Log.info(&"server", "floor draw %d seats no floor" % s)
+			continue
+		var why: Array[String] = floor_problems(drawn)
+		if why.is_empty():
+			return drawn
+		Log.info(&"server", "floor draw %d dropped: %s" % [s, why[0]])
+	return _fallback_floor(games)
+
+
+## The canonical draw over tonight's games, or the full floor when that fails too.
+func _fallback_floor(games: Dictionary) -> FloorLayout:
+	var canon: FloorLayout = FloorGenerator.full(map_def.floor_site, games, {}, floor_config)
+	if canon != null and floor_problems(canon).is_empty():
+		Log.warn(&"server", "no floor draw passed its checks: the canonical floor stands")
+		return canon
+	Log.warn(&"server", "no floor draw passed its checks: the full floor stands")
+	return _full_layout
+
+
+## Puts in the round's floor (a fresh draw; the floor the `floor` setting pins instead) and
+## switches the casino to it.
 func _new_floor() -> void:
-	var pinned: StringName = StringName(String(settings.get("floor", "")))
-	var next: StringName
-	if map_def.floor_layout(pinned) != null:
-		next = pinned
-	else:
-		next = _floor_rotation.next(func(id: StringName) -> bool: return layout_problems(id).is_empty())
-	var layout: FloorLayout = map_def.floor_layout(next)
+	var layout: FloorLayout = _pinned_floor(String(settings.get("floor", "")))
+	if layout != null and layout != _full_layout:
+		var why: Array[String] = floor_problems(layout)
+		if not why.is_empty():
+			Log.warn(&"server", "pinned floor %s fails its checks (%s): falling back" % [layout.id, why[0]])
+			layout = _fallback_floor(_floor_games(true))
 	if layout == null:
-		layout = map_def.floor_layouts[0]
+		layout = draw_floor(_floor_rotation.next_seed())
+	if layout == null:
+		layout = _full_layout
 	_apply_floor(layout.wire_stations(), layout.id)
 
 

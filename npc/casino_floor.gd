@@ -8,11 +8,12 @@ extends Node3D
 ## and the jail (carrying jailed players to the cell, locking them in, letting them out) live in
 ## its `SecurityView` child.
 
-## Service loop: from by the Gift Shop out across the floor and back (navmesh points; every floor
-## layout keeps them walkable, docs/FLOOR_PLAN.md).
+## Service loop: from the plaza by the Gift Shop along the south aisle, up the west pillars'
+## aisle, along the north aisle and back down the east one (navmesh points on the aisles every
+## floor keeps open, docs/FLOOR_PLAN.md).
 const WAITER_ROUTE: Array[Vector3] = [
-	Vector3(14.0, 0, 1.6), Vector3(2.5, 0, 2.2), Vector3(-5.0, 0, 0.6), Vector3(-12.5, 0, -4.6),
-	Vector3(-1.0, 0, -10.5), Vector3(9.0, 0, -9.0), Vector3(12.5, 0, -2.0),
+	Vector3(16.0, 0, 5.6), Vector3(6.5, 0, 0.6), Vector3(-6.5, 0, 0.6), Vector3(-11.1, 0, -5.6),
+	Vector3(-6.5, 0, -11.8), Vector3(6.5, 0, -11.8), Vector3(11.1, 0, -5.6),
 ]
 const PUDDLE_COLOR: Color = Color("#7A3B22")
 
