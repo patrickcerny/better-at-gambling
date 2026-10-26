@@ -171,6 +171,10 @@
   walking cancels only after the first moment and the cue stops. Updated for the new key order
   and lengths: `test_play_emote.gd`, `test_avatar_emotes.gd` (key 6 = 6-7), `test_emote_camera.gd`,
   `test_emote_replication.gd`.
+- Emote wheel: seven pills at radius 250 (the bottom pair overlapped when lit at 220), and the
+  stick picks again (a full stick throw fell inside the mouse's 40 px dead zone, so pointing and
+  releasing sent nothing). `tests/ui/test_emote_wheel.gd`: seven pills, 6-7 on top, no overlap
+  when lit, stick up then release sends 6-7.
 ### 2026-10-19 / 0.9.15 Pixel look removed
 - **Pixel look removed** (Patrick: "OK no actually remove that filter overall. Save the code
   though if i want to implement it again"): the game always renders at the window's full
