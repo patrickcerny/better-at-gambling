@@ -499,6 +499,14 @@ static func in_play_text(st: ClientMatchState, pid: int) -> String:
 				var h: Dictionary = HiLoStation.hand_of(pub.get("hands", {}), pid)
 				if String(h.get("phase", "")) == "play":
 					amount += int(h.get("pot", h.get("stake", 0)))
+			&"holdem":
+				# The ante and call still riding (and a bonus before the flop settles it).
+				if int(pub.get("state", 0)) != HoldemLogic.State.PAYOUT:
+					var h: Dictionary = HoldemStation.hand_of(pub.get("hands", {}), pid)
+					if not h.is_empty() and StringName(h.get("decision", &"")) != HoldemLogic.FOLD:
+						amount += int(h.get("ante", 0)) + int(h.get("call", 0))
+					if not h.is_empty() and int(h.get("bonus_returned", -1)) < 0:
+						amount += int(h.get("bonus", 0))
 		if amount > 0:
 			total += amount
 			parts.append("%s $%d" % [ClientMatchState.station_label(StringName(sid)), amount])

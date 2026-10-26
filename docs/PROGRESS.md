@@ -214,6 +214,43 @@
   `skin` arm directions and skin-only emote tests went, `emote_shot` takes `--colors`. Suites
   after the merge: lint ok; unit 850, physics 177, ui 292, integration 261 (before it also smoke 4
   + boot, session and net 14 green).
+### 2026-10-26 / 0.9.16 Casino Hold'em
+Patrick: "add 2 card texas holdem against dealer (the one with ante and bonus play). Orient yourself
+on the bwin game." bwin's table is Evolution's Casino Hold'em; built to its rules and paytables
+(GDD entry under Casino games):
+- **Game** (`games/holdem/`): `HoldemHand` (best five of seven, names like "Two Pair, Kings and
+  Fives", dealer qualifies with a pair of 4s, flush/straight draws), `HoldemLogic` (4 seats, ANTE
+  $10–$100 × limits plus an optional AA BONUS up to $50, all-in through `clamp_bet` keeping the
+  call covered, 8 s betting window, one fresh deck per hand, FOLD or CALL 2× on a 15 s server clock,
+  timeout / standing up / match end fold, the bonus settled with the flop, "Table closing!" when a
+  hand could not finish, a minigame gives the open ante and call back and keeps a settled bonus).
+  Ante table royal 100 / straight flush 20 / quads 10 / full house 3 / flush 2 / straight or lower
+  1; AA Bonus pair of aces–straight 7 / flush 20 / full house 30 / quads 40 / straight flush 50 /
+  royal 100. Luck through `LuckRng.draw` on the hole cards, the flop and the showdown cards. Quiet
+  house rules: `holdem_favour` 0.12 (turn, river and the dealer's two drawn again once when nobody
+  would win and someone would lose), `holdem_bonus_favour` 0.095 (a flop on which no bonus bet pays).
+- **RTP** (`tests/sim/test_rtp_holdem.gd`, lone player, simple strategy = call any pair, an ace or
+  king in the hole, or a flush/straight draw; calls 74.7%): main game 97.6% ± 0.4% of the stake without the house rule (94.1% per ante), **101.1% ± 0.2%** with it (300k hands through the real logic).
+  AA Bonus exact 93.74% plain (Evolution's figure), **101.10%** with the house rule (exact over 169 hole classes × 19,600 flops; 200k hands through the table 99.9% ± 0.7%). Luck −3 / 0 / +3: 78.0% / 100.9% / 123.4% (a strong effect: luck rerolls hole cards, flop and showdown).
+- **Table** (`HoldemStation`): green oval felt with the AA BONUS · ANTE · CALL circles per seat, the
+  board in the middle, the dealer's rack, deck tray and house chips; hand names over each seat's
+  cards ("FOLD" once folded), the dealer's hand at the showdown. Seat views frame the board, the
+  dealer and the seat's own cards and spots in the left two thirds at FOV 85. Chips go to the spots
+  and settle through `TableFx`; feed line "X hit a flush at Casino Hold'em: $N" (flush or better).
+- **Overlay** (`HoldemUi`, docked right column): ante chips, AA BONUS OFF / sizes ([B] cycles),
+  DEAL; FOLD / CALL with the amounts ([F] / [C], pad X / A); cards, the hand named live, the
+  dealer's hand, the bonus and main results; others at the table; the paytables under HOW IT WORKS.
+- **Floor**: registered in its own last commit (`holdem.tres`, `games.tres`, the map's stations and
+  Hot Table candidates, `LuckyLounge._make_station`, and one `holdem_1` spot in The Grand Hall at
+  (4.5, 0, −11)) so it can be dropped or replaced when the layout generator lands; the other
+  layouts don't place it yet. Dealer behind the rail, HUD money-on-table line, autoplay plays a
+  bonus hand and a fold. PROTOCOL_VERSION 11 (new `holdem_action` / `holdem_showdown` events and
+  station state); `test_sword_tapper_flow.gd` now checks the protocol is at least 10.
+- Tests: `tests/unit/test_holdem_hand.gd`, `tests/unit/test_holdem.gd`,
+  `tests/sim/test_rtp_holdem.gd`, `tests/integration/test_holdem_flow.gd`,
+  `tests/physics/test_holdem_table.gd`, `tests/ui/test_holdem_ui.gd`. Dev render
+  `tools/dev/holdem_shot.tscn` (`--view seat|close|wide`, `--seat N`, `--showdown`).
+
 ### 2026-10-19 / 0.9.15 Pixel look removed
 - **Pixel look removed** (Patrick: "OK no actually remove that filter overall. Save the code
   though if i want to implement it again"): the game always renders at the window's full

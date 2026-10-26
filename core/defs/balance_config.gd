@@ -127,6 +127,37 @@ extends Resource
 @export var hilo_action_time: float = 15.0
 @export var hilo_result_time: float = 2.5
 
+@export_group("Casino Hold'em")
+## Ante limits (× limits); the call is always twice the ante.
+@export var holdem_min_bet: int = 10
+@export var holdem_max_bet: int = 100
+## The optional AA Bonus side bet: 0, or between the table minimum and this (× limits).
+@export var holdem_bonus_max_bet: int = 50
+## What the ante pays (profit per $1, by `HoldemHand.Rank`, high card → royal flush) when the
+## dealer does not qualify or the player's hand wins: the standard Casino Hold'em ante paytable
+## (straight or lower 1:1, flush 2:1, full house 3:1, quads 10:1, straight flush 20:1, royal 100:1).
+@export var holdem_ante_pays: PackedInt32Array = PackedInt32Array([1, 1, 1, 1, 1, 2, 3, 10, 20, 100])
+## The AA Bonus on the player's first five cards (two hole cards + the flop), by `HoldemHand.Rank`:
+## a pair pays only when it is aces (Evolution's paytable: pair of aces to straight 7:1, flush 20:1,
+## full house 30:1, quads 40:1, straight flush 50:1, royal 100:1).
+@export var holdem_bonus_pays: PackedInt32Array = PackedInt32Array([0, 7, 7, 7, 7, 20, 30, 40, 50, 100])
+## Chance that a showdown no called hand at the table would win (and one would lose) has its
+## unseen cards (turn, river, the dealer's two) drawn again once: the quiet house rule of 0.9.6
+## ("always favoured to win for you, by a bit, like the other games, but dont show it"). A lone
+## player's simple strategy (`HoldemLogic.simple_call`) returns 97.6% of the stake without it and
+## about 101.1% with 0.12 (`tests/sim/test_rtp_holdem.gd`).
+@export var holdem_favour: float = 0.12
+## The same for the AA Bonus: a flop on which no bonus bet at the table pays is drawn again once
+## with this chance (only while someone has a bonus bet out). The paytable alone returns 93.74%
+## (Evolution's figure); 0.095 makes it 101.1% (exact, `tests/sim/test_rtp_holdem.gd`).
+@export var holdem_bonus_favour: float = 0.095
+## Seconds from the first ante until the cards are dealt (others can still ante).
+@export var holdem_betting_window: float = 8.0
+## Each player's clock to FOLD or CALL once the flop is out; out of time = fold (the real rule).
+@export var holdem_action_time: float = 15.0
+## Seconds the showdown stays up before the next hand.
+@export var holdem_result_time: float = 4.0
+
 @export_group("Slots")
 @export var slots_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var slots_spin_time: float = 1.6

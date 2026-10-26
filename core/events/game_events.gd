@@ -13,6 +13,8 @@ const SCHEMA: Dictionary = {
 	&"luck_flourish": ["player", "station", "kind"],
 	&"jackpot_won": ["player", "station", "amount"],
 	&"sword_pull": ["station", "player", "stake", "serial", "free", "gems", "mult"],
+	&"holdem_action": ["station", "player", "action"],
+	&"holdem_showdown": ["station", "board", "dealer", "dealer_hand", "qualifies"],
 	&"jackpot_changed": ["amount"],
 	&"player_shoved": ["attacker", "target"],
 	&"player_knocked_down": ["target"],

@@ -199,7 +199,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
-	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()], [&"sword_tapper", SwordTapperUi.new()]]:
+	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()], [&"sword_tapper", SwordTapperUi.new()], [&"holdem", HoldemUi.new()]]:
 		var ui: StationUi = pair[1]
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
@@ -1534,6 +1534,8 @@ func _seat(pid: int, sid: StringName, seat: int = -1) -> void:
 		router.set_play_mode(InputRouter.Mode.SEATED)
 		if st is BlackjackStation:
 			(st as BlackjackStation).set_viewer_seat(idx)
+		elif st is HoldemStation:
+			(st as HoldemStation).set_viewer_seat(idx)
 		hud.set_prompt("")
 		hud.set_crosshair_visible(false)
 		var ui: StationUi = station_uis.get(st.game_id, null)
@@ -1550,6 +1552,8 @@ func _unseat(pid: int) -> void:
 		return
 	if pid == local_id and a.seat != null and a.seat.get_parent() is BlackjackStation:
 		(a.seat.get_parent() as BlackjackStation).set_viewer_seat(-1)
+	elif pid == local_id and a.seat != null and a.seat.get_parent() is HoldemStation:
+		(a.seat.get_parent() as HoldemStation).set_viewer_seat(-1)
 	a.stand()
 	_report_position(pid)
 	if pid == local_id:
@@ -2583,6 +2587,8 @@ func _on_station_state(sid: StringName) -> void:
 			(node as ScratchStation).show_state(st)
 		elif node is SwordTapperStation:
 			(node as SwordTapperStation).show_state(st)
+		elif node is HoldemStation:
+			(node as HoldemStation).show_round(st)
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 	_update_look_lock()
@@ -2732,6 +2738,8 @@ func _min_bet(st: StationBase) -> int:
 			base = cfg.scratch_prices[0]
 		&"sword_tapper":
 			base = cfg.sword_min_bet
+		&"holdem":
+			base = cfg.holdem_min_bet
 	return int(floor(base * mult))
 
 
