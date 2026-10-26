@@ -182,10 +182,11 @@ const FLOOR_CLEAR: Array[Rect2] = [
 	Rect2(13.55, 1.15, 0.9, 0.9), Rect2(2.05, 1.75, 0.9, 0.9), Rect2(-5.45, 0.15, 0.9, 0.9), Rect2(-12.95, -5.05, 0.9, 0.9),
 	Rect2(-1.45, -10.95, 0.9, 0.9), Rect2(8.55, -9.45, 0.9, 0.9), Rect2(12.05, -2.45, 0.9, 0.9),
 ]
-## The navmesh's agent (`_nav_template`; the floor plan's walkway check uses the same).
+## The navmesh's agent (`nav_template`; the floor plan's walkway check uses the same).
 const NAV_RADIUS: float = 0.5
 const NAV_HEIGHT: float = 2.0
 const NAV_CLIMB: float = 0.25
+const NAV_CELL: float = 0.25
 ## Where people come onto the casino floor (x, z): inside the lobby doors. Every chair of every
 ## layout must be walkable from here.
 const FLOOR_ENTRIES: Array[Vector2] = [Vector2(0.0, 7.2)]
@@ -1397,7 +1398,7 @@ func rebake_navmesh() -> void:
 	_rebake_queued = false
 	if not is_inside_tree():
 		return
-	nav_region.navigation_mesh = _nav_template()
+	nav_region.navigation_mesh = nav_template()
 	nav_region.bake_navigation_mesh(false)
 
 
@@ -1468,7 +1469,7 @@ func _build_lights() -> void:
 func _build_navmesh() -> void:
 	nav_region = NavigationRegion3D.new()
 	nav_region.name = "NavRegion"
-	nav_region.navigation_mesh = _nav_template()
+	nav_region.navigation_mesh = nav_template()
 	add_child(nav_region)
 	# Static colliders register with the physics server a frame later; bake once they exist.
 	await get_tree().physics_frame
@@ -1482,14 +1483,15 @@ func _build_navmesh() -> void:
 
 
 ## The navmesh's bake settings (a fresh resource for each bake: `_on_bake_finished` swaps in a
-## copy without them).
-func _nav_template() -> NavigationMesh:
+## copy without them). The floor layouts' walkway test bakes the same way with its own agent radius
+## and a finer cell (`radius`, `cell`; docs/FLOOR_PLAN.md).
+static func nav_template(radius: float = NAV_RADIUS, cell: float = NAV_CELL) -> NavigationMesh:
 	var nm := NavigationMesh.new()
-	nm.agent_radius = NAV_RADIUS
+	nm.agent_radius = radius
 	nm.agent_height = NAV_HEIGHT
 	nm.agent_max_climb = NAV_CLIMB  # one cell_height: stools (0.5 m) are obstacles, not steps
 	nm.agent_max_slope = 40.0
-	nm.cell_size = 0.25
+	nm.cell_size = cell
 	nm.cell_height = 0.25
 	nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	nm.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_EXPLICIT

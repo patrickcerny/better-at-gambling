@@ -24,6 +24,10 @@ const REMOTE_LERP: float = 10.0
 const REMOTE_CATCH_UP: float = 1.25
 const PUPPET_LERP: float = 18.0
 const HELD_OFFSET: Vector3 = Vector3(0.0, 1.0, -0.9)
+## The bean's body: its capsule's radius and height (the floor layouts' walkway test sizes its
+## aisles by it, docs/FLOOR_PLAN.md).
+const BODY_RADIUS: float = 0.42
+const BODY_HEIGHT: float = 1.7
 ## Height of a carried bean's feet line above the guard's feet (lying across the guard's head).
 const CARRIED_HEIGHT: float = 1.62
 
@@ -91,8 +95,8 @@ func _ready() -> void:
 	stamina = cfg.sprint_stamina
 	_collision = CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
-	cap.radius = 0.42
-	cap.height = 1.7
+	cap.radius = BODY_RADIUS
+	cap.height = BODY_HEIGHT
 	_collision.shape = cap
 	_collision.position.y = 0.85
 	add_child(_collision)
