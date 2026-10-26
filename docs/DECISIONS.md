@@ -338,3 +338,12 @@ every frame "reached nobody". Two rules change:
 - **LOBBY, INTRO and REGROUP are global voice** like the quiz, rewards and results: everyone is in
   the entrance hall or the waiting room, waiting, and a waiting room where you cannot hear the
   others is broken. Casino and the pre-minigame warning stay proximity (20 m, same table, megaphone).
+
+## 2026-10-26 — 6-7 on the wheel and the 6 key; emotes have their own lengths (0.9.16)
+- **6-7 is in both lists**: the top slot of the wheel (so it shows its bubble and plays through the
+  `emote` intent) and the number keys (`play_emote`). The keys are reordered so 6-7 sits on **6**:
+  4 thumbs up, 5 thumbs down, 6 6-7, 7 default dance. Players who learned 4 = 67 since 0.9.5 lose
+  that; the mnemonic and the wheel slot are worth it (Patrick could not find the 67 at all).
+- **Lengths per emote** (`Emotes.LENGTHS`, 2.2–3.4 s) instead of one 2.5 s for all: a dance with a
+  twirl and finish needs 3.4 s, a thumbs up is done in 2.2. The server keeps each in the snapshot
+  for its own length; the walk cancel (after 0.3 s, above 2.2 m/s) is unchanged.
