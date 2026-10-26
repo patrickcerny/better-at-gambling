@@ -133,7 +133,7 @@ func test_ragdoll_sitting_and_a_new_emote_cut_it_short() -> void:
 	assert_eq(a.bubble.text, Emotes.bubble_text(&"wave"), "the bubble still shows")
 	a.end_ragdoll(Vector3.ZERO)
 	assert_true(a.play_emote(&"six_seven"))
-	assert_eq(a.bubble.text, "6 7", "67 keeps its bubble")
+	assert_eq(a.bubble.text, Emotes.bubble_text(&"six_seven"), "6-7 keeps its bubble")
 	var seat := Node3D.new()
 	add_child_autofree(seat)
 	a.sit(seat, seat)

@@ -1,7 +1,8 @@
 extends GutTest
-## The new bean (AvatarVisuals) and its number-key emotes: an emote plays for ~2.5 s and ends on
-## its own (or when the bean is hit or walks off), the right hand has a slot for held items that
-## follows a character skin, and in the real match scene key 5 sends `play_emote` and everyone's
+## The new bean (AvatarVisuals) and its number-key emotes: an emote plays for its length
+## (`Emotes.length`, 2-4 s) and ends on its own (or when the bean is hit or walks off), the right
+## hand has a slot for held items that follows a character skin, and in the real match scene key 6
+## sends `play_emote` for 6-7 and everyone's
 ## copy of our bean plays it (ours watched in third person), and a wheel emote from someone else
 ## plays on their bean without touching our camera. (Camera: test_emote_camera.gd; every emote's
 ## motion: test_emote_animations.gd.)
@@ -37,8 +38,8 @@ func test_emote_plays_and_ends() -> void:
 	assert_eq(v.emote_id, &"default_dance")
 	await wait_seconds(1.0)
 	assert_true(v.is_emoting(), "still dancing after a second")
-	await wait_seconds(AvatarVisuals.EMOTE_SECONDS - 1.0 + 0.4)
-	assert_false(v.is_emoting(), "over after ~2.5 s")
+	await wait_seconds(Emotes.length(&"default_dance") - 1.0 + 0.4)
+	assert_false(v.is_emoting(), "over after its length")
 	assert_eq(v.emote_id, &"")
 
 
@@ -65,7 +66,7 @@ func test_emotes_play_on_skins_and_the_hand_slot_follows() -> void:
 	assert_true(v.skin_root.is_ancestor_of(slot), "on the skin's right hand")
 	assert_true(v.emote(&"thumbs_up"))
 	v.update_motion(Vector3.ZERO, true, 0.016)
-	await wait_seconds(AvatarVisuals.EMOTE_SECONDS + 0.3)
+	await wait_seconds(Emotes.length(&"thumbs_up") + 0.3)
 	assert_false(v.is_emoting())
 	v.set_skin(&"wizard")
 	assert_true(v.emote(&"six_seven"), "skins with arm bones but no clips emote too")
@@ -82,12 +83,13 @@ func test_key_sends_the_emote_and_the_bean_plays_it() -> void:
 	assert_eq(scene.router.mode, InputRouter.Mode.WALK)
 	assert_eq(scene.local.cam.mode, PlayerCamera.Mode.FIRST, "first person by default")
 	var k := InputEventKey.new()
-	k.physical_keycode = KEY_5
-	k.keycode = KEY_5
+	k.physical_keycode = KEY_6
+	k.keycode = KEY_6
 	k.pressed = true
 	get_tree().root.push_input(k)
 	await wait_physics_frames(3)
-	assert_eq(scene.local.visuals.emote_id, &"thumbs_up", "key 5 = thumbs up, through the server")
+	assert_eq(scene.local.visuals.emote_id, &"six_seven", "key 6 = 6-7, through the server")
+	assert_eq(scene.local.bubble.text, Emotes.bubble_text(&"six_seven"), "with its bubble")
 	assert_true(scene.local.cam.emote_view, "our emote is watched in third person")
 	assert_eq(scene.local.cam.mode, PlayerCamera.Mode.FIRST, "the player's own choice of view is kept underneath")
 	await wait_physics_frames(30)
@@ -100,7 +102,7 @@ func test_key_sends_the_emote_and_the_bean_plays_it() -> void:
 	assert_true(scene.server.submit_intent(bot, Intents.make(&"play_emote", {"emote": &"default_dance"}))["ok"])
 	await wait_physics_frames(3)
 	assert_eq((scene.avatars[bot] as PlayerAvatar).visuals.emote_id, &"default_dance")
-	await wait_seconds(AvatarVisuals.EMOTE_SECONDS + 0.3)
+	await wait_seconds(Emotes.MAX_SECONDS + 0.3)
 	assert_false(scene.local.visuals.is_emoting())
 	assert_false((scene.avatars[bot] as PlayerAvatar).visuals.is_emoting())
 	assert_false(scene.local.cam.emote_view, "the emote view ends with the emote")

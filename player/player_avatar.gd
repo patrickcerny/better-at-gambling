@@ -218,7 +218,7 @@ func say(text: String, seconds: float = 2.0) -> void:
 
 
 ## Acts out an emote (the wheel's or a number key's, `Emotes`) on the bean or skin, standing or
-## in a seat. Wheel emotes always show their bubble ("👋 WAVE"); "67" says "6 7" when it plays.
+## in a seat. Wheel emotes always show their bubble ("👋 WAVE", "🤲 6-7"), from the wheel or a key.
 ## Our own emote swings the camera round to watch it (`PlayerCamera.begin_emote_view`) unless it
 ## is a replay (`at` > 0: a late joiner catching up on one already playing). Returns whether the
 ## body acts it out (not while ragdolled, held, carried or knocked out).
@@ -231,8 +231,6 @@ func play_emote(id: StringName, at: float = 0.0) -> bool:
 		return false
 	if cam != null and at <= 0.0:
 		cam.begin_emote_view()  # our own emote: watch it in third person
-	if id == &"six_seven":
-		say("6 7", Emotes.SECONDS - at)
 	return true
 
 

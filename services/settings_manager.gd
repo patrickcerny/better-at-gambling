@@ -38,7 +38,7 @@ const KEYBINDS: Dictionary[StringName, String] = {
 	&"move_forward": "Move forward", &"move_back": "Move back", &"move_left": "Move left", &"move_right": "Move right",
 	&"sprint": "Sprint", &"jump": "Jump", &"interact": "Interact", &"shove": "Shove", &"grab": "Grab / throw", &"shake": "Shake",
 	&"item_1": "Item 1", &"item_2": "Item 2", &"item_3": "Item 3", &"emote_wheel": "Emote wheel",
-	&"emote_1": "Emote: 67", &"emote_2": "Emote: thumbs up", &"emote_3": "Emote: thumbs down", &"emote_4": "Emote: default dance",
+	&"emote_1": "Emote: thumbs up", &"emote_2": "Emote: thumbs down", &"emote_3": "Emote: 6-7", &"emote_4": "Emote: default dance",
 	&"leaderboard": "Leaderboard", &"ping": "Ping", &"toggle_camera": "Toggle camera",
 	&"leave_station": "Leave station", &"pause": "Pause menu", &"push_to_talk": "Push to talk",
 	&"toggle_fullscreen": "Toggle fullscreen",
