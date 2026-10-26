@@ -6,7 +6,7 @@ extends Control
 
 signal picked(id: StringName)
 
-const RADIUS: float = 220.0
+const RADIUS: float = 250.0
 const PILL_SIZE: Vector2 = Vector2(190, 64)
 ## Pointer distance (px) from the centre before a pill is chosen.
 const DEAD_ZONE: float = 40.0
@@ -93,7 +93,9 @@ func _process(_delta: float) -> void:
 	if _glyph_epoch != InputGlyphs.epoch:
 		_highlight()
 	var dir: Vector2 = Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
-	if dir.length() < 0.5:
+	if dir.length() >= 0.5:
+		dir *= DEAD_ZONE * 2.0  # a stick pushed past half way points (it used to fall inside the dead zone)
+	else:
 		dir = get_viewport().get_mouse_position() - get_viewport_rect().size * 0.5
 	if dir.length() < DEAD_ZONE:
 		return
