@@ -131,7 +131,8 @@ func test_draws() -> void:
 	assert_false(HoldemHand.has_straight_draw(_h("AS KD 9H 7C 2S")))
 	assert_true(HoldemLogic.simple_call(_h("2S 7D"), _h("7H 9C KS")), "a pair calls")
 	assert_true(HoldemLogic.simple_call(_h("AH 9H"), _h("7H 4H KS")), "a flush draw calls")
-	assert_false(HoldemLogic.simple_call(_h("AS JD"), _h("9H 6C 2S")), "nothing folds")
+	assert_true(HoldemLogic.simple_call(_h("KS 3D"), _h("9H 6C 2S")), "a king in the hole calls")
+	assert_false(HoldemLogic.simple_call(_h("QS JD"), _h("9H 6C 2S")), "nothing folds")
 
 
 func test_matches_a_brute_force_count_over_random_hands() -> void:

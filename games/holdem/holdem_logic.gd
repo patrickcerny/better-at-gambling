@@ -632,11 +632,14 @@ static func preflop_strength(hole: Array[int]) -> float:
 	return out
 
 
-## The simple strategy the RTP sim and the autoplay use: call with a pair or better, or a flush or
-## straight draw; fold with nothing.
+## The simple strategy the RTP sim and the autoplay use: call with a pair or better, a flush or
+## straight draw, or an ace or a king in the hole; fold with nothing else (about one hand in four).
 static func simple_call(hole: Array[int], flop: Array[int]) -> bool:
 	var five: Array[int] = hole.duplicate()
 	five.append_array(flop)
 	if HoldemHand.category(HoldemHand.evaluate(five)) >= HoldemHand.Rank.PAIR:
 		return true
+	for c: int in hole:
+		if HoldemHand.value(c) >= 13:
+			return true
 	return HoldemHand.has_flush_draw(five) or HoldemHand.has_straight_draw(five)

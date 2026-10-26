@@ -143,12 +143,14 @@ extends Resource
 @export var holdem_bonus_pays: PackedInt32Array = PackedInt32Array([0, 7, 7, 7, 7, 20, 30, 40, 50, 100])
 ## Chance that a showdown no called hand at the table would win (and one would lose) has its
 ## unseen cards (turn, river, the dealer's two) drawn again once: the quiet house rule of 0.9.6
-## ("always favoured to win for you, by a bit, like the other games, but dont show it"). Tuned so a
-## lone player's simple strategy returns 100.5–102% (`tests/sim/test_rtp_holdem.gd`).
-@export var holdem_favour: float = 0.1
+## ("always favoured to win for you, by a bit, like the other games, but dont show it"). A lone
+## player's simple strategy (`HoldemLogic.simple_call`) returns 97.6% of the stake without it and
+## about 101.1% with 0.12 (`tests/sim/test_rtp_holdem.gd`).
+@export var holdem_favour: float = 0.12
 ## The same for the AA Bonus: a flop on which no bonus bet at the table pays is drawn again once
-## with this chance (only while someone has a bonus bet out).
-@export var holdem_bonus_favour: float = 0.1
+## with this chance (only while someone has a bonus bet out). The paytable alone returns 93.74%
+## (Evolution's figure); 0.095 makes it 101.1% (exact, `tests/sim/test_rtp_holdem.gd`).
+@export var holdem_bonus_favour: float = 0.095
 ## Seconds from the first ante until the cards are dealt (others can still ante).
 @export var holdem_betting_window: float = 8.0
 ## Each player's clock to FOLD or CALL once the flop is out; out of time = fold (the real rule).
