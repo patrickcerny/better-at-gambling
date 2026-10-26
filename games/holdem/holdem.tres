@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/game_definition.gd" id="1"]
+[ext_resource type="Script" path="res://games/holdem/holdem_logic.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"holdem"
+display_name = "Casino Hold'em"
+rules_text = "Texas Hold'em against the dealer. Ante (and the optional AA Bonus), get two cards and see the flop, then FOLD or CALL for twice the ante. The dealer needs a pair of 4s: if not, the ante pays by the paytable and the call comes back; if so, beat the dealer to win both. AA Bonus pays on your two cards and the flop."
+logic_script = ExtResource("2")
+rug_color = Color(0.153, 0.369, 0.286, 1)
+floor_footprint = &"table"

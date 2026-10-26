@@ -76,6 +76,10 @@ var net_world: NetWorld
 var lobby_panel: LobbyPanel
 var shop_panel: ShopPanel
 var odd_jobs: OddJobsController
+## The colour panels at the pedestals' feet (`ColorPlaque`): yours sets your bean's colour.
+var color_panel: ColorPanelController
+## The cosmetics shop, opened from the lobby panel.
+var cosmetics_panel: CosmeticsPanel
 var connection_label: Label
 ## Proximity voice (clients only; the dedicated server just relays in `Net`).
 var voice: VoiceChannel = null
@@ -127,6 +131,8 @@ var _pad_timer: float = 0.0
 var _pedestal_timer: float = 0.0
 var _countdown_shown: int = -1
 var _match_over: bool = false
+## What the local profile took from the last `match_ended` (`ProfileManager.apply_results`).
+var _progress_summary: Dictionary = {}
 ## Predicted local actions awaiting the server: intent type → give-up time.
 var _predicted: Dictionary[StringName, float] = {}
 const PREDICTION_TIMEOUT: float = 0.6
@@ -194,7 +200,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
-	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()], [&"sword_tapper", SwordTapperUi.new()]]:
+	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()], [&"sword_tapper", SwordTapperUi.new()], [&"holdem", HoldemUi.new()]]:
 		var ui: StationUi = pair[1]
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
@@ -213,6 +219,19 @@ func _ready() -> void:
 			router.set_play_mode(InputRouter.Mode.WALK))
 	lobby_panel.leave_requested.connect(_leave_to_menu)
 	ui_layer.add_child(lobby_panel)
+	# The cosmetics shop from the lobby's settings tablet: a colour put on there goes on the bean
+	# at once (`set_color`), like one picked at the pedestal's colour panel.
+	cosmetics_panel = CosmeticsPanel.new()
+	ui_layer.add_child(cosmetics_panel)
+	cosmetics_panel.color_worn.connect(func(c: int) -> void:
+		if color_panel != null and view.state.phase == Phase.Id.LOBBY:
+			color_panel.choose(c))
+	cosmetics_panel.closed.connect(func() -> void:
+		if router.mode == InputRouter.Mode.MENU and results_panel == null:
+			router.set_play_mode(InputRouter.Mode.WALK))
+	lobby_panel.cosmetics_requested.connect(func() -> void:
+		lobby_panel.visible = false  # hidden, not closed: the menu mode stays for the shop
+		cosmetics_panel.open())
 	shop_panel = ShopPanel.new()
 	shop_panel.name = "ShopPanel"
 	shop_panel.closed.connect(func() -> void:
@@ -269,6 +288,8 @@ func _ready() -> void:
 	add_child(items_ctl)
 	odd_jobs = OddJobsController.new(self)
 	add_child(odd_jobs)
+	color_panel = ColorPanelController.new(self)
+	add_child(color_panel)
 	Net.event_received.connect(_on_event)
 	net_world = NetWorld.new()
 	net_world.name = "NetWorld"
@@ -477,20 +498,19 @@ func _start_local(cmd: Cmdline) -> void:
 	var player_name: String = str(Settings.get_value("profile", "name", "You"))
 	var id: int = Net.start_local(server, player_name)
 	server.set_server_position(id, def.spawn_points[0])
-	if cmd.has("skin"):  # dev/screenshots
-		(server.state.players[id] as PlayerState).skin = StringName(cmd.get_string("skin"))
+	if cmd.has("bean-color"):  # dev/screenshots
+		(server.state.players[id] as PlayerState).bean_color = posmod(cmd.get_int("bean-color", 0), Cosmetics.COLOR_COUNT)
 	for i: int in clampi(cmd.get_int("dummies", test_dummies), 0, 7):
-		# Dev/screenshots: `--dummy-skins` dresses the dummies in the character skins.
-		var skin: StringName = Cosmetics.SKINS[(i + 1) % Cosmetics.SKINS.size()] if cmd.has_flag("dummy-skins") else &"bean"
-		var did: int = _add_dummy(i, skin)
+		# Dev/screenshots: `--dummy-colors` dresses the dummies in the colours bought with Coins.
+		var did: int = _add_dummy(i, Cosmetics.SLOT_COLORS + i if cmd.has_flag("dummy-colors") else -1)
 		# A step ahead of the spawn, still in the start room (clear of its north wall at z 8.4).
 		server.set_server_position(did, def.spawn_points[(i + 1) % def.spawn_points.size()] + Vector3(0, 0, -1.5))
 
 
 ## Test/screenshot dummy: a ready player with no client that only stands where it is put (or
 ## where physics throws it). Simulated by whoever hosts the server.
-func _add_dummy(i: int, skin: StringName = &"bean") -> int:
-	var did: int = server.add_player("dummy-%d" % (i + 1), DUMMY_NAMES[i % DUMMY_NAMES.size()], -1, skin)
+func _add_dummy(i: int, bean_color: int = -1) -> int:
+	var did: int = server.add_player("dummy-%d" % (i + 1), DUMMY_NAMES[i % DUMMY_NAMES.size()], bean_color)
 	server.lobby.set_panel_ready(did, true)
 	dummies[did] = true
 	return did
@@ -515,7 +535,7 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.name = "Player%d" % pid
 	a.player_id = pid
 	a.display_name = str(p.get("name", "Player"))
-	a.color = Palette.player_color(int(p.get("color", pid - 1)))
+	a.color = Palette.player_color(int(p.get("bean_color", p.get("color", pid - 1))))
 	a.is_local = pid == local_id
 	a.cfg = cfg
 	a.router = router if a.is_local else null
@@ -538,7 +558,6 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.ragdoll_impact.connect(func(strength: float, wall: bool) -> void: _on_ragdoll_impact(pid, strength, wall))
 	a.ragdoll_settled.connect(func() -> void: _on_ragdoll_settled(pid))
 	avatars[pid] = a
-	a.set_skin(StringName(p.get("skin", "bean")))
 	if not bool(p.get("connected", true)):
 		a.set_connection_away(true)
 	# Already at a table when we learn about them (joining late, reconnecting): put them in their
@@ -910,10 +929,10 @@ func _on_event(ev: Dictionary) -> void:
 			if a != null:
 				a.queue_free()
 				avatars.erase(int(ev["player"]))
-		&"player_skin":
+		&"player_color":
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null:
-				a.set_skin(StringName(ev["skin"]))
+				a.set_color(Palette.player_color(int(ev["bean_color"])))
 		&"player_left", &"player_rejoined":
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null and int(ev["player"]) != local_id:
@@ -1117,6 +1136,9 @@ func _on_event(ev: Dictionary) -> void:
 				Audio.play(&"cash_register", &"SFX", -4.0)
 		&"match_ended":
 			_match_over = true
+			# Our row of the XP/Coins breakdown goes into the local profile (once per match).
+			if role != Role.SERVER and local_id >= 0:
+				_progress_summary = ProfileManager.apply_results(ev, local_id)
 			_show_results(ev["standings"])
 			_log_digest()
 		&"match_reset":
@@ -1512,6 +1534,8 @@ func _seat(pid: int, sid: StringName, seat: int = -1) -> void:
 		router.set_play_mode(InputRouter.Mode.SEATED)
 		if st is BlackjackStation:
 			(st as BlackjackStation).set_viewer_seat(idx)
+		elif st is HoldemStation:
+			(st as HoldemStation).set_viewer_seat(idx)
 		hud.set_prompt("")
 		hud.set_crosshair_visible(false)
 		var ui: StationUi = station_uis.get(st.game_id, null)
@@ -1528,6 +1552,8 @@ func _unseat(pid: int) -> void:
 		return
 	if pid == local_id and a.seat != null and a.seat.get_parent() is BlackjackStation:
 		(a.seat.get_parent() as BlackjackStation).set_viewer_seat(-1)
+	elif pid == local_id and a.seat != null and a.seat.get_parent() is HoldemStation:
+		(a.seat.get_parent() as HoldemStation).set_viewer_seat(-1)
 	a.stand()
 	_report_position(pid)
 	if pid == local_id:
@@ -1582,6 +1608,7 @@ func _show_results(_standings: Array) -> void:
 	results_panel.name = "Results"
 	results_panel.ui_host = self  # its 2D goes on the window, outside the world's sub viewport
 	pixel_view.world.add_child(results_panel)
+	results_panel.progress_summary = _progress_summary
 	results_panel.setup(view.state, local_id, view.state.room_mode)
 	results_panel.play_again_pressed.connect(func() -> void:
 		if view.state.room_mode:
@@ -2035,6 +2062,8 @@ func _on_interact() -> void:
 		return
 	if local == null or not local.is_standing():
 		return
+	if color_panel.try_press():
+		return
 	var lobby_spot: StringName = _lobby_spot()
 	if lobby_spot != &"":
 		_open_lobby_panel(lobby_spot)
@@ -2070,6 +2099,8 @@ func _on_grab() -> void:
 	if stage is WalkableStage and (stage as WalkableStage).on_grab_pressed():
 		return  # a walkable minigame's own use of the click (Bat Heist: the bat)
 	if odd_jobs.try_press():
+		return
+	if color_panel.try_press():
 		return
 	grab_in_front()
 
@@ -2276,8 +2307,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 # --- World checks ------------------------------------------------------------------------------
 
-## &"settings" when the local player stands at the settings tablet in the lobby (skins are picked
-## in the main menu's Clothes menu).
+## &"settings" when the local player stands at the settings tablet in the lobby.
 func _lobby_spot() -> StringName:
 	if local == null or not view.state.room_mode or view.state.phase != Phase.Id.LOBBY:
 		return &""
@@ -2299,6 +2329,10 @@ func _update_prompt() -> void:
 		&"settings":
 			hud.set_prompt(InputGlyphs.fill("[{interact}] Lobby settings" if view.state.leader == local_id else "[{interact}] Lobby settings (only the leader ★ can change them)"))
 			return
+	var color_prompt: String = color_panel.prompt()
+	if color_prompt != "":
+		hud.set_prompt(color_prompt)
+		return
 	var floor_prompt: String = casino_floor.prompt() if casino_floor != null else ""
 	if floor_prompt != "":
 		hud.set_prompt(floor_prompt)
@@ -2553,6 +2587,8 @@ func _on_station_state(sid: StringName) -> void:
 			(node as ScratchStation).show_state(st)
 		elif node is SwordTapperStation:
 			(node as SwordTapperStation).show_state(st)
+		elif node is HoldemStation:
+			(node as HoldemStation).show_round(st)
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 	_update_look_lock()
@@ -2702,6 +2738,8 @@ func _min_bet(st: StationBase) -> int:
 			base = cfg.scratch_prices[0]
 		&"sword_tapper":
 			base = cfg.sword_min_bet
+		&"holdem":
+			base = cfg.holdem_min_bet
 	return int(floor(base * mult))
 
 

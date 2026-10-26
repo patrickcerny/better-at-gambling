@@ -6,7 +6,10 @@ extends Node3D
 ## under a little rain cloud. Standings (left) and the money-over-time graph (right) slide in, the
 ## fun awards pop up one by one, then Play again / Leave. Online, the party leader takes the room
 ## back to the lobby (or it goes back by itself after a minute); in Practice, Play again starts a
-## fresh match.
+## fresh match. Every standings row shows the XP that player earned (the server's `progress` rows,
+## the same numbers on every screen), and YOUR PROGRESS (the bottom corners) breaks down the
+## local player's XP and Coins, then fills the XP bar ("LEVEL 7 → 8") as the profile takes them
+## (docs/GDD.md "Progression").
 
 signal play_again_pressed
 signal leave_pressed
@@ -35,6 +38,11 @@ const SHOT_ASPECT: float = 16.0 / 9.0
 const CAM_NEAR_Z: float = 9.0
 ## More rows than this: the standings list gets compact so it ends above the floor crowd's tags.
 const COMPACT_ROWS: int = 6
+## When the XP bar starts filling and how long it takes.
+const T_XP: float = 2.4
+const XP_FILL_SECONDS: float = 1.8
+## Width of the two YOUR PROGRESS corner panels.
+const XP_PANEL_W: float = 440.0
 
 var state: ClientMatchState
 var local_id: int = -1
@@ -54,6 +62,22 @@ var graph: MoneyGraph
 var standings_panel: Control
 var graph_panel: Control
 var award_cards: Array[Control] = []
+## What the profile took from this match (`PlayerProfile.apply_match`: xp, coins, level_bonus,
+## level_from, level_to, xp_from); set before `setup`. Empty (already counted, a reconnect): the
+## panel shows the server's row and the profile as it is.
+var progress_summary: Dictionary = {}
+var xp_panel: PanelContainer
+var xp_bar: ProgressBar
+var level_label: Label
+var xp_label: Label
+var coins_line: Label
+## The XP total the bar shows now (animates from `xp_from` to the profile's XP).
+var xp_shown: float = 0.0
+var _xp_from: float = 0.0
+var _xp_to: float = 0.0
+var _xp_t: float = -1.0
+## The level the match started at.
+var _level_from: int = 1
 ## [{at: float, fn: Callable}] still to run, by time.
 var _cues: Array[Dictionary] = []
 var _clock: float = 0.0
@@ -87,6 +111,9 @@ func _process(delta: float) -> void:
 	k = 1.0 - pow(1.0 - k, 3.0)
 	camera.position = _cam_from.lerp(_cam_to, k)
 	camera.look_at(global_position + Vector3(0, 2.0, 0))
+	if _xp_t >= 0.0 and _xp_t < 1.0:
+		_xp_t = minf(_xp_t + delta / XP_FILL_SECONDS, 1.0)
+		_show_xp(lerpf(_xp_from, _xp_to, 1.0 - pow(1.0 - _xp_t, 2.0)))
 	if _room and wait_label != null:
 		var leader: bool = state.leader == local_id
 		play_button.visible = leader
@@ -111,6 +138,9 @@ func finish_show() -> void:
 	while not _cues.is_empty():
 		var cue: Dictionary = _cues.pop_front()
 		(cue["fn"] as Callable).call()
+	if _xp_t >= 0.0:
+		_xp_t = 1.0
+		_show_xp(_xp_to)
 
 
 func _rank_of(pid: int) -> int:
@@ -192,8 +222,7 @@ func _build_set() -> void:
 		bean.position = base
 		bean.visible = false
 		add_child(bean)
-		bean.set_color(_color_of(pid))
-		bean.set_skin(StringName(state.players.get(pid, {}).get("skin", "bean")))
+		bean.set_color(Palette.bean_color(state.players.get(pid, {"color": pid - 1})))
 		bean.rotation.y = PI  # face the camera
 		beans[pid] = bean
 		bean_y[pid] = base.y
@@ -415,6 +444,16 @@ func _build_ui() -> void:
 		m.text = "$%s" % Hud._thousands(int(row["money"]))
 		m.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if int(row["rank"]) == 1 else Palette.CREAM)
 		h.add_child(m)
+		var prow: Dictionary = _progress_row(int(row["player"]))
+		if not prow.is_empty():
+			var xl := Label.new()
+			xl.name = "Xp%d" % int(row["player"])
+			xl.theme_type_variation = &"SmallLabel"
+			xl.text = "+%d XP" % int(prow.get("xp", 0))
+			xl.custom_minimum_size.x = 88
+			xl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			xl.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+			h.add_child(xl)
 		if int(row["player"]) == local_id:
 			n.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 			r.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
@@ -453,6 +492,7 @@ func _build_ui() -> void:
 	_cue(1.0, func() -> void: graph.set_process(true))
 	_cue(T_ANNOUNCE, func() -> void: Audio.play(&"announcer_results", &"UI", -2.0))
 	_slide_in(gp, Vector2(660, 0), 0.6)
+	_build_xp_panel(root)
 	# Awards, bottom.
 	var awards := HBoxContainer.new()
 	awards.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -512,6 +552,133 @@ func _build_ui() -> void:
 		wait_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		root.add_child(wait_label)
 	play_button.grab_focus()
+
+
+## The server's XP/Coins row for `pid` ({} when the event carried none).
+func _progress_row(pid: int) -> Dictionary:
+	var row: Variant = state.progress.get(pid, null)
+	return row as Dictionary if row is Dictionary else {}
+
+
+## YOUR PROGRESS, in the two bottom corners under the awards (clear of the floor crowd's name
+## tags): right, the level bar ("LEVEL 7 → 8"), the XP and the Coins (out-of-match money, for
+## cosmetics only); left, where the XP came from.
+func _build_xp_panel(root: Control) -> void:
+	var row: Dictionary = _progress_row(local_id)
+	if row.is_empty() or ProfileManager.profile == null:
+		return
+	var prof: PlayerProfile = ProfileManager.profile
+	var cfg: ProgressionConfig = prof.config
+	xp_panel = _corner_panel(root, "XpPanel", false)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override(&"separation", 2)
+	xp_panel.add_child(v)
+	var lv := HBoxContainer.new()
+	lv.add_theme_constant_override(&"separation", 10)
+	v.add_child(lv)
+	level_label = Label.new()
+	level_label.name = "Level"
+	level_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	lv.add_child(level_label)
+	xp_bar = ProgressBar.new()
+	xp_bar.name = "XpBar"
+	xp_bar.show_percentage = false
+	xp_bar.max_value = 1.0
+	xp_bar.step = 0.0
+	xp_bar.custom_minimum_size = Vector2(80, 14)
+	xp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	xp_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	lv.add_child(xp_bar)
+	xp_label = Label.new()
+	xp_label.name = "XpLabel"
+	xp_label.theme_type_variation = &"SmallLabel"
+	lv.add_child(xp_label)
+	var ch := HBoxContainer.new()
+	ch.add_theme_constant_override(&"separation", 8)
+	v.add_child(ch)
+	var total := Label.new()
+	total.name = "XpTotal"
+	total.text = "+%d XP" % int(row.get("xp", 0))
+	total.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	ch.add_child(total)
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ch.add_child(gap)
+	var coin := CoinIcon.make(24.0)
+	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	ch.add_child(coin)
+	coins_line = Label.new()
+	coins_line.name = "Coins"
+	coins_line.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
+	coins_line.tooltip_text = "Coins buy cosmetics in the main menu. Your $ stays here: it starts fresh next match."
+	var summary: Dictionary = progress_summary
+	var coins: int = int(summary.get("coins", row.get("coins", 0)))
+	var bonus: int = int(summary.get("level_bonus", 0))
+	coins_line.text = "+%d COINS" % coins + (" (+%d level-up bonus)" % bonus if bonus > 0 else " for cosmetics")
+	ch.add_child(coins_line)
+	# Where the XP came from, bottom left.
+	var parts_panel: PanelContainer = _corner_panel(root, "XpParts", true)
+	var pv := VBoxContainer.new()
+	pv.add_theme_constant_override(&"separation", 0)
+	parts_panel.add_child(pv)
+	var t := Label.new()
+	t.theme_type_variation = &"SmallLabel"
+	t.text = "YOUR XP" + ("  ·  PRACTICE: HALF RATE" if bool(row.get("practice", false)) else "")
+	t.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	pv.add_child(t)
+	var line := PackedStringArray()
+	for p: Variant in row.get("parts", []):
+		if p is Dictionary:
+			line.append("%s +%d" % [str((p as Dictionary).get("label", "")), int((p as Dictionary).get("xp", 0))])
+	var bd := Label.new()
+	bd.name = "Breakdown"
+	bd.theme_type_variation = &"SmallLabel"
+	bd.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bd.text = "  ·  ".join(line)
+	pv.add_child(bd)
+	_xp_to = float(prof.xp)
+	_xp_from = float(summary.get("xp_from", prof.xp)) if not summary.is_empty() else _xp_to
+	_level_from = cfg.level_for_xp(int(_xp_from))
+	_show_xp(_xp_from)
+	_slide_in(xp_panel, Vector2(0, 160), 0.9)
+	_slide_in(parts_panel, Vector2(0, 160), 0.9)
+	_cue(T_XP, func() -> void:
+		_xp_t = 0.0
+		if _xp_to > _xp_from:
+			Audio.play(&"ui_click", &"UI", -8.0, 1.4))
+
+
+## A small panel in a bottom corner, under the awards row.
+func _corner_panel(root: Control, node_name: String, left: bool) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.name = node_name
+	p.anchor_left = 0.0 if left else 1.0
+	p.anchor_right = p.anchor_left
+	p.anchor_top = 1.0
+	p.anchor_bottom = 1.0
+	p.offset_left = 28.0 if left else -28.0 - XP_PANEL_W
+	p.offset_right = p.offset_left + XP_PANEL_W
+	p.offset_top = -120.0
+	p.offset_bottom = -16.0
+	p.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	root.add_child(p)
+	return p
+
+
+## Draws the bar at `total` XP: the level it reaches ("LEVEL 7 → 8" once it passes the one the
+## match started at) and how far into it.
+func _show_xp(total: float) -> void:
+	if xp_bar == null:
+		return
+	xp_shown = total
+	var cfg: ProgressionConfig = ProfileManager.profile.config
+	var xp: int = int(round(total))
+	var lvl: int = cfg.level_for_xp(xp)
+	var into: int = xp - cfg.xp_for_level(lvl)
+	var need: int = cfg.xp_to_next(lvl)
+	xp_bar.value = 1.0 if need <= 0 else clampf(float(into) / float(need), 0.0, 1.0)
+	level_label.text = ("LEVEL %d → %d" % [_level_from, lvl]) if lvl > _level_from else "LEVEL %d" % lvl
+	xp_label.text = "%d / %d XP" % [into, need] if need > 0 else "MAX LEVEL"
 
 
 func _award_card(a: Dictionary) -> Control:

@@ -61,7 +61,7 @@ func test_first_person_swings_round_to_watch_the_emote_and_back() -> void:
 	assert_gt(absf(_cam_pos(a).x - a.global_position.x), 0.5, "three-quarter, not dead ahead")
 	assert_true(a.visuals.visible, "we see ourselves do it")
 	assert_eq(a.cam.mode, PlayerCamera.Mode.FIRST, "the player's choice is kept underneath")
-	await wait_seconds(Emotes.SECONDS - 0.6 + 0.6)
+	await wait_seconds(Emotes.length(&"six_seven") - 0.6 + 0.6)
 	assert_false(a.visuals.is_emoting())
 	assert_false(a.cam.emote_view)
 	assert_almost_eq(a.cam.emote_blend, 0.0, 0.001)
@@ -79,7 +79,7 @@ func test_third_person_gets_the_emote_view_and_stays_third() -> void:
 	a.play_emote(&"wave")
 	await wait_seconds(0.6)
 	assert_true(_faces_us(a), "swung round to the front")
-	await wait_seconds(Emotes.SECONDS)
+	await wait_seconds(Emotes.length(&"wave"))
 	assert_eq(a.cam.mode, PlayerCamera.Mode.THIRD, "still third person")
 	assert_almost_eq(_cam_pos(a).distance_to(behind), 0.0, 0.1, "back behind us")
 
@@ -104,7 +104,7 @@ func test_seated_emote_lifts_off_the_station_view_and_returns() -> void:
 	assert_almost_eq(_cam_pos(a).y, PlayerCamera.EMOTE_SEATED_HEIGHT, 0.05, "up over the table")
 	assert_gt(_cam_pos(a).distance_to(a.global_position), 2.0, "pulled back from the table to see the whole bean")
 	assert_true(a.visuals.visible)
-	await wait_seconds(Emotes.SECONDS)
+	await wait_seconds(Emotes.length(&"laugh"))
 	assert_almost_eq(_cam_pos(a).distance_to(anchor.global_position), 0.0, 0.02, "back at the station view")
 	assert_false(a.visuals.visible)
 

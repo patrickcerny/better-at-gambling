@@ -71,6 +71,25 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   or the match end: a won pot is cashed out, a fresh ante takes the likelier side. A minigame gives
   fresh antes back and banks won pots. House rule as at the horse race (0.9.6): a call that would
   lose has its card redrawn once with 15% chance, then luck rerolls it; never shown. $10–$100.
+- **Casino Hold'em** (casino floor; only in The Grand Hall layout until the layout generator places it): oval card table, a
+  dealer, 4 seats, one fresh deck per hand (Evolution's / bwin's Casino Hold'em). ANTE ($10–$100)
+  plus an optional AA BONUS (up to $50), 8 s betting window; two hole cards each, the dealer two
+  face down, the flop. FOLD (the ante is lost) or CALL for twice the ante on your own 15 s clock
+  (out of time, standing up or the match end = fold); the balance must cover the call when you
+  ante. Turn and river, best five of seven. The dealer qualifies with a pair of 4s or better: if
+  not, the ante pays by the table and the call comes back; if so, a win pays the ante by the table
+  and the call 1:1, a tie gives both back. Ante table: royal 100, straight flush 20, quads 10, full
+  house 3, flush 2, straight or lower 1. AA Bonus on your two cards and the flop, paid at the flop
+  even if you fold: pair of aces to straight 7, flush 20, full house 30, quads 40, straight flush
+  50, royal 100. House rules (never shown): the turn, river and dealer's cards are drawn again once
+  with 12% when nobody would win and someone would lose; a flop on which no bonus bet pays is drawn
+  again once with 9.5%; luck rerolls hole cards, flop and showdown through `LuckRng`. A lone
+  player with the simple strategy (call any pair, an ace or king in the hole, or a flush/straight
+  draw) gets about 101.1% back; the AA Bonus 101.1% (93.7% plain). A minigame gives the open ante
+  and call back (a bonus the flop settled stays). The overlay is a column down the right third
+  (ante chips, AA BONUS sizes, DEAL; FOLD / CALL with amounts, the hand named live, the dealer's
+  hand, the result), the paytables folded under HOW IT WORKS; each stool's view frames the board,
+  the dealer and the seat's own cards and spots in the left two thirds.
 - **Scratch Cards** (counter on the casino floor, by the Gift Shop on the full floor): one player at the counter at a time. Buy a
   $10 / $25 / $50 card (× limits); the server draws the whole card at purchase and sends it in one
   `scratch_card` event; the panel shows it big under foil, scratched with the mouse or REVEAL ALL,
@@ -131,6 +150,32 @@ Grab/hold, shove (2 hits in 1.5 s or 3 in 4 s → knockdown/KO), throw, knockout
 per shake capped 8% / $400×mult. Seated players protected. Security guards throw out attackers seen
 within 8 m. Money never depends on physics.
 
+## Emotes
+Seven on the wheel (hold **G** / D-pad down, point, release): **6-7** (top slot), wave, laugh,
+taunt, cry, dance, GG; and on the number keys while walking: **4** thumbs up, **5** thumbs down,
+**6** 6-7, **7** the default dance (remappable, Settings > Controls). Every emote is sent as an
+intent and played on every client from its id (`Emotes`; a late joiner picks one up part-way
+through), shows its bubble ("🤲 6-7", "👋 WAVE") when it is a wheel emote, and is acted out by the
+bean in beats (`EmotePoses`): a wind-up, key poses reached with a small overshoot and held, the
+body squashing, bouncing and tilting along, arms swinging in arcs (and stretching like rubber
+hoses on a reach), and the face playing its part. Each has its own length (2.2–3.4 s,
+`Emotes.LENGTHS`) and a sound cue timed to its beats (`emote_<id>.wav`), which stops if the emote
+is cut short. Walking off (after the first 0.3 s), a hit, a shove, a ragdoll, sitting down or a
+new emote ends one; our own emote swings the camera round to watch it (emote cam).
+
+| Emote | What the bean does |
+|---|---|
+| 6-7 | Hands come up in front at chest height, palms up, and weigh "six… seven" up and down in turn like scales: eight words, snapping to the top and bottom and holding a beat, the body bouncing on every word and tilting to the lower hand, eyes on the hand going up, mouthing the words. Ends in a shrug: hands out to the sides, shoulders up, head cocked, brows up, mouth flat. Cue: a woodblock "six" and "se-ven" on each word, a muted-trumpet "meh" on the shrug. |
+| Wave | A little crouch, a hop as the right arm swings up in an arc and stretches, then big waves with the wrist flicking behind the arm, the body swaying along, the left foot kicked up behind, a "hiii" grin with bouncing brows. Cue: slide whistle up, a "hel-lo" whistle. |
+| Laugh | Scrunches up with a snort, then jabs a pointing finger at you and rocks back cackling "ha-ha-ha", eyes squeezed shut; doubles over clutching its belly, stamping a foot, tears of joy; comes up with a happy sigh. Cue: a muted-trumpet cackle, a wheezing "hee-hee", a sigh. |
+| Taunt | Crouch and pop, thumbs at the temples with the fingers waggling, head tilting side to side, a wink and the tongue out; a half turn to wiggle its bum at you with two slaps; turns back for a smug finish (arms crossed, chin up, one brow raised, side glance). Cue: kazoo "nyah-nyah na-nyah-nyah", two slaps, whooshes on the turns. |
+| Cry | Lip wobbles and the eyes go big and wet, a wail with the head thrown back and the arms flung up, then fists rubbing the eyes in turn while the shoulders hitch with every sob, foot stamps, tears running; a big sniff and a slump. Cue: a muted-trumpet "waaah", a sob on every hitch, a sniff. |
+| Dance | The disco: on every beat the right hand stabs a finger up to the ceiling and down across to the other hip, snapping there and holding, hips swaying and the knees bouncing; a hop into a full twirl with the arms out; a finger-to-the-sky finish with a wink. Cue: four-on-the-floor kick and bass, a riser into the twirl, a vibes "ta-da". |
+| GG | A wind-up and the hand shoots out for a handshake, a step in, three firm pumps with the other hand on top; hand to the belly, the other behind the back, a slow deep bow with the eyes shut; a hop back up with a thumbs up and a wink. Cue: soft pats on the pumps, a warm chord on the bow, a "ding" and coins on the thumbs up. |
+| Thumbs up | The fist pulls in, punches out thumb up with a pop and a wink, a confident nod; the other hand joins with a hop and both pump while the brows waggle. Cue: a click and a "ding!", a higher one for the second thumb. |
+| Thumbs down | Thumb up first with a hopeful face, then it turns slowly over as the smile sinks into a frown; three "boo" pumps downwards with the other hand joining, head shaking. Cue: a sinking slide whistle, three muted-trumpet "boo"s. |
+| Default dance | The Fortnite default dance, a pose on every beat: fists punch down across the hips in turn, then both arms swing up over the head to one side and the other, hips swaying, knees giving, a foot kicking out, a hop at the end of each bar. Cue: kick-and-snare beat with a walking bass at the dance's tempo. |
+
 ## Minigames
 - **Jackpot Climb** (climb room "towers"): mostly a run, up a 26 m cake of giant casino chips to
   the gold pad under the JACKPOT sign. Three giant-chip tiers (tops at 8.5, 16 and 21.5 m) each
@@ -156,6 +201,51 @@ the first launch goes straight to the main menu. **F11** (remappable) toggles fu
 anywhere and saves it. The Hot Table's arrow over the table is the same size on screen from
 anywhere on the floor and shows through walls.
 
+## Progression
+Out-of-match progress (Patrick: "Create a XP level and an ingame currency"), kept per PC in
+`user://profile.cfg` by the `ProfileManager` autoload (`PlayerProfile`): XP and level, **Coins**,
+owned and preferred cosmetics, lifetime stats (matches, wins, biggest single win). No accounts:
+loading clamps every value (level always recomputed from XP, unknown items dropped), no DRM.
+- **XP per match**, computed by the server from match data and sent per player in `match_ended`
+  (`progress`, with a `match_id`), so every screen shows the same numbers; each client adds only
+  its own row, once per match id. Clients never send XP. Data: `data/progression/progression.tres`.
+  Match played 100, placement 120 / 80 / 50 / 30 / 20 (5th and below), 30 per minigame won,
+  1 per $20 of profit (max 100), 2 per table hand (max 60), at most 2,000. Practice earns half.
+  A typical match (2nd, one minigame, +$600, 20 hands) is about 280 XP.
+- **Level curve**: level L → L+1 costs 100 + 35 × (L − 1) XP up to level 10 (2,160 XP in all,
+  about 8 matches), then 450 + 50 × (L − 10), so levels 10 → 20 take about 24 more matches.
+  Level 99 is the cap.
+- **Coins** (the gold coin; "chips" are the casino's): a tenth of the match's XP plus 50 per
+  level gained. Earned only by playing, never bought, never spendable at the tables: the in-match
+  $ is separate and starts fresh every match, and the UI says so wherever Coins show.
+- **UI**: the main menu's top-left line (LEVEL n, XP bar, Coins); on the results screen every
+  standings row shows "+N XP" and YOUR PROGRESS (bottom corners) lists where the XP came from,
+  the Coins (with the level-up bonus) and fills the level bar ("LEVEL 7 → 8"). Nothing new in the
+  HUD.
+
+## Cosmetics shop
+The bean is the only body (Patrick: "Remove all other skins"; the six poly.pizza character skins
+went in 0.9.16); what players choose is its colour.
+- **Colours**: 16 (`Cosmetics.COLOR_COUNT`, `Palette.PLAYER_COLORS`). The first 8 are the
+  colourblind-safe player colours, free and always owned; Ruby, Mint, Lavender, Teal, Lime, Onyx,
+  Silver and Gold cost 150–400 Coins (`data/progression/cosmetics_shop.tres`).
+- **Slot colour vs bean colour**: the server still hands every player one of the 8 free colours
+  (first free, unique): it marks them on the HUD, the name plates and their ready pedestal. The
+  bean wears the player's **preferred colour** (profile, sent in the hello) when no other bean
+  wears it; otherwise their slot colour; if even that is worn, the first colour nobody wears. Two
+  beans never share a colour. The server checks only the index (ownership is local).
+- **The shop**: COSMETICS in the main menu (also the T-shirt button, and COSMETICS on the lobby
+  settings tablet's panel). A turning bean previews the picked colour; BUY spends Coins ("Not
+  enough Coins: N more to go" otherwise), WEAR makes it the preferred colour (in a lobby it goes on
+  the bean at once). One tab per kind of cosmetic in stock: `CosmeticDef` (kind colour | hat | …,
+  price, id) in the `CosmeticShop` list, so hats and the like slot in later; only colours exist now.
+- **Pedestal colour panel** (Patrick: "under the podest should be a color panel you can click"):
+  a brass plaque at the foot of every ready pedestal. Yours shows the colours you own, the one you
+  wear framed and the ones other beans wear dimmed; look at a swatch and click (or E) to wear it:
+  `set_color` → the server checks it is free → `player_color` recolours your bean for everyone,
+  and it becomes your preferred colour. Other players' panels don't work for you. Lobby only.
+- The Tab list ("THE TABLE") shows each player's bean in its colour as the portrait.
+
 ## Online
 Dedicated Godot server per room on the owner's VPS, FastAPI room orchestrator, ENet over UDP,
 5-character room codes, Steam lobbies for invites/presence (M8).
@@ -177,7 +267,7 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | player_joined / player_rejoined | ui_click (soft) |
 | player_left | ui_hover, low |
 | player_removed | — (follows player_left) |
-| player_skin | pickup pop at the avatar |
+| player_color | pickup pop at the avatar |
 | match_started / phase INTRO | chime (lounge vibes roll) |
 | phase PRE_MINIGAME | countdown_beep (+ HUD per-second beeps) |
 | phase CASINO after rewards | chime |
@@ -195,7 +285,7 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | chips_shaken_out | coin |
 | player_sat (you) / player_stood (you) | ui_click / ui_hover |
 | player_thrown_out | whistle (pea-whistle tweet-tweeet) |
-| emote | jump, high |
+| emote / player_emote | the emote's own cue `emote_<id>` at the bean (see Emotes), cut off with the emote |
 | intent_rejected | buzzer for VIP denied; soft buzzer for other refusals with a toast |
 | round_result | money pop: chip_clack (stake), coin, big_win (≥ $200); your loss: loss_sting (muted trumpet, at most every 6 s) |
 | bet_placed | chip_clack (HUD stake) |
@@ -207,6 +297,8 @@ Every server event `MatchScene._on_event` handles has a sound (or is silent on p
 | wheel_result | — (the clicker slows down); reel_stop, low, as the wheel rests on the segment |
 | hilo_dealt / hilo_call | card_deal as the card slides out of the deck onto the seat's spot (TableCards) |
 | hilo_reshuffle | — (the deck on the table is full again) |
+| holdem_action | — (the ante and the AA Bonus are chips: bet_placed plays chip_clack; a fold slides the hand into the muck) |
+| holdem_showdown | card_deal as the turn, the river and the dealer's two go over (TableCards) |
 | sword_pull | stone_grind as the bean heaves; stuck: thud, low, and a dust puff; free: sword_ring (metal ring-out) and a ring of light, plink per lit gem (pitch rising), thud + coin as a multiplier slams down; stone_grind, high and quiet, as the sword sinks back (big win: the round_result fanfare and the golden light column) |
 | scratch_card | card_deal as the card slides out of the kiosk's dispenser; scratching plays the scratch rasp per stroke (pitch varied) and a higher one as each cell's foil pops off |
 | jackpot_won | jackpot_siren (bell arpeggio, coin shower, held chord) |

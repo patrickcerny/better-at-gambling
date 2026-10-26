@@ -1,12 +1,11 @@
 # poly.pizza models to download
 
-Patrick's picks (2026-10-05), 23 files. Download each one as GLB into `assets/polypizza/<file>.glb` and
+Patrick's picks (2026-10-05), 17 files (the six skin models were removed in 0.9.16). Download each one as GLB into `assets/polypizza/<file>.glb` and
 record its author and license in `CREDITS.md`. poly.pizza blocks the cloud sandbox, so the
 download has to run on Patrick's PC.
 
 | File | poly.pizza id | Use |
 |---|---|---|
-| skin_01 .. skin_06 | 6oDxK0wqyL, JFrLIKqvCH, RaWl2GJ0NZ, I1gTjmuK2m, HMnuH5geEG, Btfn3G5Xv4 | Player skins |
 | poker_chip | 2T3RWLeAudL | Chips |
 | money_pile | dZPTS7VMmqP | Money piles, also next to Plinko when the jackpot is big |
 | atm_shop | p4U0tSF5WN | Gift shop kiosk |

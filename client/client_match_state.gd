@@ -48,6 +48,10 @@ var jackpot: int = 0
 var last_seq: int = 0
 var piles: Dictionary[int, Dictionary] = {}
 var standings: Array = []
+## XP and Coins per player for the match that ended (`Progression.breakdown`, player → row) and
+## that match's id (`PlayerProfile.apply_match` adds the local row once per id).
+var progress: Dictionary = {}
+var match_id: String = ""
 ## Seated station of each player.
 var seat_of: Dictionary[int, StringName] = {}
 ## Online lobby: party leader, host settings, start countdown (-1 = none), room or Practice.
@@ -134,6 +138,8 @@ func apply_snapshot(snap: Dictionary) -> void:
 	rewards = (snap.get("rewards", {}) as Dictionary).get("rewards", [])
 	standings = snap.get("standings", [])
 	awards = snap.get("awards", [])
+	progress = snap.get("progress", {})
+	match_id = str(snap.get("match_id", ""))
 	results_return_in = float(snap.get("results_return_in", -1.0))
 	effects.clear()
 	for id: Variant in snap.get("effects", {}):
@@ -223,7 +229,10 @@ func _apply(ev: Dictionary) -> void:
 			players_changed.emit()
 		&"round_result":
 			var net: int = int(ev["net"])
-			if net != 0 and not bool(ev.get("fun", false)):  # play money stays out of the feed
+			var big_hand: String = holdem_brag(ev)
+			if big_hand != "":
+				_feed(big_hand, &"jackpot")
+			elif net != 0 and not bool(ev.get("fun", false)):  # play money stays out of the feed
 				_feed("%s %s$%d at %s" % [player_name(int(ev["player"])), "+" if net > 0 else "−", absi(net), station_label(StringName(ev["station"]))], &"win" if net > 0 else &"loss")
 			if bool((ev.get("details", {}) as Dictionary).get("big", false)) and not bool(ev.get("fun", false)):
 				# A big pull at the Sword Tapper (≥ `sword_big_win` × the stake): the whole floor hears of it.
@@ -246,9 +255,9 @@ func _apply(ev: Dictionary) -> void:
 			if players.has(int(ev["player"])):
 				players[int(ev["player"])]["ready"] = bool(ev["ready"])
 			lobby_changed.emit()
-		&"player_skin":
+		&"player_color":
 			if players.has(int(ev["player"])):
-				players[int(ev["player"])]["skin"] = StringName(ev["skin"])
+				players[int(ev["player"])]["bean_color"] = int(ev["bean_color"])
 			players_changed.emit()
 			lobby_changed.emit()
 		&"leader_changed":
@@ -285,6 +294,8 @@ func _apply(ev: Dictionary) -> void:
 		&"match_ended":
 			standings = ev["standings"]
 			awards = ev.get("awards", [])
+			progress = ev.get("progress", {})
+			match_id = str(ev.get("match_id", ""))
 			results_return_in = float(ev.get("return_in", -1.0))
 			phase = Phase.Id.RESULTS
 			hot_station = &""
@@ -413,6 +424,7 @@ func _apply(ev: Dictionary) -> void:
 			last_call = false
 			standings = []
 			awards = []
+			progress = {}
 			results_return_in = -1.0
 			phase_changed.emit(phase)
 	if ev.has("station") and stations.has(ev["station"]):
@@ -487,10 +499,30 @@ func _on_item_used(ev: Dictionary) -> void:
 	_feed(text, &"item")
 
 
-## "Blackjack 2" from "blackjack_2" ("Sword Tapper 1" from the pedestal "sword_1").
+## "Patrick hit a flush at Casino Hold'em: $320" for a winning Casino Hold'em hand of a flush or
+## better (the main bet or the AA Bonus; the amount is what it won), "" for anything else.
+func holdem_brag(ev: Dictionary) -> String:
+	var details: Dictionary = ev.get("details", {})
+	if bool(ev.get("fun", false)) or int(ev.get("net", 0)) <= 0 or not details.has("rank") or not String(ev.get("station", "")).begins_with("holdem_"):
+		return ""
+	var rank: int = int(details["rank"])
+	if rank < HoldemHand.Rank.FLUSH:
+		return ""
+	var what: String = HoldemHand.category_name(rank).to_lower()
+	var article: String = "a " if rank != HoldemHand.Rank.FOUR_OF_A_KIND else ""
+	if rank == HoldemHand.Rank.FOUR_OF_A_KIND:
+		what = "four of a kind"
+	var bonus: String = " on the AA Bonus" if StringName(details.get("type", &"")) == &"bonus" else ""
+	return "%s hit %s%s at Casino Hold'em%s: $%s" % [player_name(int(ev["player"])), article, what, bonus, WinFx.thousands(int(ev["net"]))]
+
+
+## "Blackjack 2" from "blackjack_2" ("Sword Tapper 1" from the pedestal "sword_1", "Casino
+## Hold'em 1" from "holdem_1").
 static func station_label(sid: StringName) -> String:
 	if String(sid).begins_with("sword_") and String(sid).trim_prefix("sword_").is_valid_int():
 		return "Sword Tapper %s" % String(sid).trim_prefix("sword_")
+	if String(sid).begins_with("holdem_") and String(sid).trim_prefix("holdem_").is_valid_int():
+		return "Casino Hold'em %s" % String(sid).trim_prefix("holdem_")
 	var parts: PackedStringArray = String(sid).split("_")
 	if parts.size() >= 2 and parts[-1].is_valid_int():
 		return "%s %s" % [" ".join(parts.slice(0, parts.size() - 1)).capitalize(), parts[-1]]

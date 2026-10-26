@@ -60,14 +60,11 @@ func leader() -> int:
 	return _leader
 
 
-## First free color, preferring `wanted`.
+## First free slot colour (`Cosmetics.SLOT_COLORS`), preferring `wanted`.
 func free_color(taken: Array[int], wanted: int = -1) -> int:
-	if Cosmetics.is_valid_color(wanted) and not wanted in taken:
+	if Cosmetics.is_slot_color(wanted) and not wanted in taken:
 		return wanted
-	for c: int in Cosmetics.COLOR_COUNT:
-		if not c in taken:
-			return c
-	return 0
+	return Cosmetics.free_slot(taken)
 
 
 ## Ready from standing on the pad.

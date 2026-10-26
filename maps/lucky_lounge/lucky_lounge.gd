@@ -227,6 +227,8 @@ var pedestal_tops: Array[MeshInstance3D] = []
 var pedestal_lights: Array[SpotLight3D] = []
 var pedestal_glows: Array[Node3D] = []
 var _pedestal_state: Array = []
+## Per ready pedestal: the colour panel at its foot (`ColorPlaque`, `ColorPanelController`).
+var color_plaques: Array[ColorPlaque] = []
 ## 0..1 per pedestal: how far its glow has faded in, and the fade under way.
 var _glow_level: Array[float] = []
 var _glow_tweens: Array[Tween] = []
@@ -536,7 +538,7 @@ func _build_lobby() -> void:
 	var hall_z1: float = SIZE_Z * 0.5 - 0.25
 	_plane(Vector2(SIZE_X - 0.5, hall_z1 - hall_z0), Vector3(0, 0.015, (hall_z0 + hall_z1) * 0.5), Palette.CASINO_RED.darkened(0.3), "LobbyCarpet")
 	# Plants either side of the doors (start-room side), one where the reception desk stood and one
-	# where the wardrobe mirror was (the skin picker lives in the main menu now).
+	# where the wardrobe mirror was (the bean colour is picked at the pedestals and in the cosmetics shop now).
 	for p: Vector3 in [Vector3(-5.4, 0, hall_z0 + 0.7), Vector3(5.4, 0, hall_z0 + 0.7), Vector3(-13.2, 0, 15.1), Vector3(-21.0, 0, 12.0)]:
 		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, p + Vector3(0, 0.3, 0), Color("#5A3A22"), "Pot")
 		PropModels.dress(pot, &"plant_2" if p.x < 0.0 else &"plant_1", 0.3, 1.7).rotation.y = p.x * 0.7
@@ -710,6 +712,11 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 		(step.get_node("Mesh") as MeshInstance3D).material_override = marble if k % 2 == 0 else marble_dark
 	pedestal_labels.append(_build_name_plate(root, i))
 	pedestal_tops.append(top_mesh)
+	# The colour panel beside the bottom step (Patrick: "under the podest should be a color panel").
+	var plaque := ColorPlaque.new()
+	plaque.position = ColorPlaque.OFFSET
+	root.add_child(plaque)
+	color_plaques.append(plaque)
 	_build_glow(root)
 	_pedestal_state.append(["", false])
 	_glow_level.append(0.0)
@@ -1506,6 +1513,8 @@ func _make_station(kind: StringName) -> StationBase:
 			return ScratchStation.new()
 		&"sword_tapper":
 			return SwordTapperStation.new()
+		&"holdem":
+			return HoldemStation.new()
 	# A newer game can bring its own station scene (`GameDefinition.station_scene`).
 	var def: GameDefinition = Registry.games.get(kind, null)
 	if def != null and def.station_scene != null:

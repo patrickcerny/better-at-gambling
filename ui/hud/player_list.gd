@@ -1,8 +1,8 @@
 class_name PlayerList
 extends PanelContainer
 ## The Tab list ("THE TABLE"), held open in the lobby and in the match: a burgundy card with gold
-## trim, one row per player. Each row has a little live 3D portrait of the player's skin in their
-## colour (`SkinPreviewView`), a colour bar, the name with skin and colour, the HOST badge, a
+## trim, one row per player. Each row has a little live 3D portrait of the player's bean in its
+## colour (`BeanPreviewView`), a colour bar, the name with the bean's colour, the HOST badge, a
 ## speaker while they talk (`VoiceChannel.is_talking`) and, for the local row, the ping. In the
 ## match rows are sorted by money with the standing (1ST, 2ND...) and a gold crown on the leader
 ## (`LeaderCrown.leader_of`, the same rule as the 3D crown); in the lobby they keep the join order
@@ -99,10 +99,10 @@ func ordered_ids() -> Array[int]:
 
 
 ## Every portrait currently alive in the list.
-func portraits() -> Array[SkinPreviewView]:
-	var out: Array[SkinPreviewView] = []
+func portraits() -> Array[BeanPreviewView]:
+	var out: Array[BeanPreviewView] = []
 	for pid: int in rows:
-		out.append(rows[pid]["portrait"] as SkinPreviewView)
+		out.append(rows[pid]["portrait"] as BeanPreviewView)
 	return out
 
 
@@ -125,15 +125,13 @@ func refresh() -> void:
 		rows_box.move_child(r["frame"] as Node, i)
 		var p: Dictionary = state.players.get(pid, {})
 		var col: Color = Palette.player_color(int(p.get("color", 0)))
-		var skin := StringName(str(p.get("skin", "bean")))
-		if not Cosmetics.is_valid_skin(skin):
-			skin = &"bean"
+		var bean: Color = Palette.bean_color(p)
 		var mine: bool = pid == local_id
 		(r["frame"] as PanelContainer).add_theme_stylebox_override(&"panel", _row_style(mine))
 		(r["bar"] as ColorRect).color = col
-		var portrait: SkinPreviewView = r["portrait"]
-		if portrait.skin != skin or portrait.color != col:
-			portrait.set_look(skin, col)
+		var portrait: BeanPreviewView = r["portrait"]
+		if portrait.color != bean:
+			portrait.set_bean_color(bean)
 		(r["portrait_frame"] as PanelContainer).add_theme_stylebox_override(&"panel", _portrait_style(col))
 		var rank: Label = r["rank"]
 		rank.text = "%d" % (i + 1) if lobby else Hud._ordinal(i + 1).to_upper()
@@ -147,7 +145,7 @@ func refresh() -> void:
 		name_label.custom_minimum_size.x = minf(ceilf(w) + 4.0, NAME_MAX_W)
 		(r["frame"] as CanvasItem).modulate.a = 1.0 if bool(p.get("connected", true)) else 0.6
 		name_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if mine else Palette.CREAM)
-		var info: PackedStringArray = [str(Cosmetics.SKIN_NAMES.get(skin, "Bean")), _color_name(int(p.get("color", 0)))]
+		var info: PackedStringArray = ["%s bean" % _color_name(int(p.get("bean_color", p.get("color", 0))))]
 		if mine:
 			info.append("you")
 		if not bool(p.get("connected", true)):
@@ -312,11 +310,9 @@ func _make_row(pid: int) -> Dictionary:
 	pframe.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(pframe)
 	var p: Dictionary = state.players.get(pid, {})
-	var skin := StringName(str(p.get("skin", "bean")))
-	var portrait := SkinPreviewView.make(skin if Cosmetics.is_valid_skin(skin) else &"bean", PORTRAIT_SIZE)
+	var portrait := BeanPreviewView.make(Palette.bean_color(p), PORTRAIT_SIZE)
 	portrait.name = "Portrait"
 	portrait.portrait = true
-	portrait.color = Palette.player_color(int(p.get("color", 0)))
 	pframe.add_child(portrait)
 	var names := VBoxContainer.new()
 	names.alignment = BoxContainer.ALIGNMENT_CENTER

@@ -2,8 +2,9 @@ extends Control
 ## Main menu, centred under the 3D logo (Patrick: "the main menu centered"): Play Online (create a
 ## party, join by code, browse public parties), Practice (straight into a solo casino match;
 ## Patrick: "The practise mode should only be the game"; minigames only stays a lobby mode),
-## Tutorial (how to play), Quit, and small buttons in the bottom-right corner: "?" (the tutorial
-## again), the T-shirt (clothes) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
+## Tutorial (how to play), Cosmetics (the shop, `CosmeticsPanel`), Quit, the profile line in the
+## top-left corner (level, XP bar, Coins: `ProfileBadge`) and small buttons in the bottom-right
+## corner: "?" (the tutorial again), the T-shirt (the cosmetics shop too) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
 ## the tutorial first (Patrick: "The Tutorial pops up when you click practise or play for the first
 ## time") and then carries on to what the player chose; `tutorial/seen` in user://settings.cfg
 ## remembers it.
@@ -22,6 +23,7 @@ signal practice_requested(settings: Dictionary)
 @onready var _play_online: Button = %PlayOnline
 @onready var _practice: Button = %Practice
 @onready var _tutorial: Button = %Tutorial
+@onready var _cosmetics_entry: Button = %Cosmetics
 @onready var _quit: Button = %Quit
 @onready var _main_box: VBoxContainer = %VBox
 @onready var _column: VBoxContainer = %Column
@@ -39,9 +41,11 @@ var _status: Label
 var _busy: bool = false
 var _settings: SettingsPanel
 var _settings_button: GearButton
-## The T-shirt button next to the gear and the clothes menu it opens (skin picker).
-var clothes_button: TShirtButton
-var clothes: ClothesPanel
+## The T-shirt button next to the gear and the cosmetics shop it opens (so does COSMETICS).
+var cosmetics_button: TShirtButton
+var cosmetics: CosmeticsPanel
+## Level, XP bar and Coins in the top-left corner.
+var profile_badge: ProfileBadge
 var how_to_play: HowToPlayPanel
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
@@ -107,27 +111,38 @@ func _ready() -> void:
 	add_child(_settings)
 	_settings.closed.connect(func() -> void: _settings_button.grab_focus())
 	_settings_button.pressed.connect(func() -> void:
-		clothes.close()
+		cosmetics.close()
 		_settings.open(false))
-	# Clothes (T-shirt) left of the gear: the skin is picked here, not in game.
-	clothes_button = TShirtButton.new()
-	clothes_button.name = "ClothesButton"
-	clothes_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	clothes_button.offset_left = -48.0 - 2.0 * GearButton.SIZE
-	clothes_button.offset_top = -32.0 - GearButton.SIZE
-	clothes_button.offset_right = -48.0 - GearButton.SIZE
-	clothes_button.offset_bottom = -32.0
-	clothes_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	clothes_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	add_child(clothes_button)
-	clothes = ClothesPanel.new()
-	add_child(clothes)
-	clothes.closed.connect(func() -> void:
-		if not _settings.visible:
-			clothes_button.grab_focus())
-	clothes_button.pressed.connect(func() -> void:
+	# The cosmetics shop: the T-shirt left of the gear and the COSMETICS entry.
+	cosmetics_button = TShirtButton.new()
+	cosmetics_button.name = "CosmeticsButton"
+	cosmetics_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	cosmetics_button.offset_left = -48.0 - 2.0 * GearButton.SIZE
+	cosmetics_button.offset_top = -32.0 - GearButton.SIZE
+	cosmetics_button.offset_right = -48.0 - GearButton.SIZE
+	cosmetics_button.offset_bottom = -32.0
+	cosmetics_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	cosmetics_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(cosmetics_button)
+	cosmetics = CosmeticsPanel.new()
+	add_child(cosmetics)
+	var cosmetics_opener: Array[Control] = [cosmetics_button]
+	cosmetics.closed.connect(func() -> void:
+		if not _settings.visible and cosmetics_opener[0].is_visible_in_tree():
+			cosmetics_opener[0].grab_focus())
+	cosmetics_button.pressed.connect(func() -> void:
+		cosmetics_opener[0] = cosmetics_button
 		_settings.close()
-		clothes.open())
+		cosmetics.open())
+	_cosmetics_entry.pressed.connect(func() -> void:
+		cosmetics_opener[0] = _cosmetics_entry
+		_settings.close()
+		cosmetics.open())
+	profile_badge = ProfileBadge.new()
+	profile_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	profile_badge.offset_left = 32.0
+	profile_badge.offset_top = 28.0
+	add_child(profile_badge)
 	# The tutorial again any time: "?" left of the T-shirt.
 	help_button = HelpButton.new()
 	help_button.name = "HelpButton"
@@ -143,7 +158,7 @@ func _ready() -> void:
 		if _busy:
 			return  # joining: the online box stays up with its status
 		_settings.close()
-		clothes.close()
+		cosmetics.close()
 		_after_tutorial = Callable()
 		_show_tutorial(help_button))
 	how_to_play = HowToPlayPanel.new()

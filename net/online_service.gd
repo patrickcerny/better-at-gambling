@@ -63,7 +63,7 @@ func list_parties() -> Array[Dictionary]:
 
 ## Connects to a room returned by `create_party`/`join_party`.
 func connect_room(room: Dictionary, display_name: String, cosmetics: Dictionary = {}, opts: Dictionary = {}) -> Error:
-	var hello: Dictionary = {"join_token": room["join_token"], "name": display_name, "color": int(cosmetics.get("color", -1)), "skin": StringName(cosmetics.get("skin", "bean"))}
+	var hello: Dictionary = {"join_token": room["join_token"], "name": display_name, "color": int(cosmetics.get("color", -1))}
 	var err: Error = Net.join_server(str(room["host"]), int(room["port"]), hello, opts)
 	if err == OK:
 		Net.room = {"room_id": room.get("room_id", ""), "room_code": room.get("room_code", ""), "host": room["host"], "port": room["port"]}

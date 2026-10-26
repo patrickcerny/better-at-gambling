@@ -124,7 +124,7 @@ const ROOT_HAND_OFFSET: Vector3 = Vector3(0.5, 0.85, -0.25)
 static func hand_node(visuals: Node) -> Node3D:
 	if visuals == null:
 		return null
-	# The bean exposes its right-hand slot (also moves onto a skin's wrist bone).
+	# The bean exposes its right-hand slot.
 	if visuals.has_method("hand_node"):
 		var slot: Node3D = visuals.call("hand_node") as Node3D
 		if slot != null:

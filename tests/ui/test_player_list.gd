@@ -2,7 +2,7 @@ extends GutTest
 ## The Tab list (`PlayerList`, Patrick: "make the tablist you press cooler... the skin, the color
 ## and stuff"): one row per player in the right order, the crown on the money leader, the local row
 ## highlighted, read-only ready states in the lobby (no READY control: "They have to be on the
-## podest"), the talking speaker, and the skin portraits built only while the list is open.
+## podest"), the talking speaker, and the bean portraits (in each bean's colour) built only while the list is open.
 
 
 class FakeServer:
@@ -41,9 +41,9 @@ func before_each() -> void:
 	state.room_mode = true
 	state.leader = 1
 	state.phase = Phase.Id.CASINO
-	var skins: Array[String] = ["king", "wizard", "bean"]
+	var beans: Array[int] = [9, 2, 3]
 	for pid: int in [1, 2, 3]:
-		state.players[pid] = {"id": pid, "name": "P%d" % pid, "color": pid, "ready": pid == 2, "skin": skins[pid - 1], "connected": true}
+		state.players[pid] = {"id": pid, "name": "P%d" % pid, "color": pid, "bean_color": beans[pid - 1], "ready": pid == 2, "connected": true}
 	state.balances = {1: 400, 2: 1200, 3: 800}
 	var layer := CanvasLayer.new()
 	add_child_autofree(layer)
@@ -62,7 +62,7 @@ func after_each() -> void:
 
 
 func _portrait_count() -> int:
-	return list.find_children("*", "SkinPreviewView", true, false).size()
+	return list.find_children("*", "BeanPreviewView", true, false).size()
 
 
 func _names() -> Array[String]:
@@ -96,22 +96,22 @@ func test_match_rows_sorted_by_money_with_standings_and_crown() -> void:
 	assert_false((list.rows[2]["crown"] as Control).visible)
 
 
-func test_rows_show_skin_colour_and_host() -> void:
+func test_rows_show_a_bean_portrait_in_its_colour_and_host() -> void:
 	list.show_list(true)
-	assert_eq((list.rows[1]["bar"] as ColorRect).color, Palette.player_color(1), "colour bar")
-	assert_string_contains((list.rows[1]["info"] as Label).text, "King")
-	assert_string_contains((list.rows[1]["info"] as Label).text, Palette.PLAYER_COLOR_NAMES[1])
-	assert_string_contains((list.rows[2]["info"] as Label).text, "Wizard")
-	assert_eq((list.rows[1]["portrait"] as SkinPreviewView).skin, &"king")
-	assert_eq((list.rows[1]["portrait"] as SkinPreviewView).color, Palette.player_color(1))
+	assert_eq((list.rows[1]["bar"] as ColorRect).color, Palette.player_color(1), "colour bar: the slot colour")
+	assert_string_contains((list.rows[1]["info"] as Label).text, Palette.PLAYER_COLOR_NAMES[9], "the bean's colour by name")
+	assert_string_contains((list.rows[2]["info"] as Label).text, Palette.PLAYER_COLOR_NAMES[2])
+	assert_false((list.rows[1]["info"] as Label).text.contains("King"), "no skin names")
+	assert_eq((list.rows[1]["portrait"] as BeanPreviewView).color, Palette.player_color(9), "the portrait is the bean in its colour")
+	assert_eq((list.rows[3]["portrait"] as BeanPreviewView).color, Palette.player_color(3))
 	assert_true((list.rows[1]["host"] as Control).visible, "host badge on the leader")
 	assert_false((list.rows[2]["host"] as Control).visible)
-	# A skin change re-dresses the same portrait.
-	var portrait: SkinPreviewView = list.rows[2]["portrait"]
-	state.players[2]["skin"] = &"swat"
+	# A colour change recolours the same portrait.
+	var portrait: BeanPreviewView = list.rows[2]["portrait"]
+	state.players[2]["bean_color"] = 14
 	state.players_changed.emit()
 	assert_same(list.rows[2]["portrait"], portrait, "portrait reused")
-	assert_eq(portrait.skin, &"swat")
+	assert_eq(portrait.color, Palette.player_color(14))
 
 
 func test_local_row_is_highlighted() -> void:
@@ -169,10 +169,10 @@ func test_portraits_live_only_while_open() -> void:
 	assert_eq(_portrait_count(), 0, "nothing built while closed")
 	list.show_list(true)
 	assert_eq(_portrait_count(), 3, "one portrait per player")
-	var before: Array[SkinPreviewView] = list.portraits()
+	var before: Array[BeanPreviewView] = list.portraits()
 	list.show_list(false)
 	assert_eq(_portrait_count(), 0, "freed on close")
-	for p: SkinPreviewView in before:
+	for p: BeanPreviewView in before:
 		assert_false(is_instance_valid(p), "portrait freed")
 	for i: int in 5:
 		list.show_list(true)

@@ -27,7 +27,8 @@ const SCHEMA: Dictionary = {
 	&"minigame_ready": [],
 	&"set_ready": ["ready"],
 	&"lobby_setting": ["key", "value"],
-	&"set_skin": ["skin"],
+	## Bean colour (`Cosmetics`, the pedestal colour panel): {"color": palette index}.
+	&"set_color": ["color"],
 	&"return_to_lobby": [],
 	&"kick_player": ["target"],
 	&"emote": ["id"],

@@ -57,9 +57,9 @@ func test_another_client_sees_a_wheel_emote_and_a_key_emote() -> void:
 	ev = _over_the_wire(fx.of_type(&"player_emote").back())
 	assert_true(EmoteWheel.apply_event(on_b, ev))
 	assert_eq(a_on_b.visuals.emote_id, &"six_seven", "the new emote replaces the laugh")
-	assert_eq(a_on_b.bubble.text, "6 7")
+	assert_eq(a_on_b.bubble.text, Emotes.bubble_text(&"six_seven"), "🤲 6-7")
 	# Emote time steps at most 1/30 s per frame, so wait on it rather than the wall clock.
-	await wait_until(func() -> bool: return not a_on_b.visuals.is_emoting(), Emotes.SECONDS * 4.0)
+	await wait_until(func() -> bool: return not a_on_b.visuals.is_emoting(), Emotes.MAX_SECONDS * 4.0)
 	assert_false(a_on_b.visuals.is_emoting(), "and ends on B's screen too")
 	assert_eq(fx.server.economy.balance(a), money, "emotes never touch money")
 	assert_false(EmoteWheel.apply_event(on_b, {"type": &"money_changed"}), "other events are not emotes")
@@ -96,5 +96,5 @@ func test_a_late_joiner_picks_up_an_emote_still_playing() -> void:
 	assert_eq(a_on_late.visuals.emote_id, &"cry", "the late joiner sees A still crying")
 	assert_gt(a_on_late.visuals.emote_time, 0.9, "part-way through, not from the start")
 	assert_false((on_late[late] as PlayerAvatar).cam.emote_view, "a replay never moves a camera")
-	fx.run(2.0)
+	fx.run(Emotes.length(&"cry") - 1.0 + 0.1)
 	assert_false(fx.server.get_snapshot()["emotes"].has(a), "a finished emote leaves the snapshot")

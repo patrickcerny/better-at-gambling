@@ -30,6 +30,8 @@ const FPS_CAPS: Array[int] = [0, 30, 60, 90, 120, 144, 165, 240, MATCH_MONITOR]
 const MAX_MIC_GAIN: float = 2.0
 ## Keys of the `video` section older versions saved that mean nothing any more (`drop_removed_keys`).
 const REMOVED_VIDEO_KEYS: Array[String] = ["pixel_look", "pixel_scale"]
+## Keys of the `profile` section older versions saved that mean nothing any more.
+const REMOVED_PROFILE_KEYS: Array[String] = ["skin"]
 ## Section of the settings file that holds remapped keys: action → "key:<physical keycode>" or
 ## "mouse:<button index>". Only actions the player changed are stored.
 const KEYBIND_SECTION: String = "keybinds"
@@ -38,7 +40,7 @@ const KEYBINDS: Dictionary[StringName, String] = {
 	&"move_forward": "Move forward", &"move_back": "Move back", &"move_left": "Move left", &"move_right": "Move right",
 	&"sprint": "Sprint", &"jump": "Jump", &"interact": "Interact", &"shove": "Shove", &"grab": "Grab / throw", &"shake": "Shake",
 	&"item_1": "Item 1", &"item_2": "Item 2", &"item_3": "Item 3", &"emote_wheel": "Emote wheel",
-	&"emote_1": "Emote: 67", &"emote_2": "Emote: thumbs up", &"emote_3": "Emote: thumbs down", &"emote_4": "Emote: default dance",
+	&"emote_1": "Emote: thumbs up", &"emote_2": "Emote: thumbs down", &"emote_3": "Emote: 6-7", &"emote_4": "Emote: default dance",
 	&"leaderboard": "Leaderboard", &"ping": "Ping", &"toggle_camera": "Toggle camera",
 	&"leave_station": "Leave station", &"pause": "Pause menu", &"push_to_talk": "Push to talk",
 	&"toggle_fullscreen": "Toggle fullscreen",
@@ -117,6 +119,11 @@ func drop_removed_keys() -> bool:
 	for key: String in REMOVED_VIDEO_KEYS:
 		if _cfg.has_section_key("video", key):
 			_cfg.erase_section_key("video", key)
+			dropped = true
+	# The character skins are gone (0.9.16); the bean's colour lives in user://profile.cfg.
+	for key: String in REMOVED_PROFILE_KEYS:
+		if _cfg.has_section_key("profile", key):
+			_cfg.erase_section_key("profile", key)
 			dropped = true
 	if dropped:
 		save()

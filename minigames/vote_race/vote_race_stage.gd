@@ -392,10 +392,8 @@ func _sync_track() -> void:
 	_track_key = key
 	var info: Dictionary = {}
 	for p: int in lanes + bench:
-		var skin: String = "bean"
-		if state != null and state.players.has(p):
-			skin = String(state.players[p].get("skin", "bean"))
-		info[p] = {"name": _name(p), "color": _color(p), "skin": skin, "steps": display_steps.get(p, 0)}
+		var bean: Color = Palette.bean_color(state.players[p]) if state != null and state.players.has(p) else _color(p)
+		info[p] = {"name": _name(p), "color": _color(p), "bean": bean, "steps": display_steps.get(p, 0)}
 	track.set_racers(lanes, bench, info)
 
 

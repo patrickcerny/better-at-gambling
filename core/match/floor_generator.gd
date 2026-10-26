@@ -32,6 +32,7 @@ const NOMINAL: Dictionary = {
 	&"plinko": Rect2(-2.05, -0.35, 4.1, 2.85),
 	&"scratch": Rect2(-0.8, -1.255, 1.6, 2.435),
 	&"sword_tapper": Rect2(-0.7, -0.7, 1.4, 2.15),
+	&"holdem": Rect2(-2.12, -1.9, 4.24, 3.58),
 }
 ## The solid part of each game in its own frame (what people walk round: its colliders, stools
 ## included; `FloorGeometry.obstacles`), when the map has measured nothing.
@@ -45,6 +46,7 @@ const NOMINAL_SOLID: Dictionary = {
 	&"plinko": Rect2(-2.05, -0.35, 4.1, 2.77),
 	&"scratch": Rect2(-0.8, -1.255, 1.6, 2.355),
 	&"sword_tapper": Rect2(-0.7, -0.7, 1.4, 1.4),
+	&"holdem": Rect2(-2.12, -0.92, 4.24, 2.52),
 }
 ## A game nobody measured yet, by footprint: the biggest of its kind (a table as wide as roulette
 ## and as deep as the pit lets a row be).

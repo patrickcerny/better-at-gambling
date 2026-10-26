@@ -3,7 +3,7 @@ extends Node3D
 ## tools/screenshot.gd --scene res://tools/dev/bean_lineup_shot.tscn --frames 100000 --
 ## --poses stand,walk,hit,jump --shot out.png [--at seconds] [--view front|side|close]
 ## Poses: stand, walk, run, hit, jump, win, big_win, loss, slip, ko, emote:<id> (Emotes.ANIMATED),
-## and skin:<skin>:<pose> for a character skin. The scene saves the shot at `--at` seconds and quits.
+## and color:<index>:<pose> for a bean in another colour (`Palette.player_color`). The scene saves the shot at `--at` seconds and quits.
 
 var _beans: Array[AvatarVisuals] = []
 var _poses: PackedStringArray = []
@@ -44,10 +44,8 @@ func _ready() -> void:
 		v.position = Vector3((i - (n - 1) * 0.5) * gap, 0, 0)
 		v.rotation.y = PI
 		var parts: PackedStringArray = _poses[i].split(":")
-		if parts[0] == "skin" and parts.size() >= 2:
-			v.skin_id = StringName(parts[1])
 		add_child(v)
-		v.set_color(Palette.player_color(i))
+		v.set_color(Palette.player_color(int(parts[1]) if parts[0] == "color" and parts.size() >= 2 else i))
 		_beans.append(v)
 		var tag := Label3D.new()
 		tag.text = _poses[i]
@@ -76,7 +74,7 @@ func _ready() -> void:
 
 func _pose_of(i: int) -> String:
 	var parts: PackedStringArray = _poses[i].split(":")
-	if parts[0] == "skin":
+	if parts[0] == "color":
 		return ":".join(parts.slice(2)) if parts.size() > 2 else "stand"
 	return _poses[i]
 

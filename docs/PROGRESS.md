@@ -200,6 +200,118 @@ The 321 countdown on the door is enough. [...] Group the tablegames and make ran
   - The Last Call banner goes when last call is over.
 
   Tests: `tests/ui/test_hud_toasts.gd`.
+### 2026-10-26 / 0.9.16 emotes
+- Patrick: "The animation is good for the emotes, but make them even better. add a 67 emote.
+  Really take your time on these to make them good." The 67 existed (key 4 since 0.9.5) but was
+  off the wheel and weak: both hands straight out, a small symmetric wobble, a "6 7" bubble.
+  Now **6-7** sits at the top of the emote wheel ("🤲 6-7") and on the **6** key (number keys:
+  4 thumbs up, 5 thumbs down, 6 6-7, 7 default dance; the settings labels follow), and plays the
+  meme: palms up at chest height, weighing "six… seven" in anti-phase eight times with a hold at
+  each end, a bounce on every word, tilt to the lower hand, eyes on the hand going up, mouthing
+  the words, then a shrug.
+- Every emote rebuilt in beats (`player/emote_poses.gd`, `EmotePoses`): wind-ups, key poses
+  reached with an eased overshoot and held, arm arcs (directions swung along the sphere instead
+  of lerped pitch/splay), squash and bounce, crisp head tilts (`tilt`), whole-body hops and turns
+  (`lift`, `spin`: the disco's twirl, the taunt's bum wiggle with its back turned), rubber-hose
+  arm stretch (`reach`) and a pointing finger (`point`), and per-emote faces (`smirk`,
+  `brow_side`, `round`, `pupil`, `blush`, right-eye `wink`). What each one does: docs/GDD.md
+  "Emotes". `AvatarVisuals` only gained the hooks for the new keys; the choreography lives in the
+  new file. Designed for the plain bean body.
+- Lengths per emote (`Emotes.LENGTHS`, 2.2–3.4 s; the server keeps an emote in the snapshot for
+  its own length), and a sound cue per emote timed to its beats (`tools/audio/gen_sfx.py`
+  `emote_*`, ten new `audio/sfx/emote_<id>.wav`), now also for the number-key emotes; the cue
+  stops when the emote is cut short (`PlayerAvatar.set_emote_sound`, `AudioDirector.play_at`
+  returns its player).
+- Dev: `tools/dev/emote_shot.gd --view strip [--times a,b,…] [--angle deg]` renders one bean per
+  moment of an emote, driving the clock itself (a slow software-rendered frame used to push the
+  frozen pose a quarter second on).
+- Tests: `tests/physics/test_emote_animations.gd` (14): each emote travels through its beats and
+  ends at rest with no NaN; nothing pops between frames (arm ≤ 0.55 rad, glove ≤ 1 rad per 60 fps
+  frame); 6-7 eight words in anti-phase with palms up and a shrug; the disco hops and twirls; the
+  taunt turns its back and comes round; faces (laugh squint, cry tears and frown, taunt wink);
+  walking cancels only after the first moment and the cue stops. Updated for the new key order
+  and lengths: `test_play_emote.gd`, `test_avatar_emotes.gd` (key 6 = 6-7), `test_emote_camera.gd`,
+  `test_emote_replication.gd`.
+- Emote wheel: seven pills at radius 250 (the bottom pair overlapped when lit at 220), and the
+  stick picks again (a full stick throw fell inside the mouse's 40 px dead zone, so pointing and
+  releasing sent nothing). `tests/ui/test_emote_wheel.gd`: seven pills, 6-7 on top, no overlap
+  when lit, stick up then release sends 6-7.
+### 2026-10-26 / 0.9.16 XP, Coins, colours
+- **XP and levels** (Patrick: "Create a XP level and an ingame currency. There will be a shop for
+  cosmetics."): a local profile (`ProfileManager` autoload, `PlayerProfile`, `user://profile.cfg`,
+  every value clamped on load, no DRM) keeps XP, level, Coins, owned and preferred cosmetics and
+  lifetime stats. The server works out each player's XP from the match (`Progression.breakdown`,
+  numbers in `data/progression/progression.tres`): match played 100, placement 120/80/50/30/20,
+  30 per minigame won, 1 per $20 profit (max 100), 2 per table hand (max 60); Practice half. It
+  sends the rows in `match_ended` (`progress`, `match_id`, also in the RESULTS snapshot) and each
+  client adds its own row once per match id. Level L→L+1 costs 100 + 35(L−1) up to level 10
+  (2,160 XP, about 8 typical ~280 XP matches), then 450 + 50(L−10); cap 99.
+- **Coins**: a tenth of the match's XP plus 50 per level gained, a drawn gold coin icon
+  (`CoinIcon`). Only for cosmetics, never at the tables; the UI says the $ starts fresh each match.
+  Main menu: a LEVEL / XP bar / Coins line top left (`ProfileBadge`). Results: "+N XP" on every
+  standings row, YOUR XP breakdown bottom left and the level bar filling with the Coins bottom right.
+- **Cosmetics shop** (COSMETICS in the main menu, the T-shirt button and the lobby tablet,
+  `CosmeticsPanel`): 16 bean colours, the 8 player colours free, Ruby, Mint, Lavender, Teal, Lime,
+  Onyx, Silver, Gold 150–400 Coins (`data/progression/cosmetics_shop.tres`, `CosmeticDef` with a
+  kind so hats can follow); a turning bean preview, BUY and WEAR.
+- **Bean colour vs slot colour**: the server still gives every player one of the 8 slot colours
+  (HUD, name plate, pedestal). The bean wears the preferred colour from the hello when no other
+  bean wears it, else the slot colour, else the first free one (`Cosmetics.bean_color_for`); two
+  beans never match. `PlayerState.bean_color` on the wire, intent `set_color`, event
+  `player_color`, error `color_taken`.
+- **Pedestal colour panel** (Patrick: "under the podest should be a color panel you can click"):
+  a brass lectern beside every ready pedestal with a 4×4 swatch plaque (`ColorPlaque`,
+  `ColorPanelController`); look at a swatch on your own and click or press E to wear it (lobby
+  only); it also becomes your preferred colour. Worn colours dimmed, yours framed.
+- **Skins removed** ("Remove all other skins"): the six poly.pizza skin models, `SkinLibrary`,
+  `SkinArmModifier`, the skin preview view, the clothes panel, `Cosmetics.SKINS`, the `skin` field
+  in the hello and player state, `set_skin`/`player_skin`, the skin parts of `AvatarVisuals`,
+  `RagdollBody` and `PlayerAvatar`, and the skin rows in CREDITS and MODELS. The Tab list's
+  portraits are now the player's bean in its colour. `PROTOCOL_VERSION` 10 → 11.
+- Tests: new `test_progression`, `test_player_profile`, `test_bean_colors` (unit),
+  `test_progress_results` (integration), `test_cosmetics_shop`, `test_color_panel` (ui), more in
+  `test_results_stage`; skin tests deleted or rewritten; the main menu test lists COSMETICS. Dev
+  shot `tools/dev/cosmetics_shot.tscn` (shop, menu, plaque, results). Merged over the new emotes: the
+  `skin` arm directions and skin-only emote tests went, `emote_shot` takes `--colors`. Suites
+  after the merge: lint ok; unit 850, physics 177, ui 292, integration 261 (before it also smoke 4
+  + boot, session and net 14 green).
+### 2026-10-26 / 0.9.16 Casino Hold'em
+Patrick: "add 2 card texas holdem against dealer (the one with ante and bonus play). Orient yourself
+on the bwin game." bwin's table is Evolution's Casino Hold'em; built to its rules and paytables
+(GDD entry under Casino games):
+- **Game** (`games/holdem/`): `HoldemHand` (best five of seven, names like "Two Pair, Kings and
+  Fives", dealer qualifies with a pair of 4s, flush/straight draws), `HoldemLogic` (4 seats, ANTE
+  $10–$100 × limits plus an optional AA BONUS up to $50, all-in through `clamp_bet` keeping the
+  call covered, 8 s betting window, one fresh deck per hand, FOLD or CALL 2× on a 15 s server clock,
+  timeout / standing up / match end fold, the bonus settled with the flop, "Table closing!" when a
+  hand could not finish, a minigame gives the open ante and call back and keeps a settled bonus).
+  Ante table royal 100 / straight flush 20 / quads 10 / full house 3 / flush 2 / straight or lower
+  1; AA Bonus pair of aces–straight 7 / flush 20 / full house 30 / quads 40 / straight flush 50 /
+  royal 100. Luck through `LuckRng.draw` on the hole cards, the flop and the showdown cards. Quiet
+  house rules: `holdem_favour` 0.12 (turn, river and the dealer's two drawn again once when nobody
+  would win and someone would lose), `holdem_bonus_favour` 0.095 (a flop on which no bonus bet pays).
+- **RTP** (`tests/sim/test_rtp_holdem.gd`, lone player, simple strategy = call any pair, an ace or
+  king in the hole, or a flush/straight draw; calls 74.7%): main game 97.6% ± 0.4% of the stake without the house rule (94.1% per ante), **101.1% ± 0.2%** with it (300k hands through the real logic).
+  AA Bonus exact 93.74% plain (Evolution's figure), **101.10%** with the house rule (exact over 169 hole classes × 19,600 flops; 200k hands through the table 99.9% ± 0.7%). Luck −3 / 0 / +3: 78.0% / 100.9% / 123.4% (a strong effect: luck rerolls hole cards, flop and showdown).
+- **Table** (`HoldemStation`): green oval felt with the AA BONUS · ANTE · CALL circles per seat, the
+  board in the middle, the dealer's rack, deck tray and house chips; hand names over each seat's
+  cards ("FOLD" once folded), the dealer's hand at the showdown. Seat views frame the board, the
+  dealer and the seat's own cards and spots in the left two thirds at FOV 85. Chips go to the spots
+  and settle through `TableFx`; feed line "X hit a flush at Casino Hold'em: $N" (flush or better).
+- **Overlay** (`HoldemUi`, docked right column): ante chips, AA BONUS OFF / sizes ([B] cycles),
+  DEAL; FOLD / CALL with the amounts ([F] / [C], pad X / A); cards, the hand named live, the
+  dealer's hand, the bonus and main results; others at the table; the paytables under HOW IT WORKS.
+- **Floor**: registered in its own last commit (`holdem.tres`, `games.tres`, the map's stations and
+  Hot Table candidates, `LuckyLounge._make_station`, and one `holdem_1` spot in The Grand Hall at
+  (4.5, 0, −11)) so it can be dropped or replaced when the layout generator lands; the other
+  layouts don't place it yet. Dealer behind the rail, HUD money-on-table line, autoplay plays a
+  bonus hand and a fold. PROTOCOL_VERSION 11 (new `holdem_action` / `holdem_showdown` events and
+  station state); `test_sword_tapper_flow.gd` now checks the protocol is at least 10.
+- Tests: `tests/unit/test_holdem_hand.gd`, `tests/unit/test_holdem.gd`,
+  `tests/sim/test_rtp_holdem.gd`, `tests/integration/test_holdem_flow.gd`,
+  `tests/physics/test_holdem_table.gd`, `tests/ui/test_holdem_ui.gd`. Dev render
+  `tools/dev/holdem_shot.tscn` (`--view seat|close|wide`, `--seat N`, `--showdown`).
+
 ### 2026-10-19 / 0.9.15 Pixel look removed
 - **Pixel look removed** (Patrick: "OK no actually remove that filter overall. Save the code
   though if i want to implement it again"): the game always renders at the window's full

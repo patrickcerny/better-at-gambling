@@ -1,15 +1,17 @@
 class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
-## accessibility: the 8 slots (name, color, skin, ready, leader) and — for the party leader — the mode (casino or minigames only), match length (minigames,
+## accessibility: the 8 slots (name, color, ready, leader) and — for the party leader — the mode (casino or minigames only), match length (minigames,
 ## gambling minutes between them), items, which minigames are on (MinigameSelector), PUBLIC (listed in the server browser) and a KICK button
 ## next to every other player (press twice: KICK → SURE?). Every button sends an intent; the panel
 ## only redraws from the ClientMatchState mirror. There is no READY button: players get ready
 ## only by standing on their pedestal (Patrick); the slots just show it. Opened at the settings
-## tablet; Tab shows the `PlayerList` instead.
+## tablet; Tab shows the `PlayerList` instead. COSMETICS opens the cosmetics shop
+## (`CosmeticsPanel`) over the lobby.
 
 signal closed
 signal leave_requested
+signal cosmetics_requested
 
 var state: ClientMatchState
 var local_id: int = -1
@@ -31,6 +33,8 @@ var public_button: Button
 var invite_button: Button
 ## MINIGAMES: opens the minigame selector (`minigame_pool`; read-only for everyone but the leader).
 var minigames_button: Button
+## Opens the cosmetics shop (bean colours) without leaving the lobby.
+var cosmetics_button: Button
 var selector: MinigameSelector
 ## Player id whose KICK was pressed once (the second press kicks), and when it disarms.
 var _kick_armed: int = -1
@@ -176,6 +180,11 @@ func _build() -> void:
 	_close_button.text = "CLOSE"
 	_close_button.pressed.connect(close)
 	bottom.add_child(_close_button)
+	cosmetics_button = Button.new()
+	cosmetics_button.name = "CosmeticsButton"
+	cosmetics_button.text = "COSMETICS"
+	cosmetics_button.pressed.connect(func() -> void: cosmetics_requested.emit())
+	bottom.add_child(cosmetics_button)
 	var leave := Button.new()
 	leave.text = "LEAVE LOBBY"
 	leave.pressed.connect(func() -> void: leave_requested.emit())

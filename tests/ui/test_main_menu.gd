@@ -39,7 +39,7 @@ func test_entries_in_order_without_a_settings_entry() -> void:
 	var names: PackedStringArray = []
 	for b: Node in box.get_children():
 		names.append((b as Button).text)
-	assert_eq(names, PackedStringArray(["PLAY ONLINE", "PRACTICE", "TUTORIAL", "QUIT"]))
+	assert_eq(names, PackedStringArray(["PLAY ONLINE", "PRACTICE", "TUTORIAL", "COSMETICS", "QUIT"]))
 
 
 func test_logo_and_entries_are_centred() -> void:

@@ -1,5 +1,6 @@
 extends GutTest
-## Results screen (§2.11): the podium show runs to its end state, awards and the money graph show.
+## Results screen (§2.11): the podium show runs to its end state, awards and the money graph show,
+## every standings row shows the XP that player earned and YOUR PROGRESS fills the level bar.
 
 var stage: ResultsStage
 
@@ -15,6 +16,9 @@ func _state(n: int) -> ClientMatchState:
 		rows.append({"player": pid, "name": "P%d" % pid, "money": money, "rank": i + 1, "series": [1000, 1200, money]})
 	st.standings = rows
 	st.awards = Awards.pick({1: {"jackpot_won": 500}, 2: {"loss_streak": 4}}, {1: "P1", 2: "P2"}, 4)
+	for row: Variant in rows:
+		st.progress[int(row["player"])] = Progression.breakdown(ProgressionConfig.default(), int(row["rank"]), 1, int(row["money"]) - 1000, 12)
+	st.match_id = "results-test"
 	return st
 
 
@@ -122,7 +126,7 @@ func test_a_full_party_of_eight_fits_the_screen() -> void:
 		await wait_process_frames(3)
 		var tags: Array[Label3D] = _tags()
 		assert_eq(tags.size(), n, "%d name tags" % n)
-		var panels: Array[Rect2] = [_panel_rect(stage.standings_panel), _panel_rect(stage.graph_panel)]
+		var panels: Array[Rect2] = [_panel_rect(stage.standings_panel), _panel_rect(stage.graph_panel), _panel_rect(stage.xp_panel), _panel_rect(stage.find_child("XpParts", true, false) as Control)]
 		var rects: Array[Rect2] = []
 		for t: Label3D in tags:
 			var r: Rect2 = _tag_rect(t)
@@ -140,3 +144,50 @@ func test_a_full_party_of_eight_fits_the_screen() -> void:
 		assert_lt(standings_bottom, _panel_rect(stage.award_cards[0].get_parent() as Control).position.y, "%d players: the standings end above the awards" % n)
 		view.queue_free()
 		await wait_process_frames(1)
+
+
+func test_xp_rows_and_the_level_bar() -> void:
+	ProfileManager.reload()
+	var st: ClientMatchState = _state(4)
+	var cfg: ProgressionConfig = ProgressionConfig.default()
+	var row: Dictionary = st.progress[1]
+	ProfileManager.profile.xp = cfg.xp_for_level(2) - 20  # 20 XP short of level 2
+	ProfileManager.profile.sanitize()
+	var summary: Dictionary = ProfileManager.apply_results({"progress": st.progress, "match_id": st.match_id}, 1)
+	assert_eq(summary["level_from"], 1)
+	assert_gt(int(summary["level_to"]), 1)
+	stage = ResultsStage.new()
+	stage.progress_summary = summary
+	add_child_autofree(stage)
+	stage.setup(st, 1, false)
+	for pid: int in [1, 2, 3, 4]:
+		var xl: Label = stage.standings_panel.find_child("Xp%d" % pid, true, false) as Label
+		assert_not_null(xl, "P%d's row shows its XP" % pid)
+		if xl != null:
+			assert_eq(xl.text, "+%d XP" % int(st.progress[pid]["xp"]), "the server's number, the same on every screen")
+	assert_not_null(stage.xp_panel, "YOUR PROGRESS")
+	assert_eq((stage.xp_panel.find_child("XpTotal", true, false) as Label).text, "+%d XP" % int(row["xp"]))
+	var breakdown: String = (stage.find_child("Breakdown", true, false) as Label).text
+	assert_string_contains(breakdown, "1st place +120")
+	assert_string_contains(breakdown, "Match played +100")
+	assert_string_contains(stage.coins_line.text, "+%d COINS" % int(summary["coins"]))
+	assert_string_contains(stage.coins_line.text, "level-up bonus")
+	assert_not_null(stage.find_child("XpParts", true, false), "where the XP came from")
+	assert_eq(stage.level_label.text, "LEVEL 1", "the bar starts where the match began")
+	assert_almost_eq(stage.xp_shown, float(summary["xp_from"]), 0.5)
+	await wait_seconds(ResultsStage.T_XP + 0.6)
+	assert_gt(stage.xp_shown, float(summary["xp_from"]), "the bar fills")
+	stage.finish_show()
+	assert_almost_eq(stage.xp_shown, float(ProfileManager.profile.xp), 0.5, "ends at the profile's XP")
+	assert_eq(stage.level_label.text, "LEVEL 1 → %d" % int(summary["level_to"]))
+	ProfileManager.reload()
+
+
+func test_no_rows_no_progress_panel() -> void:
+	var st: ClientMatchState = _state(3)
+	st.progress = {}
+	stage = ResultsStage.new()
+	add_child_autofree(stage)
+	stage.setup(st, 1, false)
+	assert_null(stage.xp_panel)
+	assert_null(stage.standings_panel.find_child("Xp1", true, false))
