@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Synthesizes the SFX that have no recorded (Kenney CC0) take: fountain splash, guard whistle,
 jackpot, big win, loss sting, slips, the waiter's tray crash, megaphone, last-call bell, cash
-register, hot-table shimmer, lounge chime, the spring boing and the scratch-card rasp. Writes 16-bit mono WAVs into
+register, hot-table shimmer, lounge chime, the spring boing, the scratch-card rasp and a cue for
+every emote (`emote_<id>`, timed to its choreography). Writes 16-bit mono WAVs into
 audio/sfx/ (they replace the old sfxr-style placeholders from tools/gen_audio.py).
 
     python3 tools/audio/gen_sfx.py            # all
@@ -333,11 +334,201 @@ def sword_ring():
     return finish(S.reverb(buf, 0.2, 1.2), peak_db=-5.0)
 
 
+# --- Emotes (timed to the choreography in player/emote_poses.gd; each fits inside Emotes.LENGTHS) --
+
+def trim(x, buf, tail):
+    """`x` (the reverbed `buf`) cut `tail` seconds after `buf` ends, so a cue stops with its emote."""
+    return x[..., : len(buf) + int(tail * SR)]
+
+
+def kazoo(m, dur, vib=0.0):
+    """A toy kazoo note: a buzzy sawtooth through a nasal band, with a little vibrato."""
+    n = int(dur * SR)
+    t = secs(n)
+    f = midi_hz(m) * (1 + vib * np.sin(2 * np.pi * 6.0 * t) * np.clip(t / 0.15, 0, 1))
+    ph = osc_phase(f, n)
+    y = np.zeros(n)
+    for k in range(1, 18):
+        if midi_hz(m) * k > 6500:
+            break
+        y += np.sin(k * ph) / k
+    y = band(y, 350, 4200) + 0.35 * band(y, 900, 1500)
+    return y * adsr(n, a=0.015, r=0.05)
+
+
+def slide(f0, f1, dur, shape=1.0):
+    """A slide whistle gliding from `f0` to `f1` Hz."""
+    n = int(dur * SR)
+    t = secs(n)
+    k = (t / dur) ** shape
+    f = f0 * (f1 / f0) ** k * (1 + 0.012 * np.sin(2 * np.pi * 9 * t))
+    ph = osc_phase(f, n)
+    return (np.sin(ph) + 0.08 * np.sin(2 * ph)) * adsr(n, a=0.02, r=0.06)
+
+
+def wah(peak, dur, base=500):
+    """A muted trumpet's mute opening and closing over `dur` (for `trumpet`)."""
+    return lambda t: base + peak * np.sin(np.pi * np.clip(t / dur, 0, 1))
+
+
+def emote_six_seven():
+    """6-7: a woodblock "six" (low) and "se-ven" (two higher taps) as each hand reaches the top,
+    eight in all, then a muted-trumpet "meh" for the shrug."""
+    buf = buffer(2.95)
+    for k in range(8):
+        at = 0.3 + 0.125 + 0.25 * k - 0.03  # the hand reaches the top of its swing
+        if k % 2 == 0:
+            put(buf, S.woodblock(76, 0.9), at)
+        else:
+            put(buf, S.woodblock(83, 0.8), at - 0.05)
+            put(buf, S.woodblock(81, 0.75), at + 0.04)
+    put(buf, trumpet(60, 0.18, lambda t: 700 + 600 * np.clip(t / 0.18, 0, 1)), 2.3, 0.7)
+    put(buf, trumpet(57, 0.4, lambda t: 1300 - 700 * np.clip(t / 0.4, 0, 1), vibrato=0.01), 2.47, 0.7)
+    return finish(trim(S.reverb(buf, 0.12, 0.6), buf, 0.3), hi=7000)
+
+
+def emote_wave():
+    """Wave: a slide whistle up as the arm swings up, then a friendly two-note "hel-lo" whistle."""
+    buf = buffer(2.2)
+    put(buf, slide(500, 1400, 0.28, 0.7), 0.13, 0.55)
+    for at, f0, f1, d in [(0.62, 1150, 1500, 0.2), (0.86, 1450, 1050, 0.38)]:
+        put(buf, slide(f0, f1, d, 0.5), at, 0.7)
+    return finish(trim(S.reverb(buf, 0.2, 0.8), buf, 0.3), peak_db=-5.0, hi=6000)
+
+
+def emote_laugh():
+    """Laugh: a muted-trumpet cackle, "hah-hah-hah", tumbling down, then a wheezing higher "hee-hee"
+    while the bean is doubled over, and a happy sigh."""
+    buf = buffer(2.75)
+    for i, m in enumerate([70, 69, 68, 67, 66, 65, 66, 65, 64, 63]):
+        put(buf, trumpet(m - 2, 0.085, wah(1800, 0.085, 600)), 0.2 + i * 0.095, 0.75)
+    for i in range(7):
+        put(buf, trumpet(74 - (i % 3), 0.07, wah(2000, 0.07, 900)), 1.35 + i * 0.12, 0.55)
+    put(buf, trumpet(62, 0.45, lambda t: 1200 - 800 * np.clip(t / 0.45, 0, 1), vibrato=0.01), 2.3, 0.45)
+    return finish(trim(S.reverb(buf, 0.15, 0.7), buf, 0.3), hi=6000)
+
+
+def emote_taunt():
+    """Taunt: the playground "nyah-nyah na-nyah-nyah" on a kazoo while the hands waggle, two bum
+    slaps, and a whoosh for each turn."""
+    rng = np.random.default_rng(31)
+    buf = buffer(2.6)
+    for at, m, d in [(0.42, 67, 0.17), (0.6, 64, 0.17), (0.78, 69, 0.1), (0.88, 67, 0.1), (0.99, 64, 0.22)]:
+        put(buf, kazoo(m, d, vib=0.015), at, 0.65)
+    for at in (1.59, 1.83):
+        m = int(0.08 * SR)
+        slap = band(noise(m, rng), 500, 4500) * np.exp(-secs(m) * 60)
+        slap += 0.6 * np.sin(osc_phase(np.full(m, 180.0), m)) * np.exp(-secs(m) * 50)
+        put(buf, slap, at, 0.8)
+    for at in (1.2, 2.0):
+        m = int(0.22 * SR)
+        swish = band(noise(m, rng), 700, 4000) * np.sin(np.pi * secs(m) / 0.22) ** 2
+        put(buf, swish, at, 0.35)
+    return finish(trim(S.reverb(buf, 0.12, 0.6), buf, 0.3), hi=7000)
+
+
+def emote_cry():
+    """Cry: a muted-trumpet "waaah" with the wail, a sob on every hitch of the shoulders, and a
+    sniff at the end."""
+    rng = np.random.default_rng(32)
+    buf = buffer(2.9)
+    put(buf, trumpet(64, 0.55, wah(1600, 0.55), vibrato=0.02), 0.38, 0.85)
+    for i, at in enumerate([0.66, 1.0, 1.33, 1.66, 2.0]):
+        put(buf, trumpet(62 - (i % 2), 0.16, wah(1100, 0.16)), at, 0.55)
+        put(buf, trumpet(60 - (i % 2), 0.14, wah(700, 0.14)), at + 0.13, 0.45)
+    m = int(0.28 * SR)
+    sniff = band(noise(m, rng), 2500, 8000) * np.sin(np.pi * secs(m) / 0.28) ** 0.6 * np.linspace(0.6, 1.0, m)
+    put(buf, sniff, 2.3, 0.4)
+    return finish(trim(S.reverb(buf, 0.18, 0.9), buf, 0.3), hi=6000)
+
+
+def emote_dance():
+    """Dance (the disco): four-on-the-floor kick, hat offbeats and an octave bass on the four
+    pointing beats, a riser into the twirl and a vibes "ta-da" as it lands."""
+    rng = np.random.default_rng(33)
+    buf = buffer(3.35)
+    beat = 0.5
+    for k in range(4):
+        at = 0.15 + k * beat
+        put(buf, S.kick(0.9, rng), at)
+        put(buf, S.hat_chick(0.5, rng), at + beat / 2)
+        put(buf, S.upright_bass(45 if k % 2 == 0 else 57, 0.2, 1.0, rng), at)
+        put(buf, S.upright_bass(57 if k % 2 == 0 else 45, 0.15, 0.8, rng), at + beat / 2)
+    m = int(0.65 * SR)
+    riser = band(noise(m, rng), 1500, 7000) * (secs(m) / 0.65) ** 2
+    put(buf, riser, 2.2, 0.35)
+    put(buf, slide(400, 1200, 0.6, 1.0), 2.22, 0.3)
+    for mm in (69, 73, 76, 81):
+        put(buf, S.vibes(mm, 0.5, 0.8), 2.86, 0.45)
+    put(buf, S.kick(0.9, rng), 2.86)
+    return finish(trim(S.reverb(buf, 0.15, 0.8), buf, 0.3))
+
+
+def emote_default_dance():
+    """The default dance: a bouncy kick-and-snare beat with a walking bass, two bars at the
+    dance's tempo (2.35 beats a second)."""
+    rng = np.random.default_rng(34)
+    buf = buffer(3.35)
+    beat = 1.0 / 2.35
+    bass = [45, 48, 50, 52, 45, 48, 52, 50]
+    for k in range(8):
+        at = k * beat
+        put(buf, S.kick(0.85, rng), at)
+        if k % 2 == 1:
+            put(buf, S.brush_tap(1.0, rng), at)
+        put(buf, S.hat_chick(0.45, rng), at + beat / 2)
+        put(buf, S.upright_bass(bass[k], beat * 0.8, 1.0, rng), at)
+    return finish(trim(S.reverb(buf, 0.12, 0.6), buf, 0.3))
+
+
+def emote_gg():
+    """GG: three soft pats with the handshake pumps, a warm vibes chord with the bow, and a bright
+    "ding" with the thumbs up at the end."""
+    rng = np.random.default_rng(35)
+    buf = buffer(2.95)
+    for k in range(3):
+        at = 0.45 + (0.25 + k) / 3.8
+        m = int(0.07 * SR)
+        put(buf, band(noise(m, rng), 300, 2500) * np.exp(-secs(m) * 55), at, 0.5)
+    for mm in (60, 64, 67, 71):
+        put(buf, S.vibes(mm, 0.7, 0.6), 1.55, 0.35)
+    put(buf, S.bell(midi_hz(84), 1.0, 0.7), 2.42, 0.8)
+    coins(buf, rng, 2.42, 3, 0.15, 0.3)
+    return finish(trim(S.reverb(buf, 0.18, 1.0), buf, 0.3))
+
+
+def emote_thumbs_up():
+    """Thumbs up: a "click" and a bright "ding!" on the punch, a second, higher one when the other
+    thumb joins."""
+    rng = np.random.default_rng(36)
+    buf = buffer(2.0)
+    for at, mm in [(0.31, 84), (0.9, 91)]:
+        m = int(0.012 * SR)
+        put(buf, band(noise(m, rng), 2000, 8000), at - 0.01, 0.4)
+        put(buf, S.bell(midi_hz(mm), 1.0, 0.8), at, 0.8)
+        put(buf, S.vibes(mm - 12, 0.3, 0.7), at, 0.4)
+    return finish(trim(S.reverb(buf, 0.18, 0.9), buf, 0.3))
+
+
+def emote_thumbs_down():
+    """Thumbs down: a slide whistle sinking as the thumb turns over, then three muted-trumpet
+    "boo"s going down."""
+    buf = buffer(2.3)
+    put(buf, slide(1300, 450, 0.32, 1.2), 0.27, 0.5)
+    for at, m in [(0.72, 58), (1.12, 57), (1.52, 55)]:
+        put(buf, trumpet(m, 0.3, wah(700, 0.3, 450)), at, 0.8)
+    return finish(trim(S.reverb(buf, 0.15, 0.8), buf, 0.3), hi=6000)
+
+
 RECIPES = {
     "splash": splash, "whistle": whistle, "jackpot_siren": jackpot, "big_win": big_win,
     "loss_sting": loss_sting, "slip": slip, "tray_crash": tray_crash, "megaphone": megaphone,
     "last_call_bell": last_call_bell, "cash_register": cash_register, "hot_table": hot_table,
     "chime": chime, "boing": boing, "scratch": scratch, "stone_grind": stone_grind, "sword_ring": sword_ring,
+    "emote_six_seven": emote_six_seven, "emote_wave": emote_wave, "emote_laugh": emote_laugh,
+    "emote_taunt": emote_taunt, "emote_cry": emote_cry, "emote_dance": emote_dance,
+    "emote_default_dance": emote_default_dance, "emote_gg": emote_gg, "emote_thumbs_up": emote_thumbs_up,
+    "emote_thumbs_down": emote_thumbs_down,
 }
 
 if __name__ == "__main__":

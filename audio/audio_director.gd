@@ -77,13 +77,14 @@ func play(name: StringName, bus: StringName = &"SFX", volume_db: float = 0.0, pi
 			return
 
 
-## Plays a positional one-shot under `parent` (freed when done).
-func play_at(name: StringName, parent: Node3D, volume_db: float = 0.0, pitch: float = 1.0) -> void:
+## Plays a positional one-shot under `parent` (freed when done). Returns the player (null when
+## nothing plays), so a caller can cut it short.
+func play_at(name: StringName, parent: Node3D, volume_db: float = 0.0, pitch: float = 1.0) -> AudioStreamPlayer3D:
 	if _silent:
-		return
+		return null
 	var clip: AudioStream = _clip(name)
 	if clip == null or parent == null or not parent.is_inside_tree():
-		return
+		return null
 	var p := AudioStreamPlayer3D.new()
 	p.stream = clip
 	p.bus = &"SFX"
@@ -93,6 +94,7 @@ func play_at(name: StringName, parent: Node3D, volume_db: float = 0.0, pitch: fl
 	parent.add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
+	return p
 
 
 ## The music for a moment of the game: &"menu", &"casino", &"quiz" (or &"minigame"),

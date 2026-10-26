@@ -1,12 +1,12 @@
 class_name EmoteWheel
 extends Control
 ## Radial emote picker (§2.4.2): hold the emote key (G / D-pad down), point with the mouse or
-## right stick, release to send. Six emotes (`Emotes`), each a charcoal pill that lights up gold
-## when pointed at; the centre says what you picked and how to send it.
+## right stick, release to send. Seven emotes (`Emotes.LIST`, 6-7 at the top), each a charcoal pill
+## that lights up gold when pointed at; the centre says what you picked and how to send it.
 
 signal picked(id: StringName)
 
-const RADIUS: float = 200.0
+const RADIUS: float = 220.0
 const PILL_SIZE: Vector2 = Vector2(190, 64)
 ## Pointer distance (px) from the centre before a pill is chosen.
 const DEAD_ZONE: float = 40.0
@@ -128,13 +128,17 @@ static func _style(bg: Color, border: Color, radius: int, width: int) -> StyleBo
 	return sb
 
 
-## Shows an emote on a character: the bubble with the emoji and word, the character acting it
-## out (`PlayerAvatar.play_emote`; our own one in third person), and its sound.
+## Shows an emote on a character: the bubble with the emoji and word (wheel emotes), the
+## character acting it out (`PlayerAvatar.play_emote`; our own one in third person), and its sound
+## (`Emotes.sound`), timed to the choreography.
 static func present(avatar: PlayerAvatar, id: StringName) -> void:
-	if avatar == null or not Emotes.has(id):
+	if avatar == null or not Emotes.has_animation(id):
 		return
-	avatar.play_emote(id)
-	Audio.play_at(Emotes.sound(id), avatar, -6.0)
+	if not avatar.play_emote(id):
+		return
+	var clip: StringName = Emotes.sound(id)
+	if clip != &"":
+		avatar.set_emote_sound(Audio.play_at(clip, avatar, -6.0))
 
 
 ## An `emote` (wheel) or `player_emote` (number key) event on the avatars (player id →
@@ -144,9 +148,7 @@ static func apply_event(avatars: Dictionary, ev: Dictionary) -> bool:
 		&"emote":
 			present(avatars.get(int(ev["player"]), null), StringName(ev["id"]))
 		&"player_emote":
-			var emoter: PlayerAvatar = avatars.get(int(ev["player"]), null)
-			if emoter != null:
-				emoter.play_emote(StringName(ev["emote"]))
+			present(avatars.get(int(ev["player"]), null), StringName(ev["emote"]))
 		_:
 			return false
 	return true
