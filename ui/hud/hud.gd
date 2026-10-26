@@ -40,12 +40,14 @@ var _last_warning_second: int = -1
 ## Beer: the money counter shows "$???" and no +/- pops until you sober up.
 var money_hidden: bool = false
 
+## When the toast goes and when each feed line goes (`_clock` seconds; a feed line carries its own
+## as the `until` meta, so a line that is trimmed or freed can't leave another without one).
 var _toast_until: float = -INF
 var _clock: float = 0.0
+var _banner_tween: Tween
 var _displayed_money: float = 0.0
 ## Counts the money readout up/down to the balance and flashes it green/red.
 var money_counter := MoneyCounter.new()
-var _feed_times: Array[float] = []
 
 
 func _ready() -> void:
@@ -106,25 +108,35 @@ func set_hot_pointer(on: bool, pos: Vector2 = Vector2.ZERO, angle: float = 0.0) 
 		hot_pointer.scale = Vector2.ONE * (1.0 + absf(sin(Time.get_ticks_msec() / 160.0)) * 0.2)
 
 
+## Big centred banner (items, the Hot Table) for `seconds`, then it fades. A new banner replaces the
+## one up and gets its own full time (the old one's fade must not take it down).
 func banner(text: String, color: Color = Palette.VIP_GOLD, seconds: float = 2.2) -> void:
+	if _banner_tween != null and _banner_tween.is_valid():
+		_banner_tween.kill()
 	item_banner.text = text
 	item_banner.add_theme_color_override(&"font_color", color)
 	item_banner.visible = true
 	item_banner.modulate.a = 1.0
 	item_banner.scale = Vector2(1.25, 1.25)
 	item_banner.pivot_offset = item_banner.size / 2.0
-	var t: Tween = create_tween()
-	t.tween_property(item_banner, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_interval(seconds)
-	t.tween_property(item_banner, "modulate:a", 0.0, 0.4)
-	t.tween_callback(func() -> void: item_banner.visible = false)
+	_banner_tween = create_tween()
+	_banner_tween.tween_property(item_banner, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_banner_tween.tween_interval(seconds)
+	_banner_tween.tween_property(item_banner, "modulate:a", 0.0, 0.4)
+	_banner_tween.tween_callback(func() -> void: item_banner.visible = false)
 
 
-## Short centred message (rejections, VIP sign).
+## Short centred message (rejections, VIP sign) for `seconds`; it replaces the one up, if any, and
+## goes after its own seconds. An empty text takes the toast down at once.
 func toast(text: String, seconds: float = 2.0) -> void:
 	toast_label.text = text
-	toast_label.visible = true
-	_toast_until = _clock + seconds
+	toast_label.visible = text != "" and seconds > 0.0
+	_toast_until = _clock + seconds if toast_label.visible else -INF
+
+
+## A quiet line in the event feed (bottom left), for what needn't take the middle of the screen.
+func note(text: String, kind: StringName = &"info") -> void:
+	_on_feed(text, kind)
 
 
 func show_leaderboard(shown: bool) -> void:
@@ -155,10 +167,9 @@ func _process(delta: float) -> void:
 	_clock += delta
 	if toast_label.visible and _clock > _toast_until:
 		toast_label.visible = false
-	for i: int in range(_feed_times.size() - 1, -1, -1):
-		if _clock - _feed_times[i] > FEED_SECONDS and i < feed.get_child_count():
-			feed.get_child(i).queue_free()
-			_feed_times.remove_at(i)
+	for line: Node in feed.get_children():
+		if not line.is_queued_for_deletion() and _clock > float(line.get_meta(&"until", -INF)):
+			line.queue_free()
 	if state == null:
 		return
 	money_counter.set_target(state.balance(local_id))
@@ -175,6 +186,8 @@ func _process(delta: float) -> void:
 		last_call_banner.visible = true
 		last_call_banner.text = "LAST CALL  ×%.1f PAYOUTS  %02d:%02d" % [Registry.balance.last_call_multiplier, t / 60, t % 60]
 		timer_label.add_theme_color_override(&"font_color", Palette.LOSS_RED)
+	elif last_call_banner.visible:
+		last_call_banner.visible = false  # last call is over (a new match, a snapshot without it)
 	_update_countdowns()
 
 
@@ -187,11 +200,12 @@ func _update_countdowns() -> void:
 		var n: int = ceili(nm)
 		next_quiz_label.text = "MINIGAME IN %d:%02d" % [n / 60, n % 60]
 	var warn: bool = state.phase == Phase.Id.PRE_MINIGAME
-	var regroup: bool = state.phase == Phase.Id.REGROUP and state.regroup_in >= 0.0
+	# Between minigames-only rounds the next minigame's countdown; in a casino match the 3-2-1 on
+	# the hall doors says it all (Patrick, 0.9.16).
+	var regroup: bool = state.phase == Phase.Id.REGROUP and state.regroup_in >= 0.0 and MatchMode.is_minigames_only(state.lobby_settings)
 	minigame_warning.visible = warn or regroup
 	if regroup:
-		var next: String = "Next minigame in %d…" if MatchMode.is_minigames_only(state.lobby_settings) else "Everyone back in the hall!  Doors open in %d…"
-		minigame_warning.text = next % maxi(ceili(state.regroup_in), 1)
+		minigame_warning.text = "Next minigame in %d…" % maxi(ceili(state.regroup_in), 1)
 	elif warn:
 		var sec: int = ceili(maxf(nm, 0.0))
 		minigame_warning.text = "MINIGAME in %d…  Tables closing!" % sec
@@ -271,11 +285,11 @@ func _on_feed(text: String, kind: StringName) -> void:
 		&"item", &"floor":
 			c = Palette.VIP_GOLD
 	l.add_theme_color_override(&"font_color", c)
+	l.set_meta(&"until", _clock + FEED_SECONDS)
 	feed.add_child(l)
-	_feed_times.append(_clock)
-	while feed.get_child_count() > FEED_MAX:
-		feed.get_child(0).free()
-		_feed_times.remove_at(0)
+	var lines: Array[Node] = feed.get_children().filter(func(n: Node) -> bool: return not n.is_queued_for_deletion())
+	for i: int in maxi(lines.size() - FEED_MAX, 0):
+		lines[i].free()
 
 
 func _on_phase(phase: Phase.Id) -> void:

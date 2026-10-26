@@ -576,9 +576,8 @@ func _on_lobby_changed() -> void:
 	var cd: int = ceili(view.state.countdown) if view.state.countdown > 0.0 else -1
 	if cd != _countdown_shown:
 		_countdown_shown = cd
-		map.set_door_countdown(view.state.countdown if cd > 0 else -1.0)  # 3-2-1 on the lobby doors
+		map.set_door_countdown(view.state.countdown if cd > 0 else -1.0)  # 3-2-1 on the lobby doors (no toast: Patrick, 0.9.16)
 		if cd > 0 and local != null:
-			hud.toast("Everyone's ready! Doors open in %d…" % cd, 3.2)
 			Audio.play(&"countdown_beep", &"SFX", -6.0)
 
 
@@ -1886,7 +1885,9 @@ func _back_to_casino() -> void:
 	hud.visible = true
 	if local != null and local.state != PlayerAvatar.State.SEATED:
 		router.set_mode(InputRouter.Mode.WALK)
-	hud.toast("Doors are open! Back to the tables (%ds spawn protection)" % int(cfg.spawn_protection), 2.5)
+	# No "doors are open" toast (the doors say it); the spawn protection is a quiet feed line.
+	if cfg.spawn_protection > 0.0:
+		hud.note("Spawn protection: %ds" % ceili(cfg.spawn_protection))
 
 
 ## A view created mid-match (late join, reconnect) catches up with a minigame, rewards or results.
@@ -1990,9 +1991,7 @@ func _regroup() -> void:
 	router.set_mode(InputRouter.Mode.WALK)
 	if _minigames_only():
 		hud.toast("Next minigame coming up…", 2.5)
-	else:
-		hud.toast("Back in the hall! The doors open in %d…" % int(cfg.regroup_time), 2.5)
-	map.set_door_countdown(cfg.regroup_time)
+	map.set_door_countdown(cfg.regroup_time)  # the 3-2-1 on the doors is the only door text
 
 
 ## Online room went back to its lobby for another match ("play again in the same room").
