@@ -267,7 +267,7 @@ func _felt_text(text: String, pos: Vector3, size: int, pixel: float, node_name: 
 
 ## Per seat: a gold ring for the ante, the six ladder steps and the pot card behind the cards.
 func _build_seat_marks() -> void:
-	_lamp_on = GreyboxKit.gold()
+	_lamp_on = GreyboxKit.gold().duplicate() as StandardMaterial3D  # lit below: not the shared gold
 	_lamp_on.emission_enabled = true
 	_lamp_on.emission = Palette.VIP_GOLD
 	_lamp_on.emission_energy_multiplier = 0.6

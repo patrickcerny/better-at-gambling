@@ -3,20 +3,24 @@ extends RefCounted
 ## Helpers that build simple collidable placeholder geometry (boxes, cylinders) with palette
 ## materials. Everything in the greybox map comes from here so it is cheap to restyle later.
 
-static var _materials: Dictionary[Color, StandardMaterial3D] = {}
+static var _metal_keys: Dictionary[Color, Dictionary] = {}
+static var _boxes: Dictionary[Vector3, BoxMesh] = {}
+static var _cylinders: Dictionary[Vector2, CylinderMesh] = {}
 
 
-## Flat material for a colour (cached).
+## Material for a colour, shared by everything with the same colour, metalness and roughness, so
+## the renderer can batch them (it was a new material for every metallic call, and a cached plain
+## one ignored its roughness). The result is shared: `.duplicate()` it before changing it.
 static func material(color: Color, metallic: float = 0.0, roughness: float = 0.9) -> StandardMaterial3D:
-	var key: Color = color
-	if _materials.has(key) and metallic == 0.0:
-		return _materials[key]
+	var by_finish: Dictionary = _metal_keys.get_or_add(color, {})
+	var finish := Vector2(snappedf(metallic, 0.001), snappedf(roughness, 0.001))
+	if by_finish.has(finish):
+		return by_finish[finish]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.metallic = metallic
 	m.roughness = roughness
-	if metallic == 0.0:
-		_materials[key] = m
+	by_finish[finish] = m
 	return m
 
 
@@ -27,17 +31,40 @@ static func gold() -> StandardMaterial3D:
 
 ## Static box with collision. `pos` is the centre.
 static func box(parent: Node, size: Vector3, pos: Vector3, color: Color, name: String = "Box", collide: bool = true) -> Node3D:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	return _solid(parent, mesh, BoxShape3D.new() if collide else null, size, pos, color, name)
+	return _solid(parent, box_mesh(size), BoxShape3D.new() if collide else null, size, pos, color, name)
+
+
+## A box mesh of `size`, shared by every box of that size: with the shared materials the renderer
+## draws identical boxes together. Shared: never change it, make your own `BoxMesh` for that.
+static func box_mesh(size: Vector3) -> BoxMesh:
+	var key: Vector3 = size.snappedf(0.0005)
+	var mesh: BoxMesh = _boxes.get(key, null)
+	if mesh == null:
+		mesh = BoxMesh.new()
+		mesh.size = size
+		_boxes[key] = mesh
+	return mesh
+
+
+## A vertical cylinder mesh, shared like `box_mesh`. Segments follow the size (the default 64
+## is invisible on a table leg and costs 4x the triangles).
+static func cylinder_mesh(radius: float, height: float) -> CylinderMesh:
+	var key := Vector2(snappedf(radius, 0.0005), snappedf(height, 0.0005))
+	var mesh: CylinderMesh = _cylinders.get(key, null)
+	if mesh == null:
+		mesh = CylinderMesh.new()
+		mesh.top_radius = radius
+		mesh.bottom_radius = radius
+		mesh.height = height
+		mesh.radial_segments = 16 if radius < 0.15 else (24 if radius < 0.6 else 48)
+		mesh.rings = 1
+		_cylinders[key] = mesh
+	return mesh
 
 
 ## Static cylinder (vertical) with collision.
 static func cylinder(parent: Node, radius: float, height: float, pos: Vector3, color: Color, name: String = "Cylinder", collide: bool = true, metallic: float = 0.0) -> Node3D:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
+	var mesh: CylinderMesh = cylinder_mesh(radius, height)
 	var shape: CylinderShape3D = null
 	if collide:
 		shape = CylinderShape3D.new()

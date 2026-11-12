@@ -33,6 +33,8 @@ const ITEM_PROPS: Dictionary = {&"empty_bottle": &"beer"}
 
 ## Model-space bounds per prop, measured once.
 static var _bounds: Dictionary = {}
+## Darkened copies of prop materials, by [source material, factor] (`shade`).
+static var _shaded: Dictionary = {}
 
 
 static func has(id: StringName) -> bool:
@@ -82,16 +84,23 @@ static func dress(solid: Node3D, id: StringName, half_height: float, height: flo
 
 
 ## Darkens a prop's colors by `factor` (0..1) so bright source palettes sit in the warm casino.
+## The darkened copies are shared by every prop with the same source material and factor (82
+## stools used to get 328 materials of their own, so none of them could be drawn together).
 static func shade(prop: Node3D, factor: float) -> Node3D:
 	for n: Node in prop.find_children("*", "MeshInstance3D", true, false):
 		var mi: MeshInstance3D = n
 		for i: int in mi.get_surface_override_material_count():
 			var src: Material = mi.get_active_material(i)
 			if src is BaseMaterial3D:
-				var m: BaseMaterial3D = (src as BaseMaterial3D).duplicate()
-				m.albedo_color = m.albedo_color.darkened(1.0 - factor)
+				var key: Array = [src, snappedf(factor, 0.001)]
+				var m: BaseMaterial3D = _shaded.get(key, null)
+				if m == null:
+					m = (src as BaseMaterial3D).duplicate()
+					m.albedo_color = m.albedo_color.darkened(1.0 - factor)
+					_shaded[key] = m
 				mi.set_surface_override_material(i, m)
 	return prop
+
 
 
 static func _measure(model: Node3D) -> AABB:
