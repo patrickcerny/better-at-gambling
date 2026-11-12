@@ -191,3 +191,18 @@ func test_no_rows_no_progress_panel() -> void:
 	stage.setup(st, 1, false)
 	assert_null(stage.xp_panel)
 	assert_null(stage.standings_panel.find_child("Xp1", true, false))
+
+
+func test_online_a_pad_player_always_has_a_button_focused() -> void:
+	var st: ClientMatchState = _state(3)
+	st.leader = 2
+	stage = ResultsStage.new()
+	add_child_autofree(stage)
+	stage.setup(st, 1, true)
+	await wait_process_frames(2)
+	assert_false(stage.play_button.visible, "only the leader may restart")
+	assert_eq(stage.get_viewport().gui_get_focus_owner(), stage.leave_button, "LEAVE LOBBY instead")
+	st.leader = 1  # the leader left: this player leads now
+	await wait_process_frames(2)
+	assert_true(stage.play_button.visible)
+	assert_true(stage.get_viewport().gui_get_focus_owner() != null, "still focused")

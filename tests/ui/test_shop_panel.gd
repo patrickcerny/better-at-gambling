@@ -64,3 +64,19 @@ func test_a_refused_buy_stays_open_and_says_why() -> void:
 		if not b.disabled:
 			enabled += 1
 	assert_eq(enabled, 2, "the offers can be bought again")
+
+
+func test_a_refresh_keeps_the_pad_focus_on_the_same_offer() -> void:
+	_buttons()[1].grab_focus()
+	state.balances[1] = 900
+	panel._refresh()  # what a money or stock change does while the window is open
+	var owner_now: Control = panel.get_viewport().gui_get_focus_owner()
+	assert_not_null(owner_now, "a pad player still has a focused row")
+	assert_eq(owner_now, _buttons()[1], "on the offer that was focused")
+
+
+func test_open_focuses_an_offer_that_can_be_bought() -> void:
+	panel.close_panel()
+	state.balances[1] = 100  # only the $80 beer is affordable
+	panel.open()
+	assert_eq(panel.get_viewport().gui_get_focus_owner(), _buttons()[1])

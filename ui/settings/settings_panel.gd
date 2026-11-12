@@ -110,6 +110,7 @@ func _ready() -> void:
 		tab_buttons.append(b)
 	v.add_child(HSeparator.new())
 	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true  # a pad or the arrow keys scroll to the focused row
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)

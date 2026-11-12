@@ -116,7 +116,13 @@ func _process(delta: float) -> void:
 		_show_xp(lerpf(_xp_from, _xp_to, 1.0 - pow(1.0 - _xp_t, 2.0)))
 	if _room and wait_label != null:
 		var leader: bool = state.leader == local_id
-		play_button.visible = leader
+		if play_button.visible != leader:
+			play_button.visible = leader
+			# Hiding the focused button drops the focus, and a new leader's button appears without it:
+			# keep a pad player on a button they can press.
+			var owner_now: Control = get_viewport().gui_get_focus_owner()
+			if owner_now == null or not owner_now.is_visible_in_tree():
+				(play_button if leader else leave_button).grab_focus()
 		var secs: int = ceili(maxf(state.results_return_in, 0.0))
 		wait_label.text = ("Back to the lobby in %ds" % secs) if leader else ("Waiting for the lobby leader… back to the lobby in %ds" % secs)
 

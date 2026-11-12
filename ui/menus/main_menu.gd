@@ -261,6 +261,7 @@ func _build_browser() -> void:
 	frame.theme_type_variation = &"HudPlate"
 	browser_box.add_child(frame)
 	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true  # a pad or the arrow keys scroll to the focused row
 	scroll.custom_minimum_size = Vector2(0, 380)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	frame.add_child(scroll)

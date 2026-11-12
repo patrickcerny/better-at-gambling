@@ -110,6 +110,7 @@ func _build() -> void:
 		_send(PackedStringArray([on[0]]) if not on.is_empty() else PackedStringArray()))
 	top.add_child(none_button)
 	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true  # a pad or the arrow keys scroll to the focused row
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)

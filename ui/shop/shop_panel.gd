@@ -76,8 +76,7 @@ func open() -> void:
 	_pending = false
 	_close.text = "Close %s" % InputGlyphs.hint(&"ui_cancel")
 	_refresh()
-	if _rows.get_child_count() > 0:
-		(_rows.get_child(0) as Control).grab_focus()
+	_focus_row(0)
 
 
 func close_panel() -> void:
@@ -147,7 +146,15 @@ func _refresh() -> void:
 	_bought = bool(Net.request_private_snapshot().get("items", {}).get("shop_bought", false))
 	var money: int = state.balance(local_id)
 	_note.text = "You already bought something this round. New stock after the next minigame." if _bought else "One item per round  ·  you have $%s" % Hud._thousands(money)
-	for c: Node in _rows.get_children():
+	# Which row had the focus, so a refresh (money or stock changed) does not drop a pad player's focus.
+	var focused: int = -1
+	var owner_now: Control = get_viewport().gui_get_focus_owner() if is_inside_tree() else null
+	var old_rows: Array[Node] = _rows.get_children()
+	for i: int in old_rows.size():
+		var c: Node = old_rows[i]
+		if owner_now != null and (c == owner_now or c.is_ancestor_of(owner_now)):
+			focused = i
+		_rows.remove_child(c)  # out of the list now, so the new rows take indices 0..n at once
 		c.queue_free()
 	for i: int in state.shop_offers.size():
 		var o: Dictionary = state.shop_offers[i]
@@ -217,3 +224,21 @@ func _refresh() -> void:
 		var l := Label.new()
 		l.text = "Sold out. New stock after the next minigame."
 		_rows.add_child(l)
+	if focused >= 0 and visible:
+		_focus_row(focused)
+
+
+## Focuses row `index` if it can be bought, else the first row that can, else the close button.
+func _focus_row(index: int) -> void:
+	if not visible or not is_inside_tree():
+		return
+	var rows: Array[Node] = _rows.get_children()
+	var order: Array[Node] = []
+	if index >= 0 and index < rows.size():
+		order.append(rows[index])
+	order.append_array(rows)
+	for c: Node in order:
+		if c is Button and not (c as Button).disabled:
+			(c as Button).grab_focus()
+			return
+	_close.grab_focus()

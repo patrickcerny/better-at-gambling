@@ -841,7 +841,7 @@
    "difficulty": 1,
    "question": "What does the house do when you're completely broke?",
    "answers": [
-    "Gives you a $150 comp",
+    "Gives you a House Comp",
     "Throws you out",
     "Ends the match",
     "Takes your hat"
@@ -854,7 +854,7 @@
    "difficulty": 1,
    "question": "What does security do if they catch you causing trouble?",
    "answers": [
-    "Throw you out",
+    "Lock you in jail",
     "Give you chips",
     "Make you dealer",
     "Ignore it"
@@ -932,7 +932,7 @@
    "difficulty": 3,
    "question": "In the Lucky Lounge, when the dealer busts, winning blackjack hands are paid\u2026",
    "answers": [
-    "1.1 to 1",
+    "1.07 to 1",
     "2 to 1",
     "1 to 2",
     "3 to 2"
@@ -945,7 +945,7 @@
    "difficulty": 1,
    "question": "Which of these is NOT played on the Lucky Lounge floor?",
    "answers": [
-    "Poker",
+    "Baccarat",
     "Blackjack",
     "Roulette",
     "Plinko"
