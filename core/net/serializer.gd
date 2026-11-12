@@ -30,11 +30,54 @@ static func vec3(v: Vector3) -> Array:
 	return [snappedf(v.x, 0.001), snappedf(v.y, 0.001), snappedf(v.z, 0.001)]
 
 
-## [x, y, z] → Vector3 (zero on malformed input).
+## [x, y, z] → Vector3. Zero on anything else: not a list of three, an element that is not a
+## number (`float([])` is a script error, `float("nan")` is NaN), or a non-finite result.
 static func to_vec3(a: Variant) -> Vector3:
 	if typeof(a) != TYPE_ARRAY or (a as Array).size() != 3:
 		return Vector3.ZERO
-	return Vector3(float(a[0]), float(a[1]), float(a[2]))
+	for x: Variant in a:
+		if typeof(x) != TYPE_INT and typeof(x) != TYPE_FLOAT:
+			return Vector3.ZERO
+	var v := Vector3(float(a[0]), float(a[1]), float(a[2]))
+	return v if v.is_finite() else Vector3.ZERO
+
+
+## A number from the wire as a float; `default` for anything else (other types, NaN, infinity).
+static func to_float(v: Variant, default: float = 0.0) -> float:
+	if typeof(v) != TYPE_INT and typeof(v) != TYPE_FLOAT:
+		return default
+	var f: float = float(v)
+	return f if is_finite(f) else default
+
+
+## A whole number from the wire; `default` for anything else (an int, or a float with no fraction
+## and a sane size: `int(1e30)` and `int(NAN)` are the smallest int64).
+static func to_int(v: Variant, default: int = 0) -> int:
+	if typeof(v) == TYPE_INT:
+		return v
+	if typeof(v) == TYPE_FLOAT:
+		var f: float = v
+		if is_finite(f) and absf(f) <= 9.0e15 and f == floorf(f):
+			return int(f)
+	return default
+
+
+## A name from the wire (String or StringName); `default` for anything else.
+static func to_name(v: Variant, default: StringName = &"") -> StringName:
+	if typeof(v) == TYPE_STRING_NAME:
+		return v
+	if typeof(v) == TYPE_STRING:
+		return StringName(v as String)
+	return default
+
+
+## A yes/no from the wire (bool, or a number as 0 / not 0); `default` for anything else.
+static func to_bool(v: Variant, default: bool = false) -> bool:
+	if typeof(v) == TYPE_BOOL:
+		return v
+	if typeof(v) == TYPE_INT:
+		return (v as int) != 0
+	return default
 
 
 ## Encoded byte size (for bandwidth accounting).

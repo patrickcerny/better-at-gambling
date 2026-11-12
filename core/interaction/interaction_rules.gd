@@ -130,9 +130,11 @@ func shove(attacker: int, target: int, now: float, target_airborne: bool = false
 		if now - h <= recent_window:
 			kept.append(h)
 	t.shove_hits = kept
-	t.shove_hits.append(now)
 	if now < t.ko_immune_until or is_knocked_out(target, now):
+		# Not counted: hits banked while someone is immune made the next knockout instant the
+		# moment the immunity ran out (one player could keep another down for good).
 		return res
+	t.shove_hits.append(now)
 	var in_ko_window: int = 0
 	var in_kd_window: int = 0
 	for h: float in t.shove_hits:
