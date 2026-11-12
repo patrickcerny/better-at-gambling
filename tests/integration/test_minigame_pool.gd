@@ -45,3 +45,19 @@ func test_the_leader_picks_the_pool_in_the_lobby() -> void:
 	var played: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == &"minigame_started").map(func(e: Dictionary) -> String: return str(e["minigame"]))
 	assert_eq(played, ["lonely_number", "lonely_number", "lonely_number"])
 	server.free()
+
+
+func test_a_reconnect_snapshot_names_the_running_minigame() -> void:
+	# A client that joins mid-minigame opens the stage from the snapshot alone (it fell back to the
+	# quiz stage for every game whose public state has no id of its own).
+	for id: String in ["lonely_number", "vote_race", "bust_or_bank", "pass_the_bomb"]:
+		var fx := ServerFixture.new(4, {"minigames": 1, "gamble_seconds": 5.0, "seed": 3, "minigame_pool": id, "minigame_briefing": 0.0})
+		fx.server.start_match()
+		var t: float = 0.0
+		while fx.server.phases.phase != Phase.Id.MINIGAME and t < 120.0:
+			fx.server.advance(MatchServer.TICK)
+			t += MatchServer.TICK
+		var mg: Dictionary = fx.server.get_snapshot().get("minigame", {})
+		assert_eq(str(mg.get("minigame", "")), id, "%s names itself" % id)
+		assert_eq((mg.get("players", []) as Array).size(), 4, "%s lists its players" % id)
+		fx.server.free()

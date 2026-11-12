@@ -1,6 +1,6 @@
 extends GutTest
 ## The scratch-card kiosk through the real server: sit at the counter, buy a card (one event
-## carries it), reveal it and the printed prize pays through the ledger; a minigame refunds an open
+## carries it), reveal it and the printed prize pays through the ledger; a minigame pays an open
 ## card; walking away mid-card pays it; one player at a time; the Hot Table and the stats see it
 ## like any other station.
 
@@ -86,7 +86,7 @@ func test_buy_reveal_and_payout() -> void:
 	assert_eq(fx.server.economy.balance(p), expected, "every card paid exactly its printed prize")
 
 
-func test_minigame_refund_mid_card() -> void:
+func test_minigame_start_mid_card_pays_it() -> void:
 	var p: int = fx.player_ids[0]
 	assert_true(_sit(p)["ok"])
 	var start: int = fx.server.economy.balance(p)
@@ -94,13 +94,14 @@ func test_minigame_refund_mid_card() -> void:
 	assert_true(fx.server.stations.has_stake(p))
 	fx.server.stations.refund_all()
 	fx.run(0.1)
-	assert_eq(fx.server.economy.balance(p), start, "the card is called off and the price comes back")
+	var paid: Array[Dictionary] = fx.of_type(&"round_result").filter(func(e: Dictionary) -> bool: return StringName(e["station"]) == SID)
+	assert_eq(paid.size(), 1, "the card pays what it holds (it was drawn when it was bought)")
 	assert_false(fx.server.stations.has_stake(p))
-	assert_eq(fx.of_type(&"bets_refunded").filter(func(e: Dictionary) -> bool: return StringName(e["station"]) == SID).size(), 1)
+	assert_eq(fx.of_type(&"bets_refunded").filter(func(e: Dictionary) -> bool: return StringName(e["station"]) == SID).size(), 0, "never a refund")
 	assert_eq(fx.intent(p, &"action", {"station": SID, "action": &"reveal"})["error"], &"no_card")
 
 
-func test_the_minigame_start_refunds_the_open_card() -> void:
+func test_the_minigame_start_pays_the_open_card() -> void:
 	var p: int = fx.player_ids[0]
 	assert_true(_sit(p)["ok"])
 	var guard: int = 0
@@ -113,10 +114,8 @@ func test_the_minigame_start_refunds_the_open_card() -> void:
 		fx.run(0.5)
 		guard += 1
 	assert_eq(fx.server.phases.phase, Phase.Id.MINIGAME)
-	assert_eq(fx.of_type(&"round_result").filter(func(e: Dictionary) -> bool: return StringName(e["station"]) == SID).size(), 0, "it never paid")
-	var refunds: Array[Dictionary] = fx.of_type(&"bets_refunded").filter(func(e: Dictionary) -> bool: return StringName(e["station"]) == SID)
-	assert_eq(refunds.size(), 1, "the price came back when the minigame started")
-	assert_eq(int(refunds[0]["amount"]), 10)
+	assert_eq(fx.of_type(&"round_result").filter(func(e: Dictionary) -> bool: return StringName(e["station"]) == SID).size(), 1, "it paid what it held")
+	assert_eq(fx.of_type(&"bets_refunded").filter(func(e: Dictionary) -> bool: return StringName(e["station"]) == SID).size(), 0, "no refund")
 	assert_false(fx.server.stations.has_stake(p))
 
 

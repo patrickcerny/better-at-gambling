@@ -686,6 +686,12 @@ func get_snapshot() -> Dictionary:
 	snap["hot_table"] = {"station": hot_tables.current, "time_left": snappedf(hot_tables.time_left, 0.01)} if hot_tables.current != &"" else {}
 	if minigame != null:
 		snap["minigame"] = minigame.get_public_state().duplicate()
+		# Late joiners and reconnects open the stage from this: without the id a client fell back
+		# to the quiz stage (Lonely Number, Vote Race, Bust or Bank and the walkable rooms).
+		if not snap["minigame"].has("minigame") and minigames.current_def != null:
+			snap["minigame"]["minigame"] = minigames.current_def.id
+		if not snap["minigame"].has("players"):
+			snap["minigame"]["players"] = minigame.players.duplicate()
 		if briefing_left > 0.0:
 			snap["minigame"]["briefing"] = {"left": snappedf(briefing_left, 0.01), "ready": ready_players.keys()}
 	if phases.phase == Phase.Id.MINIGAME or phases.phase == Phase.Id.REWARDS:

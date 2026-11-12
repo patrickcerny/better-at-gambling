@@ -27,7 +27,7 @@ const OUTCOME_BLANK: int = 0
 const OUTCOME_CASH: int = 1
 const OUTCOME_LINE0: int = 2
 ## Seconds a purchase needs at least: a card bought later than this before the casino closes is
-## refused ("Table closing!"); a card still open when a minigame starts is refunded, at the end of
+## refused ("Table closing!"); a card still open when a minigame starts pays what it holds, at the end of
 ## the match it pays.
 const ROUND_SECONDS: float = 6.0
 
@@ -162,19 +162,11 @@ func auto_resolve() -> void:
 		_pay()
 
 
-## The open card is called off: its price comes back and the card is gone.
+## A minigame starts with a card open: it pays what it holds (never a refund).
 func refund_all() -> void:
-	if card.is_empty():
-		return
-	var totals: Dictionary = {}
-	_refund(player, stake, stake_covered, totals)
-	card.clear()
-	stake = 0
-	stake_covered = 0
-	tier = -1
-	_flourish = &""
-	last = {}
-	_emit_refunds(totals)
+	# The result was drawn when the stake went down (and the client already shows it): it pays now,
+	# like Sword Tapper. A refund let a player keep the winners and hand back the losers.
+	auto_resolve()
 
 
 func get_public_state() -> Dictionary:

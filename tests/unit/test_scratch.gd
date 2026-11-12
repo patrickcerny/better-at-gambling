@@ -260,32 +260,40 @@ func test_an_untouched_card_scratches_itself() -> void:
 	assert_eq(fx.economy.balance(1), 995)
 
 
-func test_refund_gives_the_price_back() -> void:
+func test_a_minigame_start_pays_the_open_card() -> void:
+	# The card was drawn when it was bought (and shown to its player): it pays what it holds. A
+	# refund let a player keep the winners and hand back the losers.
 	sc.place_bet(1, {"tier": 2})
 	assert_eq(fx.economy.balance(1), 950)
+	sc.card = _card([S.LEMON, S.BELL, S.CHERRY, S.CHERRY, S.SEVEN, S.LEMON, S.BELL, S.LEMON, S.SEVEN])
 	sc.drain_events()
 	sc.refund_all()
-	assert_eq(fx.economy.balance(1), 1000)
+	assert_eq(fx.economy.balance(1), 950, "a losing card stays lost")
 	var evs: Array[Dictionary] = sc.drain_events()
-	assert_eq(_types(evs, &"bets_refunded").size(), 1)
-	assert_eq(int(_types(evs, &"bets_refunded")[0]["amount"]), 50)
-	assert_eq(_types(evs, &"table_reset").size(), 1)
-	assert_eq(_types(evs, &"round_result").size(), 0, "the card never pays")
+	assert_eq(_types(evs, &"bets_refunded").size(), 0)
+	assert_eq(_types(evs, &"round_result").size(), 1, "the card is settled")
 	assert_false(sc.has_stake(1))
-	assert_eq(sc.player_action(1, &"reveal")["error"], &"no_card")
 	sc.refund_all()
-	assert_eq(sc.drain_events().size(), 0, "nothing open, nothing to refund")
+	assert_eq(sc.drain_events().size(), 0, "nothing open, nothing to settle")
 
 
-func test_fake_cash_part_is_not_refunded() -> void:
+func test_a_minigame_start_pays_a_winning_card() -> void:
+	sc.place_bet(1, {"tier": 0})
+	sc.card = _card([S.LEMON, S.LEMON, S.LEMON, S.CHERRY, S.BELL, S.CHERRY, S.BELL, S.CHERRY, S.BELL])
+	sc.refund_all()
+	assert_gt(fx.economy.balance(1), 1000, "the winner is paid")
+
+
+func test_fake_cash_card_pays_nothing_back_when_it_loses() -> void:
 	var m := Modifier.new()
 	m.id = &"fake_cash"
 	m.flags = {&"fake_cash": true}
 	fx.modifiers.add(1, m)
 	sc.place_bet(1, {"tier": 1})
 	assert_eq(sc.stake_covered, 25)
+	sc.card = _card([S.LEMON, S.BELL, S.CHERRY, S.CHERRY, S.SEVEN, S.LEMON, S.BELL, S.LEMON, S.SEVEN])
 	sc.refund_all()
-	assert_eq(fx.economy.balance(1), 1000 + 25 - 25, "Fake Cash paid it: nothing comes back")
+	assert_eq(fx.economy.balance(1), 1000, "Fake Cash paid it and it lost: nothing comes back")
 
 
 func test_round_seconds_and_auto_resolve() -> void:

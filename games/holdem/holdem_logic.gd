@@ -237,8 +237,10 @@ func _longest_clock() -> float:
 
 
 func round_seconds() -> float:
-	# The rest of the betting window, then at least a few seconds of play and the showdown.
-	return (timer if state == State.BETTING else balance.holdem_betting_window) + 4.0
+	# The rest of the betting window, a full decision clock and the showdown: a hand dealt before
+	# a minigame is decided at the table (the clock folds it), so stalling a bad hand into the
+	# minigame for a refund no longer works.
+	return (timer if state == State.BETTING else balance.holdem_betting_window) + balance.holdem_action_time + 4.0
 
 
 func has_stake(p: int) -> bool:
