@@ -61,6 +61,7 @@ func _setup(p_amount: int, p_lifetime: float) -> void:
 	quad.size = Vector2(0.09, 0.14)
 	var m := StandardMaterial3D.new()
 	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true  # sRGB colours (Forward+ washed them out)
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES

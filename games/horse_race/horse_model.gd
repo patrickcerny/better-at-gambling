@@ -168,6 +168,7 @@ static func make_crown() -> MeshInstance3D:
 	if _crown_material == null:
 		_crown_material = StandardMaterial3D.new()
 		_crown_material.vertex_color_use_as_albedo = true
+		_crown_material.vertex_color_is_srgb = true  # sRGB colours (Forward+ washed them out)
 		_crown_material.metallic = 0.7
 		_crown_material.roughness = 0.35
 	mi.material_override = _crown_material
@@ -392,6 +393,7 @@ static func shared_material() -> StandardMaterial3D:
 	if _material == null:
 		_material = StandardMaterial3D.new()
 		_material.vertex_color_use_as_albedo = true
+		_material.vertex_color_is_srgb = true  # sRGB colours (Forward+ washed them out)
 		_material.roughness = 0.72
 	return _material
 

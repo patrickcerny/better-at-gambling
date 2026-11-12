@@ -204,6 +204,11 @@ static func pot_of(h: Dictionary) -> int:
 ## The card that is up gets its call: the true chances from the deck as it stands and the pays,
 ## locked until the call is made (other players' cards never change what you were shown).
 func _open_call(h: Dictionary) -> void:
+	if deck.is_empty():
+		# Two players can drain the deck mid-hand: with no cards both calls had 0 % and only
+		# CASH OUT was left.
+		_reshuffle()
+		events.append(GameEvents.make(&"hilo_reshuffle", {"station": station_id}))
 	var shown: int = value_of(int((h["cards"] as Array).back()))
 	var odds: Dictionary = odds_for(shown, counts_of(deck))
 	h["odds"] = odds
@@ -306,6 +311,13 @@ func _reshuffle() -> void:
 			deck.append(c)
 	rng.shuffle(deck)
 	reshuffles += 1
+	# The calls still open were priced on the old deck: a skewed tail of 15 cards could lock a long
+	# shot that the fresh deck makes likely. Price them again on the deck they will draw from.
+	for p: int in hands:
+		if hands[p]["phase"] == PLAY:
+			var left: float = float(hands[p].get("timer", balance.hilo_action_time))
+			_open_call(hands[p])
+			hands[p]["timer"] = left
 
 
 func _draw() -> int:

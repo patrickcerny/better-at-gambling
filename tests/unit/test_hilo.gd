@@ -425,3 +425,29 @@ func test_items_and_hot_table_multiply_the_winnings_only() -> void:
 	var pot: int = HiLoLogic.pot_of(hl.hands[1])
 	hl.player_action(1, &"cash_out")
 	assert_eq(fx.economy.balance(1), 900 + 100 + int(floor((pot - 100) * 2.0 + 0.000001)), "the hot table doubles the profit, not the ante")
+
+
+func test_a_reshuffle_reprices_the_calls_still_open() -> void:
+	# Player 1's call is priced on a short deck of high cards only: LOWER is a long shot.
+	var high: Array[int] = []
+	for r: int in [12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 11, 11, 11, 11]:
+		high.append(_c(r, high.size() % 4))
+	hl.deck.clear()
+	hl.deck.append_array(high)
+	hl.deck.append(_c(9, 1))  # dealt to player 1
+	assert_true(hl.place_bet(1, {"amount": 10})["ok"])
+	var long_shot: float = float(hl.hands[1]["odds"][HiLoLogic.LOWER])
+	assert_lt(long_shot, 0.01, "nothing lower is left")
+	hl.hands[1]["timer"] = 7.0
+	# Player 2 antes on a deck under the reshuffle mark: a fresh deck.
+	assert_true(hl.place_bet(2, {"amount": 10})["ok"])
+	assert_gt(float(hl.hands[1]["odds"][HiLoLogic.LOWER]), 0.4, "priced again on the fresh deck")
+	assert_almost_eq(float(hl.hands[1]["timer"]), 7.0, 0.001, "the clock keeps running, it does not restart")
+
+
+func test_an_empty_deck_never_leaves_a_hand_without_a_call() -> void:
+	assert_true(hl.place_bet(1, {"amount": 10})["ok"])
+	hl.deck.clear()
+	hl._open_call(hl.hands[1])
+	assert_gt(hl.deck.size(), 0)
+	assert_gt(float(hl.hands[1]["odds"][HiLoLogic.HIGHER]) + float(hl.hands[1]["odds"][HiLoLogic.LOWER]), 0.0)

@@ -95,6 +95,7 @@ static func _apply_materials(node: Node) -> void:
 			m.resource_name = key
 			m.set_meta(&"logo_look", true)
 			m.vertex_color_use_as_albedo = true
+			m.vertex_color_is_srgb = true  # sRGB colours (Forward+ washed them out)
 			m.metallic = look["metallic"]
 			m.roughness = look["roughness"]
 			m.metallic_specular = look["specular"]

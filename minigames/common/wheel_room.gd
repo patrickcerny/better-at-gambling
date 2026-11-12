@@ -260,6 +260,7 @@ static func _pocket_ring() -> MeshInstance3D:
 	mi.mesh = st.commit()
 	var m := StandardMaterial3D.new()
 	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true  # sRGB colours (Forward+ washed them out)
 	m.roughness = 0.5
 	m.metallic_specular = 0.6
 	mi.material_override = m
