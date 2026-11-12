@@ -108,7 +108,7 @@ func test_malformed_unknown_and_rate_limited() -> void:
 	fx.run(1.0)
 	assert_true(fx.intent(p, &"emote", {"id": &"wave"})["ok"])
 	assert_eq(fx.intent(p, &"emote", {"id": &"moon"})["error"], &"unknown_emote")
-	assert_eq(fx.intent(p, &"emote", {"id": 7})["error"], &"unknown_emote")
+	assert_eq(fx.intent(p, &"emote", {"id": 7})["error"], &"malformed", "not a name: refused by the intent schema")
 
 
 func test_snapshot_round_trips_into_client_state() -> void:
@@ -124,3 +124,13 @@ func test_snapshot_round_trips_into_client_state() -> void:
 	assert_eq(cs.rank_of(p), 1)
 	for ev: Dictionary in fx.events:
 		assert_true(Serializer.is_wire_safe(ev), str(ev["type"]))
+
+
+func test_the_match_seed_never_reaches_a_client() -> void:
+	# Every random stream of the match is forked from the seed: a client that knew it could work out
+	# the shoe, the next spins and the quiz answers.
+	for ev: Dictionary in fx.of_type(&"match_started"):
+		assert_false(ev.has("seed"), "match_started carries no seed")
+	var snap: Dictionary = fx.server.get_snapshot()
+	assert_false(snap.has("seed") or snap.has("match_seed"), "nor does the snapshot")
+	assert_gt(fx.of_type(&"match_started").size(), 0)

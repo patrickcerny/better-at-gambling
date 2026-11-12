@@ -3,6 +3,13 @@ extends RefCounted
 ## Owns one StationLogicBase per station in the map, tracks who sits where, routes station
 ## intents, ticks the games and collects their events (§3.6).
 
+## The bet fields the games read, and their kinds (`bet_fields_ok`).
+const BET_FIELDS: Dictionary = {
+	"amount": Intents.Kind.INT, "bonus": Intents.Kind.INT, "value": Intents.Kind.INT,
+	"horse": Intents.Kind.INT, "symbol": Intents.Kind.INT, "tier": Intents.Kind.INT,
+	"type": Intents.Kind.NAME, "risk": Intents.Kind.NAME,
+}
+
 ## Station id → logic.
 var logics: Dictionary[StringName, StationLogicBase] = {}
 ## Station id → game id.
@@ -162,7 +169,7 @@ func route(player: int, intent: Dictionary) -> Dictionary:
 			if out_of_order.has(station_id):
 				return StationLogicBase.fail(&"out_of_order")
 			var bet: Variant = intent.get("bet", {})
-			if typeof(bet) != TYPE_DICTIONARY:
+			if typeof(bet) != TYPE_DICTIONARY or not bet_fields_ok(bet):
 				return StationLogicBase.fail(&"bad_bet")
 			if logic.round_seconds() > closing_in:
 				return StationLogicBase.fail(&"table_closing")
@@ -174,6 +181,15 @@ func route(player: int, intent: Dictionary) -> Dictionary:
 			var params: Variant = intent.get("params", {})
 			return logic.player_action(player, StringName(intent["action"]), params if typeof(params) == TYPE_DICTIONARY else {})
 	return StationLogicBase.fail(&"unknown_intent")
+
+
+## True if every field of a client's bet that a game reads has the kind it expects (a number
+## where `int()` is taken, a name where `StringName()` is): `int([])` aborted the handler.
+static func bet_fields_ok(bet: Dictionary) -> bool:
+	for key: String in BET_FIELDS:
+		if bet.has(key) and not Intents.fits(bet[key], BET_FIELDS[key]):
+			return false
+	return true
 
 
 ## Ticks every station.

@@ -417,10 +417,12 @@ func _server_packet(peer: int, type: int, payload: Variant) -> void:
 	var pid: int = room_host.player_of(peer)
 	if pid < 0 or local_server == null:
 		return
+	if type in [Protocol.Msg.INTENT, Protocol.Msg.MOVE, Protocol.Msg.PING] and not WireGuard.is_clean_dictionary(payload):
+		return  # not a dictionary of plain, finite, bounded data: nothing a real client sends
 	match type:
 		Protocol.Msg.INTENT:
 			var intent: Dictionary = payload
-			if intent.get("type") == &"move":
+			if Intents.type_of(intent) == &"move":
 				return
 			var res: Dictionary = local_server.submit_intent(pid, intent)
 			if not res["ok"] and StringName(res["error"]) in SILENT_REJECTIONS:
@@ -430,9 +432,9 @@ func _server_packet(peer: int, type: int, payload: Variant) -> void:
 			if Intents.validate(m).size() > 0 or not local_server.can_move(pid):
 				return
 			var pos: Vector3 = Serializer.to_vec3(m["pos"])
-			var yaw: float = float(m["yaw"])
-			if local_server.apply_move(pid, pos, yaw, bool(m.get("airborne", false))):
-				move_received.emit(pid, pos, yaw, bool(m.get("airborne", false)))
+			var yaw: float = Serializer.to_float(m["yaw"])
+			if local_server.apply_move(pid, pos, yaw, Serializer.to_bool(m.get("airborne", false))):
+				move_received.emit(pid, pos, yaw, Serializer.to_bool(m.get("airborne", false)))
 			else:
 				var good: Vector3 = local_server.sanity.last_good(pid)
 				if local_server.sanity.in_teleport_grace(pid, local_server.uptime()):
@@ -445,7 +447,7 @@ func _server_packet(peer: int, type: int, payload: Variant) -> void:
 		Protocol.Msg.SNAPSHOT_REQ:
 			_send(peer, Protocol.CHANNEL_EVENTS, true, Protocol.Msg.SNAPSHOT, local_server.get_snapshot())
 		Protocol.Msg.PING:
-			_send(peer, Protocol.CHANNEL_STATE, true, Protocol.Msg.PONG, {"t": payload.get("t", 0.0), "server_time": server_time()})
+			_send(peer, Protocol.CHANNEL_STATE, true, Protocol.Msg.PONG, {"t": Serializer.to_float(payload.get("t", 0.0)), "server_time": server_time()})
 		Protocol.Msg.LOADED:
 			room_host.on_loaded(peer)
 		Protocol.Msg.BYE:

@@ -155,3 +155,13 @@ func test_knock_down_does_not_stack_on_a_knockout() -> void:
 	assert_true(r.is_knocked_down(2, 1.0))
 	r.knock_out(2, 5.0)
 	assert_false(r.knock_down(2, 5.5), "already out cold")
+
+
+func test_shoves_during_knockout_immunity_are_not_banked() -> void:
+	r.shove(1, 2, 0.0)
+	r.shove(1, 2, 2.0)
+	assert_true(r.shove(1, 2, 3.9)["knockout"])
+	# Out until 6.4, immune until 10.4: two shoves in the immunity, then one right after it.
+	r.shove(1, 2, 8.0)
+	r.shove(1, 2, 9.3)
+	assert_false(r.shove(1, 2, 10.5)["knockout"], "hits during the immunity do not count afterwards")

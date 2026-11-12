@@ -61,7 +61,7 @@ func test_a_reported_step_onto_the_pad_finishes() -> void:
 	var g: JackpotClimbLogic = _to_game()
 	var a: int = fx.player_ids[0]
 	var last: Vector3 = _on_lane(ChipTowers.SEGMENTS - 1, &"steady", 0.97)
-	fx.server.world.set_transform(a, last, 0.0)
+	fx.server.set_server_position(a, last)  # the server knows where the bean stands (MoveSanity too)
 	fx.run(0.2)
 	assert_false(g.is_up(a), "the end of the last lane is not the top")
 	var pad: Vector3 = WalkableLogicBase.ROOM_ORIGIN + ChipTowers.pad_center() + ChipTowers.entry_dir() * 1.2

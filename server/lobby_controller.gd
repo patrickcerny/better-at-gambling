@@ -119,8 +119,12 @@ func set_setting(player: int, key: String, value: Variant) -> StringName:
 				return &"bad_value"
 			settings["gamble_minutes"] = int(value)
 		"items_enabled":
+			if typeof(value) != TYPE_BOOL and typeof(value) != TYPE_INT:
+				return &"bad_value"
 			settings["items_enabled"] = bool(value)
 		"quiz_category":
+			if typeof(value) != TYPE_STRING and typeof(value) != TYPE_STRING_NAME:
+				return &"bad_value"
 			settings["quiz_category"] = StringName(value)
 		"mode":
 			if not MatchMode.is_valid(value):

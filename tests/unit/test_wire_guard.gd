@@ -73,3 +73,51 @@ func test_nesting_depth() -> void:
 	var cyclic: Array = []
 	cyclic.append(cyclic)
 	assert_ne(WireGuard.problem(cyclic), "", "a self-referencing array ends at the depth limit")
+
+
+func test_intents_check_the_kind_of_every_field() -> void:
+	assert_eq(Intents.validate(Intents.make(&"sit", {"station": &"blackjack_1"})), [] as Array[String])
+	assert_eq(Intents.validate(Intents.make(&"sit", {"station": 5})), ["station"] as Array[String])
+	assert_eq(Intents.validate(Intents.make(&"grab", {"target": []})), ["target"] as Array[String])
+	assert_eq(Intents.validate(Intents.make(&"grab", {"target": 2.0})), [] as Array[String], "a whole float is a whole number")
+	assert_eq(Intents.validate(Intents.make(&"grab", {"target": 2.5})), ["target"] as Array[String])
+	assert_eq(Intents.validate(Intents.make(&"move", {"pos": [1, 2, "x"], "yaw": 0.0})), ["pos"] as Array[String])
+	assert_eq(Intents.validate(Intents.make(&"move", {"pos": [1, 2, 3], "yaw": NAN})), ["payload"] as Array[String])
+	assert_eq(Intents.validate(Intents.make(&"shove", {"aim": [0, 0, -1], "target": "bob"})), ["target"] as Array[String], "optional fields are checked when present")
+	assert_eq(Intents.validate(Intents.make(&"set_ready", {"ready": "yes"})), ["ready"] as Array[String])
+	assert_eq(Intents.validate(Intents.make(&"place_bet", {"station": &"slot_1", "bet": [10]})), ["bet"] as Array[String])
+	assert_eq(Intents.validate({"type": 7}), ["type"] as Array[String])
+	assert_eq(Intents.validate({"type": &"fly"}), ["type"] as Array[String])
+	assert_eq(Intents.type_of({"type": [1]}), &"")
+
+
+func test_bet_fields() -> void:
+	assert_true(StationManager.bet_fields_ok({"type": &"straight", "value": 17, "amount": 10}))
+	assert_true(StationManager.bet_fields_ok({"amount": 25, "risk": "high", "unknown": [1]}))
+	assert_false(StationManager.bet_fields_ok({"amount": [25]}))
+	assert_false(StationManager.bet_fields_ok({"amount": 10, "type": 3}))
+	assert_false(StationManager.bet_fields_ok({"amount": 10, "bonus": {}}))
+
+
+func test_serializer_readers_refuse_junk() -> void:
+	assert_eq(Serializer.to_vec3([1, 2, 3]), Vector3(1, 2, 3))
+	assert_eq(Serializer.to_vec3([1, [], 3]), Vector3.ZERO)
+	assert_eq(Serializer.to_vec3(["nan", 0, 0]), Vector3.ZERO)
+	assert_eq(Serializer.to_vec3([NAN, 0, 0]), Vector3.ZERO)
+	assert_eq(Serializer.to_float("3"), 0.0)
+	assert_eq(Serializer.to_float(INF, 1.5), 1.5)
+	assert_eq(Serializer.to_int(4.0), 4)
+	assert_eq(Serializer.to_int(1.0e30, -1), -1)
+	assert_eq(Serializer.to_name(5, &"x"), &"x")
+	assert_true(Serializer.to_bool(1))
+	assert_false(Serializer.to_bool("true"))
+
+
+func test_weighted_index_never_draws_a_zero_weight() -> void:
+	var r := SeededRng.new(1)
+	for i: int in 20000:
+		assert_ne(r.weighted_index([1.0, 2.0, 0.0]), 2)
+		if is_failing():
+			return
+	assert_eq(r.weighted_index([0.0, 0.0]), -1)
+	assert_lt(r.unit(), 1.0)

@@ -190,7 +190,9 @@ func _apply_length() -> void:
 ## again for "play again in the same room"; players, lobby and the room survive.
 func _build_match_systems(seed_value: int) -> void:
 	if seed_value == 0:
-		seed_value = int(Time.get_unix_time_from_system()) ^ randi()
+		# 62 random bits: the old `unix time ^ randi()` had 32, few enough to brute-force from the
+		# public floor ids.
+		seed_value = (randi() << 30) ^ randi()
 	settings["seed"] = seed_value
 	state.match_seed = seed_value
 	rng = SeededRng.new(seed_value)
@@ -520,6 +522,7 @@ func remove_player(player: int) -> void:
 	lobby.remove(player)
 	stats.erase(player)
 	_server_owned.erase(player)
+	sanity.forget(player)
 	_emit(GameEvents.make(&"player_removed", {"player": player}))
 	_check_leader()
 	_flush()
@@ -624,7 +627,7 @@ func start_match() -> void:
 	stations.set_limits_multiplier(balance.limits_multiplier(0))
 	for id: int in state.players:
 		rules.protect(id, match_time)
-	_emit(GameEvents.make(&"match_started", {"seed": state.match_seed, "minigames": schedule.minigames, "gamble_s": schedule.segment_s, "duration_s": schedule.duration_s, "segment_s": schedule.segment_s, "mode": settings["mode"], "floor_plan": floor_wire()}))
+	_emit(GameEvents.make(&"match_started", {"minigames": schedule.minigames, "gamble_s": schedule.segment_s, "duration_s": schedule.duration_s, "segment_s": schedule.segment_s, "mode": settings["mode"], "floor_plan": floor_wire()}))
 	_flush()
 
 

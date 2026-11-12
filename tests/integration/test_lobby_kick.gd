@@ -57,7 +57,7 @@ func test_non_leaders_cannot_kick_and_nobody_kicks_themselves() -> void:
 	assert_eq(_kick(bob, host)["error"], &"not_leader")
 	assert_eq(_kick(host, host)["error"], &"bad_target")
 	assert_eq(_kick(host, 99)["error"], &"bad_target")
-	assert_eq(_kick(host, "bob")["error"], &"bad_target")
+	assert_eq(_kick(host, "bob")["error"], &"malformed", "not a player id: refused by the intent schema")
 	assert_eq(server.submit_intent(host, {"type": &"kick_player"})["error"], &"malformed", "needs a target")
 	assert_true(dropped.is_empty())
 	assert_true(server.state.players.has(host) and server.state.players.has(bob))

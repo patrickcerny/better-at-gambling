@@ -103,7 +103,39 @@ func test_move_sanity() -> void:
 	assert_true(s.in_teleport_grace(1, 31.5), "a stale report right after a server move is expected")
 	assert_false(s.in_teleport_grace(1, 32.1), "after the grace it is a real snap-back")
 	assert_false(s.in_teleport_grace(2, 31.5), "other players are unaffected")
-	assert_true(s.check(1, Vector3(20, 0, -10), 31.2), "teleport grace")
-	assert_true(s.check(1, Vector3(20.2, 0, -10), 33.0))
+	assert_false(s.check(1, Vector3(20, 0, -10), 31.2), "the grace is no free teleport: far from both spots")
+	assert_true(s.check(1, Vector3(8.3, 0, 0), 31.1), "a stale report from the old spot")
+	assert_true(s.check(1, Vector3(0.5, 0, 12.5), 31.3), "near where the server put the player")
+	assert_true(s.check(1, Vector3(1.0, 0, 12.0), 33.0), "after the grace: measured from the last report")
 	assert_false(s.check(1, Vector3(-20, 0, 10), 33.05))
 	assert_false(s.check(2, Vector3(NAN, 0, 0), 1.0))
+
+
+func test_move_sanity_more_reports_buy_no_extra_distance() -> void:
+	var s := MoveSanity.new()
+	assert_true(s.check(1, Vector3.ZERO, 10.0))
+	# A modified client sends many reports in one server frame (same timestamp), 1.4 m apart each.
+	var accepted: int = 0
+	for i: int in range(1, 30):
+		if s.check(1, Vector3(1.4 * i, 0, 0), 10.0):
+			accepted += 1
+	assert_eq(accepted, 1, "only the first fits the slack")
+	assert_almost_eq(s.last_good(1).x, 1.4, 0.001)
+	# At an honest 20 Hz the budget is the speed limit, not speed limit + slack per report.
+	var t: float = 10.0
+	var x: float = 1.4
+	var far: float = 0.0
+	for i: int in 40:
+		t += 0.05
+		x += 1.2  # 24 m/s, well over max_speed
+		if s.check(1, Vector3(x, 0, 0), t):
+			far = x
+	assert_lt(far, 1.4 + s.max_speed * 2.0 + s.slack * 2.0 + 0.01, "about max_speed over two seconds")
+
+
+func test_move_sanity_forget() -> void:
+	var s := MoveSanity.new()
+	s.check(3, Vector3.ZERO, 0.0)
+	s.forget(3)
+	assert_eq(s.last_good(3), Vector3.INF)
+	assert_true(s.check(3, Vector3(5, 0, 5), 0.1), "a new baseline after forgetting")

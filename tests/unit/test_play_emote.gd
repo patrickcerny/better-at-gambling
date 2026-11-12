@@ -56,6 +56,6 @@ func test_server_rejects_unknown_emotes() -> void:
 	fx.run(3.1)
 	var p: int = fx.player_ids[0]
 	assert_eq(fx.intent(p, &"play_emote", {"emote": &"moonwalk"})["error"], &"unknown_emote")
-	assert_eq(fx.intent(p, &"play_emote", {"emote": 4})["error"], &"unknown_emote")
+	assert_eq(fx.intent(p, &"play_emote", {"emote": 4})["error"], &"malformed", "not a name: refused by the intent schema")
 	assert_eq(fx.server.submit_intent(p, {"type": &"play_emote"})["error"], &"malformed")
 	assert_eq(fx.of_type(&"player_emote").size(), 0)

@@ -64,7 +64,7 @@ func test_a_reported_step_onto_the_landing_finishes() -> void:
 	var g: DodgeTheDiceLogic = _to_game()
 	var a: int = fx.player_ids[0]
 	var edge: Vector3 = _on_row(ClimbRoom.ROWS - 1, 0.0, 0.85)
-	fx.server.world.set_transform(a, edge, 0.0)
+	fx.server.set_server_position(a, edge)  # the server knows where the bean stands (MoveSanity too)
 	fx.run(0.2)
 	assert_false(g.is_up(a), "the top row is not the top")
 	var landing := Vector3(edge.x, ClimbRoom.top_y(), ClimbRoom.top_z() - 0.6)

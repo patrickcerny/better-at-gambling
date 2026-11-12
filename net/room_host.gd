@@ -115,10 +115,10 @@ func on_server_attached(p_server: MatchServer) -> void:
 
 ## First message of every connection.
 func on_hello(peer: int, hello: Variant) -> void:
-	if typeof(hello) != TYPE_DICTIONARY or _players.has(peer) or _verifying.has(peer):
+	if not WireGuard.is_clean_dictionary(hello) or _players.has(peer) or _verifying.has(peer):
 		return
 	var h: Dictionary = hello
-	if int(h.get("protocol", -1)) != Protocol.PROTOCOL_VERSION or str(h.get("build", "")) != Protocol.BUILD_ID:
+	if Serializer.to_int(h.get("protocol", -1), -1) != Protocol.PROTOCOL_VERSION or str(h.get("build", "")) != Protocol.BUILD_ID:
 		Log.info(&"room", "peer %d rejected: version %s/%s, server %d/%s" % [peer, h.get("protocol"), h.get("build"), Protocol.PROTOCOL_VERSION, Protocol.BUILD_ID])
 		_reject(peer, &"version_mismatch")
 		return
