@@ -41,6 +41,9 @@ const SHOW_LEAN: float = 1.05
 const ACTION_CONFIRM_TIMEOUT: float = 1.5
 ## Seat-local height of the name tags (above the forehead cards).
 const TAG_Y: float = 2.0
+## Lucky's size and how far he stands back when we watch from a chair (first person).
+const DEALER_SCALE_SEATED: float = 0.85
+const DEALER_BACK_SEATED: float = 0.3
 
 const BLACK_FONT: Font = preload("res://assets/fonts/BarlowCondensed-Black.ttf")
 const BOLD_FONT: Font = preload("res://assets/fonts/BarlowCondensed-ExtraBold.ttf")
@@ -226,6 +229,10 @@ func _setup_view() -> void:
 	(table.seats[local_id]["bean"] as Node3D).visible = false  # we are inside it
 	(table.seats[local_id]["tag"] as Node3D).visible = false
 	_eye = seat.position + seat.basis * EYE
+	# Lucky is sized for the overview camera; from a chair 3 m away he filled a third of the screen
+	# and poked through the HUD (Patrick's report). Smaller and a step back behind the rail.
+	table.host_root.scale = Vector3.ONE * DEALER_SCALE_SEATED
+	table.host_root.position.z = CardTableSet.DEALER_Z - DEALER_BACK_SEATED
 	var target := Vector3(0, CardTableSet.TABLE_TOP + 0.35, -0.05)
 	var d: Vector3 = target - _eye
 	_base_yaw = atan2(-d.x, -d.z)
