@@ -1,6 +1,6 @@
 # Better at Gambling
 
-> Better at Gambling is an online casino party game for 2 to 8 friends, coming soon to Steam for Windows PC. It is played with fictional play chips only: no real money can be wagered, bought or won, and there are no microtransactions or loot boxes.
+> Better at Gambling is an online casino party game for 2 to 8 friends, coming soon to Steam for Windows PC. It is played with fictional play chips only: no real money can be wagered or won and nothing can be cashed out. The only purchases are optional cosmetic outfit pieces through Steam (see below); there are no loot boxes and nothing pay-to-win.
 
 Everyone starts with $1,000 in play chips. The goal is to be the richest player ("bean") when the casino closes.
 
@@ -9,7 +9,8 @@ Everyone starts with $1,000 in play chips. The goal is to be the richest player 
 - Minigames (16), hosted by Lucky the house cat: Forehead Poker, Split or Steal, Spy, Vote Race, Lonely Number, Bat Heist, Roulette Sumo, Pass the Bomb, Last Seat at the Table, Grab Your Hand, Jackpot Climb, Dodge the Dice, Casino Quiz, Find the Lady, Roulette Royale, Bust or Bank.
 - 33 items, for example Banana Peel, Bad Luck Monkey, Credit Card, Russian Roulette, Pickpocket, Baseball Bat, Bribe the Guard, Lucky Clover, Robin Hood, Get Out of Jail Free.
 - Last Call: in the final 60 seconds every win pays x1.5.
-- Proximity voice chat, emotes, a new casino floor layout every round, 1–10 minigames per night (about 30 minutes), practice mode and tutorial, XP levels and cosmetic bean colours earned by playing (Coins cannot be bought).
+- Proximity voice chat, emotes, a new casino floor layout every round, 1–10 minigames per night (about 30 minutes), practice mode and tutorial, XP levels and Coins earned by playing (Coins cannot be bought).
+- Cosmetics: 75 outfit pieces (15 each of hats, shirts, trousers, capes, boots) and bean colours. Most pieces unlock with Coins; outfit pieces can also be bought through Steam for 0.50–1 € each, 10 of them are paid only, and 10 outfit packs (1.50–4.25 €) are cheaper than the pieces one by one. Purely cosmetic, no loot boxes, no trading.
 - Developer: Patrick Cerny, independent developer from Lochau, Vorarlberg, Austria (https://cerny.app/). Engine: Godot.
 
 ## Links
