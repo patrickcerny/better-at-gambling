@@ -1,4 +1,4 @@
-# One-time Steam login for the automatic Steam uploads (.github/workflows/steam.yml).
+# One-time Steam login for the automatic Steam uploads (the steam job in .github/workflows/release.yml).
 # Run on Patrick's Windows PC in PowerShell:
 #   powershell -ExecutionPolicy Bypass -File tools\steam\steam_login.ps1
 # or straight from GitHub without a checkout:

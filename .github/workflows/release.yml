@@ -153,3 +153,74 @@ jobs:
             gh release create "$tag" dist/*.zip dist/*.dmg --target "$GITHUB_SHA" \
               --title "Better at Gambling ${build_id}" --notes-file notes.md --latest
           fi
+
+  # Steam upload (SteamPipe) of the release just published; see docs/STEAM_UPLOAD.md. Lives here and
+  # not in its own workflow file because only this registered workflow runs from pushes.
+  steam:
+    needs: build
+    permissions:
+      contents: read
+    env:
+      APP_ID: "5623410"
+      DEPOT_WINDOWS: "5623411"
+      DEPOT_LINUX: "5623412"
+      DEPOT_MACOS: "5623413"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secrets present?
+        id: secrets
+        env:
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+        run: |
+          if [[ -z "$STEAM_USERNAME" || -z "$STEAM_CONFIG_VDF" ]]; then
+            echo "::notice::STEAM_USERNAME / STEAM_CONFIG_VDF not set: nothing uploaded (docs/STEAM_UPLOAD.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the release zips
+        if: steps.secrets.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^const BUILD_ID: String = "\(.*\)"/\1/p' core/net/protocol.gd)
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          mkdir -p dl
+          gh release download "v$version" --repo "$GITHUB_REPOSITORY" --dir dl \
+            --pattern BetterAtGambling-windows.zip --pattern BetterAtGambling-linux.zip --pattern BetterAtGambling-macos.zip
+          ls -la dl
+
+      - name: Content folders
+        if: steps.secrets.outputs.ok == 'true'
+        run: tools/steam/prepare_content.sh dl steam_build
+
+      - name: steamcmd
+        if: steps.secrets.outputs.ok == 'true'
+        env:
+          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+        run: |
+          mkdir -p "$HOME/steamcmd"
+          curl -sSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | tar -xz -C "$HOME/steamcmd"
+          sudo dpkg --add-architecture i386 && sudo apt-get update -qq && sudo apt-get install -y -qq lib32gcc-s1 >/dev/null
+          "$HOME/steamcmd/steamcmd.sh" +quit >/dev/null || true  # self-update first
+          # The saved login (Steam Guard already done on Patrick's PC): where steamcmd looks for it.
+          umask 077
+          for d in "$HOME/steamcmd/config" "$HOME/Steam/config" "$HOME/.steam/steam/config"; do
+            mkdir -p "$d" && echo "$STEAM_CONFIG_VDF" | base64 -d > "$d/config.vdf"
+          done
+
+      - name: Upload to Steam
+        if: steps.secrets.outputs.ok == 'true'
+        env:
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+        run: |
+          desc="Better at Gambling $VERSION (${GITHUB_SHA::7})"
+          tools/steam/write_vdfs.sh "$PWD/steam_build" "$desc"
+          "$HOME/steamcmd/steamcmd.sh" +login "$STEAM_USERNAME" +run_app_build "$PWD/steam_build/scripts/app_build.vdf" +quit | tee steamcmd.log
+          grep -q "Successfully finished AppID $APP_ID build" steamcmd.log || { echo "::error::Steam upload failed (see log above)"; exit 1; }
+          echo "::notice::Uploaded $VERSION to Steam. Set it live in Steamworks → SteamPipe → Builds."
