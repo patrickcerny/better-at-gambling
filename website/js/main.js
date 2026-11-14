@@ -86,6 +86,8 @@ if (!isTouch && !reduceMotion) document.querySelectorAll('.tilt').forEach((el) =
 // items rail moves sideways while its section scrolls past; Last Call timer counts down
 const itemsSec = document.getElementById('items');
 const rail = document.getElementById('itemsRail');
+// phones and tablets swipe the item cards themselves; desktops move them with the page scroll
+const swipeRail = matchMedia('(max-width: 820px), (pointer: coarse)');
 const lcSec = document.getElementById('lastcall');
 const lcTimer = document.getElementById('lcTimer');
 function sectionProgress(el) {
@@ -93,9 +95,12 @@ function sectionProgress(el) {
   return THREE.MathUtils.clamp((innerHeight - r.top) / (r.height + innerHeight), 0, 1);
 }
 function uiOnScroll() {
-  const p = sectionProgress(itemsSec);
-  const max = Math.max(0, rail.scrollWidth - innerWidth);
-  rail.style.transform = `translate3d(${-max * THREE.MathUtils.smoothstep(p, 0.15, 0.85)}px,0,0)`;
+  if (swipeRail.matches) rail.style.transform = '';
+  else {
+    const p = sectionProgress(itemsSec);
+    const max = Math.max(0, rail.scrollWidth - innerWidth);
+    rail.style.transform = `translate3d(${-max * THREE.MathUtils.smoothstep(p, 0.15, 0.85)}px,0,0)`;
+  }
   const lp = THREE.MathUtils.clamp((sectionProgress(lcSec) - 0.25) / 0.5, 0, 1);
   const secs = Math.round(60 - lp * 59);
   lcTimer.textContent = `00:${String(secs).padStart(2, '0')}`;
