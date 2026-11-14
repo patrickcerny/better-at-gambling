@@ -10,6 +10,10 @@ extends PanelContainer
 ## the preferred one or puts a piece on (worn from the next join on, and in the lobby at once
 ## through `set_color` / `set_outfit`); TAKE OFF takes a piece off. Coins are out-of-match money:
 ## the tables never take them. BACK (or Esc) closes.
+## Real money (Patrick 2026-11-14): every paid piece can also be bought through Steam for 0,50 to
+## 1 euro, a few only that way (`CosmeticDef.money_only`), and the PACKS tab sells whole outfits
+## 50 cents under their pieces (`CosmeticPack`). The STEAM button opens the Steam overlay
+## (`SteamSvc.buy_item`); Steam's inventory then says what is owned. Without Steam it is greyed out.
 
 signal closed
 ## A colour was put on (the lobby forwards it to the server).
@@ -22,11 +26,15 @@ const TILE: Vector2 = Vector2(196, 236)
 const KIND_TITLES: Dictionary = {
 	CosmeticDef.KIND_COLOR: "COLOURS", CosmeticDef.KIND_HAT: "HATS", CosmeticDef.KIND_SHIRT: "SHIRTS",
 	CosmeticDef.KIND_PANTS: "TROUSERS", CosmeticDef.KIND_CAPE: "CAPES", CosmeticDef.KIND_BOOTS: "BOOTS",
+	KIND_PACK: "PACKS",
 }
+## The packs tab's key (not a `CosmeticDef` kind).
+const KIND_PACK: StringName = &"pack"
 ## The piece each tab's icon shows.
 const TAB_ICONS: Dictionary = {
 	CosmeticDef.KIND_COLOR: &"color_gold", CosmeticDef.KIND_HAT: &"hat_top", CosmeticDef.KIND_SHIRT: &"shirt_tux",
 	CosmeticDef.KIND_PANTS: &"pants_jeans", CosmeticDef.KIND_CAPE: &"cape_hero", CosmeticDef.KIND_BOOTS: &"boots_sneakers",
+	KIND_PACK: &"pack_royal",
 }
 const MUTED := Color("#B9A98C")
 
@@ -41,6 +49,8 @@ var price_row: HBoxContainer
 var price_label: Label
 var price_coin: CoinIcon
 var action_button: Button
+## Pays real money through Steam (a piece or a pack).
+var steam_button: Button
 var status_label: Label
 var coins_label: Label
 var back_button: Button
@@ -153,6 +163,11 @@ func _ready() -> void:
 	action_button.custom_minimum_size = Vector2(0, 60)
 	action_button.pressed.connect(press_action)
 	left.add_child(action_button)
+	steam_button = Button.new()
+	steam_button.name = "Steam"
+	steam_button.custom_minimum_size = Vector2(0, 52)
+	steam_button.pressed.connect(press_steam)
+	left.add_child(steam_button)
 	status_label = Label.new()
 	status_label.name = "Status"
 	status_label.theme_type_variation = &"SmallLabel"
@@ -179,21 +194,15 @@ func _ready() -> void:
 		var items: Array[CosmeticDef] = shop.of_kind(kind)
 		if items.is_empty():
 			continue  # a kind shows up once the shop stocks it
-		var scroll := ScrollContainer.new()
-		scroll.name = str(KIND_TITLES.get(kind, String(kind).to_upper()))
-		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		scroll.follow_focus = true
-		tabs.add_child(scroll)
-		var grid := GridContainer.new()
-		grid.name = "Grid"
-		grid.columns = COLUMNS
-		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		grid.add_theme_constant_override(&"h_separation", 14)
-		grid.add_theme_constant_override(&"v_separation", 14)
-		scroll.add_child(grid)
+		var grid: GridContainer = _grid_tab(str(KIND_TITLES.get(kind, String(kind).to_upper())))
 		for d: CosmeticDef in items:
 			grid.add_child(_tile(d))
 		tab_row.add_child(_tab_button(kind, tabs.get_tab_count() - 1))
+	if not shop.packs.is_empty():
+		var pgrid: GridContainer = _grid_tab(str(KIND_TITLES[KIND_PACK]))
+		for k: CosmeticPack in shop.packs:
+			pgrid.add_child(_tile(null, k))
+		tab_row.add_child(_tab_button(KIND_PACK, tabs.get_tab_count() - 1))
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(bottom)
@@ -204,7 +213,26 @@ func _ready() -> void:
 	back_button.pressed.connect(close)
 	bottom.add_child(back_button)
 	ProfileManager.changed.connect(_refresh)
+	SteamSvc.store_changed.connect(_refresh)
+	SteamSvc.purchase_finished.connect(_on_purchase_finished)
 	resized.connect(_fit_columns)
+
+
+## A scrolling grid of tiles as a new page of `tabs`.
+func _grid_tab(title: String) -> GridContainer:
+	var scroll := ScrollContainer.new()
+	scroll.name = title
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	tabs.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.name = "Grid"
+	grid.columns = COLUMNS
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override(&"h_separation", 14)
+	grid.add_theme_constant_override(&"v_separation", 14)
+	scroll.add_child(grid)
+	return grid
 
 
 ## An icon tab: a 3D picture of a typical piece, the kind's name as its tooltip.
@@ -241,12 +269,15 @@ func show_kind(kind: StringName) -> void:
 		tab_buttons[k].set_pressed_no_signal(k == kind)
 
 
-func _tile(d: CosmeticDef) -> Button:
+## A piece's tile, or a pack's (`d` null).
+func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
+	var id: StringName = d.id if d != null else pack.id
+	var title: String = d.display_name if d != null else pack.display_name
 	var b := Button.new()
-	b.name = String(d.id)
+	b.name = String(id)
 	b.toggle_mode = true
 	b.custom_minimum_size = TILE
-	b.tooltip_text = d.display_name
+	b.tooltip_text = title if d != null else "%s: %d pieces, %s cheaper than one by one" % [title, pack.pieces.size(), SteamSvc.format_price(CosmeticPack.DISCOUNT_CENTS, "EUR")]
 	b.clip_contents = true
 	SettingsPanel.style_tab(b)
 	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
@@ -261,14 +292,14 @@ func _tile(d: CosmeticDef) -> Button:
 	var pic := TextureRect.new()
 	pic.name = "Picture"
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pic.texture = CosmeticThumbnails.texture_for(d.id)
+	pic.texture = CosmeticThumbnails.texture_for(id)
 	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(pic)
 	var label := Label.new()
 	label.name = "Name"
-	label.text = d.display_name.to_upper()
+	label.text = title.to_upper()
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	label.clip_text = true
@@ -280,9 +311,9 @@ func _tile(d: CosmeticDef) -> Button:
 	(pr[1] as Label).name = "Price"
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(row)
-	b.pressed.connect(select.bind(d.id))
-	b.focus_entered.connect(select.bind(d.id))
-	tiles[d.id] = b
+	b.pressed.connect(select.bind(id))
+	b.focus_entered.connect(select.bind(id))
+	tiles[id] = b
 	return b
 
 
@@ -304,20 +335,70 @@ func _price_widget(coin_px: float, variation: StringName) -> Array:
 ## Shows `id` in the preview and points the action button at it.
 func select(id: StringName) -> void:
 	var d: CosmeticDef = shop.find(id)
-	if d == null:
+	if d == null and shop.find_pack(id) == null:
 		return
 	if selected == id:
 		return
 	selected = id
 	status_label.text = ""
 	if preview != null:
-		preview.face(d.kind == CosmeticDef.KIND_CAPE)
-		preview.focus(d.kind)
+		preview.face(d != null and d.kind == CosmeticDef.KIND_CAPE)
+		preview.focus(d.kind if d != null else &"")
+	_refresh()
+
+
+## A pack's pieces as an outfit (kind -> id).
+static func pack_outfit(pack: CosmeticPack) -> Dictionary:
+	var o: Dictionary = {}
+	var shop: CosmeticShop = CosmeticShop.default()
+	for id: StringName in pack.pieces:
+		var d: CosmeticDef = shop.find(id)
+		if d != null and d.kind in CosmeticDef.OUTFIT_KINDS:
+			o[d.kind] = id
+	return o
+
+
+## The real-money price of Steam item definition `def`: Steam's, in the player's currency, or the
+## reference euro price while Steam hasn't answered (or isn't running).
+static func money_text(def: int, cents: int) -> String:
+	var t: String = SteamSvc.price_text(def)
+	return t if t != "" else SteamSvc.format_price(cents, "EUR")
+
+
+## STEAM: opens the Steam overlay to pay for the picked piece or pack.
+func press_steam() -> void:
+	var d: CosmeticDef = shop.find(selected)
+	var pack: CosmeticPack = shop.find_pack(selected)
+	var def: int = d.steam_item if d != null else (pack.steam_item if pack != null else 0)
+	if def <= 0 or not SteamSvc.is_available():
+		status_label.text = "Buying with real money needs Steam running."
+		return
+	if SteamSvc.buy_item(def):
+		status_label.text = "Finish the purchase in the Steam overlay."
+	else:
+		status_label.text = "A purchase is already open in the Steam overlay."
+	_refresh()
+
+
+func _on_purchase_finished(ok: bool) -> void:
+	if not visible:
+		return
+	status_label.text = "Thanks! It shows up here in a moment." if ok else "Purchase cancelled."
 	_refresh()
 
 
 ## BUY when not owned (refused with a message when the Coins don't reach), else WEAR / TAKE OFF.
 func press_action() -> void:
+	var pack: CosmeticPack = shop.find_pack(selected)
+	if pack != null:
+		if ProfileManager.profile.owns_pack(pack):
+			for id: StringName in pack.pieces:
+				var piece: CosmeticDef = shop.find(id)
+				if piece != null and ProfileManager.wear(id):
+					outfit_worn.emit(piece.kind, id)
+			status_label.text = "Your bean wears the whole %s outfit." % pack.display_name
+		_refresh()
+		return
 	var d: CosmeticDef = shop.find(selected)
 	if d == null:
 		return
@@ -329,7 +410,7 @@ func press_action() -> void:
 				status_label.text = "Bought %s! Wear it whenever you like." % d.display_name
 				Audio.play(&"cash_register", &"UI", -6.0)
 			&"not_enough_coins":
-				status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (d.price - p.coins)
+				status_label.text = "Not enough Coins: %d more to go. Play matches to earn them%s." % [d.price - p.coins, (", or buy it with Steam" if d.steam_buyable() else "")]
 				Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
 			_:
 				status_label.text = "Can't buy that right now."
@@ -357,7 +438,8 @@ static func _wearing(p: PlayerProfile, d: CosmeticDef) -> bool:
 	return p.is_worn(d.id)
 
 
-## Fills a price row: "WEARING" / "OWNED" / "FREE" as words, else the number and the Coin.
+## Fills a price row: "WEARING" / "OWNED" / "FREE" as words, the Steam price for real-money-only
+## pieces, else the number and the Coin.
 static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: CosmeticDef) -> void:
 	var wearing: bool = _wearing(p, d)
 	coin.visible = not p.owns(d.id)
@@ -365,6 +447,9 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 		label.text = "WEARING"
 	elif p.owns(d.id):
 		label.text = "FREE" if d.is_free() else "OWNED"
+	elif not d.coin_buyable() and d.steam_buyable():
+		label.text = money_text(d.steam_item, d.cents)
+		coin.visible = false
 	else:
 		label.text = "%s" % Hud._thousands(d.price)
 	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else Palette.COIN_GOLD))
@@ -380,9 +465,17 @@ func _refresh() -> void:
 		var b: Button = tiles[id]
 		b.set_pressed_no_signal(id == selected)
 		var row: Node = b.find_child("PriceRow", true, false)
-		_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
+		if d != null:
+			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
+		else:
+			_show_pack_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, shop.find_pack(id))
+	var pack: CosmeticPack = shop.find_pack(selected)
+	if pack != null:
+		_refresh_pack(p, pack)
+		return
 	var sel: CosmeticDef = shop.find(selected)
 	if sel == null:
+		steam_button.visible = false
 		action_button.disabled = true
 		action_button.text = "PICK SOMETHING"
 		item_name.text = ""
@@ -402,8 +495,12 @@ func _refresh() -> void:
 	if preview.outfit != dress:
 		preview.set_outfit(dress)
 	action_button.disabled = false
-	if not p.owns(sel.id):
-		action_button.text = "BUY"
+	action_button.visible = true
+	_show_steam_button(not p.owns(sel.id) and sel.steam_buyable(), sel.steam_item, sel.cents, "BUY WITH STEAM")
+	if not p.owns(sel.id) and not sel.coin_buyable():
+		action_button.visible = false  # real money only: the Steam button is the way
+	elif not p.owns(sel.id):
+		action_button.text = "BUY FOR COINS" if sel.steam_buyable() else "BUY"
 	elif sel.kind == CosmeticDef.KIND_COLOR and p.preferred_color == sel.color_index:
 		action_button.text = "WEARING"
 		action_button.disabled = true
@@ -411,6 +508,45 @@ func _refresh() -> void:
 		action_button.text = "TAKE OFF"
 	else:
 		action_button.text = "WEAR"
+
+
+## A pack's tile price: OWNED when every piece is, else the Steam price.
+static func _show_pack_price(label: Label, coin: CoinIcon, p: PlayerProfile, pack: CosmeticPack) -> void:
+	coin.visible = false
+	var owned: bool = p.owns_pack(pack)
+	label.text = "OWNED" if owned else money_text(pack.steam_item, pack.cents)
+	label.add_theme_color_override(&"font_color", Palette.CREAM if owned else Palette.COIN_GOLD)
+
+
+## The stage for a pack: the bean in the whole outfit, its price and what it saves; WEAR ALL once
+## it is owned.
+func _refresh_pack(p: PlayerProfile, pack: CosmeticPack) -> void:
+	item_name.text = pack.display_name.to_upper()
+	var single: String = SteamSvc.format_price(shop.pieces_cents(pack), "EUR")
+	item_kind.text = "PACK OF %d · %s ONE BY ONE" % [pack.pieces.size(), single]
+	price_row.visible = true
+	_show_pack_price(price_label, price_coin, p, pack)
+	var worn_color: int = p.preferred_color if p.preferred_color >= 0 else 0
+	preview.set_bean_color(Palette.player_color(worn_color))
+	var dress: Dictionary = pack_outfit(pack)
+	if preview.outfit != dress:
+		preview.set_outfit(dress)
+	var owned: bool = p.owns_pack(pack)
+	action_button.visible = owned
+	action_button.disabled = false
+	action_button.text = "WEAR ALL"
+	_show_steam_button(not owned, pack.steam_item, pack.cents, "BUY PACK")
+
+
+## The Steam button: shown when real money can buy the pick, greyed out without Steam.
+func _show_steam_button(on: bool, def: int, cents: int, verb: String) -> void:
+	steam_button.visible = on
+	if not on:
+		return
+	var ready: bool = SteamSvc.is_available() and not SteamSvc.buying
+	steam_button.disabled = not ready
+	steam_button.text = "%s · %s" % [verb, money_text(def, cents)]
+	steam_button.tooltip_text = "" if SteamSvc.is_available() else "Needs Steam running"
 
 
 ## As many tile columns as fit.
@@ -426,6 +562,7 @@ func _fit_columns() -> void:
 
 
 func open() -> void:
+	SteamSvc.refresh_inventory()  # bought on another PC, or in the Steam store
 	var p: PlayerProfile = ProfileManager.profile
 	var worn: CosmeticDef = shop.color_item(p.preferred_color)
 	selected = &""
@@ -443,7 +580,7 @@ func open() -> void:
 		_dim.visible = true
 	visible = true
 	var sel: CosmeticDef = shop.find(selected)
-	show_kind(sel.kind if sel != null else CosmeticDef.KIND_COLOR)
+	show_kind(sel.kind if sel != null else (KIND_PACK if shop.find_pack(selected) != null else CosmeticDef.KIND_COLOR))
 	_fit_columns.call_deferred()
 	if tiles.has(selected):
 		tiles[selected].grab_focus()

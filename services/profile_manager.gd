@@ -16,6 +16,8 @@ var profile: PlayerProfile
 var path: String = PATH
 ## Off: nothing is read or written, the profile lives in memory (tests, autoplay clients).
 var persist: bool = true
+## Pieces in the Steam inventory (`SteamSvc`), kept across `reload`.
+var steam_owned: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -37,6 +39,16 @@ func reload() -> void:
 	var err: Error = profile.load_from(path) if persist else ERR_FILE_NOT_FOUND
 	if err != OK and err != ERR_FILE_NOT_FOUND:
 		Log.warn(&"profile", "could not load %s (error %d), starting fresh" % [path, err])
+	profile.steam_owned = steam_owned.duplicate()
+	changed.emit()
+
+
+## What the Steam inventory holds now (pieces bought with real money).
+func set_steam_owned(ids: Array[StringName]) -> void:
+	if ids == steam_owned:
+		return
+	steam_owned = ids.duplicate()
+	profile.steam_owned = steam_owned.duplicate()
 	changed.emit()
 
 

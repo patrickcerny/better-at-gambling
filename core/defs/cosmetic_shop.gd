@@ -5,6 +5,8 @@ extends Resource
 const PATH: String = "res://data/progression/cosmetics_shop.tres"
 
 @export var items: Array[CosmeticDef] = []
+## Full outfits sold together for real money (the PACKS tab).
+@export var packs: Array[CosmeticPack] = []
 
 static var _default: CosmeticShop = null
 
@@ -23,6 +25,36 @@ func find(id: StringName) -> CosmeticDef:
 		if d.id == id:
 			return d
 	return null
+
+
+func find_pack(id: StringName) -> CosmeticPack:
+	for k: CosmeticPack in packs:
+		if k.id == id:
+			return k
+	return null
+
+
+## The item or pack granted by Steam item definition `def` (null when none).
+func by_steam_item(def: int) -> Resource:
+	if def <= 0:
+		return null
+	for d: CosmeticDef in items:
+		if d.steam_item == def:
+			return d
+	for k: CosmeticPack in packs:
+		if k.steam_item == def:
+			return k
+	return null
+
+
+## The pieces' euro cents added up (what a pack would cost piece by piece).
+func pieces_cents(pack: CosmeticPack) -> int:
+	var sum: int = 0
+	for id: StringName in pack.pieces:
+		var d: CosmeticDef = find(id)
+		if d != null:
+			sum += d.cents
+	return sum
 
 
 ## Every item of one kind, in shop order.

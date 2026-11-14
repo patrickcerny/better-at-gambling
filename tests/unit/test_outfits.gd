@@ -53,14 +53,14 @@ func test_sanitize_outfit_keeps_only_real_pieces_in_their_slots() -> void:
 
 func test_the_profile_wears_owned_pieces_and_remembers_them() -> void:
 	var p: PlayerProfile = ProfileManager.profile
-	assert_false(p.wear(&"hat_crown"), "not bought yet")
+	assert_false(p.wear(&"hat_top"), "not bought yet")
 	assert_true(p.wear(&"hat_party"), "free pieces are owned")
 	p.coins = 5000
-	assert_eq(p.buy(&"hat_crown"), &"")
-	assert_true(p.wear(&"hat_crown"), "one hat at a time: the crown replaces the party hat")
+	assert_eq(p.buy(&"hat_top"), &"")
+	assert_true(p.wear(&"hat_top"), "one hat at a time: the top hat replaces the party hat")
 	assert_true(p.wear(&"cape_towel"))
 	assert_false(p.wear(&"color_mint"), "colours are not outfit pieces")
-	assert_eq(p.outfit_wire(), PackedStringArray(["hat_crown", "", "", "cape_towel", ""]))
+	assert_eq(p.outfit_wire(), PackedStringArray(["hat_top", "", "", "cape_towel", ""]))
 	var path: String = "user://test_outfit_profile.cfg"
 	assert_eq(p.save(path), OK)
 	var back := PlayerProfile.new()
@@ -76,7 +76,7 @@ func test_the_profile_wears_owned_pieces_and_remembers_them() -> void:
 	assert_eq(back.outfit_wire(), PackedStringArray(["", "", "", "cape_towel", ""]), "only owned pieces stay on")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	p.take_off(&"hat")
-	assert_false(p.is_worn(&"hat_crown"))
+	assert_false(p.is_worn(&"hat_top"))
 	assert_eq(SceneRouter.profile_cosmetics()["outfit"], p.outfit_wire(), "the next join sends it")
 
 
@@ -109,7 +109,7 @@ func test_the_bean_puts_pieces_on_and_takes_them_off() -> void:
 	assert_false(v.outfit.has(&"hat"), "a cape is not a hat")
 	var torso := Node3D.new()
 	add_child_autofree(torso)
-	assert_eq(AvatarVisuals.dress(torso, {&"hat": &"hat_crown", &"boots": &"boots_gold", &"cape": &"cape_royal"}).size(), 2, "the ragdoll wears hat and cape (no feet to put boots on)")
+	assert_eq(AvatarVisuals.dress(torso, {&"hat": &"hat_top", &"boots": &"boots_gold", &"cape": &"cape_royal"}).size(), 2, "the ragdoll wears hat and cape (no feet to put boots on)")
 
 
 func test_the_shop_sells_and_puts_on_outfit_pieces() -> void:
@@ -122,21 +122,21 @@ func test_the_shop_sells_and_puts_on_outfit_pieces() -> void:
 		assert_not_null(panel.find_child(tab, true, false), "a %s tab" % tab)
 	var worn: Array = []
 	panel.outfit_worn.connect(func(kind: StringName, id: StringName) -> void: worn.append([kind, id]))
-	var crown: CosmeticDef = CosmeticShop.default().find(&"hat_crown")
-	ProfileManager.profile.coins = crown.price
-	panel.select(&"hat_crown")
-	assert_eq(panel.preview.outfit.get(&"hat"), &"hat_crown", "the preview tries it on")
+	var top_hat: CosmeticDef = CosmeticShop.default().find(&"hat_top")
+	ProfileManager.profile.coins = top_hat.price
+	panel.select(&"hat_top")
+	assert_eq(panel.preview.outfit.get(&"hat"), &"hat_top", "the preview tries it on")
 	assert_string_contains(panel.action_button.text, "BUY")
 	panel.action_button.pressed.emit()
-	assert_true(ProfileManager.profile.owns(&"hat_crown"))
+	assert_true(ProfileManager.profile.owns(&"hat_top"))
 	assert_eq(panel.action_button.text, "WEAR")
 	panel.action_button.pressed.emit()
-	assert_true(ProfileManager.profile.is_worn(&"hat_crown"))
-	assert_eq(worn, [[&"hat", &"hat_crown"]])
-	assert_eq((panel.tiles[&"hat_crown"].find_child("Price", true, false) as Label).text, "WEARING")
+	assert_true(ProfileManager.profile.is_worn(&"hat_top"))
+	assert_eq(worn, [[&"hat", &"hat_top"]])
+	assert_eq((panel.tiles[&"hat_top"].find_child("Price", true, false) as Label).text, "WEARING")
 	assert_eq(panel.action_button.text, "TAKE OFF")
 	panel.action_button.pressed.emit()
-	assert_false(ProfileManager.profile.is_worn(&"hat_crown"))
+	assert_false(ProfileManager.profile.is_worn(&"hat_top"))
 	assert_eq(worn[-1], [&"hat", &""])
 
 

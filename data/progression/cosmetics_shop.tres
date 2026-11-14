@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="CosmeticShop" load_steps=94 format=3]
+[gd_resource type="Resource" script_class="CosmeticShop" load_steps=105 format=3]
 
 [ext_resource type="Script" path="res://core/defs/cosmetic_shop.gd" id="1"]
 [ext_resource type="Script" path="res://core/defs/cosmetic_def.gd" id="2"]
+[ext_resource type="Script" path="res://core/defs/cosmetic_pack.gd" id="3"]
 
 [sub_resource type="Resource" id="c0"]
 script = ExtResource("2")
@@ -153,6 +154,8 @@ id = &"hat_police"
 kind = &"hat"
 display_name = "Police Cap"
 price = 250
+cents = 50
+steam_item = 100
 swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o3"]
@@ -161,6 +164,8 @@ id = &"hat_bowler"
 kind = &"hat"
 display_name = "Bowler Hat"
 price = 250
+cents = 50
+steam_item = 101
 swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.1098, 0.102, 0.09804, 1)
 
 [sub_resource type="Resource" id="o4"]
@@ -169,6 +174,8 @@ id = &"hat_chef"
 kind = &"hat"
 display_name = "Chef's Toque"
 price = 250
+cents = 50
+steam_item = 102
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1)
 
 [sub_resource type="Resource" id="o5"]
@@ -177,6 +184,8 @@ id = &"hat_cone"
 kind = &"hat"
 display_name = "Traffic Cone"
 price = 300
+cents = 50
+steam_item = 103
 swatch = PackedColorArray(0.851, 0.4667, 0.1686, 1, 0.9569, 0.9373, 0.8941, 1)
 
 [sub_resource type="Resource" id="o6"]
@@ -185,6 +194,8 @@ id = &"hat_fedora"
 kind = &"hat"
 display_name = "Fedora"
 price = 350
+cents = 75
+steam_item = 104
 swatch = PackedColorArray(0.3529, 0.2902, 0.2353, 1, 0.1098, 0.102, 0.09804, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o7"]
@@ -193,6 +204,8 @@ id = &"hat_firefighter"
 kind = &"hat"
 display_name = "Fire Helmet"
 price = 350
+cents = 75
+steam_item = 105
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o8"]
@@ -201,6 +214,8 @@ id = &"hat_cowboy"
 kind = &"hat"
 display_name = "Cowboy Hat"
 price = 400
+cents = 75
+steam_item = 106
 swatch = PackedColorArray(0.6902, 0.4784, 0.2706, 1, 0.3529, 0.2275, 0.1412, 1)
 
 [sub_resource type="Resource" id="o9"]
@@ -209,6 +224,8 @@ id = &"hat_propeller"
 kind = &"hat"
 display_name = "Propeller Cap"
 price = 400
+cents = 75
+steam_item = 107
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.8863, 0.698, 0.2275, 1, 0.1843, 0.3647, 0.6588, 1)
 
 [sub_resource type="Resource" id="o10"]
@@ -217,6 +234,8 @@ id = &"hat_pirate"
 kind = &"hat"
 display_name = "Pirate Tricorn"
 price = 500
+cents = 75
+steam_item = 108
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1, 0.9569, 0.9373, 0.8941, 1)
 
 [sub_resource type="Resource" id="o11"]
@@ -225,6 +244,8 @@ id = &"hat_top"
 kind = &"hat"
 display_name = "Top Hat"
 price = 500
+cents = 75
+steam_item = 109
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o12"]
@@ -233,6 +254,9 @@ id = &"hat_viking"
 kind = &"hat"
 display_name = "Viking Helmet"
 price = 600
+money_only = true
+cents = 100
+steam_item = 110
 swatch = PackedColorArray(0.549, 0.5686, 0.5961, 1, 0.9137, 0.8627, 0.7373, 1)
 
 [sub_resource type="Resource" id="o13"]
@@ -241,6 +265,8 @@ id = &"hat_wizard"
 kind = &"hat"
 display_name = "Wizard Hat"
 price = 600
+cents = 100
+steam_item = 111
 swatch = PackedColorArray(0.1804, 0.2431, 0.4784, 1, 0.8863, 0.698, 0.2275, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o14"]
@@ -249,6 +275,9 @@ id = &"hat_crown"
 kind = &"hat"
 display_name = "Crown"
 price = 1000
+money_only = true
+cents = 100
+steam_item = 112
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o15"]
@@ -273,6 +302,8 @@ id = &"shirt_police"
 kind = &"shirt"
 display_name = "Police Shirt"
 price = 250
+cents = 50
+steam_item = 113
 swatch = PackedColorArray(0.4902, 0.6118, 0.7686, 1, 0.1373, 0.1882, 0.2902, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o18"]
@@ -281,6 +312,8 @@ id = &"shirt_business"
 kind = &"shirt"
 display_name = "Business Suit"
 price = 300
+cents = 50
+steam_item = 114
 swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o19"]
@@ -289,6 +322,8 @@ id = &"shirt_chef"
 kind = &"shirt"
 display_name = "Chef's Jacket"
 price = 250
+cents = 50
+steam_item = 115
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.1098, 0.102, 0.09804, 1)
 
 [sub_resource type="Resource" id="o20"]
@@ -297,6 +332,8 @@ id = &"shirt_jailbird"
 kind = &"shirt"
 display_name = "Jailbird"
 price = 250
+cents = 50
+steam_item = 116
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
 
 [sub_resource type="Resource" id="o21"]
@@ -305,6 +342,8 @@ id = &"shirt_referee"
 kind = &"shirt"
 display_name = "Referee"
 price = 300
+cents = 50
+steam_item = 117
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1, 0.7216, 0.7373, 0.7608, 1)
 
 [sub_resource type="Resource" id="o22"]
@@ -313,6 +352,8 @@ id = &"shirt_flannel"
 kind = &"shirt"
 display_name = "Lumberjack Flannel"
 price = 300
+cents = 50
+steam_item = 118
 swatch = PackedColorArray(0.6588, 0.1961, 0.1725, 1, 0.1098, 0.102, 0.09804, 1)
 
 [sub_resource type="Resource" id="o23"]
@@ -321,6 +362,8 @@ id = &"shirt_firefighter"
 kind = &"shirt"
 display_name = "Fire Coat"
 price = 350
+cents = 75
+steam_item = 119
 swatch = PackedColorArray(0.5412, 0.4157, 0.2275, 1, 0.8863, 0.698, 0.2275, 1, 0.7216, 0.7373, 0.7608, 1)
 
 [sub_resource type="Resource" id="o24"]
@@ -329,6 +372,8 @@ id = &"shirt_hawaiian"
 kind = &"shirt"
 display_name = "Hawaiian Shirt"
 price = 350
+cents = 75
+steam_item = 120
 swatch = PackedColorArray(0.7843, 0.3137, 0.2275, 1, 0.9137, 0.8627, 0.7373, 1, 0.8863, 0.698, 0.2275, 1)
 
 [sub_resource type="Resource" id="o25"]
@@ -337,6 +382,8 @@ id = &"shirt_sweater"
 kind = &"shirt"
 display_name = "Cozy Sweater"
 price = 350
+cents = 75
+steam_item = 121
 swatch = PackedColorArray(0.1529, 0.3686, 0.2863, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o26"]
@@ -345,6 +392,8 @@ id = &"shirt_dealer"
 kind = &"shirt"
 display_name = "Dealer Vest"
 price = 450
+cents = 75
+steam_item = 122
 swatch = PackedColorArray(0.4078, 0.1216, 0.1725, 1, 0.9569, 0.9373, 0.8941, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o27"]
@@ -353,6 +402,8 @@ id = &"shirt_hero"
 kind = &"shirt"
 display_name = "Super Suit"
 price = 500
+cents = 75
+steam_item = 123
 swatch = PackedColorArray(0.1843, 0.3647, 0.6588, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o28"]
@@ -361,6 +412,9 @@ id = &"shirt_tux"
 kind = &"shirt"
 display_name = "Tuxedo"
 price = 600
+money_only = true
+cents = 100
+steam_item = 124
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o29"]
@@ -369,6 +423,9 @@ id = &"shirt_knight"
 kind = &"shirt"
 display_name = "Knight's Tabard"
 price = 700
+money_only = true
+cents = 100
+steam_item = 125
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.549, 0.5686, 0.5961, 1)
 
 [sub_resource type="Resource" id="o30"]
@@ -393,6 +450,8 @@ id = &"pants_police"
 kind = &"pants"
 display_name = "Police Trousers"
 price = 250
+cents = 50
+steam_item = 126
 swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.851, 0.6824, 0.3216, 1, 0.1098, 0.102, 0.09804, 1)
 
 [sub_resource type="Resource" id="o33"]
@@ -401,6 +460,8 @@ id = &"pants_suit"
 kind = &"pants"
 display_name = "Suit Trousers"
 price = 250
+cents = 50
+steam_item = 127
 swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.3529, 0.2275, 0.1412, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o34"]
@@ -409,6 +470,8 @@ id = &"pants_chef"
 kind = &"pants"
 display_name = "Chef's Checks"
 price = 250
+cents = 50
+steam_item = 128
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
 
 [sub_resource type="Resource" id="o35"]
@@ -417,6 +480,8 @@ id = &"pants_jailbird"
 kind = &"pants"
 display_name = "Jailbird Trousers"
 price = 250
+cents = 50
+steam_item = 129
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.1098, 0.102, 0.09804, 1)
 
 [sub_resource type="Resource" id="o36"]
@@ -425,6 +490,8 @@ id = &"pants_firefighter"
 kind = &"pants"
 display_name = "Fire Trousers"
 price = 300
+cents = 50
+steam_item = 130
 swatch = PackedColorArray(0.5412, 0.4157, 0.2275, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o37"]
@@ -433,6 +500,8 @@ id = &"pants_boxers"
 kind = &"pants"
 display_name = "Lucky Boxers"
 price = 300
+cents = 50
+steam_item = 131
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.4902, 0.6118, 0.7686, 1)
 
 [sub_resource type="Resource" id="o38"]
@@ -441,6 +510,8 @@ id = &"pants_golf"
 kind = &"pants"
 display_name = "Golf Argyle"
 price = 350
+cents = 75
+steam_item = 132
 swatch = PackedColorArray(0.8902, 0.6039, 0.651, 1, 0.2431, 0.4196, 0.2706, 1, 0.9569, 0.9373, 0.8941, 1)
 
 [sub_resource type="Resource" id="o39"]
@@ -449,6 +520,8 @@ id = &"pants_pirate"
 kind = &"pants"
 display_name = "Pirate Breeches"
 price = 350
+cents = 75
+steam_item = 133
 swatch = PackedColorArray(0.4196, 0.2902, 0.1804, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o40"]
@@ -457,6 +530,8 @@ id = &"pants_clown"
 kind = &"pants"
 display_name = "Clown Pants"
 price = 400
+cents = 75
+steam_item = 134
 swatch = PackedColorArray(0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1, 0.1843, 0.3647, 0.6588, 1)
 
 [sub_resource type="Resource" id="o41"]
@@ -465,6 +540,8 @@ id = &"pants_hero"
 kind = &"pants"
 display_name = "Super Briefs"
 price = 450
+cents = 75
+steam_item = 135
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.1843, 0.3647, 0.6588, 1, 0.8863, 0.698, 0.2275, 1)
 
 [sub_resource type="Resource" id="o42"]
@@ -473,6 +550,8 @@ id = &"pants_kilt"
 kind = &"pants"
 display_name = "Tartan Kilt"
 price = 500
+cents = 75
+steam_item = 136
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.2431, 0.4196, 0.2706, 1, 0.4196, 0.2902, 0.1804, 1)
 
 [sub_resource type="Resource" id="o43"]
@@ -481,6 +560,9 @@ id = &"pants_tux"
 kind = &"pants"
 display_name = "Tuxedo Trousers"
 price = 500
+money_only = true
+cents = 100
+steam_item = 137
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4078, 0.1216, 0.1725, 1)
 
 [sub_resource type="Resource" id="o44"]
@@ -489,6 +571,9 @@ id = &"pants_lederhosen"
 kind = &"pants"
 display_name = "Lederhosen"
 price = 600
+money_only = true
+cents = 100
+steam_item = 138
 swatch = PackedColorArray(0.4196, 0.2902, 0.1804, 1, 0.9137, 0.8627, 0.7373, 1)
 
 [sub_resource type="Resource" id="o45"]
@@ -513,6 +598,8 @@ id = &"cape_hero"
 kind = &"cape"
 display_name = "Hero Cape"
 price = 300
+cents = 50
+steam_item = 139
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o48"]
@@ -521,6 +608,8 @@ id = &"cape_rainbow"
 kind = &"cape"
 display_name = "Rainbow Cape"
 price = 350
+cents = 75
+steam_item = 140
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1, 0.2431, 0.549, 0.5333, 1)
 
 [sub_resource type="Resource" id="o49"]
@@ -529,6 +618,8 @@ id = &"cape_patchwork"
 kind = &"cape"
 display_name = "Patchwork Quilt"
 price = 350
+cents = 75
+steam_item = 141
 swatch = PackedColorArray(0.2431, 0.549, 0.5333, 1, 0.851, 0.6824, 0.3216, 1, 0.8902, 0.6039, 0.651, 1)
 
 [sub_resource type="Resource" id="o50"]
@@ -537,6 +628,8 @@ id = &"cape_detective"
 kind = &"cape"
 display_name = "Detective Cape"
 price = 400
+cents = 75
+steam_item = 142
 swatch = PackedColorArray(0.6275, 0.4706, 0.3137, 1, 0.3529, 0.2275, 0.1412, 1)
 
 [sub_resource type="Resource" id="o51"]
@@ -545,6 +638,8 @@ id = &"cape_leopard"
 kind = &"cape"
 display_name = "Leopard Print"
 price = 400
+cents = 75
+steam_item = 143
 swatch = PackedColorArray(0.7882, 0.5882, 0.3059, 1, 0.1098, 0.102, 0.09804, 1)
 
 [sub_resource type="Resource" id="o52"]
@@ -553,6 +648,8 @@ id = &"cape_knight"
 kind = &"cape"
 display_name = "Knight's Cloak"
 price = 450
+cents = 75
+steam_item = 144
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.549, 0.5686, 0.5961, 1)
 
 [sub_resource type="Resource" id="o53"]
@@ -561,6 +658,8 @@ id = &"cape_matador"
 kind = &"cape"
 display_name = "Matador Cape"
 price = 450
+cents = 75
+steam_item = 145
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o54"]
@@ -569,6 +668,8 @@ id = &"cape_wizard"
 kind = &"cape"
 display_name = "Starry Cloak"
 price = 500
+cents = 75
+steam_item = 146
 swatch = PackedColorArray(0.1804, 0.2431, 0.4784, 1, 0.8863, 0.698, 0.2275, 1, 0.3059, 0.1647, 0.4196, 1)
 
 [sub_resource type="Resource" id="o55"]
@@ -577,6 +678,8 @@ id = &"cape_vampire"
 kind = &"cape"
 display_name = "Vampire Cloak"
 price = 550
+cents = 100
+steam_item = 147
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4784, 0.1216, 0.1333, 1)
 
 [sub_resource type="Resource" id="o56"]
@@ -585,6 +688,8 @@ id = &"cape_card_shark"
 kind = &"cape"
 display_name = "Card Shark"
 price = 600
+cents = 100
+steam_item = 148
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o57"]
@@ -593,6 +698,8 @@ id = &"cape_money"
 kind = &"cape"
 display_name = "Money Cape"
 price = 700
+cents = 100
+steam_item = 149
 swatch = PackedColorArray(0.2471, 0.4784, 0.2902, 1, 0.9137, 0.8627, 0.7373, 1)
 
 [sub_resource type="Resource" id="o58"]
@@ -601,6 +708,9 @@ id = &"cape_royal"
 kind = &"cape"
 display_name = "Royal Robe"
 price = 900
+money_only = true
+cents = 100
+steam_item = 150
 swatch = PackedColorArray(0.3059, 0.1647, 0.4196, 1, 0.9569, 0.9373, 0.8941, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o59"]
@@ -609,6 +719,9 @@ id = &"cape_high_roller"
 kind = &"cape"
 display_name = "High Roller"
 price = 1200
+money_only = true
+cents = 100
+steam_item = 151
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1)
 
 [sub_resource type="Resource" id="o60"]
@@ -633,6 +746,8 @@ id = &"boots_oxford"
 kind = &"boots"
 display_name = "Oxford Shoes"
 price = 200
+cents = 50
+steam_item = 152
 swatch = PackedColorArray(0.3529, 0.2275, 0.1412, 1, 0.9137, 0.8627, 0.7373, 1)
 
 [sub_resource type="Resource" id="o63"]
@@ -641,6 +756,8 @@ id = &"boots_police"
 kind = &"boots"
 display_name = "Police Boots"
 price = 250
+cents = 50
+steam_item = 153
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1)
 
 [sub_resource type="Resource" id="o64"]
@@ -649,6 +766,8 @@ id = &"boots_clogs"
 kind = &"boots"
 display_name = "Chef's Clogs"
 price = 250
+cents = 50
+steam_item = 154
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.9137, 0.8627, 0.7373, 1)
 
 [sub_resource type="Resource" id="o65"]
@@ -657,6 +776,8 @@ id = &"boots_firefighter"
 kind = &"boots"
 display_name = "Fire Boots"
 price = 300
+cents = 50
+steam_item = 155
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.8863, 0.698, 0.2275, 1)
 
 [sub_resource type="Resource" id="o66"]
@@ -665,6 +786,8 @@ id = &"boots_flippers"
 kind = &"boots"
 display_name = "Flippers"
 price = 300
+cents = 50
+steam_item = 156
 swatch = PackedColorArray(0.2431, 0.549, 0.5333, 1)
 
 [sub_resource type="Resource" id="o67"]
@@ -673,6 +796,8 @@ id = &"boots_bunny"
 kind = &"boots"
 display_name = "Bunny Slippers"
 price = 350
+cents = 75
+steam_item = 157
 swatch = PackedColorArray(0.8902, 0.6039, 0.651, 1, 0.9569, 0.9373, 0.8941, 1)
 
 [sub_resource type="Resource" id="o68"]
@@ -681,6 +806,8 @@ id = &"boots_clown"
 kind = &"boots"
 display_name = "Clown Shoes"
 price = 350
+cents = 75
+steam_item = 158
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.8863, 0.698, 0.2275, 1, 0.9137, 0.8627, 0.7373, 1)
 
 [sub_resource type="Resource" id="o69"]
@@ -689,6 +816,8 @@ id = &"boots_cowboy"
 kind = &"boots"
 display_name = "Cowboy Boots"
 price = 400
+cents = 75
+steam_item = 159
 swatch = PackedColorArray(0.6902, 0.4784, 0.2706, 1, 0.7216, 0.7373, 0.7608, 1)
 
 [sub_resource type="Resource" id="o70"]
@@ -697,6 +826,8 @@ id = &"boots_pirate"
 kind = &"boots"
 display_name = "Pirate Boots"
 price = 400
+cents = 75
+steam_item = 160
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4196, 0.2902, 0.1804, 1, 0.851, 0.6824, 0.3216, 1)
 
 [sub_resource type="Resource" id="o71"]
@@ -705,6 +836,8 @@ id = &"boots_skates"
 kind = &"boots"
 display_name = "Roller Skates"
 price = 450
+cents = 75
+steam_item = 161
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
 
 [sub_resource type="Resource" id="o72"]
@@ -713,6 +846,8 @@ id = &"boots_spats"
 kind = &"boots"
 display_name = "Spats"
 price = 450
+cents = 75
+steam_item = 162
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
 
 [sub_resource type="Resource" id="o73"]
@@ -721,6 +856,9 @@ id = &"boots_knight"
 kind = &"boots"
 display_name = "Knight's Sabatons"
 price = 600
+money_only = true
+cents = 100
+steam_item = 163
 swatch = PackedColorArray(0.549, 0.5686, 0.5961, 1)
 
 [sub_resource type="Resource" id="o74"]
@@ -729,8 +867,92 @@ id = &"boots_gold"
 kind = &"boots"
 display_name = "Golden High-Tops"
 price = 900
+money_only = true
+cents = 100
+steam_item = 164
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="p0"]
+script = ExtResource("3")
+id = &"pack_police"
+display_name = "Police Squad"
+pieces = Array[StringName]([&"hat_police", &"shirt_police", &"pants_police", &"boots_police"])
+cents = 150
+steam_item = 1000
+
+[sub_resource type="Resource" id="p1"]
+script = ExtResource("3")
+id = &"pack_business"
+display_name = "Business Class"
+pieces = Array[StringName]([&"hat_bowler", &"shirt_business", &"pants_suit", &"boots_oxford"])
+cents = 150
+steam_item = 1001
+
+[sub_resource type="Resource" id="p2"]
+script = ExtResource("3")
+id = &"pack_black_tie"
+display_name = "Black Tie"
+pieces = Array[StringName]([&"hat_top", &"shirt_tux", &"pants_tux", &"cape_vampire", &"boots_spats"])
+cents = 400
+steam_item = 1002
+
+[sub_resource type="Resource" id="p3"]
+script = ExtResource("3")
+id = &"pack_chef"
+display_name = "Head Chef"
+pieces = Array[StringName]([&"hat_chef", &"shirt_chef", &"pants_chef", &"boots_clogs"])
+cents = 150
+steam_item = 1003
+
+[sub_resource type="Resource" id="p4"]
+script = ExtResource("3")
+id = &"pack_firefighter"
+display_name = "Fire Brigade"
+pieces = Array[StringName]([&"hat_firefighter", &"shirt_firefighter", &"pants_firefighter", &"boots_firefighter"])
+cents = 200
+steam_item = 1004
+
+[sub_resource type="Resource" id="p5"]
+script = ExtResource("3")
+id = &"pack_pirate"
+display_name = "Pirate Captain"
+pieces = Array[StringName]([&"hat_pirate", &"shirt_sailor", &"pants_pirate", &"boots_pirate"])
+cents = 175
+steam_item = 1005
+
+[sub_resource type="Resource" id="p6"]
+script = ExtResource("3")
+id = &"pack_royal"
+display_name = "Royal Highness"
+pieces = Array[StringName]([&"hat_crown", &"shirt_knight", &"pants_kilt", &"cape_royal", &"boots_knight"])
+cents = 425
+steam_item = 1006
+
+[sub_resource type="Resource" id="p7"]
+script = ExtResource("3")
+id = &"pack_hero"
+display_name = "Super Wizard"
+pieces = Array[StringName]([&"hat_wizard", &"shirt_hero", &"pants_hero", &"cape_hero", &"boots_gold"])
+cents = 350
+steam_item = 1007
+
+[sub_resource type="Resource" id="p8"]
+script = ExtResource("3")
+id = &"pack_cowboy"
+display_name = "Wild West"
+pieces = Array[StringName]([&"hat_cowboy", &"shirt_flannel", &"pants_jeans", &"cape_leopard", &"boots_cowboy"])
+cents = 225
+steam_item = 1008
+
+[sub_resource type="Resource" id="p9"]
+script = ExtResource("3")
+id = &"pack_holiday"
+display_name = "Holiday Mode"
+pieces = Array[StringName]([&"hat_propeller", &"shirt_hawaiian", &"pants_lederhosen", &"cape_towel", &"boots_flippers"])
+cents = 250
+steam_item = 1009
 
 [resource]
 script = ExtResource("1")
 items = Array[ExtResource("2")]([SubResource("c0"), SubResource("c1"), SubResource("c2"), SubResource("c3"), SubResource("c4"), SubResource("c5"), SubResource("c6"), SubResource("c7"), SubResource("c8"), SubResource("c9"), SubResource("c10"), SubResource("c11"), SubResource("c12"), SubResource("c13"), SubResource("c14"), SubResource("c15"), SubResource("o0"), SubResource("o1"), SubResource("o2"), SubResource("o3"), SubResource("o4"), SubResource("o5"), SubResource("o6"), SubResource("o7"), SubResource("o8"), SubResource("o9"), SubResource("o10"), SubResource("o11"), SubResource("o12"), SubResource("o13"), SubResource("o14"), SubResource("o15"), SubResource("o16"), SubResource("o17"), SubResource("o18"), SubResource("o19"), SubResource("o20"), SubResource("o21"), SubResource("o22"), SubResource("o23"), SubResource("o24"), SubResource("o25"), SubResource("o26"), SubResource("o27"), SubResource("o28"), SubResource("o29"), SubResource("o30"), SubResource("o31"), SubResource("o32"), SubResource("o33"), SubResource("o34"), SubResource("o35"), SubResource("o36"), SubResource("o37"), SubResource("o38"), SubResource("o39"), SubResource("o40"), SubResource("o41"), SubResource("o42"), SubResource("o43"), SubResource("o44"), SubResource("o45"), SubResource("o46"), SubResource("o47"), SubResource("o48"), SubResource("o49"), SubResource("o50"), SubResource("o51"), SubResource("o52"), SubResource("o53"), SubResource("o54"), SubResource("o55"), SubResource("o56"), SubResource("o57"), SubResource("o58"), SubResource("o59"), SubResource("o60"), SubResource("o61"), SubResource("o62"), SubResource("o63"), SubResource("o64"), SubResource("o65"), SubResource("o66"), SubResource("o67"), SubResource("o68"), SubResource("o69"), SubResource("o70"), SubResource("o71"), SubResource("o72"), SubResource("o73"), SubResource("o74")])
+packs = Array[ExtResource("3")]([SubResource("p0"), SubResource("p1"), SubResource("p2"), SubResource("p3"), SubResource("p4"), SubResource("p5"), SubResource("p6"), SubResource("p7"), SubResource("p8"), SubResource("p9")])

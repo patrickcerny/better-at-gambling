@@ -22,6 +22,13 @@ const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_
 @export var display_name: String = ""
 ## Price in Coins; 0 = free and always owned.
 @export var price: int = 0
+## Only for real money through Steam (no Coin price; `price` is ignored).
+@export var money_only: bool = false
+## Real-money price in euro cents (0 = not sold for money). The price shown comes from Steam
+## (the player's currency); this is the reference written into tools/steam/itemdefs.json.
+@export var cents: int = 0
+## The Steam Inventory item definition that grants this piece (0 = none).
+@export var steam_item: int = 0
 ## Outfit pieces: up to three colours for the shop tile's swatch.
 @export var swatch: PackedColorArray = PackedColorArray()
 ## KIND_COLOR: the palette index (`Palette.player_color`, `Cosmetics.COLOR_COUNT`).
@@ -29,4 +36,14 @@ const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_
 
 
 func is_free() -> bool:
-	return price <= 0
+	return price <= 0 and not money_only
+
+
+## Whether it can be bought with Coins.
+func coin_buyable() -> bool:
+	return not money_only and price > 0
+
+
+## Whether it can be bought with real money through Steam.
+func steam_buyable() -> bool:
+	return steam_item > 0 and cents > 0

@@ -103,8 +103,12 @@ func _process(_delta: float) -> void:
 func _stage(id: StringName) -> void:
 	var d: CosmeticDef = CosmeticShop.default().find(id)
 	var kind: StringName = d.kind if d != null else &""
-	_bean.set_outfit({kind: id} if kind in CosmeticDef.OUTFIT_KINDS else {})
-	_bean.set_color(Palette.player_color(d.color_index) if kind == CosmeticDef.KIND_COLOR else BEAN_COLOR)
+	var pack: CosmeticPack = CosmeticShop.default().find_pack(id)
+	if pack != null:
+		_bean.set_outfit(CosmeticsPanel.pack_outfit(pack))  # a whole outfit, the whole bean
+	else:
+		_bean.set_outfit({kind: id} if kind in CosmeticDef.OUTFIT_KINDS else {})
+	_bean.set_color(Palette.player_color(d.color_index) if d != null and kind == CosmeticDef.KIND_COLOR else BEAN_COLOR)
 	_bean.rotation.y = PI + 0.45  # face the camera, a little turned
 	# Boots alone read best: no body or arms looming over them.
 	var bare_feet: bool = kind == CosmeticDef.KIND_BOOTS

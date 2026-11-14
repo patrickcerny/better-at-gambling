@@ -19,6 +19,9 @@ var coins: int = 0
 var preferred_color: int = -1
 ## Bought cosmetics (`CosmeticDef.id`); free ones are always owned and not listed.
 var owned: Array[StringName] = []
+## Pieces in the player's Steam inventory (bought with real money). Not saved: Steam is the
+## record (`SteamSvc` fills it on start and after each purchase), so a hand-edited file can't add any.
+var steam_owned: Array[StringName] = []
 ## The outfit worn from the next join on: `CosmeticDef.OUTFIT_KINDS` kind -> owned item id.
 var outfit: Dictionary[StringName, StringName] = {}
 var matches: int = 0
@@ -58,10 +61,18 @@ func level_progress() -> float:
 
 # --- Cosmetics ----------------------------------------------------------------------------------
 
-## Free items and bought ones.
+## Free items, ones bought with Coins and ones in the Steam inventory.
 func owns(id: StringName) -> bool:
 	var d: CosmeticDef = shop.find(id)
-	return d != null and (d.is_free() or id in owned)
+	return d != null and (d.is_free() or id in owned or id in steam_owned)
+
+
+## Whether every piece of pack `pack` is owned.
+func owns_pack(pack: CosmeticPack) -> bool:
+	for id: StringName in pack.pieces:
+		if not owns(id):
+			return false
+	return true
 
 
 ## Whether this profile may wear bean colour `index`.
@@ -81,14 +92,16 @@ func owned_colors() -> Array[int]:
 	return out
 
 
-## Buys `id` with Coins. Returns &"" when bought, else why not: &"unknown", &"owned" or
-## &"not_enough_coins". Nothing changes on a refusal.
+## Buys `id` with Coins. Returns &"" when bought, else why not: &"unknown", &"owned",
+## &"steam_only" (real money only) or &"not_enough_coins". Nothing changes on a refusal.
 func buy(id: StringName) -> StringName:
 	var d: CosmeticDef = shop.find(id)
 	if d == null:
 		return &"unknown"
 	if owns(id):
 		return &"owned"
+	if not d.coin_buyable():
+		return &"steam_only"
 	if coins < d.price:
 		return &"not_enough_coins"
 	coins -= d.price
@@ -118,16 +131,18 @@ func take_off(kind: StringName) -> void:
 	outfit.erase(kind)
 
 
-## Whether piece `id` is worn now.
+## Whether piece `id` is worn now (and owned: a Steam piece counts once the inventory says so).
 func is_worn(id: StringName) -> bool:
-	return id != &"" and id in outfit.values()
+	return id != &"" and id in outfit.values() and owns(id)
 
 
-## The outfit for the hello and `set_outfit` (`Cosmetics.sanitize_outfit` order).
+## The outfit for the hello and `set_outfit` (`Cosmetics.sanitize_outfit` order): owned pieces
+## only (a Steam piece stays in the saved outfit while the inventory loads, but is not shown).
 func outfit_wire() -> PackedStringArray:
 	var out := PackedStringArray()
 	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
-		out.append(String(outfit.get(kind, &"")))
+		var id: StringName = outfit.get(kind, &"")
+		out.append(String(id) if owns(id) else "")
 	return out
 
 
@@ -217,7 +232,7 @@ func sanitize() -> void:
 	var clean: Array[StringName] = []
 	for id: StringName in owned:
 		var d: CosmeticDef = shop.find(id)
-		if d != null and not d.is_free() and not id in clean:
+		if d != null and d.coin_buyable() and not id in clean:
 			clean.append(id)
 	owned = clean
 	if preferred_color != -1 and not owns_color(preferred_color):
@@ -225,7 +240,8 @@ func sanitize() -> void:
 	var worn: Dictionary[StringName, StringName] = {}
 	for kind: StringName in outfit:
 		var d: CosmeticDef = shop.find(outfit[kind])
-		if kind in CosmeticDef.OUTFIT_KINDS and d != null and d.kind == kind and owns(d.id):
+		# Steam pieces stay put: the Steam inventory arrives after the profile is loaded.
+		if kind in CosmeticDef.OUTFIT_KINDS and d != null and d.kind == kind and (owns(d.id) or d.steam_buyable()):
 			worn[kind] = d.id
 	outfit = worn
 	matches = maxi(matches, 0)
