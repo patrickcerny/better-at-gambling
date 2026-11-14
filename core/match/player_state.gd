@@ -11,6 +11,9 @@ var color_index: int = 0
 ## The bean's colour (`Palette.player_color`, 0 .. `Cosmetics.COLOR_COUNT`-1): the player's
 ## preferred colour unless another bean wears it (`Cosmetics.bean_color_for`).
 var bean_color: int = 0
+## Outfit pieces worn: five shop ids in `CosmeticDef.OUTFIT_KINDS` order ("" = none,
+## `Cosmetics.sanitize_outfit`).
+var outfit: PackedStringArray = Cosmetics.sanitize_outfit([])
 var connected: bool = true
 var ready: bool = false
 var inventory: Array[StringName] = []
@@ -33,7 +36,7 @@ var jail_fine: int = 0
 ## Wire dictionary.
 func to_wire() -> Dictionary:
 	return {
-		"id": id, "uid": uid, "name": display_name, "color": color_index, "bean_color": bean_color,
+		"id": id, "uid": uid, "name": display_name, "color": color_index, "bean_color": bean_color, "outfit": outfit.duplicate(),
 		"connected": connected, "ready": ready, "inventory": inventory.duplicate(),
 		"quiz_points": quiz_points, "quiz_time": quiz_correct_time, "biggest_win": biggest_win, "station": station, "seat": seat,
 		"pos": Serializer.vec3(position),
@@ -49,6 +52,7 @@ static func from_wire(d: Dictionary) -> PlayerState:
 	p.display_name = str(d.get("name", ""))
 	p.color_index = int(d.get("color", 0))
 	p.bean_color = int(d.get("bean_color", p.color_index))
+	p.outfit = Cosmetics.sanitize_outfit(d.get("outfit", []))
 	p.connected = bool(d.get("connected", true))
 	p.ready = bool(d.get("ready", false))
 	for item: Variant in d.get("inventory", []):

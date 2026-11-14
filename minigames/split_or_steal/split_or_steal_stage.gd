@@ -1005,6 +1005,7 @@ func _build_seat(pid: int, idx: int) -> void:
 	bean.scale = Vector3.ONE * AUDIENCE_SCALE
 	seat.add_child(bean)
 	bean.set_color(Palette.bean_color(state.players.get(pid, {"color": pid - 1})))
+	bean.set_outfit(Cosmetics.outfit_of(state.players.get(pid, {})))
 	var puppet: BeanPuppet = BeanPuppet.attach(bean)
 	puppet.cheer_height = 0.2
 	var tag := Label3D.new()

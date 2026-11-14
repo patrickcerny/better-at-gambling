@@ -393,7 +393,8 @@ func _sync_track() -> void:
 	var info: Dictionary = {}
 	for p: int in lanes + bench:
 		var bean: Color = Palette.bean_color(state.players[p]) if state != null and state.players.has(p) else _color(p)
-		info[p] = {"name": _name(p), "color": _color(p), "bean": bean, "steps": display_steps.get(p, 0)}
+		var outfit: Dictionary = Cosmetics.outfit_of(state.players[p]) if state != null and state.players.has(p) else {}
+		info[p] = {"name": _name(p), "color": _color(p), "bean": bean, "outfit": outfit, "steps": display_steps.get(p, 0)}
 	track.set_racers(lanes, bench, info)
 
 

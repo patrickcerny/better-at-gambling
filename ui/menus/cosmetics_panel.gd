@@ -2,18 +2,24 @@ class_name CosmeticsPanel
 extends PanelContainer
 ## The cosmetics shop (Patrick: "There will be a shop for cosmetics", docs/GDD.md "Cosmetics
 ## shop"), from the main menu's COSMETICS entry, its T-shirt button and the lobby's settings
-## tablet. A turning bean shows the picked item; one tab per kind of cosmetic that has stock
-## (`CosmeticShop`, data/progression/cosmetics_shop.tres: only COLOURS for now), a tile per item
-## with its price or state. BUY spends Coins, WEAR makes a colour the preferred one (worn from the
-## next join on, and in the lobby at once through `set_color`). Coins are out-of-match money: the
-## tables never take them. BACK (or Esc) closes.
+## tablet. A turning bean shows the picked item on top of what you wear; one tab per kind of
+## cosmetic (`CosmeticShop`, data/progression/cosmetics_shop.tres: COLOURS, HATS, SHIRTS,
+## TROUSERS, CAPES, BOOTS), a tile per item with its price or state. BUY spends Coins; WEAR makes
+## a colour the preferred one or puts an outfit piece on (worn from the next join on, and in the
+## lobby at once through `set_color` / `set_outfit`); TAKE OFF takes a piece off again. Coins are
+## out-of-match money: the tables never take them. BACK (or Esc) closes.
 
 signal closed
 ## A colour was put on (the lobby forwards it to the server).
 signal color_worn(index: int)
+## An outfit piece was put on in slot `kind` (`id` &"": taken off); the lobby forwards it.
+signal outfit_worn(kind: StringName, id: StringName)
 
 const COLUMNS: int = 4
-const KIND_TITLES: Dictionary = {CosmeticDef.KIND_COLOR: "COLOURS", CosmeticDef.KIND_HAT: "HATS"}
+const KIND_TITLES: Dictionary = {
+	CosmeticDef.KIND_COLOR: "COLOURS", CosmeticDef.KIND_HAT: "HATS", CosmeticDef.KIND_SHIRT: "SHIRTS",
+	CosmeticDef.KIND_PANTS: "TROUSERS", CosmeticDef.KIND_CAPE: "CAPES", CosmeticDef.KIND_BOOTS: "BOOTS",
+}
 
 ## Item id -> its tile (a toggle Button).
 var tiles: Dictionary[StringName, Button] = {}
@@ -104,12 +110,18 @@ func _ready() -> void:
 		var items: Array[CosmeticDef] = shop.of_kind(kind)
 		if items.is_empty():
 			continue  # a kind shows up once the shop stocks it
+		var scroll := ScrollContainer.new()
+		scroll.name = str(KIND_TITLES.get(kind, String(kind).to_upper()))
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.follow_focus = true
+		tabs.add_child(scroll)
 		var grid := GridContainer.new()
-		grid.name = str(KIND_TITLES.get(kind, String(kind).to_upper()))
+		grid.name = "Grid"
 		grid.columns = COLUMNS
+		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_theme_constant_override(&"h_separation", 10)
 		grid.add_theme_constant_override(&"v_separation", 10)
-		tabs.add_child(grid)
+		scroll.add_child(grid)
 		for d: CosmeticDef in items:
 			grid.add_child(_tile(d))
 	var bottom := HBoxContainer.new()
@@ -153,6 +165,25 @@ func _tile(d: CosmeticDef) -> Button:
 		sb.border_color = Palette.CASINO_BLACK
 		sw.add_theme_stylebox_override(&"panel", sb)
 		box.add_child(sw)
+	else:
+		# An outfit piece: its colours as a row of little dots (the preview shows the model).
+		var dots := HBoxContainer.new()
+		dots.name = "Swatch"
+		dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dots.alignment = BoxContainer.ALIGNMENT_CENTER
+		dots.add_theme_constant_override(&"separation", 4)
+		box.add_child(dots)
+		for c: Color in d.swatch:
+			var dot := Panel.new()
+			dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			dot.custom_minimum_size = Vector2(30, 30)
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = c
+			sb.set_corner_radius_all(15)
+			sb.set_border_width_all(2)
+			sb.border_color = Palette.CASINO_BLACK
+			dot.add_theme_stylebox_override(&"panel", sb)
+			dots.add_child(dot)
 	var label := Label.new()
 	label.name = "Name"
 	label.text = d.display_name.to_upper()
@@ -202,7 +233,22 @@ func press_action() -> void:
 		ProfileManager.set_preferred_color(d.color_index)
 		status_label.text = "Your bean wears %s from now on." % d.display_name
 		color_worn.emit(d.color_index)
+	elif d.kind in CosmeticDef.OUTFIT_KINDS:
+		if p.is_worn(d.id):
+			ProfileManager.take_off(d.kind)
+			status_label.text = "Took off the %s." % d.display_name
+			outfit_worn.emit(d.kind, &"")
+		elif ProfileManager.wear(d.id):
+			status_label.text = "Your bean wears the %s from now on." % d.display_name
+			outfit_worn.emit(d.kind, d.id)
 	_refresh()
+
+
+## Whether item `d` is what the bean wears now (its colour or one of its outfit pieces).
+static func _wearing(p: PlayerProfile, d: CosmeticDef) -> bool:
+	if d.kind == CosmeticDef.KIND_COLOR:
+		return p.preferred_color == d.color_index
+	return p.is_worn(d.id)
 
 
 func _refresh() -> void:
@@ -215,7 +261,7 @@ func _refresh() -> void:
 		var b: Button = tiles[id]
 		b.set_pressed_no_signal(id == selected)
 		var price: Label = b.find_child("Price", true, false) as Label
-		var wearing: bool = d.kind == CosmeticDef.KIND_COLOR and p.preferred_color == d.color_index
+		var wearing: bool = _wearing(p, d)
 		if wearing:
 			price.text = "WEARING"
 		elif p.owns(id):
@@ -230,14 +276,22 @@ func _refresh() -> void:
 		item_name.text = ""
 		return
 	item_name.text = sel.display_name.to_upper()
-	if sel.kind == CosmeticDef.KIND_COLOR:
-		preview.set_bean_color(Palette.player_color(sel.color_index))
+	# The preview: what you wear, with the picked item tried on.
+	var worn_color: int = p.preferred_color if p.preferred_color >= 0 else 0
+	preview.set_bean_color(Palette.player_color(sel.color_index if sel.kind == CosmeticDef.KIND_COLOR else worn_color))
+	var dress: Dictionary = p.outfit.duplicate()
+	if sel.kind in CosmeticDef.OUTFIT_KINDS:
+		dress[sel.kind] = sel.id
+	if preview.outfit != dress:
+		preview.set_outfit(dress)
 	action_button.disabled = false
 	if not p.owns(sel.id):
 		action_button.text = "BUY  ·  %d COINS" % sel.price
 	elif sel.kind == CosmeticDef.KIND_COLOR and p.preferred_color == sel.color_index:
 		action_button.text = "WEARING"
 		action_button.disabled = true
+	elif sel.kind in CosmeticDef.OUTFIT_KINDS and p.is_worn(sel.id):
+		action_button.text = "TAKE OFF"
 	else:
 		action_button.text = "WEAR"
 

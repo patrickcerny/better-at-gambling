@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CosmeticShop" load_steps=19 format=3]
+[gd_resource type="Resource" script_class="CosmeticShop" load_steps=94 format=3]
 
 [ext_resource type="Script" path="res://core/defs/cosmetic_shop.gd" id="1"]
 [ext_resource type="Script" path="res://core/defs/cosmetic_def.gd" id="2"]
@@ -131,6 +131,606 @@ display_name = "Gold"
 price = 400
 color_index = 15
 
+[sub_resource type="Resource" id="o0"]
+script = ExtResource("2")
+id = &"hat_party"
+kind = &"hat"
+display_name = "Party Hat"
+price = 0
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.9137, 0.8627, 0.7373, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o1"]
+script = ExtResource("2")
+id = &"hat_hardhat"
+kind = &"hat"
+display_name = "Hard Hat"
+price = 0
+swatch = PackedColorArray(0.8863, 0.698, 0.2275, 1)
+
+[sub_resource type="Resource" id="o2"]
+script = ExtResource("2")
+id = &"hat_police"
+kind = &"hat"
+display_name = "Police Cap"
+price = 250
+swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o3"]
+script = ExtResource("2")
+id = &"hat_bowler"
+kind = &"hat"
+display_name = "Bowler Hat"
+price = 250
+swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.1098, 0.102, 0.09804, 1)
+
+[sub_resource type="Resource" id="o4"]
+script = ExtResource("2")
+id = &"hat_chef"
+kind = &"hat"
+display_name = "Chef's Toque"
+price = 250
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o5"]
+script = ExtResource("2")
+id = &"hat_cone"
+kind = &"hat"
+display_name = "Traffic Cone"
+price = 300
+swatch = PackedColorArray(0.851, 0.4667, 0.1686, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o6"]
+script = ExtResource("2")
+id = &"hat_fedora"
+kind = &"hat"
+display_name = "Fedora"
+price = 350
+swatch = PackedColorArray(0.3529, 0.2902, 0.2353, 1, 0.1098, 0.102, 0.09804, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o7"]
+script = ExtResource("2")
+id = &"hat_firefighter"
+kind = &"hat"
+display_name = "Fire Helmet"
+price = 350
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o8"]
+script = ExtResource("2")
+id = &"hat_cowboy"
+kind = &"hat"
+display_name = "Cowboy Hat"
+price = 400
+swatch = PackedColorArray(0.6902, 0.4784, 0.2706, 1, 0.3529, 0.2275, 0.1412, 1)
+
+[sub_resource type="Resource" id="o9"]
+script = ExtResource("2")
+id = &"hat_propeller"
+kind = &"hat"
+display_name = "Propeller Cap"
+price = 400
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.8863, 0.698, 0.2275, 1, 0.1843, 0.3647, 0.6588, 1)
+
+[sub_resource type="Resource" id="o10"]
+script = ExtResource("2")
+id = &"hat_pirate"
+kind = &"hat"
+display_name = "Pirate Tricorn"
+price = 500
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o11"]
+script = ExtResource("2")
+id = &"hat_top"
+kind = &"hat"
+display_name = "Top Hat"
+price = 500
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o12"]
+script = ExtResource("2")
+id = &"hat_viking"
+kind = &"hat"
+display_name = "Viking Helmet"
+price = 600
+swatch = PackedColorArray(0.549, 0.5686, 0.5961, 1, 0.9137, 0.8627, 0.7373, 1)
+
+[sub_resource type="Resource" id="o13"]
+script = ExtResource("2")
+id = &"hat_wizard"
+kind = &"hat"
+display_name = "Wizard Hat"
+price = 600
+swatch = PackedColorArray(0.1804, 0.2431, 0.4784, 1, 0.8863, 0.698, 0.2275, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o14"]
+script = ExtResource("2")
+id = &"hat_crown"
+kind = &"hat"
+display_name = "Crown"
+price = 1000
+swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o15"]
+script = ExtResource("2")
+id = &"shirt_sailor"
+kind = &"shirt"
+display_name = "Sailor Stripes"
+price = 0
+swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o16"]
+script = ExtResource("2")
+id = &"shirt_hivis"
+kind = &"shirt"
+display_name = "Hi-Vis Vest"
+price = 0
+swatch = PackedColorArray(0.851, 0.4667, 0.1686, 1, 0.7216, 0.7373, 0.7608, 1)
+
+[sub_resource type="Resource" id="o17"]
+script = ExtResource("2")
+id = &"shirt_police"
+kind = &"shirt"
+display_name = "Police Shirt"
+price = 250
+swatch = PackedColorArray(0.4902, 0.6118, 0.7686, 1, 0.1373, 0.1882, 0.2902, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o18"]
+script = ExtResource("2")
+id = &"shirt_business"
+kind = &"shirt"
+display_name = "Business Suit"
+price = 300
+swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o19"]
+script = ExtResource("2")
+id = &"shirt_chef"
+kind = &"shirt"
+display_name = "Chef's Jacket"
+price = 250
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.1098, 0.102, 0.09804, 1)
+
+[sub_resource type="Resource" id="o20"]
+script = ExtResource("2")
+id = &"shirt_jailbird"
+kind = &"shirt"
+display_name = "Jailbird"
+price = 250
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o21"]
+script = ExtResource("2")
+id = &"shirt_referee"
+kind = &"shirt"
+display_name = "Referee"
+price = 300
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1, 0.7216, 0.7373, 0.7608, 1)
+
+[sub_resource type="Resource" id="o22"]
+script = ExtResource("2")
+id = &"shirt_flannel"
+kind = &"shirt"
+display_name = "Lumberjack Flannel"
+price = 300
+swatch = PackedColorArray(0.6588, 0.1961, 0.1725, 1, 0.1098, 0.102, 0.09804, 1)
+
+[sub_resource type="Resource" id="o23"]
+script = ExtResource("2")
+id = &"shirt_firefighter"
+kind = &"shirt"
+display_name = "Fire Coat"
+price = 350
+swatch = PackedColorArray(0.5412, 0.4157, 0.2275, 1, 0.8863, 0.698, 0.2275, 1, 0.7216, 0.7373, 0.7608, 1)
+
+[sub_resource type="Resource" id="o24"]
+script = ExtResource("2")
+id = &"shirt_hawaiian"
+kind = &"shirt"
+display_name = "Hawaiian Shirt"
+price = 350
+swatch = PackedColorArray(0.7843, 0.3137, 0.2275, 1, 0.9137, 0.8627, 0.7373, 1, 0.8863, 0.698, 0.2275, 1)
+
+[sub_resource type="Resource" id="o25"]
+script = ExtResource("2")
+id = &"shirt_sweater"
+kind = &"shirt"
+display_name = "Cozy Sweater"
+price = 350
+swatch = PackedColorArray(0.1529, 0.3686, 0.2863, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o26"]
+script = ExtResource("2")
+id = &"shirt_dealer"
+kind = &"shirt"
+display_name = "Dealer Vest"
+price = 450
+swatch = PackedColorArray(0.4078, 0.1216, 0.1725, 1, 0.9569, 0.9373, 0.8941, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o27"]
+script = ExtResource("2")
+id = &"shirt_hero"
+kind = &"shirt"
+display_name = "Super Suit"
+price = 500
+swatch = PackedColorArray(0.1843, 0.3647, 0.6588, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o28"]
+script = ExtResource("2")
+id = &"shirt_tux"
+kind = &"shirt"
+display_name = "Tuxedo"
+price = 600
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o29"]
+script = ExtResource("2")
+id = &"shirt_knight"
+kind = &"shirt"
+display_name = "Knight's Tabard"
+price = 700
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.549, 0.5686, 0.5961, 1)
+
+[sub_resource type="Resource" id="o30"]
+script = ExtResource("2")
+id = &"pants_jeans"
+kind = &"pants"
+display_name = "Jeans"
+price = 0
+swatch = PackedColorArray(0.2431, 0.3608, 0.5333, 1, 0.4196, 0.2902, 0.1804, 1)
+
+[sub_resource type="Resource" id="o31"]
+script = ExtResource("2")
+id = &"pants_cargo"
+kind = &"pants"
+display_name = "Cargo Pants"
+price = 0
+swatch = PackedColorArray(0.3569, 0.3882, 0.251, 1, 0.1098, 0.102, 0.09804, 1)
+
+[sub_resource type="Resource" id="o32"]
+script = ExtResource("2")
+id = &"pants_police"
+kind = &"pants"
+display_name = "Police Trousers"
+price = 250
+swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.851, 0.6824, 0.3216, 1, 0.1098, 0.102, 0.09804, 1)
+
+[sub_resource type="Resource" id="o33"]
+script = ExtResource("2")
+id = &"pants_suit"
+kind = &"pants"
+display_name = "Suit Trousers"
+price = 250
+swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.3529, 0.2275, 0.1412, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o34"]
+script = ExtResource("2")
+id = &"pants_chef"
+kind = &"pants"
+display_name = "Chef's Checks"
+price = 250
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o35"]
+script = ExtResource("2")
+id = &"pants_jailbird"
+kind = &"pants"
+display_name = "Jailbird Trousers"
+price = 250
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.1098, 0.102, 0.09804, 1)
+
+[sub_resource type="Resource" id="o36"]
+script = ExtResource("2")
+id = &"pants_firefighter"
+kind = &"pants"
+display_name = "Fire Trousers"
+price = 300
+swatch = PackedColorArray(0.5412, 0.4157, 0.2275, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o37"]
+script = ExtResource("2")
+id = &"pants_boxers"
+kind = &"pants"
+display_name = "Lucky Boxers"
+price = 300
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.4902, 0.6118, 0.7686, 1)
+
+[sub_resource type="Resource" id="o38"]
+script = ExtResource("2")
+id = &"pants_golf"
+kind = &"pants"
+display_name = "Golf Argyle"
+price = 350
+swatch = PackedColorArray(0.8902, 0.6039, 0.651, 1, 0.2431, 0.4196, 0.2706, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o39"]
+script = ExtResource("2")
+id = &"pants_pirate"
+kind = &"pants"
+display_name = "Pirate Breeches"
+price = 350
+swatch = PackedColorArray(0.4196, 0.2902, 0.1804, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o40"]
+script = ExtResource("2")
+id = &"pants_clown"
+kind = &"pants"
+display_name = "Clown Pants"
+price = 400
+swatch = PackedColorArray(0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1, 0.1843, 0.3647, 0.6588, 1)
+
+[sub_resource type="Resource" id="o41"]
+script = ExtResource("2")
+id = &"pants_hero"
+kind = &"pants"
+display_name = "Super Briefs"
+price = 450
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.1843, 0.3647, 0.6588, 1, 0.8863, 0.698, 0.2275, 1)
+
+[sub_resource type="Resource" id="o42"]
+script = ExtResource("2")
+id = &"pants_kilt"
+kind = &"pants"
+display_name = "Tartan Kilt"
+price = 500
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.2431, 0.4196, 0.2706, 1, 0.4196, 0.2902, 0.1804, 1)
+
+[sub_resource type="Resource" id="o43"]
+script = ExtResource("2")
+id = &"pants_tux"
+kind = &"pants"
+display_name = "Tuxedo Trousers"
+price = 500
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4078, 0.1216, 0.1725, 1)
+
+[sub_resource type="Resource" id="o44"]
+script = ExtResource("2")
+id = &"pants_lederhosen"
+kind = &"pants"
+display_name = "Lederhosen"
+price = 600
+swatch = PackedColorArray(0.4196, 0.2902, 0.1804, 1, 0.9137, 0.8627, 0.7373, 1)
+
+[sub_resource type="Resource" id="o45"]
+script = ExtResource("2")
+id = &"cape_towel"
+kind = &"cape"
+display_name = "Bath Towel"
+price = 0
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.4902, 0.6118, 0.7686, 1)
+
+[sub_resource type="Resource" id="o46"]
+script = ExtResource("2")
+id = &"cape_picnic"
+kind = &"cape"
+display_name = "Picnic Blanket"
+price = 0
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o47"]
+script = ExtResource("2")
+id = &"cape_hero"
+kind = &"cape"
+display_name = "Hero Cape"
+price = 300
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o48"]
+script = ExtResource("2")
+id = &"cape_rainbow"
+kind = &"cape"
+display_name = "Rainbow Cape"
+price = 350
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1, 0.2431, 0.549, 0.5333, 1)
+
+[sub_resource type="Resource" id="o49"]
+script = ExtResource("2")
+id = &"cape_patchwork"
+kind = &"cape"
+display_name = "Patchwork Quilt"
+price = 350
+swatch = PackedColorArray(0.2431, 0.549, 0.5333, 1, 0.851, 0.6824, 0.3216, 1, 0.8902, 0.6039, 0.651, 1)
+
+[sub_resource type="Resource" id="o50"]
+script = ExtResource("2")
+id = &"cape_detective"
+kind = &"cape"
+display_name = "Detective Cape"
+price = 400
+swatch = PackedColorArray(0.6275, 0.4706, 0.3137, 1, 0.3529, 0.2275, 0.1412, 1)
+
+[sub_resource type="Resource" id="o51"]
+script = ExtResource("2")
+id = &"cape_leopard"
+kind = &"cape"
+display_name = "Leopard Print"
+price = 400
+swatch = PackedColorArray(0.7882, 0.5882, 0.3059, 1, 0.1098, 0.102, 0.09804, 1)
+
+[sub_resource type="Resource" id="o52"]
+script = ExtResource("2")
+id = &"cape_knight"
+kind = &"cape"
+display_name = "Knight's Cloak"
+price = 450
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.549, 0.5686, 0.5961, 1)
+
+[sub_resource type="Resource" id="o53"]
+script = ExtResource("2")
+id = &"cape_matador"
+kind = &"cape"
+display_name = "Matador Cape"
+price = 450
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o54"]
+script = ExtResource("2")
+id = &"cape_wizard"
+kind = &"cape"
+display_name = "Starry Cloak"
+price = 500
+swatch = PackedColorArray(0.1804, 0.2431, 0.4784, 1, 0.8863, 0.698, 0.2275, 1, 0.3059, 0.1647, 0.4196, 1)
+
+[sub_resource type="Resource" id="o55"]
+script = ExtResource("2")
+id = &"cape_vampire"
+kind = &"cape"
+display_name = "Vampire Cloak"
+price = 550
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4784, 0.1216, 0.1333, 1)
+
+[sub_resource type="Resource" id="o56"]
+script = ExtResource("2")
+id = &"cape_card_shark"
+kind = &"cape"
+display_name = "Card Shark"
+price = 600
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o57"]
+script = ExtResource("2")
+id = &"cape_money"
+kind = &"cape"
+display_name = "Money Cape"
+price = 700
+swatch = PackedColorArray(0.2471, 0.4784, 0.2902, 1, 0.9137, 0.8627, 0.7373, 1)
+
+[sub_resource type="Resource" id="o58"]
+script = ExtResource("2")
+id = &"cape_royal"
+kind = &"cape"
+display_name = "Royal Robe"
+price = 900
+swatch = PackedColorArray(0.3059, 0.1647, 0.4196, 1, 0.9569, 0.9373, 0.8941, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o59"]
+script = ExtResource("2")
+id = &"cape_high_roller"
+kind = &"cape"
+display_name = "High Roller"
+price = 1200
+swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1)
+
+[sub_resource type="Resource" id="o60"]
+script = ExtResource("2")
+id = &"boots_sneakers"
+kind = &"boots"
+display_name = "Sneakers"
+price = 0
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o61"]
+script = ExtResource("2")
+id = &"boots_work"
+kind = &"boots"
+display_name = "Work Boots"
+price = 0
+swatch = PackedColorArray(0.6902, 0.4784, 0.2706, 1, 0.851, 0.4667, 0.1686, 1, 0.549, 0.5686, 0.5961, 1)
+
+[sub_resource type="Resource" id="o62"]
+script = ExtResource("2")
+id = &"boots_oxford"
+kind = &"boots"
+display_name = "Oxford Shoes"
+price = 200
+swatch = PackedColorArray(0.3529, 0.2275, 0.1412, 1, 0.9137, 0.8627, 0.7373, 1)
+
+[sub_resource type="Resource" id="o63"]
+script = ExtResource("2")
+id = &"boots_police"
+kind = &"boots"
+display_name = "Police Boots"
+price = 250
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1)
+
+[sub_resource type="Resource" id="o64"]
+script = ExtResource("2")
+id = &"boots_clogs"
+kind = &"boots"
+display_name = "Chef's Clogs"
+price = 250
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.9137, 0.8627, 0.7373, 1)
+
+[sub_resource type="Resource" id="o65"]
+script = ExtResource("2")
+id = &"boots_firefighter"
+kind = &"boots"
+display_name = "Fire Boots"
+price = 300
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.8863, 0.698, 0.2275, 1)
+
+[sub_resource type="Resource" id="o66"]
+script = ExtResource("2")
+id = &"boots_flippers"
+kind = &"boots"
+display_name = "Flippers"
+price = 300
+swatch = PackedColorArray(0.2431, 0.549, 0.5333, 1)
+
+[sub_resource type="Resource" id="o67"]
+script = ExtResource("2")
+id = &"boots_bunny"
+kind = &"boots"
+display_name = "Bunny Slippers"
+price = 350
+swatch = PackedColorArray(0.8902, 0.6039, 0.651, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o68"]
+script = ExtResource("2")
+id = &"boots_clown"
+kind = &"boots"
+display_name = "Clown Shoes"
+price = 350
+swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.8863, 0.698, 0.2275, 1, 0.9137, 0.8627, 0.7373, 1)
+
+[sub_resource type="Resource" id="o69"]
+script = ExtResource("2")
+id = &"boots_cowboy"
+kind = &"boots"
+display_name = "Cowboy Boots"
+price = 400
+swatch = PackedColorArray(0.6902, 0.4784, 0.2706, 1, 0.7216, 0.7373, 0.7608, 1)
+
+[sub_resource type="Resource" id="o70"]
+script = ExtResource("2")
+id = &"boots_pirate"
+kind = &"boots"
+display_name = "Pirate Boots"
+price = 400
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4196, 0.2902, 0.1804, 1, 0.851, 0.6824, 0.3216, 1)
+
+[sub_resource type="Resource" id="o71"]
+script = ExtResource("2")
+id = &"boots_skates"
+kind = &"boots"
+display_name = "Roller Skates"
+price = 450
+swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
+
+[sub_resource type="Resource" id="o72"]
+script = ExtResource("2")
+id = &"boots_spats"
+kind = &"boots"
+display_name = "Spats"
+price = 450
+swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
+
+[sub_resource type="Resource" id="o73"]
+script = ExtResource("2")
+id = &"boots_knight"
+kind = &"boots"
+display_name = "Knight's Sabatons"
+price = 600
+swatch = PackedColorArray(0.549, 0.5686, 0.5961, 1)
+
+[sub_resource type="Resource" id="o74"]
+script = ExtResource("2")
+id = &"boots_gold"
+kind = &"boots"
+display_name = "Golden High-Tops"
+price = 900
+swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1, 0.9569, 0.9373, 0.8941, 1)
+
 [resource]
 script = ExtResource("1")
-items = Array[ExtResource("2")]([SubResource("c0"), SubResource("c1"), SubResource("c2"), SubResource("c3"), SubResource("c4"), SubResource("c5"), SubResource("c6"), SubResource("c7"), SubResource("c8"), SubResource("c9"), SubResource("c10"), SubResource("c11"), SubResource("c12"), SubResource("c13"), SubResource("c14"), SubResource("c15")])
+items = Array[ExtResource("2")]([SubResource("c0"), SubResource("c1"), SubResource("c2"), SubResource("c3"), SubResource("c4"), SubResource("c5"), SubResource("c6"), SubResource("c7"), SubResource("c8"), SubResource("c9"), SubResource("c10"), SubResource("c11"), SubResource("c12"), SubResource("c13"), SubResource("c14"), SubResource("c15"), SubResource("o0"), SubResource("o1"), SubResource("o2"), SubResource("o3"), SubResource("o4"), SubResource("o5"), SubResource("o6"), SubResource("o7"), SubResource("o8"), SubResource("o9"), SubResource("o10"), SubResource("o11"), SubResource("o12"), SubResource("o13"), SubResource("o14"), SubResource("o15"), SubResource("o16"), SubResource("o17"), SubResource("o18"), SubResource("o19"), SubResource("o20"), SubResource("o21"), SubResource("o22"), SubResource("o23"), SubResource("o24"), SubResource("o25"), SubResource("o26"), SubResource("o27"), SubResource("o28"), SubResource("o29"), SubResource("o30"), SubResource("o31"), SubResource("o32"), SubResource("o33"), SubResource("o34"), SubResource("o35"), SubResource("o36"), SubResource("o37"), SubResource("o38"), SubResource("o39"), SubResource("o40"), SubResource("o41"), SubResource("o42"), SubResource("o43"), SubResource("o44"), SubResource("o45"), SubResource("o46"), SubResource("o47"), SubResource("o48"), SubResource("o49"), SubResource("o50"), SubResource("o51"), SubResource("o52"), SubResource("o53"), SubResource("o54"), SubResource("o55"), SubResource("o56"), SubResource("o57"), SubResource("o58"), SubResource("o59"), SubResource("o60"), SubResource("o61"), SubResource("o62"), SubResource("o63"), SubResource("o64"), SubResource("o65"), SubResource("o66"), SubResource("o67"), SubResource("o68"), SubResource("o69"), SubResource("o70"), SubResource("o71"), SubResource("o72"), SubResource("o73"), SubResource("o74")])

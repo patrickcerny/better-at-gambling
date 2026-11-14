@@ -27,6 +27,8 @@ var hand_l: RigidBody3D
 var hand_r: RigidBody3D
 var hips: RigidBody3D
 var color: Color = Palette.CREAM
+## The outfit the bean wears (`AvatarVisuals.dress`: hat, shirt, trousers and cape ride the torso).
+var outfit: Dictionary = {}
 var max_time: float = 2.5
 ## Player this ragdoll belongs to.
 var player_id: int = -1
@@ -172,6 +174,7 @@ func _build() -> void:
 		_eyes.append(e)
 	if DisplayServer.get_name() != "headless":
 		_build_flail(mat, dark)
+		AvatarVisuals.dress(torso_mesh, outfit)
 	set_dazed(_dazed)
 
 

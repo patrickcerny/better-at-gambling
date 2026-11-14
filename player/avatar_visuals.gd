@@ -152,6 +152,17 @@ var _emote_spin: float = 0.0
 var _brow_side: float = 0.0
 var _tears: Array[MeshInstance3D] = []
 var _headless: bool = false
+## Outfit pieces worn (`CosmeticDef.OUTFIT_KINDS` kind -> item id, `OutfitMeshes`).
+var outfit: Dictionary[StringName, StringName] = {}
+## The node each worn piece hangs on (boots: the right boot; the left one is in `_boot_l`).
+var _outfit_nodes: Dictionary[StringName, Node3D] = {}
+var _boot_l: Node3D = null
+var _cape_pivot: Node3D = null
+var _cape_swing: float = 0.0
+var _foot_meshes: Array[Mesh] = []
+
+## Headless beans (servers) keep the outfit ids only; tests switch the models on.
+static var outfits_headless: bool = false
 
 
 func _ready() -> void:
@@ -164,6 +175,114 @@ func set_color(c: Color) -> void:
 	color = c
 	if _body_mat != null:
 		ToonMaterial.set_color(_body_mat, c)
+
+
+## Puts on a whole outfit (kind -> item id; missing kinds come off).
+func set_outfit(o: Dictionary) -> void:
+	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
+		wear(kind, StringName(str(o.get(kind, o.get(String(kind), "")))))
+
+
+## Puts on one piece (`OutfitMeshes`): &"" or an unknown id takes that kind off.
+func wear(kind: StringName, id: StringName) -> void:
+	if not kind in CosmeticDef.OUTFIT_KINDS or outfit.get(kind, &"") == id:
+		return
+	_take_off(kind)
+	if id == &"" or not String(id).begins_with(String(kind) + "_"):
+		return
+	outfit[kind] = id
+	if body == null or (_headless and not outfits_headless):
+		return
+	match kind:
+		CosmeticDef.KIND_BOOTS:
+			var pair: Array[ArrayMesh] = OutfitMeshes.boot_meshes(id)
+			if pair.is_empty():
+				return
+			for i: int in 2:
+				var foot: MeshInstance3D = _legs[1 - i]  # the right foot (+X) gets the first boot
+				var holder := Node3D.new()
+				holder.name = "Boot"
+				holder.scale = Vector3(1.0 / foot.scale.x, 1.0 / foot.scale.y, 1.0 / foot.scale.z)
+				foot.add_child(holder)
+				holder.add_child(_outfit_mesh(pair[i], "BootMesh"))
+				foot.mesh = null  # the boot is the foot now
+				if i == 0:
+					_outfit_nodes[kind] = holder
+				else:
+					_boot_l = holder
+		CosmeticDef.KIND_CAPE:
+			var m: ArrayMesh = OutfitMeshes.mesh(id)
+			if m == null:
+				return
+			_cape_pivot = Node3D.new()
+			_cape_pivot.name = "Cape"
+			_cape_pivot.position = OutfitMeshes.cape_pivot()
+			body.add_child(_cape_pivot)
+			var mi: MeshInstance3D = _outfit_mesh(m, "CapeMesh")
+			mi.position = -_cape_pivot.position
+			_cape_pivot.add_child(mi)
+			_outfit_nodes[kind] = _cape_pivot
+		_:
+			var m: ArrayMesh = OutfitMeshes.mesh(id)
+			if m == null:
+				return
+			var mi: MeshInstance3D = _outfit_mesh(m, "Outfit" + String(kind).capitalize())
+			body.add_child(mi)
+			_outfit_nodes[kind] = mi
+			if kind == CosmeticDef.KIND_SHIRT:
+				var sleeve: Color = OutfitMeshes.sleeve_color(id)
+				if sleeve.a > 0.0:
+					var mat: Material = ToonMaterial.make(sleeve, 0.3)
+					for seg: MeshInstance3D in _segments:
+						seg.material_override = mat
+
+
+func _take_off(kind: StringName) -> void:
+	outfit.erase(kind)
+	var n: Node3D = _outfit_nodes.get(kind, null)
+	_outfit_nodes.erase(kind)
+	if n != null:
+		n.get_parent().remove_child(n)
+		n.free()
+	match kind:
+		CosmeticDef.KIND_BOOTS:
+			if _boot_l != null:
+				_boot_l.get_parent().remove_child(_boot_l)
+				_boot_l.free()
+				_boot_l = null
+			for i: int in _legs.size():
+				_legs[i].mesh = _foot_meshes[i]
+		CosmeticDef.KIND_CAPE:
+			_cape_pivot = null
+			_cape_swing = 0.0
+		CosmeticDef.KIND_SHIRT:
+			for seg: MeshInstance3D in _segments:
+				seg.material_override = _body_mat
+
+
+static func _outfit_mesh(m: Mesh, node_name: String) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = node_name
+	mi.mesh = m
+	mi.material_override = OutfitMeshes.material()
+	return mi
+
+
+## Hangs the body-worn pieces of `o` (hat, shirt, trousers, cape; no boots) on `parent`, a node in
+## the body's space (the ragdoll's torso). Returns the nodes made.
+static func dress(parent: Node3D, o: Dictionary) -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = []
+	for kind: StringName in [CosmeticDef.KIND_HAT, CosmeticDef.KIND_SHIRT, CosmeticDef.KIND_PANTS, CosmeticDef.KIND_CAPE]:
+		var id: StringName = StringName(str(o.get(kind, "")))
+		if id == &"" or not String(id).begins_with(String(kind) + "_"):
+			continue
+		var m: ArrayMesh = OutfitMeshes.mesh(id)
+		if m == null:
+			continue
+		var mi: MeshInstance3D = _outfit_mesh(m, "Outfit" + String(kind).capitalize())
+		parent.add_child(mi)
+		out.append(mi)
+	return out
 
 
 ## The right hand: a node at the glove for held items. Its -Z points
@@ -384,8 +503,23 @@ func _animate(frame_delta: float) -> void:
 	_animate_arms(walk, em)
 	_animate_legs(walk, em)
 	_animate_face(delta, em)
+	_animate_cape(delta, speed)
 	if reaching and not is_swinging():
 		_point_arms(reach_target)
+
+
+## The cape streams back with speed and flutters a little; it swings forward on landing and in
+## the air (`_cape_pivot`).
+func _animate_cape(delta: float, speed: float) -> void:
+	if _cape_pivot == null:
+		return
+	var want: float = clampf(speed * 0.1, 0.0, 0.7) + sin(_time * 11.0) * 0.05 * clampf(speed / 4.0, 0.0, 1.0)
+	if not _on_floor:
+		want += clampf(-_velocity.y * 0.06, -0.3, 0.5)
+	if sitting:
+		want = 0.25  # draped over the chair's back
+	_cape_swing = lerpf(_cape_swing, want, minf(1.0, 8.0 * delta))
+	_cape_pivot.rotation = Vector3(-_cape_swing - _lean.x * 0.6, 0.0, 0.0)
 
 
 ## Where a bean arm posed (`pitch`, `splay`) points, in the rig's space (-Z forward); `side` -1
@@ -777,6 +911,16 @@ static func _radius_at(t: float) -> float:
 	return lerpf(BODY_RADIUS, BODY_RADIUS * 0.86, clampf(t, 0.0, 1.0)) * roundness
 
 
+## Public `_radius_at` (outfits are cut to the body: `OutfitMeshKit`).
+static func radius_at(t: float) -> float:
+	return _radius_at(t)
+
+
+## Public `_bend_at`.
+static func bend_at(t: float) -> float:
+	return _bend_at(t)
+
+
 ## The bean's slight curve: the belly bulges forward a touch, the back is a little hollow.
 static func _bend_at(t: float) -> float:
 	var u: float = clampf(t, 0.0, 1.0) * 2.0 - 1.0
@@ -975,6 +1119,7 @@ func _build() -> void:
 	for side: float in [-1.0, 1.0]:
 		var foot: MeshInstance3D = _blob(_rig, Vector3(side * 0.17, 0.065, -0.05), Vector3(0.11, 0.075, 0.16), shoe, "FootL" if side < 0.0 else "FootR")
 		_legs.append(foot)
+		_foot_meshes.append(foot.mesh)
 	hat_slot = Node3D.new()
 	hat_slot.name = "HatSlot"
 	hat_slot.position.y = BODY_HEIGHT * 0.5 - 0.05

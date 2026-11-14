@@ -93,6 +93,13 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-14 / 0.9.18 outfits
+- 75 outfit pieces (15 hats, shirts, trousers, capes, boots) in the cosmetics shop, built in code
+  (`player/outfit/`), worn from the profile, on the wire (PROTOCOL_VERSION 12: hello `outfit`,
+  `set_outfit`, `player_outfit`, `PlayerState.outfit`). See docs/GDD.md "Outfits".
+- Look-dev: `scripts/screenshot.sh res://tools/dev/outfit_shot.tscn <name> 60 --kind hat|shirt|pants|cape|boots|sets [--back] [--walk] [--low]`.
+- Vertex colours: the toon shader must NOT convert them from sRGB (Godot already hands them over
+  linear); converting again made gold look orange.
 ### 2026-10-04 / session 1
 - Readiness check passed; M0 built and committed (see git log).
 - M1 built: all core logic + the four game logics with unit tests; RTP tuned (slot weights, Plinko weights, roulette generosity 4%) with Monte-Carlo sims; decisions logged.

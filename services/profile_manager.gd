@@ -71,6 +71,26 @@ func buy(id: StringName) -> StringName:
 	return err
 
 
+## Wears an owned outfit piece in its slot.
+func wear(id: StringName) -> bool:
+	if profile.is_worn(id):
+		return true
+	if not profile.wear(id):
+		return false
+	save()
+	changed.emit()
+	return true
+
+
+## Takes off the piece in slot `kind`.
+func take_off(kind: StringName) -> void:
+	if not profile.outfit.has(kind):
+		return
+	profile.take_off(kind)
+	save()
+	changed.emit()
+
+
 ## Sets the preferred bean colour (owned colours only).
 func set_preferred_color(index: int) -> bool:
 	if index == profile.preferred_color:

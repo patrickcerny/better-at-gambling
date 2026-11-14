@@ -339,6 +339,7 @@ func _make_bean(p: int, d: Dictionary) -> void:
 	bean.rotation.y = PI + 0.55  # face the audience, turned towards the cashier
 	root.add_child(bean)
 	bean.set_color(color)
+	bean.set_outfit(d.get("outfit", {}))
 	var puppet: BeanPuppet = BeanPuppet.attach(bean)
 	puppet.cheer_height = 0.25
 	# A disc in their colour under their feet (gold ring for you).

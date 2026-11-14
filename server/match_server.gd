@@ -449,8 +449,9 @@ func open_lobby() -> void:
 
 
 ## Adds a participant and returns its player id. The slot colour is fixed and unique; `bean_color`
-## is the player's preferred bean colour from their profile (`Cosmetics.bean_color_for`).
-func add_player(uid: String, display_name: String, bean_color: int = -1) -> int:
+## is the player's preferred bean colour from their profile (`Cosmetics.bean_color_for`), `outfit`
+## the pieces they wear (anything a client sent: `Cosmetics.sanitize_outfit` cleans it).
+func add_player(uid: String, display_name: String, bean_color: int = -1, outfit: Variant = []) -> int:
 	var p := PlayerState.new()
 	p.id = _next_player_id
 	_next_player_id += 1
@@ -460,6 +461,7 @@ func add_player(uid: String, display_name: String, bean_color: int = -1) -> int:
 	# wears the preferred colour when no other bean does (0.9.16, the pedestal colour panel).
 	p.color_index = lobby.free_color(_taken_colors(), -1)
 	p.bean_color = Cosmetics.bean_color_for(bean_color, p.color_index, _worn_bean_colors(-1))
+	p.outfit = Cosmetics.sanitize_outfit(outfit)
 	state.add_player(p)
 	economy.add_player(p.id, balance.start_money)
 	_reset_stats(p.id)
@@ -1358,6 +1360,20 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				return StationLogicBase.fail(&"color_taken")
 			ps.bean_color = int(c)
 			_emit(GameEvents.make(&"player_color", {"player": player, "bean_color": ps.bean_color}))
+			return StationLogicBase.OK_RESULT
+		&"set_outfit":
+			# One slot at a time: {kind, item} with item "" to take it off. Ownership lives in the
+			# player's local profile (no accounts), like colours: the server checks the id only.
+			var kind: StringName = StringName(str(intent["kind"]))
+			var item: String = str(intent["item"])
+			var slot: int = CosmeticDef.OUTFIT_KINDS.find(kind)
+			if slot < 0 or (item != "" and not Cosmetics.is_outfit_item(kind, StringName(item))):
+				return StationLogicBase.fail(&"bad_value")
+			var ps: PlayerState = state.players[player]
+			if ps.outfit[slot] == item:
+				return StationLogicBase.OK_RESULT
+			ps.outfit[slot] = item
+			_emit(GameEvents.make(&"player_outfit", {"player": player, "outfit": ps.outfit.duplicate()}))
 			return StationLogicBase.OK_RESULT
 		&"lobby_setting":
 			var err: StringName = lobby.set_setting(player, str(intent["key"]), intent["value"])

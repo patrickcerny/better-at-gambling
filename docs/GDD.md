@@ -225,7 +225,7 @@ loading clamps every value (level always recomputed from XP, unknown items dropp
 
 ## Cosmetics shop
 The bean is the only body (Patrick: "Remove all other skins"; the six poly.pizza character skins
-went in 0.9.16); what players choose is its colour.
+went in 0.9.16); what players choose is its colour and, since 0.9.18, an outfit.
 - **Colours**: 16 (`Cosmetics.COLOR_COUNT`, `Palette.PLAYER_COLORS`). The first 8 are the
   colourblind-safe player colours, free and always owned; Ruby, Mint, Lavender, Teal, Lime, Onyx,
   Silver and Gold cost 150–400 Coins (`data/progression/cosmetics_shop.tres`).
@@ -237,8 +237,25 @@ went in 0.9.16); what players choose is its colour.
 - **The shop**: COSMETICS in the main menu (also the T-shirt button, and COSMETICS on the lobby
   settings tablet's panel). A turning bean previews the picked colour; BUY spends Coins ("Not
   enough Coins: N more to go" otherwise), WEAR makes it the preferred colour (in a lobby it goes on
-  the bean at once). One tab per kind of cosmetic in stock: `CosmeticDef` (kind colour | hat | …,
-  price, id) in the `CosmeticShop` list, so hats and the like slot in later; only colours exist now.
+  the bean at once). One tab per kind of cosmetic: `CosmeticDef` (kind, price, id, swatch) in the
+  `CosmeticShop` list: COLOURS, HATS, SHIRTS, TROUSERS, CAPES, BOOTS.
+- **Outfits** (Patrick, 2026-11-14: "Hats, Boots, Pants, Capes, shirts. Design for each 15. They
+  can be fitting (policemen, business men) and also just random stuff"): 15 pieces per slot, 75 in
+  all, two free per slot, the rest 200–1,200 Coins. Themed sets (police, business, tuxedo, dealer,
+  chef, firefighter, construction, pirate/sailor, jailbird, knight, superhero, wizard, cowboy) plus
+  fun ones (traffic cone, propeller cap, party hat, bath towel, lederhosen, kilt, flippers, bunny
+  slippers, roller skates, clown shoes ...). Every model is low-poly and built in code
+  (`OutfitMeshes`, `OutfitMeshKit`: one mesh in vertex colours per piece, one draw call, shared by
+  every bean), no imported art. Shirts and trousers are cloth bands cut to the bean's body; shirts
+  colour the arms as sleeves; capes hang from the back of the shoulders and stream back with
+  speed; boots replace the feet. The ragdoll wears hat, shirt, trousers and cape.
+  WEAR puts a piece on (one per slot), TAKE OFF takes it off; the preview bean tries the picked
+  piece on over what you wear. Worn pieces are in the profile (`PlayerProfile.outfit`, section
+  `[outfit]`), sent in the hello as five ids (hat, shirt, pants, cape, boots; "" = none) and changed
+  in the lobby with `set_outfit {kind, item}` → `player_outfit`. The server only checks that each id
+  is a shop item of that slot (ownership is local, like colours); any number of beans may wear the
+  same piece. Results podium, quiz podiums, card tables, Split or Steal, the vote race and the Tab
+  list portraits show the outfits too.
 - **Pedestal colour panel** (Patrick: "under the podest should be a color panel you can click"):
   a brass plaque at the foot of every ready pedestal. Yours shows the colours you own, the one you
   wear framed and the ones other beans wear dimmed; look at a swatch and click (or E) to wear it:

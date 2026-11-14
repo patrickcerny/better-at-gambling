@@ -19,6 +19,8 @@ var coins: int = 0
 var preferred_color: int = -1
 ## Bought cosmetics (`CosmeticDef.id`); free ones are always owned and not listed.
 var owned: Array[StringName] = []
+## The outfit worn from the next join on: `CosmeticDef.OUTFIT_KINDS` kind -> owned item id.
+var outfit: Dictionary[StringName, StringName] = {}
 var matches: int = 0
 var wins: int = 0
 ## Matches won online against at least one other player (Practice wins don't count; achievements).
@@ -102,6 +104,33 @@ func set_preferred_color(index: int) -> bool:
 	return true
 
 
+## Wears outfit piece `id` in its slot (owned pieces only). Returns false when refused.
+func wear(id: StringName) -> bool:
+	var d: CosmeticDef = shop.find(id)
+	if d == null or not d.kind in CosmeticDef.OUTFIT_KINDS or not owns(id):
+		return false
+	outfit[d.kind] = id
+	return true
+
+
+## Takes off whatever is worn in slot `kind`.
+func take_off(kind: StringName) -> void:
+	outfit.erase(kind)
+
+
+## Whether piece `id` is worn now.
+func is_worn(id: StringName) -> bool:
+	return id != &"" and id in outfit.values()
+
+
+## The outfit for the hello and `set_outfit` (`Cosmetics.sanitize_outfit` order).
+func outfit_wire() -> PackedStringArray:
+	var out := PackedStringArray()
+	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
+		out.append(String(outfit.get(kind, &"")))
+	return out
+
+
 # --- Matches ------------------------------------------------------------------------------------
 
 ## Adds this player's row of a finished match (`Progression.breakdown`, sent by the server) once
@@ -142,6 +171,8 @@ func to_config(cfg: ConfigFile) -> void:
 	for id: StringName in owned:
 		ids.append(String(id))
 	cfg.set_value(SECTION, "owned", ids)
+	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
+		cfg.set_value("outfit", String(kind), String(outfit.get(kind, &"")))
 	cfg.set_value("stats", "matches", matches)
 	cfg.set_value("stats", "wins", wins)
 	cfg.set_value("stats", "online_wins", online_wins)
@@ -159,6 +190,11 @@ func from_config(cfg: ConfigFile) -> void:
 	if ids is PackedStringArray or ids is Array:
 		for id: Variant in ids:
 			owned.append(StringName(str(id)))
+	outfit.clear()
+	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
+		var worn: Variant = cfg.get_value("outfit", String(kind), "")
+		if typeof(worn) in [TYPE_STRING, TYPE_STRING_NAME] and str(worn) != "":
+			outfit[kind] = StringName(str(worn))
 	matches = _int(cfg.get_value("stats", "matches", 0))
 	wins = _int(cfg.get_value("stats", "wins", 0))
 	online_wins = _int(cfg.get_value("stats", "online_wins", 0))
@@ -186,6 +222,12 @@ func sanitize() -> void:
 	owned = clean
 	if preferred_color != -1 and not owns_color(preferred_color):
 		preferred_color = -1
+	var worn: Dictionary[StringName, StringName] = {}
+	for kind: StringName in outfit:
+		var d: CosmeticDef = shop.find(outfit[kind])
+		if kind in CosmeticDef.OUTFIT_KINDS and d != null and d.kind == kind and owns(d.id):
+			worn[kind] = d.id
+	outfit = worn
 	matches = maxi(matches, 0)
 	wins = clampi(wins, 0, matches)
 	online_wins = clampi(online_wins, 0, wins)

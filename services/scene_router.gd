@@ -51,10 +51,19 @@ func profile_name() -> String:
 
 
 ## Saved look for the hello: {color: the preferred bean colour from the profile (-1 = none),
-## `--color N` overrides it}.
+## `--color N` overrides it; outfit: the worn pieces (`PlayerProfile.outfit_wire`), `--outfit
+## hat_crown,cape_hero` overrides them}.
 func profile_cosmetics() -> Dictionary:
 	var preferred: int = ProfileManager.profile.preferred_color if ProfileManager.profile != null else -1
-	return {"color": cmdline.get_int("color", preferred) if cmdline != null else preferred}
+	var outfit: PackedStringArray = ProfileManager.profile.outfit_wire() if ProfileManager.profile != null else Cosmetics.sanitize_outfit([])
+	var forced: String = cmdline.get_string("outfit", "") if cmdline != null else ""
+	if forced != "":
+		outfit = Cosmetics.sanitize_outfit([])
+		for id: String in forced.split(","):
+			var d: CosmeticDef = CosmeticShop.default().find(StringName(id))
+			if d != null and d.kind in CosmeticDef.OUTFIT_KINDS:
+				outfit[CosmeticDef.OUTFIT_KINDS.find(d.kind)] = id
+	return {"color": cmdline.get_int("color", preferred) if cmdline != null else preferred, "outfit": outfit}
 
 
 ## Network test options from the command line ({latency_ms, loss, seed}).

@@ -6,6 +6,8 @@ extends TextureRect
 ## instead of the whole bean (the Tab list's player rows).
 
 var color: Color = Palette.player_color(0)
+## Outfit pieces worn (kind -> item id).
+var outfit: Dictionary = {}
 var portrait: bool = false
 var visuals: AvatarVisuals
 var _viewport: SubViewport
@@ -18,6 +20,13 @@ static func make(p_color: Color, min_size: Vector2 = Vector2(150, 180)) -> BeanP
 	v.color = p_color
 	v.custom_minimum_size = min_size
 	return v
+
+
+## Dresses the bean (kind -> item id) without rebuilding the viewport.
+func set_outfit(o: Dictionary) -> void:
+	outfit = o.duplicate()
+	if visuals != null:
+		visuals.set_outfit(outfit)
 
 
 ## Recolours the bean without rebuilding the viewport.
@@ -45,6 +54,7 @@ func _ready() -> void:
 	visuals = AvatarVisuals.new()
 	root.add_child(visuals)
 	visuals.set_color(color)
+	visuals.set_outfit(outfit)
 	var cam := Camera3D.new()
 	cam.fov = 30.0
 	cam.position = Vector3(0, 1.2, -2.0) if portrait else Vector3(0, 1.0, -3.6)

@@ -108,7 +108,8 @@ func start_local(server: MatchServer, display_name: String) -> int:
 	mode = Mode.LOCAL
 	local_server = server
 	server.event_emitted.connect(_on_local_event)
-	local_player_id = server.add_player("local", display_name, int(SceneRouter.profile_cosmetics().get("color", -1)))
+	var looks: Dictionary = SceneRouter.profile_cosmetics()
+	local_player_id = server.add_player("local", display_name, int(looks.get("color", -1)), looks.get("outfit", []))
 	connected.emit()
 	return local_player_id
 

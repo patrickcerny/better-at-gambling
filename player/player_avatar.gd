@@ -34,6 +34,8 @@ const CARRIED_HEIGHT: float = 1.62
 var player_id: int = -1
 var display_name: String = "Player"
 var color: Color = Palette.CREAM
+## Outfit pieces worn (kind -> item id): the bean and its ragdoll wear them.
+var outfit: Dictionary = {}
 var is_local: bool = false
 var state: State = State.STANDING
 var drive: Drive = Drive.SIM
@@ -105,6 +107,7 @@ func _ready() -> void:
 	visuals.name = "Visuals"
 	add_child(visuals)
 	visuals.set_color(color)
+	visuals.set_outfit(outfit)
 	nametag = NameTag.new()  # clamps its on-screen size by distance
 	nametag.name = "Nametag"
 	nametag.text = display_name
@@ -135,6 +138,13 @@ func _ready() -> void:
 		cam.yaw = yaw
 	target_position = global_position
 	target_yaw = yaw
+
+
+## Puts an outfit on the bean (kind -> item id, `Cosmetics.outfit_dict`).
+func set_outfit(o: Dictionary) -> void:
+	outfit = o.duplicate()
+	if visuals != null:
+		visuals.set_outfit(outfit)
 
 
 ## Sets the player colour on the bean.
@@ -252,6 +262,7 @@ func start_ragdoll(velocity: Vector3, max_time: float = 2.5, puppet: bool = fals
 	ragdoll = RagdollBody.new()
 	ragdoll.name = "Ragdoll%d" % player_id
 	ragdoll.color = color
+	ragdoll.outfit = outfit
 	ragdoll.player_id = player_id
 	ragdoll.max_time = max_time
 	ragdoll.puppet = puppet

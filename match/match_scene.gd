@@ -220,12 +220,16 @@ func _ready() -> void:
 	lobby_panel.leave_requested.connect(_leave_to_menu)
 	ui_layer.add_child(lobby_panel)
 	# The cosmetics shop from the lobby's settings tablet: a colour put on there goes on the bean
-	# at once (`set_color`), like one picked at the pedestal's colour panel.
+	# at once (`set_color`), like one picked at the pedestal's colour panel; so do outfit pieces
+	# (`set_outfit`).
 	cosmetics_panel = CosmeticsPanel.new()
 	ui_layer.add_child(cosmetics_panel)
 	cosmetics_panel.color_worn.connect(func(c: int) -> void:
 		if color_panel != null and view.state.phase == Phase.Id.LOBBY:
 			color_panel.choose(c))
+	cosmetics_panel.outfit_worn.connect(func(kind: StringName, id: StringName) -> void:
+		if view.state.phase in [Phase.Id.LOBBY, Phase.Id.RESULTS]:
+			Net.send_intent(Intents.make(&"set_outfit", {"kind": kind, "item": String(id)})))
 	cosmetics_panel.closed.connect(func() -> void:
 		if router.mode == InputRouter.Mode.MENU and results_panel == null:
 			router.set_play_mode(InputRouter.Mode.WALK))
@@ -536,6 +540,7 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	a.player_id = pid
 	a.display_name = str(p.get("name", "Player"))
 	a.color = Palette.player_color(int(p.get("bean_color", p.get("color", pid - 1))))
+	a.outfit = Cosmetics.outfit_of(p)
 	a.is_local = pid == local_id
 	a.cfg = cfg
 	a.router = router if a.is_local else null
@@ -938,6 +943,10 @@ func _on_event(ev: Dictionary) -> void:
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null:
 				a.set_color(Palette.player_color(int(ev["bean_color"])))
+		&"player_outfit":
+			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if a != null:
+				a.set_outfit(Cosmetics.outfit_dict(ev["outfit"]))
 		&"player_left", &"player_rejoined":
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null and int(ev["player"]) != local_id:

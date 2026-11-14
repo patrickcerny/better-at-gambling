@@ -286,6 +286,8 @@ func _build_seat(pid: int, i: int, n: int) -> void:
 	bean.rotation.y = PI  # a bean's face is its -Z: face the table, the chair back behind it
 	seat.add_child(bean)
 	bean.set_color(Palette.bean_color(state.players[pid]) if state != null and state.players.has(pid) else _color(pid))
+	if state != null and state.players.has(pid):
+		bean.set_outfit(Cosmetics.outfit_of(state.players[pid]))
 	var puppet: BeanPuppet = BeanPuppet.attach(bean)
 	puppet.cheer_height = 0.18
 	var tag := Label3D.new()

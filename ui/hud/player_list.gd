@@ -132,6 +132,9 @@ func refresh() -> void:
 		var portrait: BeanPreviewView = r["portrait"]
 		if portrait.color != bean:
 			portrait.set_bean_color(bean)
+		var dress: Dictionary = Cosmetics.outfit_of(p)
+		if portrait.outfit != dress:
+			portrait.set_outfit(dress)
 		(r["portrait_frame"] as PanelContainer).add_theme_stylebox_override(&"panel", _portrait_style(col))
 		var rank: Label = r["rank"]
 		rank.text = "%d" % (i + 1) if lobby else Hud._ordinal(i + 1).to_upper()

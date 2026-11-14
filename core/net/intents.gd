@@ -50,6 +50,8 @@ const SCHEMA: Dictionary = {
 	&"lobby_setting": {"key": Kind.NAME, "value": Kind.ANY},
 	## Bean colour (`Cosmetics`, the pedestal colour panel): {"color": palette index}.
 	&"set_color": {"color": Kind.INT},
+	## One outfit slot (`CosmeticDef.OUTFIT_KINDS`): the shop item to wear there, "" to take it off.
+	&"set_outfit": {"kind": Kind.NAME, "item": Kind.NAME},
 	&"return_to_lobby": {},
 	&"kick_player": {"target": Kind.INT},
 	&"emote": {"id": Kind.NAME},
