@@ -82,6 +82,10 @@ var _collision: CollisionShape3D
 var _clock: float = 0.0
 ## The cue of the emote playing now (`EmoteWheel.present`); stopped when the emote ends early.
 var _emote_sound: AudioStreamPlayer3D = null
+## Other players' held item (`set_held_item`): its id, its model in the hand and the arm pose.
+var held_item: StringName = &""
+var _held_model: Node3D = null
+var _held_pose: Vector3 = Vector3.INF
 
 
 func _ready() -> void:
@@ -138,6 +142,38 @@ func _ready() -> void:
 		cam.yaw = yaw
 	target_position = global_position
 	target_yaw = yaw
+
+
+## Shows `item` in the bean's right hand (`ItemModels.make_held`; &"" = empty hands). Used for the
+## other players; your own hand is drawn by ItemController, which also handles first person.
+func set_held_item(item: StringName) -> void:
+	if item == held_item and (item == &"" or is_instance_valid(_held_model)):
+		return
+	if is_instance_valid(_held_model):
+		_held_model.queue_free()
+	_held_model = null
+	if visuals != null and visuals.hold_arm_r == _held_pose:
+		visuals.hold_right_arm(Vector3.INF)
+	held_item = item
+	_held_pose = Vector3.INF
+	if item == &"" or visuals == null:
+		return
+	_held_model = ItemModels.make_held(item)
+	ItemModels.attach_to_hand(visuals, _held_model)
+	_held_pose = ItemModels.arm_pose(item)
+	visuals.hold_right_arm(_held_pose)
+	_update_held()
+
+
+## The held item hides while the bean can't hold it (seated, ragdolled, carried, away) and the arm
+## goes back to holding it after something else used it (the megaphone).
+func _update_held() -> void:
+	if not is_instance_valid(_held_model):
+		return
+	var shown: bool = state == State.STANDING or state == State.STUNNED
+	_held_model.visible = shown
+	if shown and visuals.hold_arm_r == Vector3.INF and _held_pose != Vector3.INF:
+		visuals.hold_right_arm(_held_pose)
 
 
 ## Puts an outfit on the bean (kind -> item id, `Cosmetics.outfit_dict`).
@@ -432,6 +468,8 @@ func set_away(away: bool) -> void:
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	if _held_model != null:
+		_update_held()
 	if bubble.visible and _clock > _bubble_until:
 		bubble.visible = false
 	if cam != null and cam.emote_view and not visuals.is_emoting():

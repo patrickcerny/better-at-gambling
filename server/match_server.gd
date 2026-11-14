@@ -786,6 +786,7 @@ func _step(delta: float) -> void:
 	interactions.tick(match_time)
 	_tick_jail(delta)
 	pickups.tick(match_time)
+	_check_held(casino_open)
 
 
 func _tick_lobby(delta: float) -> void:
@@ -1312,6 +1313,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			return items.use(player, int(intent["slot"]), int(intent.get("target", -1)), match_time, opts)
 		&"discard_item":
 			return items.discard(player, int(intent["slot"]), match_time)
+		&"hold_item":
+			return _hold_item(player, StringName(str(intent["item"])))
 		&"rps_pick":
 			return items.duels.pick(player, int(intent["duel"]), int(intent["pick"]), match_time)
 		&"shop_buy":
@@ -1384,6 +1387,31 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			_emit(GameEvents.make(&"lobby_settings", {"settings": lobby.settings.duplicate()}))
 			return StationLogicBase.OK_RESULT
 	return StationLogicBase.fail(&"not_implemented")
+
+
+## `hold_item {item}`: the player shows an item from their inventory in their hand (or puts it
+## away with ""); everyone sees it through `player_held {player, item}`.
+func _hold_item(player: int, item: StringName) -> Dictionary:
+	var ps: PlayerState = state.players[player]
+	if item != &"":
+		var open: bool = phases.phase == Phase.Id.CASINO or phases.phase == Phase.Id.PRE_MINIGAME
+		if not open:
+			return StationLogicBase.fail(&"wrong_phase")
+		if not item in ps.inventory:
+			return StationLogicBase.fail(&"not_owned")
+	if ps.held != item:
+		ps.held = item
+		_emit(GameEvents.make(&"player_held", {"player": player, "item": String(item)}))
+	return StationLogicBase.OK_RESULT
+
+
+## Empties hands whose item was used, stolen or dropped, and everyone's when the casino closes.
+func _check_held(casino_open: bool) -> void:
+	for pid: int in state.players:
+		var ps: PlayerState = state.players[pid]
+		if ps.held != &"" and (not casino_open or not ps.held in ps.inventory):
+			ps.held = &""
+			_emit(GameEvents.make(&"player_held", {"player": pid, "item": ""}))
 
 
 ## Number-key emote (`play_emote {emote}`): a known animated emote is shown to everyone as

@@ -260,6 +260,9 @@ func _apply(ev: Dictionary) -> void:
 				players[int(ev["player"])]["bean_color"] = int(ev["bean_color"])
 			players_changed.emit()
 			lobby_changed.emit()
+		&"player_held":
+			if players.has(int(ev["player"])):
+				players[int(ev["player"])]["held"] = str(ev["item"])
 		&"player_outfit":
 			if players.has(int(ev["player"])):
 				players[int(ev["player"])]["outfit"] = Cosmetics.sanitize_outfit(ev["outfit"])

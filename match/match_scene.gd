@@ -322,6 +322,10 @@ func _ready() -> void:
 		for id: String in cmd.get_string("give-items", "").split(",", false):
 			for pid: int in server.state.players:
 				server.items.give(pid, StringName(id), server.match_time)
+		# Dev/screenshots: `--hold` (with --give-items) puts an item in every hand: the dummies take
+		# one each in turn through the server (the `player_held` path the others see), you the first.
+		if cmd.has_flag("hold"):
+			_dev_hold.call_deferred()
 	# The waiting room's door follows the server: open in the lobby, locked once the match starts.
 	map.set_waiting_room_open(view.state.waiting_room_open)
 	view.state.waiting_room_changed.connect(map.set_waiting_room_open)
@@ -520,6 +524,32 @@ func _add_dummy(i: int, bean_color: int = -1) -> int:
 	return did
 
 
+## Dev/screenshots (`--hold`): past the intro, the dummies line up facing you a few steps ahead,
+## each takes one of their items out through the server (the `player_held` path the others see),
+## and you take your first one.
+func _dev_hold() -> void:
+	var guard: int = 0
+	while server.phases.phase != Phase.Id.CASINO and guard < 2000:
+		server.advance(MatchServer.TICK)
+		guard += 1
+	var turn: int = 0
+	var base: Vector3 = local.global_position if local != null else Vector3.ZERO
+	for pid: int in server.state.players:
+		var inv: Array[StringName] = server.state.players[pid].inventory
+		if inv.is_empty():
+			continue
+		if pid == local_id:
+			items_ctl.hold(0)
+			continue
+		var a: PlayerAvatar = avatars.get(pid, null)
+		if a != null:
+			var at: Vector3 = base + Vector3([-1.3, 1.3, -2.6, 2.6, -3.9, 3.9, 0.0][turn % 7], 0.0, -2.6)
+			a.teleport(at, PI)
+			server.set_server_position(pid, at)
+		server.submit_intent(pid, Intents.make(&"hold_item", {"item": String(inv[turn % inv.size()])}))
+		turn += 1
+
+
 func _spawn_avatars() -> void:
 	view.resync()
 	for pid: int in view.state.players:
@@ -565,6 +595,8 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	avatars[pid] = a
 	if not bool(p.get("connected", true)):
 		a.set_connection_away(true)
+	if not a.is_local:
+		a.set_held_item(StringName(str(p.get("held", ""))))
 	# Already at a table when we learn about them (joining late, reconnecting): put them in their
 	# own chair. They used to stand where they last walked, which is the same spot in front of the
 	# table for everyone, so they piled up on top of each other.
@@ -947,6 +979,11 @@ func _on_event(ev: Dictionary) -> void:
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null:
 				a.set_outfit(Cosmetics.outfit_dict(ev["outfit"]))
+		&"player_held":
+			# Your own hand is drawn by ItemController (it also knows first person).
+			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
+			if a != null and not a.is_local:
+				a.set_held_item(StringName(str(ev["item"])))
 		&"player_left", &"player_rejoined":
 			var a: PlayerAvatar = avatars.get(int(ev["player"]), null)
 			if a != null and int(ev["player"]) != local_id:

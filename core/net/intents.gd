@@ -31,6 +31,8 @@ const SCHEMA: Dictionary = {
 	&"action": {"station": Kind.NAME, "action": Kind.NAME},
 	&"use_item": {"slot": Kind.INT},
 	&"discard_item": {"slot": Kind.INT},
+	## Shows the item you took in your hand to the others (`player_held`): its id, "" to put it away.
+	&"hold_item": {"item": Kind.NAME},
 	&"rps_pick": {"duel": Kind.INT, "pick": Kind.INT},
 	&"shop_buy": {"index": Kind.INT},
 	## One smash of the Odd Jobs button next to the Gift Shop (the server counts and pays).

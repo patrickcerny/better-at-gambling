@@ -16,15 +16,33 @@ const MODELS: Dictionary = {
 	&"scratch_ticket": "res://assets/polypizza/scratch_ticket.glb",
 	&"beer": "res://assets/polypizza/beer_full.glb",
 }
+## The idle motion of model-file items (hand-built ones animate in `ItemArt`):
+## [ItemIdle.Kind, amount, speed, axis].
+const DEFAULT_SWAY: Array = [ItemIdle.Kind.SWING, 0.08, 1.6, Vector3.FORWARD]
+const SWAYS: Dictionary = {
+	&"baseball_bat": [ItemIdle.Kind.SWING, 0.06, 1.2, Vector3.RIGHT],
+	&"russian_roulette": [ItemIdle.Kind.SWING, 0.1, 1.4, Vector3.UP],
+	&"scratch_ticket": [ItemIdle.Kind.SWING, 0.15, 1.8, Vector3.UP],
+	&"dog_collar": [ItemIdle.Kind.SWING, 0.2, 2.0, Vector3.FORWARD],
+	&"beer": [ItemIdle.Kind.SWING, 0.1, 1.5, Vector3.FORWARD],
+	&"empty_bottle": [ItemIdle.Kind.SWING, 0.12, 1.5, Vector3.FORWARD],
+}
 ## Longest side of the model in the hand, metres (DEFAULT_SIZE otherwise).
 const DEFAULT_SIZE: float = 0.3
 const SIZES: Dictionary = {
 	&"baseball_bat": 0.95,
 	&"dog_collar": 0.42,
-	&"russian_roulette": 0.4,
+	&"russian_roulette": 0.5,
 	&"scratch_ticket": 0.32,
 	&"beer": 0.34,
 	&"empty_bottle": 0.32,
+	&"bad_luck_monkey": 0.46, &"banana_peel": 0.38, &"black_cat": 0.46, &"bodyguard": 0.4,
+	&"bouncer": 0.62, &"boxing_glove": 0.55, &"bribe": 0.4, &"credit_card": 0.36,
+	&"double_down": 0.38, &"energy_drink": 0.36, &"fake_cash": 0.4, &"get_out_of_jail_free": 0.46,
+	&"golden_chip": 0.3, &"grease": 0.4, &"hot_hands": 0.46, &"jackpot_magnet": 0.42,
+	&"loaded_reels": 0.42, &"lucky_clover": 0.42, &"mirror": 0.5, &"out_of_order": 0.52,
+	&"pickpocket": 0.36, &"robin_hood": 0.8, &"rock_paper_scissors": 0.46, &"scissors": 0.42,
+	&"sunglasses": 0.38, &"vip_pass": 0.48, &"wild_card": 0.4,
 }
 ## How a model sits in the hand, in upright space (y up, -z forward): [offset, rotation degrees].
 ## bat.glb has its barrel (thick end) at -y, so the bat is turned end over end (z ~180) to put the
@@ -32,7 +50,7 @@ const SIZES: Dictionary = {
 const DEFAULT_GRIP: Array = [Vector3(0.0, 0.16, -0.2), Vector3.ZERO]
 const GRIPS: Dictionary = {
 	&"baseball_bat": [Vector3(0.0, 0.38, -0.12), Vector3(-25, 0, 160)],
-	&"russian_roulette": [Vector3(0.0, 0.12, -0.24), Vector3(0, 90, 0)],
+	&"russian_roulette": [Vector3(0.0, 0.14, -0.12), Vector3(0, 180, 80)],
 	&"scratch_ticket": [Vector3(0.0, 0.2, -0.2), Vector3(75, 0, 0)],
 	&"dog_collar": [Vector3(0.0, 0.18, -0.22), Vector3(60, 0, 0)],
 }
@@ -42,6 +60,11 @@ const GRIPS: Dictionary = {
 const HAND_SCALE: Dictionary = {
 	&"baseball_bat": 1.35,
 }
+## The arm pose while holding an item (`AvatarVisuals.hold_right_arm`: pitch, splay, roll): the
+## forearm out in front, a bit below level, so the item is shown off instead of dangling at the hip.
+const HOLD_ARM: Vector3 = Vector3(-0.55, -0.3, 0.0)
+## Items that keep the arm hanging at rest instead (the bat rests along the arm, Patrick's pose).
+const ARM_AT_REST: Array[StringName] = [&"baseball_bat"]
 ## AvatarVisuals.ARM_REST turned back (the hand hangs at -1.3 rad about x).
 const HAND_UPRIGHT: float = 1.3
 
@@ -61,7 +84,7 @@ static func path_for(item: StringName) -> String:
 
 ## True when the item has a model of its own (not the coin placeholder).
 static func has_own(item: StringName) -> bool:
-	return path_for(item) != DEFAULT_MODEL
+	return path_for(item) != DEFAULT_MODEL or (not MODELS.has(item) and ItemArt.has(item))
 
 
 static func size_for(item: StringName) -> float:
@@ -80,21 +103,65 @@ static func make(item: StringName, size: float = 0.0) -> Node3D:
 	holder.name = "Item_" + String(item).to_pascal_case()
 	holder.set_meta(&"item", item)
 	var path: String = path_for(item)
-	var ps: PackedScene = load(path) as PackedScene if ResourceLoader.exists(path) else null
-	if ps == null:
-		return holder
-	var model: Node3D = ps.instantiate()
-	if not _bounds.has(path):
-		_bounds[path] = _measure(model)
-	var b: AABB = _bounds[path]
+	var model: Node3D = null
+	var key: String = path
+	if not MODELS.has(item) and ItemArt.has(item):
+		model = ItemArt.build(item)  # hand-built and animated (ItemArt)
+		key = "art:" + String(item)
+	else:
+		var ps: PackedScene = load(path) as PackedScene if ResourceLoader.exists(path) else null
+		if ps == null:
+			return holder
+		model = ps.instantiate()
+	if not _bounds.has(key):
+		_bounds[key] = _measure(model)
+	var b: AABB = _bounds[key]
 	var longest: float = maxf(maxf(b.size.x, b.size.y), maxf(b.size.z, 0.0001))
 	var s: float = (size if size > 0.0 else size_for(item)) / longest
 	model.scale = model.scale * s
 	model.position = -b.get_center() * s
+	holder.set_meta(&"extent", b.size * s)
 	for n: Node in model.find_children("*", "GeometryInstance3D", true, false):
 		(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if key == path and path != DEFAULT_MODEL:
+		# Model files have no animation of their own: they sway a little in the hand (`SWAYS`).
+		var sway := Node3D.new()
+		sway.name = "Sway"
+		holder.add_child(sway)
+		sway.add_child(model)
+		var idle := ItemIdle.new()
+		var sw: Array = SWAYS.get(item, DEFAULT_SWAY)
+		idle.add(sway, sw[0], sw[1], sw[2], sw[3])
+		holder.add_child(idle)
+		return holder
 	holder.add_child(model)
 	return holder
+
+
+## Hand-built items (`ItemArt`) without a line in `GRIPS`: they stand on top of the fist, a little
+## in front of it, or hang from it by their string or strap (`HANGING`).
+const HANGING: Array[StringName] = [&"vip_pass", &"out_of_order", &"get_out_of_jail_free"]
+const FIST: float = 0.08
+## Hand-built items turned in the hand (degrees), so the side worth seeing faces the others.
+const ART_TURN: Dictionary = {&"robin_hood": Vector3(0, -90, 0)}
+## Hand-built items held by a handle or stem: how high their centre sits above the fist, as a share
+## of their height (the rest stand on the fist).
+const ART_LIFT: Dictionary = {
+	&"bouncer": 0.12, &"boxing_glove": 0.3, &"mirror": 0.3, &"lucky_clover": 0.3, &"robin_hood": 0.0,
+}
+
+
+static func art_grip(item: StringName, m: Node3D) -> Array:
+	var ext: Vector3 = m.get_meta(&"extent", Vector3.ONE * size_for(item))
+	if item in HANGING:
+		return [Vector3(0.0, -ext.y * 0.5 + FIST * 0.6, -0.1), ART_TURN.get(item, Vector3.ZERO)]
+	var up: float = ext.y * float(ART_LIFT[item]) if ART_LIFT.has(item) else ext.y * 0.5 + FIST
+	return [Vector3(0.0, up, -0.12), ART_TURN.get(item, Vector3.ZERO)]
+
+
+## How the right arm holds `item` (`AvatarVisuals.hold_right_arm`; Vector3.INF = hanging at rest).
+static func arm_pose(item: StringName) -> Vector3:
+	return Vector3.INF if item in ARM_AT_REST else HOLD_ARM
 
 
 ## The model posed for a hand: `make` plus the item's grip, inside a "Held" node that turns the
@@ -104,9 +171,14 @@ static func make_held(item: StringName) -> Node3D:
 	var held := Node3D.new()
 	held.name = "Held"
 	held.set_meta(&"item", item)
-	held.rotation.x = HAND_UPRIGHT
+	var pose: Vector3 = arm_pose(item)
+	if pose == Vector3.INF:
+		held.rotation.x = HAND_UPRIGHT
+	else:
+		# The right arm's basis is Rz(-splay) * Rx(pitch) (`AvatarVisuals._set_arm`); undo it.
+		held.rotation = Vector3(-pose.x, 0.0, pose.y)
 	var m: Node3D = make(item)
-	var grip: Array = GRIPS.get(item, DEFAULT_GRIP)
+	var grip: Array = GRIPS.get(item, DEFAULT_GRIP) if GRIPS.has(item) or not ItemArt.has(item) else art_grip(item, m)
 	var k: float = hand_scale(item)
 	m.position = (grip[0] as Vector3) * k
 	m.rotation_degrees = grip[1]
@@ -173,6 +245,9 @@ static func make_kiosk(height: float = 1.9) -> Node3D:
 ## smaller than in the hand so a bat doesn't fill the screen.
 const VIEW_OFFSET: Vector3 = Vector3(0.3, -0.27, -0.6)
 const VIEW_SCALE: float = 0.5
+## Hand-built items in first person: turned so you see their front (180°), the bow at an angle
+## with the arrow pointing ahead.
+const ART_VIEW_TURN: Dictionary = {&"robin_hood": Vector3(0, -55, 0)}
 ## First-person poses where the hand pose would block the view: [offset, rotation degrees].
 const VIEW_GRIPS: Dictionary = {
 	&"baseball_bat": [Vector3(0.08, 0.02, -0.05), Vector3(-40, 0, 135)],
@@ -188,6 +263,8 @@ static func make_view(item: StringName) -> Node3D:
 	var k: float = hand_scale(item)
 	var m: Node3D = make(item, size_for(item) * VIEW_SCALE)
 	var grip: Array = VIEW_GRIPS.get(item, GRIPS.get(item, DEFAULT_GRIP))
+	if not VIEW_GRIPS.has(item) and not GRIPS.has(item) and ItemArt.has(item):
+		grip = [Vector3.ZERO, ART_VIEW_TURN.get(item, Vector3(0, 180, 0))]  # their front toward you
 	m.position = (grip[0] as Vector3) * k if VIEW_GRIPS.has(item) else Vector3.ZERO
 	m.rotation_degrees = grip[1]
 	m.scale = Vector3.ONE * k

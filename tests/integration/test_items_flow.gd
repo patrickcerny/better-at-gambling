@@ -24,6 +24,31 @@ func _give(player: int, items: Array[StringName]) -> void:
 		fx.server.items.give(player, it, fx.server.match_time)
 
 
+func test_held_item_is_shown_to_everyone_and_cleared_when_used() -> void:
+	var a: int = fx.player_ids[0]
+	_give(a, [&"lucky_clover", &"black_cat"])
+	assert_eq(fx.intent(a, &"hold_item", {"item": "lucky_clover"})["error"], &"wrong_phase", "not in the intro")
+	_start()
+	assert_eq(fx.intent(a, &"hold_item", {"item": "bribe"})["error"], &"not_owned")
+	assert_true(fx.intent(a, &"hold_item", {"item": "lucky_clover"})["ok"])
+	assert_eq(fx.server.state.players[a].held, &"lucky_clover")
+	var held: Array[Dictionary] = fx.of_type(&"player_held")
+	assert_eq(held.size(), 1)
+	assert_eq(int(held[0]["player"]), a)
+	assert_eq(str(held[0]["item"]), "lucky_clover")
+	assert_eq(fx.server.state.players[a].to_wire()["held"], "lucky_clover", "late joiners see it too")
+	assert_true(fx.intent(a, &"hold_item", {"item": "lucky_clover"})["ok"])
+	assert_eq(fx.of_type(&"player_held").size(), 1, "no event when nothing changed")
+	assert_true(fx.intent(a, &"use_item", {"slot": 0})["ok"])
+	fx.run(0.2)
+	assert_eq(fx.server.state.players[a].held, &"", "a used item leaves the hand")
+	held = fx.of_type(&"player_held")
+	assert_eq(str(held[held.size() - 1]["item"]), "")
+	assert_true(fx.intent(a, &"hold_item", {"item": "black_cat"})["ok"])
+	assert_true(fx.intent(a, &"hold_item", {"item": ""})["ok"], "put away")
+	assert_eq(fx.server.state.players[a].held, &"")
+
+
 func test_use_item_intent_rules() -> void:
 	var a: int = fx.player_ids[0]
 	var b: int = fx.player_ids[1]

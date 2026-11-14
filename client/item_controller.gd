@@ -50,6 +50,12 @@ var _outlined: Array[GeometryInstance3D] = []
 var _outline_mat: ShaderMaterial
 ## Blackjack table whose hole card is x-rayed for us (Sunglasses), &"" = none.
 var _xray_station: StringName = &""
+## The arm pose we put on our own bean for the held item (Vector3.INF = none of ours).
+var _arm_pose: Vector3 = Vector3.INF
+## When we last told the server what is in our hand (`_sync_hand`).
+var _hand_sent_at: float = -INF
+## Seconds between `hold_item` intents while scrolling through items (the last one always goes).
+const HAND_SYNC_GAP: float = 0.25
 
 
 func _init(p_scene: MatchScene) -> void:
@@ -475,6 +481,10 @@ func _process(delta: float) -> void:
 		_refresh_model()  # V switched the camera
 	if held_model != null:
 		held_model.visible = not seated and scene.local.is_standing()
+		var v: AvatarVisuals = scene.local.visuals
+		if not _model_first_person and held_model.visible and _arm_pose != Vector3.INF and v.hold_arm_r == Vector3.INF:
+			v.hold_right_arm(_arm_pose)  # the megaphone let go of the arm
+	_sync_hand()
 	# The usual "[E / LMB] Grab Anna" line would lie while the hand holds an item.
 	if held >= 0 and _free_to_use() and _nothing_to_interact():
 		scene.hud.set_prompt("")
@@ -521,14 +531,32 @@ func _refresh_model() -> void:
 		held_model.queue_free()
 	held_model = null
 	_model_first_person = _first_person()
-	if held < 0 or scene.local == null or scene.local.visuals == null:
+	var v: AvatarVisuals = scene.local.visuals if scene.local != null else null
+	if v != null and _arm_pose != Vector3.INF and v.hold_arm_r == _arm_pose:
+		v.hold_right_arm(Vector3.INF)
+	_arm_pose = Vector3.INF
+	if held < 0 or v == null:
 		return
 	if _model_first_person:
 		held_model = ItemModels.make_view(held_item)
 		scene.local.cam.camera.add_child(held_model)
 	else:
 		held_model = ItemModels.make_held(held_item)
-		ItemModels.attach_to_hand(scene.local.visuals, held_model)
+		ItemModels.attach_to_hand(v, held_model)
+		_arm_pose = ItemModels.arm_pose(held_item)
+		if _arm_pose != Vector3.INF:
+			v.hold_right_arm(_arm_pose)
+
+
+## Tells the server what is in our hand so the others see it (`hold_item` → `player_held`), when it
+## differs from what the server last said; at most every HAND_SYNC_GAP s while scrolling.
+func _sync_hand() -> void:
+	var want: String = String(held_item) if held >= 0 else ""
+	var shown: String = str(scene.view.state.players.get(scene.local_id, {}).get("held", ""))
+	if want == shown or _clock - _hand_sent_at < HAND_SYNC_GAP:
+		return
+	_hand_sent_at = _clock
+	Net.send_intent(Intents.make(&"hold_item", {"item": want}))
 
 
 func _first_person() -> bool:

@@ -78,10 +78,12 @@ func test_item_models_have_a_model_for_every_item() -> void:
 		assert_gt(ItemModels.size_for(id), 0.05)
 	assert_true(ItemModels.has_own(&"baseball_bat"))
 	assert_true(ItemModels.has_own(&"empty_bottle"), "PropModels.ITEM_PROPS")
-	assert_false(ItemModels.has_own(&"lucky_clover"), "the coin placeholder")
+	for id: StringName in Registry.items:
+		assert_true(ItemModels.has_own(id), "no coin placeholder left: %s" % id)
 	var bat: Node3D = ItemModels.make(&"baseball_bat")
 	assert_eq(bat.get_meta(&"item"), &"baseball_bat")
-	assert_eq(bat.get_child_count(), 1)
+	assert_eq(bat.get_child_count(), 2, "the model in its Sway node, and the Idle animation")
+	assert_not_null(bat.get_node_or_null(^"Sway"))
 	bat.free()
 
 

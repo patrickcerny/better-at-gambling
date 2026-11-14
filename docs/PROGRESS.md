@@ -93,6 +93,16 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-14 / 0.9.19 item models
+- Every item has a real 3D model now: 27 hand-built in code (`items/item_art.gd`, primitives in the
+  casino palette) next to the 6 model files, all with an idle animation (`items/item_idle.gd`: the
+  monkey's tail sways, the reels spin, the flames flicker; model files sway in the hand).
+- Held items are raised in front of the bean (`ItemModels.HOLD_ARM`, the bat keeps the arm at rest) and
+  everyone sees them (PROTOCOL_VERSION 13: `hold_item`, `player_held`, `PlayerState.held`; the server
+  clears the hand when the item leaves the inventory or the casino closes).
+- Look-dev: `scripts/screenshot.sh res://tools/dev/item_models_shot.tscn <name> 40 --view models|hands|first
+  [--items a,b] [--page N] [--side]`. In a real practice match: `-- --practice --skip-intro --dummies 3
+  --give-items a,b,c --capture out.png --capture-at 9 --hold --third-person`.
 ### 2026-11-14 / 0.9.18 outfits
 - 75 outfit pieces (15 hats, shirts, trousers, capes, boots) in the cosmetics shop, built in code
   (`player/outfit/`), worn from the profile, on the wire (PROTOCOL_VERSION 12: hello `outfit`,
