@@ -1,11 +1,11 @@
 extends GutTest
 ## Main menu (Patrick's playtest notes): the logo and entries are centred; PLAY ONLINE, PRACTICE,
 ## TUTORIAL, QUIT; the settings sit behind a small gear in the bottom-right corner; no "Rejoin
-## last party" and no LAN/IP hosting, only HOST ON THIS PC (STEAM) (host mode, Patrick: "like
-## Pummel Party"), disabled with "Start Steam to host" when Steam isn't running (as in these
-## headless tests); TUTORIAL opens the how-to-play pages and DONE returns. (The first-run
-## tutorial gate is in test_tutorial.gd; here the tutorial counts as seen.)
-## PLAY ONLINE has no join-by-address and a server browser (Browse Parties); PRACTICE goes
+## last party" and no LAN/IP hosting; lobbies only through Steam (Patrick 2026-11-14: "nur noch
+## über Steam", and the button just says CREATE LOBBY), disabled with "Start Steam to play online"
+## when Steam isn't running (as in these headless tests); TUTORIAL opens the how-to-play pages and
+## DONE returns. (The first-run tutorial gate is in test_tutorial.gd; here the tutorial counts as
+## seen.) PLAY ONLINE has no join-by-address, no room codes and no server browser; PRACTICE goes
 ## straight into a solo casino match (Patrick: "The practise mode should only be the game, not the
 ## minigames selection"), no choice box in between.
 
@@ -78,24 +78,28 @@ func test_only_steam_hosting_and_no_rejoin() -> void:
 	menu.call(&"_show_online")
 	await wait_process_frames(1)
 	for t: String in _texts(menu):
-		assert_false(t.to_lower().contains("host on") and t != "Host on this PC (Steam)", "no LAN Host on this PC: %s" % t)
+		assert_false(t.to_lower().contains("host on"), "no Host on this PC: %s" % t)
+		assert_false(t.to_lower().contains("steam"), "no Steam wording, it's the only way: %s" % t)
+		assert_false(t.to_lower().contains("browse"), "no server browser: %s" % t)
 		assert_false(t.to_lower().contains("rejoin"), "no Rejoin last party: %s" % t)
 	assert_false(menu.has_method(&"_host_local"))
 	assert_false(menu.has_method(&"_rejoin_last"))
 	assert_true("Create Lobby" in _texts(menu), "the online form is still there")
+	for e: Node in menu.find_children("*", "LineEdit", true, false):
+		assert_false((e as LineEdit).placeholder_text.to_lower().contains("code"), "no room codes")
 
 
-func test_host_on_this_pc_needs_steam() -> void:
+func test_create_lobby_needs_steam() -> void:
 	assert_false(SteamSvc.is_available(), "no Steam client in the headless tests")
 	menu.call(&"_show_online")
 	await wait_process_frames(1)
 	var host: Button = menu.find_child("HostParty", true, false) as Button
-	assert_not_null(host, "HOST ON THIS PC under PLAY ONLINE")
+	assert_not_null(host, "CREATE LOBBY under PLAY ONLINE")
 	if host == null:
 		return
-	assert_eq(host.text, "Host on this PC (Steam)")
+	assert_eq(host.text, "Create Lobby")
 	assert_true(host.disabled, "disabled without Steam")
-	assert_eq(host.tooltip_text, "Start Steam to host")
+	assert_eq(host.tooltip_text, "Start Steam to play online")
 	assert_true(host.is_visible_in_tree())
 	assert_false((menu.find_child("JoinFriend", true, false) as Control).visible, "no friends list without Steam")
 	host.pressed.emit()  # even if it fired: nothing starts, nothing breaks
@@ -113,38 +117,6 @@ func test_no_join_by_ip_and_port() -> void:
 	for t: String in _texts(menu):
 		assert_ne(t, "Connect", "no direct Connect button")
 	assert_false(menu.has_method(&"_join_ip"))
-
-
-func test_browse_parties_lists_name_players_phase_and_join() -> void:
-	menu.call(&"_show_online")
-	var browse: Button = menu.find_child("BrowseParties", true, false) as Button
-	assert_not_null(browse, "Browse Lobbies under PLAY ONLINE")
-	if browse == null:
-		return
-	browse.pressed.emit()
-	await wait_process_frames(1)
-	assert_true(menu.browser_box.visible)
-	menu.fill_browser([
-		{"room_id": "r1", "room_code": "ABCDE", "name": "Patrick's party", "players": 3, "max_players": 8, "phase": "match", "mode": "casino", "joinable": true},
-		{"room_id": "r2", "room_code": "FGHJK", "name": "Chip's party", "players": 2, "max_players": 8, "phase": "results", "mode": "minigames", "joinable": false},
-	])
-	await wait_process_frames(1)
-	assert_eq(menu.browser_list.get_child_count(), 2)
-	var first: Node = menu.browser_list.get_node("PartyABCDE")
-	var labels: PackedStringArray = []
-	for l: Node in first.find_children("*", "Label", true, false):
-		labels.append((l as Label).text)
-	assert_true("Patrick's party" in labels, str(labels))
-	assert_true("3/8" in labels, str(labels))
-	assert_true("PLAYING" in labels, "running matches are listed (late join)")
-	assert_false((first.find_child("Join", true, false) as Button).disabled)
-	var second: Node = menu.browser_list.get_node("PartyFGHJK")
-	assert_true((second.find_child("Join", true, false) as Button).disabled, "results screen: not joinable")
-	assert_string_contains((second.find_child("Phase", true, false) as Label).text, "MINIGAMES")
-	menu.fill_browser([])
-	await wait_process_frames(1)
-	assert_eq(menu.browser_list.get_child_count(), 0)
-	assert_string_contains(menu.browser_status.text, "No public lobbies")
 
 
 func test_practice_starts_the_solo_casino_match() -> void:

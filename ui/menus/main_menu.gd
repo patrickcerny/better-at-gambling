@@ -1,6 +1,6 @@
 extends Control
 ## Main menu, centred under the 3D logo (Patrick: "the main menu centered"): Play Online (create a
-## party, join by code, browse public parties), Practice (straight into a solo casino match;
+## lobby, join a friend's lobby), Practice (straight into a solo casino match;
 ## Patrick: "The practise mode should only be the game"; minigames only stays a lobby mode),
 ## Tutorial (how to play), Cosmetics (the shop, `CosmeticsPanel`), Quit, the profile line in the
 ## top-left corner (level, XP bar, Coins: `ProfileBadge`) and small buttons in the bottom-right
@@ -10,11 +10,10 @@ extends Control
 ## remembers it.
 ## Joining shows the joining screen (`Loading`, with the logo) until the match has loaded;
 ## connection errors from the last online attempt are shown here when we return. There is no
-## join-by-address (Patrick: "Remove join by ip and port"): parties are reached through the
-## orchestrator, or through Steam in host mode (`--connect` stays a dev/test command-line flag).
-## Host mode (Patrick: "like Pummel Party"): HOST ON THIS PC (STEAM) runs the party on this PC and
-## friends join through Steam invites or the "Join a friend" list (`SteamParty`); without Steam
-## running the button is disabled ("Start Steam to host").
+## join-by-address (Patrick: "Remove join by ip and port") and no lobby server of ours any more
+## (Patrick 2026-11-14: "nur noch über Steam"): CREATE LOBBY runs the party on this PC and friends
+## join through Steam invites or the "Join a friend" list (`SteamParty`); without Steam running the
+## button is disabled ("Start Steam to play online"). `--connect` stays a dev/test command-line flag.
 
 ## PRACTICE starts a solo casino match: `practice_requested` fires first, then the match scene
 ## loads unless `load_match` is off (tests stop there instead of leaving the menu).
@@ -30,10 +29,7 @@ signal practice_requested(settings: Dictionary)
 
 var _online_box: VBoxContainer
 var _name_edit: LineEdit
-var _code_edit: LineEdit
-var _create_button: Button
-var _browse_button: Button
-## Host mode (Steam): host on this PC, and friends' parties to join.
+## CREATE LOBBY (the party runs on this PC, friends join through Steam), and friends' lobbies.
 var host_button: Button
 var friends_box: VBoxContainer
 var _friends_list: VBoxContainer
@@ -53,12 +49,6 @@ var help_button: HelpButton
 var _after_tutorial: Callable = Callable()
 ## Who gets the focus back when the tutorial closes to the main entries.
 var _tutorial_opener: Control
-## Server browser (Patrick: "Server browser good"): public parties from the orchestrator.
-var browser_box: VBoxContainer
-var browser_list: VBoxContainer
-var browser_status: Label
-var _refresh_button: Button
-var _browser_seq: int = 0
 ## Off in tests: PRACTICE stops at `practice_requested` instead of loading the match.
 var load_match: bool = true
 
@@ -167,7 +157,6 @@ func _ready() -> void:
 	_column.add_child(how_to_play)
 	how_to_play.closed.connect(_on_tutorial_closed)
 	_build_online()
-	_build_browser()
 	_practice.grab_focus()
 	Audio.set_mood(&"menu")
 	if DisplayServer.get_name() != "headless":
@@ -210,24 +199,6 @@ func _build_online() -> void:
 	_online_box.add_child(_name_edit)
 	_name_edit.text_submitted.connect(func(_t: String) -> void: _save_name())
 	_name_edit.focus_exited.connect(_save_name)
-	_create_button = _button("Create Lobby", _create)
-	_online_box.add_child(_create_button)
-	var join_row := HBoxContainer.new()
-	_online_box.add_child(join_row)
-	_code_edit = LineEdit.new()
-	_code_edit.placeholder_text = "ROOM CODE"
-	_code_edit.max_length = 5
-	_code_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_code_edit.text_changed.connect(func(t: String) -> void:
-		var caret: int = _code_edit.caret_column
-		_code_edit.text = t.to_upper()
-		_code_edit.caret_column = caret)
-	_code_edit.text_submitted.connect(func(_t: String) -> void: _join_code())
-	join_row.add_child(_code_edit)
-	join_row.add_child(_button("Join", _join_code, 140))
-	_browse_button = _button("Browse Lobbies", _show_browser)
-	_browse_button.name = "BrowseParties"
-	_online_box.add_child(_browse_button)
 	host_button = _button(HOST_LABEL, _host_steam)
 	host_button.name = "HostParty"
 	_online_box.add_child(host_button)
@@ -247,39 +218,6 @@ func _build_online() -> void:
 	_status.custom_minimum_size = Vector2(540, 0)
 	_online_box.add_child(_status)
 	_online_box.add_child(_button("Back", _show_main))
-
-
-## PLAY ONLINE → Browse Parties: name, players/max, phase and a JOIN button per public party.
-func _build_browser() -> void:
-	browser_box = _sub_box("Browser", "PUBLIC LOBBIES", 860.0)
-	var hint := Label.new()
-	hint.text = "Lobbies whose leader switched PUBLIC on in the lobby. Running matches take new players too."
-	hint.theme_type_variation = &"MutedLabel"
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	browser_box.add_child(hint)
-	var frame := PanelContainer.new()
-	frame.theme_type_variation = &"HudPlate"
-	browser_box.add_child(frame)
-	var scroll := ScrollContainer.new()
-	scroll.follow_focus = true  # a pad or the arrow keys scroll to the focused row
-	scroll.custom_minimum_size = Vector2(0, 380)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	frame.add_child(scroll)
-	browser_list = VBoxContainer.new()
-	browser_list.name = "List"
-	browser_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	browser_list.add_theme_constant_override(&"separation", 4)
-	scroll.add_child(browser_list)
-	browser_status = Label.new()
-	browser_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	browser_box.add_child(browser_status)
-	var bottom := HBoxContainer.new()
-	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
-	bottom.add_theme_constant_override(&"separation", 16)
-	browser_box.add_child(bottom)
-	_refresh_button = _button("Refresh", refresh_browser, 200)
-	bottom.add_child(_refresh_button)
-	bottom.add_child(_button("Back", _show_online, 200))
 
 
 ## PRACTICE: the solo casino match straight away (the match scene merges
@@ -303,7 +241,6 @@ func _hide_boxes() -> void:
 	_main_box.visible = false
 	_set_logo_visible(false)
 	_online_box.visible = false
-	browser_box.visible = false
 	how_to_play.visible = false
 
 
@@ -312,16 +249,7 @@ func _show_online() -> void:
 	_online_box.visible = true
 	_status.text = ""
 	_refresh_steam_entries()
-	_create_button.grab_focus()
-
-
-func _show_browser() -> void:
-	if _busy:
-		return
-	_hide_boxes()
-	browser_box.visible = true
-	_refresh_button.grab_focus()
-	refresh_browser()
+	host_button.grab_focus()
 
 
 ## Whether the player has been through the tutorial once (`tutorial/seen` in user://settings.cfg).
@@ -373,10 +301,7 @@ func _show_main() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed(&"ui_cancel"):
 		return
-	if browser_box.visible:
-		get_viewport().set_input_as_handled()
-		_show_online()
-	elif _online_box.visible:
+	if _online_box.visible:
 		get_viewport().set_input_as_handled()
 		_show_main()
 
@@ -404,125 +329,7 @@ func _set_status(text: String, error: bool = false) -> void:
 	_status.add_theme_color_override(&"font_color", Palette.LOSS_RED if error else Palette.CREAM)
 
 
-func _create() -> void:
-	await _via_orchestrator(func(n: String) -> Dictionary: return await Net.online.create_party(n), "Creating lobby…", "CREATING LOBBY")
-
-
-func _join_code() -> void:
-	var code: String = _code_edit.text.strip_edges().to_upper()
-	if code.length() != 5:
-		_set_status("Room codes have 5 letters.", true)
-		return
-	await _via_orchestrator(func(n: String) -> Dictionary: return await Net.online.join_party(n, code), "Joining %s…" % code, "JOINING %s" % code)
-
-
-# --- Server browser ----------------------------------------------------------------------------
-
-## Asks the orchestrator for the public parties and lists them.
-func refresh_browser() -> void:
-	_browser_seq += 1
-	var seq: int = _browser_seq
-	browser_status.text = "Looking for lobbies…"
-	browser_status.remove_theme_color_override(&"font_color")
-	_refresh_button.disabled = true
-	var rooms: Array[Dictionary] = await Net.online.list_parties()
-	if seq != _browser_seq or not is_inside_tree():
-		return
-	_refresh_button.disabled = false
-	if rooms.is_empty() and Net.online.last_error != "":
-		fill_browser([])
-		browser_status.text = Net.online.last_error
-		browser_status.add_theme_color_override(&"font_color", Palette.LOSS_RED)
-		return
-	fill_browser(rooms)
-
-
-## One row per party: name, players/max, phase (and mode), JOIN.
-func fill_browser(rooms: Array) -> void:
-	for c: Node in browser_list.get_children():
-		browser_list.remove_child(c)
-		c.queue_free()
-	browser_status.remove_theme_color_override(&"font_color")
-	browser_status.text = "" if not rooms.is_empty() else "No public lobbies right now. Create one and switch PUBLIC on in the lobby (TAB)."
-	for r: Variant in rooms:
-		if r is Dictionary:
-			browser_list.add_child(_browser_row(r))
-
-
-static func phase_text(phase: String) -> String:
-	match phase:
-		"lobby":
-			return "IN LOBBY"
-		"match":
-			return "PLAYING"
-		"results":
-			return "RESULTS"
-	return phase.to_upper()
-
-
-func _browser_row(r: Dictionary) -> Control:
-	var framed := PanelContainer.new()
-	framed.name = "Party%s" % str(r.get("room_code", ""))
-	framed.theme_type_variation = &"RowPanel"
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override(&"separation", 16)
-	framed.add_child(row)
-	var name_label := Label.new()
-	name_label.text = str(r.get("name", "Lobby"))
-	name_label.clip_text = true
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(name_label)
-	var count := Label.new()
-	count.name = "Players"
-	count.text = "%d/%d" % [int(r.get("players", 0)), int(r.get("max_players", Protocol.MAX_PLAYERS))]
-	count.custom_minimum_size = Vector2(70, 0)
-	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	count.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(count)
-	var phase := Label.new()
-	phase.name = "Phase"
-	var mode_tag: String = "  ·  MINIGAMES" if MatchMode.normalize(r.get("mode", "casino")) == MatchMode.MINIGAMES else ""
-	phase.text = phase_text(str(r.get("phase", "lobby"))) + mode_tag
-	phase.theme_type_variation = &"SmallLabel"
-	phase.custom_minimum_size = Vector2(230, 0)
-	phase.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	phase.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if str(r.get("phase", "")) == "lobby" else Palette.WARM_GOLD)
-	row.add_child(phase)
-	var join := Button.new()
-	join.name = "Join"
-	join.text = "JOIN"
-	join.custom_minimum_size = Vector2(120, 44)
-	join.disabled = not bool(r.get("joinable", true))
-	var room_id: String = str(r.get("room_id", ""))
-	var code: String = str(r.get("room_code", ""))
-	join.pressed.connect(func() -> void: _join_listed(room_id, code))
-	row.add_child(join)
-	return framed
-
-
-func _join_listed(room_id: String, code: String) -> void:
-	await _via_orchestrator(func(n: String) -> Dictionary: return await Net.online.join_party(n, "", room_id), "Joining %s…" % code, "JOINING %s" % code, browser_status)
-
-
 # --- Connecting --------------------------------------------------------------------------------
-
-func _via_orchestrator(call: Callable, busy_text: String, screen_text: String, status_label: Label = null) -> void:
-	if _busy:
-		return
-	_busy = true
-	var label: Label = status_label if status_label != null else _status
-	label.text = busy_text
-	label.remove_theme_color_override(&"font_color")
-	var name_: String = _display_name()
-	var room: Dictionary = await call.call(name_)
-	if room.is_empty():
-		_busy = false
-		label.text = Net.online.last_error
-		label.add_theme_color_override(&"font_color", Palette.LOSS_RED)
-		return
-	_connect(func() -> Error: return Net.online.connect_room(room, name_, SceneRouter.profile_cosmetics()), screen_text)
-
 
 ## Starts the UDP connection behind the joining screen; the match scene loads once the server
 ## welcomes us (the screen turns into the loading screen), or we come back here with the reason.
@@ -550,14 +357,12 @@ func _on_failed(reason: String) -> void:
 	if Net.mode == Net.Mode.NONE:
 		Net.steam_party.stop_hosting()  # hosting, but our own game could not join: no orphan server
 		SteamSvc.leave_lobby()
-	if browser_box.visible:
-		_show_online()
 	_set_status(reason, true)
 
 
-# --- Host mode (Steam) -------------------------------------------------------------------------
+# --- Lobbies (Steam) ---------------------------------------------------------------------------
 
-const HOST_LABEL: String = "Host on this PC (Steam)"
+const HOST_LABEL: String = "Create Lobby"
 const FRIENDS_REFRESH: float = 3.0
 var _friends_timer: float = 0.0
 
@@ -566,9 +371,11 @@ var _friends_timer: float = 0.0
 func _refresh_steam_entries() -> void:
 	var on: bool = SteamSvc.is_available()
 	host_button.disabled = not on
-	host_button.tooltip_text = "Run the lobby on this PC; invite Steam friends from the lobby" if on else "Start Steam to host"
+	host_button.tooltip_text = "Invite your friends from the lobby" if on else "Start Steam to play online"
 	friends_box.visible = on
 	if not on:
+		if not _busy and _status != null and _status.text == "":
+			_set_status("Start Steam to play online.")
 		return
 	for c: Node in _friends_list.get_children():
 		c.queue_free()
@@ -593,7 +400,7 @@ func _process(delta: float) -> void:
 		_refresh_steam_entries()
 
 
-## HOST ON THIS PC: start the party server here, open the Steam lobby, then join it.
+## CREATE LOBBY: start the party server here, open the Steam lobby, then join it.
 func _host_steam() -> void:
 	if _busy or not SteamSvc.is_available():
 		return
@@ -606,7 +413,7 @@ func _host_steam() -> void:
 		_busy = false
 		_set_status(Net.steam_party.last_error, true)
 		return
-	_connect(func() -> Error: return Net.steam_party.join_own_party(name_, SceneRouter.profile_cosmetics()), "HOSTING")
+	_connect(func() -> Error: return Net.steam_party.join_own_party(name_, SceneRouter.profile_cosmetics()), "CREATING LOBBY")
 
 
 func _on_steam_join_requested(lobby_id: int) -> void:

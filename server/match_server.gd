@@ -913,6 +913,10 @@ func progress_rows(standings: Array[Dictionary]) -> Dictionary:
 		var st: Dictionary = stats.get(id, {})
 		out[id] = Progression.breakdown(cfg, int(row.get("rank", 1)), int(st.get("minigames_won", 0)),
 			economy.balance(id) - balance.start_money, int(st.get("hands", 0)), not room_mode, int(st.get("biggest_win", 0)))
+		# For the Steam achievements (`Achievements.from_match`).
+		out[id]["minigames_won"] = int(st.get("minigames_won", 0))
+		out[id]["money"] = economy.balance(id)
+		out[id]["players"] = standings.size()
 	return out
 
 

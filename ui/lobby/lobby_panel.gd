@@ -2,7 +2,7 @@ class_name LobbyPanel
 extends PanelContainer
 ## The 2D lobby panel (§2.2) that mirrors the physical entrance hall for gamepad and
 ## accessibility: the 8 slots (name, color, ready, leader) and — for the party leader — the mode (casino or minigames only), match length (minigames,
-## gambling minutes between them), items, which minigames are on (MinigameSelector), PUBLIC (listed in the server browser) and a KICK button
+## gambling minutes between them), items, which minigames are on (MinigameSelector), INVITE FRIENDS (Steam overlay) and a KICK button
 ## next to every other player (press twice: KICK → SURE?). Every button sends an intent; the panel
 ## only redraws from the ClientMatchState mirror. There is no READY button: players get ready
 ## only by standing on their pedestal (Patrick); the slots just show it. Opened at the settings
@@ -25,11 +25,10 @@ var _countdown_label: Label
 ## Match length steppers (Patrick's note #12): setting key → {minus, plus, value: Label}.
 var _steppers: Dictionary[String, Dictionary] = {}
 var _items_button: Button
-## Leader-only toggles: party mode (`MatchMode`) and server-browser listing.
+## Leader-only toggle: party mode (`MatchMode`).
 var mode_button: Button
-var public_button: Button
-## Host mode (a Steam party on someone's PC): opens the Steam overlay's invite dialog. Replaces
-## PUBLIC there (there is no server browser for Steam parties).
+## Opens the Steam overlay's invite dialog (every party is a Steam lobby on the host's PC; there is
+## no server browser and no PUBLIC toggle any more). Disabled in a dev `--connect` room.
 var invite_button: Button
 ## MINIGAMES: opens the minigame selector (`minigame_pool`; read-only for everyone but the leader).
 var minigames_button: Button
@@ -143,19 +142,11 @@ func _build() -> void:
 		var now: StringName = MatchMode.normalize(state.lobby_settings.get("mode", MatchMode.CASINO))
 		Net.send_intent(Intents.make(&"lobby_setting", {"key": "mode", "value": MatchMode.MINIGAMES if now == MatchMode.CASINO else MatchMode.CASINO})))
 	toggles.add_child(mode_button)
-	public_button = Button.new()
-	public_button.name = "Public"
-	public_button.toggle_mode = true
-	public_button.custom_minimum_size = Vector2(170, 0)
-	public_button.pressed.connect(func() -> void:
-		Net.send_intent(Intents.make(&"lobby_setting", {"key": "public", "value": not bool(state.lobby_settings.get("public", false))})))
-	toggles.add_child(public_button)
 	invite_button = Button.new()
 	invite_button.name = "InviteFriends"
 	invite_button.text = "INVITE FRIENDS"
-	invite_button.tooltip_text = "Invite Steam friends (Steam overlay)"
+	invite_button.tooltip_text = "Invite friends (Steam overlay)"
 	invite_button.custom_minimum_size = Vector2(170, 0)
-	invite_button.visible = false
 	invite_button.pressed.connect(func() -> void: SteamSvc.invite_friends())
 	toggles.add_child(invite_button)
 	_add_stepper("minigames", "MINIGAMES")
@@ -239,11 +230,8 @@ func _heading(text: String) -> Label:
 func _refresh() -> void:
 	if state == null or _title == null:
 		return
-	var code: String = str(Net.room.get("room_code", ""))
-	var steam_party: bool = int(Net.room.get("steam_lobby", 0)) != 0
-	_title.text = "LOBBY" + ("   ·   CODE %s" % code if code != "" else ("   ·   STEAM" if steam_party else ""))
-	public_button.visible = not steam_party
-	invite_button.visible = steam_party
+	_title.text = "LOBBY"
+	invite_button.disabled = int(Net.room.get("steam_lobby", 0)) == 0
 	_countdown_label.text = "Doors open in %d…" % ceili(state.countdown) if state.countdown > 0.0 else "Step up on the pedestal with your name to get ready."
 	var ids: Array = state.players.keys()
 	ids.sort()
@@ -292,11 +280,6 @@ func _refresh() -> void:
 	_length_note.text = "%d minigames back to back, no casino" % mg if minigames_only else "About %d min of gambling in all" % (gm * (mg + 1))
 	mode_button.text = "MODE: %s" % MatchMode.label(state.lobby_settings.get("mode", MatchMode.CASINO))
 	mode_button.disabled = not leader
-	var public: bool = bool(state.lobby_settings.get("public", false))
-	public_button.text = "PUBLIC" if public else "PRIVATE"
-	public_button.set_pressed_no_signal(public)
-	public_button.disabled = not leader
-	public_button.tooltip_text = "Listed in the server browser" if public else "Only people with the code can join"
 	_items_button.text = "ITEMS: %s" % ("ON" if bool(state.lobby_settings.get("items_enabled", true)) else "OFF")
 	_items_button.button_pressed = bool(state.lobby_settings.get("items_enabled", true))
 	_items_button.disabled = not leader

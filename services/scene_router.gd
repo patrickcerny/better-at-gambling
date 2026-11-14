@@ -31,7 +31,7 @@ func _ready() -> void:
 		Log.info(&"boot", "smoke test: running %d frames / %.0f s" % [_smoke_frames_left, _smoke_seconds_left])
 	if cmdline.has_flag("server"):
 		_boot_server.call_deferred()
-	elif cmdline.has("connect") or cmdline.has("join-code") or cmdline.has_flag("create-room"):
+	elif cmdline.has("connect"):
 		_boot_client.call_deferred()
 	elif cmdline.has_flag("practice") or cmdline.has_flag("autoplay"):
 		# Straight into a Practice match (dev/CI shortcut; the menu's Practice button does the same).
@@ -97,40 +97,27 @@ func _boot_server() -> void:
 	goto(MATCH)
 
 
-## `--connect host:port` (direct, dev and the network tests only: players join through the
-## orchestrator, by code or from the server browser), `--join-code CODE` or `--create-room`.
+## `--connect host:port` (direct, dev and the network tests only: players join through Steam
+## lobbies from the main menu).
 func _boot_client() -> void:
 	var display: String = profile_name()
-	var err: Error = OK
 	Net.connected.connect(_on_boot_connected, CONNECT_ONE_SHOT)
 	Net.disconnected.connect(_on_boot_failed, CONNECT_ONE_SHOT)
 	Loading.begin("JOINING")  # the joining screen (nothing when headless)
-	if cmdline.has("connect"):
-		var parts: PackedStringArray = cmdline.get_string("connect").rsplit(":", true, 1)
-		var host: String = parts[0] if parts[0] != "" else "127.0.0.1"
-		var port: int = int(parts[1]) if parts.size() > 1 else Protocol.DEFAULT_PORT
-		var hello: Dictionary = profile_cosmetics()
-		hello["name"] = display
-		if cmdline.has("uid"):
-			hello["uid"] = cmdline.get_string("uid")
-		if cmdline.has("build"):
-			hello["build"] = cmdline.get_string("build")  # version-mismatch tests
-		err = Net.join_server(host, port, hello, net_opts())
-		# `--bridge-port P` (with `--connect` to a `--host-mode` room): this game also runs the
-		# host's bridge, friends joining over ENet on P (`SteamParty.start_dev_bridge`).
-		if err == OK and cmdline.has("bridge-port") and Net.steam_party.start_dev_bridge(cmdline.get_int("bridge-port", 0), port) != OK:
-			Log.warn(&"host", "dev bridge: could not listen on port %d" % cmdline.get_int("bridge-port", 0))
-	else:
-		var room: Dictionary
-		if cmdline.has_flag("create-room"):
-			room = await Net.online.create_party(display)
-		else:
-			room = await Net.online.join_party(display, cmdline.get_string("join-code"))
-		if room.is_empty():
-			_on_boot_failed(Net.online.last_error)
-			return
-		Log.info(&"boot", "room %s at %s:%d" % [room.get("room_code", ""), room.get("host", ""), int(room.get("port", 0))])
-		err = Net.online.connect_room(room, display, profile_cosmetics(), net_opts())
+	var parts: PackedStringArray = cmdline.get_string("connect").rsplit(":", true, 1)
+	var host: String = parts[0] if parts[0] != "" else "127.0.0.1"
+	var port: int = int(parts[1]) if parts.size() > 1 else Protocol.DEFAULT_PORT
+	var hello: Dictionary = profile_cosmetics()
+	hello["name"] = display
+	if cmdline.has("uid"):
+		hello["uid"] = cmdline.get_string("uid")
+	if cmdline.has("build"):
+		hello["build"] = cmdline.get_string("build")  # version-mismatch tests
+	var err: Error = Net.join_server(host, port, hello, net_opts())
+	# `--bridge-port P` (with `--connect` to a `--host-mode` room): this game also runs the
+	# host's bridge, friends joining over ENet on P (`SteamParty.start_dev_bridge`).
+	if err == OK and cmdline.has("bridge-port") and Net.steam_party.start_dev_bridge(cmdline.get_int("bridge-port", 0), port) != OK:
+		Log.warn(&"host", "dev bridge: could not listen on port %d" % cmdline.get_int("bridge-port", 0))
 	if err != OK:
 		_on_boot_failed(Net.last_error)
 

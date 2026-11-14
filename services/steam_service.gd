@@ -3,9 +3,9 @@ extends Node
 ## (addons/godotsteam). The autoload is named `SteamSvc`, not `Steam`, because GodotSteam registers
 ## an engine singleton called `Steam` (docs/DECISIONS.md).
 ##
-## Steam is optional: the game is the GitHub zip and Steam only has to be running for host mode
-## (host a party on this PC, friends join through the Steam relay, App ID 480 until we have our
-## own). Without a Steam client (the headless tests, the dedicated server, `--no-steam`, a PC
+## Steam is needed to play online: every party is a Steam lobby hosted on a player's PC, friends join
+## through the Steam relay (App ID 5623410, the game's own; Practice works without Steam).
+## Without a Steam client (the headless tests, the dedicated server, `--no-steam`, a PC
 ## without Steam) `is_available()` is false, nothing else is called and one info line says why.
 ##
 ## Lobbies: the host's party is a friends-only Steam lobby carrying {game, build, name}; friends
@@ -22,8 +22,8 @@ signal lobby_entered(result: Dictionary)
 ## Someone entered or left our lobby.
 signal lobby_members_changed(lobby_id: int)
 
-## Free test App ID ("Spacewar") until the game has its own; friends see "Spacewar" as the game.
-const APP_ID: int = 480
+## The game's own Steamworks App ID (was 480 "Spacewar" for tests until 0.9.16).
+const APP_ID: int = 5623410
 const LOBBY_GAME: String = "better_at_gambling"
 const LOBBY_TYPE_FRIENDS_ONLY: int = 1
 const CHAT_ROOM_ENTER_RESPONSE_SUCCESS: int = 1
@@ -42,6 +42,8 @@ var last_error: String = ""
 var _available: bool = false
 var _steam_id: int = 0
 var _persona: String = ""
+## Achievements already handed to Steam this run (asked once each).
+var _unlocked: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -69,6 +71,9 @@ func _ready() -> void:
 	steam.connect(&"lobby_joined", _on_lobby_joined)
 	steam.connect(&"lobby_chat_update", _on_lobby_chat_update)
 	Log.info(&"steam", "Steam on: %s (app %d)" % [_persona, APP_ID])
+	# Lifetime achievements follow the profile (level-ups, matches, the shop) and catch up on start.
+	ProfileManager.changed.connect(_on_profile_changed)
+	_on_profile_changed()
 
 
 func _process(_delta: float) -> void:
@@ -84,6 +89,33 @@ func _exit_tree() -> void:
 
 
 ## Why Steam stays off in this process ("" = try it).
+## Unlocks Steam achievements by API name (`Achievements.DEFS`) and stores them once. Without
+## Steam nothing happens. Returns the ones newly unlocked this call.
+func unlock_achievements(ids: Array[StringName]) -> Array[StringName]:
+	var fresh: Array[StringName] = []
+	if not _available or ids.is_empty():
+		return fresh
+	for id: StringName in ids:
+		if id in _unlocked:
+			continue
+		_unlocked.append(id)
+		var have: Dictionary = steam.call("getAchievement", String(id))
+		if bool(have.get("achieved", false)):
+			continue
+		if bool(steam.call("setAchievement", String(id))):
+			fresh.append(id)
+		else:
+			Log.warn(&"steam", "achievement %s is not set up in Steamworks" % id)
+	if not fresh.is_empty():
+		steam.call("storeStats")
+		Log.info(&"steam", "achievements unlocked: %s" % ", ".join(fresh))
+	return fresh
+
+
+func _on_profile_changed() -> void:
+	unlock_achievements(Achievements.from_profile(ProfileManager.profile))
+
+
 func _skip_reason() -> String:
 	var user_args: PackedStringArray = OS.get_cmdline_user_args()
 	if "--no-steam" in user_args:

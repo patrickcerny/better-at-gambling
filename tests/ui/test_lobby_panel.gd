@@ -140,15 +140,16 @@ func test_tab_closes_the_open_panel() -> void:
 	assert_eq(closed.size(), 1)
 
 
-func test_a_steam_hosted_party_offers_invite_instead_of_public() -> void:
-	panel._refresh()
-	assert_true(panel.public_button.visible, "orchestrator party: PUBLIC toggle")
-	assert_false(panel.invite_button.visible)
+func test_invite_friends_and_no_public_toggle() -> void:
 	var old_room: Dictionary = Net.room
+	Net.room = {}
+	panel._refresh()
+	assert_null(panel.find_child("Public", true, false), "no PUBLIC toggle: there is no server browser")
+	assert_true(panel.invite_button.visible)
+	assert_true(panel.invite_button.disabled, "no Steam lobby (dev --connect room): nothing to invite to")
 	Net.room = {"steam_lobby": 109775240000000001, "host_mode": true}
 	panel._refresh()
-	assert_false(panel.public_button.visible, "no server browser for a Steam party")
-	assert_true(panel.invite_button.visible, "INVITE FRIENDS opens the Steam overlay")
-	assert_string_contains(panel._title.text, "STEAM")
+	assert_false(panel.invite_button.disabled, "INVITE FRIENDS opens the Steam overlay")
+	assert_eq(panel._title.text, "LOBBY", "no Steam wording, it's the only way")
 	panel.invite_button.pressed.emit()  # no Steam here: nothing happens, nothing breaks
 	Net.room = old_room

@@ -77,37 +77,30 @@ func test_kick_needs_a_second_press_and_sends_the_target() -> void:
 	assert_eq(_kick_button(2).text, "KICK")
 
 
-func test_non_leaders_cannot_kick_or_change_mode_and_public() -> void:
+func test_non_leaders_cannot_kick_or_change_mode() -> void:
 	Net.local_player_id = 2
 	panel.bind(state, 2)
 	panel.open()
 	await wait_process_frames(1)
 	for i: int in 3:
 		assert_false(_kick_button(i).visible, "no KICK for a non-leader (slot %d)" % i)
-	assert_true(panel.public_button.disabled)
 	assert_true(panel.mode_button.disabled)
 	panel._on_kick_pressed(0)
 	panel._on_kick_pressed(0)
 	assert_eq(fake.sent.size(), 0)
 
 
-func test_public_and_mode_toggles_send_lobby_settings() -> void:
+func test_mode_toggle_sends_lobby_settings() -> void:
 	panel.bind(state, 1)
 	panel.open()
 	await wait_process_frames(1)
-	assert_eq(panel.public_button.text, "PRIVATE")
 	assert_string_contains(panel.mode_button.text, "CASINO")
-	panel.public_button.pressed.emit()
-	assert_eq(fake.sent[-1], {"type": &"lobby_setting", "key": "public", "value": true})
 	panel.mode_button.pressed.emit()
 	assert_eq(fake.sent[-1], {"type": &"lobby_setting", "key": "mode", "value": MatchMode.MINIGAMES})
 	# The server's answer arrives.
-	state.lobby_settings["public"] = true
 	state.lobby_settings["mode"] = &"minigames"
 	state.lobby_changed.emit()
 	await wait_process_frames(1)
-	assert_eq(panel.public_button.text, "PUBLIC")
-	assert_true(panel.public_button.button_pressed)
 	assert_string_contains(panel.mode_button.text, "MINIGAMES ONLY")
 	assert_true((panel._steppers["gamble_minutes"]["plus"] as Button).disabled, "no gambling time in minigames only")
 	assert_string_contains(panel._length_note.text, "back to back")

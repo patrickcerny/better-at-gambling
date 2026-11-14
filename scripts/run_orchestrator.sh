@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the room orchestrator locally (dev auth) spawning game servers from this checkout.
-# Clients then use: --orchestrator http://127.0.0.1:8080 --create-room | --join-code ABCDE
+# Only clients up to 0.9.16 use it (later builds play online through Steam lobbies only).
 set -euo pipefail
 source "$(dirname "$0")/_common.sh"
 BUILD=$(sed -n 's/^const BUILD_ID: String = "\(.*\)"/\1/p' "$ROOT/core/net/protocol.gd")

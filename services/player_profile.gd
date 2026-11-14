@@ -1,8 +1,7 @@
 class_name PlayerProfile
 extends RefCounted
 ## The local player's progression (docs/GDD.md "Progression", "Cosmetics shop"): XP and level,
-## Coins, the cosmetics they own and wear, and lifetime stats. There are no accounts (Steam test
-## App ID, local play), so it lives in a ConfigFile on this machine (`ProfileManager` keeps the
+## Coins, the cosmetics they own and wear, and lifetime stats. There are no accounts, so it lives in a ConfigFile on this machine (`ProfileManager` keeps the
 ## one in user://profile.cfg). Loading sanity-checks every value (clamped, unknown items dropped,
 ## the level recomputed from the XP), so a hand-edited or damaged file can't break anything; there
 ## is no DRM. Coins are never in-match money: the tables take $ only, which resets every match.
@@ -22,6 +21,8 @@ var preferred_color: int = -1
 var owned: Array[StringName] = []
 var matches: int = 0
 var wins: int = 0
+## Matches won online against at least one other player (Practice wins don't count; achievements).
+var online_wins: int = 0
 ## Biggest single win at a table ($, in any match).
 var biggest_win: int = 0
 ## Match ids already applied (newest last).
@@ -120,6 +121,8 @@ func apply_match(match_id: String, row: Dictionary) -> Dictionary:
 	matches += 1
 	if int(row.get("rank", 0)) == 1:
 		wins += 1
+		if Achievements.counts_as_online_win(row):
+			online_wins += 1
 	biggest_win = maxi(biggest_win, int(row.get("biggest_win", 0)))
 	if match_id != "":
 		applied.append(match_id)
@@ -141,6 +144,7 @@ func to_config(cfg: ConfigFile) -> void:
 	cfg.set_value(SECTION, "owned", ids)
 	cfg.set_value("stats", "matches", matches)
 	cfg.set_value("stats", "wins", wins)
+	cfg.set_value("stats", "online_wins", online_wins)
 	cfg.set_value("stats", "biggest_win", biggest_win)
 	cfg.set_value("stats", "applied", PackedStringArray(applied))
 
@@ -157,6 +161,7 @@ func from_config(cfg: ConfigFile) -> void:
 			owned.append(StringName(str(id)))
 	matches = _int(cfg.get_value("stats", "matches", 0))
 	wins = _int(cfg.get_value("stats", "wins", 0))
+	online_wins = _int(cfg.get_value("stats", "online_wins", 0))
 	biggest_win = _int(cfg.get_value("stats", "biggest_win", 0))
 	applied.clear()
 	var ap: Variant = cfg.get_value("stats", "applied", PackedStringArray())
@@ -183,6 +188,7 @@ func sanitize() -> void:
 		preferred_color = -1
 	matches = maxi(matches, 0)
 	wins = clampi(wins, 0, matches)
+	online_wins = clampi(online_wins, 0, wins)
 	biggest_win = maxi(biggest_win, 0)
 	if applied.size() > MAX_APPLIED:
 		applied = applied.slice(applied.size() - MAX_APPLIED)

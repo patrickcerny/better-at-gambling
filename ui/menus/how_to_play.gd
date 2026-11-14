@@ -21,7 +21,7 @@ const PAGES: Array[Array] = [
 	["MINIGAMES", "Every few minutes the curtain closes for a minigame: a quiz, Plinko, Split or Steal and more. Open bets are refunded and everyone is stood up first.\n\nThe briefing explains each one. Placing well pays cash and a better item.", "res://assets/tutorial/minigame.webp"],
 	["ROUGH PLAY", "[{grab}] grabs and throws, [{shove}] shoves. Knock a rival down and [{shake}] shakes chips out of their pockets.\n\nSeated players are safe.", "res://assets/tutorial/rough.webp"],
 	["SECURITY & JAIL", "The security guards watch: get caught attacking someone and you go to jail, behind the bars in the casino wall.\n\nEvery time you are caught you sit longer and pay a bigger fine.", "res://assets/tutorial/jail.webp"],
-	["PLAYING WITH FRIENDS", "PLAY ONLINE: Create Lobby puts your lobby on our server; friends join with its 5-letter code or from Browse Lobbies. In the lobby, step up on your pedestal to be ready.\n\nWith Steam running you can also Host on this PC: friends join through Steam (INVITE FRIENDS in the lobby, or Join Game in their friends list). Everyone needs the same version of the game.", "res://assets/tutorial/lobby.webp"],
+	["PLAYING WITH FRIENDS", "PLAY ONLINE: Create Lobby and invite your friends (INVITE FRIENDS in the lobby), or join a friend's lobby from PLAY ONLINE or with Join Game in your friends list. In the lobby, step up on your pedestal to be ready. Everyone needs the same version of the game.", "res://assets/tutorial/lobby.webp"],
 ]
 const PICTURE_SIZE: Vector2 = Vector2(640, 360)
 

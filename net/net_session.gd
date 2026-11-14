@@ -86,9 +86,7 @@ var _private_hashes: Dictionary[int, int] = {}
 var _start_ticks: int = Time.get_ticks_usec()
 
 
-## Orchestrator client (create/join parties by code).
-var online: OnlineService
-## Host mode: host a party on this PC, join friends through Steam.
+## Lobbies: host a party on this PC, join friends through Steam (the only way to play online).
 var steam_party: SteamParty
 
 
@@ -97,9 +95,6 @@ func _exit_tree() -> void:
 
 
 func _ready() -> void:
-	online = OnlineService.new()
-	online.name = "Online"
-	add_child(online)
 	steam_party = SteamParty.new()
 	steam_party.name = "SteamParty"
 	add_child(steam_party)

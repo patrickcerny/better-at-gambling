@@ -924,6 +924,8 @@ func _on_event(ev: Dictionary) -> void:
 		casino_floor.on_event(ev)
 	if event_sfx != null:
 		event_sfx.on_event(ev)
+	if role != Role.SERVER:
+		SteamSvc.unlock_achievements(Achievements.from_event(ev, local_id))
 	match type:
 		&"player_joined":
 			_spawn_avatar(int(ev["player"]["id"]), ev["player"])
@@ -1142,6 +1144,9 @@ func _on_event(ev: Dictionary) -> void:
 			# Our row of the XP/Coins breakdown goes into the local profile (once per match).
 			if role != Role.SERVER and local_id >= 0:
 				_progress_summary = ProfileManager.apply_results(ev, local_id)
+				var my_row: Variant = (ev.get("progress", {}) as Dictionary).get(local_id, null)
+				if my_row is Dictionary:
+					SteamSvc.unlock_achievements(Achievements.from_match(my_row as Dictionary))
 			_show_results(ev["standings"])
 			_log_digest()
 		&"match_reset":

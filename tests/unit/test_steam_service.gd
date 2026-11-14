@@ -38,7 +38,7 @@ func test_lobby_checks() -> void:
 	assert_eq(SteamParty.check_lobby(ok, 76561190000000002), "")
 	var other_game: Dictionary = ok.duplicate()
 	other_game["game"] = ""
-	assert_string_contains(SteamParty.check_lobby(other_game, 2), "not a Better at Gambling lobby", "App 480 is shared with other games")
+	assert_string_contains(SteamParty.check_lobby(other_game, 2), "not a Better at Gambling lobby", "only lobbies of this game")
 	var old: Dictionary = ok.duplicate()
 	old["build"] = "0.0.1"
 	assert_string_contains(SteamParty.check_lobby(old, 2), "same version")

@@ -137,7 +137,7 @@ func join_host(host_steam_id: int, display_name: String, cosmetics: Dictionary) 
 	return err
 
 
-## Why a lobby can't be joined ("" = fine): another game on App 480, another build, or ourselves.
+## Why a lobby can't be joined ("" = fine): not our game, another build, or ourselves.
 static func check_lobby(info: Dictionary, my_steam_id: int) -> String:
 	if str(info.get("game", "")) != SteamSvc.LOBBY_GAME:
 		return "That Steam lobby is not a Better at Gambling lobby."
