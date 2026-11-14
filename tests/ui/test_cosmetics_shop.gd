@@ -33,7 +33,7 @@ func test_buy_refuse_and_wear() -> void:
 	assert_true(panel.find_child("COLOURS", true, false) != null, "a COLOURS tab")
 	var price: Label = panel.tiles[&"color_mint"].find_child("Price", true, false) as Label
 	var mint: CosmeticDef = CosmeticShop.default().find(&"color_mint")
-	assert_eq(price.text, "%d COINS" % mint.price)
+	assert_eq(price.text, Hud._thousands(mint.price), "the number, with a coin icon next to it")
 	assert_eq((panel.tiles[&"color_sky"].find_child("Price", true, false) as Label).text, "FREE")
 	# Not enough Coins.
 	ProfileManager.profile.coins = mint.price - 30

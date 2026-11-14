@@ -138,3 +138,26 @@ func test_the_shop_sells_and_puts_on_outfit_pieces() -> void:
 	panel.action_button.pressed.emit()
 	assert_false(ProfileManager.profile.is_worn(&"hat_crown"))
 	assert_eq(worn[-1], [&"hat", &""])
+
+
+func test_capes_are_cloth_that_hangs_from_the_shoulders() -> void:
+	var m: ArrayMesh = OutfitMeshes.mesh(&"cape_hero")
+	var uv2: PackedVector2Array = m.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2]
+	assert_eq(uv2.size(), (m.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size(), "every vertex knows its place on the cloth")
+	var mi := MeshInstance3D.new()
+	mi.mesh = m
+	add_child_autofree(mi)
+	var mat := ShaderMaterial.new()
+	mat.shader = ToonMaterial.CLOTH_SHADER
+	var cloth := CapeCloth.new(&"cape_hero", mi, mat)
+	for i: int in 30:
+		mi.global_position += Vector3(0, 0, -0.15)  # running forward (-Z)
+		cloth.step(1.0 / 60.0, -10.0)
+	var disp: PackedVector3Array = mat.get_shader_parameter(&"cloth")
+	assert_eq(disp.size(), CapeCloth.NU * CapeCloth.NV)
+	for i: int in CapeCloth.NU:
+		assert_eq(disp[i], Vector3.ZERO, "the top row stays on the shoulders")
+	var hem: Vector3 = disp[disp.size() - 1 - CapeCloth.NU / 2]
+	assert_gt(hem.z, 0.05, "the hem trails behind a running bean")
+	for d: Vector3 in disp:
+		assert_lt(d.length(), 1.5, "the cloth stays in one piece")

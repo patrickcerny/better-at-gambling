@@ -60,7 +60,7 @@ func _ready() -> void:
 		var row: int = i / cols
 		var col: int = i % cols
 		v.position = Vector3((col - (cols - 1) * 0.5) * 1.5, 0, -row * 2.2)
-		v.rotation.y = 0.0 if back else PI
+		v.rotation.y = (0.0 if back else PI) + (PI * 0.5 if c.has_flag("side") else 0.0)
 		add_child(v)
 		v.set_color(Palette.player_color((i * 3) % Cosmetics.COLOR_COUNT))
 		v.set_outfit(looks[i])
@@ -92,4 +92,7 @@ func _process(delta: float) -> void:
 	if not _walk:
 		return
 	for v: AvatarVisuals in _beans:
-		v.update_motion(-v.global_basis.z * 4.5, true, delta)
+		# Run back and forth along the facing (the capes trail and swing).
+		var vel: Vector3 = -v.global_basis.z * 4.5 * maxf(cos(_t * 2.2), 0.0)
+		v.global_position += vel * minf(delta, 1.0 / 30.0)  # the bean animates at most 1/30 s a frame
+		v.update_motion(vel, true, delta)

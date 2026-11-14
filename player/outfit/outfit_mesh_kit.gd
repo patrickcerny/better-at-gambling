@@ -12,6 +12,12 @@ var verts := PackedVector3Array()
 var normals := PackedVector3Array()
 var colors := PackedColorArray()
 var indices := PackedInt32Array()
+## Second UVs (a cape's cloth coordinates), one per vertex while `record_uv2` is on: surfaces
+## built with `surface_uv2` on get their own (u, v), everything else gets `uv2`.
+var uv2s := PackedVector2Array()
+var record_uv2: bool = false
+var surface_uv2: bool = false
+var uv2: Vector2 = Vector2.ZERO
 ## Applied to everything added (hats are built upright around the hat's base, then tipped back).
 var xf: Transform3D = Transform3D.IDENTITY
 
@@ -36,6 +42,8 @@ func add_primitive(mesh: PrimitiveMesh, place: Transform3D, color: Color) -> voi
 		verts.append(full * v[i])
 		normals.append((nb * n[i]).normalized() if i < n.size() else Vector3.UP)
 		colors.append(color)
+		if record_uv2:
+			uv2s.append(uv2)
 	var flip: bool = full.basis.determinant() < 0.0
 	for i: int in range(0, idx.size() - 2, 3):
 		indices.append(base + idx[i])
@@ -132,7 +140,7 @@ func tri(a: Vector3, b: Vector3, c: Vector3, n: Vector3, color: Color) -> void:
 
 
 ## One triangle with its own vertex normals; turned so its front faces along them.
-func tri_n(a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vector3, color: Color) -> void:
+func tri_n(a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vector3, color: Color, uva: Vector2 = -Vector2.ONE, uvb: Vector2 = -Vector2.ONE, uvc: Vector2 = -Vector2.ONE) -> void:
 	if xf != Transform3D.IDENTITY:
 		var nbasis: Basis = xf.basis.inverse().transposed()
 		a = xf * a
@@ -152,6 +160,11 @@ func tri_n(a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vec
 	for i: int in 3:
 		colors.append(color)
 		indices.append(base + i)
+	if record_uv2:
+		var own: bool = uva.x >= 0.0
+		uv2s.append(uva if own else uv2)
+		uv2s.append((uvc if swap else uvb) if own else uv2)
+		uv2s.append((uvb if swap else uvc) if own else uv2)
 
 
 # --- Surfaces -----------------------------------------------------------------------------------
@@ -193,8 +206,16 @@ func surface(at: Callable, nu: int, nv: int, paint: Callable, outward: Callable,
 			var b: Vector3 = pts[i + 1][j]
 			var cc: Vector3 = pts[i + 1][j + 1]
 			var d: Vector3 = pts[i][j + 1]
-			tri_n(a, b, cc, nrm[i][j], nrm[i + 1][j], nrm[i + 1][j + 1], c)
-			tri_n(a, cc, d, nrm[i][j], nrm[i + 1][j + 1], nrm[i][j + 1], c)
+			if surface_uv2:
+				var u0: float = float(i) / float(nu)
+				var u1: float = float(i + 1) / float(nu)
+				var v0: float = float(j) / float(nv)
+				var v1: float = float(j + 1) / float(nv)
+				tri_n(a, b, cc, nrm[i][j], nrm[i + 1][j], nrm[i + 1][j + 1], c, Vector2(u0, v0), Vector2(u1, v0), Vector2(u1, v1))
+				tri_n(a, cc, d, nrm[i][j], nrm[i + 1][j + 1], nrm[i][j + 1], c, Vector2(u0, v0), Vector2(u1, v1), Vector2(u0, v1))
+			else:
+				tri_n(a, b, cc, nrm[i][j], nrm[i + 1][j], nrm[i + 1][j + 1], c)
+				tri_n(a, cc, d, nrm[i][j], nrm[i + 1][j + 1], nrm[i][j + 1], c)
 
 
 ## A point on the bean's surface (`AvatarVisuals`), `inflate` metres further out: `t` is the height
@@ -270,7 +291,7 @@ func band(t0: float, top: Callable, inflate: float, paint: Callable, flare: floa
 static func neckline(front: float, back: float, v: float = 0.0) -> Callable:
 	return func(a: float) -> float:
 		var f: float = (1.0 + cos(a)) * 0.5  # 1 at the front, 0 at the back
-		return lerpf(back, front, pow(f, 0.6)) - v * pow(maxf(cos(a), 0.0), 10.0)
+		return lerpf(back, front, pow(f, 2.5)) - v * pow(maxf(cos(a), 0.0), 10.0)
 
 
 ## A flat height (a waistband).
@@ -309,6 +330,8 @@ func commit() -> ArrayMesh:
 	arr[Mesh.ARRAY_NORMAL] = normals
 	arr[Mesh.ARRAY_COLOR] = colors
 	arr[Mesh.ARRAY_INDEX] = indices
+	if uv2s.size() == verts.size():
+		arr[Mesh.ARRAY_TEX_UV2] = uv2s
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 	return mesh
 

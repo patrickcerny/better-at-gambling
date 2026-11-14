@@ -6,6 +6,7 @@ extends RefCounted
 
 const SHADER: Shader = preload("res://vfx/shaders/toon.gdshader")
 const VERTEX_COLOR_SHADER: Shader = preload("res://vfx/shaders/toon_vertex_color.gdshader")
+const CLOTH_SHADER: Shader = preload("res://vfx/shaders/toon_cloth.gdshader")
 
 ## Off switch (side-by-side comparison shots).
 static var enabled: bool = true
@@ -35,6 +36,18 @@ static func make_vertex_colored(rim: float = 0.3) -> Material:
 		return m
 	var s := ShaderMaterial.new()
 	s.shader = VERTEX_COLOR_SHADER
+	s.set_shader_parameter(&"albedo", Color.WHITE)
+	s.set_shader_parameter(&"rim_strength", rim)
+	return s
+
+
+## A cape's own material: `make_vertex_colored` plus the cloth deformation (`CapeCloth`). Null
+## when the toon shaders are off (the cape then just swings).
+static func make_cloth(rim: float = 0.3) -> ShaderMaterial:
+	if not enabled or not Vfx.enabled():
+		return null
+	var s := ShaderMaterial.new()
+	s.shader = CLOTH_SHADER
 	s.set_shader_parameter(&"albedo", Color.WHITE)
 	s.set_shader_parameter(&"rim_strength", rim)
 	return s

@@ -159,6 +159,8 @@ var _outfit_nodes: Dictionary[StringName, Node3D] = {}
 var _boot_l: Node3D = null
 var _cape_pivot: Node3D = null
 var _cape_swing: float = 0.0
+## The worn cape's cloth (null when the toon shaders are off: the cape just swings then).
+var _cloth: CapeCloth = null
 var _foot_meshes: Array[Mesh] = []
 
 ## Headless beans (servers) keep the outfit ids only; tests switch the models on.
@@ -222,6 +224,11 @@ func wear(kind: StringName, id: StringName) -> void:
 			mi.position = -_cape_pivot.position
 			_cape_pivot.add_child(mi)
 			_outfit_nodes[kind] = _cape_pivot
+			var cloth_mat: ShaderMaterial = ToonMaterial.make_cloth(0.3)
+			if cloth_mat != null:
+				mi.material_override = cloth_mat
+				mi.extra_cull_margin = 1.0  # the cloth moves the vertices outside the mesh's box
+				_cloth = CapeCloth.new(id, mi, cloth_mat)
 		_:
 			var m: ArrayMesh = OutfitMeshes.mesh(id)
 			if m == null:
@@ -255,6 +262,7 @@ func _take_off(kind: StringName) -> void:
 		CosmeticDef.KIND_CAPE:
 			_cape_pivot = null
 			_cape_swing = 0.0
+			_cloth = null
 		CosmeticDef.KIND_SHIRT:
 			for seg: MeshInstance3D in _segments:
 				seg.material_override = _body_mat
@@ -508,10 +516,14 @@ func _animate(frame_delta: float) -> void:
 		_point_arms(reach_target)
 
 
-## The cape streams back with speed and flutters a little; it swings forward on landing and in
-## the air (`_cape_pivot`).
+## The cape is cloth (`CapeCloth`): it trails behind when running, flaps in jumps and falls, and
+## settles back. Without the toon shaders it swings on its hinge instead (`_cape_pivot`): back with
+## speed, forward on landing and in the air.
 func _animate_cape(delta: float, speed: float) -> void:
 	if _cape_pivot == null:
+		return
+	if _cloth != null:
+		_cloth.step(delta, global_position.y)
 		return
 	var want: float = clampf(speed * 0.1, 0.0, 0.7) + sin(_time * 11.0) * 0.05 * clampf(speed / 4.0, 0.0, 1.0)
 	if not _on_floor:

@@ -100,6 +100,13 @@
 - Look-dev: `scripts/screenshot.sh res://tools/dev/outfit_shot.tscn <name> 60 --kind hat|shirt|pants|cape|boots|sets [--back] [--walk] [--low]`.
 - Vertex colours: the toon shader must NOT convert them from sRGB (Godot already hands them over
   linear); converting again made gold look orange.
+- Shop redo after Patrick's feedback: nearly full-screen panel, icon tabs, 3D thumbnails of every
+  piece (`CosmeticThumbnails`, one offscreen render per frame), a big turnable preview on a
+  pedestal that zooms to the slot (`BeanPreviewView.focus`), prices as number + coin icon.
+  Shop look-dev: `scripts/screenshot.sh res://tools/dev/cosmetics_shot.tscn <name> 200 --view shop --select <id>`.
+- Capes are cloth (`CapeCloth`): a 7x6 Verlet grid in world space, top row pinned, air drag makes
+  it trail; the shader `toon_cloth.gdshader` moves vertices by the grid (UV2 = cloth coordinates).
+  `outfit_shot.tscn --kind cape --side --walk` shows them running.
 ### 2026-10-04 / session 1
 - Readiness check passed; M0 built and committed (see git log).
 - M1 built: all core logic + the four game logics with unit tests; RTP tuned (slot weights, Plinko weights, roulette generosity 4%) with Monte-Carlo sims; decisions logged.

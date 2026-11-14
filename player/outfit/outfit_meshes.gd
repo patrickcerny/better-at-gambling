@@ -76,7 +76,9 @@ static func mesh(id: StringName) -> ArrayMesh:
 	elif s.begins_with("pants_"):
 		_pants(k, id)
 	elif s.begins_with("cape_"):
+		k.record_uv2 = true  # cloth coordinates for `CapeCloth`
 		_cape(k, id)
+		_cape_bottoms[id] = _cape_bottom
 	var m: ArrayMesh = null if k.is_empty() else k.commit()
 	_cache[id] = m
 	return m
@@ -383,7 +385,6 @@ static func _shirt(k: OutfitMeshKit, id: StringName) -> void:
 				if t > SHIRT_FRONT - 0.04 and _front(a) > 1.2:
 					return NAVY  # the square collar at the back
 				return NAVY if int(floor(t / 0.03)) % 2 == 0 else WHITE)
-			_tie_knot(k, RED)
 		&"shirt_jailbird":
 			k.band(b, top, inf, func(t: float, _a: float) -> Color:
 				return BLACK if int(floor(t / 0.045)) % 2 == 0 else WHITE)
@@ -724,13 +725,28 @@ static func _cape_at(u: float, v: float, bottom_y: float, inflate: float) -> Vec
 	var y_top: float = (CAPE_TOP_T - 0.5) * AvatarVisuals.BODY_HEIGHT
 	var y: float = lerpf(y_top, bottom_y, v)
 	var t: float = clampf(y / AvatarVisuals.BODY_HEIGHT + 0.5, 0.0, 1.0)
-	var r: float = maxf(AvatarVisuals.radius_at(t), 0.41) + 0.035 + 0.13 * pow(v, 1.3) + inflate
-	var w: float = lerpf(1.2, 1.5, v)
+	var r: float = maxf(AvatarVisuals.radius_at(t), 0.41) + 0.035 + 0.06 * v + inflate
+	# Wrapped round the shoulders at the top, hanging as a flatter sheet behind further down (a
+	# cape, not a skirt).
+	var w: float = lerpf(1.25, 1.0, v)
 	var b: float = (u - 0.5) * 2.0 * w
-	return Vector3(-sin(b) * r, y, AvatarVisuals.bend_at(t) + cos(b) * r * AvatarVisuals.BODY_DEPTH)
+	var x: float = -sin(b) * r * (1.0 + 0.3 * v)
+	var z_round: float = cos(b) * r * AvatarVisuals.BODY_DEPTH
+	var z_flat: float = r * AvatarVisuals.BODY_DEPTH * 0.82 + 0.04 * v
+	var z: float = lerpf(z_round, maxf(z_round, z_flat), smoothstep(0.0, 0.7, v))
+	return Vector3(x, y, AvatarVisuals.bend_at(t) + z)
 
 
 static var _cape_bottom: float = -0.78
+## Cape id -> its hem height (body space), for the cloth.
+static var _cape_bottoms: Dictionary = {}
+
+
+## Where cape `id`'s cloth point (u across, v down) rests, in body space (`CapeCloth`).
+static func cape_rest(id: StringName, u: float, v: float) -> Vector3:
+	if not _cape_bottoms.has(id):
+		mesh(id)
+	return _cape_at(u, v, _cape_bottoms.get(id, -0.78), 0.0)
 
 
 static func _cape_sheet(k: OutfitMeshKit, bottom_y: float, paint: Callable, lining: Color, nu: int = 40, nv: int = 22) -> void:
@@ -739,10 +755,12 @@ static func _cape_sheet(k: OutfitMeshKit, bottom_y: float, paint: Callable, lini
 		return Vector3(p.x, 0.0, p.z + 0.03)
 	var inside := func(p: Vector3) -> Vector3:
 		return -Vector3(p.x, 0.0, p.z + 0.03)
+	k.surface_uv2 = true
 	k.surface(func(u: float, v: float) -> Vector3: return _cape_at(u, v, bottom_y, 0.004), nu, nv, paint, out)
 	k.surface(func(u: float, v: float) -> Vector3: return _cape_at(u, v, bottom_y, -0.004), nu, nv, func(u: float, v: float) -> Color:
 		var c: Color = paint.call(u, v)
 		return Color(lining, c.a), inside)
+	k.surface_uv2 = false
 
 
 ## A standing collar behind the head (vampire, ermine, a detective's coat).
@@ -768,11 +786,15 @@ static func _cape_frame(v: float, lift: float = 0.006) -> Transform3D:
 
 
 static func _cape_emblem(k: OutfitMeshKit, poly: PackedVector2Array, v: float, color: Color) -> void:
+	k.uv2 = Vector2(0.5, v)  # moves with the cloth
 	k.prism(poly, 0.012, _cape_frame(v), color)
+	k.uv2 = Vector2.ZERO
 
 
 static func _cape_glyph(k: OutfitMeshKit, text: String, v: float, color: Color, size: float, lift: float = 0.006) -> void:
+	k.uv2 = Vector2(0.5, v)
 	_glyph(k, text, _cape_frame(v, lift), color, size)
+	k.uv2 = Vector2.ZERO
 
 
 ## The two clasps at the front of the shoulders where the cape is tied.

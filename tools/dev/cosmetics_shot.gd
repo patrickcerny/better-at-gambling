@@ -29,7 +29,11 @@ func _ready() -> void:
 			if view == "shop":
 				var shop: CosmeticsPanel = menu.get("cosmetics")
 				shop.open()
-				shop.select(&"color_gold")
+				var pick: String = Cmdline.parse(OS.get_cmdline_user_args()).get_string("select", "color_gold")
+				var d: CosmeticDef = CosmeticShop.default().find(StringName(pick))
+				if d != null:
+					shop.show_kind(d.kind)
+				shop.select(StringName(pick))
 
 
 func _plaque() -> void:
