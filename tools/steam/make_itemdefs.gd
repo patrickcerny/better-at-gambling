@@ -1,11 +1,17 @@
 extends SceneTree
 ## Writes tools/steam/itemdefs.json from the cosmetics shop: one Steam Inventory item definition
-## per paid outfit piece (`CosmeticDef.steam_item`) and one bundle per pack (`CosmeticPack`).
+## per paid outfit piece (`CosmeticDef.steam_item`), one bundle per pack (`CosmeticPack`) and one
+## per coin pack (`CoinPack`: the game uses it up and adds the Coins). Packs taken out of the shop
+## stay listed, hidden (`RETIRED`): Steam never deletes an item definition.
 ## Upload it in Steamworks (App 5623410 → Inventory Service → Item Definitions).
 ##   tools/godot/godot --headless --path . -s tools/steam/make_itemdefs.gd
 
 const OUT: String = "res://tools/steam/itemdefs.json"
 const APP_ID: int = 5623410  # SteamSvc.APP_ID
+## Item definitions already on Steam that the shop no longer sells: kept, hidden from the store.
+const RETIRED: Array[Dictionary] = [
+	{"itemdefid": 1009, "name": "Holiday Mode", "bundle": "107x1;120x1;138x1;156x1"},
+]
 
 
 func _init() -> void:
@@ -48,6 +54,28 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"description": "The whole %s outfit (%d pieces), cheaper than one by one." % [k.display_name, grants.size()],
 			"price": price(k.cents),
 			"store_tags": "pack",
+			"tradable": false,
+			"marketable": false,
+		})
+	for c: CoinPack in shop.coin_packs:
+		items.append({
+			"itemdefid": c.steam_item,
+			"type": "item",
+			"name": "%d Coins" % c.coins,
+			"description": "%d Coins to spend in the cosmetics shop of Better at Gambling. Used up when they arrive in your wallet." % c.coins,
+			"price": price(c.cents),
+			"store_tags": "coins",
+			"tradable": false,
+			"marketable": false,
+		})
+	for r: Dictionary in RETIRED:
+		items.append({
+			"itemdefid": r["itemdefid"],
+			"type": "bundle",
+			"bundle": r["bundle"],
+			"name": r["name"],
+			"description": "No longer sold.",
+			"store_hidden": true,
 			"tradable": false,
 			"marketable": false,
 		})

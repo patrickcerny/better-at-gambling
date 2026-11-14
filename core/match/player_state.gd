@@ -11,7 +11,7 @@ var color_index: int = 0
 ## The bean's colour (`Palette.player_color`, 0 .. `Cosmetics.COLOR_COUNT`-1): the player's
 ## preferred colour unless another bean wears it (`Cosmetics.bean_color_for`).
 var bean_color: int = 0
-## Outfit pieces worn: five shop ids in `CosmeticDef.OUTFIT_KINDS` order ("" = none,
+## Outfit pieces worn: one shop id per slot in `CosmeticDef.OUTFIT_KINDS` order ("" = none,
 ## `Cosmetics.sanitize_outfit`).
 var outfit: PackedStringArray = Cosmetics.sanitize_outfit([])
 var connected: bool = true

@@ -14,6 +14,9 @@ extends PanelContainer
 ## 1 euro, a few only that way (`CosmeticDef.money_only`), and the PACKS tab sells whole outfits
 ## 50 cents under their pieces (`CosmeticPack`). The STEAM button opens the Steam overlay
 ## (`SteamSvc.buy_item`); Steam's inventory then says what is owned. Without Steam it is greyed out.
+## The + next to the wallet opens the COINS page: Coins for real money (`CoinPack`). Some items
+## unlock for free at a player level (`CosmeticDef.level`, a LV badge on the tile) and can be
+## bought before that.
 
 signal closed
 ## A colour was put on (the lobby forwards it to the server).
@@ -24,17 +27,21 @@ signal outfit_worn(kind: StringName, id: StringName)
 const COLUMNS: int = 4
 const TILE: Vector2 = Vector2(196, 236)
 const KIND_TITLES: Dictionary = {
-	CosmeticDef.KIND_COLOR: "COLOURS", CosmeticDef.KIND_HAT: "HATS", CosmeticDef.KIND_SHIRT: "SHIRTS",
-	CosmeticDef.KIND_PANTS: "TROUSERS", CosmeticDef.KIND_CAPE: "CAPES", CosmeticDef.KIND_BOOTS: "BOOTS",
-	KIND_PACK: "PACKS",
+	CosmeticDef.KIND_COLOR: "COLOURS", CosmeticDef.KIND_SKIN: "SKINS", CosmeticDef.KIND_HAT: "HATS",
+	CosmeticDef.KIND_SHIRT: "SHIRTS", CosmeticDef.KIND_PANTS: "TROUSERS", CosmeticDef.KIND_CAPE: "CAPES",
+	CosmeticDef.KIND_BOOTS: "BOOTS", CosmeticDef.KIND_EYES: "EYES", CosmeticDef.KIND_MOUTH: "MOUTHS",
+	CosmeticDef.KIND_BEARD: "BEARDS", KIND_PACK: "PACKS", KIND_COINS: "COINS",
 }
 ## The packs tab's key (not a `CosmeticDef` kind).
 const KIND_PACK: StringName = &"pack"
+## The coins page's key (opened by the + next to the wallet; no tab icon).
+const KIND_COINS: StringName = &"coins"
 ## The piece each tab's icon shows.
 const TAB_ICONS: Dictionary = {
-	CosmeticDef.KIND_COLOR: &"color_gold", CosmeticDef.KIND_HAT: &"hat_top", CosmeticDef.KIND_SHIRT: &"shirt_tux",
-	CosmeticDef.KIND_PANTS: &"pants_jeans", CosmeticDef.KIND_CAPE: &"cape_hero", CosmeticDef.KIND_BOOTS: &"boots_sneakers",
-	KIND_PACK: &"pack_royal",
+	CosmeticDef.KIND_COLOR: &"color_gold", CosmeticDef.KIND_SKIN: &"skin_rainbow", CosmeticDef.KIND_HAT: &"hat_top",
+	CosmeticDef.KIND_SHIRT: &"shirt_tux", CosmeticDef.KIND_PANTS: &"pants_jeans", CosmeticDef.KIND_CAPE: &"cape_hero",
+	CosmeticDef.KIND_BOOTS: &"boots_sneakers", CosmeticDef.KIND_EYES: &"eyes_star", CosmeticDef.KIND_MOUTH: &"mouth_tongue",
+	CosmeticDef.KIND_BEARD: &"beard_full", KIND_PACK: &"pack_royal",
 }
 const MUTED := Color("#B9A98C")
 
@@ -53,6 +60,8 @@ var action_button: Button
 var steam_button: Button
 var status_label: Label
 var coins_label: Label
+## The + next to the wallet: opens the COINS page.
+var coins_button: Button
 var back_button: Button
 var tabs: TabContainer
 ## Kind -> its icon tab button.
@@ -108,10 +117,19 @@ func _ready() -> void:
 	var coin := CoinIcon.make(40.0)
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	wrow.add_child(coin)
+	coins_button = Button.new()
+	coins_button.name = "BuyCoins"
+	coins_button.text = "+"
+	coins_button.tooltip_text = "Buy Coins"
+	coins_button.theme_type_variation = &"ActionButton"
+	coins_button.custom_minimum_size = Vector2(56, 56)
+	coins_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	coins_button.pressed.connect(func() -> void: show_kind(KIND_COINS))
+	head.add_child(coins_button)
 	var hint := Label.new()
 	hint.theme_type_variation = &"SmallLabel"
 	hint.add_theme_color_override(&"font_color", MUTED)
-	hint.text = "Coins come from playing matches (and every level up). They only buy cosmetics: the tables take $, which starts fresh every match."
+	hint.text = "Coins come from playing matches (and every level up), or with + through Steam. They only buy cosmetics: the tables take $, which starts fresh every match."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(hint)
 	var body := HBoxContainer.new()
@@ -180,9 +198,10 @@ func _ready() -> void:
 	right.add_theme_constant_override(&"separation", 14)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(right)
-	var tab_row := HBoxContainer.new()
+	var tab_row := HFlowContainer.new()  # wraps onto a second row on narrow screens
 	tab_row.name = "TabIcons"
-	tab_row.add_theme_constant_override(&"separation", 12)
+	tab_row.add_theme_constant_override(&"h_separation", 8)
+	tab_row.add_theme_constant_override(&"v_separation", 8)
 	right.add_child(tab_row)
 	tabs = TabContainer.new()
 	tabs.name = "Kinds"
@@ -203,6 +222,13 @@ func _ready() -> void:
 		for k: CosmeticPack in shop.packs:
 			pgrid.add_child(_tile(null, k))
 		tab_row.add_child(_tab_button(KIND_PACK, tabs.get_tab_count() - 1))
+	if not shop.coin_packs.is_empty():
+		var cgrid: GridContainer = _grid_tab(str(KIND_TITLES[KIND_COINS]))
+		for c: CoinPack in shop.coin_packs:
+			cgrid.add_child(_coin_tile(c))
+		var coins_tab: Button = _tab_button(KIND_COINS, tabs.get_tab_count() - 1)
+		coins_tab.visible = false  # the + next to the wallet opens it
+		tab_row.add_child(coins_tab)
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(bottom)
@@ -240,9 +266,10 @@ func _tab_button(kind: StringName, index: int) -> Button:
 	var b := Button.new()
 	b.name = "Tab" + str(KIND_TITLES.get(kind, kind))
 	b.toggle_mode = true
-	b.custom_minimum_size = Vector2(88, 88)
+	b.custom_minimum_size = Vector2(76, 76)
 	b.tooltip_text = str(KIND_TITLES.get(kind, kind)).capitalize()
-	b.icon = CosmeticThumbnails.texture_for(TAB_ICONS.get(kind, &""), true)
+	if TAB_ICONS.has(kind):
+		b.icon = CosmeticThumbnails.texture_for(TAB_ICONS[kind], true)
 	b.expand_icon = true
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	SettingsPanel.style_tab(b)
@@ -267,6 +294,19 @@ func show_kind(kind: StringName) -> void:
 	tabs.current_tab = int(b.get_meta(&"tab"))
 	for k: StringName in tab_buttons:
 		tab_buttons[k].set_pressed_no_signal(k == kind)
+	if coins_button != null:
+		coins_button.set_pressed_no_signal(kind == KIND_COINS)
+	# The pictures on this page first (backwards, so the first tile ends up at the front).
+	var ids: Array[StringName] = []
+	if kind == KIND_PACK:
+		for pack: CosmeticPack in CosmeticShop.default().packs:
+			ids.append(pack.id)
+	elif kind != KIND_COINS:
+		for d: CosmeticDef in CosmeticShop.default().of_kind(kind):
+			ids.append(d.id)
+	ids.reverse()
+	for id: StringName in ids:
+		CosmeticThumbnails.texture_for(id, true)
 
 
 ## A piece's tile, or a pack's (`d` null).
@@ -305,6 +345,16 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 	label.clip_text = true
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(label)
+	if d != null and d.level > 0:
+		var badge := Label.new()
+		badge.name = "Level"
+		badge.theme_type_variation = &"SmallLabel"
+		badge.text = "LV %d" % d.level
+		badge.tooltip_text = "Free at level %d" % d.level
+		badge.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 10)
+		b.add_child(badge)
 	var pr: Array = _price_widget(22.0, &"SmallLabel")
 	var row: HBoxContainer = pr[0]
 	row.name = "PriceRow"
@@ -314,6 +364,55 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 	b.pressed.connect(select.bind(id))
 	b.focus_entered.connect(select.bind(id))
 	tiles[id] = b
+	return b
+
+
+## A coin pack's tile: a pile of Coins, how many, and the Steam price.
+func _coin_tile(c: CoinPack) -> Button:
+	var b := Button.new()
+	b.name = String(c.id)
+	b.toggle_mode = true
+	b.custom_minimum_size = TILE
+	b.tooltip_text = "%s Coins" % Hud._thousands(c.coins)
+	SettingsPanel.style_tab(b)
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
+		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
+		sb.set_corner_radius_all(18)
+		b.add_theme_stylebox_override(st, sb)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override(&"separation", 6)
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 10)
+	b.add_child(box)
+	var pile := HBoxContainer.new()
+	pile.alignment = BoxContainer.ALIGNMENT_CENTER
+	pile.add_theme_constant_override(&"separation", -34)
+	pile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pile.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var n: int = 1 + shop.coin_packs.find(c)
+	for i: int in n:
+		var ci := CoinIcon.make(72.0 - float(n - 1) * 6.0)
+		ci.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pile.add_child(ci)
+	box.add_child(pile)
+	var label := Label.new()
+	label.name = "Name"
+	label.theme_type_variation = &"HeadingLabel"
+	label.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
+	label.text = Hud._thousands(c.coins)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(label)
+	var price := Label.new()
+	price.name = "Price"
+	price.theme_type_variation = &"SmallLabel"
+	price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(price)
+	b.pressed.connect(select.bind(c.id))
+	b.focus_entered.connect(select.bind(c.id))
+	tiles[c.id] = b
 	return b
 
 
@@ -335,7 +434,7 @@ func _price_widget(coin_px: float, variation: StringName) -> Array:
 ## Shows `id` in the preview and points the action button at it.
 func select(id: StringName) -> void:
 	var d: CosmeticDef = shop.find(id)
-	if d == null and shop.find_pack(id) == null:
+	if d == null and shop.find_pack(id) == null and shop.find_coin_pack(id) == null:
 		return
 	if selected == id:
 		return
@@ -369,7 +468,8 @@ static func money_text(def: int, cents: int) -> String:
 func press_steam() -> void:
 	var d: CosmeticDef = shop.find(selected)
 	var pack: CosmeticPack = shop.find_pack(selected)
-	var def: int = d.steam_item if d != null else (pack.steam_item if pack != null else 0)
+	var coin_pack: CoinPack = shop.find_coin_pack(selected)
+	var def: int = d.steam_item if d != null else (pack.steam_item if pack != null else (coin_pack.steam_item if coin_pack != null else 0))
 	if def <= 0 or not SteamSvc.is_available():
 		status_label.text = "Buying with real money needs Steam running."
 		return
@@ -412,6 +512,8 @@ func press_action() -> void:
 			&"not_enough_coins":
 				status_label.text = "Not enough Coins: %d more to go. Play matches to earn them%s." % [d.price - p.coins, (", or buy it with Steam" if d.steam_buyable() else "")]
 				Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
+			&"level":
+				status_label.text = "Reach level %d to unlock it (you're level %d)." % [d.level, p.level]
 			_:
 				status_label.text = "Can't buy that right now."
 		_refresh()
@@ -450,6 +552,9 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	elif not d.coin_buyable() and d.steam_buyable():
 		label.text = money_text(d.steam_item, d.cents)
 		coin.visible = false
+	elif not d.coin_buyable():
+		label.text = "LEVEL %d" % d.level
+		coin.visible = false
 	else:
 		label.text = "%s" % Hud._thousands(d.price)
 	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else Palette.COIN_GOLD))
@@ -464,6 +569,15 @@ func _refresh() -> void:
 		var d: CosmeticDef = shop.find(id)
 		var b: Button = tiles[id]
 		b.set_pressed_no_signal(id == selected)
+		var badge: Node = b.get_node_or_null("Level")
+		if badge != null:
+			(badge as Control).visible = d != null and not p.owns(id)
+		var coin_pack: CoinPack = shop.find_coin_pack(id)
+		if coin_pack != null:
+			var pl: Label = b.find_child("Price", true, false) as Label
+			pl.text = money_text(coin_pack.steam_item, coin_pack.cents)
+			pl.add_theme_color_override(&"font_color", Palette.CREAM)
+			continue
 		var row: Node = b.find_child("PriceRow", true, false)
 		if d != null:
 			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
@@ -472,6 +586,17 @@ func _refresh() -> void:
 	var pack: CosmeticPack = shop.find_pack(selected)
 	if pack != null:
 		_refresh_pack(p, pack)
+		return
+	var coin_pack: CoinPack = shop.find_coin_pack(selected)
+	if coin_pack != null:
+		item_name.text = "%s COINS" % Hud._thousands(coin_pack.coins)
+		item_kind.text = "COINS FOR COSMETICS"
+		price_row.visible = true
+		price_label.text = money_text(coin_pack.steam_item, coin_pack.cents)
+		price_label.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
+		price_coin.visible = false
+		action_button.visible = false
+		_show_steam_button(true, coin_pack.steam_item, coin_pack.cents, "BUY WITH STEAM")
 		return
 	var sel: CosmeticDef = shop.find(selected)
 	if sel == null:
@@ -484,6 +609,8 @@ func _refresh() -> void:
 		return
 	item_name.text = sel.display_name.to_upper()
 	item_kind.text = str(KIND_TITLES.get(sel.kind, "")).trim_suffix("S").replace("TROUSER", "TROUSERS")
+	if sel.level > 0 and not p.owns(sel.id):
+		item_kind.text += " · FREE AT LEVEL %d" % sel.level
 	price_row.visible = true
 	_show_price(price_label, price_coin, p, sel)
 	# The preview: what you wear, with the picked item tried on.
@@ -497,8 +624,11 @@ func _refresh() -> void:
 	action_button.disabled = false
 	action_button.visible = true
 	_show_steam_button(not p.owns(sel.id) and sel.steam_buyable(), sel.steam_item, sel.cents, "BUY WITH STEAM")
-	if not p.owns(sel.id) and not sel.coin_buyable():
+	if not p.owns(sel.id) and not sel.coin_buyable() and sel.steam_buyable():
 		action_button.visible = false  # real money only: the Steam button is the way
+	elif not p.owns(sel.id) and not sel.coin_buyable():
+		action_button.text = "LEVEL %d" % sel.level  # only levelling up unlocks it
+		action_button.disabled = true
 	elif not p.owns(sel.id):
 		action_button.text = "BUY FOR COINS" if sel.steam_buyable() else "BUY"
 	elif sel.kind == CosmeticDef.KIND_COLOR and p.preferred_color == sel.color_index:

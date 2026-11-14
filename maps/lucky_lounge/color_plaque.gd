@@ -8,11 +8,11 @@ extends Node3D
 ## (`ColorPanelController`). Other players' plaques show the free colours, dimmed, with the colour
 ## their bean wears framed. Visual only: no collision, the server never sees it.
 
-const COLUMNS: int = 4
+const COLUMNS: int = 6
 const ROWS: int = 4
 ## Swatch size and pitch on the plaque (m).
-const SWATCH: float = 0.085
-const PITCH: float = 0.105
+const SWATCH: float = 0.064
+const PITCH: float = 0.079
 ## Where the lectern stands relative to its pedestal's centre: beside the lowest step, room side.
 const OFFSET: Vector3 = Vector3(0.8, 0, -1.95)
 ## Height of the plaque's centre and how far it tips back (its face looks up at whoever stands
@@ -72,7 +72,7 @@ func _ready() -> void:
 	face.add_child(title)
 
 
-## Shows `p_colors` (grid order, at most 16) with `p_worn` framed and `dimmed` greyed out.
+## Shows `p_colors` (grid order, at most 24) with `p_worn` framed and `dimmed` greyed out.
 ## Rebuilt only when something changed.
 func show_colors(p_colors: Array[int], p_worn: int, dimmed: Array[int], p_interactive: bool) -> void:
 	var key: Array = [p_colors.duplicate(), p_worn, dimmed.duplicate(), p_interactive]

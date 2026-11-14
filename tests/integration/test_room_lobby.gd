@@ -61,9 +61,9 @@ func test_slot_colors_are_fixed_and_beans_wear_the_preferred_colour() -> void:
 func test_outfits_join_with_the_hello_and_change_one_slot_at_a_time() -> void:
 	var a: int = server.add_player("dev:a", "A", -1, ["hat_crown", "shirt_tux", "boots_gold", 7, "nope"])
 	var b: int = server.add_player("dev:b", "B", -1, ["hat_crown"])
-	assert_eq(server.state.players[a].outfit, PackedStringArray(["hat_crown", "shirt_tux", "", "", ""]), "a piece in the wrong slot and junk are dropped")
+	assert_eq(server.state.players[a].outfit, PackedStringArray(["hat_crown", "shirt_tux", "", "", "", "", "", "", ""]), "a piece in the wrong slot and junk are dropped")
 	assert_eq(server.state.players[b].outfit[0], "hat_crown", "two beans may wear the same piece")
-	assert_eq(Array(server.state.players[a].to_wire()["outfit"]), ["hat_crown", "shirt_tux", "", "", ""], "on the wire")
+	assert_eq(Array(server.state.players[a].to_wire()["outfit"]), ["hat_crown", "shirt_tux", "", "", "", "", "", "", ""], "on the wire")
 	assert_eq(PlayerState.from_wire(server.state.players[a].to_wire()).outfit, server.state.players[a].outfit)
 	assert_true(_intent(a, &"set_outfit", {"kind": &"cape", "item": "cape_vampire"})["ok"])
 	assert_eq(server.state.players[a].outfit[3], "cape_vampire")
@@ -75,7 +75,7 @@ func test_outfits_join_with_the_hello_and_change_one_slot_at_a_time() -> void:
 	assert_false(_intent(a, &"set_outfit", {"kind": &"hat", "item": 5})["ok"], "malformed")
 	var changed: Array = server.event_log.filter(func(e: Dictionary) -> bool: return e["type"] == &"player_outfit")
 	assert_eq(changed.size(), 2, "every change is broadcast")
-	assert_eq(Array(changed[-1]["outfit"]), ["", "shirt_tux", "", "cape_vampire", ""])
+	assert_eq(Array(changed[-1]["outfit"]), ["", "shirt_tux", "", "cape_vampire", "", "", "", "", ""])
 
 
 func test_not_ready_wins_over_the_pad_and_reconnect_starts_not_ready() -> void:

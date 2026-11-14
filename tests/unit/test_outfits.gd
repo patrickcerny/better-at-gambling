@@ -1,7 +1,11 @@
 extends GutTest
-## Outfits (Patrick: "Hats, Boots, Pants, Capes, shirts. Design for each 15"): 15 pieces per slot in
-## the shop, each with a model (`OutfitMeshes`), worn from the profile, cleaned on the way in from
-## the network, and put on / taken off the bean (`AvatarVisuals.wear`).
+## Outfits (Patrick: "Hats, Boots, Pants, Capes, shirts. Design for each 15"; later skins, eyes,
+## mouths and beards): at least 15 pieces per clothing slot in the shop, each with a model
+## (`OutfitMeshes`), worn from the profile, cleaned on the way in from the network, and put on /
+## taken off the bean (`AvatarVisuals.wear`).
+
+const CLOTHES: Array[StringName] = [CosmeticDef.KIND_HAT, CosmeticDef.KIND_SHIRT, CosmeticDef.KIND_PANTS, CosmeticDef.KIND_CAPE, CosmeticDef.KIND_BOOTS]
+const EMPTY_WIRE: Array[String] = ["", "", "", "", "", "", "", "", ""]
 
 
 func before_each() -> void:
@@ -16,9 +20,9 @@ func after_each() -> void:
 func test_fifteen_pieces_per_slot_each_with_a_model() -> void:
 	var shop: CosmeticShop = CosmeticShop.default()
 	var ids: Array[StringName] = []
-	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
+	for kind: StringName in CLOTHES:
 		var items: Array[CosmeticDef] = shop.of_kind(kind)
-		assert_eq(items.size(), 15, "15 %s" % kind)
+		assert_gte(items.size(), 15, "15 or more %s" % kind)
 		var free: int = 0
 		for d: CosmeticDef in items:
 			assert_true(String(d.id).begins_with(String(kind) + "_"), "%s is named after its slot" % d.id)
@@ -30,24 +34,42 @@ func test_fifteen_pieces_per_slot_each_with_a_model() -> void:
 			if d.is_free():
 				free += 1
 		assert_eq(free, 2, "two free %s to start with" % kind)
+	for kind: StringName in [CosmeticDef.KIND_SKIN, CosmeticDef.KIND_EYES, CosmeticDef.KIND_MOUTH, CosmeticDef.KIND_BEARD]:
+		var items: Array[CosmeticDef] = shop.of_kind(kind)
+		assert_gte(items.size(), 6, "a choice of %s" % kind)
+		for d: CosmeticDef in items:
+			assert_true(String(d.id).begins_with(String(kind) + "_"), "%s is named after its slot" % d.id)
+			assert_false(d.id in ids, "%s is listed once" % d.id)
+			ids.append(d.id)
+			assert_false(d.is_free(), "%s is bought or unlocked" % d.id)
+			assert_true(d.coin_buyable() or d.steam_buyable() or d.level > 0, "%s can be had somehow" % d.id)
+	for d: CosmeticDef in shop.of_kind(CosmeticDef.KIND_BEARD):
+		assert_true(OutfitMeshes.has_model(d.id), "%s has a model" % d.id)
+	for d: CosmeticDef in shop.of_kind(CosmeticDef.KIND_SKIN):
+		assert_not_null(ToonMaterial.make_skin(d.id), "%s has a skin shader" % d.id)
 	assert_null(OutfitMeshes.mesh(&"hat_nope"))
 	assert_true(OutfitMeshes.boot_meshes(&"boots_nope").is_empty())
 
 
 func test_models_stay_light() -> void:
-	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
+	# Pattern edges are cut exactly along the paint (OutfitMeshKit.surface), which costs triangles on
+	# busy patterns (checks, plaid); 24k per piece keeps eight dressed beans comfortably light.
+	var kinds: Array[StringName] = CLOTHES.duplicate()
+	kinds.append(CosmeticDef.KIND_BEARD)
+	for kind: StringName in kinds:
 		for d: CosmeticDef in CosmeticShop.default().of_kind(kind):
 			var m: ArrayMesh = OutfitMeshes.boot_meshes(d.id)[0] if kind == CosmeticDef.KIND_BOOTS else OutfitMeshes.mesh(d.id)
 			assert_eq(m.get_surface_count(), 1, "%s is one draw call" % d.id)
-			assert_lt(m.surface_get_array_index_len(0) / 3, 7000, "%s stays low-poly" % d.id)
+			assert_lt(m.surface_get_array_index_len(0) / 3, 24000, "%s stays light" % d.id)
 
 
 func test_sanitize_outfit_keeps_only_real_pieces_in_their_slots() -> void:
-	assert_eq(Cosmetics.sanitize_outfit(null), PackedStringArray(["", "", "", "", ""]))
-	assert_eq(Cosmetics.sanitize_outfit({"hat": "hat_crown"}), PackedStringArray(["", "", "", "", ""]), "a dictionary is not the wire form")
-	assert_eq(Cosmetics.sanitize_outfit(["hat_crown", "pants_kilt", "pants_kilt", "cape_hero", "boots_gold", "extra"]),
-		PackedStringArray(["hat_crown", "", "pants_kilt", "cape_hero", "boots_gold"]))
-	assert_eq(Cosmetics.sanitize_outfit([[], 3.0, "color_mint"]), PackedStringArray(["", "", "", "", ""]))
+	assert_eq(Cosmetics.sanitize_outfit(null), PackedStringArray(EMPTY_WIRE))
+	assert_eq(Cosmetics.sanitize_outfit({"hat": "hat_crown"}), PackedStringArray(EMPTY_WIRE), "a dictionary is not the wire form")
+	assert_eq(Cosmetics.sanitize_outfit(["hat_crown", "pants_kilt", "pants_kilt", "cape_hero", "boots_gold", "skin_lava", "eyes_star", "mouth_gold", "beard_viking", "extra"]),
+		PackedStringArray(["hat_crown", "", "pants_kilt", "cape_hero", "boots_gold", "skin_lava", "eyes_star", "mouth_gold", "beard_viking"]))
+	assert_eq(Cosmetics.sanitize_outfit(["", "", "", "", "", "beard_viking", "", "", "skin_lava"]), PackedStringArray(EMPTY_WIRE), "each piece only in its own slot")
+	assert_eq(Cosmetics.sanitize_outfit([[], 3.0, "color_mint"]), PackedStringArray(EMPTY_WIRE))
 	assert_eq(Cosmetics.outfit_dict(["", "shirt_tux"]), {&"shirt": &"shirt_tux"})
 
 
@@ -60,7 +82,7 @@ func test_the_profile_wears_owned_pieces_and_remembers_them() -> void:
 	assert_true(p.wear(&"hat_top"), "one hat at a time: the top hat replaces the party hat")
 	assert_true(p.wear(&"cape_towel"))
 	assert_false(p.wear(&"color_mint"), "colours are not outfit pieces")
-	assert_eq(p.outfit_wire(), PackedStringArray(["hat_top", "", "", "cape_towel", ""]))
+	assert_eq(p.outfit_wire(), PackedStringArray(["hat_top", "", "", "cape_towel", "", "", "", "", ""]))
 	var path: String = "user://test_outfit_profile.cfg"
 	assert_eq(p.save(path), OK)
 	var back := PlayerProfile.new()
@@ -73,7 +95,7 @@ func test_the_profile_wears_owned_pieces_and_remembers_them() -> void:
 	cfg.set_value("outfit", "boots", "boots_party_hat")
 	cfg.save(path)
 	assert_eq(back.load_from(path), OK)
-	assert_eq(back.outfit_wire(), PackedStringArray(["", "", "", "cape_towel", ""]), "only owned pieces stay on")
+	assert_eq(back.outfit_wire(), PackedStringArray(["", "", "", "cape_towel", "", "", "", "", ""]), "only owned pieces stay on")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	p.take_off(&"hat")
 	assert_false(p.is_worn(&"hat_top"))

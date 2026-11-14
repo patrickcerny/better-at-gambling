@@ -21,10 +21,13 @@ const PLAYER_COLORS: Array[Color] = [
 	Color("#0072B2"), Color("#D55E00"), Color("#CC79A7"), Color("#F2E6C9"),
 	Color("#B3263E"), Color("#8FE3C3"), Color("#B7A3E8"), Color("#1F8A8A"),
 	Color("#A6D94A"), Color("#3A3533"), Color("#C9CED4"), Color("#F2C14E"),
+	Color("#B87333"), Color("#7A3B69"), Color("#F08A6C"), Color("#2F5D3A"),
+	Color("#23304A"), Color("#E3A795"), Color("#2E5BBA"), Color("#E8D3A2"),
 ]
 const PLAYER_COLOR_NAMES: Array[String] = [
 	"Orange", "Sky", "Green", "Yellow", "Blue", "Vermilion", "Pink", "Cream",
 	"Ruby", "Mint", "Lavender", "Teal", "Lime", "Onyx", "Silver", "Gold",
+	"Copper", "Plum", "Coral", "Forest", "Navy", "Rose Gold", "Sapphire", "Champagne",
 ]
 ## The Coins (out-of-match currency) gold.
 const COIN_GOLD := Color("#F5C542")

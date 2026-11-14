@@ -7,6 +7,8 @@ const PATH: String = "res://data/progression/cosmetics_shop.tres"
 @export var items: Array[CosmeticDef] = []
 ## Full outfits sold together for real money (the PACKS tab).
 @export var packs: Array[CosmeticPack] = []
+## Coins sold for real money (the + next to the wallet).
+@export var coin_packs: Array[CoinPack] = []
 
 static var _default: CosmeticShop = null
 
@@ -34,7 +36,14 @@ func find_pack(id: StringName) -> CosmeticPack:
 	return null
 
 
-## The item or pack granted by Steam item definition `def` (null when none).
+func find_coin_pack(id: StringName) -> CoinPack:
+	for c: CoinPack in coin_packs:
+		if c.id == id:
+			return c
+	return null
+
+
+## The item, pack or coin pack granted by Steam item definition `def` (null when none).
 func by_steam_item(def: int) -> Resource:
 	if def <= 0:
 		return null
@@ -44,6 +53,9 @@ func by_steam_item(def: int) -> Resource:
 	for k: CosmeticPack in packs:
 		if k.steam_item == def:
 			return k
+	for c: CoinPack in coin_packs:
+		if c.steam_item == def:
+			return c
 	return null
 
 

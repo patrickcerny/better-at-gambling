@@ -3,8 +3,8 @@ extends RefCounted
 ## Player looks (§2.2, docs/GDD.md "Cosmetics shop"). The bean is the only body (the character
 ## skins were removed in 0.9.16); what players choose is its colour and an outfit.
 ## - The outfit (`PlayerState.outfit`): one piece per `CosmeticDef.OUTFIT_KINDS` slot (hat, shirt,
-##   trousers, cape, boots), item ids from the shop or "" for none, on the wire as five strings in
-##   that order (`sanitize_outfit`). Sent in the hello, changed with `set_outfit`. Any number of
+##   trousers, cape, boots, skin, eyes, mouth, beard), item ids from the shop or "" for none, on
+##   the wire as one string per slot in that order (`sanitize_outfit`). Sent in the hello, changed with `set_outfit`. Any number of
 ##   beans may wear the same piece.
 ## - The slot colour (`PlayerState.color_index`, 0 .. SLOT_COLORS-1): one of the 8 colourblind-safe
 ##   colours, handed out by the server (first free), unique per player. It marks the player on the
@@ -18,7 +18,7 @@ extends RefCounted
 ## (`PlayerProfile`, no accounts), so the client offers owned colours only.
 
 ## Every bean colour: the 8 free ones, then the ones bought with Coins.
-const COLOR_COUNT: int = 16
+const COLOR_COUNT: int = 24
 ## The free colours the server hands out as slot colours.
 const SLOT_COLORS: int = 8
 
@@ -31,7 +31,7 @@ static func is_slot_color(index: int) -> bool:
 	return index >= 0 and index < SLOT_COLORS
 
 
-## A clean outfit from anything a client sent: five ids in `CosmeticDef.OUTFIT_KINDS` order, each
+## A clean outfit from anything a client sent: one id per `CosmeticDef.OUTFIT_KINDS` slot, in that order, each
 ## a shop item of that slot's kind or "" (unknown ids, wrong kinds and junk become "").
 static func sanitize_outfit(v: Variant) -> PackedStringArray:
 	var out := PackedStringArray()

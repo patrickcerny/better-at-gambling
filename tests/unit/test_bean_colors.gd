@@ -54,8 +54,8 @@ func test_slot_colours_stay_in_the_free_eight() -> void:
 	assert_eq(lobby.free_color([0, 1], 12), 2, "a bought colour is never a slot colour")
 	assert_true(Cosmetics.is_slot_color(7))
 	assert_false(Cosmetics.is_slot_color(8))
-	assert_true(Cosmetics.is_valid_color(15))
-	assert_false(Cosmetics.is_valid_color(16))
+	assert_true(Cosmetics.is_valid_color(23))
+	assert_false(Cosmetics.is_valid_color(24))
 
 
 func test_palette_bean_color_reads_the_wire() -> void:

@@ -160,6 +160,10 @@ func focus(kind: StringName) -> void:
 			_frame_goal = Vector2(0.5, 3.6)
 		CosmeticDef.KIND_BOOTS:
 			_frame_goal = Vector2(0.55, 4.2)
+		CosmeticDef.KIND_EYES, CosmeticDef.KIND_MOUTH:
+			_frame_goal = Vector2(1.0, 2.4)
+		CosmeticDef.KIND_BEARD:
+			_frame_goal = Vector2(0.8, 3.2)
 		_:
 			_frame_goal = Vector2(0.95, 5.0)
 

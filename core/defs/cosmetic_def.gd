@@ -11,10 +11,17 @@ const KIND_SHIRT: StringName = &"shirt"
 const KIND_PANTS: StringName = &"pants"
 const KIND_CAPE: StringName = &"cape"
 const KIND_BOOTS: StringName = &"boots"
+## Animated skins: a moving pattern over the whole bean (`vfx/shaders/bean_skin.gdshader`), worn
+## like an outfit piece (its own slot) and drawn over the bean colour.
+const KIND_SKIN: StringName = &"skin"
+## The face: eyes (pupil shapes, lashes, glasses), mouths (teeth, tongue, lipstick) and beards.
+const KIND_EYES: StringName = &"eyes"
+const KIND_MOUTH: StringName = &"mouth"
+const KIND_BEARD: StringName = &"beard"
 ## Shop tabs, in order.
-const KINDS: Array[StringName] = [KIND_COLOR, KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_CAPE, KIND_BOOTS]
+const KINDS: Array[StringName] = [KIND_COLOR, KIND_SKIN, KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_CAPE, KIND_BOOTS, KIND_EYES, KIND_MOUTH, KIND_BEARD]
 ## The outfit slots, in wire order (`PlayerState.outfit`).
-const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_CAPE, KIND_BOOTS]
+const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_CAPE, KIND_BOOTS, KIND_SKIN, KIND_EYES, KIND_MOUTH, KIND_BEARD]
 
 ## Stable id saved in the profile ("color_mint").
 @export var id: StringName = &""
@@ -22,6 +29,9 @@ const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_
 @export var display_name: String = ""
 ## Price in Coins; 0 = free and always owned.
 @export var price: int = 0
+## Unlocked for free at this player level (0 = never): before that it can be bought (Patrick
+## 2026-11-14: "some skins behind a level wall, or you can buy them").
+@export var level: int = 0
 ## Only for real money through Steam (no Coin price; `price` is ignored).
 @export var money_only: bool = false
 ## Real-money price in euro cents (0 = not sold for money). The price shown comes from Steam
@@ -36,7 +46,7 @@ const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_
 
 
 func is_free() -> bool:
-	return price <= 0 and not money_only
+	return price <= 0 and not money_only and level <= 0
 
 
 ## Whether it can be bought with Coins.

@@ -14,6 +14,9 @@ uniform float rim_strength : hint_range(0.0, 1.0) = 0.3;
 uniform vec4 rim_color : source_color = vec4(1.0, 0.82, 0.5, 1.0);
 uniform float steps = 3.0;
 uniform float softness : hint_range(0.0, 0.5) = 0.08;
+// Vertex alpha below 1 marks a twinkling part (stars on a wizard's robe, light-up soles): it
+// glows in its own colour, pulsing over time, the less alpha the brighter.
+varying vec3 v_pos;
 
 vec3 cloth_at(int i, int j) {
 	return cloth[clamp(j, 0, NV - 1) * NU + clamp(i, 0, NU - 1)];
@@ -26,12 +29,18 @@ void vertex() {
 	vec3 top = mix(cloth_at(g.x, g.y), cloth_at(g.x + 1, g.y), f.x);
 	vec3 bottom = mix(cloth_at(g.x, g.y + 1), cloth_at(g.x + 1, g.y + 1), f.x);
 	VERTEX += mix(top, bottom, f.y);
+	v_pos = VERTEX;
 }
 
 void fragment() {
 	ALBEDO = albedo.rgb * COLOR.rgb;
 	ROUGHNESS = 0.8;
 	SPECULAR = 0.2;
+	float glow = 1.0 - COLOR.a;
+	if (glow > 0.01) {
+		float pulse = 0.5 + 0.5 * sin(TIME * 3.0 + dot(v_pos, vec3(23.1, 17.7, 11.3)));
+		EMISSION = COLOR.rgb * glow * (0.4 + 2.2 * pulse);
+	}
 }
 
 void light() {

@@ -28,13 +28,17 @@ func test_every_paid_piece_costs_50_cents_to_a_euro_and_has_its_own_steam_item()
 			assert_false(d.steam_buyable(), "%s is free" % d.id)
 			continue
 		assert_true(d.steam_buyable(), "%s is for sale on Steam" % d.id)
-		assert_between(d.cents, 50, 100, "%s costs 0,50 to 1 euro" % d.id)
+		if d.kind == CosmeticDef.KIND_SKIN:
+			assert_between(d.cents, 100, 200, "%s: animated skins are the pricier tier" % d.id)
+			assert_true(d.money_only, "%s: skins are for money (or a level)" % d.id)
+		else:
+			assert_between(d.cents, 50, 100, "%s costs 0,50 to 1 euro" % d.id)
 		assert_false(d.steam_item in defs, "%s has its own item definition" % d.id)
 		defs.append(d.steam_item)
 		if d.money_only:
 			money_only += 1
 			assert_false(d.coin_buyable())
-	assert_between(money_only, 5, 20, "some pieces are only sold for money")
+	assert_between(money_only, 5, 40, "some pieces are only sold for money")
 	for k: CosmeticPack in shop.packs:
 		assert_eq(k.cents, shop.pieces_cents(k) - CosmeticPack.DISCOUNT_CENTS, "%s is 50 cents under its pieces" % k.id)
 		assert_false(k.steam_item in defs)
@@ -42,7 +46,15 @@ func test_every_paid_piece_costs_50_cents_to_a_euro_and_has_its_own_steam_item()
 		assert_gt(k.pieces.size(), 2)
 		for id: StringName in k.pieces:
 			assert_not_null(shop.find(id), "%s: %s exists" % [k.id, id])
-	assert_eq(shop.packs.size(), 10)
+	assert_eq(shop.packs.size(), 16)
+	var holiday: CosmeticPack = shop.find_pack(&"pack_holiday")
+	assert_null(holiday, "Holiday Mode is gone from the shop")
+	for c: CoinPack in shop.coin_packs:
+		assert_false(c.steam_item in defs, "%s has its own item definition" % c.id)
+		defs.append(c.steam_item)
+		assert_gt(c.coins, 0)
+		assert_between(c.cents, 50, 1000)
+	assert_false(1009 in defs, "Holiday Mode's Steam item is never reused")
 
 
 func test_money_only_pieces_come_from_steam_not_coins() -> void:
@@ -108,7 +120,7 @@ func test_the_shop_sells_packs_and_money_only_pieces_through_steam() -> void:
 	assert_eq(panel.preview.outfit.get(&"hat"), &"hat_crown", "the preview wears the whole pack")
 	assert_true(panel.steam_button.visible)
 	assert_true(panel.steam_button.disabled, "no Steam in tests: greyed out")
-	assert_string_contains(panel.steam_button.text, "4,25 €")
+	assert_string_contains(panel.steam_button.text, SteamSvc.format_price(CosmeticShop.default().find_pack(&"pack_royal").cents, "EUR"))
 	assert_false(panel.action_button.visible, "nothing to wear yet")
 	panel.select(&"hat_crown")
 	assert_false(panel.action_button.visible, "no Coins price for the crown")
@@ -126,3 +138,42 @@ func test_the_shop_sells_packs_and_money_only_pieces_through_steam() -> void:
 	panel.action_button.pressed.emit()
 	assert_eq(worn.size(), 5)
 	assert_true(ProfileManager.profile.is_worn(&"cape_royal"))
+
+
+func test_coin_packs_bought_on_steam_become_coins() -> void:
+	var shop: CosmeticShop = CosmeticShop.default()
+	assert_eq(shop.coin_packs.size(), 3)
+	var small: CoinPack = shop.coin_packs[0]
+	var stacks: Array[Dictionary] = SteamSvc.coin_stacks([
+		{"item_id": 7, "item_definition": small.steam_item, "quantity": 2},
+		{"item_id": 8, "item_definition": shop.find(&"hat_crown").steam_item, "quantity": 1},
+		{"item_id": 9, "item_definition": small.steam_item, "quantity": 0}, "junk"], shop)
+	assert_eq(stacks.size(), 1, "only coin packs are used up, and only real stacks")
+	assert_eq(stacks[0], {"item_id": 7, "quantity": 2, "coins": small.coins * 2})
+	assert_eq(shop.by_steam_item(small.steam_item), small)
+	var ids: Array[StringName] = SteamSvc.owned_from_items([{"item_id": 7, "item_definition": small.steam_item, "quantity": 1}], shop)
+	assert_true(ids.is_empty(), "a coin pack is no cosmetic")
+	var p: PlayerProfile = ProfileManager.profile
+	p.coins = 100
+	assert_eq(ProfileManager.add_coins(small.coins), small.coins)
+	assert_eq(ProfileManager.profile.coins, 100 + small.coins)
+	assert_eq(ProfileManager.add_coins(-50), 0, "nothing is taken away")
+
+
+func test_level_walls_unlock_skins_and_colours() -> void:
+	var p: PlayerProfile = ProfileManager.profile
+	var gold: CosmeticDef = CosmeticShop.default().find(&"skin_gold")
+	var rainbow: CosmeticDef = CosmeticShop.default().find(&"skin_rainbow")
+	assert_eq(gold.level, 25)
+	assert_eq(rainbow.level, 50)
+	assert_true(gold.steam_buyable(), "or bought with money")
+	p.level = 24
+	p.coins = 99999
+	assert_false(p.owns(&"skin_gold"))
+	assert_eq(p.buy(&"skin_gold"), &"steam_only")
+	p.level = 25
+	assert_true(p.owns(&"skin_gold"), "level 25 unlocks gold")
+	assert_false(p.owns(&"skin_rainbow"))
+	p.level = 50
+	assert_true(p.owns(&"skin_rainbow"), "level 50 unlocks the rainbow")
+	assert_false(gold.is_free())

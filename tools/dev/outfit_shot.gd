@@ -2,21 +2,8 @@ extends Node3D
 ## Dev: look-dev shots of the outfit pieces (`OutfitMeshes`). Run with
 ## scripts/screenshot.sh res://tools/dev/outfit_shot.tscn <name> 60 --kind <kind> [--back] [--walk]
 ## `--kind hat|shirt|pants|cape|boots`: all 15 of one kind, a bean each (3 rows of 5);
-## `--kind sets`: whole themed outfits; `--back` turns the beans round (capes), `--walk` makes them
+## `--kind sets`: the shop's packs (whole outfits), `--only a,b` just those; `--back` turns the beans round (capes), `--walk` makes them
 ## run in place (cape sway, boots), `--low` a low camera close to the feet.
-
-const SETS: Array[PackedStringArray] = [
-	["hat_police", "shirt_police", "pants_police", "", "boots_police"],
-	["hat_bowler", "shirt_business", "pants_suit", "", "boots_oxford"],
-	["hat_top", "shirt_tux", "pants_tux", "cape_vampire", "boots_spats"],
-	["hat_chef", "shirt_chef", "pants_chef", "", "boots_clogs"],
-	["hat_firefighter", "shirt_firefighter", "pants_firefighter", "", "boots_firefighter"],
-	["hat_pirate", "shirt_sailor", "pants_pirate", "", "boots_pirate"],
-	["hat_crown", "shirt_knight", "pants_kilt", "cape_royal", "boots_knight"],
-	["hat_wizard", "shirt_hero", "pants_hero", "cape_hero", "boots_gold"],
-	["hat_cowboy", "shirt_flannel", "pants_jeans", "cape_leopard", "boots_cowboy"],
-	["hat_propeller", "shirt_hawaiian", "pants_lederhosen", "cape_towel", "boots_flippers"],
-]
 
 var _beans: Array[AvatarVisuals] = []
 var _walk: bool = false
@@ -49,12 +36,16 @@ func _ready() -> void:
 	add_child(fm)
 	var looks: Array[Dictionary] = []
 	if kind == "sets":
-		for s: PackedStringArray in SETS:
-			looks.append(Cosmetics.outfit_dict(s))
+		var only: PackedStringArray = c.get_string("only", "").split(",", false)
+		for pack: CosmeticPack in CosmeticShop.default().packs:
+			if only.is_empty() or String(pack.id).trim_prefix("pack_") in only:
+				var o: Dictionary = CosmeticsPanel.pack_outfit(pack)
+				o[&"_name"] = pack.display_name
+				looks.append(o)
 	else:
 		for d: CosmeticDef in CosmeticShop.default().of_kind(StringName(kind)):
 			looks.append({StringName(kind): d.id, &"_name": d.display_name})
-	var cols: int = 5
+	var cols: int = mini(c.get_int("cols", 5), looks.size())
 	for i: int in looks.size():
 		var v := AvatarVisuals.new()
 		var row: int = i / cols
@@ -78,12 +69,12 @@ func _ready() -> void:
 	cam.current = true
 	cam.fov = 40
 	var rows: int = ceili(looks.size() / float(cols))
-	var z: float = 6.2 + rows * 0.9
+	var z: float = (6.2 + rows * 0.9) * c.get_float("zoom", 1.0)
 	if c.has_flag("low"):
 		cam.position = Vector3(0, 0.9, z * 0.6)
 		cam.look_at(Vector3(0, 0.35, -(rows - 1) * 1.1))
 	else:
-		cam.position = Vector3(0, 3.4, z)
+		cam.position = Vector3(0, 3.4 * c.get_float("zoom", 1.0), z)
 		cam.look_at(Vector3(0, 0.6, -(rows - 1) * 1.1))
 
 

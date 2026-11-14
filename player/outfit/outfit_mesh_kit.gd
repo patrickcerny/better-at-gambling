@@ -18,6 +18,11 @@ var uv2s := PackedVector2Array()
 var record_uv2: bool = false
 var surface_uv2: bool = false
 var uv2: Vector2 = Vector2.ZERO
+## A surface cell that a pattern edge runs through is split up to this many times each way, as
+## far as REFINE_BUDGET allows (busy patterns like plaid get split less, so pieces stay light).
+const REFINE: int = 2
+## Extra quads the splitting may add, as a share of the surface's own cells.
+const REFINE_BUDGET: float = 2.5
 ## Applied to everything added (hats are built upright around the hat's base, then tipped back).
 var xf: Transform3D = Transform3D.IDENTITY
 
@@ -170,9 +175,9 @@ func tri_n(a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vec
 # --- Surfaces -----------------------------------------------------------------------------------
 
 ## A smooth surface sampled on a `nu` × `nv` grid: `at(u, v)` gives the point (u, v in 0..1),
-## `paint(u, v)` the colour of the cell around (u, v) (crisp per cell: stripes and checks stay
-## sharp), `outward(p)` a direction the front should face at `p`. `closed_u` wraps u around.
-func surface(at: Callable, nu: int, nv: int, paint: Callable, outward: Callable, closed_u: bool = false) -> void:
+## `paint(u, v)` the colour at (u, v) (crisp: stripes and checks stay sharp; cells an edge runs
+## through are split finer, `REFINE`), `outward(p)` a direction the front should face at `p`. `closed_u` wraps u around.
+func surface(at: Callable, nu: int, nv: int, paint: Callable, outward: Callable, closed_u: bool = false, refine: bool = true) -> void:
 	var pts: Array[PackedVector3Array] = []
 	var nrm: Array[PackedVector3Array] = []
 	var du: float = 1.0 / float(nu)
@@ -197,25 +202,180 @@ func surface(at: Callable, nu: int, nv: int, paint: Callable, outward: Callable,
 			ncol.append(n)
 		pts.append(col)
 		nrm.append(ncol)
+	# The paint at every grid corner (shared by neighbouring cells): a cell whose corners and centre
+	# agree is one quad; one the pattern's edge runs through is split REFINE x REFINE, so lapels,
+	# V-necks and ties come out smooth instead of in steps.
+	var corner: Array[PackedColorArray] = []
+	for i: int in nu + 1:
+		var col := PackedColorArray()
+		for j: int in nv + 1:
+			col.append(paint.call(float(i) / float(nu), float(j) / float(nv)))
+		corner.append(col)
+	var centre: Array[PackedColorArray] = []
+	var edges: int = 0
 	for i: int in nu:
+		var col := PackedColorArray()
 		for j: int in nv:
 			var c: Color = paint.call((float(i) + 0.5) / float(nu), (float(j) + 0.5) / float(nv))
-			if c.a <= 0.0:
-				continue  # a hole (cut-outs, ragged edges)
-			var a: Vector3 = pts[i][j]
-			var b: Vector3 = pts[i + 1][j]
-			var cc: Vector3 = pts[i + 1][j + 1]
-			var d: Vector3 = pts[i][j + 1]
-			if surface_uv2:
-				var u0: float = float(i) / float(nu)
-				var u1: float = float(i + 1) / float(nu)
-				var v0: float = float(j) / float(nv)
-				var v1: float = float(j + 1) / float(nv)
-				tri_n(a, b, cc, nrm[i][j], nrm[i + 1][j], nrm[i + 1][j + 1], c, Vector2(u0, v0), Vector2(u1, v0), Vector2(u1, v1))
-				tri_n(a, cc, d, nrm[i][j], nrm[i + 1][j + 1], nrm[i][j + 1], c, Vector2(u0, v0), Vector2(u1, v1), Vector2(u0, v1))
-			else:
-				tri_n(a, b, cc, nrm[i][j], nrm[i + 1][j], nrm[i + 1][j + 1], c)
-				tri_n(a, cc, d, nrm[i][j], nrm[i + 1][j + 1], nrm[i][j + 1], c)
+			col.append(c)
+			if not (_same(corner[i][j], c) and _same(corner[i + 1][j], c) and _same(corner[i + 1][j + 1], c) and _same(corner[i][j + 1], c)):
+				edges += 1
+		centre.append(col)
+	var split: int = 1
+	if refine:
+		for n: int in range(REFINE, 1, -1):
+			if float(edges * (n * n - 1)) <= REFINE_BUDGET * float(nu * nv):
+				split = n
+				break
+	for i: int in nu:
+		for j: int in nv:
+			var c: Color = centre[i][j]
+			var flat: bool = _same(corner[i][j], c) and _same(corner[i + 1][j], c) and _same(corner[i + 1][j + 1], c) and _same(corner[i][j + 1], c)
+			var n: int = 1 if flat else split
+			if flat:
+				if c.a <= 0.0:
+					continue  # a hole (cut-outs, ragged edges)
+				_quad(pts[i][j], pts[i + 1][j], pts[i + 1][j + 1], pts[i][j + 1], nrm[i][j], nrm[i + 1][j], nrm[i + 1][j + 1], nrm[i][j + 1], c,
+						Vector2(float(i) / float(nu), float(j) / float(nv)), Vector2(float(i + 1) / float(nu), float(j + 1) / float(nv)))
+				continue
+			# A cell an edge runs through: split n x n, and each little quad cut exactly along the
+			# edge (marching squares, the crossing found by bisection), so lapels, V-necks and ties
+			# come out as clean lines instead of steps.
+			var cell := Vector2(float(i), float(j))
+			var size := Vector2(float(nu), float(nv))
+			var normal_at := func(f: Vector2) -> Vector3:
+				return _bilerp(nrm[i][j], nrm[i + 1][j], nrm[i + 1][j + 1], nrm[i][j + 1], f).normalized()
+			for si: int in n:
+				for sj: int in n:
+					_piece(at, normal_at, paint, cell, size, Vector2(float(si) / n, float(sj) / n), Vector2(float(si + 1) / n, float(sj + 1) / n), 1)
+
+
+## A piece of a split cell from cell fractions `lo` to `hi`: one colour is a quad, two colours are cut
+## along their edge, more (where three meet) are split again `depth` more times.
+func _piece(at: Callable, normal_at: Callable, paint: Callable, cell: Vector2, size: Vector2, lo: Vector2, hi: Vector2, depth: int) -> void:
+	var fs: Array[Vector2] = [lo, Vector2(hi.x, lo.y), hi, Vector2(lo.x, hi.y)]
+	var cs: Array[Color] = []
+	for f: Vector2 in fs:
+		cs.append(paint.call((cell.x + f.x) / size.x, (cell.y + f.y) / size.y))
+	var cls: Array[int] = [0, 0, 0, 0]
+	var other: int = -1
+	var two: bool = true
+	for kk: int in range(1, 4):
+		if _same(cs[kk], cs[0]):
+			continue
+		if other < 0:
+			other = kk
+		if not _same(cs[kk], cs[other]):
+			two = false
+		cls[kk] = 1
+	var flips: int = 0
+	for kk: int in 4:
+		if cls[kk] != cls[(kk + 1) % 4]:
+			flips += 1
+	var mid: Vector2 = (lo + hi) * 0.5
+	if other < 0:
+		# One colour at the corners; the centre decides (a thin stripe can pass between them).
+		var cc: Color = paint.call((cell.x + mid.x) / size.x, (cell.y + mid.y) / size.y)
+		if not _same(cc, cs[0]) and depth > 0:
+			_split4(at, normal_at, paint, cell, size, lo, hi, depth - 1)
+			return
+		if cs[0].a > 0.0:
+			_tri_at(at, normal_at, cell, size, fs[0], fs[1], fs[2], cs[0])
+			_tri_at(at, normal_at, cell, size, fs[0], fs[2], fs[3], cs[0])
+		return
+	if two and flips == 2:
+		var polys: Array = [[], []]
+		for kk: int in 4:
+			polys[cls[kk]].append(fs[kk])
+			var nx: int = (kk + 1) % 4
+			if cls[kk] != cls[nx]:
+				var x: Vector2 = _crossing(paint, cell, size, fs[kk], fs[nx], cs[kk])
+				polys[0].append(x)
+				polys[1].append(x)
+		for side: int in 2:
+			var col: Color = cs[0] if side == 0 else cs[other]
+			if col.a <= 0.0:
+				continue
+			var poly: Array = polys[side]
+			for m: int in range(1, poly.size() - 1):
+				_tri_at(at, normal_at, cell, size, poly[0], poly[m], poly[m + 1], col)
+		return
+	if depth > 0:
+		_split4(at, normal_at, paint, cell, size, lo, hi, depth - 1)
+		return
+	# Three colours or a saddle, small enough: two triangles, each in the paint at its own centre.
+	for tri: int in 2:
+		var p0: Vector2 = fs[0]
+		var p1: Vector2 = fs[1] if tri == 0 else fs[2]
+		var p2: Vector2 = fs[2] if tri == 0 else fs[3]
+		var g: Vector2 = (p0 + p1 + p2) / 3.0
+		var tc: Color = paint.call((cell.x + g.x) / size.x, (cell.y + g.y) / size.y)
+		if tc.a > 0.0:
+			_tri_at(at, normal_at, cell, size, p0, p1, p2, tc)
+
+
+func _split4(at: Callable, normal_at: Callable, paint: Callable, cell: Vector2, size: Vector2, lo: Vector2, hi: Vector2, depth: int) -> void:
+	var mid: Vector2 = (lo + hi) * 0.5
+	_piece(at, normal_at, paint, cell, size, lo, mid, depth)
+	_piece(at, normal_at, paint, cell, size, Vector2(mid.x, lo.y), Vector2(hi.x, mid.y), depth)
+	_piece(at, normal_at, paint, cell, size, mid, hi, depth)
+	_piece(at, normal_at, paint, cell, size, Vector2(lo.x, mid.y), Vector2(mid.x, hi.y), depth)
+
+
+## One flat quad of the grid (corners counter-clockwise from (u0, v0)); `uv_lo`/`uv_hi` its uv2 corners.
+func _quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, na: Vector3, nb: Vector3, nc: Vector3, nd: Vector3, col: Color, uv_lo: Vector2, uv_hi: Vector2) -> void:
+	if surface_uv2:
+		tri_n(a, b, c, na, nb, nc, col, uv_lo, Vector2(uv_hi.x, uv_lo.y), uv_hi)
+		tri_n(a, c, d, na, nc, nd, col, uv_lo, uv_hi, Vector2(uv_lo.x, uv_hi.y))
+	else:
+		tri_n(a, b, c, na, nb, nc, col)
+		tri_n(a, c, d, na, nc, nd, col)
+
+
+## A triangle inside cell `cell` at cell fractions `fa`, `fb`, `fc` (points taken from the shape itself).
+func _tri_at(at: Callable, normal_at: Callable, cell: Vector2, size: Vector2, fa: Vector2, fb: Vector2, fc: Vector2, col: Color) -> void:
+	var ua: Vector2 = (cell + fa) / size
+	var ub: Vector2 = (cell + fb) / size
+	var uc: Vector2 = (cell + fc) / size
+	var pa: Vector3 = at.call(ua.x, ua.y)
+	var pb: Vector3 = at.call(ub.x, ub.y)
+	var pc: Vector3 = at.call(uc.x, uc.y)
+	if surface_uv2:
+		tri_n(pa, pb, pc, normal_at.call(fa), normal_at.call(fb), normal_at.call(fc), col, ua, ub, uc)
+	else:
+		tri_n(pa, pb, pc, normal_at.call(fa), normal_at.call(fb), normal_at.call(fc), col)
+
+
+## Where the paint changes between cell fractions `fa` (painted `ca`) and `fb`, by bisection. The
+## search always runs from the smaller end, so the two quads sharing a side find the same point.
+static func _crossing(paint: Callable, cell: Vector2, size: Vector2, fa: Vector2, fb: Vector2, ca: Color) -> Vector2:
+	var lo: Vector2 = fa
+	var hi: Vector2 = fb
+	var lo_is_a: bool = true
+	if fb.x < fa.x or (fb.x == fa.x and fb.y < fa.y):
+		lo = fb
+		hi = fa
+		lo_is_a = false
+	var t0: float = 0.0
+	var t1: float = 1.0
+	for _it: int in 7:
+		var tm: float = (t0 + t1) * 0.5
+		var f: Vector2 = lo.lerp(hi, tm)
+		var on_a: bool = _same(paint.call((cell.x + f.x) / size.x, (cell.y + f.y) / size.y), ca)
+		if on_a == lo_is_a:
+			t0 = tm
+		else:
+			t1 = tm
+	return lo.lerp(hi, (t0 + t1) * 0.5)
+
+
+## Whether two paints read as the same colour (soft shading inside a cell is no edge worth splitting).
+static func _same(a: Color, b: Color) -> bool:
+	return (a.a > 0.0) == (b.a > 0.0) and absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) < 0.12
+
+
+static func _bilerp(a: Vector3, b: Vector3, c: Vector3, d: Vector3, f: Vector2) -> Vector3:
+	return a.lerp(b, f.x).lerp(d.lerp(c, f.x), f.y)
 
 
 ## A point on the bean's surface (`AvatarVisuals`), `inflate` metres further out: `t` is the height
@@ -263,7 +423,7 @@ static func body_frame(t: float, a: float, inflate: float) -> Transform3D:
 ## `top` is a Callable(a) -> t (a neckline), `paint(t, a)` the colour, `flare` extra width at the
 ## bottom edge (skirts, coat tails). The inside is drawn too, a shade darker, so open edges don't
 ## show a hole.
-func band(t0: float, top: Callable, inflate: float, paint: Callable, flare: float = 0.0, nu: int = 40, nv: int = 30) -> void:
+func band(t0: float, top: Callable, inflate: float, paint: Callable, flare: float = 0.0, nu: int = 48, nv: int = 30) -> void:
 	var t_max: float = t0
 	for i: int in 64:
 		t_max = maxf(t_max, top.call((float(i) / 64.0 - 0.5) * TAU))
@@ -284,7 +444,7 @@ func band(t0: float, top: Callable, inflate: float, paint: Callable, flare: floa
 			return c if side == 0 else Color(c.darkened(0.45), c.a)
 		var out := func(p: Vector3) -> Vector3:
 			return body_out(p) if side == 0 else -body_out(p)
-		surface(at, nu, nv, pt, out, true)
+		surface(at, nu, nv, pt, out, true, side == 0)  # the inside only shows at the hems: no splitting
 
 
 ## A neckline: `front` height at the front centre, `back` at the back, `v` > 0 cuts a V.

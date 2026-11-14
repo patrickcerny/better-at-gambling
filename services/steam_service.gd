@@ -25,6 +25,8 @@ signal lobby_members_changed(lobby_id: int)
 signal store_changed
 ## A purchase ended: ok (paid, the inventory follows) or not (cancelled or failed).
 signal purchase_finished(ok: bool)
+## Coins bought with real money arrived (after Steam used up the coin pack).
+signal coins_added(amount: int)
 
 ## The game's own Steamworks App ID (was 480 "Spacewar" for tests until 0.9.16).
 const APP_ID: int = 5623410
@@ -54,6 +56,10 @@ var currency: String = ""
 var prices: Dictionary[int, int] = {}
 ## A purchase is waiting for the overlay.
 var buying: bool = false
+## Coin packs being consumed: result handle -> Coins to add when Steam confirms.
+var _consuming: Dictionary[int, int] = {}
+## Inventory item instances with a consume on its way (never consumed twice).
+var _consuming_items: Array[int] = []
 
 
 func _ready() -> void:
@@ -211,8 +217,58 @@ static func owned_from_items(items: Array, shop: CosmeticShop) -> Array[StringNa
 	return out
 
 
+## The coin packs in an inventory listing that still have to be turned into Coins:
+## [{item_id, quantity, coins}] (coins = the pack's Coins times the quantity).
+static func coin_stacks(items: Array, shop: CosmeticShop) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for it: Variant in items:
+		if not it is Dictionary:
+			continue
+		var row: Dictionary = it
+		var found: Resource = shop.by_steam_item(int(row.get("item_definition", 0)))
+		var qty: int = int(row.get("quantity", 1))
+		if found is CoinPack and qty > 0:
+			out.append({"item_id": int(row.get("item_id", 0)), "quantity": qty, "coins": (found as CoinPack).coins * qty})
+	return out
+
+
 func _on_inventory_result(result: int = 0, handle: int = 0, _a: Variant = null, _b: Variant = null) -> void:
+	if _consuming.has(handle):
+		_finish_consume(result, handle)
+		return
 	_read_inventory(result, handle)
+
+
+## Coins bought: the coin pack item is used up in the Steam inventory, and only when Steam says
+## that worked are the Coins added (so a pack is never paid out twice, or not at all).
+func _consume_coin_packs(items: Array) -> void:
+	for stack: Dictionary in coin_stacks(items, CosmeticShop.default()):
+		var item_id: int = int(stack["item_id"])
+		if item_id in _consuming_items:
+			continue
+		var handle: int = int(steam.call("consumeItem", item_id, int(stack["quantity"])))
+		if handle <= 0:
+			continue
+		_consuming[handle] = int(stack["coins"])
+		_consuming_items.append(item_id)
+
+
+func _finish_consume(result: int, handle: int) -> void:
+	var coins: int = int(_consuming[handle])
+	_consuming.erase(handle)
+	var items: Variant = steam.call("getResultItems", handle)
+	steam.call("destroyResult", handle)
+	if items is Array:
+		for it: Variant in items:
+			if it is Dictionary:
+				_consuming_items.erase(int((it as Dictionary).get("item_id", 0)))
+	if result != 1:
+		Log.warn(&"steam", "coin pack not used up (result %d), trying again later" % result)
+		_consuming_items.clear()
+		return
+	var added: int = ProfileManager.add_coins(coins)
+	Log.info(&"steam", "coins bought: +%d" % added)
+	coins_added.emit(added)
 
 
 func _on_inventory_full(handle: int = 0, _a: Variant = null, _b: Variant = null) -> void:
@@ -227,6 +283,7 @@ func _read_inventory(result: int, handle: int) -> void:
 	steam.call("destroyResult", handle)
 	if not items is Array:
 		return
+	_consume_coin_packs(items as Array)
 	var ids: Array[StringName] = owned_from_items(items as Array, CosmeticShop.default())
 	Log.info(&"steam", "inventory: %d pieces" % ids.size())
 	ProfileManager.set_steam_owned(ids)
@@ -246,6 +303,8 @@ func _on_prices(result: int = 0, code: Variant = "", _a: Variant = null) -> void
 			defs.append(d.steam_item)
 	for k: CosmeticPack in shop.packs:
 		defs.append(k.steam_item)
+	for c: CoinPack in shop.coin_packs:
+		defs.append(c.steam_item)
 	for def: int in defs:
 		var p: Variant = steam.call("getItemPrice", def)
 		if p is Dictionary and int((p as Dictionary).get("price", 0)) > 0:

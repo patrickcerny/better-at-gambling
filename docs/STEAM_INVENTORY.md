@@ -17,6 +17,15 @@ drops, no second currency (casino theme, Austrian/Belgian rules on paid randomne
   purchases is saved in profile.cfg. BUY WITH STEAM / BUY PACK call `startPurchase`, which opens
   the Steam overlay.
 - Without Steam the Steam buttons are greyed out; the reference euro prices still show.
+- Animated skins (200+) are the pricier tier: 1,49 € or 1,99 €, money only. Gold Rush (level 25)
+  and Rainbow (level 50) are also free at that level (`CosmeticDef.level`). Eyes 300+, mouths 310+,
+  beards 320+.
+- Coin packs (`CoinPack`, 3000+: 500 / 1200 / 3500 Coins for 0,99 / 1,99 / 4,99 €) are consumable
+  Steam items. After a purchase `SteamSvc` finds them in the inventory, calls `consumeItem` and
+  credits the Coins (`ProfileManager.add_coins`) only on an OK result for that handle, so a pack is
+  never counted twice. The + next to the Coins in the shop opens the COINS page.
+- Retired item definitions are never reused: 1009 (Holiday Mode, removed from the shop) stays in
+  itemdefs.json as `store_hidden` so owners keep its pieces.
 
 ## Steamworks setup (once, and after catalog changes)
 

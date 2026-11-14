@@ -74,6 +74,15 @@ func apply_results(ev: Dictionary, local_id: int) -> Dictionary:
 	return out
 
 
+## Adds Coins bought with real money and saves. Returns how many were added.
+func add_coins(amount: int) -> int:
+	var added: int = profile.add_coins(amount)
+	if added > 0:
+		save()
+		changed.emit()
+	return added
+
+
 ## Buys a cosmetic (see `PlayerProfile.buy`); &"" on success.
 func buy(id: StringName) -> StringName:
 	var err: StringName = profile.buy(id)

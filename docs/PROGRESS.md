@@ -93,6 +93,18 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-14 / outfits rework (branch claude/project-thread-vj2yq8, not on main yet)
+- Shop: coin packs for real money (+ next to the Coins), 8 animated skins (`vfx/shaders/bean_skin.gdshader`;
+  Gold free at level 25, Rainbow at 50), 8 more colours (24), eyes / mouths / beards as new outfit
+  slots (9 slots, PROTOCOL_VERSION 14), level badges on tiles.
+- Sets: Businessman, Black Tie, Pirate Captain, Royal Highness (knight-style bottom), Superhero,
+  Wild West (chaps), new Pilot, Doctor, Knight, Wizard (glowing, orbiting stars), Playground
+  (spinning propeller), Bavarian, Golfer. Holiday Mode removed (Steam 1009 retired, never reused).
+- Pattern edges are cut exactly along the paint (`OutfitMeshKit.surface`: marching squares inside
+  split cells), so lapels and V-necks are clean lines instead of steps; pieces stay under 24k
+  triangles (test_outfits).
+- Look-dev: `scripts/screenshot.sh res://tools/dev/outfit_shot.tscn <name> 90 --kind sets|skin|eyes|mouth|beard
+  [--only a,b] [--cols N] [--zoom 0.5] [--low]`.
 ### 2026-11-14 / 0.9.20 real-money cosmetics + voice level
 - Steam Inventory purchases: every paid piece also 0,50-1 EUR, ten pieces money only, ten packs
   50 cents under their pieces (PACKS tab). See docs/STEAM_INVENTORY.md; Steamworks still needs

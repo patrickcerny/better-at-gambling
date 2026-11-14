@@ -162,6 +162,15 @@ var _cape_swing: float = 0.0
 ## The worn cape's cloth (null when the toon shaders are off: the cape just swings then).
 var _cloth: CapeCloth = null
 var _foot_meshes: Array[Mesh] = []
+## The animated skin worn (`ToonMaterial.make_skin`), null for the plain bean colour.
+var _skin_mat: Material = null
+## Parts that turn on their own (`OutfitMeshes.spinners`): [{node, axis, speed}].
+var _spinners: Array[Dictionary] = []
+## Eye pieces: the pupils' own shape spins this fast (radians a second), and what to restore.
+var _pupil_spin: float = 0.0
+var _plain_pupil: Mesh = null
+var _plain_pupil_mat: Material = null
+var _lashes: Array[MeshInstance3D] = []
 
 ## Headless beans (servers) keep the outfit ids only; tests switch the models on.
 static var outfits_headless: bool = false
@@ -196,6 +205,18 @@ func wear(kind: StringName, id: StringName) -> void:
 	if body == null or (_headless and not outfits_headless):
 		return
 	match kind:
+		CosmeticDef.KIND_SKIN:
+			_skin_mat = ToonMaterial.make_skin(id)
+			if _skin_mat == null:
+				return
+			body.material_override = _skin_mat
+			if OutfitMeshes.sleeve_color(outfit.get(CosmeticDef.KIND_SHIRT, &"")).a <= 0.0:
+				for seg: MeshInstance3D in _segments:
+					seg.material_override = _skin_mat
+		CosmeticDef.KIND_MOUTH:
+			_mouth_mat.set_shader_parameter(&"style", OutfitMeshes.mouth_style(id))
+		CosmeticDef.KIND_EYES:
+			_wear_eyes(id)
 		CosmeticDef.KIND_BOOTS:
 			var pair: Array[ArrayMesh] = OutfitMeshes.boot_meshes(id)
 			if pair.is_empty():
@@ -236,6 +257,8 @@ func wear(kind: StringName, id: StringName) -> void:
 			var mi: MeshInstance3D = _outfit_mesh(m, "Outfit" + String(kind).capitalize())
 			body.add_child(mi)
 			_outfit_nodes[kind] = mi
+			for sp: MeshInstance3D in _add_spinners(mi, id):
+				_spinners.append({"node": sp, "axis": sp.get_meta(&"axis"), "speed": sp.get_meta(&"speed")})
 			if kind == CosmeticDef.KIND_SHIRT:
 				var sleeve: Color = OutfitMeshes.sleeve_color(id)
 				if sleeve.a > 0.0:
@@ -265,7 +288,82 @@ func _take_off(kind: StringName) -> void:
 			_cloth = null
 		CosmeticDef.KIND_SHIRT:
 			for seg: MeshInstance3D in _segments:
-				seg.material_override = _body_mat
+				seg.material_override = _bare_mat()
+		CosmeticDef.KIND_SKIN:
+			_skin_mat = null
+			if body != null:
+				body.material_override = _body_mat
+				if OutfitMeshes.sleeve_color(outfit.get(CosmeticDef.KIND_SHIRT, &"")).a <= 0.0:
+					for seg: MeshInstance3D in _segments:
+						seg.material_override = _body_mat
+		CosmeticDef.KIND_MOUTH:
+			if _mouth_mat != null:
+				_mouth_mat.set_shader_parameter(&"style", 0)
+		CosmeticDef.KIND_EYES:
+			_take_off_eyes()
+	_spinners = _spinners.filter(func(sp: Dictionary) -> bool: return is_instance_valid(sp["node"]))
+
+
+## What bare arms wear: the animated skin, or the bean colour.
+func _bare_mat() -> Material:
+	return _skin_mat if _skin_mat != null else _body_mat
+
+
+## Eye pieces: glasses in front of the face (`_outfit_nodes`), pupils in another shape, lashes.
+func _wear_eyes(id: StringName) -> void:
+	var m: ArrayMesh = OutfitMeshes.mesh(id)
+	if m != null:
+		var mi: MeshInstance3D = _outfit_mesh(m, "OutfitEyes")
+		body.add_child(mi)
+		_outfit_nodes[CosmeticDef.KIND_EYES] = mi
+	var shape: ArrayMesh = OutfitMeshes.pupil_mesh(id)
+	if shape != null:
+		_pupil_spin = float(OutfitMeshes.PUPILS.get(id, 0.0))
+		for pivot: Node3D in _pupils:
+			var pupil := pivot.get_node("Pupil") as MeshInstance3D
+			_plain_pupil = pupil.mesh
+			_plain_pupil_mat = pupil.material_override
+			pupil.mesh = shape
+			pupil.material_override = OutfitMeshes.material()
+			pupil.get_node("Sparkle").visible = false
+	if OutfitMeshes.has_lashes(id):
+		for i: int in 2:
+			var lash := MeshInstance3D.new()
+			lash.name = "Lashes"
+			lash.mesh = OutfitMeshes.lash_mesh(-1.0 if i == 0 else 1.0)
+			lash.material_override = OutfitMeshes.material()
+			(eye_l if i == 0 else eye_r).add_child(lash)
+			_lashes.append(lash)
+
+
+func _take_off_eyes() -> void:
+	_pupil_spin = 0.0
+	if _plain_pupil != null:
+		for pivot: Node3D in _pupils:
+			var pupil := pivot.get_node("Pupil") as MeshInstance3D
+			pupil.mesh = _plain_pupil
+			pupil.material_override = _plain_pupil_mat
+			pupil.rotation = Vector3.ZERO
+			pupil.get_node("Sparkle").visible = true
+		_plain_pupil = null
+	for lash: MeshInstance3D in _lashes:
+		lash.get_parent().remove_child(lash)
+		lash.free()
+	_lashes.clear()
+
+
+## Adds the parts of piece `id` that turn on their own under `parent` (body space), each with its
+## turning axis and speed in metadata.
+static func _add_spinners(parent: Node3D, id: StringName) -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = []
+	for sp: Dictionary in OutfitMeshes.spinners(id):
+		var mi: MeshInstance3D = _outfit_mesh(sp["mesh"], "Spinner")
+		mi.position = sp["origin"]
+		mi.set_meta(&"axis", sp["axis"])
+		mi.set_meta(&"speed", sp["speed"])
+		parent.add_child(mi)
+		out.append(mi)
+	return out
 
 
 static func _outfit_mesh(m: Mesh, node_name: String) -> MeshInstance3D:
@@ -280,7 +378,12 @@ static func _outfit_mesh(m: Mesh, node_name: String) -> MeshInstance3D:
 ## the body's space (the ragdoll's torso). Returns the nodes made.
 static func dress(parent: Node3D, o: Dictionary) -> Array[MeshInstance3D]:
 	var out: Array[MeshInstance3D] = []
-	for kind: StringName in [CosmeticDef.KIND_HAT, CosmeticDef.KIND_SHIRT, CosmeticDef.KIND_PANTS, CosmeticDef.KIND_CAPE]:
+	var skin: StringName = StringName(str(o.get(CosmeticDef.KIND_SKIN, "")))
+	if parent is MeshInstance3D and String(skin).begins_with("skin_"):
+		var mat: Material = ToonMaterial.make_skin(skin)
+		if mat != null:
+			(parent as MeshInstance3D).material_override = mat
+	for kind: StringName in [CosmeticDef.KIND_HAT, CosmeticDef.KIND_SHIRT, CosmeticDef.KIND_PANTS, CosmeticDef.KIND_CAPE, CosmeticDef.KIND_BEARD, CosmeticDef.KIND_EYES]:
 		var id: StringName = StringName(str(o.get(kind, "")))
 		if id == &"" or not String(id).begins_with(String(kind) + "_"):
 			continue
@@ -290,6 +393,7 @@ static func dress(parent: Node3D, o: Dictionary) -> Array[MeshInstance3D]:
 		var mi: MeshInstance3D = _outfit_mesh(m, "Outfit" + String(kind).capitalize())
 		parent.add_child(mi)
 		out.append(mi)
+		out.append_array(_add_spinners(mi, id))
 	return out
 
 
@@ -512,6 +616,11 @@ func _animate(frame_delta: float) -> void:
 	_animate_legs(walk, em)
 	_animate_face(delta, em)
 	_animate_cape(delta, speed)
+	for sp: Dictionary in _spinners:
+		(sp["node"] as Node3D).basis = Basis(sp["axis"] as Vector3, _time * float(sp["speed"]))
+	if _pupil_spin != 0.0:
+		for pivot: Node3D in _pupils:
+			(pivot.get_node("Pupil") as Node3D).rotation.z = _time * _pupil_spin
 	if reaching and not is_swinging():
 		_point_arms(reach_target)
 

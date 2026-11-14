@@ -2,6 +2,86 @@
   "appid": 5623410,
   "items": [
     {
+      "itemdefid": 204,
+      "type": "item",
+      "name": "Lucky Felt",
+      "description": "Skin for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR149,USD149",
+      "store_tags": "skin",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 205,
+      "type": "item",
+      "name": "Candy Swirl",
+      "description": "Skin for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR149,USD149",
+      "store_tags": "skin",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 206,
+      "type": "item",
+      "name": "Deep Sea",
+      "description": "Skin for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR149,USD149",
+      "store_tags": "skin",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 207,
+      "type": "item",
+      "name": "Marble",
+      "description": "Skin for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR149,USD149",
+      "store_tags": "skin",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 200,
+      "type": "item",
+      "name": "Gold Rush",
+      "description": "Skin for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR199,USD199",
+      "store_tags": "skin",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 201,
+      "type": "item",
+      "name": "Rainbow",
+      "description": "Skin for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR199,USD199",
+      "store_tags": "skin",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 202,
+      "type": "item",
+      "name": "Molten Lava",
+      "description": "Skin for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR199,USD199",
+      "store_tags": "skin",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 203,
+      "type": "item",
+      "name": "Starry Night",
+      "description": "Skin for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR199,USD199",
+      "store_tags": "skin",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 100,
       "type": "item",
       "name": "Police Cap",
@@ -32,9 +112,39 @@
       "marketable": false
     },
     {
+      "itemdefid": 167,
+      "type": "item",
+      "name": "Surgeon's Cap",
+      "description": "Hat for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "hat",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 103,
       "type": "item",
       "name": "Traffic Cone",
+      "description": "Hat for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "hat",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 165,
+      "type": "item",
+      "name": "Slick Side Part",
+      "description": "Hat for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "hat",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 170,
+      "type": "item",
+      "name": "Golf Flat Cap",
       "description": "Hat for your bean in Better at Gambling.",
       "price": "1;EUR50,USD50",
       "store_tags": "hat",
@@ -82,6 +192,26 @@
       "marketable": false
     },
     {
+      "itemdefid": 166,
+      "type": "item",
+      "name": "Captain's Cap",
+      "description": "Hat for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "hat",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 169,
+      "type": "item",
+      "name": "Tyrolean Hat",
+      "description": "Hat for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "hat",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 108,
       "type": "item",
       "name": "Pirate Tricorn",
@@ -102,20 +232,20 @@
       "marketable": false
     },
     {
-      "itemdefid": 110,
+      "itemdefid": 111,
       "type": "item",
-      "name": "Viking Helmet",
-      "description": "Hat for your bean in Better at Gambling. Only sold here.",
+      "name": "Wizard Hat",
+      "description": "Hat for your bean in Better at Gambling.",
       "price": "1;EUR100,USD100",
       "store_tags": "hat",
       "tradable": false,
       "marketable": false
     },
     {
-      "itemdefid": 111,
+      "itemdefid": 110,
       "type": "item",
-      "name": "Wizard Hat",
-      "description": "Hat for your bean in Better at Gambling.",
+      "name": "Viking Helmet",
+      "description": "Hat for your bean in Better at Gambling. Only sold here.",
       "price": "1;EUR100,USD100",
       "store_tags": "hat",
       "tradable": false,
@@ -132,9 +262,19 @@
       "marketable": false
     },
     {
-      "itemdefid": 113,
+      "itemdefid": 168,
       "type": "item",
-      "name": "Police Shirt",
+      "name": "Knight's Helm",
+      "description": "Hat for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "hat",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 176,
+      "type": "item",
+      "name": "Star Tee",
       "description": "Shirt for your bean in Better at Gambling.",
       "price": "1;EUR50,USD50",
       "store_tags": "shirt",
@@ -142,9 +282,9 @@
       "marketable": false
     },
     {
-      "itemdefid": 114,
+      "itemdefid": 113,
       "type": "item",
-      "name": "Business Suit",
+      "name": "Police Shirt",
       "description": "Shirt for your bean in Better at Gambling.",
       "price": "1;EUR50,USD50",
       "store_tags": "shirt",
@@ -165,6 +305,26 @@
       "itemdefid": 116,
       "type": "item",
       "name": "Jailbird",
+      "description": "Shirt for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "shirt",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 178,
+      "type": "item",
+      "name": "Golf Polo",
+      "description": "Shirt for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "shirt",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 114,
+      "type": "item",
+      "name": "Business Suit",
       "description": "Shirt for your bean in Better at Gambling.",
       "price": "1;EUR50,USD50",
       "store_tags": "shirt",
@@ -222,9 +382,39 @@
       "marketable": false
     },
     {
+      "itemdefid": 171,
+      "type": "item",
+      "name": "Pilot's Shirt",
+      "description": "Shirt for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "shirt",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 172,
+      "type": "item",
+      "name": "Lab Coat",
+      "description": "Shirt for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "shirt",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 122,
       "type": "item",
       "name": "Dealer Vest",
+      "description": "Shirt for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "shirt",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 177,
+      "type": "item",
+      "name": "Trachten Vest",
       "description": "Shirt for your bean in Better at Gambling.",
       "price": "1;EUR75,USD75",
       "store_tags": "shirt",
@@ -237,6 +427,26 @@
       "name": "Super Suit",
       "description": "Shirt for your bean in Better at Gambling.",
       "price": "1;EUR75,USD75",
+      "store_tags": "shirt",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 173,
+      "type": "item",
+      "name": "Captain's Coat",
+      "description": "Shirt for your bean in Better at Gambling.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "shirt",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 175,
+      "type": "item",
+      "name": "Wizard Robe",
+      "description": "Shirt for your bean in Better at Gambling.",
+      "price": "1;EUR100,USD100",
       "store_tags": "shirt",
       "tradable": false,
       "marketable": false
@@ -255,6 +465,16 @@
       "itemdefid": 125,
       "type": "item",
       "name": "Knight's Tabard",
+      "description": "Shirt for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "shirt",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 174,
+      "type": "item",
+      "name": "Royal Doublet",
       "description": "Shirt for your bean in Better at Gambling. Only sold here.",
       "price": "1;EUR100,USD100",
       "store_tags": "shirt",
@@ -302,6 +522,26 @@
       "marketable": false
     },
     {
+      "itemdefid": 179,
+      "type": "item",
+      "name": "Pilot Trousers",
+      "description": "Pants for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "pants",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 180,
+      "type": "item",
+      "name": "Scrubs",
+      "description": "Pants for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "pants",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 130,
       "type": "item",
       "name": "Fire Trousers",
@@ -315,6 +555,16 @@
       "itemdefid": 131,
       "type": "item",
       "name": "Lucky Boxers",
+      "description": "Pants for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "pants",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 185,
+      "type": "item",
+      "name": "Dungarees",
       "description": "Pants for your bean in Better at Gambling.",
       "price": "1;EUR50,USD50",
       "store_tags": "pants",
@@ -352,9 +602,39 @@
       "marketable": false
     },
     {
+      "itemdefid": 181,
+      "type": "item",
+      "name": "Captain's Breeches",
+      "description": "Pants for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "pants",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 186,
+      "type": "item",
+      "name": "Cowboy Chaps",
+      "description": "Pants for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "pants",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 135,
       "type": "item",
       "name": "Super Briefs",
+      "description": "Pants for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "pants",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 184,
+      "type": "item",
+      "name": "Wizard Robe Skirt",
       "description": "Pants for your bean in Better at Gambling.",
       "price": "1;EUR75,USD75",
       "store_tags": "pants",
@@ -385,6 +665,26 @@
       "itemdefid": 138,
       "type": "item",
       "name": "Lederhosen",
+      "description": "Pants for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "pants",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 182,
+      "type": "item",
+      "name": "Royal Breeches",
+      "description": "Pants for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "pants",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 183,
+      "type": "item",
+      "name": "Knight's Greaves",
       "description": "Pants for your bean in Better at Gambling. Only sold here.",
       "price": "1;EUR100,USD100",
       "store_tags": "pants",
@@ -552,6 +852,16 @@
       "marketable": false
     },
     {
+      "itemdefid": 187,
+      "type": "item",
+      "name": "Polished Shoes",
+      "description": "Boots for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "boots",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 155,
       "type": "item",
       "name": "Fire Boots",
@@ -565,6 +875,16 @@
       "itemdefid": 156,
       "type": "item",
       "name": "Flippers",
+      "description": "Boots for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "boots",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 193,
+      "type": "item",
+      "name": "Golf Spikes",
       "description": "Boots for your bean in Better at Gambling.",
       "price": "1;EUR50,USD50",
       "store_tags": "boots",
@@ -592,6 +912,16 @@
       "marketable": false
     },
     {
+      "itemdefid": 190,
+      "type": "item",
+      "name": "Curly Slippers",
+      "description": "Boots for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "boots",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 159,
       "type": "item",
       "name": "Cowboy Boots",
@@ -605,6 +935,26 @@
       "itemdefid": 160,
       "type": "item",
       "name": "Pirate Boots",
+      "description": "Boots for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "boots",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 189,
+      "type": "item",
+      "name": "Hero Boots",
+      "description": "Boots for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "boots",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 192,
+      "type": "item",
+      "name": "Haferl Shoes",
       "description": "Boots for your bean in Better at Gambling.",
       "price": "1;EUR75,USD75",
       "store_tags": "boots",
@@ -632,6 +982,16 @@
       "marketable": false
     },
     {
+      "itemdefid": 191,
+      "type": "item",
+      "name": "Light-Up Sneakers",
+      "description": "Boots for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "boots",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 163,
       "type": "item",
       "name": "Knight's Sabatons",
@@ -652,6 +1012,236 @@
       "marketable": false
     },
     {
+      "itemdefid": 188,
+      "type": "item",
+      "name": "Royal Buckle Shoes",
+      "description": "Boots for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "boots",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 300,
+      "type": "item",
+      "name": "Long Lashes",
+      "description": "Eyes for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 301,
+      "type": "item",
+      "name": "Round Specs",
+      "description": "Eyes for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 302,
+      "type": "item",
+      "name": "Cat Eyes",
+      "description": "Eyes for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 303,
+      "type": "item",
+      "name": "Star Eyes",
+      "description": "Eyes for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 304,
+      "type": "item",
+      "name": "Heart Eyes",
+      "description": "Eyes for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 305,
+      "type": "item",
+      "name": "Dollar Eyes",
+      "description": "Eyes for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 306,
+      "type": "item",
+      "name": "Monocle",
+      "description": "Eyes for your bean in Better at Gambling.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 307,
+      "type": "item",
+      "name": "Aviator Shades",
+      "description": "Eyes for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 308,
+      "type": "item",
+      "name": "Hypno Eyes",
+      "description": "Eyes for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "eyes",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 310,
+      "type": "item",
+      "name": "Cheeky Tongue",
+      "description": "Mouth for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "mouth",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 311,
+      "type": "item",
+      "name": "Buck Teeth",
+      "description": "Mouth for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "mouth",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 313,
+      "type": "item",
+      "name": "Lipstick",
+      "description": "Mouth for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "mouth",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 312,
+      "type": "item",
+      "name": "Gold Tooth",
+      "description": "Mouth for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "mouth",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 314,
+      "type": "item",
+      "name": "Vampire Fangs",
+      "description": "Mouth for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "mouth",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 315,
+      "type": "item",
+      "name": "Gold Grill",
+      "description": "Mouth for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "mouth",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 320,
+      "type": "item",
+      "name": "Gentleman's Mustache",
+      "description": "Beard for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "beard",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 321,
+      "type": "item",
+      "name": "Goatee",
+      "description": "Beard for your bean in Better at Gambling.",
+      "price": "1;EUR50,USD50",
+      "store_tags": "beard",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 322,
+      "type": "item",
+      "name": "Handlebar",
+      "description": "Beard for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "beard",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 323,
+      "type": "item",
+      "name": "Lumberjack Beard",
+      "description": "Beard for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "beard",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 324,
+      "type": "item",
+      "name": "Santa Beard",
+      "description": "Beard for your bean in Better at Gambling.",
+      "price": "1;EUR75,USD75",
+      "store_tags": "beard",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 325,
+      "type": "item",
+      "name": "Wizard Beard",
+      "description": "Beard for your bean in Better at Gambling.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "beard",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 326,
+      "type": "item",
+      "name": "Viking Braids",
+      "description": "Beard for your bean in Better at Gambling. Only sold here.",
+      "price": "1;EUR100,USD100",
+      "store_tags": "beard",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 1000,
       "type": "bundle",
       "bundle": "100x1;113x1;126x1;153x1",
@@ -665,9 +1255,9 @@
     {
       "itemdefid": 1001,
       "type": "bundle",
-      "bundle": "101x1;114x1;127x1;152x1",
-      "name": "Business Class",
-      "description": "The whole Business Class outfit (4 pieces), cheaper than one by one.",
+      "bundle": "165x1;114x1;127x1;152x1",
+      "name": "Businessman",
+      "description": "The whole Businessman outfit (4 pieces), cheaper than one by one.",
       "price": "1;EUR150,USD150",
       "store_tags": "pack",
       "tradable": false,
@@ -676,10 +1266,10 @@
     {
       "itemdefid": 1002,
       "type": "bundle",
-      "bundle": "109x1;124x1;137x1;147x1;162x1",
+      "bundle": "109x1;124x1;137x1;162x1",
       "name": "Black Tie",
-      "description": "The whole Black Tie outfit (5 pieces), cheaper than one by one.",
-      "price": "1;EUR400,USD400",
+      "description": "The whole Black Tie outfit (4 pieces), cheaper than one by one.",
+      "price": "1;EUR300,USD300",
       "store_tags": "pack",
       "tradable": false,
       "marketable": false
@@ -709,10 +1299,10 @@
     {
       "itemdefid": 1005,
       "type": "bundle",
-      "bundle": "108x1;133x1;160x1",
+      "bundle": "108x1;173x1;181x1;160x1",
       "name": "Pirate Captain",
-      "description": "The whole Pirate Captain outfit (3 pieces), cheaper than one by one.",
-      "price": "1;EUR175,USD175",
+      "description": "The whole Pirate Captain outfit (4 pieces), cheaper than one by one.",
+      "price": "1;EUR275,USD275",
       "store_tags": "pack",
       "tradable": false,
       "marketable": false
@@ -720,10 +1310,10 @@
     {
       "itemdefid": 1006,
       "type": "bundle",
-      "bundle": "112x1;125x1;136x1;150x1;163x1",
+      "bundle": "112x1;174x1;182x1;150x1;188x1",
       "name": "Royal Highness",
       "description": "The whole Royal Highness outfit (5 pieces), cheaper than one by one.",
-      "price": "1;EUR425,USD425",
+      "price": "1;EUR450,USD450",
       "store_tags": "pack",
       "tradable": false,
       "marketable": false
@@ -731,10 +1321,10 @@
     {
       "itemdefid": 1007,
       "type": "bundle",
-      "bundle": "111x1;123x1;135x1;139x1;164x1",
-      "name": "Super Wizard",
-      "description": "The whole Super Wizard outfit (5 pieces), cheaper than one by one.",
-      "price": "1;EUR350,USD350",
+      "bundle": "123x1;135x1;139x1;189x1",
+      "name": "Superhero",
+      "description": "The whole Superhero outfit (4 pieces), cheaper than one by one.",
+      "price": "1;EUR225,USD225",
       "store_tags": "pack",
       "tradable": false,
       "marketable": false
@@ -742,7 +1332,7 @@
     {
       "itemdefid": 1008,
       "type": "bundle",
-      "bundle": "106x1;118x1;143x1;159x1",
+      "bundle": "106x1;118x1;186x1;159x1",
       "name": "Wild West",
       "description": "The whole Wild West outfit (4 pieces), cheaper than one by one.",
       "price": "1;EUR225,USD225",
@@ -751,13 +1341,119 @@
       "marketable": false
     },
     {
+      "itemdefid": 1010,
+      "type": "bundle",
+      "bundle": "166x1;171x1;179x1;187x1",
+      "name": "Pilot",
+      "description": "The whole Pilot outfit (4 pieces), cheaper than one by one.",
+      "price": "1;EUR200,USD200",
+      "store_tags": "pack",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 1011,
+      "type": "bundle",
+      "bundle": "167x1;172x1;180x1;154x1",
+      "name": "Doctor",
+      "description": "The whole Doctor outfit (4 pieces), cheaper than one by one.",
+      "price": "1;EUR175,USD175",
+      "store_tags": "pack",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 1012,
+      "type": "bundle",
+      "bundle": "168x1;125x1;183x1;144x1;163x1",
+      "name": "Knight",
+      "description": "The whole Knight outfit (5 pieces), cheaper than one by one.",
+      "price": "1;EUR425,USD425",
+      "store_tags": "pack",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 1013,
+      "type": "bundle",
+      "bundle": "111x1;175x1;184x1;146x1;190x1;325x1",
+      "name": "Wizard",
+      "description": "The whole Wizard outfit (6 pieces), cheaper than one by one.",
+      "price": "1;EUR475,USD475",
+      "store_tags": "pack",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 1014,
+      "type": "bundle",
+      "bundle": "107x1;176x1;185x1;191x1",
+      "name": "Playground",
+      "description": "The whole Playground outfit (4 pieces), cheaper than one by one.",
+      "price": "1;EUR200,USD200",
+      "store_tags": "pack",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 1015,
+      "type": "bundle",
+      "bundle": "169x1;177x1;138x1;192x1",
+      "name": "Bavarian",
+      "description": "The whole Bavarian outfit (4 pieces), cheaper than one by one.",
+      "price": "1;EUR275,USD275",
+      "store_tags": "pack",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 1016,
+      "type": "bundle",
+      "bundle": "170x1;178x1;132x1;193x1",
+      "name": "Golfer",
+      "description": "The whole Golfer outfit (4 pieces), cheaper than one by one.",
+      "price": "1;EUR175,USD175",
+      "store_tags": "pack",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3000,
+      "type": "item",
+      "name": "500 Coins",
+      "description": "500 Coins to spend in the cosmetics shop of Better at Gambling. Used up when they arrive in your wallet.",
+      "price": "1;EUR99,USD99",
+      "store_tags": "coins",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3001,
+      "type": "item",
+      "name": "1200 Coins",
+      "description": "1200 Coins to spend in the cosmetics shop of Better at Gambling. Used up when they arrive in your wallet.",
+      "price": "1;EUR199,USD199",
+      "store_tags": "coins",
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3002,
+      "type": "item",
+      "name": "3500 Coins",
+      "description": "3500 Coins to spend in the cosmetics shop of Better at Gambling. Used up when they arrive in your wallet.",
+      "price": "1;EUR499,USD499",
+      "store_tags": "coins",
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 1009,
       "type": "bundle",
       "bundle": "107x1;120x1;138x1;156x1",
       "name": "Holiday Mode",
-      "description": "The whole Holiday Mode outfit (4 pieces), cheaper than one by one.",
-      "price": "1;EUR250,USD250",
-      "store_tags": "pack",
+      "description": "No longer sold.",
+      "store_hidden": true,
       "tradable": false,
       "marketable": false
     }

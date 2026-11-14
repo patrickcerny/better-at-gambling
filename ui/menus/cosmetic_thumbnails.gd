@@ -65,6 +65,9 @@ func _ready() -> void:
 ## The picture of item `id` (blank until rendered). `urgent` ones (the tab icons) jump the queue.
 static func texture_for(id: StringName, urgent: bool = false) -> ImageTexture:
 	if _cache.has(id):
+		if urgent and id in _queue:  # still waiting (asked for by a tile first): jump the queue now
+			_queue.erase(id)
+			_queue.push_front(id)
 		return _cache[id]
 	var img := Image.create_empty(SIZE, SIZE, false, Image.FORMAT_RGBA8)
 	var tex := ImageTexture.create_from_image(img)
@@ -137,6 +140,21 @@ func _stage(id: StringName) -> void:
 			look = Vector3(0, 0.1, -0.03)
 			dist = 1.45
 			height = 0.55
+		CosmeticDef.KIND_EYES:
+			_bean.rotation.y = PI + 0.2
+			look = Vector3(0, 1.02, 0)
+			dist = 2.1
+			height = 0.05
+		CosmeticDef.KIND_MOUTH:
+			_bean.rotation.y = PI + 0.15
+			look = Vector3(0, 0.9, 0)
+			dist = 1.9
+			height = 0.05
+		CosmeticDef.KIND_BEARD:
+			_bean.rotation.y = PI + 0.3
+			look = Vector3(0, 0.82 if id != &"beard_wizard" else 0.62, 0)
+			dist = 2.3 if id != &"beard_wizard" else 2.9
+			height = 0.1
 	_cam.fov = 32.0
 	_cam.position = look + Vector3(0.0, height, dist)
 	_cam.look_at(look, Vector3.UP)

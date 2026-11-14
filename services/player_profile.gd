@@ -61,10 +61,10 @@ func level_progress() -> float:
 
 # --- Cosmetics ----------------------------------------------------------------------------------
 
-## Free items, ones bought with Coins and ones in the Steam inventory.
+## Free items, ones unlocked by level, ones bought with Coins and ones in the Steam inventory.
 func owns(id: StringName) -> bool:
 	var d: CosmeticDef = shop.find(id)
-	return d != null and (d.is_free() or id in owned or id in steam_owned)
+	return d != null and (d.is_free() or (d.level > 0 and level >= d.level) or id in owned or id in steam_owned)
 
 
 ## Whether every piece of pack `pack` is owned.
@@ -93,7 +93,8 @@ func owned_colors() -> Array[int]:
 
 
 ## Buys `id` with Coins. Returns &"" when bought, else why not: &"unknown", &"owned",
-## &"steam_only" (real money only) or &"not_enough_coins". Nothing changes on a refusal.
+## &"steam_only" (real money only), &"level" (only unlocked by levelling up) or
+## &"not_enough_coins". Nothing changes on a refusal.
 func buy(id: StringName) -> StringName:
 	var d: CosmeticDef = shop.find(id)
 	if d == null:
@@ -101,12 +102,19 @@ func buy(id: StringName) -> StringName:
 	if owns(id):
 		return &"owned"
 	if not d.coin_buyable():
-		return &"steam_only"
+		return &"steam_only" if d.steam_buyable() else &"level"
 	if coins < d.price:
 		return &"not_enough_coins"
 	coins -= d.price
 	owned.append(id)
 	return &""
+
+
+## Adds Coins bought with real money (`SteamSvc`), up to MAX_COINS. Returns how many were added.
+func add_coins(amount: int) -> int:
+	var before: int = coins
+	coins = clampi(coins + maxi(amount, 0), 0, MAX_COINS)
+	return coins - before
 
 
 ## Wears colour `index` from the next join on (and now, in a lobby). Only owned colours; -1 clears.
