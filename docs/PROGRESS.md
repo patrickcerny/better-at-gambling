@@ -93,6 +93,11 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-14 / 0.9.20 real-money cosmetics + voice level
+- Steam Inventory purchases: every paid piece also 0,50-1 EUR, ten pieces money only, ten packs
+  50 cents under their pieces (PACKS tab). See docs/STEAM_INVENTORY.md; Steamworks still needs
+  the Inventory Service switched on and tools/steam/itemdefs.json uploaded.
+- Voice: automatic mic level, mic volume up to 400 % (c7628f5).
 ### 2026-11-14 / 0.9.19 item models
 - Every item has a real 3D model now: 27 hand-built in code (`items/item_art.gd`, primitives in the
   casino palette) next to the 6 model files, all with an idle animation (`items/item_idle.gd`: the
