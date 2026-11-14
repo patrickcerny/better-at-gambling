@@ -22,6 +22,8 @@ var owned: Array[StringName] = []
 ## Pieces in the player's Steam inventory (bought with real money). Not saved: Steam is the
 ## record (`SteamSvc` fills it on start and after each purchase), so a hand-edited file can't add any.
 var steam_owned: Array[StringName] = []
+## Developer mode (`DevMode`): every cosmetic counts as owned. Never saved.
+var dev_all: bool = false
 ## The outfit worn from the next join on: `CosmeticDef.OUTFIT_KINDS` kind -> owned item id.
 var outfit: Dictionary[StringName, StringName] = {}
 var matches: int = 0
@@ -64,7 +66,7 @@ func level_progress() -> float:
 ## Free items, ones bought with Coins and ones in the Steam inventory.
 func owns(id: StringName) -> bool:
 	var d: CosmeticDef = shop.find(id)
-	return d != null and (d.is_free() or id in owned or id in steam_owned)
+	return d != null and (dev_all or d.is_free() or id in owned or id in steam_owned)
 
 
 ## Whether every piece of pack `pack` is owned.

@@ -178,7 +178,10 @@ func _build() -> void:
 	bottom.add_child(cosmetics_button)
 	var leave := Button.new()
 	leave.text = "LEAVE LOBBY"
-	leave.pressed.connect(func() -> void: leave_requested.emit())
+	leave.name = "LeaveButton"
+	# Patrick: "Are you sure Dialog after quit game or leave game (so you dont misclick)".
+	leave.pressed.connect(func() -> void:
+		ConfirmDialog.ask(get_parent() if get_parent() != null else self, "LEAVE THE LOBBY?", "You go back to the main menu.", "LEAVE", func() -> void: leave_requested.emit()))
 	bottom.add_child(leave)
 
 

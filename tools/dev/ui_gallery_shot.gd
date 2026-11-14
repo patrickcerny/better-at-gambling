@@ -1,6 +1,7 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|players|players_lobby|shop|rewards|settings|audio|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining`
+## `--panel lobby|players|players_lobby|shop|rewards|settings|audio|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining|dev|dev_match|confirm`
+## (tutorial: `--page N` picks the page, `--minigame <id>` opens that game's page)
 ## over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
@@ -67,7 +68,25 @@ func _ready() -> void:
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
 			menu.call(&"_show_tutorial", null)
-			(menu.get("how_to_play") as HowToPlayPanel).show_page(2)
+			var how: HowToPlayPanel = menu.get("how_to_play")
+			var cl: Cmdline = Cmdline.parse(OS.get_cmdline_user_args())
+			how.show_page(cl.get_int("page", 2))
+			if cl.has("minigame"):
+				how.open_minigame(StringName(cl.get_string("minigame")))
+		"dev":
+			DevMode.forced = 1
+			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
+			add_child(menu)
+			(menu.find_child("DevMode", true, false) as Button).pressed.emit()
+		"dev_match":
+			var p := DevMatchPanel.new()
+			add_child(p)
+			p.open()
+		"confirm":
+			var p := PauseMenu.new()
+			add_child(p)
+			p.open()
+			p.ask_leave()
 		"pause_tutorial":
 			var p := PauseMenu.new()
 			add_child(p)

@@ -83,13 +83,33 @@ func test_settings_return_to_the_pause_menu() -> void:
 	assert_signal_emitted(menu, "resumed")
 
 
-func test_leave_and_quit_emit() -> void:
+func test_leave_and_quit_ask_first() -> void:
+	# Patrick: "Are you sure Dialog after quit game or leave game (so you dont misclick)".
 	menu.open()
 	watch_signals(menu)
 	menu.leave_button.pressed.emit()
+	var d: ConfirmDialog = ConfirmDialog.open_in(menu)
+	assert_not_null(d, "LEAVE asks first")
+	assert_signal_not_emitted(menu, "leave_requested", "nothing happens before the answer")
+	assert_true(d.cancel_button.has_focus(), "CANCEL is focused: Enter does no harm")
+	d.cancel_button.pressed.emit()
+	await wait_process_frames(1)
+	assert_signal_not_emitted(menu, "leave_requested", "CANCEL stays")
+	assert_true(menu.visible)
+	assert_null(ConfirmDialog.open_in(menu))
+	menu.leave_button.pressed.emit()
+	ConfirmDialog.open_in(menu).yes_button.pressed.emit()
 	assert_signal_emitted(menu, "leave_requested")
 	assert_false(menu.visible)
+	await wait_process_frames(1)
 	menu.open()
 	menu.quit_button.pressed.emit()
+	assert_signal_not_emitted(menu, "quit_requested")
+	menu.back()  # Esc while asking: back to the pause menu, not to play
+	assert_signal_not_emitted(menu, "quit_requested")
+	assert_true(menu.visible)
+	await wait_process_frames(1)
+	menu.quit_button.pressed.emit()
+	ConfirmDialog.open_in(menu).yes_button.pressed.emit()
 	assert_signal_emitted(menu, "quit_requested")
 	assert_signal_not_emitted(menu, "resumed")

@@ -7,12 +7,16 @@ extends Control
 ## BACK returns here and whose RESUME goes straight back to play. The match keeps running behind
 ## it (online games can't pause); the match scene owns the input mode while it is open.
 ## A "?" left of the gear opens the tutorial (`HowToPlayPanel`) over the game; DONE, SKIP or Esc
-## come back here.
+## come back here. LEAVE and QUIT GAME ask first (`ConfirmDialog`; Patrick: "Are you sure Dialog
+## after quit game or leave game (so you dont misclick)"). In Practice, for Patrick only
+## (`DevMode`), a DEV button opens the dev tools (`DevMatchPanel`).
 
 ## RESUME, Esc, or RESUME in the settings: back to play.
 signal resumed
 signal leave_requested
 signal quit_requested
+## DEV (only shown when `dev_available`): the match scene opens its dev tools.
+signal dev_requested
 
 ## In-game settings panel bottom, from the screen centre (1080-high canvas: ends 230 px above the
 ## bottom edge, above the HUD's item bar).
@@ -26,6 +30,8 @@ var quit_button: Button
 var settings_button: GearButton
 var help_button: HelpButton
 var how_to_play: HowToPlayPanel
+## The dev tools entry (hidden unless `set_dev_available(true)`).
+var dev_button: Button
 
 
 func _ready() -> void:
@@ -57,12 +63,14 @@ func _ready() -> void:
 	v.add_child(title)
 	resume_button = _button(v, "RESUME", resume)
 	resume_button.theme_type_variation = &"ActionButton"
-	leave_button = _button(v, "LEAVE TO MENU", func() -> void:
+	leave_button = _button(v, "LEAVE TO MENU", ask_leave)
+	quit_button = _button(v, "QUIT GAME", ask_quit)
+	dev_button = _button(v, "DEV TOOLS", func() -> void:
 		close()
-		leave_requested.emit())
-	quit_button = _button(v, "QUIT GAME", func() -> void:
-		close()
-		quit_requested.emit())
+		dev_requested.emit())
+	dev_button.name = "DevButton"
+	dev_button.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
+	dev_button.visible = false
 	var bottom := HBoxContainer.new()
 	bottom.name = "Bottom"
 	bottom.alignment = BoxContainer.ALIGNMENT_END
@@ -100,11 +108,33 @@ func open() -> void:
 	resume_button.grab_focus()
 
 
+## Patrick only (`DevMode`, Practice): shows the DEV TOOLS entry.
+func set_dev_available(on: bool) -> void:
+	dev_button.visible = on
+
+
+## LEAVE TO MENU: asks first, then leaves.
+func ask_leave() -> void:
+	ConfirmDialog.ask(self, "LEAVE THE MATCH?", "You go back to the main menu. Your money in this match is gone.", "LEAVE", func() -> void:
+		close()
+		leave_requested.emit())
+
+
+## QUIT GAME: asks first, then quits.
+func ask_quit() -> void:
+	ConfirmDialog.ask(self, "QUIT THE GAME?", "The game closes and you leave this match.", "QUIT", func() -> void:
+		close()
+		quit_requested.emit())
+
+
 ## Hides the menu (and the settings) without resuming: the caller sets the input mode.
 func close() -> void:
 	if not visible:
 		return
 	visible = false
+	var d: ConfirmDialog = ConfirmDialog.open_in(self)
+	if d != null:
+		d.queue_free()
 	settings.close()  # saves; `_on_settings_closed` ignores it now that we are hidden
 	how_to_play.close()
 
@@ -118,7 +148,10 @@ func resume() -> void:
 func back() -> void:
 	if not visible:
 		return
-	if settings.visible:
+	var d: ConfirmDialog = ConfirmDialog.open_in(self)
+	if d != null:
+		d.cancel()
+	elif settings.visible:
 		settings.close()
 	elif how_to_play.visible:
 		how_to_play.close()
@@ -154,7 +187,7 @@ func _on_settings_closed() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if visible and not settings.visible and not how_to_play.visible and (event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause")):
+	if visible and not settings.visible and not how_to_play.visible and ConfirmDialog.open_in(self) == null and (event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause")):
 		get_viewport().set_input_as_handled()
 		resume()
 

@@ -6,7 +6,7 @@ extends Node
 ## Views: hall (the casino floor from above), table (sat at blackjack with a bet down), shop (the
 ## gift shop open, items in the HUD slots), jail (two beans behind the bars, a guard outside),
 ## lobby (ready pedestals glowing in the start room), rough (a shove knockdown, from the brawl clip),
-## leaderboard (the standings over the casino), oddjobs (broke at the Odd Jobs cabinet, aiming at the
+## items (four beans in a row, each holding an item out), leaderboard (the standings over the casino), oddjobs (broke at the Odd Jobs cabinet, aiming at the
 ## glowing red button, the shared bar part full). Dev checks only: race, racehall, and floor (the
 ## casino floor from just inside the lobby doors; `--floor <layout id>` picks the floor, e.g.
 ## `--floor floor_1234` (a drawn floor by its seed), `--floor random` or `--floor grand_hall`,
@@ -22,6 +22,9 @@ var _cam: Camera3D
 ## Floor view: where the camera stands and looks (`--from`, `--to`).
 var _from: Vector3 = Vector3(0.0, 4.2, 7.6)
 var _to: Vector3 = Vector3(0.0, 0.0, -6.0)
+## Items view: where the row of beans stands and which way they face (`--items-at x,y,z`, `--items-yaw`).
+var _items_at: Vector3 = Vector3(0.0, 0.0, 2.0)
+var _items_yaw: float = PI
 ## Lobby view: whose pedestal glows.
 var _ready_ids: Array[int] = []
 
@@ -31,6 +34,8 @@ func _ready() -> void:
 	_view = c.get_string("view", "hall")
 	_from = _vec3(c.get_string("from", ""), _from)
 	_to = _vec3(c.get_string("to", ""), _to)
+	_items_at = _vec3(c.get_string("items-at", ""), _items_at)
+	_items_yaw = c.get_float("items-yaw", _items_yaw)
 	_shot = c.get_string("shot", "/tmp/tutorial_%s.png" % _view)
 	_at = c.get_float("at", float({"table": 17.0, "rough": 7.4, "oddjobs": 9.0}.get(_view, 5.0)))
 	if _view == "rough":
@@ -39,7 +44,7 @@ func _ready() -> void:
 		add_child(clip)  # run with `--seconds 60` so the clip does not quit before the shot
 		_scene = clip.get(&"_scene")
 		return
-	MatchScene.test_dummies = 4 if _view in ["lobby", "leaderboard", "hall"] else 2
+	MatchScene.test_dummies = 4 if _view in ["lobby", "leaderboard", "hall", "items"] else 2
 	_scene = (load("res://match/match_scene.tscn") as PackedScene).instantiate()
 	add_child(_scene)
 
@@ -79,6 +84,18 @@ func _stage() -> void:
 			for pid: int in _others():
 				_place(pid, spots[i % spots.size()], randf() * TAU)
 				i += 1
+		"items":  # beans in a row, each with an item out in their hand (the items page)
+			var kit: Array[StringName] = [&"baseball_bat", &"lucky_clover", &"black_cat", &"beer"]
+			var i: int = 0
+			for pid: int in _others():
+				var id: StringName = kit[i % kit.size()]
+				srv.items.give(pid, id, srv.match_time)
+				_place(pid, _items_at + Vector3(-2.4 + 1.6 * i, 0, 0), _items_yaw)
+				srv.submit_intent(pid, Intents.make(&"hold_item", {"item": String(id)}))
+				i += 1
+			_place(_scene.local_id, _items_at + Vector3(0, 0, -6), 0.0)
+			_scene.hud.visible = false
+			_free_cam(_items_at + Vector3(0.3, 1.7, 4.2), _items_at + Vector3(0, 0.9, 0), 55.0)
 		"table":
 			_scene.call(&"_autosit", &"blackjack_2")
 		"shop":

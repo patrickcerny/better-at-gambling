@@ -49,7 +49,7 @@ func test_next_back_done_and_the_counter() -> void:
 	var how: HowToPlayPanel = await _panel()
 	var n: int = HowToPlayPanel.PAGES.size()
 	assert_eq(how.page, 0)
-	assert_eq(how.counter.text, "1 / %d" % n)
+	assert_string_ends_with(how.counter.text, " 1 / %d" % n)
 	assert_true(how.back_button.disabled, "no BACK on the first page")
 	assert_true(how.next_button.visible)
 	assert_false(how.done_button.visible, "DONE only on the last page")
@@ -57,7 +57,7 @@ func test_next_back_done_and_the_counter() -> void:
 	assert_true(how.next_button.has_focus(), "NEXT is focused")
 	how.next_button.pressed.emit()
 	assert_eq(how.page, 1)
-	assert_eq(how.counter.text, "2 / %d" % n)
+	assert_string_ends_with(how.counter.text, " 2 / %d" % n)
 	assert_false(how.back_button.disabled)
 	how.back_button.pressed.emit()
 	assert_eq(how.page, 0)
@@ -65,7 +65,7 @@ func test_next_back_done_and_the_counter() -> void:
 		if how.next_button.visible:
 			how.next_button.pressed.emit()
 	assert_eq(how.page, n - 1)
-	assert_eq(how.counter.text, "%d / %d" % [n, n])
+	assert_string_ends_with(how.counter.text, " %d / %d" % [n, n])
 	assert_false(how.next_button.visible)
 	assert_true(how.done_button.visible)
 	assert_true(how.done_button.has_focus(), "DONE is focused on the last page")
@@ -79,32 +79,63 @@ func test_next_back_done_and_the_counter() -> void:
 
 func test_every_page_has_a_picture_heading_and_text() -> void:
 	var how: HowToPlayPanel = await _panel()
-	assert_gte(HowToPlayPanel.PAGES.size(), 7)
+	assert_gte(HowToPlayPanel.PAGES.size(), 10)
 	for i: int in HowToPlayPanel.PAGES.size():
 		how.show_page(i)
+		assert_ne(how.heading.text, "")
+		var special: String = str(HowToPlayPanel.PAGES[i][3])
+		if special == HowToPlayPanel.ALL_ITEMS or special == HowToPlayPanel.ALL_MINIGAMES:
+			assert_false(how.page_box.visible, "page %d shows its list instead" % (i + 1))
+			continue
+		assert_true(ResourceLoader.exists(special), "page %d picture file %s" % [i + 1, special])
 		assert_not_null(how.picture.texture, "page %d has its picture" % (i + 1))
 		if how.picture.texture != null:
 			assert_gt(how.picture.texture.get_width(), 400, "page %d picture is a real screenshot" % (i + 1))
-		assert_ne(how.heading.text, "")
 		assert_gt(how.body.text.length(), 40)
 		assert_false(how.body.text.contains("{"), "page %d key names filled in" % (i + 1))
 	assert_eq(how.picture.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_CENTERED, "pictures keep their aspect")
 	assert_eq((how.find_child("Title", true, false) as Label).text, "HOW TO PLAY")
 
 
-func test_smash_the_button_page_follows_the_shop() -> void:
+func test_three_sections_with_tabs() -> void:
+	# Patrick: "split the tutorial into The casino, The items and The mingamges".
+	var how: HowToPlayPanel = await _panel()
+	assert_eq(HowToPlayPanel.SECTIONS, ["THE CASINO", "THE ITEMS", "THE MINIGAMES"] as Array[String])
+	assert_eq(how.tabs.size(), 3)
+	var last_section: int = 0
+	for i: int in HowToPlayPanel.PAGES.size():
+		var sec: int = HowToPlayPanel.section_of(i)
+		assert_gte(sec, last_section, "pages run in section order")
+		last_section = sec
+	assert_true(how.tabs[0].button_pressed, "THE CASINO lit on the first page")
+	how.tabs[1].pressed.emit()
+	assert_eq(HowToPlayPanel.section_of(how.page), 1)
+	assert_eq(how.heading.text, "USING ITEMS", "THE ITEMS starts with using them")
+	assert_true(how.tabs[1].button_pressed)
+	assert_false(how.tabs[0].button_pressed)
+	assert_string_contains(how.counter.text, "THE ITEMS")
+	how.tabs[2].pressed.emit()
+	assert_eq(how.heading.text, "MINIGAMES")
+	how.tabs[0].pressed.emit()
+	assert_eq(how.page, 0)
+	# Casino pages: smash the button is still there, items moved out of the casino section.
+	var headings: Array[String] = []
+	for p: Array in HowToPlayPanel.PAGES:
+		if int(p[0]) == 0:
+			headings.append(str(p[1]))
+	assert_has(headings, "SMASH THE BUTTON")
+	assert_has(headings, "SECURITY & JAIL")
+	assert_does_not_have(headings, "USING ITEMS")
+
+
+func test_smash_the_button_page() -> void:
 	# Patrick: "Add smash the button to the tutorial".
 	var how: HowToPlayPanel = await _panel()
 	var at: int = -1
-	var shop: int = -1
 	for i: int in HowToPlayPanel.PAGES.size():
-		if str(HowToPlayPanel.PAGES[i][0]) == "SMASH THE BUTTON":
+		if str(HowToPlayPanel.PAGES[i][1]) == "SMASH THE BUTTON":
 			at = i
-		if str(HowToPlayPanel.PAGES[i][2]).ends_with("shop.webp"):
-			shop = i
 	assert_gt(at, -1, "the page is there")
-	assert_eq(at, shop + 1, "right after the items / Gift Shop page")
-	assert_eq(HowToPlayPanel.PAGES.size(), 9)
 	how.show_page(at)
 	assert_eq(how.heading.text, "SMASH THE BUTTON")
 	assert_string_contains(how.body.text, "Odd Jobs cabinet")
@@ -113,7 +144,70 @@ func test_smash_the_button_page_follows_the_shop() -> void:
 	assert_string_contains(how.body.text, "$50")
 	assert_false(how.body.text.contains("{"), "the click key is filled in")
 	assert_eq(how.picture.texture.resource_path, "res://assets/tutorial/oddjobs.webp")
-	assert_eq(how.counter.text, "%d / 9" % (at + 1))
+
+
+func test_all_items_lists_every_item_with_its_text() -> void:
+	var how: HowToPlayPanel = await _panel()
+	var at: int = -1
+	for i: int in HowToPlayPanel.PAGES.size():
+		if str(HowToPlayPanel.PAGES[i][3]) == HowToPlayPanel.ALL_ITEMS:
+			at = i
+	assert_gt(at, -1)
+	assert_eq(HowToPlayPanel.section_of(at), 1, "in THE ITEMS")
+	how.show_page(at)
+	assert_true(how.items_box.visible)
+	assert_false(how.page_box.visible)
+	var listed: Array[ItemDefinition] = HowToPlayPanel.listed_items()
+	assert_gt(listed.size(), 20)
+	for id: Variant in Registry.items:
+		var d: ItemDefinition = Registry.items[id]
+		assert_eq(how.item_rows.has(d.id), d.in_loot, "%s listed only if players can get it" % d.id)
+	var scissors: Control = how.item_rows.get(&"scissors", null)
+	assert_not_null(scissors)
+	if scissors != null:
+		assert_eq((scissors.find_child("Name", true, false) as Label).text, "Scissors")
+		assert_string_contains((scissors.find_child("Description", true, false) as Label).text, "Blackjack")
+		assert_not_null((scissors.find_child("Icon", true, false) as TextureRect).texture, "the model picture slot is filled")
+	for i: int in listed.size() - 1:
+		assert_true(listed[i].rarity <= listed[i + 1].rarity, "commons first, legendaries last")
+
+
+func test_minigame_grid_and_a_page_per_game() -> void:
+	# Patrick: "Minigames also submenu with images".
+	var how: HowToPlayPanel = await _panel()
+	var grid_page: int = HowToPlayPanel.PAGES.size() - 1
+	assert_eq(str(HowToPlayPanel.PAGES[grid_page][3]), HowToPlayPanel.ALL_MINIGAMES, "the grid is the last page")
+	how.show_page(grid_page)
+	assert_true(how.minigames_box.visible)
+	assert_true(how.done_button.visible)
+	assert_eq(how.minigame_tiles.size(), Registry.minigames.size(), "a tile per minigame")
+	for id: Variant in Registry.minigames:
+		var tile: Button = how.minigame_tiles[id]
+		assert_not_null((tile.find_child("Picture", true, false) as TextureRect).texture, "%s has its picture" % id)
+	var first: StringName = Registry.minigames.keys()[0]
+	var second: StringName = Registry.minigames.keys()[1]
+	(how.minigame_tiles[&"bat_heist"] as Button).pressed.emit()
+	assert_eq(how.minigame, &"bat_heist")
+	assert_true(how.page_box.visible)
+	assert_false(how.minigames_box.visible)
+	assert_eq(how.heading.text, "BAT HEIST")
+	assert_string_contains(how.body.text, "bat")
+	assert_string_contains(how.body.text, "2+ players")
+	assert_eq(how.picture.texture, MinigameSelector.picture(&"bat_heist"))
+	assert_eq(how.back_button.text, "ALL MINIGAMES")
+	how.back_button.pressed.emit()
+	assert_eq(how.minigame, &"")
+	assert_true(how.minigames_box.visible, "back to the grid")
+	assert_eq(how.page, grid_page)
+	how.open_minigame(first)
+	assert_eq(how.next_button.text, "NEXT GAME")
+	how.next_button.pressed.emit()
+	assert_eq(how.minigame, second, "NEXT GAME steps through the games")
+	how.open_minigame(StringName(Registry.minigames.keys()[-1]))
+	assert_false(how.next_button.visible, "no NEXT GAME after the last one")
+	watch_signals(how)
+	how.done_button.pressed.emit()
+	assert_signal_emit_count(how, "closed", 1, "DONE from a game page closes")
 
 
 func test_escape_and_skip_close() -> void:

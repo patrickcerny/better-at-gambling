@@ -740,6 +740,34 @@ func advance(real_delta: float) -> void:
 	_flush()
 
 
+# --- Developer mode (Practice only: `DevMatchPanel`, the server runs on Patrick's own PC) ---------
+
+## Adds `amount` $ (negative takes) to `player`'s money.
+func dev_give_money(player: int, amount: int) -> bool:
+	if not economy.has_player(player) or amount == 0:
+		return false
+	if amount < 0:
+		economy.take_up_to(player, -amount, &"dev")
+		return true
+	return economy.apply(player, amount, &"dev")
+
+
+## Gives `player` item `item` (the normal path: a full bag asks what to throw away).
+func dev_give_item(player: int, item: StringName) -> bool:
+	return items.give(player, item, match_time)
+
+
+## Jumps the casino clock to just before the next minigame; `id` (if set) is the one that comes.
+## False when the casino isn't open or no minigame is left this match.
+func dev_minigame_now(id: StringName = &"") -> bool:
+	if phases.phase != Phase.Id.CASINO or phases.minigames_done >= schedule.minigames:
+		return false
+	minigames.forced_next = id
+	var at: float = schedule.minigame_times()[phases.minigames_done] - PhaseMachine.PRE_MINIGAME_SECONDS + 9.0
+	phases.casino_time = maxf(phases.casino_time, at)
+	return true
+
+
 ## Runs the simulation until the match is over or `max_seconds` elapsed (tests/sims).
 func run_to_end(max_seconds: float = 36000.0) -> void:
 	var elapsed: float = 0.0

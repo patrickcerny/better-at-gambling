@@ -103,8 +103,8 @@ func _exit_tree() -> void:
 ## Steam nothing happens. Returns the ones newly unlocked this call.
 func unlock_achievements(ids: Array[StringName]) -> Array[StringName]:
 	var fresh: Array[StringName] = []
-	if not _available or ids.is_empty():
-		return fresh
+	if not _available or ids.is_empty() or DevMode.used:
+		return fresh  # developer mode was used this run: nothing it did may earn an achievement
 	for id: StringName in ids:
 		if id in _unlocked:
 			continue
