@@ -453,3 +453,74 @@ export function makeRope(len = 2.4) {
   g.add(rope);
   return g;
 }
+
+// ---------------------------------------------------------------- roulette table (wheel in a wooden pod + betting layout)
+/** Footprint 6.6 x 3.0 m, top surface at y = 0.95; local +Z faces the players. The wheel sits on the
+ *  left end (`userData.wheelPos`), the layout fills the rest (`userData.layoutRect` = x0, x1, z0, z1). */
+export function makeRouletteTable() {
+  const g = new THREE.Group();
+  const W = 6.6, D = 3.0, TOP = 0.95;
+  const wood = new THREE.MeshStandardMaterial({ color: 0x4a2414, roughness: 0.38 });
+  const darkWood = new THREE.MeshStandardMaterial({ color: 0x2b1a12, roughness: 0.5 });
+  const gold = new THREE.MeshStandardMaterial({ color: PAL.vipGold, metalness: 0.9, roughness: 0.28 });
+  // cabinet
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(W - 0.5, TOP - 0.12, D - 0.5), darkWood);
+  cab.position.y = (TOP - 0.12) / 2; cab.castShadow = cab.receiveShadow = true; g.add(cab);
+  const kick = new THREE.Mesh(new THREE.BoxGeometry(W - 0.4, 0.06, D - 0.4), gold); kick.position.y = 0.03; g.add(kick);
+  // felt with the betting layout
+  const layoutTex = canvasTex(2048, 920, (ctx, w, h) => {
+    ctx.fillStyle = css(PAL.felt); ctx.fillRect(0, 0, w, h);
+    const reds = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+    const x0 = 760, y0 = 90, cw = 92, ch = 150; // number grid: 12 columns x 3 rows, 0 on the left
+    ctx.strokeStyle = '#E3B95C'; ctx.lineWidth = 5; ctx.fillStyle = '#F2E6C9';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // zero
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 - 70, y0 + ch * 1.5); ctx.lineTo(x0, y0 + ch * 3); ctx.closePath();
+    ctx.fillStyle = css(0x1f5a3c); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#F2E6C9'; ctx.font = '900 64px "Barlow Condensed", sans-serif'; ctx.fillText('0', x0 - 26, y0 + ch * 1.5);
+    for (let c = 0; c < 12; c++) for (let r = 0; r < 3; r++) {
+      const n = c * 3 + (3 - r), x = x0 + c * cw, y = y0 + r * ch;
+      ctx.strokeRect(x, y, cw, ch);
+      ctx.fillStyle = reds.has(n) ? css(PAL.red) : '#1a1817';
+      ctx.beginPath(); ctx.ellipse(x + cw / 2, y + ch / 2, 34, 46, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#F2E6C9'; ctx.font = '800 50px "Barlow Condensed", sans-serif'; ctx.fillText(String(n), x + cw / 2, y + ch / 2 + 2);
+    }
+    // 2 to 1
+    for (let r = 0; r < 3; r++) { const x = x0 + 12 * cw, y = y0 + r * ch; ctx.strokeRect(x, y, 110, ch); ctx.font = '800 38px "Barlow Condensed", sans-serif'; ctx.fillText('2 TO 1', x + 55, y + ch / 2); }
+    // dozens and outside bets
+    const dozens = ['1st 12', '2nd 12', '3rd 12'];
+    dozens.forEach((d, i) => { const x = x0 + i * cw * 4, y = y0 + ch * 3; ctx.strokeRect(x, y, cw * 4, 110); ctx.font = '800 46px "Barlow Condensed", sans-serif'; ctx.fillText(d.toUpperCase(), x + cw * 2, y + 55); });
+    const outs = ['1–18', 'EVEN', 'RED', 'BLACK', 'ODD', '19–36'];
+    outs.forEach((o, i) => {
+      const x = x0 + i * cw * 2, y = y0 + ch * 3 + 110; ctx.strokeRect(x, y, cw * 2, 110);
+      if (o === 'RED' || o === 'BLACK') {
+        ctx.fillStyle = o === 'RED' ? css(PAL.red) : '#1a1817';
+        ctx.beginPath(); ctx.moveTo(x + cw, y + 18); ctx.lineTo(x + cw + 60, y + 55); ctx.lineTo(x + cw, y + 92); ctx.lineTo(x + cw - 60, y + 55); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#F2E6C9';
+      } else { ctx.font = '800 44px "Barlow Condensed", sans-serif'; ctx.fillText(o, x + cw, y + 56); }
+    });
+    // house name on the wheel side
+    ctx.save(); ctx.globalAlpha = 0.18; ctx.font = '900 120px "Barlow Condensed", sans-serif'; ctx.fillText('LUCKY', 330, h - 110); ctx.restore();
+  });
+  const felt = new THREE.Mesh(new THREE.BoxGeometry(W - 0.36, 0.06, D - 0.36), [darkWood, darkWood, new THREE.MeshStandardMaterial({ map: layoutTex, roughness: 0.92 }), darkWood, darkWood, darkWood]);
+  felt.position.y = TOP - 0.03; felt.receiveShadow = true; g.add(felt);
+  // padded wooden rail all around (rounded rectangle ring)
+  const rr = (w, d, r) => { const s = new THREE.Shape(); const x = -w / 2, y = -d / 2;
+    s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+    s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; };
+  const ring = rr(W, D, 0.45); ring.holes.push(rr(W - 0.36, D - 0.36, 0.3));
+  const railGeo = new THREE.ExtrudeGeometry(ring, { depth: 0.1, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 4, curveSegments: 16 });
+  railGeo.rotateX(-Math.PI / 2);
+  const rail = new THREE.Mesh(railGeo, wood); rail.position.y = TOP - 0.02; rail.castShadow = true; g.add(rail);
+  const band = rr(W + 0.04, D + 0.04, 0.47); band.holes.push(rr(W - 0.1, D - 0.1, 0.4));
+  const trim = new THREE.Mesh(new THREE.ExtrudeGeometry(band, { depth: 0.04, bevelEnabled: false, curveSegments: 16 }), gold);
+  trim.rotation.x = -Math.PI / 2; trim.position.y = TOP - 0.1; g.add(trim);
+  // wheel pod on the left end
+  const pod = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.2, 0.16, 48), wood);
+  pod.position.set(-W / 2 + 1.55, TOP + 0.05, 0); pod.castShadow = true; g.add(pod);
+  g.userData.wheelPos = new THREE.Vector3(-W / 2 + 1.55, TOP + 0.2, 0);
+  // the layout spans x from about -0.65 to +2.95 and z from -1.1 to +1.1 (texture x0..: grid starts 37% in)
+  g.userData.layoutRect = [-0.3, 2.8, -1.1, 0.9];
+  g.userData.top = TOP;
+  return g;
+}

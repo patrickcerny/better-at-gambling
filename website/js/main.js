@@ -10,7 +10,7 @@ import Lenis from 'lenis';
 import { makeBean, BEAN_COLORS } from './bean.js';
 import {
   PAL, chipGeometry, chipMaterials, chipStack, makeRoulette, makeCard, makeFeltTable, makeBigWheel,
-  makePegDrop, makeMarquee, makePodium, makeColumn, makeChandelier, makeRope,
+  makePegDrop, makeMarquee, makePodium, makeColumn, makeChandelier, makeRope, makeRouletteTable,
 } from './props.js';
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -292,29 +292,33 @@ async function start() {
     });
   }
 
-  // ---------------------------------------------------------------- station 1: the tables
+  // ---------------------------------------------------------------- station 1: the roulette table
   {
     const X = STATIONS[1];
-    const table = makeFeltTable(2.6); table.position.set(X + 1.8, 0.95, -0.4); scene.add(table);
-    const wheel = makeRoulette(); wheel.position.set(X + 1.8, 1.07, -0.9); wheel.scale.setScalar(0.85); scene.add(wheel);
+    const table = makeRouletteTable(); table.position.set(X + 1.0, 0, -0.6); scene.add(table);
+    const wheel = makeRoulette(); wheel.position.copy(table.userData.wheelPos).add(table.position); wheel.scale.setScalar(0.75); scene.add(wheel);
     updaters.push((dt) => wheel.userData.update(dt));
-    const chipsA = chipStack(9, PAL.red, chipMaterials(PAL.red)); chipsA.position.set(X + 0.3, 1.01, 0.9); scene.add(chipsA);
-    const chipsB = chipStack(5, PAL.black, chipMaterials(PAL.black)); chipsB.position.set(X + 0.75, 1.01, 1.2); scene.add(chipsB);
-    const chipsC = chipStack(7, PAL.felt, chipMaterials(PAL.felt)); chipsC.position.set(X + 3.2, 1.01, 1.0); scene.add(chipsC);
-    const dealer = makeBean(PAL.cream); dealer.root.position.set(X + 1.8, 0, -3.3); scene.add(dealer.root);
+    const top = table.position.y + table.userData.top;
+    const [lx0, lx1, lz0, lz1] = table.userData.layoutRect;
+    // bets on the layout
+    [[0.2, -0.6, PAL.red, 4], [0.85, 0.1, PAL.black, 2], [1.6, -0.2, PAL.felt, 5], [2.3, 0.55, PAL.red, 3], [0.5, 0.75, 0x1F4E8C, 6], [1.9, -0.75, PAL.black, 3]].forEach(([x, z, c, n]) => {
+      const st = chipStack(n, c, chipMaterials(c)); st.position.set(table.position.x + x, top, table.position.z + z); scene.add(st);
+    });
+    // each player's bank on the rail side
+    [[2.7, 1.05, PAL.red, 12], [3.05, 1.0, PAL.black, 8]].forEach(([x, z, c, n]) => {
+      const st = chipStack(n, c, chipMaterials(c)); st.position.set(table.position.x + x, top, table.position.z + z); scene.add(st);
+    });
+    const dealer = makeBean(PAL.cream); dealer.root.position.set(table.position.x - 1.75, 0, table.position.z - 2.25); scene.add(dealer.root);
     const bowTie = new THREE.Mesh(new THREE.TorusKnotGeometry(0.06, 0.03, 30, 6, 2, 3), new THREE.MeshStandardMaterial({ color: PAL.red }));
-    bowTie.position.set(0, 1.18 - 0.5, 0.42); bowTie.scale.set(1.6, 0.8, 0.6); dealer.pivot.add(bowTie);
-    const player = makeBean(BEAN_COLORS[5]); player.root.position.set(X - 1.0, 0, 0.9); player.root.rotation.y = 1.0; scene.add(player.root);
-    // a blackjack hand dealt on the felt; the top card flips over now and then
-    const deal = [['spades_A', -0.55, 1.35, 0.15], ['hearts_K', -0.3, 1.38, -0.12], ['diamonds_Q', 0.75, 1.5, 0.1], ['clubs_J', 1.0, 1.48, -0.18]];
-    const cards = deal.map(([f, dx, dz, rz]) => { const c = makeCard(f, manager); c.rotation.set(-Math.PI / 2, 0, rz); c.position.set(X + 1.8 + dx, 1.025, -0.4 + dz); scene.add(c); return c; });
-    const flip = makeCard('spades_10', manager); flip.position.set(X + 1.8 + 0.2, 1.03, -0.4 + 1.55); scene.add(flip);
+    bowTie.position.set(0, 0.62, 0.4); bowTie.scale.set(1.6, 0.8, 0.6); dealer.pivot.add(bowTie);
+    const p1 = makeBean(BEAN_COLORS[5]); p1.root.position.set(table.position.x + 2.2, 0, table.position.z + 2.15); p1.root.rotation.y = Math.PI * 0.85; scene.add(p1.root);
+    const p2 = makeBean(BEAN_COLORS[1]); p2.root.position.set(table.position.x + 3.7, 0, table.position.z + 1.95); p2.root.rotation.y = Math.PI * 1.2; scene.add(p2.root);
+    const wheelWorld = wheel.position.clone().add(new THREE.Vector3(0, 0.1, 0));
     updaters.push((dt, t) => {
-      dealer.idle(t); player.idle(t); player.setMouth((Math.sin(t * 5) + 1) * 0.3);
-      dealer.look(camera.position); player.look(wheel.getWorldPosition(new THREE.Vector3()));
-      const fc = (t % 5) / 5, k = THREE.MathUtils.smoothstep(fc, 0.55, 0.75) - THREE.MathUtils.smoothstep(fc, 0.9, 1.0);
-      flip.rotation.set(-Math.PI / 2 + k * Math.PI, 0, 0.05);
-      flip.position.y = 1.03 + Math.sin(k * Math.PI) * 0.35;
+      dealer.idle(t); p1.idle(t); p2.idle(t);
+      p1.setMouth((Math.sin(t * 5) + 1) * 0.3);
+      if ((t % 9) > 6.3) { p2.cheer(t); } // the ball has dropped: one of them won
+      dealer.look(camera.position); p1.look(wheelWorld); p2.look(wheelWorld);
     });
   }
 
@@ -530,7 +534,7 @@ async function start() {
     const S = STATIONS;
     return [
       narrow ? shot(0, 2.4, 16, 0, 0.8, 0) : shot(-1.9, 3.2, 10.2, -2.0, 2.9, 0),
-      narrow ? shot(S[1] + 1.8, 4.6, 7.8, S[1] + 1.8, 0.9, -0.5) : shot(S[1] - 1.2, 4.6, 6.6, S[1] + 0.1, 1.0, -0.6),
+      narrow ? shot(S[1] + 1.0, 5.4, 9.5, S[1] + 1.0, 0.6, -0.6) : shot(S[1] - 0.2, 5.0, 8.6, S[1] - 1.3, 0.9, -0.9),
       narrow ? shot(S[2], 3.0, 8.8, S[2], 1.6, 0) : shot(S[2] + 2.0, 2.6, 7.0, S[2] - 0.6, 1.25, 0),
       narrow ? shot(S[3] + 3.2, 4.2, 14.5, S[3] + 3.2, 3.6, -2) : shot(S[3] - 1.4, 3.4, 8.6, S[3] + 2.0, 3.0, -1.6),
       narrow ? shot(S[4], 3.0, 11, S[4], 4.6, -3) : shot(S[4], 2.0, 9.2, S[4], 4.2, -3),

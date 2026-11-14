@@ -19,6 +19,6 @@ No build step: plain ES modules, three.js r170 and Lenis are vendored in `vendor
 
 ## Hosting (VPS, betteratgambling.com)
 
-`deploy/docker-compose.yml` serves the folder with nginx on 127.0.0.1:8150. The host nginx site in
+`deploy/docker-compose.yml` serves the folder with nginx on 127.0.0.1:8152. The host nginx site in
 `deploy/host-nginx-betteratgambling.conf` proxies the domain to it; certbot adds HTTPS.
 `deploy/update.sh` pulls the newest version.
