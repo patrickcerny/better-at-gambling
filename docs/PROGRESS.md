@@ -93,6 +93,14 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-14 / 0.9.22 developer mode, three-part tutorial, "Are you sure?"
+- Developer mode for Patrick only (`DevMode.STEAM_IDS`, his SteamID64 still to add): DEV MODE in
+  the main menu (Coins, levels, every cosmetic until the game closes, a practice casino with
+  dummies, any minigame straight away) and DEV TOOLS in a Practice match's pause menu (money, any
+  item, the next minigame now). Steam achievements stay off for the run once it is used.
+- Tutorial tabs THE CASINO / THE ITEMS (every item with its model) / THE MINIGAMES (picture grid,
+  a page per game).
+- LEAVE TO MENU, QUIT GAME, QUIT and LEAVE LOBBY ask first (`ConfirmDialog`).
 ### 2026-11-14 / 0.9.21 item model review
 - Patrick: "the scissors look bad, go through every model". All 33 checked up close, in a bean's
   hand and in first person. Rebuilt: scissors (steel blades, red loops, gold screw; `ItemArt.slab`
