@@ -22,6 +22,11 @@ on:
     branches: [main]
     paths-ignore: ["docs/**", "**/*.md", "deploy/**", "services/orchestrator/**"]
   workflow_dispatch:
+    inputs:
+      steam:
+        description: "Also upload this build to Steam (Patrick's call only)"
+        type: boolean
+        default: false
 
 concurrency:
   group: release
@@ -156,8 +161,11 @@ jobs:
 
   # Steam upload (SteamPipe) of the release just published; see docs/STEAM_UPLOAD.md. Lives here and
   # not in its own workflow file because only this registered workflow runs from pushes.
+  # Only when started by hand with "steam" ticked (Patrick 2026-11-14: upload only when he says so);
+  # pushes to main build, test and release on GitHub but never upload to Steam.
   steam:
     needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.steam
     permissions:
       contents: read
     env:
