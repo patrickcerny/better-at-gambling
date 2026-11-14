@@ -16,8 +16,8 @@ All three depots are in all three packages (store, beta testing, developer comp)
 
 ## Uploading a build
 
-The `steam` job in `.github/workflows/release.yml` runs after every successful build on main (or by hand:
-Actions → Build & release → Run workflow). It downloads that version's
+The `steam` job in `.github/workflows/release.yml` runs only when started by hand (Actions → Build & release →
+Run workflow, tick "steam"), and only when Patrick says so; pushes to main never upload to Steam. It downloads that version's
 release zips, unpacks one content folder per depot (`tools/steam/prepare_content.sh`), writes the
 SteamPipe scripts (`tools/steam/write_vdfs.sh`) and runs `steamcmd +run_app_build` on Linux, which
 keeps the executable bits the Linux and Mac depots need.
