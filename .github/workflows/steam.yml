@@ -3,7 +3,7 @@
 # zips of that version's GitHub release, one depot each, and uploads them as a new build. The build
 # is NOT set live: Steamworks → SteamPipe → Builds → pick it → "Set build live" on a branch.
 # Uploading from Linux keeps the executable bits the Linux and Mac depots need (a Windows upload
-# would lose them).
+# would lose them). The first upload ran for 0.9.17.
 #
 # Needs two repository secrets, made once by tools/steam/steam_login.ps1 (docs/STEAM_UPLOAD.md):
 #   STEAM_USERNAME    the Steamworks account that may upload builds for the app
