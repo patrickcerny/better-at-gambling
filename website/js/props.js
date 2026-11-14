@@ -164,14 +164,14 @@ export function makeCard(face, manager) {
 
 // ---------------------------------------------------------------- felt table
 export function makeFeltTable(radius = 2.2) {
+  // a full round table: felt top, wooden edge and a padded rail all the way around
   const g = new THREE.Group();
-  const felt = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.12, 64, 1, false, 0, Math.PI),
+  const felt = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.12, 72),
     [new THREE.MeshStandardMaterial({ color: 0x3a2014, roughness: 0.5 }), new THREE.MeshStandardMaterial({ color: PAL.felt, roughness: 0.92 }), new THREE.MeshStandardMaterial({ color: 0x3a2014 })]);
-  felt.rotation.y = -Math.PI / 2;
   felt.receiveShadow = true;
   g.add(felt);
-  const rail = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.12, 12, 64, Math.PI), new THREE.MeshStandardMaterial({ color: 0x4a2414, roughness: 0.35 }));
-  rail.rotation.x = Math.PI / 2; rail.rotation.z = Math.PI; rail.position.y = 0.06;
+  const rail = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.12, 12, 96), new THREE.MeshStandardMaterial({ color: 0x4a2414, roughness: 0.35 }));
+  rail.rotation.x = Math.PI / 2; rail.position.y = 0.06;
   g.add(rail);
   const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 0.9, 24), new THREE.MeshStandardMaterial({ color: 0x2b1a12, roughness: 0.5 }));
   ped.position.y = -0.5; g.add(ped);

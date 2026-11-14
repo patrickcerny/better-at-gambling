@@ -301,7 +301,7 @@ async function start() {
     const chipsA = chipStack(9, PAL.red, chipMaterials(PAL.red)); chipsA.position.set(X + 0.3, 1.01, 0.9); scene.add(chipsA);
     const chipsB = chipStack(5, PAL.black, chipMaterials(PAL.black)); chipsB.position.set(X + 0.75, 1.01, 1.2); scene.add(chipsB);
     const chipsC = chipStack(7, PAL.felt, chipMaterials(PAL.felt)); chipsC.position.set(X + 3.2, 1.01, 1.0); scene.add(chipsC);
-    const dealer = makeBean(PAL.cream); dealer.root.position.set(X + 1.8, 0, -3.3); scene.add(dealer.root);
+    const dealer = makeBean(PAL.cream); dealer.root.position.set(X + 1.8, 0, -3.75); scene.add(dealer.root);
     const bowTie = new THREE.Mesh(new THREE.TorusKnotGeometry(0.06, 0.03, 30, 6, 2, 3), new THREE.MeshStandardMaterial({ color: PAL.red }));
     bowTie.position.set(0, 1.18 - 0.5, 0.42); bowTie.scale.set(1.6, 0.8, 0.6); dealer.pivot.add(bowTie);
     const player = makeBean(BEAN_COLORS[5]); player.root.position.set(X - 1.0, 0, 0.9); player.root.rotation.y = 1.0; scene.add(player.root);
