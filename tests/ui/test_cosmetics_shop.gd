@@ -113,3 +113,19 @@ func test_the_copy_keeps_coins_and_table_money_apart() -> void:
 	assert_string_contains(text, "Coins")
 	assert_string_contains(text, "$", "says the tables take $")
 	assert_string_contains(text.to_lower(), "every match", "and that $ starts over")
+
+
+func test_the_shop_fits_a_1080_high_screen_whatever_is_picked() -> void:
+	# Patrick 2026-11-14: "now the menu is bigger than the screen". The project scales a
+	# 1920x1080 canvas (aspect "expand"), so 1080 is the least height a screen gives.
+	var screen := SubViewport.new()
+	screen.size = Vector2i(1920, 1080)
+	add_child_autofree(screen)
+	var panel := CosmeticsPanel.new()
+	screen.add_child(panel)
+	panel.open()
+	for id: StringName in [&"color_orange", &"hat_police", &"hat_crown", &"pack_royal"]:
+		panel.select(id)
+		await wait_process_frames(2)
+		var need: float = panel.get_combined_minimum_size().y + panel.offset_top - panel.offset_bottom
+		assert_lte(need, 1080.0, "%s: the shop fits (needs %d px)" % [id, need])

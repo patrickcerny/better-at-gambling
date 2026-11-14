@@ -129,7 +129,7 @@ func _ready() -> void:
 	var left := VBoxContainer.new()
 	left.add_theme_constant_override(&"separation", 10)
 	stage.add_child(left)
-	preview = BeanPreviewView.make(Palette.player_color(0), Vector2(480, 460))
+	preview = BeanPreviewView.make(Palette.player_color(0), Vector2(360, 240))  # grows with the space; never pushes the panel off a 1080-high screen
 	preview.interactive = true
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	preview.tooltip_text = "Drag to turn"
@@ -173,7 +173,7 @@ func _ready() -> void:
 	status_label.theme_type_variation = &"SmallLabel"
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.custom_minimum_size.y = 44
+	status_label.custom_minimum_size.y = 26
 	left.add_child(status_label)
 	# Right: icon tabs over the tiles.
 	var right := VBoxContainer.new()

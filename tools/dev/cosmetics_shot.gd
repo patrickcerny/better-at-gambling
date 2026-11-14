@@ -34,6 +34,11 @@ func _ready() -> void:
 				if d != null:
 					shop.show_kind(d.kind)
 				shop.select(StringName(pick))
+				# Report whether the shop fits the screen (Patrick: "the menu is bigger than the screen").
+				await get_tree().process_frame
+				await get_tree().process_frame
+				var r: Rect2 = shop.get_global_rect()
+				Log.info(&"shot", "shop rect %s in viewport %s, min %s" % [r, get_viewport().get_visible_rect().size, shop.get_combined_minimum_size()])
 
 
 func _plaque() -> void:
