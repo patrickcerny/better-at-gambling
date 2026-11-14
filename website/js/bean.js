@@ -103,14 +103,14 @@ export function makeBean(color = 0xE69F00, opts = {}) {
   }
 
   // Arms
-  const armGeo = new THREE.CapsuleGeometry(0.075, ARM_LENGTH, 4, 10);
+  const armGeo = new THREE.CapsuleGeometry(0.09, ARM_LENGTH, 4, 12);
   armGeo.translate(0, -ARM_LENGTH / 2, 0);
   const handGeo = new THREE.SphereGeometry(HAND_RADIUS, 18, 14);
   const arms = [];
   for (const side of [-1, 1]) {
     const shoulder = new THREE.Group();
     const sy = BODY_BOTTOM + BODY_HEIGHT * 0.5 - 0.02;
-    shoulder.position.set(side * (radiusAt(0.5) - 0.03), sy, 0.02);
+    shoulder.position.set(side * (radiusAt(0.5) - 0.07), sy, 0.02);
     const arm = new THREE.Mesh(armGeo, bodyMat);
     arm.castShadow = true;
     shoulder.add(arm);

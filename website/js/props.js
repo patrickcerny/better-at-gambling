@@ -40,7 +40,7 @@ function chipTextures(color) {
   const side = canvasTex(256, 16, (g, w, h) => {
     g.fillStyle = base; g.fillRect(0, 0, w, h);
     g.fillStyle = '#F2E6C9';
-    for (let i = 0; i < 8; i++) g.fillRect(i * 32 + 8, 0, 14, h);
+    for (let i = 0; i < 6; i++) g.fillRect(i * 42.6 + 14, 0, 9, h);
   });
   side.wrapS = THREE.RepeatWrapping;
   return (chipTexCache[color] = { face, side });

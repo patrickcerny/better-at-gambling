@@ -51,7 +51,11 @@ document.getElementById('trailerPlay').addEventListener('click', () => {
 
 const nav = document.getElementById('nav');
 let lastY = 0;
+const floatCta = document.getElementById('floatCta');
+const bigCtas = [...document.querySelectorAll('.cta-steam')];
 function navOnScroll(y) {
+  const ctaVisible = bigCtas.some((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
+  floatCta.classList.toggle('is-on', y > innerHeight * 0.8 && !ctaVisible);
   nav.classList.toggle('is-scrolled', y > 40);
   nav.classList.toggle('is-hidden', y > lastY + 4 && y > 400);
   if (y < lastY - 4 || y < 400) nav.classList.remove('is-hidden');
@@ -301,17 +305,16 @@ async function start() {
     const bowTie = new THREE.Mesh(new THREE.TorusKnotGeometry(0.06, 0.03, 30, 6, 2, 3), new THREE.MeshStandardMaterial({ color: PAL.red }));
     bowTie.position.set(0, 1.18 - 0.5, 0.42); bowTie.scale.set(1.6, 0.8, 0.6); dealer.pivot.add(bowTie);
     const player = makeBean(BEAN_COLORS[5]); player.root.position.set(X - 1.0, 0, 0.9); player.root.rotation.y = 1.0; scene.add(player.root);
-    // floating cards orbiting the table
-    const faces = ['spades_A', 'hearts_K', 'diamonds_Q', 'clubs_J', 'spades_10'];
-    const cards = faces.map((f, i) => { const c = makeCard(f, manager); c.scale.setScalar(1.6); scene.add(c); return { c, i }; });
+    // a blackjack hand dealt on the felt; the top card flips over now and then
+    const deal = [['spades_A', -0.55, 1.35, 0.15], ['hearts_K', -0.3, 1.38, -0.12], ['diamonds_Q', 0.75, 1.5, 0.1], ['clubs_J', 1.0, 1.48, -0.18]];
+    const cards = deal.map(([f, dx, dz, rz]) => { const c = makeCard(f, manager); c.rotation.set(-Math.PI / 2, 0, rz); c.position.set(X + 1.8 + dx, 1.025, -0.4 + dz); scene.add(c); return c; });
+    const flip = makeCard('spades_10', manager); flip.position.set(X + 1.8 + 0.2, 1.03, -0.4 + 1.55); scene.add(flip);
     updaters.push((dt, t) => {
       dealer.idle(t); player.idle(t); player.setMouth((Math.sin(t * 5) + 1) * 0.3);
       dealer.look(camera.position); player.look(wheel.getWorldPosition(new THREE.Vector3()));
-      cards.forEach(({ c, i }) => {
-        const a = t * 0.35 + (i / cards.length) * Math.PI * 2;
-        c.position.set(X + 1.8 + Math.cos(a) * 3.6, 2.9 + Math.sin(t * 1.3 + i) * 0.25, -0.6 + Math.sin(a) * 2.2);
-        c.rotation.set(0.25 * Math.sin(t + i), -a + Math.PI / 2 + t * 0.6, 0.15 * Math.cos(t * 0.8 + i));
-      });
+      const fc = (t % 5) / 5, k = THREE.MathUtils.smoothstep(fc, 0.55, 0.75) - THREE.MathUtils.smoothstep(fc, 0.9, 1.0);
+      flip.rotation.set(-Math.PI / 2 + k * Math.PI, 0, 0.05);
+      flip.position.y = 1.03 + Math.sin(k * Math.PI) * 0.35;
     });
   }
 
@@ -321,7 +324,7 @@ async function start() {
     const X = STATIONS[2];
     const shover = makeBean(BEAN_COLORS[2]); scene.add(shover.root);
     const victim = makeBean(BEAN_COLORS[6], { crown: true }); scene.add(victim.root);
-    const guard = makeBean(0x2b3240, { cap: true }); guard.root.position.set(X - 4.2, 0, -2.5); scene.add(guard.root);
+    const guard = makeBean(0x3d4a66, { cap: true }); guard.root.position.set(X - 4.2, 0, -2.5); scene.add(guard.root);
     const stars = new THREE.Group();
     for (let i = 0; i < 4; i++) { const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.09), new THREE.MeshBasicMaterial({ color: 0xffe08a })); s.position.set(Math.cos(i * Math.PI / 2) * 0.45, 0, Math.sin(i * Math.PI / 2) * 0.45); stars.add(s); }
     scene.add(stars);
@@ -344,8 +347,8 @@ async function start() {
         victim.look(camera.position);
       } else if (c < 1.15) { // shove
         const k = (c - 0.9) / 0.25;
-        shover.arms[0].rotation.x = shover.arms[1].rotation.x = THREE.MathUtils.lerp(-0.4, -1.5, k);
-        shover.arms[0].rotation.z = -0.1; shover.arms[1].rotation.z = 0.1;
+        shover.arms[0].rotation.x = shover.arms[1].rotation.x = THREE.MathUtils.lerp(-0.4, -1.25, k);
+        shover.arms[0].rotation.z = -0.35; shover.arms[1].rotation.z = 0.35;
         shover.root.position.x += dt * 2.5; shover.setMouth(1);
         victim.setMouth(1);
       } else if (c < 2.1) { // fly
@@ -429,23 +432,39 @@ async function start() {
     const pl = new THREE.PointLight(0xffd9a0, 26, 14, 1.5); pl.position.set(X, 6, 3); scene.add(pl);
   }
 
-  // decor: polyhaven statue + bust (CC0)
+  // decor: Poly Haven statue + bust (CC0), scaled to a real size from their bounding boxes
+  const fitHeight = (obj, h) => {
+    const box = new THREE.Box3().setFromObject(obj); const size = box.getSize(new THREE.Vector3());
+    obj.scale.multiplyScalar(h / size.y);
+    const b2 = new THREE.Box3().setFromObject(obj); obj.position.y -= b2.min.y;
+    const c = b2.getCenter(new THREE.Vector3()); obj.position.x -= c.x; obj.position.z -= c.z;
+    const g = new THREE.Group(); g.add(obj); return g;
+  };
+  const marble = new THREE.MeshStandardMaterial({ color: 0xE8DCC4, roughness: 0.35 });
+  const goldTrim = new THREE.MeshStandardMaterial({ color: PAL.vipGold, metalness: 0.9, roughness: 0.3 });
+  const pedestal = (w, h, d) => {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), marble); body.position.y = h / 2; body.castShadow = body.receiveShadow = true;
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, 0.08, d + 0.12), goldTrim); cap.position.y = h + 0.04;
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(w + 0.16, 0.1, d + 0.16), goldTrim); foot.position.y = 0.05;
+    g.add(body, cap, foot); return g;
+  };
   const gl = new GLTFLoader(manager);
   gl.load('assets/models/horse_statue_01/horse_statue_01_1k.gltf', (g) => {
-    const m = g.scene; m.scale.setScalar(2.4); m.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    const ped = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.0, 1.1), new THREE.MeshStandardMaterial({ color: 0xE8DCC4, roughness: 0.35 }));
-    ped.position.set(8.2, 0.5, -4); scene.add(ped);
-    m.position.set(8.2, 1.0, -4); m.rotation.y = 0.6; scene.add(m);
-    const m2 = m.clone(); m2.position.set(STATIONS[5] - 6.5, 1.0, -4); m2.rotation.y = 0.4;
-    const ped2 = ped.clone(); ped2.position.set(STATIONS[5] - 6.5, 0.5, -4); scene.add(ped2, m2);
+    g.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    const horse = fitHeight(g.scene, 1.7);
+    for (const [x, ry] of [[8.2, 0.6], [STATIONS[5] - 6.5, -0.5]]) {
+      const ped = pedestal(1.3, 0.9, 0.8); ped.position.set(x, 0, -4.2); scene.add(ped);
+      const h = horse.clone(); h.position.set(x, 0.98, -4.2); h.rotation.y = ry; scene.add(h);
+    }
   });
   gl.load('assets/models/marble_bust_01/marble_bust_01_1k.gltf', (g) => {
-    const m = g.scene; m.scale.setScalar(2.2);
-    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.42, 1.3, 20), new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.4 }));
-    ped.position.set(STATIONS[2] + 4.4, 0.65, -3.6); scene.add(ped);
-    m.position.set(STATIONS[2] + 4.4, 1.3, -3.6); m.rotation.y = -0.5; scene.add(m);
-    const m2 = m.clone(); m2.position.set(STATIONS[3] - 4.5, 1.3, -3.8); m2.rotation.y = 0.5;
-    const ped2 = ped.clone(); ped2.position.set(STATIONS[3] - 4.5, 0.65, -3.8); scene.add(ped2, m2);
+    g.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    const bust = fitHeight(g.scene, 0.95);
+    for (const [x, ry] of [[STATIONS[2] + 4.4, -0.5], [STATIONS[3] - 4.5, 0.5]]) {
+      const ped = pedestal(0.6, 1.25, 0.6); ped.position.set(x, 0, -3.8); scene.add(ped);
+      const b = bust.clone(); b.position.set(x, 1.33, -3.8); b.rotation.y = ry; scene.add(b);
+    }
   });
 
   // ---------------------------------------------------------------- chip rain (instanced, 4 colours)
@@ -510,7 +529,7 @@ async function start() {
     const narrow = aspect < 0.9;
     const S = STATIONS;
     return [
-      narrow ? shot(0, 2.2, 17.5, 0, 0.7, 0) : shot(-1.9, 3.2, 10.2, -2.0, 2.9, 0),
+      narrow ? shot(0, 2.4, 16, 0, 0.8, 0) : shot(-1.9, 3.2, 10.2, -2.0, 2.9, 0),
       narrow ? shot(S[1] + 1.8, 4.6, 7.8, S[1] + 1.8, 0.9, -0.5) : shot(S[1] - 1.2, 4.6, 6.6, S[1] + 0.1, 1.0, -0.6),
       narrow ? shot(S[2], 3.0, 8.8, S[2], 1.6, 0) : shot(S[2] + 2.0, 2.6, 7.0, S[2] - 0.6, 1.25, 0),
       narrow ? shot(S[3] + 3.2, 4.2, 14.5, S[3] + 3.2, 3.6, -2) : shot(S[3] - 1.4, 3.4, 8.6, S[3] + 2.0, 3.0, -1.6),
@@ -551,6 +570,9 @@ async function start() {
     return a.top <= 0 && b.bottom >= innerHeight;
   }
 
+  // dev aid: #cam=px,py,pz,tx,ty,tz pins the camera (used for close-up checks)
+  const camHash = location.hash.match(/^#cam=([-\d.,]+)$/);
+  const debugCam = camHash ? (() => { const v = camHash[1].split(',').map(Number); return [new THREE.Vector3(v[0], v[1], v[2]), new THREE.Vector3(v[3], v[4], v[5])]; })() : null;
   let last = performance.now();
   let s = 0;
   function frame(now) {
@@ -573,6 +595,7 @@ async function start() {
     camPos.x += mouse.sx * 0.45; camPos.y += mouse.sy * 0.25;
     const ease = reduceMotion ? 1 : 1 - Math.pow(0.0015, dt);
     curPos.lerp(camPos, ease); curTgt.lerp(camTgt, ease);
+    if (debugCam) { curPos.copy(debugCam[0]); curTgt.copy(debugCam[1]); }
     camera.position.copy(curPos); camera.lookAt(curTgt);
 
     // lighting follows the camera; Last Call turns the room red
@@ -590,7 +613,9 @@ async function start() {
     // logo sway + mouse tilt
     logoPivot.rotation.y = Math.sin(t * 0.6) * 0.09 + mouse.sx * 0.35;
     logoPivot.rotation.x = Math.sin(t * 0.45 + 1.3) * 0.03 - mouse.sy * 0.12;
-    logoPivot.position.y = 3.5 + Math.sin(t * 0.9) * 0.08;
+    const narrowNow = camera.aspect < 0.9;
+    logoPivot.position.y = (narrowNow ? 4.5 : 3.5) + Math.sin(t * 0.9) * 0.08;
+    logoPivot.scale.setScalar(narrowNow ? 0.8 : 1);
     const lookPt = camera.position.clone().add(new THREE.Vector3(mouse.sx * 3, mouse.sy * 2, 0));
     heroBeans.forEach((b) => b.look(lookPt));
 
