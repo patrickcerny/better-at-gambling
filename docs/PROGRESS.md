@@ -93,6 +93,15 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-14 / 0.9.21 item model review
+- Patrick: "the scissors look bad, go through every model". All 33 checked up close, in a bean's
+  hand and in first person. Rebuilt: scissors (steel blades, red loops, gold screw; `ItemArt.slab`
+  extrudes flat outlines), rock-paper-scissors (scissors no longer hidden), bow (one smooth limb),
+  wallet (rounded, stitched, on a fishing hook), magnet (smooth horseshoe), energy drink (VOLT wraps
+  the can), VIP pass (ribbon lanyard, text spaced), fake cash (mint and purple bills).
+- Scratch ticket and dog collar are hand-built now (the model files read as a dollar bill and a thin
+  ring); both hang from the hand like the pickpocket's wallet.
+- The key line no longer promises E for the item while E belongs to the megaphone / a table.
 ### 2026-11-14 / 0.9.20 real-money cosmetics + voice level
 - Steam Inventory purchases: every paid piece also 0,50-1 EUR, ten pieces money only, ten packs
   50 cents under their pieces (PACKS tab). See docs/STEAM_INVENTORY.md; Steamworks still needs

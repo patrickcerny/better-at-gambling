@@ -485,6 +485,7 @@ func _process(delta: float) -> void:
 		if not _model_first_person and held_model.visible and _arm_pose != Vector3.INF and v.hold_arm_r == Vector3.INF:
 			v.hold_right_arm(_arm_pose)  # the megaphone let go of the arm
 	_sync_hand()
+	bar.set_e_taken(held >= 0 and not seated and not _nothing_to_interact())
 	# The usual "[E / LMB] Grab Anna" line would lie while the hand holds an item.
 	if held >= 0 and _free_to_use() and _nothing_to_interact():
 		scene.hud.set_prompt("")

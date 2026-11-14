@@ -11,9 +11,7 @@ extends RefCounted
 const DEFAULT_MODEL: String = "res://assets/polypizza/coin_placeholder.glb"
 const MODELS: Dictionary = {
 	&"baseball_bat": "res://assets/polypizza/bat.glb",
-	&"dog_collar": "res://assets/polypizza/dog_leash.glb",
 	&"russian_roulette": "res://assets/polypizza/revolver.glb",
-	&"scratch_ticket": "res://assets/polypizza/scratch_ticket.glb",
 	&"beer": "res://assets/polypizza/beer_full.glb",
 }
 ## The idle motion of model-file items (hand-built ones animate in `ItemArt`):
@@ -22,8 +20,6 @@ const DEFAULT_SWAY: Array = [ItemIdle.Kind.SWING, 0.08, 1.6, Vector3.FORWARD]
 const SWAYS: Dictionary = {
 	&"baseball_bat": [ItemIdle.Kind.SWING, 0.06, 1.2, Vector3.RIGHT],
 	&"russian_roulette": [ItemIdle.Kind.SWING, 0.1, 1.4, Vector3.UP],
-	&"scratch_ticket": [ItemIdle.Kind.SWING, 0.15, 1.8, Vector3.UP],
-	&"dog_collar": [ItemIdle.Kind.SWING, 0.2, 2.0, Vector3.FORWARD],
 	&"beer": [ItemIdle.Kind.SWING, 0.1, 1.5, Vector3.FORWARD],
 	&"empty_bottle": [ItemIdle.Kind.SWING, 0.12, 1.5, Vector3.FORWARD],
 }
@@ -33,7 +29,7 @@ const SIZES: Dictionary = {
 	&"baseball_bat": 0.95,
 	&"dog_collar": 0.42,
 	&"russian_roulette": 0.5,
-	&"scratch_ticket": 0.32,
+	&"scratch_ticket": 0.36,
 	&"beer": 0.34,
 	&"empty_bottle": 0.32,
 	&"bad_luck_monkey": 0.46, &"banana_peel": 0.38, &"black_cat": 0.46, &"bodyguard": 0.4,
@@ -41,7 +37,7 @@ const SIZES: Dictionary = {
 	&"double_down": 0.38, &"energy_drink": 0.36, &"fake_cash": 0.4, &"get_out_of_jail_free": 0.46,
 	&"golden_chip": 0.3, &"grease": 0.4, &"hot_hands": 0.46, &"jackpot_magnet": 0.42,
 	&"loaded_reels": 0.42, &"lucky_clover": 0.42, &"mirror": 0.5, &"out_of_order": 0.52,
-	&"pickpocket": 0.36, &"robin_hood": 0.8, &"rock_paper_scissors": 0.46, &"scissors": 0.42,
+	&"pickpocket": 0.5, &"robin_hood": 0.8, &"rock_paper_scissors": 0.52, &"scissors": 0.42,
 	&"sunglasses": 0.38, &"vip_pass": 0.48, &"wild_card": 0.4,
 }
 ## How a model sits in the hand, in upright space (y up, -z forward): [offset, rotation degrees].
@@ -51,8 +47,6 @@ const DEFAULT_GRIP: Array = [Vector3(0.0, 0.16, -0.2), Vector3.ZERO]
 const GRIPS: Dictionary = {
 	&"baseball_bat": [Vector3(0.0, 0.38, -0.12), Vector3(-25, 0, 160)],
 	&"russian_roulette": [Vector3(0.0, 0.14, -0.12), Vector3(0, 180, 80)],
-	&"scratch_ticket": [Vector3(0.0, 0.2, -0.2), Vector3(75, 0, 0)],
-	&"dog_collar": [Vector3(0.0, 0.18, -0.22), Vector3(60, 0, 0)],
 }
 ## In the hand and in first person only, scaled up around the fist on top of `SIZES` (the grip
 ## offset scales with it, so the knob stays in the fist). Patrick: the bat looked thin and small
@@ -140,7 +134,7 @@ static func make(item: StringName, size: float = 0.0) -> Node3D:
 
 ## Hand-built items (`ItemArt`) without a line in `GRIPS`: they stand on top of the fist, a little
 ## in front of it, or hang from it by their string or strap (`HANGING`).
-const HANGING: Array[StringName] = [&"vip_pass", &"out_of_order", &"get_out_of_jail_free"]
+const HANGING: Array[StringName] = [&"vip_pass", &"out_of_order", &"get_out_of_jail_free", &"dog_collar", &"pickpocket"]
 const FIST: float = 0.08
 ## Hand-built items turned in the hand (degrees), so the side worth seeing faces the others.
 const ART_TURN: Dictionary = {&"robin_hood": Vector3(0, -90, 0)}
