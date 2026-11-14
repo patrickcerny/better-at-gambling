@@ -44,7 +44,8 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"type": "bundle",
 			"bundle": ";".join(grants),
 			"name": k.display_name,
-			"description": "The whole %s outfit (%d pieces), cheaper than one by one." % [k.display_name, k.pieces.size()],
+			# Counts what the bundle grants: free pieces in the outfit are everyone's already.
+			"description": "The whole %s outfit (%d pieces), cheaper than one by one." % [k.display_name, grants.size()],
 			"price": price(k.cents),
 			"store_tags": "pack",
 			"tradable": false,
