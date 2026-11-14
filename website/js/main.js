@@ -311,8 +311,8 @@ async function start() {
     const dealer = makeBean(PAL.cream); dealer.root.position.set(table.position.x - 1.75, 0, table.position.z - 2.25); scene.add(dealer.root);
     const bowTie = new THREE.Mesh(new THREE.TorusKnotGeometry(0.06, 0.03, 30, 6, 2, 3), new THREE.MeshStandardMaterial({ color: PAL.red }));
     bowTie.position.set(0, 0.62, 0.4); bowTie.scale.set(1.6, 0.8, 0.6); dealer.pivot.add(bowTie);
-    const p1 = makeBean(BEAN_COLORS[5]); p1.root.position.set(table.position.x + 2.2, 0, table.position.z + 2.15); p1.root.rotation.y = Math.PI * 0.85; scene.add(p1.root);
-    const p2 = makeBean(BEAN_COLORS[1]); p2.root.position.set(table.position.x + 3.7, 0, table.position.z + 1.95); p2.root.rotation.y = Math.PI * 1.2; scene.add(p2.root);
+    const p1 = makeBean(BEAN_COLORS[5]); p1.root.position.set(table.position.x + 0.7, 0, table.position.z + 2.0); p1.root.rotation.y = Math.PI * 0.85; scene.add(p1.root);
+    const p2 = makeBean(BEAN_COLORS[1]); p2.root.position.set(table.position.x + 2.0, 0, table.position.z + 1.85); p2.root.rotation.y = Math.PI * 1.2; scene.add(p2.root);
     const wheelWorld = wheel.position.clone().add(new THREE.Vector3(0, 0.1, 0));
     updaters.push((dt, t) => {
       dealer.idle(t); p1.idle(t); p2.idle(t);
