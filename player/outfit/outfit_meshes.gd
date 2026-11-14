@@ -825,20 +825,20 @@ static func _boots(k: OutfitMeshKit, id: StringName) -> void:
 		&"boots_cowboy":
 			k.sphere(Vector3(0, -0.005, -0.03), Vector3(0.11, 0.07, 0.19), TAN.darkened(0.2), 12, 6)
 			k.cylinder(Vector3(0, -0.005, -0.21), 0.0, 0.05, 0.08, TAN.darkened(0.2), 8, Basis(Vector3.RIGHT, -PI * 0.5))
-			k.box(Vector3(0, -0.05, 0.09), Vector3(0.09, 0.05, 0.06), BROWN.darkened(0.3))
+			_sole(k, Vector3(0, -0.05, 0.09), Vector3(0.09, 0.05, 0.06), BROWN.darkened(0.3))
 			k.cylinder(Vector3(0, 0.12, 0.03), 0.1, 0.095, 0.2, TAN.darkened(0.2), 10)
 			k.cylinder(Vector3(0, 0.1, 0.03), 0.101, 0.098, 0.03, CREAM.darkened(0.2), 10)
 			k.torus(Vector3(0.0, 0.0, 0.13), 0.025, 0.035, SILVER, 8, Basis(Vector3.RIGHT, PI * 0.5))
 			k.prism(OutfitMeshKit.star_poly(6, 0.03, 0.012), 0.006, Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(0, 0.0, 0.16)), SILVER)
 		&"boots_clogs":
 			k.sphere(Vector3(0, 0.0, -0.02), Vector3(0.13, 0.09, 0.19), WHITE, 12, 6)
-			k.box(Vector3(0, -0.055, -0.02), Vector3(0.2, 0.025, 0.32), CREAM.darkened(0.2))
+			_sole(k, Vector3(0, -0.055, -0.02), Vector3(0.2, 0.025, 0.32), CREAM.darkened(0.2))
 			k.torus(Vector3(0, 0.04, 0.06), 0.11, 0.125, WHITE.darkened(0.1), 12, Basis(Vector3.BACK, PI * 0.5) * Basis(Vector3.RIGHT, PI * 0.5))
 		&"boots_firefighter":
 			_shoe(k, BLACK, BLACK.lightened(0.1))
 			k.cylinder(Vector3(0, 0.1, 0.02), 0.095, 0.105, 0.17, BLACK, 10)
 			k.cylinder(Vector3(0, 0.08, 0.02), 0.107, 0.107, 0.03, YELLOW, 10)
-			k.box(Vector3(0, -0.06, -0.02), Vector3(0.2, 0.02, 0.32), YELLOW.darkened(0.2))
+			_sole(k, Vector3(0, -0.06, -0.02), Vector3(0.2, 0.02, 0.32), YELLOW.darkened(0.2))
 		&"boots_work":
 			_shoe(k, TAN, BROWN.darkened(0.3))
 			k.cylinder(Vector3(0, 0.08, 0.02), 0.09, 0.1, 0.1, TAN, 10)
@@ -877,7 +877,7 @@ static func _boots(k: OutfitMeshKit, id: StringName) -> void:
 			k.sphere(Vector3(0, -0.05, -0.2), Vector3(0.03, 0.03, 0.03), RED, 6, 3)
 		&"boots_clown":
 			k.sphere(Vector3(0, 0.0, -0.07), Vector3(0.16, 0.095, 0.27), RED, 14, 6)
-			k.box(Vector3(0, -0.06, -0.07), Vector3(0.24, 0.02, 0.48), CREAM)
+			_sole(k, Vector3(0, -0.06, -0.07), Vector3(0.24, 0.02, 0.48), CREAM)
 			for side: float in [-1.0, 1.0]:
 				k.sphere(Vector3(side * 0.045, 0.09, -0.03), Vector3(0.05, 0.03, 0.03), YELLOW, 8, 4)
 		&"boots_knight":
@@ -895,6 +895,12 @@ static func _boots(k: OutfitMeshKit, id: StringName) -> void:
 
 
 ## A plain shoe: the upper and a darker sole.
+## A rounded sole (an oval slab): square soles stuck out at the corners under the round shoes.
+static func _sole(k: OutfitMeshKit, center: Vector3, size: Vector3, color: Color) -> void:
+	var r: float = size.x * 0.5
+	k.cylinder(center, r, r * 0.94, size.y, color, 18, Basis.IDENTITY, size.z / size.x)
+
+
 static func _shoe(k: OutfitMeshKit, upper: Color, sole: Color) -> void:
 	k.sphere(Vector3(0, 0.0, -0.01), Vector3(0.12, 0.085, 0.175), upper, 12, 6)
-	k.box(Vector3(0, -0.058, -0.01), Vector3(0.21, 0.022, 0.31), sole)
+	_sole(k, Vector3(0, -0.058, -0.01), Vector3(0.21, 0.022, 0.31), sole)
