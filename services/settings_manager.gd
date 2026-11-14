@@ -15,10 +15,11 @@ const DEFAULTS: Dictionary = {
 	"audio": {"master": 0.8, "music": 0.6, "sfx": 0.8, "ui": 0.7, "voice": 0.9},
 	## Voice chat: "push_to_talk", "open_mic" or "off" (see `VoiceChannel.MODE_KEYS`), the
 	## microphone: a name from `AudioServer.get_input_device_list()` ("Default": the system's), and
-	## `mic_gain`: how loud your own voice goes out (0..`MAX_MIC_GAIN`, 1 = as the mic hears it).
+	## `mic_gain`: how loud your own voice goes out (0..`MAX_MIC_GAIN`, 1 = as the mic hears it),
+	## `auto_level`: lift a quiet microphone to a normal speaking level first (`VoiceAgc`).
 	## Open mic by default (0.9.12; §2.22 "proximity voice is on by default"): with push-to-talk
 	## as the default almost nobody held T, and a whole casino round carried 15 frames of voice.
-	"voice": {"mode": "open_mic", "input_device": "Default", "mic_gain": 1.0},
+	"voice": {"mode": "open_mic", "input_device": "Default", "mic_gain": 1.0, "auto_level": true},
 	## `stick_sensitivity` scales the gamepad's right-stick look.
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false, "stick_sensitivity": 1.0},
 	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
@@ -26,8 +27,9 @@ const DEFAULTS: Dictionary = {
 ## Frame limit choices (Settings > Video): 0 is off, `MATCH_MONITOR` follows the screen's refresh rate.
 const MATCH_MONITOR: int = -1
 const FPS_CAPS: Array[int] = [0, 30, 60, 90, 120, 144, 165, 240, MATCH_MONITOR]
-## Mic volume goes up to 200 % (an amplifier for a quiet microphone).
-const MAX_MIC_GAIN: float = 2.0
+## Mic volume goes up to 400 % (+12 dB, an amplifier for a quiet microphone; 0.9.17: 200 % was
+## not nearly enough for a headset at Windows' default level).
+const MAX_MIC_GAIN: float = 4.0
 ## Keys of the `video` section older versions saved that mean nothing any more (`drop_removed_keys`).
 const REMOVED_VIDEO_KEYS: Array[String] = ["pixel_look", "pixel_scale"]
 ## Keys of the `profile` section older versions saved that mean nothing any more.

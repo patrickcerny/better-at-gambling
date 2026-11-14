@@ -56,6 +56,7 @@ var voice_mode: OptionButton
 var input_device: OptionButton
 var input_devices: PackedStringArray = PackedStringArray()
 var mic_gain_slider: HSlider
+var auto_level_check: CheckButton
 var mic_meter: ProgressBar
 ## The microphone the meter reads when no match is running (main menu): started while the AUDIO
 ## tab shows, stopped when it closes. In a match the meter reads the voice channel's capture.
@@ -189,6 +190,9 @@ func _build_audio(page: VBoxContainer) -> void:
 	device_row.add_child(input_device)
 	mic_gain_slider = _slider(page, "Mic volume (your voice)", "voice", "mic_gain", 0.0, Settings.MAX_MIC_GAIN, 0.05, true)
 	mic_gain_slider.name = "MicGain"
+	auto_level_check = _check(page, "Auto mic level", "voice", "auto_level")
+	auto_level_check.name = "AutoLevel"
+	auto_level_check.tooltip_text = "Brings a quiet microphone up to a normal speaking level."
 	var check_row := _row(page, "Hear yourself")
 	mic_check_button = Button.new()
 	mic_check_button.name = "TestMic"

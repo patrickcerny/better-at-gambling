@@ -46,6 +46,10 @@ var codec: VoiceCodec = MulawCodec.new()
 ## every frame is scaled by this before the level, the open-mic gate and the encoder see it,
 ## clipped to full scale. Follows Settings > Audio > Mic volume (`Settings.mic_gain`).
 var gain: float = 1.0
+## Automatic mic level (`VoiceAgc`): quiet microphones are lifted to a normal speaking level before
+## the Mic volume and the encoder. Follows Settings > Audio > Auto mic level (`voice/auto_level`).
+var auto_level: bool = true
+var agc: VoiceAgc = VoiceAgc.new()
 ## Level of the last frame (RMS, linear).
 var level: float = 0.0
 ## True while the last frame was sent.
@@ -116,6 +120,7 @@ func start_microphone() -> bool:
 	measured_rate = 0.0
 	rate_override = 0.0
 	_pending.clear()
+	agc.reset()
 	Log.info(&"voice", "microphone opened: device \"%s\" at %d Hz (driver %s)" % [source.device(), roundi(source.rate()), AudioServer.get_driver_name()])
 	return true
 
@@ -136,6 +141,7 @@ func _ready() -> void:
 
 func _sync_gain() -> void:
 	gain = Settings.mic_gain()
+	auto_level = bool(Settings.get_value("voice", "auto_level"))
 
 
 func _exit_tree() -> void:
@@ -185,6 +191,7 @@ func _process(delta: float) -> void:
 ## under the open-mic gate.
 func _note_held_back(frame: PackedFloat32Array) -> void:
 	var db: float = VoiceCodec.rms_db(frame)
+	var loud: float = VoiceCodec.rms(frame)
 	match mode:
 		Mode.PUSH_TO_TALK:
 			if db < OPEN_MIC_THRESHOLD_DB:
@@ -195,7 +202,7 @@ func _note_held_back(frame: PackedFloat32Array) -> void:
 		_:
 			return
 	held_back_seconds += VoiceCodec.FRAME_SECONDS
-	_held_back_peak = maxf(_held_back_peak, level)
+	_held_back_peak = maxf(_held_back_peak, loud)
 	if held_back_seconds < HELD_BACK_LOG_SECONDS:
 		return
 	held_back_logged = true
@@ -302,23 +309,31 @@ func feed_mono(samples: PackedFloat32Array, rate: float) -> void:
 
 
 func _frame(raw: PackedFloat32Array) -> void:
-	var frame: PackedFloat32Array = apply_gain(raw, gain)
-	level = VoiceCodec.rms(frame)
-	frame_age = 0.0
-	frame_processed.emit(frame)
+	# The gate (and the held-back log) judge the microphone as it is, with the Mic volume: room hiss
+	# must not open it just because the automatic level is turned up for a quiet voice.
+	var heard: PackedFloat32Array = apply_gain(raw, gain)
+	var heard_db: float = VoiceCodec.rms_db(heard)
 	var want: bool = false
 	match mode:
 		Mode.PUSH_TO_TALK:
 			want = ptt_pressed
 		Mode.OPEN_MIC:
-			if VoiceCodec.rms_db(frame) >= OPEN_MIC_THRESHOLD_DB:
+			if heard_db >= OPEN_MIC_THRESHOLD_DB:
 				_hang = HANGOVER
 			want = _hang > 0.0
 			_hang -= VoiceCodec.FRAME_SECONDS
+	var frame: PackedFloat32Array = heard
+	if auto_level:
+		# What goes out: the voice lifted to a normal level, then the Mic volume on top.
+		var speech: bool = heard_db >= OPEN_MIC_THRESHOLD_DB
+		frame = VoiceAgc.limit(apply_gain(agc.process(raw, speech), gain))
+	level = VoiceCodec.rms(frame)
+	frame_age = 0.0
+	frame_processed.emit(frame)
 	if want:
 		mouth.feed(frame)
 	elif frames_sent == 0 and not held_back_logged:
-		_note_held_back(frame)
+		_note_held_back(heard)
 	mouth.update(VoiceCodec.FRAME_SECONDS)
 	if not want and not transmitting:
 		return
@@ -330,5 +345,5 @@ func _frame(raw: PackedFloat32Array) -> void:
 	bytes_sent += packet.size()
 	if not _first_frame_logged:
 		_first_frame_logged = true
-		Log.info(&"voice", "first voice frame captured (%s, level %s)" % [Mode.keys()[mode].to_lower(), db_text(level)])
+		Log.info(&"voice", "first voice frame captured (%s, level %s, auto level %s)" % [Mode.keys()[mode].to_lower(), db_text(level), ("+%.0f dB" % agc.gain_db) if auto_level else "off"])
 	frame_captured.emit(packet)

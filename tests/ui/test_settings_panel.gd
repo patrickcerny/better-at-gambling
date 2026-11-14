@@ -306,7 +306,8 @@ func test_test_microphone_records_and_plays_back_through_voice_chat() -> void:
 		last = now
 	await wait_process_frames(1)
 	assert_eq(panel.mic_check_result.text, "Microphone works")
-	assert_between(linear_to_db(panel.mic_check.peak), -12.0, -10.0, "a 0.3 tone peaks at -10.5 dBFS")
+	# The auto level lifts a 0.3 tone (-13.5 dBFS RMS) by 1.5 dB to -12: peaks at -9 dBFS.
+	assert_between(linear_to_db(panel.mic_check.peak), -10.5, -8.0, "a 0.3 tone, auto-levelled, peaks near -9 dBFS")
 	var played: int = panel.mic_check.playback.frames_played if panel.mic_check.playback != null else 0
 	assert_between(played, 70, 76, "3 s of 40 ms frames came back out of the playback")
 	assert_eq(played, panel.mic_check.frames.size(), "every recorded frame was played")
@@ -316,7 +317,7 @@ func test_test_microphone_records_and_plays_back_through_voice_chat() -> void:
 
 
 ## Patrick: "change your voice loudness (so like an amplifier if the mic is too loud and stuff)".
-func test_mic_volume_slider_goes_to_200_percent_and_drives_the_capture() -> void:
+func test_mic_volume_slider_goes_to_400_percent_and_drives_the_capture() -> void:
 	var old_gain: float = float(Settings.get_value("voice", "mic_gain"))
 	panel.open(false)
 	panel.select_tab(SettingsPanel.TABS.find("AUDIO"))
@@ -324,7 +325,7 @@ func test_mic_volume_slider_goes_to_200_percent_and_drives_the_capture() -> void
 	var s: HSlider = panel.mic_gain_slider
 	assert_true(s.is_visible_in_tree(), "on the AUDIO tab")
 	assert_eq(s.min_value, 0.0)
-	assert_eq(s.max_value, 2.0, "up to 200 %")
+	assert_eq(s.max_value, 4.0, "up to 400 %")
 	var row: Node = s.get_parent()
 	assert_eq((row.get_child(0) as Label).text, "Mic volume (your voice)")
 	assert_eq((row.get_child(2) as Label).text, "%d%%" % roundi(s.value * 100.0))

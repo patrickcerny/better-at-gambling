@@ -15,6 +15,7 @@ func before_each() -> void:
 	cap = VoiceCapture.new()
 	add_child_autofree(cap)
 	cap.gain = 1.0  # whatever the saved Mic volume is
+	cap.auto_level = false  # these tests check the plain path; the auto level has its own below
 	packets.clear()
 	cap.frame_captured.connect(func(p: PackedByteArray) -> void: packets.append(p))
 
@@ -137,7 +138,7 @@ func test_mic_gain_scales_samples_and_clamps_at_full_scale() -> void:
 	assert_almost_eq(down[4], -0.35, 0.0001)
 	assert_eq(VoiceCodec.rms(VoiceCapture.apply_gain(f, 0.0)), 0.0, "0 % mutes")
 	assert_eq(VoiceCapture.apply_gain(f, 1.0), f, "100 % leaves the samples alone")
-	assert_almost_eq(VoiceCapture.apply_gain(f, 10.0)[1], 0.2, 0.0001, "gain itself is capped at 200 %")
+	assert_almost_eq(VoiceCapture.apply_gain(f, 10.0)[1], 0.4, 0.0001, "gain itself is capped at 400 %")
 
 
 func test_mic_gain_applies_before_the_gate_and_the_encoder() -> void:
@@ -160,6 +161,46 @@ func test_mic_gain_follows_the_setting() -> void:
 	Settings.change("voice", "mic_gain", 1.75)
 	assert_almost_eq(cap.gain, 1.75, 0.0001)
 	Settings.change("voice", "mic_gain", 5.0)
-	assert_almost_eq(cap.gain, Settings.MAX_MIC_GAIN, 0.0001, "kept within 200 %")
+	assert_almost_eq(cap.gain, Settings.MAX_MIC_GAIN, 0.0001, "kept within 400 %")
 	Settings.change("voice", "mic_gain", old)
 	assert_almost_eq(cap.gain, Settings.mic_gain(), 0.0001)
+
+
+## Patrick, 0.9.17: "The microphone is SUPER leise, man hört sich INSANE leise". A headset at
+## Windows' default level (-36 dBFS RMS) comes out at a normal speaking level.
+func test_auto_level_lifts_a_quiet_microphone() -> void:
+	cap.auto_level = true
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	var quiet: PackedFloat32Array = VoiceWav.tone(300.0, 2.0, 48000, 0.0224)  # -36 dBFS RMS
+	_feed(quiet, 48000)
+	assert_gt(packets.size(), 40, "quiet speech still opens the -45 dB gate")
+	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[packets.size() - 2])["payload"])
+	assert_between(VoiceCodec.rms_db(decoded), VoiceAgc.TARGET_DB - 1.5, VoiceAgc.TARGET_DB + 1.0, "sent at the voice level, not 24 dB under it")
+	assert_almost_eq(cap.agc.gain_db, VoiceAgc.TARGET_DB + 36.0, 1.0, "+24 dB")
+
+
+func test_auto_level_never_opens_the_gate_for_room_hiss() -> void:
+	cap.auto_level = true
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	_feed(VoiceWav.tone(300.0, 1.0, 48000, 0.0224), 48000)  # speak: the level goes up
+	var spoken: int = packets.size()
+	_feed(VoiceWav.tone(300.0, 2.0, 48000, 0.0014), 48000)  # -60 dBFS hiss
+	assert_lte(packets.size() - spoken, int(VoiceCapture.HANGOVER / VoiceCodec.FRAME_SECONDS) + 2, "only the hangover after the word")
+
+
+func test_auto_level_leaves_a_loud_microphone_alone() -> void:
+	cap.auto_level = true
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	_feed(VoiceWav.tone(300.0, 1.0, 48000, 0.5), 48000)
+	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
+	assert_almost_eq(VoiceCodec.rms(decoded), 0.5 / sqrt(2.0), 0.03, "never turned down")
+	assert_eq(cap.agc.gain_db, 0.0)
+
+
+func test_auto_level_follows_the_setting() -> void:
+	var old: bool = bool(Settings.get_value("voice", "auto_level"))
+	Settings.change("voice", "auto_level", false)
+	assert_false(cap.auto_level)
+	Settings.change("voice", "auto_level", true)
+	assert_true(cap.auto_level, "on by default")
+	Settings.change("voice", "auto_level", old)
