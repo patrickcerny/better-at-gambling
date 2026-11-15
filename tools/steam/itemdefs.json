@@ -16,7 +16,7 @@
       "bundle": "3100x100",
       "name": "100 Gold Coins",
       "description": "100 Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling.",
-      "price": "1;EUR99,USD99",
+      "price_category": "1;VLV100",
       "store_tags": "gold",
       "tradable": false,
       "marketable": false
@@ -27,7 +27,7 @@
       "bundle": "3100x220",
       "name": "220 Gold Coins",
       "description": "220 Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling.",
-      "price": "1;EUR199,USD199",
+      "price_category": "1;VLV200",
       "store_tags": "gold",
       "tradable": false,
       "marketable": false
@@ -38,7 +38,7 @@
       "bundle": "3100x600",
       "name": "600 Gold Coins",
       "description": "600 Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling.",
-      "price": "1;EUR499,USD499",
+      "price_category": "1;VLV500",
       "store_tags": "gold",
       "tradable": false,
       "marketable": false

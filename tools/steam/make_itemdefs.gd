@@ -43,7 +43,7 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"bundle": "%dx%d" % [CoinPack.GOLD_ITEM, c.gold],
 			"name": "%d Gold Coins" % c.gold,
 			"description": "%d Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling." % c.gold,
-			"price": price(c.cents),
+			"price_category": price_category(c.cents),
 			"store_tags": "gold",
 			"tradable": false,
 			"marketable": false,
@@ -92,6 +92,20 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"marketable": false,
 		})
 	return {"appid": APP_ID, "items": items}
+
+
+## Valve's price tiers (US cents): Steam sets a fitting price in every currency (Patrick
+## 2026-11-15: regional prices instead of fixed EUR/USD).
+const VALVE_TIERS: Array[int] = [25, 50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 7500, 10000]
+
+
+## The Valve price tier for a reference price in euro cents ("1;VLV100" for 0,99 €): the nearest
+## tier at or above it, with 0,99 counting as 1,00.
+static func price_category(cents: int) -> String:
+	for t: int in VALVE_TIERS:
+		if t >= cents:
+			return "1;VLV%d" % t
+	return "1;VLV%d" % VALVE_TIERS[-1]
 
 
 ## A Steam price string: euro and dollar, same number ("1;EUR75,USD75").

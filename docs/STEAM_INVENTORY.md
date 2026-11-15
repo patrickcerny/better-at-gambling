@@ -14,7 +14,8 @@ never uploaded to Steam.
   every non-free piece of a set has a `steam_item` too (hidden, only granted by the set).
 - Gold Coin: item definition 3100 (`CoinPack.GOLD_ITEM`). Gold packs (`CoinPack`, 3000+: 100 / 220 /
   600 Gold for 0,99 / 1,99 / 4,99 €) are bundles granting that many Gold Coins; they are the only
-  item definitions with a price. The + next to the Gold in the shop opens the GOLD page; BUY WITH
+  item definitions with a price: Valve's price tiers (`price_category` "1;VLV100" / VLV200 /
+  VLV500), so Steam sets a fitting price in every currency (Patrick 2026-11-15). The + next to the Gold in the shop opens the GOLD page; BUY WITH
   STEAM calls `startPurchase` (Steam overlay).
 - Premium pieces and sets carry an `exchange` recipe ("3100x75"). BUY FOR N GOLD calls
   `SteamSvc.buy_with_gold`, which picks Gold Coin stacks (`gold_inputs`) and calls `exchangeItems`;

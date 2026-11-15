@@ -120,14 +120,17 @@ func test_the_itemdefs_file_for_steamworks_matches_the_shop() -> void:
 	assert_true(JSON.parse_string(text) is Dictionary, "itemdefs.json parses")
 	assert_eq(text, JSON.stringify(want, "  ", false) + "\n", "run tools/steam/make_itemdefs.gd after changing the shop")
 	var items: Array = want["items"]
-	var priced: Array = items.filter(func(i: Dictionary) -> bool: return i.has("price"))
+	assert_true(items.filter(func(i: Dictionary) -> bool: return i.has("price")).is_empty(), "no fixed prices: Valve's regional tiers")
+	var priced: Array = items.filter(func(i: Dictionary) -> bool: return i.has("price_category"))
 	assert_eq(priced.size(), CosmeticShop.default().coin_packs.size(), "only gold packs cost real money")
 	for i: Dictionary in priced:
 		assert_string_contains(str(i["bundle"]), "%dx" % CoinPack.GOLD_ITEM)
 	var crown: CosmeticDef = CosmeticShop.default().find(&"hat_crown")
 	var row: Dictionary = items.filter(func(i: Dictionary) -> bool: return int(i["itemdefid"]) == crown.steam_item)[0]
 	assert_eq(row["exchange"], "%dx%d" % [CoinPack.GOLD_ITEM, crown.gold])
-	assert_eq(MakeItemdefs.price(75), "1;EUR75,USD75")
+	assert_eq(MakeItemdefs.price_category(99), "1;VLV100", "0,99 € is the 1 dollar tier")
+	assert_eq(MakeItemdefs.price_category(199), "1;VLV200")
+	assert_eq(MakeItemdefs.price_category(499), "1;VLV500")
 
 
 func test_the_shop_sells_premium_and_sets_for_gold() -> void:
