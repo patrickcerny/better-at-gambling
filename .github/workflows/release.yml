@@ -27,6 +27,10 @@ on:
         description: "Also upload this build to Steam (Patrick's call only)"
         type: boolean
         default: false
+      skip_tests:
+        description: "Skip the unit tests + boot smoke (Patrick's call only; the exported build's own smoke run still happens)"
+        type: boolean
+        default: false
 
 concurrency:
   group: release
@@ -61,6 +65,7 @@ jobs:
         run: tools/godot/godot --headless --path . --import > import.log 2>&1 || (tail -50 import.log; exit 1)
 
       - name: Unit tests + boot smoke
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_tests) }}
         run: scripts/test.sh unit && scripts/test.sh smoke
 
       - name: Export
