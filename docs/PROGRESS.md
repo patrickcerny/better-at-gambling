@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-15 / 0.9.26 shop fixes, level pass, try-on look, inventory
+### 2026-11-15 / 0.9.28 shop fixes, level pass, try-on look, inventory
 - Shop: tiles fill the width, + inside the coin pill, unaffordable/level-locked items greyed out with
   "N MORE COINS NEEDED". Try-ons stack across tabs (`CosmeticsPanel.trying`), clicking a picked tile
   takes it off, BUY ALL / WEAR ALL / RESET for the tried-on look.
@@ -109,6 +109,13 @@
   red Coins, premium pieces and sets cost Gold (Steam items exchanged through `exchangeItems`); gold
   packs are the only real-money items. docs/STEAM_INVENTORY.md; itemdefs.json regenerated (not
   uploaded).
+### 2026-11-15 / 0.9.26 public / private lobbies, Browse Lobbies
+- Patrick: "remove that start a steam play thats a useless text. Also there should be open lobby,
+  private public and browse lobbies". PLAY ONLINE: Public / Private toggle above CREATE LOBBY
+  (`online/public_lobby`, default private = Steam friends-only lobby; public = Steam public lobby
+  with lobby data `public=1`), BROWSE LOBBIES lists public lobbies of the same game + build with a
+  free seat (`SteamSvc.request_public_lobbies`, `lobby_match_list`, worldwide, refresh 8 s). Without
+  Steam the online buttons are only disabled; the "Start Steam to play online" status is gone.
 ### 2026-11-15 / 0.9.25 "Beat the Dev" achievement
 - New Steam achievement `ACH_BEAT_THE_DEV` (20th): finish an online match ranked ahead of the
   developer (`DevMode.STEAM_IDS`) or of anyone who already holds it, so it spreads. Standings rows

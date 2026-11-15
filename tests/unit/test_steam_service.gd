@@ -9,7 +9,9 @@ func test_no_steam_client_means_unavailable_and_safe_calls() -> void:
 	assert_eq(SteamSvc.get_steam_id(), 0)
 	assert_ne(SteamSvc.get_persona_name(), "", "a stand-in name")
 	assert_false(SteamSvc.create_lobby("x", 8))
-	assert_eq(SteamSvc.last_error, "Start Steam to host.")
+	assert_eq(SteamSvc.last_error, "Steam is not running.")
+	assert_false(SteamSvc.create_lobby("x", 8, true))
+	assert_false(SteamSvc.request_public_lobbies())
 	assert_false(SteamSvc.join_lobby(123))
 	assert_false(SteamSvc.invite_friends())
 	assert_eq(SteamSvc.friend_lobbies().size(), 0)
@@ -21,7 +23,7 @@ func test_no_steam_client_means_unavailable_and_safe_calls() -> void:
 func test_host_mode_refuses_politely_without_steam() -> void:
 	var port: int = await Net.steam_party.start_hosting("Patrick")
 	assert_eq(port, 0)
-	assert_eq(Net.steam_party.last_error, "Start Steam to host.")
+	assert_eq(Net.steam_party.last_error, "Steam is not running.")
 	assert_false(Net.steam_party.hosting)
 	assert_eq(Net.steam_party.server_pid, 0)
 

@@ -11,9 +11,12 @@ extends Control
 ## Joining shows the joining screen (`Loading`, with the logo) until the match has loaded;
 ## connection errors from the last online attempt are shown here when we return. There is no
 ## join-by-address (Patrick: "Remove join by ip and port") and no lobby server of ours any more
-## (Patrick 2026-11-14: "nur noch über Steam"): CREATE LOBBY runs the party on this PC and friends
-## join through Steam invites or the "Join a friend" list (`SteamParty`); without Steam running the
-## button is disabled ("Start Steam to play online"). `--connect` stays a dev/test command-line flag.
+## (Patrick 2026-11-14: "nur noch über Steam"): CREATE LOBBY runs the party on this PC, PUBLIC or
+## PRIVATE (Patrick 2026-11-15: "open lobby, private public and browse lobbies"). Private = friends
+## and invited players only (Steam invites, the "Join a friend" list); public lobbies are also
+## listed under BROWSE LOBBIES for everyone on the same version (`SteamParty`). Without Steam
+## running the online buttons are just disabled, with no text about it (Patrick: "useless text").
+## `--connect` stays a dev/test command-line flag.
 
 ## PRACTICE starts a solo casino match: `practice_requested` fires first, then the match scene
 ## loads unless `load_match` is off (tests stop there instead of leaving the menu).
@@ -31,6 +34,16 @@ var _online_box: VBoxContainer
 var _name_edit: LineEdit
 ## CREATE LOBBY (the party runs on this PC, friends join through Steam), and friends' lobbies.
 var host_button: Button
+## PUBLIC / PRIVATE for the next CREATE LOBBY (remembered in `online/public_lobby`).
+var public_toggle: Button
+var private_toggle: Button
+## BROWSE LOBBIES and the public lobby list it opens.
+var browse_button: Button
+var _browse_box: VBoxContainer
+var _browse_list: VBoxContainer
+var _browse_status: Label
+var _browse_refresh: Button
+var _online_back: Button
 var friends_box: VBoxContainer
 var _friends_list: VBoxContainer
 var _status: Label
@@ -220,9 +233,29 @@ func _build_online() -> void:
 	_online_box.add_child(_name_edit)
 	_name_edit.text_submitted.connect(func(_t: String) -> void: _save_name())
 	_name_edit.focus_exited.connect(_save_name)
+	var kind_row := HBoxContainer.new()
+	kind_row.name = "LobbyKind"
+	kind_row.add_theme_constant_override(&"separation", 8)
+	_online_box.add_child(kind_row)
+	var group := ButtonGroup.new()
+	public_toggle = _button("Public", func() -> void: _set_public(true))
+	public_toggle.name = "Public"
+	public_toggle.tooltip_text = "Anyone can find and join it under Browse Lobbies"
+	private_toggle = _button("Private", func() -> void: _set_public(false))
+	private_toggle.name = "Private"
+	private_toggle.tooltip_text = "Only your friends and players you invite can join"
+	for t: Button in [public_toggle, private_toggle]:
+		t.toggle_mode = true
+		t.button_group = group
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		kind_row.add_child(t)
+	(public_toggle if lobby_public() else private_toggle).set_pressed_no_signal(true)
 	host_button = _button(HOST_LABEL, _host_steam)
 	host_button.name = "HostParty"
 	_online_box.add_child(host_button)
+	browse_button = _button("Browse Lobbies", _show_browse)
+	browse_button.name = "BrowseLobbies"
+	_online_box.add_child(browse_button)
 	friends_box = VBoxContainer.new()
 	friends_box.name = "JoinFriend"
 	friends_box.add_theme_constant_override(&"separation", 6)
@@ -238,7 +271,32 @@ func _build_online() -> void:
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.custom_minimum_size = Vector2(540, 0)
 	_online_box.add_child(_status)
-	_online_box.add_child(_button("Back", _show_main))
+	_online_back = _button("Back", _show_main)
+	_online_box.add_child(_online_back)
+	_build_browse()
+
+
+## BROWSE LOBBIES: the public lobbies of this version, with their player count and JOIN.
+func _build_browse() -> void:
+	_browse_box = _sub_box("Browse", "PUBLIC LOBBIES", 620.0)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 360)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_browse_box.add_child(scroll)
+	_browse_list = VBoxContainer.new()
+	_browse_list.name = "LobbyList"
+	_browse_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_browse_list.add_theme_constant_override(&"separation", 6)
+	scroll.add_child(_browse_list)
+	_browse_status = Label.new()
+	_browse_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_browse_status.custom_minimum_size = Vector2(620, 0)
+	_browse_box.add_child(_browse_status)
+	_browse_refresh = _button("Refresh", _refresh_browse)
+	_browse_refresh.name = "Refresh"
+	_browse_box.add_child(_browse_refresh)
+	_browse_box.add_child(_button("Back", _show_online))
+	SteamSvc.public_lobbies_received.connect(_on_public_lobbies)
 
 
 ## Developer mode (Patrick only): DEV MODE under TUTORIAL and its panel.
@@ -299,6 +357,7 @@ func _hide_boxes() -> void:
 	_main_box.visible = false
 	_set_logo_visible(false)
 	_online_box.visible = false
+	_browse_box.visible = false
 	how_to_play.visible = false
 	if dev_panel != null:
 		dev_panel.visible = false
@@ -307,9 +366,30 @@ func _hide_boxes() -> void:
 func _show_online() -> void:
 	_hide_boxes()
 	_online_box.visible = true
-	_status.text = ""
+	if not _busy:
+		_status.text = ""
 	_refresh_steam_entries()
-	host_button.grab_focus()
+	(host_button if not host_button.disabled else _online_back).grab_focus()
+
+
+func _show_browse() -> void:
+	if _busy or not SteamSvc.is_available():
+		return
+	_hide_boxes()
+	_browse_box.visible = true
+	_browse_status.text = ""
+	_refresh_browse()
+	_browse_refresh.grab_focus()
+
+
+## Whether CREATE LOBBY makes a public lobby (default: private).
+static func lobby_public() -> bool:
+	return bool(Settings.get_value("online", "public_lobby", false))
+
+
+func _set_public(on: bool) -> void:
+	Settings.set_value("online", "public_lobby", on)
+	Settings.save()
 
 
 ## Whether the player has been through the tutorial once (`tutorial/seen` in user://settings.cfg).
@@ -361,7 +441,11 @@ func _show_main() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed(&"ui_cancel"):
 		return
-	if _online_box.visible:
+	if _browse_box.visible:
+		get_viewport().set_input_as_handled()
+		if not _busy:
+			_show_online()
+	elif _online_box.visible:
 		get_viewport().set_input_as_handled()
 		_show_main()
 
@@ -384,9 +468,13 @@ func _display_name() -> String:
 	return SceneRouter.profile_name()
 
 
+## The status line of the open box (PLAY ONLINE or PUBLIC LOBBIES).
 func _set_status(text: String, error: bool = false) -> void:
-	_status.text = text
-	_status.add_theme_color_override(&"font_color", Palette.LOSS_RED if error else Palette.CREAM)
+	for l: Label in [_status, _browse_status]:
+		if l == null:
+			continue
+		l.text = text
+		l.add_theme_color_override(&"font_color", Palette.LOSS_RED if error else Palette.CREAM)
 
 
 # --- Connecting --------------------------------------------------------------------------------
@@ -424,18 +512,20 @@ func _on_failed(reason: String) -> void:
 
 const HOST_LABEL: String = "Create Lobby"
 const FRIENDS_REFRESH: float = 3.0
+## BROWSE LOBBIES asks Steam again this often while it is open.
+const BROWSE_REFRESH: float = 8.0
 var _friends_timer: float = 0.0
+var _browse_timer: float = 0.0
 
 
 ## Host button state and the friends' parties (Steam only).
 func _refresh_steam_entries() -> void:
 	var on: bool = SteamSvc.is_available()
-	host_button.disabled = not on
-	host_button.tooltip_text = "Invite your friends from the lobby" if on else "Start Steam to play online"
+	for b: Button in [host_button, browse_button, public_toggle, private_toggle]:
+		b.disabled = not on
+	host_button.tooltip_text = "Invite your friends from the lobby" if on else ""
 	friends_box.visible = on
 	if not on:
-		if not _busy and _status != null and _status.text == "":
-			_set_status("Start Steam to play online.")
 		return
 	for c: Node in _friends_list.get_children():
 		c.queue_free()
@@ -452,6 +542,10 @@ func _refresh_steam_entries() -> void:
 
 
 func _process(delta: float) -> void:
+	if _browse_box.visible and SteamSvc.is_available() and not _busy:
+		_browse_timer += delta
+		if _browse_timer >= BROWSE_REFRESH:
+			_refresh_browse()
 	if not _online_box.visible or not SteamSvc.is_available():
 		return
 	_friends_timer += delta
@@ -468,7 +562,7 @@ func _host_steam() -> void:
 	_set_status("Starting your lobby…")
 	_status.remove_theme_color_override(&"font_color")
 	var name_: String = _display_name()
-	var port: int = await Net.steam_party.start_hosting(name_)
+	var port: int = await Net.steam_party.start_hosting(name_, public_toggle.button_pressed)
 	if port == 0:
 		_busy = false
 		_set_status(Net.steam_party.last_error, true)
@@ -484,13 +578,14 @@ func _on_steam_join_requested(lobby_id: int) -> void:
 	_join_steam_lobby(lobby_id)
 
 
-## Joins a friend's party: their Steam lobby, then their game over Steam.
+## Joins a party (a friend's, or a public one from BROWSE LOBBIES): its Steam lobby, then the
+## host's game over Steam.
 func _join_steam_lobby(lobby_id: int) -> void:
 	SteamSvc.pending_lobby = 0
 	if _busy:
 		return
 	_busy = true
-	_set_status("Joining your friend's lobby…")
+	_set_status("Joining the lobby…")
 	_status.remove_theme_color_override(&"font_color")
 	var host_id: int = await Net.steam_party.enter_lobby(lobby_id)
 	if host_id == 0:
@@ -499,6 +594,49 @@ func _join_steam_lobby(lobby_id: int) -> void:
 		return
 	var name_: String = _display_name()
 	_connect(func() -> Error: return Net.steam_party.join_host(host_id, name_, SceneRouter.profile_cosmetics()), "JOINING")
+
+
+## Asks Steam for the public lobbies again (the list redraws when they arrive).
+func _refresh_browse() -> void:
+	_browse_timer = 0.0
+	if not SteamSvc.request_public_lobbies() and _browse_list.get_child_count() == 0:
+		_fill_browse([])
+
+
+func _on_public_lobbies(lobbies: Array[Dictionary]) -> void:
+	if _browse_box.visible:
+		_fill_browse(lobbies)
+
+
+## One row per public lobby: its name, players and JOIN; full ones are left out by Steam.
+func _fill_browse(lobbies: Array[Dictionary]) -> void:
+	var had_focus: bool = _browse_list.get_viewport() != null and _browse_list.is_ancestor_of(_browse_list.get_viewport().gui_get_focus_owner())
+	for c: Node in _browse_list.get_children():
+		_browse_list.remove_child(c)
+		c.queue_free()
+	if lobbies.is_empty():
+		var none := Label.new()
+		none.text = "No public lobbies right now. Create one!"
+		none.theme_type_variation = &"MutedLabel"
+		_browse_list.add_child(none)
+	for l: Dictionary in lobbies:
+		var lid: int = int(l["lobby"])
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override(&"separation", 12)
+		var title := Label.new()
+		title.text = str(l["name"])
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.clip_text = true
+		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		row.add_child(title)
+		var count := Label.new()
+		count.text = "%d/%d" % [int(l["members"]), int(l["max"])]
+		row.add_child(count)
+		var join := _button("Join", func() -> void: _join_steam_lobby(lid), 120.0)
+		row.add_child(join)
+		_browse_list.add_child(row)
+	if had_focus:
+		_browse_refresh.grab_focus()
 
 
 ## QUIT asks first (Patrick: "Are you sure Dialog after quit game or leave game").

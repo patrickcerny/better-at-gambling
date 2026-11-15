@@ -2,10 +2,11 @@ extends GutTest
 ## Main menu (Patrick's playtest notes): the logo and entries are centred; PLAY ONLINE, PRACTICE,
 ## TUTORIAL, QUIT; the settings sit behind a small gear in the bottom-right corner; no "Rejoin
 ## last party" and no LAN/IP hosting; lobbies only through Steam (Patrick 2026-11-14: "nur noch
-## über Steam", and the button just says CREATE LOBBY), disabled with "Start Steam to play online"
-## when Steam isn't running (as in these headless tests); TUTORIAL opens the how-to-play pages and
+## über Steam", and the button just says CREATE LOBBY), PUBLIC / PRIVATE and BROWSE LOBBIES
+## (Patrick 2026-11-15), all simply disabled when Steam isn't running (as in these headless tests),
+## with no "Start Steam" text (Patrick: "useless text"); TUTORIAL opens the how-to-play pages and
 ## DONE returns. (The first-run tutorial gate is in test_tutorial.gd; here the tutorial counts as
-## seen.) PLAY ONLINE has no join-by-address, no room codes and no server browser; PRACTICE goes
+## seen.) PLAY ONLINE has no join-by-address and no room codes; PRACTICE goes
 ## straight into a solo casino match (Patrick: "The practise mode should only be the game, not the
 ## minigames selection"), no choice box in between.
 
@@ -31,6 +32,13 @@ func _texts(root: Node) -> PackedStringArray:
 	var out: PackedStringArray = []
 	for b: Node in root.find_children("*", "Button", true, false):
 		out.append((b as Button).text)
+	return out
+
+
+func _label_texts(root: Node) -> PackedStringArray:
+	var out: PackedStringArray = []
+	for l: Node in root.find_children("*", "Label", true, false):
+		out.append((l as Label).text)
 	return out
 
 
@@ -80,7 +88,6 @@ func test_only_steam_hosting_and_no_rejoin() -> void:
 	for t: String in _texts(menu):
 		assert_false(t.to_lower().contains("host on"), "no Host on this PC: %s" % t)
 		assert_false(t.to_lower().contains("steam"), "no Steam wording, it's the only way: %s" % t)
-		assert_false(t.to_lower().contains("browse"), "no server browser: %s" % t)
 		assert_false(t.to_lower().contains("rejoin"), "no Rejoin last party: %s" % t)
 	assert_false(menu.has_method(&"_host_local"))
 	assert_false(menu.has_method(&"_rejoin_last"))
@@ -99,13 +106,53 @@ func test_create_lobby_needs_steam() -> void:
 		return
 	assert_eq(host.text, "Create Lobby")
 	assert_true(host.disabled, "disabled without Steam")
-	assert_eq(host.tooltip_text, "Start Steam to play online")
+	assert_eq(host.tooltip_text, "")
 	assert_true(host.is_visible_in_tree())
+	for n: String in ["BrowseLobbies", "Public", "Private"]:
+		var b: Button = menu.find_child(n, true, false) as Button
+		assert_not_null(b, n)
+		if b != null:
+			assert_true(b.disabled, "%s disabled without Steam" % n)
+	for t: String in _texts(menu) + _label_texts(menu):
+		assert_false(t.to_lower().contains("start steam"), "no Start Steam text: %s" % t)
 	assert_false((menu.find_child("JoinFriend", true, false) as Control).visible, "no friends list without Steam")
 	host.pressed.emit()  # even if it fired: nothing starts, nothing breaks
 	await wait_process_frames(2)
 	assert_eq(Net.mode, Net.Mode.NONE)
 	assert_eq(Net.steam_party.server_pid, 0, "no server process started")
+
+
+func test_public_or_private_lobby_is_remembered() -> void:
+	var before: bool = menu.call(&"lobby_public")
+	menu.call(&"_set_public", true)
+	assert_true(menu.call(&"lobby_public"))
+	menu.call(&"_set_public", false)
+	assert_false(menu.call(&"lobby_public"))
+	menu.call(&"_set_public", before)
+	var priv: Button = menu.find_child("Private", true, false) as Button
+	var pub: Button = menu.find_child("Public", true, false) as Button
+	assert_true(priv.toggle_mode and pub.toggle_mode)
+	assert_eq(priv.button_group, pub.button_group, "one or the other")
+
+
+func test_browse_list_rows() -> void:
+	menu.call(&"_show_online")
+	var box: Control = menu.find_child("Browse", true, false) as Control
+	assert_not_null(box, "PUBLIC LOBBIES box")
+	assert_false(box.visible)
+	menu.call(&"_show_browse")  # no Steam: stays on PLAY ONLINE
+	assert_false(box.visible)
+	var rows: Array[Dictionary] = [SteamSvc.public_lobby_entry(11, "Anna's lobby", 3, 8), SteamSvc.public_lobby_entry(12, "  ", 1, 0)]
+	menu.call(&"_fill_browse", rows)
+	var list: Node = menu.find_child("LobbyList", true, false)
+	assert_eq(list.get_child_count(), 2)
+	var texts: PackedStringArray = _label_texts(list)
+	assert_true("Anna's lobby" in texts)
+	assert_true("3/8" in texts)
+	assert_true("Lobby" in texts, "an empty name gets a stand-in")
+	assert_true("1/%d" % Protocol.MAX_PLAYERS in texts)
+	menu.call(&"_fill_browse", [] as Array[Dictionary])
+	assert_eq(list.get_child_count(), 1, "just the 'no lobbies' line")
 
 
 func test_no_join_by_ip_and_port() -> void:
