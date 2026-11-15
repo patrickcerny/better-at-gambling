@@ -16,6 +16,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	DevMode.forced = -1
+	DevMode.forced_cosmetics = -1
 	DevMode.used = false
 	ProfileManager.set_dev_unlock_all(false)
 	ProfileManager.profile = _old_profile
@@ -29,6 +30,26 @@ func test_only_listed_steam_accounts() -> void:
 	assert_false(DevMode.allowed(), "tests run without Steam: off")
 	DevMode.forced = 1
 	assert_true(DevMode.allowed())
+
+
+func test_cosmetic_accounts_get_every_cosmetic_but_no_dev_mode() -> void:
+	var p: PlayerProfile = ProfileManager.profile
+	for id: int in DevMode.COSMETIC_IDS:
+		assert_false(DevMode.is_dev_id(id), "cosmetics only, no developer mode")
+	assert_false(p.owns(&"skin_the_house"), "the developer skin is not for everyone")
+	assert_false(p.owns(&"skin_gold"))
+	DevMode.forced_cosmetics = 1
+	assert_false(DevMode.allowed(), "no DEV entry, no dev tools")
+	assert_true(p.owns(&"skin_the_house"))
+	assert_true(p.owns(&"skin_gold"), "premium pieces too")
+	assert_true(p.owns(&"hat_halo"), "level pass pieces too")
+
+
+func test_developers_wear_the_developer_skin() -> void:
+	var p: PlayerProfile = ProfileManager.profile
+	DevMode.forced = 1
+	assert_true(p.owns(&"skin_the_house"))
+	assert_true(ToonMaterial.make_skin(&"skin_the_house") != null, "the skin has its own look")
 
 
 func test_coins_levels_and_every_cosmetic() -> void:

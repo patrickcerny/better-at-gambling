@@ -66,7 +66,9 @@ func level_progress() -> float:
 ## Free items, ones unlocked by level, ones bought with Coins and ones in the Steam inventory.
 func owns(id: StringName) -> bool:
 	var d: CosmeticDef = shop.find(id)
-	return d != null and (dev_all or d.is_free() or (d.level > 0 and level >= d.level) or id in owned or id in steam_owned)
+	if d != null and d.dev_only:
+		return DevMode.dev_skins()
+	return d != null and (dev_all or DevMode.all_cosmetics() or d.is_free() or (d.level > 0 and level >= d.level) or id in owned or id in steam_owned)
 
 
 ## Whether every piece of pack `pack` is owned.
@@ -251,7 +253,7 @@ func sanitize() -> void:
 	for kind: StringName in outfit:
 		var d: CosmeticDef = shop.find(outfit[kind])
 		# Steam pieces stay put: the Steam inventory arrives after the profile is loaded.
-		if kind in CosmeticDef.OUTFIT_KINDS and d != null and d.kind == kind and (owns(d.id) or d.steam_item > 0):
+		if kind in CosmeticDef.OUTFIT_KINDS and d != null and d.kind == kind and (owns(d.id) or d.steam_item > 0 or d.dev_only):
 			worn[kind] = d.id
 	outfit = worn
 	matches = maxi(matches, 0)

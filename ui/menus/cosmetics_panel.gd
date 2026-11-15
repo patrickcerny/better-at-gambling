@@ -506,10 +506,14 @@ func _refresh_places(p: PlayerProfile) -> void:
 			b.modulate = Color(1, 1, 1, 0.3)
 			b.tooltip_text = "%s: nothing" % title
 	var owned: int = 0
+	var total: int = 0
 	for d: CosmeticDef in shop.items:
+		if d.dev_only and not DevMode.dev_skins():
+			continue
+		total += 1
 		if p.owns(d.id):
 			owned += 1
-	owned_label.text = "%d OF %d OWNED" % [owned, shop.items.size()]
+	owned_label.text = "%d OF %d OWNED" % [owned, total]
 
 
 func _draw() -> void:
@@ -962,7 +966,7 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	if wearing:
 		label.text = "WEARING"
 	elif p.owns(d.id):
-		label.text = "FREE" if d.is_free() else "OWNED"
+		label.text = "FREE" if d.is_free() else ("DEVELOPER" if d.dev_only else "OWNED")
 	elif d.premium():
 		label.text = Hud._thousands(d.gold)
 	elif not d.coin_buyable():
@@ -996,7 +1000,7 @@ func _refresh() -> void:
 	for id: StringName in tiles:
 		var d: CosmeticDef = shop.find(id)
 		var b: Button = tiles[id]
-		b.visible = not inventory or (d != null and p.owns(id))
+		b.visible = (not inventory or (d != null and p.owns(id))) and (d == null or not d.dev_only or DevMode.dev_skins())
 		b.set_pressed_no_signal(id == selected or (d != null and trying.get(d.kind, &"") == id))
 		var badge: Node = b.get_node_or_null("Level")
 		if badge != null:

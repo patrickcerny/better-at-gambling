@@ -2,6 +2,7 @@ extends Node3D
 ## Dev: look-dev shots of the outfit pieces (`OutfitMeshes`). Run with
 ## scripts/screenshot.sh res://tools/dev/outfit_shot.tscn <name> 60 --kind <kind> [--back] [--walk]
 ## `--kind hat|shirt|pants|cape|boots`: all 15 of one kind, a bean each (3 rows of 5);
+## `--kind combos --combos a+b,c+d`: one bean per combination;
 ## `--kind sets`: the shop's packs (whole outfits), `--only a,b` just those; `--back` turns the beans round (capes), `--walk` makes them
 ## run in place (cape sway, boots), `--low` a low camera close to the feet.
 
@@ -35,7 +36,16 @@ func _ready() -> void:
 	fm.material_override = GreyboxKit.material(Palette.FELT_GREEN)
 	add_child(fm)
 	var looks: Array[Dictionary] = []
-	if kind == "sets":
+	if kind == "combos":
+		# --combos a+b,c+d: one bean per combination (clipping checks).
+		for combo: String in c.get_string("combos", "").split(",", false):
+			var o: Dictionary = {&"_name": combo.replace("+", " + ")}
+			for id: String in combo.split("+"):
+				var d: CosmeticDef = CosmeticShop.default().find(StringName(id))
+				if d != null:
+					o[d.kind] = d.id
+			looks.append(o)
+	elif kind == "sets":
 		var only: PackedStringArray = c.get_string("only", "").split(",", false)
 		for pack: CosmeticPack in CosmeticShop.default().packs:
 			if only.is_empty() or String(pack.id).trim_prefix("pack_") in only:

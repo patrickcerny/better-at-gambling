@@ -20,17 +20,23 @@ extends RefCounted
 const STEAM_IDS: Array[int] = [
 	76561198325616486,  # Patrick
 	76561198355845610,  # Patrick 2026-11-15
-	76561198111162215,  # Patrick 2026-11-15
-	76561198872557870,  # Patrick 2026-11-15
-	76561199081785301,  # Patrick 2026-11-15
-	76561198971147660,  # Patrick 2026-11-15
-	76561198358513331,  # Patrick 2026-11-15
+]
+## SteamID64s that own every cosmetic and the developer skins, but get NO developer mode (Patrick
+## 2026-11-15: "nicht entwickelermodus. Skin unlock all nur und den neuen dev skin. Keine dev sachen").
+const COSMETIC_IDS: Array[int] = [
+	76561198111162215,
+	76561198872557870,
+	76561199081785301,
+	76561198971147660,
+	76561198358513331,
 ]
 ## The one account that counts as "the dev" for Beat the Dev (Patrick only).
 const THE_DEV: int = 76561198325616486
 
 ## Tests: 1 forces it on, 0 off, -1 asks Steam.
 static var forced: int = -1
+## Tests: 1 forces `all_cosmetics` on, 0 off, -1 asks Steam.
+static var forced_cosmetics: int = -1
 ## Something dev was used this run (achievements stay off until the game restarts).
 static var used: bool = false
 
@@ -40,6 +46,21 @@ static func allowed() -> bool:
 	if forced >= 0:
 		return forced == 1
 	return is_dev_id(SteamSvc.get_steam_id() if SteamSvc.is_available() else 0)
+
+
+## Whether this player owns every cosmetic for good (`COSMETIC_IDS`; no developer mode).
+static func all_cosmetics() -> bool:
+	if forced_cosmetics >= 0:
+		return forced_cosmetics == 1
+	if forced >= 0:
+		return false
+	var sid: int = SteamSvc.get_steam_id() if SteamSvc.is_available() else 0
+	return sid != 0 and sid in COSMETIC_IDS
+
+
+## Whether this player may wear the developer-only pieces (developers and `COSMETIC_IDS`).
+static func dev_skins() -> bool:
+	return allowed() or all_cosmetics()
 
 
 ## Whether `steam_id` is on the list.

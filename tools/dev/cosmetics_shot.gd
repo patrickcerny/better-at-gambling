@@ -17,6 +17,9 @@ func _ready() -> void:
 	p.set_preferred_color(9)
 	ProfileManager.changed.emit()
 	var view: String = Cmdline.parse(OS.get_cmdline_user_args()).get_string("view", "shop")
+	# --dev pretends developer mode (developer-only pieces show and count as owned).
+	if Cmdline.parse(OS.get_cmdline_user_args()).has_flag("dev"):
+		DevMode.forced = true
 	match view:
 		"results":
 			_results()

@@ -1,7 +1,7 @@
 // Animated bean skins (CosmeticDef KIND_SKIN, ToonMaterial.make_skin): a moving pattern over the
 // whole bean, in the beans' toon light (soft 3-band ramp + warm rim). Warm casino colours, no neon
 // (docs/ART_DIRECTION.md). `mode`: 0 gold rush, 1 rainbow, 2 molten lava, 3 starry night,
-// 4 lucky felt, 5 candy swirl, 6 deep sea, 7 marble. Client only.
+// 4 lucky felt, 5 candy swirl, 6 deep sea, 7 marble, 8 the house (developers only). Client only.
 shader_type spatial;
 render_mode cull_back;
 
@@ -105,6 +105,42 @@ void fragment() {
 		c = mix(vec3(0.06, 0.2, 0.32), vec3(0.15, 0.42, 0.45), clamp(0.5 + p.y * 0.5, 0.0, 1.0));
 		c += vec3(0.45, 0.7, 0.62) * caus * 0.6;
 		e = vec3(0.25, 0.45, 0.4) * caus * 0.4;
+	} else if (mode == 8) {
+		// The House (developers only): black lacquer with burgundy depth, gold filigree flowing up,
+		// card suits raining down in gold and red, a gold scan ring rising, embers in the cracks.
+		float deep = fbm(p * 2.2 + vec3(0.0, -t * 0.15, 0.0));
+		c = mix(vec3(0.03, 0.02, 0.02), vec3(0.28, 0.04, 0.07), smoothstep(0.35, 0.8, deep));
+		// Filigree: two interleaved sine scrolls, gold lines.
+		float f1 = sin(ang * 6.0 + p.y * 9.0 - t * 0.9 + sin(p.y * 4.0 + t * 0.4) * 1.5);
+		float f2 = sin(ang * -6.0 + p.y * 9.0 - t * 0.7 + 1.57);
+		float fil = max(smoothstep(0.09, 0.0, abs(f1)), smoothstep(0.09, 0.0, abs(f2)) * 0.8);
+		fil *= smoothstep(0.3, 0.55, noise3(p * 4.0 + vec3(0.0, -t * 0.3, 0.0)) + 0.2);
+		vec3 gold = vec3(0.95, 0.72, 0.28);
+		c = mix(c, gold, fil);
+		e += vec3(0.55, 0.36, 0.08) * fil * (0.6 + 0.4 * sin(t * 3.0 + p.y * 6.0));
+		// Falling suits: diamonds (red) and spades-ish drops (gold) in a column grid round the bean.
+		vec2 q = vec2(ang / 6.2832 * 14.0, p.y * 5.0 + t * 0.8);
+		vec2 cid = floor(q);
+		q.y += hash3(vec3(cid.x, 0.0, 7.0)) * 10.0;
+		cid = floor(q);
+		vec2 lq = fract(q) - 0.5;
+		float h = hash3(vec3(cid, 1.3));
+		float on = step(0.72, h);
+		float dia = smoothstep(0.26, 0.2, abs(lq.x) + abs(lq.y) * 0.75);
+		float drop = smoothstep(0.24, 0.18, length(lq + vec2(0.0, 0.06))) + smoothstep(0.2, 0.14, abs(lq.x) + abs(lq.y - 0.12) * 1.3);
+		float suit = on * (h > 0.86 ? dia : clamp(drop, 0.0, 1.0));
+		vec3 sc = h > 0.86 ? vec3(0.85, 0.12, 0.12) : gold;
+		c = mix(c, sc, suit);
+		e += sc * suit * 0.7;
+		// Scan ring: a thin gold band climbing the bean every 2.5 s, flaring the filigree as it passes.
+		float ring = fract(t * 0.4) * 2.4 - 1.2;
+		float band = smoothstep(0.06, 0.0, abs(p.y - ring));
+		c = mix(c, vec3(1.0, 0.86, 0.5), band * 0.8);
+		e += vec3(1.0, 0.75, 0.3) * (band * 1.4 + fil * smoothstep(0.35, 0.0, abs(p.y - ring)));
+		// Embers: rare glints in the dark lacquer.
+		vec3 cell = floor(p * 26.0);
+		float em = step(0.96, hash3(cell)) * pow(max(sin(t * 3.0 + hash3(cell + 2.7) * 40.0), 0.0), 6.0);
+		e += vec3(1.0, 0.55, 0.2) * em * smoothstep(0.5, 0.1, length(fract(p * 26.0) - 0.5));
 	} else {
 		// Marble: slowly drifting veins with gold flecks.
 		float v = sin(p.y * 5.0 + fbm(p * 2.5 + vec3(t * 0.03)) * 6.0);
