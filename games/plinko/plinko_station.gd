@@ -19,6 +19,9 @@ const DIV_TOP: float = 0.95
 const DIV_T: float = 0.03
 ## Gap between the release height and the first peg row.
 const ROW_TOP_GAP: float = 0.4
+## Front of the burgundy face and the pegs' cream caps (the chips fly at z = 0).
+const FACE_FRONT_Z: float = -0.05
+const PEG_CAP_Z: float = 0.045
 ## Payout colours from the losing middle to the big edges (charcoal → cream → gold → red).
 const LOW_COLOR: Color = Color("#3A3330")
 
@@ -71,6 +74,12 @@ static func peg_count(r: int) -> int:
 
 static func peg_pos(r: int, c: int) -> Vector2:
 	return Vector2((c - (peg_count(r) - 1) * 0.5) * slot_w(), row_y(r))
+
+
+## False for the outer pegs of the odd rows: they sit on the side rails' inner face, so the rail
+## itself is drawn as that bumper (a peg there poked out through the frame).
+static func peg_drawn(r: int, c: int) -> bool:
+	return r % 2 == 0 or (c > 0 and c < peg_count(r) - 1)
 
 
 ## Column of the peg under a `PlinkoSteering` path position (slot units) on row `r`.
@@ -135,7 +144,8 @@ func _build_dressing() -> void:
 	var wood: StandardMaterial3D = GreyboxKit.material(Color("#3A2A1E"))
 	var gold: StandardMaterial3D = GreyboxKit.gold()
 	# Face: deep burgundy so gold pegs and cream labels read; a darker inset band for the buckets.
-	_mesh(_box(Vector3(BOARD_W, BOARD_H, 0.02)), Vector3(0, mid_y, -0.14), GreyboxKit.material(Palette.VIP_BURGUNDY.darkened(0.15)), "Face")
+	# Its front sits just behind the chips' plane, so the pegs stand out of it as short studs.
+	_mesh(_box(Vector3(BOARD_W, BOARD_H, FACE_FRONT_Z + 0.15)), Vector3(0, mid_y, (FACE_FRONT_Z - 0.15) * 0.5), GreyboxKit.material(Palette.VIP_BURGUNDY.darkened(0.15)), "Face")
 	# Gold trim frame round the face, and a cap on the cabinet.
 	for side: float in [-1.0, 1.0]:
 		_mesh(_box(Vector3(0.06, BOARD_H + 0.12, 0.06)), Vector3(side * (BOARD_W * 0.5 + 0.13), mid_y, -0.1), gold, "Trim")
@@ -162,7 +172,7 @@ func _build_dressing() -> void:
 	var shaft := CylinderMesh.new()
 	shaft.top_radius = PEG_RADIUS
 	shaft.bottom_radius = PEG_RADIUS
-	shaft.height = 0.18
+	shaft.height = PEG_CAP_Z - FACE_FRONT_Z
 	shaft.radial_segments = 10
 	shaft.rings = 1
 	var cap := SphereMesh.new()
@@ -172,15 +182,19 @@ func _build_dressing() -> void:
 	cap.rings = 4
 	var count: int = 0
 	for r: int in ROWS:
-		count += peg_count(r)
+		for c: int in peg_count(r):
+			if peg_drawn(r, c):
+				count += 1
 	var shafts := _multimesh(shaft, count, gold, "PegShafts")
 	var caps := _multimesh(cap, count, GreyboxKit.material(Palette.CREAM, 0.3, 0.4), "PegCaps")
 	var i: int = 0
 	for r: int in ROWS:
 		for c: int in peg_count(r):
+			if not peg_drawn(r, c):
+				continue
 			var p: Vector2 = peg_pos(r, c)
-			shafts.multimesh.set_instance_transform(i, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(p.x, p.y, -0.045)))
-			caps.multimesh.set_instance_transform(i, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(p.x, p.y, 0.045)))
+			shafts.multimesh.set_instance_transform(i, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(p.x, p.y, (FACE_FRONT_Z + PEG_CAP_Z) * 0.5)))
+			caps.multimesh.set_instance_transform(i, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(p.x, p.y, PEG_CAP_Z)))
 			i += 1
 	# Slot buckets (coloured by payout), gold dividers, multiplier plates.
 	var w: float = slot_w()
@@ -188,7 +202,7 @@ func _build_dressing() -> void:
 		var mat := StandardMaterial3D.new()
 		mat.roughness = 0.6
 		_bucket_mats.append(mat)
-		_buckets.append(_mesh(_box(Vector3(w - DIV_T, DIV_TOP - FLOOR_Y, 0.02)), Vector3(slot_x(s), (FLOOR_Y + DIV_TOP) * 0.5, -0.12), mat, "Bucket%d" % s))
+		_buckets.append(_mesh(_box(Vector3(w - DIV_T, DIV_TOP - FLOOR_Y, 0.02)), Vector3(slot_x(s), (FLOOR_Y + DIV_TOP) * 0.5, FACE_FRONT_Z + 0.012), mat, "Bucket%d" % s))
 		var l := _label("", 64, 0.0024, Palette.CREAM)
 		l.position = Vector3(slot_x(s), FLOOR_Y - 0.17, 0.27)
 		l.name = "SlotLabel%d" % s
@@ -273,6 +287,7 @@ func flash_peg(row: int, col: int) -> void:
 	if _flash_mesh == null or row < 0:
 		return
 	var p: Vector2 = peg_pos(row, col)
+	p.x = clampf(p.x, -BOARD_W * 0.5 + 0.04, BOARD_W * 0.5 - 0.04)  # an edge peg is the rail
 	var mi := MeshInstance3D.new()
 	mi.mesh = _flash_mesh
 	mi.material_override = _flash_mat

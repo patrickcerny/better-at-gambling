@@ -128,7 +128,7 @@ var _respawn_at: Dictionary[int, float] = {}
 var _clock: float = 0.0
 var _vip_toast_at: float = -INF
 var _owns_server: bool = false
-var _plinko_seen: Dictionary[String, bool] = {}  # "station:drop_id" (ids count per board)
+var _plinko_seen: Dictionary[String, bool] = {}  # "station:board node:drop_id" (ids count per board)
 var _pad_timer: float = 0.0
 var _pedestal_timer: float = 0.0
 var _countdown_shown: int = -1
@@ -753,10 +753,14 @@ func _process(delta: float) -> void:
 		var a: PlayerAvatar = avatars[pid]
 		if a.global_position.y < -5.0 and a.state != PlayerAvatar.State.AWAY and _simulates(a):
 			Log.warn(&"match", "player %d fell out of the world at %s, respawning" % [pid, a.global_position])
-			if a.state == PlayerAvatar.State.RAGDOLL:
+			var was_down: bool = a.state == PlayerAvatar.State.RAGDOLL
+			if was_down:
 				a.end_ragdoll(LuckyLounge.RESPAWN_POS)
 				_ko_until.erase(pid)
+				_down_until.erase(pid)
 			a.teleport(LuckyLounge.RESPAWN_POS, 0.0)
+			if was_down:
+				_got_up(pid)  # the owner's client must hear it, or its bean stays a ragdoll
 			_report_position(pid)
 	# Knockouts end on the server's clock; get up where the ragdoll stopped.
 	for pid: int in _ko_until.keys():
@@ -773,6 +777,7 @@ func _process(delta: float) -> void:
 			if a != null and a.state == PlayerAvatar.State.RAGDOLL and not _ko_until.has(pid):
 				a.end_ragdoll()
 				_got_up(pid)
+	_release_stale_bodies()
 	for pid: int in _respawn_at.keys():
 		if _clock >= _respawn_at[pid]:
 			_respawn_at.erase(pid)
@@ -935,6 +940,22 @@ func _open_lobby_panel(focus: StringName) -> void:
 		return
 	router.set_play_mode(InputRouter.Mode.MENU)
 	lobby_panel.open(focus)
+
+
+## Host safety net: the server still simulates a body that is back on its feet with nothing left
+## to wait for (a knockout ended while the bean was held, a ragdoll cut short). Without this the
+## server kept ignoring that player's moves for good: they walked around on their own screen while
+## everybody else saw them frozen.
+func _release_stale_bodies() -> void:
+	if not _owns_server or server == null:
+		return
+	for pid: int in avatars:
+		if not server.is_server_owned(pid) or _ko_until.has(pid) or _down_until.has(pid) or _respawn_at.has(pid):
+			continue
+		var a: PlayerAvatar = avatars[pid]
+		if a.is_standing():
+			Log.info(&"match", "player %d was standing but still server-owned: handing the body back" % pid)
+			_got_up(pid)
 
 
 ## Ragdoll over: the server records it and hands the body back to its owner.
@@ -2692,8 +2713,12 @@ func _update_look_lock() -> void:
 
 func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int, seconds: float, risk: StringName) -> void:
 	var st: PlinkoStation = map.stations.get(sid, null) as PlinkoStation
-	var key: String = "%s:%d" % [sid, drop_id]
-	if st == null or _plinko_seen.has(key):
+	if st == null:
+		return
+	# Keyed on the board node too: a new floor layout that moves Plinko builds a fresh board and the
+	# server a fresh logic whose drop ids start at 1 again (they used to count as seen: no chips).
+	var key: String = "%s:%d:%d" % [sid, st.get_instance_id(), drop_id]
+	if _plinko_seen.has(key):
 		return
 	if _plinko_seen.size() > 256:
 		_plinko_seen.erase(_plinko_seen.keys()[0])  # oldest first; long since landed

@@ -529,13 +529,20 @@ func set_knocked_out(ko: bool) -> void:
 		_ragdoll.set_dazed(ko)
 
 
-## While ragdolled the bean is hidden and the ragdoll stands in for it; the knockout halo follows
-## the ragdoll's head. `null` brings the bean back.
+## While ragdolled the bean itself (skin, face, outfit; no look of the ragdoll's own) rides the
+## ragdoll's torso, flailing while it flies (`_follow_ragdoll`); the knockout halo follows the
+## ragdoll's head. `null` puts the bean back on its feet.
 func set_ragdoll(rb: RagdollBody) -> void:
 	_ragdoll = rb
-	_rig.visible = rb == null
+	_rig.visible = true
 	if rb != null:
 		stop_emote()
+		reaction = &""
+		_get_up_t = -1.0
+		_squash = 1.0
+		_squash_vel = 0.0
+		_lean = Vector2.ZERO
+		_lean_vel = Vector2.ZERO
 	var orbit: KnockoutOrbit = stars as KnockoutOrbit
 	if orbit != null:
 		orbit.follow = rb.head if rb != null else null
@@ -607,7 +614,7 @@ func _animate(frame_delta: float) -> void:
 	body.rotation = Vector3(_lean.x + tilt.x, float(em.get("twist", 0.0)), -_lean.y - tilt.y + (sin(_time * 3.0) * 0.06 if reaction == &"loss" else 0.0))
 	# Squash and stretch: stretch along the fall/jump speed, squash on landing.
 	var squash_target: float = 1.0 + float(em.get("squash", 0.0))
-	if not _on_floor and not carried:
+	if not _on_floor and not carried and _ragdoll == null:
 		squash_target = 1.0 + clampf(absf(_velocity.y) * 0.026, 0.0, 0.28)
 	if _land_kick > 0.0:
 		_squash_vel -= 1.2 + _land_kick * 0.55
@@ -619,6 +626,7 @@ func _animate(frame_delta: float) -> void:
 	body.scale = sq
 	body.position = Vector3(0.0, BODY_BOTTOM + BODY_HEIGHT * 0.5 * sq.y, 0.0) + (em.get("shift", Vector3.ZERO) as Vector3)
 	_animate_rig()
+	_follow_ragdoll()
 	_animate_arms(walk, em)
 	_animate_legs(walk, em)
 	_animate_face(delta, em)
@@ -670,6 +678,23 @@ static func arm_pose(dir: Vector3, side: float) -> Vector2:
 		roll = atan2(d.x, -d.y)
 		pitch = -atan2(h, -d.z)
 	return Vector2(pitch, roll if side < 0.0 else -roll)
+
+
+## 0..1: how hard a ragdolled bean flails (flying fast = 1, lying still = 0).
+func _ragdoll_flail() -> float:
+	if _ragdoll == null or not is_instance_valid(_ragdoll) or _ragdoll.torso == null:
+		return 0.0
+	return clampf((_ragdoll.speed() - 0.6) / 4.0, 0.0, 1.0)
+
+
+## Ragdolled: the whole rig takes the torso's position and rotation (rotation only, never its
+## scale or shear), the bean's body centre on the torso's centre.
+func _follow_ragdoll() -> void:
+	if _ragdoll == null or not is_instance_valid(_ragdoll) or _ragdoll.torso == null or not _ragdoll.torso.is_inside_tree():
+		return
+	var t: Transform3D = _ragdoll.torso.global_transform
+	var b: Basis = Basis(t.basis.get_rotation_quaternion())
+	_rig.global_transform = Transform3D(b, t.origin - b * Vector3(0.0, body.position.y, 0.0))
 
 
 ## Whole-body pose on the rig: slip, big-win hop and spin, carried, get-up.
@@ -802,6 +827,11 @@ func _animate_arms(walk: float, em: Dictionary) -> void:
 	if carried:
 		l = Vector2(0.4 + sin(_time * 19.0) * 0.8, 0.3 + cos(_time * 13.0) * 0.4)
 		r = Vector2(0.4 + cos(_time * 17.0) * 0.8, 0.3 + sin(_time * 11.0) * 0.4)
+	elif _ragdoll != null:
+		# Ragdolled: arms thrown up and flailing while flying, flopped out to the sides at rest.
+		var f: float = _ragdoll_flail()
+		l = Vector2(1.1, 0.9).lerp(Vector2(1.6 + sin(_time * 19.0) * 0.8, 0.6 + cos(_time * 13.0) * 0.4), f)
+		r = Vector2(1.1, 0.9).lerp(Vector2(1.6 + cos(_time * 17.0) * 0.8, 0.6 + sin(_time * 11.0) * 0.4), f)
 	# Shoulders ride the body (lean, squash, dance shifts).
 	for i: int in 2:
 		var side: float = -1.0 if i == 0 else 1.0
@@ -852,6 +882,8 @@ func _animate_legs(walk: float, em: Dictionary) -> void:
 	var kick: float = 0.0
 	if carried or reaction == &"slip":
 		kick = 1.0
+	elif _ragdoll != null:
+		kick = _ragdoll_flail()
 	var w: float = float(em.get("w", 0.0))
 	var feet: Vector4 = em.get("feet", Vector4.ZERO) as Vector4
 	var step: Vector2 = em.get("step", Vector2.ZERO) as Vector2
@@ -920,7 +952,7 @@ func _animate_face(delta: float, em: Dictionary) -> void:
 		round_o = 1.0
 		smile = 0.0
 		brow = Vector2(1.0, 0.8)
-	if carried:
+	if carried or _ragdoll_flail() > 0.3:
 		size = 1.35
 		face_mouth = 0.8 + sin(_time * 14.0) * 0.2
 		round_o = 1.0

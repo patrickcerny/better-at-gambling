@@ -93,6 +93,59 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.43 end screen with the stats stays up for 10 s
+- Patrick: "Es hat auch den endscreen mit den stats einfach direct geskipped lass den verpflichtend paar
+  sekunden bleiben bis man leaven kann". Cause: PLAY AGAIN had the focus from the first frame, so a
+  Space / Enter / pad A still held from the match pressed it at once; the leader's press sent
+  `return_to_lobby` and took the whole room back to the lobby. Now PLAY AGAIN / LEAVE are greyed out
+  with a countdown ("LEAVE LOBBY (7)") for `BalanceConfig.results_min_time` (10 s) and only get the
+  focus when they unlock; the server also refuses `return_to_lobby` with `too_early` until 10 s
+  after `match_ended` (`MatchServer.results_lock_in`).
+### 2026-11-15 / 0.9.42 blackjack soft totals, lobby clipping
+- Patrick: "Soft 17 zb 7 / 17". A soft hand still in play shows both counts ("7 / 17", a lone ace
+  "1 / 11") in the panel, the seat panels, the 3D split tags and the dealer's up card;
+  `HandEval.total_text(cards, final)`. Stood/settled hands and the revealed dealer show the best total.
+- "kann man splits doublen?": yes, double after split already worked (test_split_takes_equal_stake...).
+- "Der screenshot clipped": the start-room wall's velvet panels ran behind the doorway column pair;
+  `LoungeDecor._walls` now starts a run's panels `PILLAR_CLEAR` past a column standing in the wall.
+- "da clipped was": the entrance hall's cross brass inlay ran through the red runner at the same
+  height (gold line across the carpet); it now stops at the runner's brass edges.
+### 2026-11-15 / 0.9.41 thrown and knocked-out beans keep their own look
+- Patrick: "wenn man jemanden wirft, ändert sich das model so weird. Verwende da das normale model und
+  skews nicht so". The ragdoll drew a stand-in bean of its own (plain colour, no skin/face/outfit
+  extras, capsule arms stretched shoulder-to-hand with a sheared basis). RagdollBody is physics only
+  now (meshes hidden); `AvatarVisuals._follow_ragdoll` puts the player's own rig on the torso (rotation
+  only, no scale/shear), arms and legs flail by ragdoll speed (`RagdollBody.speed`), shocked face while
+  flying, KO face from `knocked_out`. Look-dev: bean_shot.tscn --view chaos --at 0.35 / 2.5.
+### 2026-11-15 / 0.9.40 Plinko chips invisible after the floor changed
+- Patrick: "cant see my plinkoballs". When a new floor layout moves Plinko, the server opens a fresh
+  `PlinkoLogic` whose drop ids start at 1 again, but `MatchScene._plinko_seen` still held
+  "plinko_1:1", "plinko_1:2", ... from the old board, so every new drop counted as already shown and
+  no chip fell. The key now includes the board node's instance id (the client builds a new board for a
+  moved station). Not caused by 0.9.39 (his shot still shows the old long pegs); chips fly at z = 0,
+  in front of the 0.9.39 face (front at z = -0.05).
+### 2026-11-15 / 0.9.39 Plinko machine clean (curtains, pegs)
+- Patrick sent a screenshot of the High Risk Plinko machine: a red window curtain cut through the left of
+  the board, the outer pegs poked out of the side frame and the lower pegs read as tilted sticks. A
+  random floor layout can put Plinko on the north-west wall, in front of an arched window. `LoungeDecor`
+  now hides a window and its curtains while a game's colliders reach into them and stand above the hem
+  (`_clear_windows`, run at build and on the new `LuckyLounge.floor_changed` from `apply_floor_plan`;
+  slot cabinets under the sill keep their windows). Plinko's face moved forward to just behind the
+  chips (`FACE_FRONT_Z`), so pegs are short studs instead of 18 cm sticks, and the odd rows' outer
+  pegs (on the rails' inner face) are no longer drawn (`peg_drawn`; physics unchanged, the edge flash
+  stays inside the rail). Checked: headless probe (full floor keeps all 11 windows, Plinko moved to
+  x = -11 hides exactly that window), test_plinko*, test_floor_plan green.
+### 2026-11-15 / 0.9.38 grabbed knocked-out players froze for everyone else
+- Patrick: "Sometimes after i knock out a player too often, the skin gets stuck. The player (in his view)
+  is walking around and stuff, but the lobby is not registering any movements". Grabbing a knocked-out
+  bean (to shake or carry it) switched the avatar from RAGDOLL to HELD without removing the ragdoll, so
+  the host's knockout timer (it only gets RAGDOLL bodies up) never called `report_got_up` and the server
+  kept the body server-owned: `can_move` stayed false and every MOVE from that player was dropped. Fixes:
+  `PlayerAvatar.set_held`/`set_carried` end a ragdoll first (`_drop_ragdoll`, keeps the KO birdies);
+  `MatchScene._release_stale_bodies` (host) hands back any standing body that is still server-owned with
+  no knockout/knockdown/respawn pending; the kill floor now reports `_got_up` for a ragdoll it ends (the
+  owner's client never heard it and stayed a ragdoll). Test: tests/physics/test_grab_knocked_out.gd
+  (fails without the fix).
 ### 2026-11-15 / 0.9.37 split hands clear of the blackjack panel
 - Patrick: "when im the 4. player on the blackjack table and i split the hand, the second hand is under
   the UI". Every seat camera looked at the table's middle, so the far-right seat's cards sat right of

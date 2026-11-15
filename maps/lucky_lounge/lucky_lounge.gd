@@ -11,6 +11,9 @@ extends Node3D
 ##   table and four slots on play money while an online room waits in its lobby.
 ## Built procedurally from the tables below so it is easy to tune.
 
+## A new floor layout stands (`apply_floor_plan`): the decor clears what the new games would clip.
+signal floor_changed
+
 const SIZE_X: float = 44.0
 const SIZE_Z: float = 32.0
 const WALL_H: float = 7.0
@@ -1459,6 +1462,7 @@ func apply_floor_plan(plan: Dictionary) -> bool:
 		st.set_meta(&"floor", e.duplicate(true))
 	if bake_navmesh and nav_region != null:
 		rebake_navmesh()
+	floor_changed.emit()
 	return true
 
 

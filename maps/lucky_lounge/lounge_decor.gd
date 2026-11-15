@@ -45,6 +45,11 @@ const OPENINGS: Array[Vector3] = [Vector3(0.0, 0.0, -16.0), Vector3(0.0, 0.0, Lu
 ## Size of the entrance logo against the 13.9 x 11.2 m model (about 4.0 x 3.25 m in the room: the
 ## chip fills the wall between the door opening, 3.2 m, and the gold cornice under the ceiling).
 const SIGN_SCALE: float = 0.29
+## How far the wall panels keep from a column standing in the wall (its capital and plinth are
+## about 1.5 m across).
+const PILLAR_CLEAR: float = 0.9
+## Half the width of the entrance hall's red runner (brass edges just outside it).
+const RUNNER_HALF: float = 1.6
 
 var map: LuckyLounge
 ## Batches filled while building, turned into MultiMeshes at the end: key → [mesh, material, transforms].
@@ -57,6 +62,9 @@ var _velvet_mat: StandardMaterial3D
 var _marble_mat: StandardMaterial3D
 var _wood_mat: StandardMaterial3D
 var _mats: Dictionary = {}
+## Each arched window with its curtains: [window, curtains]. Hidden while a tall game stands in front
+## (a floor layout can put Plinko or a cabinet on a wall with windows; the velvet would cut through it).
+var _window_sets: Array = []
 
 
 func _init(p_map: LuckyLounge = null) -> void:
@@ -102,6 +110,9 @@ func _ready() -> void:
 	_waiting_room()
 	_environment()
 	_flush()
+	_clear_windows()
+	if not map.floor_changed.is_connected(_clear_windows):
+		map.floor_changed.connect(_clear_windows)
 
 
 # --- Materials --------------------------------------------------------------------------------
@@ -173,15 +184,19 @@ func _lobby_floor() -> void:
 	var ix: float = x1 - band
 	var iz0: float = z0 + band
 	var iz1: float = z1 - band
+	# The cross strips stop at the runner's brass edges (Patrick's "da clipped was": they ran
+	# through the runner, their tops level with it, so a gold line flickered across the carpet).
+	var rx: float = RUNNER_HALF + 0.08
 	for z: float in [iz0, iz1]:
-		_box(Vector3(ix * 2.0, 0.008, 0.06), Vector3(0, y + 0.006, z), _brass_mat, "brass")
+		for sx: float in [-1.0, 1.0]:
+			_box(Vector3(ix - rx, 0.008, 0.06), Vector3(sx * (ix + rx) * 0.5, y + 0.006, z), _brass_mat, "brass")
 	for x: float in [-ix, ix]:
 		_box(Vector3(0.06, 0.008, iz1 - iz0), Vector3(x, y + 0.006, (iz0 + iz1) * 0.5), _brass_mat, "brass")
 	# The red runner from the front door to the lobby doors.
 	var run_len: float = z1 - z0
-	var runner := _plane(Vector2(3.2, run_len), Vector3(0, 0.035, (z0 + z1) * 0.5), _carpet(Palette.CASINO_RED.darkened(0.15), Palette.CASINO_RED.darkened(0.35), 0.8))
+	var runner := _plane(Vector2(RUNNER_HALF * 2.0, run_len), Vector3(0, 0.035, (z0 + z1) * 0.5), _carpet(Palette.CASINO_RED.darkened(0.15), Palette.CASINO_RED.darkened(0.35), 0.8))
 	runner.name = "Runner"
-	for x: float in [-1.66, 1.66]:
+	for x: float in [-RUNNER_HALF - 0.06, RUNNER_HALF + 0.06]:
 		_box(Vector3(0.12, 0.012, run_len), Vector3(x, 0.04, (z0 + z1) * 0.5), _brass_mat, "brass")
 
 
@@ -310,11 +325,24 @@ func _walls() -> void:
 		_box_b(Vector3(length, 0.09, 0.1), mid + n * 0.06 + Vector3(0, 1.08, 0), basis, _brass_mat, "brass")
 		_box_b(Vector3(length, 0.22, 0.14), mid + n * 0.07 + Vector3(0, LuckyLounge.WALL_H - 0.2, 0), basis, _gold_mat, "gold")
 		# Gold mouldings frame the wallpaper between the rail and the ceiling, except where a
-		# window, door or doorway sits.
-		var count: int = maxi(1, int(length / 3.6))
-		var step: float = length / count
+		# window, door or doorway sits. A column standing in the wall (the doorway pair) cuts the
+		# run short: the panels start past its capital instead of running behind it.
+		var pa: Vector3 = a
+		var pb: Vector3 = b
+		for pillar: Vector3 in LuckyLounge.PILLARS:
+			var off: Vector3 = pillar - a
+			var t: float = off.dot(dir)
+			if t < -PILLAR_CLEAR or t > length + PILLAR_CLEAR or absf(off.dot(n)) > PILLAR_CLEAR:
+				continue
+			if t < length * 0.5:
+				pa = a + dir * maxf((pa - a).length(), t + PILLAR_CLEAR)
+			else:
+				pb = a + dir * minf((pb - a).length(), t - PILLAR_CLEAR)
+		var panel_len: float = (pb - pa).length()
+		var count: int = maxi(1, int(panel_len / 3.6))
+		var step: float = panel_len / count
 		for i: int in count:
-			var c: Vector3 = a + dir * (step * (i + 0.5))
+			var c: Vector3 = pa + dir * (step * (i + 0.5))
 			if step < 1.6 or _near_opening(c, 2.7):
 				continue
 			_box_b(Vector3(step - 0.7, 3.9, 0.04), c + n * 0.02 + Vector3(0, 3.6, 0), basis, _gold_mat, "gold")
@@ -432,6 +460,57 @@ func _windows() -> void:
 		curtains.rotation.y = atan2(n.x, n.z)
 		_recolor(curtains, {"Couch_Blue": curtain_red, "LightMetal": _gold_mat})
 		add_child(curtains)
+		_window_sets.append([win, curtains])
+
+
+## Hides every window (and its curtains) a game on the floor would clip: a game's colliders reach
+## into the curtains' box and stand taller than their hem (a slot cabinet under the sill is fine).
+func _clear_windows() -> void:
+	var games: Array[AABB] = []
+	for sid: StringName in map.stations:
+		var st: StationBase = map.stations[sid]
+		if is_instance_valid(st) and st.is_inside_tree():
+			var b: AABB = _collider_box(st)
+			if b.size != Vector3.ZERO:
+				games.append(b)
+	for pair: Array in _window_sets:
+		var win: Node3D = pair[0]
+		var curtains: Node3D = pair[1]
+		var zone: AABB = _mesh_box(curtains).merge(_mesh_box(win)).grow(0.05)
+		var blocked: bool = false
+		for g: AABB in games:
+			if g.end.y > zone.position.y + 0.25 and g.intersects(zone):
+				blocked = true
+				break
+		win.visible = not blocked
+		curtains.visible = not blocked
+
+
+## World box round a node's meshes.
+static func _mesh_box(root: Node3D) -> AABB:
+	var out := AABB()
+	var first: bool = true
+	for n: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = n
+		var b: AABB = mi.global_transform * mi.get_aabb()
+		out = b if first else out.merge(b)
+		first = false
+	return out
+
+
+## World box round a station's solid colliders (its static bodies; not the interact areas).
+static func _collider_box(st: Node3D) -> AABB:
+	var out := AABB()
+	var first: bool = true
+	for body: Node in st.find_children("*", "StaticBody3D", true, false):
+		for cs: Node in body.find_children("*", "CollisionShape3D", true, false):
+			var shape: Shape3D = (cs as CollisionShape3D).shape
+			if shape == null or (cs as CollisionShape3D).disabled:
+				continue
+			var b: AABB = (cs as CollisionShape3D).global_transform * shape.get_debug_mesh().get_aabb()
+			out = b if first else out.merge(b)
+			first = false
+	return out
 
 
 func _doors() -> void:
