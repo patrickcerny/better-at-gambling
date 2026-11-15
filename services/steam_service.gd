@@ -59,6 +59,8 @@ var _steam_id: int = 0
 var _persona: String = ""
 ## Achievements already handed to Steam this run (asked once each).
 var _unlocked: Array[StringName] = []
+## Beat the Dev: players we beat whose achievements Steam is still fetching.
+var _beat_pending: Array[int] = []
 ## Real-money store (Steam Inventory Service): the player's currency ("" until Steam answers) and
 ## each item definition's price in that currency's smallest unit.
 var currency: String = ""
@@ -101,6 +103,7 @@ func _ready() -> void:
 	steam.connect(&"lobby_joined", _on_lobby_joined)
 	steam.connect(&"lobby_chat_update", _on_lobby_chat_update)
 	steam.connect(&"lobby_match_list", _on_lobby_match_list)
+	steam.connect(&"user_stats_received", _on_user_stats_received)
 	Log.info(&"steam", "Steam on: %s (app %d)" % [_persona, APP_ID])
 	_start_store()
 	# Lifetime achievements follow the profile (level-ups, matches, the shop) and catch up on start.
@@ -141,6 +144,37 @@ func unlock_achievements(ids: Array[StringName]) -> Array[StringName]:
 		steam.call("storeStats")
 		Log.info(&"steam", "achievements unlocked: %s" % ", ".join(fresh))
 	return fresh
+
+
+## Beat the Dev (`Achievements.BEAT_THE_DEV`): `beaten` are the Steam IDs of the players the local
+## player finished ahead of. One of them is the developer → unlocked now; otherwise their stats are
+## requested from Steam and it unlocks if one of them already holds it (`_on_user_stats_received`).
+func check_beat_the_dev(beaten: Array[int]) -> void:
+	if not _available or beaten.is_empty() or DevMode.used or Achievements.BEAT_THE_DEV in _unlocked:
+		return
+	if bool((steam.call("getAchievement", String(Achievements.BEAT_THE_DEV)) as Dictionary).get("achieved", false)):
+		_unlocked.append(Achievements.BEAT_THE_DEV)
+		return
+	for sid: int in beaten:
+		if DevMode.is_dev_id(sid):
+			unlock_achievements([Achievements.BEAT_THE_DEV])
+			return
+	for sid: int in beaten:
+		if sid != _steam_id and not sid in _beat_pending:
+			_beat_pending.append(sid)
+			steam.call("requestUserStats", sid)
+
+
+func _on_user_stats_received(_game_id: int = 0, result: int = 0, user_id: int = 0) -> void:
+	if not user_id in _beat_pending:
+		return
+	_beat_pending.erase(user_id)
+	if result != 1:  # k_EResultOK; a failed fetch just doesn't spread it this time
+		return
+	var got: Dictionary = steam.call("getUserAchievement", user_id, String(Achievements.BEAT_THE_DEV))
+	if bool(got.get("achieved", false)):
+		_beat_pending.clear()
+		unlock_achievements([Achievements.BEAT_THE_DEV])
 
 
 func _on_profile_changed() -> void:

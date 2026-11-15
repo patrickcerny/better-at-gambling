@@ -93,6 +93,21 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.26 public / private lobbies, Browse Lobbies
+- Patrick: "remove that start a steam play thats a useless text. Also there should be open lobby,
+  private public and browse lobbies". PLAY ONLINE: Public / Private toggle above CREATE LOBBY
+  (`online/public_lobby`, default private = Steam friends-only lobby; public = Steam public lobby
+  with lobby data `public=1`), BROWSE LOBBIES lists public lobbies of the same game + build with a
+  free seat (`SteamSvc.request_public_lobbies`, `lobby_match_list`, worldwide, refresh 8 s). Without
+  Steam the online buttons are only disabled; the "Start Steam to play online" status is gone.
+### 2026-11-15 / 0.9.25 "Beat the Dev" achievement
+- New Steam achievement `ACH_BEAT_THE_DEV` (20th): finish an online match ranked ahead of the
+  developer (`DevMode.STEAM_IDS`) or of anyone who already holds it, so it spreads. Standings rows
+  carry `steam_id` (from the bridge-stamped "steam:<id>" uid; PROTOCOL_VERSION 15);
+  `Achievements.steam_ids_beaten` picks the players behind, `SteamSvc.check_beat_the_dev` unlocks
+  at once for the dev or asks Steam (`requestUserStats` + `getUserAchievement`) for the others.
+  Ties don't count. Icons in docs/steam/achievements/ACH_BEAT_THE_DEV_*.png; the Steamworks entry
+  still has to be added and published. Patrick's SteamID64 is now in `DevMode.STEAM_IDS` (dev mode on for him).
 ### 2026-11-15 / 0.9.24 voice through Steam
 - Patrick: fifine USB mic still too quiet at Mic volume 400 %, then "use this approach" (GodotSteam voice).
 - `VoiceSteamSource`: the microphone is recorded by Steam (startVoiceRecording/getVoice), decompressed
