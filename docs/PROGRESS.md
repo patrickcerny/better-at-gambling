@@ -93,6 +93,15 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.42 blackjack soft totals, lobby clipping
+- Patrick: "Soft 17 zb 7 / 17". A soft hand still in play shows both counts ("7 / 17", a lone ace
+  "1 / 11") in the panel, the seat panels, the 3D split tags and the dealer's up card;
+  `HandEval.total_text(cards, final)`. Stood/settled hands and the revealed dealer show the best total.
+- "kann man splits doublen?": yes, double after split already worked (test_split_takes_equal_stake...).
+- "Der screenshot clipped": the start-room wall's velvet panels ran behind the doorway column pair;
+  `LoungeDecor._walls` now starts a run's panels `PILLAR_CLEAR` past a column standing in the wall.
+- "da clipped was": the entrance hall's cross brass inlay ran through the red runner at the same
+  height (gold line across the carpet); it now stops at the runner's brass edges.
 ### 2026-11-15 / 0.9.41 thrown and knocked-out beans keep their own look
 - Patrick: "wenn man jemanden wirft, ändert sich das model so weird. Verwende da das normale model und
   skews nicht so". The ragdoll drew a stand-in bean of its own (plain colour, no skin/face/outfit
