@@ -20,6 +20,11 @@ extends RefCounted
 const STEAM_IDS: Array[int] = [
 	76561198325616486,  # Patrick
 	76561198355845610,  # Patrick 2026-11-15
+	76561198111162215,  # Patrick 2026-11-15
+	76561198872557870,  # Patrick 2026-11-15
+	76561199081785301,  # Patrick 2026-11-15
+	76561198971147660,  # Patrick 2026-11-15
+	76561198358513331,  # Patrick 2026-11-15
 ]
 ## The one account that counts as "the dev" for Beat the Dev (Patrick only).
 const THE_DEV: int = 76561198325616486
