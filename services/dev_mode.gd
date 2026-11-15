@@ -15,8 +15,9 @@ extends RefCounted
 ## Once anything dev was used, Steam achievements stay off until the game restarts (`used`), so
 ## a dev level or dev money never unlocks a real achievement.
 
-## SteamID64s that may use developer mode (Patrick's account).
-const STEAM_IDS: Array[int] = []
+## SteamID64s that may use developer mode and count as "the dev" for Beat the Dev (Patrick's
+## account, from his Steam account page 2026-11-15).
+const STEAM_IDS: Array[int] = [76561198325616486]
 
 ## Tests: 1 forces it on, 0 off, -1 asks Steam.
 static var forced: int = -1

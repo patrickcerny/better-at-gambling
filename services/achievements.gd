@@ -38,7 +38,15 @@ const DEFS: Dictionary[StringName, Array] = {
 	&"ACH_DUEL_WIN": ["Rock Solid", "Win a Rock Paper Scissors duel."],
 	&"ACH_HOUSE_COMP": ["On the House", "Get a comp from the house."],
 	&"ACH_SHOPPING": ["Dressed to Impress", "Buy something in the cosmetics shop."],
+	&"ACH_BEAT_THE_DEV": ["Beat the Dev", "Finish an online match ahead of the developer, or ahead of someone who already has this achievement."],
 }
+
+## Patrick 2026-11-15: "a Steam achievement (beat the Dev) where you have to win against me in a
+## game. Or someone who has beat me". Finishing an online match ranked ahead of a player who is
+## the developer (`DevMode.STEAM_IDS`) or who already holds it unlocks it, so it spreads from
+## player to player. The rule is here; whether the others hold it is asked from Steam by
+## `SteamSvc.check_beat_the_dev`.
+const BEAT_THE_DEV: StringName = &"ACH_BEAT_THE_DEV"
 
 
 ## A finished match's progress row (`Progression.breakdown` + minigames_won, money, players):
@@ -69,6 +77,29 @@ static func from_match(row: Dictionary) -> Array[StringName]:
 			out.append(&"ACH_HIGH_ROLLER")
 		if money <= 0:
 			out.append(&"ACH_BROKE")
+	return out
+
+
+## Beat the Dev: the Steam IDs of the players who finished strictly behind `local_id` in an online
+## match's `standings` (rows carry `steam_id`, 0 off Steam). Empty for Practice, a solo lobby or
+## when the local player is not in the standings. Ties don't count as beating someone.
+static func steam_ids_beaten(standings: Array, local_id: int, row: Dictionary) -> Array[int]:
+	var out: Array[int] = []
+	if row.is_empty() or bool(row.get("practice", false)) or int(row.get("players", 1)) < 2:
+		return out
+	var my_rank: int = 0
+	for s: Variant in standings:
+		if s is Dictionary and int((s as Dictionary).get("player", -1)) == local_id:
+			my_rank = int((s as Dictionary).get("rank", 0))
+	if my_rank <= 0:
+		return out
+	for s: Variant in standings:
+		if not s is Dictionary:
+			continue
+		var d: Dictionary = s
+		var sid: int = int(d.get("steam_id", 0))
+		if int(d.get("player", -1)) != local_id and sid != 0 and int(d.get("rank", 0)) > my_rank and not sid in out:
+			out.append(sid)
 	return out
 
 

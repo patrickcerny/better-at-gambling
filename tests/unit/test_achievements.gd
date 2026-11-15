@@ -32,6 +32,7 @@ func test_every_rule_names_a_defined_achievement() -> void:
 		var got: Array[StringName] = Achievements.from_event(ev, 1)
 		assert_eq(got.size(), 1, str(ev))
 		all.append_array(got)
+	all.append(Achievements.BEAT_THE_DEV)  # earned through SteamSvc.check_beat_the_dev
 	for id: StringName in all:
 		assert_true(Achievements.DEFS.has(id), "%s is in DEFS" % id)
 	for id: StringName in Achievements.DEFS:
@@ -68,3 +69,37 @@ func test_events_for_someone_else_earn_nothing() -> void:
 func test_without_steam_unlocking_does_nothing() -> void:
 	assert_false(SteamSvc.is_available())
 	assert_true(SteamSvc.unlock_achievements([&"ACH_FIRST_MATCH"] as Array[StringName]).is_empty())
+
+
+func _standings(ranks: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for pid: int in ranks:
+		out.append({"player": pid, "rank": int(ranks[pid]), "steam_id": 7000 + pid})
+	return out
+
+
+func test_beat_the_dev_lists_the_players_behind() -> void:
+	var st: Array[Dictionary] = _standings({1: 1, 2: 2, 3: 2, 4: 4})
+	st.append({"player": 5, "rank": 5, "steam_id": 0})  # no Steam ID: skipped
+	assert_eq(Achievements.steam_ids_beaten(st, 1, _row(1, false, 5)), [7002, 7003, 7004] as Array[int])
+	assert_eq(Achievements.steam_ids_beaten(st, 2, _row(2, false, 5)), [7004] as Array[int], "a tie is not a win over the tied player")
+	assert_eq(Achievements.steam_ids_beaten(st, 4, _row(4, false, 5)), [] as Array[int], "last beats nobody with a Steam ID")
+
+
+func test_beat_the_dev_only_online() -> void:
+	var st: Array[Dictionary] = _standings({1: 1, 2: 2})
+	assert_eq(Achievements.steam_ids_beaten(st, 1, _row(1, true, 2)), [] as Array[int], "Practice")
+	assert_eq(Achievements.steam_ids_beaten(st, 1, _row(1, false, 1)), [] as Array[int], "solo")
+	assert_eq(Achievements.steam_ids_beaten(st, 9, _row(1, false, 2)), [] as Array[int], "not in the standings")
+
+
+func test_standings_carry_the_steam_id_from_the_uid() -> void:
+	assert_eq(MatchServer.steam_id_of_uid("steam:76561198000000001"), 76561198000000001)
+	assert_eq(MatchServer.steam_id_of_uid("local:Bob"), 0)
+	assert_eq(MatchServer.steam_id_of_uid("steam:abc"), 0)
+	assert_eq(MatchServer.steam_id_of_uid("bridge:3"), 0)
+
+
+func test_beat_the_dev_without_steam_does_nothing() -> void:
+	SteamSvc.check_beat_the_dev([76561198000000001] as Array[int])
+	assert_true(true, "no Steam in the tests: quietly nothing")
