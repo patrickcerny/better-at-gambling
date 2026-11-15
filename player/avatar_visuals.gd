@@ -257,6 +257,8 @@ func wear(kind: StringName, id: StringName) -> void:
 			var mi: MeshInstance3D = _outfit_mesh(m, "Outfit" + String(kind).capitalize())
 			body.add_child(mi)
 			_outfit_nodes[kind] = mi
+			if kind == CosmeticDef.KIND_BEARD:
+				_place_mouth(OutfitMeshes.BEARD_MOUTH_DROP)
 			for sp: MeshInstance3D in _add_spinners(mi, id):
 				_spinners.append({"node": sp, "axis": sp.get_meta(&"axis"), "speed": sp.get_meta(&"speed")})
 			if kind == CosmeticDef.KIND_SHIRT:
@@ -296,6 +298,8 @@ func _take_off(kind: StringName) -> void:
 				if OutfitMeshes.sleeve_color(outfit.get(CosmeticDef.KIND_SHIRT, &"")).a <= 0.0:
 					for seg: MeshInstance3D in _segments:
 						seg.material_override = _body_mat
+		CosmeticDef.KIND_BEARD:
+			_place_mouth(0.0)
 		CosmeticDef.KIND_MOUTH:
 			if _mouth_mat != null:
 				_mouth_mat.set_shader_parameter(&"style", 0)
@@ -370,7 +374,8 @@ static func _outfit_mesh(m: Mesh, node_name: String) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.name = node_name
 	mi.mesh = m
-	mi.material_override = OutfitMeshes.material()
+	if m.get_surface_count() == 1:
+		mi.material_override = OutfitMeshes.material()  # else each surface brings its own (see-through lenses)
 	return mi
 
 
@@ -1111,6 +1116,12 @@ static func bean_mesh() -> ArrayMesh:
 static var _bean_mesh_cache: ArrayMesh = null
 
 
+## Rebuilds the mouth patch `drop` below MOUTH_Y (lower under a beard, between moustache and chin).
+func _place_mouth(drop: float) -> void:
+	if mouth != null:
+		mouth.mesh = _mouth_mesh(MOUTH_Y - _body_center_y() - drop, 0.32, 0.26)
+
+
 ## A small patch hugging the face for the mouth shader (UV 0..1 across it).
 static func _mouth_mesh(y: float, w: float, h: float) -> ArrayMesh:
 	var st := SurfaceTool.new()
@@ -1213,7 +1224,7 @@ func _build() -> void:
 		_cheeks.append(c)
 	mouth = MeshInstance3D.new()
 	mouth.name = "Mouth"
-	mouth.mesh = _mouth_mesh(MOUTH_Y - cy, 0.32, 0.26)
+	_place_mouth(0.0)
 	_mouth_mat = ShaderMaterial.new()
 	_mouth_mat.shader = preload("res://player/bean_mouth.gdshader")
 	mouth.material_override = _mouth_mat

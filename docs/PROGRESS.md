@@ -93,6 +93,18 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.25 shop fixes, level pass, try-on look, inventory
+- Shop: tiles fill the width, + inside the coin pill, unaffordable/level-locked items greyed out with
+  "N MORE COINS NEEDED". Try-ons stack across tabs (`CosmeticsPanel.trying`), clicking a picked tile
+  takes it off, BUY ALL / WEAR ALL / RESET for the tried-on look.
+- Main menu: SHOP entry opens the shop; the T-shirt opens MY COSMETICS (only owned items,
+  `CosmeticsPanel.open(true)`).
+- Level pass (`ui/menus/level_pass_panel.gd`, click the profile line): a card per level with the
+  Coins (`ProgressionConfig.level_coins`: +25 per ten levels, +150 every 5th, +400 every 10th) and
+  the cosmetics it unlocks. Look-dev: `cosmetics_shot.tscn --view pass --level N`.
+- Faces: see-through shades (second surface, `OutfitMeshes.lens_material`), moustaches sit above
+  the mouth (`MOUSTACHE_LIFT`), beards start lower, businessman hair redone, cape clasps gone.
+- Lobby colour plaques removed (colour/skin only in the menu shop). Rank hidden in solo.
 ### 2026-11-15 / 0.9.23 outfits rework
 - Shop: coin packs for real money (+ next to the Coins), 8 animated skins (`vfx/shaders/bean_skin.gdshader`;
   Gold free at level 25, Rainbow at 50), 8 more colours (24), eyes / mouths / beards as new outfit

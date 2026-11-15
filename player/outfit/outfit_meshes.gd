@@ -93,8 +93,43 @@ static func mesh(id: StringName) -> ArrayMesh:
 	elif s.begins_with("eyes_"):
 		_glasses(k, id)
 	var m: ArrayMesh = null if k.is_empty() else k.commit()
+	if m != null and id == &"eyes_shades":
+		# A second, see-through surface: the tinted lenses (the eyes show through them).
+		var lk := OutfitMeshKit.new()
+		_shade_lenses(lk)
+		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, lk.commit().surface_get_arrays(0))
+		m.surface_set_material(0, material())
+		m.surface_set_material(1, lens_material())
 	_cache[id] = m
 	return m
+
+
+static var _lens_material: StandardMaterial3D = null
+
+
+## Smoky see-through glass with a bit of shine.
+static func lens_material() -> Material:
+	if _lens_material == null:
+		_lens_material = StandardMaterial3D.new()
+		_lens_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_lens_material.albedo_color = Color(0.16, 0.11, 0.08, 0.55)
+		_lens_material.roughness = 0.15
+		_lens_material.metallic_specular = 0.9
+		_lens_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return _lens_material
+
+
+## The shades' two lenses: ovals just inside the gold rims (nothing pokes out under the frame).
+static func _shade_lenses(k: OutfitMeshKit) -> void:
+	var r: float = AvatarVisuals.EYE_RADIUS
+	for side: float in [-1.0, 1.0]:
+		var e: Vector3 = _eye_center(side)
+		var p := Vector3(e.x * 1.1, e.y - 0.01, e.z - r - 0.016)
+		var oval := PackedVector2Array()
+		for i: int in 28:
+			var a: float = TAU * float(i) / 28.0
+			oval.append(Vector2(cos(a) * r * 1.1 * 1.05, sin(a) * r * 1.1 * 0.92))
+		k.prism(oval, 0.004, _facing(Vector3(0, 0, -1), p), Color.WHITE)
 
 
 ## A pair of boots: [the right foot's (+X side), the left foot's] (empty for unknown ids).
@@ -1449,6 +1484,12 @@ static func has_lashes(id: StringName) -> bool:
 	return id == &"eyes_lashes"
 
 
+## How far above the mouth line a moustache sits, and how far the mouth drops under a beard, so
+## the mouth shows (and moves) in the gap between the moustache and the chin hair, not through it.
+const MOUSTACHE_LIFT: float = 0.08
+const BEARD_MOUTH_DROP: float = 0.0
+
+
 static func _mouth_y() -> float:
 	return AvatarVisuals.MOUTH_Y - AvatarVisuals._body_center_y()
 
@@ -1488,9 +1529,9 @@ static func _moustache(k: OutfitMeshKit, color: Color, reach: float, droop: floa
 		for i: int in 14:  # densely overlapping lobes read as one tuft, not a bead chain
 			var s: float = float(i) / 13.0
 			var x: float = side * (0.015 + s * reach)
-			var y: float = my + 0.05 - s * s * droop
+			var y: float = my + MOUSTACHE_LIFT - s * s * droop
 			var r: float = lerpf(thick * 1.15, thick * 0.5, s)
-			k.sphere(Vector3(x, y, AvatarVisuals.face_z(y, x) - r * 0.35), Vector3(r * 1.5, r * 0.9, r * 0.8), color, 10, 5, Basis(Vector3.BACK, side * -s * 0.5))
+			k.sphere(Vector3(x, y, AvatarVisuals.face_z(y, x) - r * 0.55), Vector3(r * 1.5, r * 0.9, r * 0.8), color, 10, 5, Basis(Vector3.BACK, side * -s * 0.5))
 
 
 static func _beard(k: OutfitMeshKit, id: StringName) -> void:
@@ -1503,7 +1544,7 @@ static func _beard(k: OutfitMeshKit, id: StringName) -> void:
 			_moustache(k, c, 0.14, 0.01, 0.026)
 			for side: float in [-1.0, 1.0]:  # the curled-up ends
 				var cx: float = side * 0.175
-				var cy: float = my + 0.075
+				var cy: float = my + MOUSTACHE_LIFT + 0.025
 				for i: int in 22:  # overlapping, so the curl reads as one twirl
 					var ph: float = float(i) / 21.0 * PI * 1.5
 					var x: float = cx + side * sin(ph) * 0.032
@@ -1512,15 +1553,15 @@ static func _beard(k: OutfitMeshKit, id: StringName) -> void:
 					k.sphere(Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.008), Vector3.ONE * r, c, 8, 4)
 		&"beard_goatee":
 			var c := Color("#5A3B26")
-			_moustache(k, c, 0.09, 0.06, 0.022)
-			_beard_patch(k, 0.3, func(_a: float) -> float: return my - 0.075, func(a: float) -> float:
+			_moustache(k, c, 0.09, 0.022, 0.026)
+			_beard_patch(k, 0.3, func(_a: float) -> float: return my - 0.1, func(a: float) -> float:
 				return my - 0.24 + 0.13 * absf(a) / 0.3,
 				func(_u: float, v: float) -> float: return 0.02 + 0.012 * v, c, 16, 8)
 		&"beard_full", &"beard_viking":
 			var c := Color("#A0522D") if id == &"beard_full" else Color("#B5652E")
 			_moustache(k, c.darkened(0.08), 0.13, 0.06, 0.03)
 			_beard_patch(k, 1.35, func(a: float) -> float:
-				return lerpf(my - 0.075, my + 0.15, smoothstep(0.42, 1.3, absf(a))),
+				return lerpf(my - 0.1, my + 0.15, smoothstep(0.42, 1.3, absf(a))),
 				func(a: float) -> float:
 					return my - 0.27 + 0.13 * smoothstep(0.3, 1.35, absf(a)) + 0.012 * sin(a * 16.0),
 				func(u: float, v: float) -> float:
@@ -1538,7 +1579,7 @@ static func _beard(k: OutfitMeshKit, id: StringName) -> void:
 			var c := Color("#F4EFE4")
 			_moustache(k, c, 0.15, 0.07, 0.036)
 			_beard_patch(k, 1.4, func(a: float) -> float:
-				return lerpf(my - 0.07, my + 0.26, smoothstep(0.4, 1.3, absf(a))),
+				return lerpf(my - 0.1, my + 0.26, smoothstep(0.4, 1.3, absf(a))),
 				func(a: float) -> float:
 					return my - 0.42 + 0.24 * smoothstep(0.2, 1.4, absf(a)) + 0.02 * sin(a * 12.0),
 				func(u: float, v: float) -> float:
@@ -1547,7 +1588,7 @@ static func _beard(k: OutfitMeshKit, id: StringName) -> void:
 			var c := Color("#D8D4CC")
 			_moustache(k, c.darkened(0.05), 0.15, 0.11, 0.03)
 			_beard_patch(k, 1.15, func(a: float) -> float:
-				return lerpf(my - 0.075, my + 0.22, smoothstep(0.42, 1.1, absf(a))),
+				return lerpf(my - 0.1, my + 0.22, smoothstep(0.42, 1.1, absf(a))),
 				func(a: float) -> float:
 					return my - 0.66 + 0.5 * pow(absf(a) / 1.15, 1.1),
 				func(u: float, v: float) -> float:
@@ -1609,16 +1650,10 @@ static func _glasses(k: OutfitMeshKit, id: StringName) -> void:
 				var x: float = p.x + 0.04 + s * 0.12
 				k.sphere(Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.02), Vector3.ONE * 0.009, GOLD.darkened(0.1), 6, 3)
 		&"eyes_shades":
-			var lens := Color("#1C1A19")
+			# The tinted lenses are their own see-through surface (`shade_lenses`), inside the rims.
 			for side: float in [-1.0, 1.0]:
 				var e: Vector3 = _eye_center(side)
 				var p := Vector3(e.x * 1.1, e.y - 0.01, e.z - r - 0.016)
-				var drop := PackedVector2Array()
-				for i: int in 20:
-					var a: float = TAU * float(i) / 20.0
-					var y: float = sin(a) * r * 1.0 - (0.02 if sin(a) < 0.0 else 0.0) * absf(sin(a))
-					drop.append(Vector2(cos(a) * r * 1.18 + side * 0.01 * maxf(-sin(a), 0.0), y))
-				k.prism(drop, 0.012, _facing(Vector3(0, 0, -1), p), lens)
 				k.torus(p, r * 1.1, r * 1.2, GOLD, 22, face * Basis.from_scale(Vector3(1.05, 1.0, 0.92)))
 				k.cylinder(Vector3(side * (absf(p.x) + r * 1.2), e.y + 0.02, p.z + 0.08), 0.008, 0.008, 0.17, GOLD, 6, Basis(Vector3.RIGHT, PI * 0.5) * Basis(Vector3.BACK, side * 0.4))
 			var top_y: float = _eye_center(1.0).y + r * 0.95

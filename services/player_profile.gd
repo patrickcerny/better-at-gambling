@@ -170,7 +170,7 @@ func apply_match(match_id: String, row: Dictionary) -> Dictionary:
 	var from_xp: int = xp
 	xp = mini(xp + gained, config.max_xp())
 	level = config.level_for_xp(xp)
-	var bonus: int = maxi(level - from_level, 0) * config.level_up_coins
+	var bonus: int = config.level_coins_between(from_level, level)
 	coins = mini(coins + match_coins + bonus, MAX_COINS)
 	matches += 1
 	if int(row.get("rank", 0)) == 1:

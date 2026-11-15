@@ -81,7 +81,7 @@ func test_main_menu_opens_the_shop_and_shows_the_profile() -> void:
 	assert_not_null(entry, "a COSMETICS entry")
 	if entry == null:
 		return
-	assert_eq(entry.text, "COSMETICS")
+	assert_eq(entry.text, "SHOP")
 	var badge: ProfileBadge = menu.get("profile_badge")
 	assert_eq(badge.level_label.text, "LEVEL %d" % ProfileManager.profile.level)
 	assert_gt(ProfileManager.profile.level, 1)
@@ -90,10 +90,14 @@ func test_main_menu_opens_the_shop_and_shows_the_profile() -> void:
 	assert_string_contains(badge.xp_label.text, "XP")
 	var shop: CosmeticsPanel = menu.get("cosmetics")
 	entry.pressed.emit()
-	assert_true(shop.visible, "COSMETICS opens the shop")
+	assert_true(shop.visible, "SHOP opens the shop")
+	assert_false(shop.inventory)
+	assert_true(shop.tiles[&"color_mint"].visible, "the shop shows what you don't own")
 	shop.close()
 	(menu.find_child("CosmeticsButton", true, false) as Button).pressed.emit()
-	assert_true(shop.visible, "so does the T-shirt")
+	assert_true(shop.visible and shop.inventory, "the T-shirt opens your inventory")
+	assert_false(shop.tiles[&"color_mint"].visible, "the inventory only shows what you own")
+	assert_true(shop.tiles[&"color_sky"].visible, "free things are yours")
 	shop.close()
 	# Buying updates the corner line.
 	ProfileManager.profile.coins = 1000
@@ -127,3 +131,43 @@ func test_the_shop_fits_a_1080_high_screen_whatever_is_picked() -> void:
 		await wait_process_frames(2)
 		var need: float = panel.get_combined_minimum_size().y + panel.offset_top - panel.offset_bottom
 		assert_lte(need, 1080.0, "%s: the shop fits (needs %d px)" % [id, need])
+
+
+## Patrick 2026-11-15: picks stack across the tabs (a skin and a hat together), clicking a picked
+## tile again takes it off, and BUY ALL pays for the tried-on look at once.
+func test_try_ons_stack_and_come_off() -> void:
+	var panel: CosmeticsPanel = _shop()
+	panel.open()
+	var shop: CosmeticShop = CosmeticShop.default()
+	var hat: CosmeticDef = null
+	var shirt: CosmeticDef = null
+	for d: CosmeticDef in shop.items:
+		if d.coin_buyable() and not d.is_free() and d.level == 0:
+			if hat == null and d.kind == CosmeticDef.KIND_HAT:
+				hat = d
+			elif shirt == null and d.kind == CosmeticDef.KIND_SHIRT:
+				shirt = d
+	panel._on_tile_pressed(hat.id)
+	panel._on_tile_pressed(shirt.id)
+	assert_eq(panel.preview.outfit.get(CosmeticDef.KIND_HAT, &""), hat.id, "the hat stays on")
+	assert_eq(panel.preview.outfit.get(CosmeticDef.KIND_SHIRT, &""), shirt.id)
+	assert_true(panel.tiles[hat.id].button_pressed, "both tiles show as picked")
+	assert_true(panel.look_label.get_parent().visible, "the look row shows")
+	assert_eq(panel.look_price(), hat.price + shirt.price)
+	assert_eq(panel.look_button.text, "BUY ALL · %s" % Hud._thousands(hat.price + shirt.price))
+	# Clicking the picked shirt again takes it off.
+	panel._on_tile_pressed(shirt.id)
+	assert_eq(panel.selected, &"")
+	assert_false(panel.preview.outfit.has(CosmeticDef.KIND_SHIRT), "the shirt is off")
+	assert_eq(panel.preview.outfit.get(CosmeticDef.KIND_HAT, &""), hat.id, "the hat still on")
+	panel._on_tile_pressed(shirt.id)
+	ProfileManager.profile.coins = hat.price + shirt.price
+	panel.look_button.pressed.emit()
+	assert_true(ProfileManager.profile.owns(hat.id) and ProfileManager.profile.owns(shirt.id), "bought both")
+	assert_eq(ProfileManager.profile.coins, 0)
+	assert_eq(panel.look_button.text, "WEAR ALL")
+	panel.look_button.pressed.emit()
+	assert_true(ProfileManager.profile.is_worn(hat.id) and ProfileManager.profile.is_worn(shirt.id))
+	panel.reset_look()
+	assert_true(panel.trying.is_empty())
+	panel.close()

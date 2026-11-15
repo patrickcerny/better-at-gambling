@@ -47,10 +47,25 @@ const MUTED := Color("#B9A98C")
 ## A Coins price the wallet can't pay yet.
 const TOO_DEAR := Color("#D9705F")
 
+## Inventory mode (the T-shirt in the menu's corner): only what the player owns, to wear it.
+## Shop mode (SHOP in the menu) shows everything to buy.
+var inventory: bool = false
+var title_label: Label
+## Switches between the shop and the inventory.
+var switch_button: Button
 ## Item id -> its tile (a toggle Button).
 var tiles: Dictionary[StringName, Button] = {}
 ## The item the preview and the action button are about.
 var selected: StringName = &""
+## What the preview tries on, one per slot (kind -> id): picks stack across the tabs, so a hat, a
+## shirt and a skin can be seen together. Clicking a picked tile again takes it back off.
+var trying: Dictionary[StringName, StringName] = {}
+## The tried-on look: how many pieces, what they cost together.
+var look_label: Label
+## BUY ALL for the tried-on pieces not owned yet, then WEAR ALL.
+var look_button: Button
+## Takes every try-on off again.
+var reset_button: Button
 var preview: BeanPreviewView
 var item_name: Label
 var item_kind: Label
@@ -99,11 +114,18 @@ func _ready() -> void:
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override(&"separation", 16)
 	v.add_child(head)
-	var title := Label.new()
-	title.theme_type_variation = &"TitleLabel"
-	title.text = "COSMETICS"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
+	title_label = Label.new()
+	title_label.name = "Title"
+	title_label.theme_type_variation = &"TitleLabel"
+	title_label.text = "SHOP"
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title_label)
+	switch_button = Button.new()
+	switch_button.name = "Switch"
+	switch_button.custom_minimum_size = Vector2(0, 52)
+	switch_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	switch_button.pressed.connect(func() -> void: set_inventory(not inventory))
+	head.add_child(switch_button)
 	var wallet := PanelContainer.new()
 	wallet.add_theme_stylebox_override(&"panel", _box(Color("#1E1414"), Color(Palette.WARM_GOLD, 0.6), 2, 28, 18))
 	wallet.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -200,6 +222,30 @@ func _ready() -> void:
 	steam_button.custom_minimum_size = Vector2(0, 52)
 	steam_button.pressed.connect(press_steam)
 	left.add_child(steam_button)
+	var look_row := HBoxContainer.new()
+	look_row.name = "Look"
+	look_row.add_theme_constant_override(&"separation", 8)
+	left.add_child(look_row)
+	look_label = Label.new()
+	look_label.name = "LookLabel"
+	look_label.theme_type_variation = &"SmallLabel"
+	look_label.add_theme_color_override(&"font_color", MUTED)
+	look_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	look_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	look_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	look_row.add_child(look_label)
+	look_button = Button.new()
+	look_button.name = "LookAction"
+	look_button.custom_minimum_size = Vector2(0, 44)
+	look_button.pressed.connect(press_look)
+	look_row.add_child(look_button)
+	reset_button = Button.new()
+	reset_button.name = "Reset"
+	reset_button.text = "RESET"
+	reset_button.tooltip_text = "Take off everything you're trying on"
+	reset_button.custom_minimum_size = Vector2(0, 44)
+	reset_button.pressed.connect(reset_look)
+	look_row.add_child(reset_button)
 	status_label = Label.new()
 	status_label.name = "Status"
 	status_label.theme_type_variation = &"SmallLabel"
@@ -376,8 +422,10 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 	(pr[1] as Label).name = "Price"
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(row)
-	b.pressed.connect(select.bind(id))
-	b.focus_entered.connect(select.bind(id))
+	b.pressed.connect(_on_tile_pressed.bind(id))
+	b.focus_entered.connect(func() -> void:
+		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):  # a click selects on release instead
+			select(id))
 	tiles[id] = b
 	return b
 
@@ -454,10 +502,96 @@ func select(id: StringName) -> void:
 	if selected == id:
 		return
 	selected = id
+	if d != null:
+		trying[d.kind] = id
 	status_label.text = ""
 	if preview != null:
 		preview.face(d != null and d.kind == CosmeticDef.KIND_CAPE)
 		preview.focus(d.kind if d != null else &"")
+	_refresh()
+
+
+## A click on a tile: picks it, or (picked already) takes that try-on back off.
+func _on_tile_pressed(id: StringName) -> void:
+	var d: CosmeticDef = shop.find(id)
+	if d != null and selected == id and trying.get(d.kind, &"") == id:
+		untry(d.kind)
+	elif d != null and selected != id and trying.get(d.kind, &"") == id:
+		selected = id  # stacked further back: just bring it to the front
+		_refresh()
+	else:
+		select(id)
+
+
+## Takes the try-on in slot `kind` off; the stage goes back to the whole look.
+func untry(kind: StringName) -> void:
+	var id: StringName = trying.get(kind, &"")
+	trying.erase(kind)
+	if selected == id or shop.find(selected) == null:
+		selected = &""
+	status_label.text = ""
+	_refresh()
+
+
+## RESET: no try-ons, the bean as it is worn.
+func reset_look() -> void:
+	trying.clear()
+	selected = &""
+	status_label.text = ""
+	_refresh()
+
+
+## The tried-on pieces that aren't worn yet.
+func look_pieces() -> Array[CosmeticDef]:
+	var out: Array[CosmeticDef] = []
+	var p: PlayerProfile = ProfileManager.profile
+	for kind: StringName in trying:
+		var d: CosmeticDef = shop.find(trying[kind])
+		if d != null and not _wearing(p, d):
+			out.append(d)
+	return out
+
+
+## What the tried-on pieces not owned yet cost in Coins together (pieces Coins can't buy left out).
+func look_price() -> int:
+	var total: int = 0
+	var p: PlayerProfile = ProfileManager.profile
+	for d: CosmeticDef in look_pieces():
+		if not p.owns(d.id) and d.coin_buyable():
+			total += d.price
+	return total
+
+
+## BUY ALL (every tried-on piece Coins can buy) when some aren't owned, else WEAR ALL.
+func press_look() -> void:
+	var p: PlayerProfile = ProfileManager.profile
+	var to_buy: Array[CosmeticDef] = []
+	for d: CosmeticDef in look_pieces():
+		if not p.owns(d.id) and d.coin_buyable():
+			to_buy.append(d)
+	if not to_buy.is_empty():
+		if p.coins < look_price():
+			status_label.text = "Not enough Coins for the whole look: %s more to go." % Hud._thousands(look_price() - p.coins)
+			_refresh()
+			return
+		for d: CosmeticDef in to_buy:
+			ProfileManager.buy(d.id)
+		status_label.text = "Bought %d pieces! WEAR ALL puts the look on." % to_buy.size()
+		Audio.play(&"cash_register", &"UI", -6.0)
+		_refresh()
+		return
+	var n: int = 0
+	for d: CosmeticDef in look_pieces():
+		if not p.owns(d.id):
+			continue
+		if d.kind == CosmeticDef.KIND_COLOR:
+			ProfileManager.set_preferred_color(d.color_index)
+			color_worn.emit(d.color_index)
+			n += 1
+		elif ProfileManager.wear(d.id):
+			outfit_worn.emit(d.kind, d.id)
+			n += 1
+	status_label.text = "Your bean wears the new look." if n > 0 else ""
 	_refresh()
 
 
@@ -593,7 +727,8 @@ func _refresh() -> void:
 	for id: StringName in tiles:
 		var d: CosmeticDef = shop.find(id)
 		var b: Button = tiles[id]
-		b.set_pressed_no_signal(id == selected)
+		b.visible = not inventory or (d != null and p.owns(id))
+		b.set_pressed_no_signal(id == selected or (d != null and trying.get(d.kind, &"") == id))
 		var badge: Node = b.get_node_or_null("Level")
 		if badge != null:
 			(badge as Control).visible = d != null and not p.owns(id)
@@ -615,6 +750,7 @@ func _refresh() -> void:
 			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
 		else:
 			_show_pack_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, shop.find_pack(id))
+	_refresh_look(p)
 	var pack: CosmeticPack = shop.find_pack(selected)
 	if pack != null:
 		_refresh_pack(p, pack)
@@ -632,10 +768,13 @@ func _refresh() -> void:
 		return
 	var sel: CosmeticDef = shop.find(selected)
 	if sel == null:
+		# Nothing picked: the bean as worn, with whatever is still tried on.
+		_dress_preview(p)
 		steam_button.visible = false
+		action_button.visible = true
 		action_button.disabled = true
 		action_button.text = "PICK SOMETHING"
-		item_name.text = ""
+		item_name.text = "YOUR LOOK" if not look_pieces().is_empty() else ""
 		item_kind.text = ""
 		price_row.visible = false
 		return
@@ -645,14 +784,7 @@ func _refresh() -> void:
 		item_kind.text += " · FREE AT LEVEL %d" % sel.level
 	price_row.visible = true
 	_show_price(price_label, price_coin, p, sel)
-	# The preview: what you wear, with the picked item tried on.
-	var worn_color: int = p.preferred_color if p.preferred_color >= 0 else 0
-	preview.set_bean_color(Palette.player_color(sel.color_index if sel.kind == CosmeticDef.KIND_COLOR else worn_color))
-	var dress: Dictionary = p.outfit.duplicate()
-	if sel.kind in CosmeticDef.OUTFIT_KINDS:
-		dress[sel.kind] = sel.id
-	if preview.outfit != dress:
-		preview.set_outfit(dress)
+	_dress_preview(p)
 	action_button.disabled = false
 	action_button.visible = true
 	_show_steam_button(not p.owns(sel.id) and sel.steam_buyable(), sel.steam_item, sel.cents, "BUY WITH STEAM")
@@ -673,6 +805,57 @@ func _refresh() -> void:
 		action_button.text = "TAKE OFF"
 	else:
 		action_button.text = "WEAR"
+
+
+## The preview: what the bean wears, with every try-on on top.
+func _dress_preview(p: PlayerProfile) -> void:
+	var color: int = p.preferred_color if p.preferred_color >= 0 else 0
+	var dress: Dictionary = p.outfit.duplicate()
+	for kind: StringName in trying:
+		var d: CosmeticDef = shop.find(trying[kind])
+		if d == null:
+			continue
+		if d.kind == CosmeticDef.KIND_COLOR:
+			color = d.color_index
+		elif d.kind in CosmeticDef.OUTFIT_KINDS:
+			dress[d.kind] = d.id
+	preview.set_bean_color(Palette.player_color(color))
+	if preview.outfit != dress:
+		preview.set_outfit(dress)
+
+
+## The look row: shown once two or more pieces are tried on (or one and nothing is picked), with
+## their total and BUY ALL / WEAR ALL, and RESET.
+func _refresh_look(p: PlayerProfile) -> void:
+	var pieces: Array[CosmeticDef] = look_pieces()
+	var on: bool = shop.find_pack(selected) == null and shop.find_coin_pack(selected) == null \
+		and (pieces.size() >= 2 or (pieces.size() == 1 and selected == &""))
+	look_label.get_parent().visible = on
+	if not on:
+		return
+	var total: int = look_price()
+	var unbuyable: int = 0
+	var to_buy: int = 0
+	for d: CosmeticDef in pieces:
+		if not p.owns(d.id):
+			if d.coin_buyable():
+				to_buy += 1
+			else:
+				unbuyable += 1
+	look_label.text = "TRYING ON %d" % pieces.size()
+	if to_buy > 0:
+		look_label.text += " · %s COINS TOGETHER" % Hud._thousands(total)
+	if unbuyable > 0:
+		look_label.text += " · %d NEED A LEVEL OR STEAM" % unbuyable
+	look_button.visible = true
+	if to_buy > 0:
+		look_button.text = "BUY ALL · %s" % Hud._thousands(total)
+		look_button.disabled = p.coins < total
+		look_button.tooltip_text = "%s more Coins needed" % Hud._thousands(total - p.coins) if p.coins < total else ""
+	else:
+		look_button.text = "WEAR ALL"
+		look_button.tooltip_text = ""
+		look_button.disabled = pieces.size() == unbuyable
 
 
 ## A pack's tile price: OWNED when every piece is, else the Steam price.
@@ -730,11 +913,33 @@ func _fit_columns() -> void:
 				(t as Control).custom_minimum_size.x = tw
 
 
-func open() -> void:
+## Shop (everything) or inventory (only what is owned).
+func set_inventory(on: bool) -> void:
+	inventory = on
+	title_label.text = "MY COSMETICS" if on else "SHOP"
+	switch_button.text = "OPEN SHOP" if on else "MY COSMETICS"
+	if tab_buttons.has(KIND_PACK):
+		tab_buttons[KIND_PACK].visible = not on
+	var sel: CosmeticDef = shop.find(selected)
+	if on and (sel == null or not ProfileManager.profile.owns(sel.id)):
+		selected = &""
+		trying.clear()
+		if tabs != null and tab_buttons.get(KIND_PACK, null) != null and tabs.current_tab == int(tab_buttons[KIND_PACK].get_meta(&"tab")):
+			show_kind(CosmeticDef.KIND_COLOR)
+		if tabs != null and tab_buttons.get(KIND_COINS, null) != null and tabs.current_tab == int(tab_buttons[KIND_COINS].get_meta(&"tab")):
+			show_kind(CosmeticDef.KIND_COLOR)
+	status_label.text = ""
+	_refresh()
+
+
+## Opens the shop, or with `as_inventory` the player's own cosmetics.
+func open(as_inventory: bool = false) -> void:
+	set_inventory(as_inventory)
 	SteamSvc.refresh_inventory()  # bought on another PC, or in the Steam store
 	var p: PlayerProfile = ProfileManager.profile
 	var worn: CosmeticDef = shop.color_item(p.preferred_color)
 	selected = &""
+	trying.clear()
 	select(worn.id if worn != null else (shop.items[0].id if not shop.items.is_empty() else &""))
 	status_label.text = ""
 	_refresh()

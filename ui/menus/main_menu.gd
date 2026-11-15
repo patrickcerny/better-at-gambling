@@ -2,9 +2,9 @@ extends Control
 ## Main menu, centred under the 3D logo (Patrick: "the main menu centered"): Play Online (create a
 ## lobby, join a friend's lobby), Practice (straight into a solo casino match;
 ## Patrick: "The practise mode should only be the game"; minigames only stays a lobby mode),
-## Tutorial (how to play), Cosmetics (the shop, `CosmeticsPanel`), Quit, the profile line in the
+## Tutorial (how to play), Shop (the cosmetics shop, `CosmeticsPanel`), Quit, the profile line in the
 ## top-left corner (level, XP bar, Coins: `ProfileBadge`) and small buttons in the bottom-right
-## corner: "?" (the tutorial again), the T-shirt (the cosmetics shop too) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
+## corner: "?" (the tutorial again), the T-shirt (your cosmetics inventory: only what you own, Patrick 2026-11-15) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
 ## the tutorial first (Patrick: "The Tutorial pops up when you click practise or play for the first
 ## time") and then carries on to what the player chose; `tutorial/seen` in user://settings.cfg
 ## remembers it.
@@ -42,6 +42,7 @@ var cosmetics_button: TShirtButton
 var cosmetics: CosmeticsPanel
 ## Level, XP bar and Coins in the top-left corner.
 var profile_badge: ProfileBadge
+var level_pass: LevelPassPanel
 var how_to_play: HowToPlayPanel
 ## DEV MODE under TUTORIAL and the panel it opens: only for Patrick's Steam account (`DevMode`);
 ## for everyone else neither exists.
@@ -124,10 +125,11 @@ func _ready() -> void:
 	cosmetics.closed.connect(func() -> void:
 		if not _settings.visible and cosmetics_opener[0].is_visible_in_tree():
 			cosmetics_opener[0].grab_focus())
+	cosmetics_button.tooltip_text = "My cosmetics"
 	cosmetics_button.pressed.connect(func() -> void:
 		cosmetics_opener[0] = cosmetics_button
 		_settings.close()
-		cosmetics.open())
+		cosmetics.open(true))  # the T-shirt: your own things, to wear
 	_cosmetics_entry.pressed.connect(func() -> void:
 		cosmetics_opener[0] = _cosmetics_entry
 		_settings.close()
@@ -137,6 +139,19 @@ func _ready() -> void:
 	profile_badge.offset_left = 32.0
 	profile_badge.offset_top = 28.0
 	add_child(profile_badge)
+	# Click the profile line: the level pass (every level's Coins and unlocks).
+	level_pass = LevelPassPanel.new()
+	add_child(level_pass)
+	profile_badge.pressed.connect(func() -> void:
+		_settings.close()
+		level_pass.open())
+	level_pass.item_pressed.connect(func(id: StringName) -> void:
+		level_pass.close()
+		cosmetics.open()
+		cosmetics.select(id)
+		var d: CosmeticDef = CosmeticShop.default().find(id)
+		if d != null:
+			cosmetics.show_kind(d.kind))
 	# The tutorial again any time: "?" left of the T-shirt.
 	help_button = HelpButton.new()
 	help_button.name = "HelpButton"

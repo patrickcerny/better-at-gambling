@@ -62,7 +62,7 @@ func test_a_match_row_applies_once_with_the_level_bonus() -> void:
 	assert_eq(first["level_from"], 1)
 	assert_eq(first["level_to"], p.config.level_for_xp(p.xp))
 	assert_gt(first["level_to"], 1, "a good first match levels up")
-	var bonus: int = (int(first["level_to"]) - 1) * p.config.level_up_coins
+	var bonus: int = p.config.level_coins_between(1, int(first["level_to"]))
 	assert_eq(first["level_bonus"], bonus)
 	assert_eq(p.coins, int(row["coins"]) + bonus, "Coins from the row plus the level-up bonus")
 	assert_eq(p.matches, 1)
@@ -81,7 +81,7 @@ func test_a_server_row_is_capped() -> void:
 	var p: PlayerProfile = _fresh()
 	p.apply_match("evil", {"xp": 10_000_000, "coins": 10_000_000})
 	assert_eq(p.xp, Progression.MAX_MATCH_XP)
-	assert_lte(p.coins, Progression.coins_for_xp(p.config, Progression.MAX_MATCH_XP) + p.config.level_up_coins * p.level)
+	assert_lte(p.coins, Progression.coins_for_xp(p.config, Progression.MAX_MATCH_XP) + p.config.level_coins_between(1, p.level))
 
 
 func test_save_and_load_round_trip() -> void:
@@ -145,3 +145,14 @@ func test_loading_clamps_a_tampered_file() -> void:
 func test_the_autoload_stays_in_memory_under_tests() -> void:
 	assert_false(ProfileManager.persist, "GUT never writes the player's real profile")
 	assert_true(ProfileManager.is_test_run())
+
+
+func test_the_level_pass_pays_more_at_milestones() -> void:
+	var c: ProgressionConfig = ProgressionConfig.default()
+	assert_eq(c.level_coins(1), 0)
+	assert_eq(c.level_coins(2), c.level_up_coins)
+	assert_eq(c.level_coins(5), c.level_up_coins + c.milestone_coins, "every 5th level a bonus")
+	assert_eq(c.level_coins(10), c.level_up_coins + c.level_up_step + c.big_milestone_coins, "every 10th a bigger one")
+	assert_gt(c.level_coins(21), c.level_coins(11), "later levels pay more")
+	assert_eq(c.level_coins_between(1, 3), c.level_coins(2) + c.level_coins(3))
+	assert_eq(c.level_coins_between(4, 4), 0)

@@ -2,6 +2,9 @@ class_name ProfileBadge
 extends PanelContainer
 ## The profile line on the main menu (docs/GDD.md "Progression"): LEVEL n, the XP bar to the next
 ## level with "x / y XP", and the Coins balance with its coin. Follows `ProfileManager.changed`.
+## Clicking it opens the level pass (`pressed`, `LevelPassPanel`).
+
+signal pressed
 
 var level_label: Label
 var xp_bar: ProgressBar
@@ -12,7 +15,13 @@ var coins_label: Label
 func _ready() -> void:
 	name = "ProfileBadge"
 	theme_type_variation = &"HudPlate"
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	tooltip_text = "Level pass: what every level gives you"
+	gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and (e as InputEventMouseButton).pressed and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+			accept_event()
+			pressed.emit())
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override(&"separation", 16)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE

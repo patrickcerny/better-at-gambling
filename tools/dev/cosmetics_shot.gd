@@ -2,7 +2,7 @@ extends Node
 ## Dev: look-dev shots for the cosmetics shop and the profile line.
 ## Run with scripts/screenshot.sh res://tools/dev/cosmetics_shot.tscn <name> 90 --view <view>:
 ## `shop` (the main menu with the shop open on Gold), `menu` (the main menu and its profile line),
-## `results` (the results screen with YOUR PROGRESS). The profile is in memory only: nothing is
+## `pass` (the level pass, `--level N` to pretend), `results` (the results screen with YOUR PROGRESS). The profile is in memory only: nothing is
 ## written to user://profile.cfg.
 
 
@@ -23,14 +23,21 @@ func _ready() -> void:
 		_:
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
+			if view == "pass":
+				var lv: int = Cmdline.parse(OS.get_cmdline_user_args()).get_int("level", 0)
+				if lv > 0:
+					ProfileManager.profile.level = lv
+					ProfileManager.profile.xp = ProfileManager.profile.config.xp_for_level(lv) + 120
+				(menu.get("level_pass") as LevelPassPanel).open()
 			if view == "shop":
 				var shop: CosmeticsPanel = menu.get("cosmetics")
-				shop.open()
-				var pick: String = Cmdline.parse(OS.get_cmdline_user_args()).get_string("select", "color_gold")
-				var d: CosmeticDef = CosmeticShop.default().find(StringName(pick))
-				if d != null:
-					shop.show_kind(d.kind)
-				shop.select(StringName(pick))
+				shop.open(Cmdline.parse(OS.get_cmdline_user_args()).has_flag("inventory"))
+				# --select a,b,c tries several on (they stack), the last one picked.
+				for pick: String in Cmdline.parse(OS.get_cmdline_user_args()).get_string("select", "color_gold").split(","):
+					var d: CosmeticDef = CosmeticShop.default().find(StringName(pick))
+					if d != null:
+						shop.show_kind(d.kind)
+					shop.select(StringName(pick))
 				# Report whether the shop fits the screen (Patrick: "the menu is bigger than the screen").
 				await get_tree().process_frame
 				await get_tree().process_frame
