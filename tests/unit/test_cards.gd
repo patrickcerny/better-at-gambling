@@ -27,6 +27,15 @@ func test_totals_soft_and_hard() -> void:
 	assert_true(HandEval.is_bust(_h([10, 6, 9])))
 
 
+func test_total_text_shows_both_soft_counts() -> void:
+	assert_eq(HandEval.total_text(_h([1, 6])), "7 / 17")
+	assert_eq(HandEval.total_text(_h([1])), "1 / 11")
+	assert_eq(HandEval.total_text(_h([1, 6]), true), "17", "a finished hand shows its best total")
+	assert_eq(HandEval.total_text(_h([1, 6, 10])), "17", "hard once the ace has to count 1")
+	assert_eq(HandEval.total_text(_h([1, 10])), "21")
+	assert_eq(HandEval.total_text(_h([10, 6])), "16")
+
+
 func test_blackjack_vs_21() -> void:
 	assert_true(HandEval.is_blackjack(_h([1, 13])))
 	assert_false(HandEval.is_blackjack(_h([7, 7, 7])))
