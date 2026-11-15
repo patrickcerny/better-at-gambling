@@ -119,6 +119,8 @@ const CURTAIN_OPEN_TIME: float = 0.8
 const CURTAIN_GATHER: float = 0.7
 ## Gold crown over the money leader (not on the dedicated server).
 var crown: LeaderCrown = null
+## Streaks for the table and minigame achievements of this match (`AchievementTracker`).
+var achievement_tracker: AchievementTracker = AchievementTracker.new()
 
 var _ko_until: Dictionary[int, float] = {}
 var _ragdoll_attacker: Dictionary[int, int] = {}
@@ -962,6 +964,9 @@ func _on_event(ev: Dictionary) -> void:
 		event_sfx.on_event(ev)
 	if role != Role.SERVER:
 		SteamSvc.unlock_achievements(Achievements.from_event(ev, local_id))
+		if type == &"match_started" or type == &"match_reset":
+			achievement_tracker = AchievementTracker.new()  # streaks count within one match
+		SteamSvc.unlock_achievements(achievement_tracker.on_event(ev, local_id, _station_game(ev)))
 	match type:
 		&"player_joined":
 			_spawn_avatar(int(ev["player"]["id"]), ev["player"])
@@ -2076,6 +2081,14 @@ func _regroup() -> void:
 
 
 ## Online room went back to its lobby for another match ("play again in the same room").
+## The game of an event's station (`&""` without one), for `AchievementTracker`.
+func _station_game(ev: Dictionary) -> StringName:
+	var sid: StringName = StringName(ev.get("station", &""))
+	if sid == &"" or map == null or not map.stations.has(sid):
+		return &""
+	return map.stations[sid].game_id
+
+
 func _on_match_reset() -> void:
 	if results_panel != null:
 		results_panel.queue_free()

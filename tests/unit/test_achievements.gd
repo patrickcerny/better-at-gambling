@@ -33,6 +33,7 @@ func test_every_rule_names_a_defined_achievement() -> void:
 		assert_eq(got.size(), 1, str(ev))
 		all.append_array(got)
 	all.append(Achievements.BEAT_THE_DEV)  # earned through SteamSvc.check_beat_the_dev
+	all.append_array(AchievementTracker.IDS)  # tests/unit/test_achievement_tracker.gd
 	for id: StringName in all:
 		assert_true(Achievements.DEFS.has(id), "%s is in DEFS" % id)
 	for id: StringName in Achievements.DEFS:
