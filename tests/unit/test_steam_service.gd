@@ -71,3 +71,21 @@ func test_room_server_files_live_in_user_data() -> void:
 	assert_eq(ready.get_file(), "host_ready_4242.txt")
 	assert_ne(SteamParty.ready_file_path(1), SteamParty.ready_file_path(2), "one ready file per hosting process")
 	assert_eq(log_path.get_file(), "host_server.log")
+
+
+func test_friends_in_one_lobby_are_one_entry() -> void:
+	var seen: Array[Dictionary] = [
+		{"name": "Anna", "lobby": 7, "party": "Anna's lobby", "build": "1", "members": 0, "max": 8},
+		{"name": "Ben", "lobby": 7, "party": "Anna's lobby", "build": "1", "members": 5, "max": 8},
+		{"name": "Carl", "lobby": 9, "party": "", "build": "1", "members": 0, "max": 0},
+		{"name": "Dora", "lobby": 7, "party": "Anna's lobby", "build": "1", "members": 0, "max": 8},
+		{"name": "Emil", "lobby": 7, "party": "Anna's lobby", "build": "1", "members": 0, "max": 8},
+	]
+	var out: Array[Dictionary] = SteamSvc.group_friend_lobbies(seen)
+	assert_eq(out.size(), 2, "4 friends in one lobby: one entry (Patrick)")
+	assert_eq(out[0]["lobby"], 7)
+	assert_eq(out[0]["friends"], ["Anna", "Ben", "Dora", "Emil"])
+	assert_eq(out[0]["members"], 5)
+	assert_eq(out[1]["members"], 1, "at least the friend we see in it")
+	assert_eq(SteamSvc.friends_text(out[0]["friends"]), "Anna, Ben and 2 more")
+	assert_eq(SteamSvc.friends_text(["Anna", "Ben"]), "Anna and Ben")

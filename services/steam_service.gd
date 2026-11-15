@@ -501,12 +501,14 @@ func member_count() -> int:
 	return int(steam.call("getNumLobbyMembers", lobby_id)) if _available and lobby_id != 0 else 0
 
 
-## Friends playing this App ID inside a lobby: [{steam_id, name, lobby, party}] ("party" is the
-## lobby's name once Steam has its data; lobbies of other "Spacewar" games are left out once known).
+## Lobbies of friends playing this game, ONE entry per lobby however many friends are in it
+## (Patrick: "If i have 4 friends in the lobby, it shows 4 times the same lobby"):
+## [{lobby, party, build, friends: [names], members, max}]. Our own lobby is left out, and so
+## are other games' lobbies once Steam has their data.
 func friend_lobbies() -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
+	var seen: Array[Dictionary] = []
 	if not _available:
-		return out
+		return group_friend_lobbies(seen)
 	var n: int = int(steam.call("getFriendCount", FRIEND_FLAG_IMMEDIATE))
 	for i: int in n:
 		var fid: int = int(steam.call("getFriendByIndex", i, FRIEND_FLAG_IMMEDIATE))
@@ -514,13 +516,47 @@ func friend_lobbies() -> Array[Dictionary]:
 		if int(game.get("id", 0)) != APP_ID or int(game.get("lobby", 0)) == 0:
 			continue
 		var lid: int = int(game["lobby"])
+		if lid == lobby_id:
+			continue
 		var kind: String = lobby_data(lid, "game")
 		if kind == "":
 			steam.call("requestLobbyData", lid)  # arrives later; the list refreshes
 		elif kind != LOBBY_GAME:
 			continue
-		out.append({"steam_id": fid, "name": str(steam.call("getFriendPersonaName", fid)), "lobby": lid, "party": lobby_data(lid, "name"), "build": lobby_data(lid, "build")})
+		seen.append({"name": str(steam.call("getFriendPersonaName", fid)), "lobby": lid, "party": lobby_data(lid, "name"),
+			"build": lobby_data(lid, "build"), "members": int(steam.call("getNumLobbyMembers", lid)), "max": int(steam.call("getLobbyMemberLimit", lid))})
+	return group_friend_lobbies(seen)
+
+
+## One entry per lobby id, in first-seen order, with every friend's name in `friends`.
+static func group_friend_lobbies(seen: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var at: Dictionary[int, int] = {}
+	for f: Dictionary in seen:
+		var lid: int = int(f["lobby"])
+		if at.has(lid):
+			var e: Dictionary = out[at[lid]]
+			(e["friends"] as Array).append(str(f["name"]))
+			e["members"] = maxi(int(e["members"]), int(f.get("members", 0)))
+			continue
+		at[lid] = out.size()
+		out.append({"lobby": lid, "party": str(f.get("party", "")), "build": str(f.get("build", "")), "friends": [str(f["name"])],
+			"members": int(f.get("members", 0)), "max": int(f.get("max", 0))})
+	for e: Dictionary in out:
+		e["members"] = maxi(int(e["members"]), (e["friends"] as Array).size())  # Steam may not know yet
 	return out
+
+
+## "Anna", "Anna and Ben", "Anna, Ben and 2 more".
+static func friends_text(names: Array) -> String:
+	match names.size():
+		0:
+			return ""
+		1:
+			return str(names[0])
+		2:
+			return "%s and %s" % [names[0], names[1]]
+	return "%s, %s and %d more" % [names[0], names[1], names.size() - 2]
 
 
 # --- callbacks ---------------------------------------------------------------------------------
