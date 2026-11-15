@@ -93,6 +93,9 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.34 open eyes in shop pictures
+- Shop thumbnails were sometimes taken mid-blink (slit eyes); the thumbnail bean never blinks now (`AvatarVisuals.no_blink`).
+
 ### 2026-11-15 / 0.9.33 shop vs wardrobe, level pass rework, pass-only cosmetics
 - Shop is a storefront (striped awning, wallet, three FEATURED premium cards a day); MY COSMETICS is a
   wardrobe (dark wood, WEARING column with one slot per kind, "N OF M OWNED", no prices or wallet).
