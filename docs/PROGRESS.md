@@ -93,6 +93,18 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.32 voice rework
+- Patrick (0.9.28): Steam voice silent; without it, Mic volume 400 % needed for normal loudness.
+- Cause: raw mics speak at -35..-50 dBFS; the open-mic gate and the auto level hung on a fixed
+  -45 dBFS threshold, so a quiet mic barely opened it and the auto level never lifted it.
+- `VoiceVad` (speech relative to the room's noise floor), `VoiceAgc` driven by it (up to +30 dB,
+  room capped at -36 dBFS), settings upgrade (auto level on, Mic volume 100 %, Steam voice off).
+- `AdpcmCodec`: 16 kHz IMA ADPCM instead of 8 kHz mu-law, same bandwidth (~8.2 KB/s per speaker).
+- Steam voice: getVoice results logged; still off by default until a log shows why it was silent.
+- Evidence: 149 voice/settings GUT tests green locally (Godot 4.7.2 headless). The net voice tests
+  (tests/net) could not run in the cloud container (UDP clients time out, also on unchanged main);
+  CI runs them on the Steam deploy.
+
 ### 2026-11-15 / 0.9.30 22 new Steam achievements
 - Patrick: "More achievements for next version: lose 4 blackjack hands in a row, hit 2 single
   numbers after each other, get a blackjack, stuff like this". `AchievementTracker` (one per match,
