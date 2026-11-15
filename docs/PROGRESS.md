@@ -93,6 +93,12 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.29 joining works again
+- Patrick on Steam 0.9.28: "Create Lobby" waited long, then "The server did not answer." Cause: the
+  hello carried the worn outfit as a PackedStringArray (since 0.9.18), which the server's WireGuard
+  drops silently, so no WELCOME ever came (own lobby and friends alike). `NetSession.wire_hello`
+  now sends packed arrays as plain Arrays; `tests/unit/test_wire_hello.gd`. Reproduced and verified
+  with a real `--server --host-mode` process plus a `--connect` client.
 ### 2026-11-15 / 0.9.28 shop fixes, level pass, try-on look, inventory
 - Shop: tiles fill the width, + inside the coin pill, unaffordable/level-locked items greyed out with
   "N MORE COINS NEEDED". Try-ons stack across tabs (`CosmeticsPanel.trying`), clicking a picked tile
