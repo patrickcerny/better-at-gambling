@@ -778,7 +778,8 @@ static func _shirt(k: OutfitMeshKit, id: StringName) -> void:
 					path.append(OutfitMeshKit.body_point(lerpf(end_t, top.call(0.42) - 0.012, float(i) / 9.0), side * 0.42, inf + 0.02))
 				for i: int in 24:
 					var a: float = side * lerpf(0.42, PI, float(i + 1) / 24.0)
-					path.append(OutfitMeshKit.body_point(top.call(a) - 0.012, a, inf + 0.02))
+					# Snug round the back of the neck, under a cape's collar.
+					path.append(OutfitMeshKit.body_point(top.call(a) - 0.012, a, inf + lerpf(0.02, 0.006, smoothstep(0.8, 1.6, absf(a)))))
 				_tube(k, path, 0.011, tube)
 			var bell: Transform3D = OutfitMeshKit.body_frame(0.26, -0.42, inf + 0.022)
 			k.prism(OutfitMeshKit.circle_poly(0.032, 14), 0.014, bell, SILVER)
@@ -1259,7 +1260,7 @@ static func _cape(k: OutfitMeshKit, id: StringName) -> void:
 				if (v > 0.78 and v < 0.82) or (v > 0.85 and v < 0.87):
 					return SKY
 				return WHITE, WHITE.darkened(0.08), 64, 26)
-			k.sphere(OutfitMeshKit.body_point(0.56, 0.0, 0.03), Vector3(0.07, 0.05, 0.04), WHITE, 8, 4)
+			# No knot at the front: there it sat on the mouth and poked through every beard.
 		&"cape_leopard":
 			_cape_sheet(k, -0.78, func(u: float, v: float) -> Color:
 				var h: float = _hash(int(u * 22.0), int(v * 18.0), 13)
@@ -1575,6 +1576,8 @@ static func has_lashes(id: StringName) -> bool:
 ## the mouth shows (and moves) in the gap between the moustache and the chin hair, not through it.
 const MOUSTACHE_LIFT: float = 0.08
 const BEARD_MOUTH_DROP: float = 0.0
+## How far a long beard stands off the chest below the shirt's neckline (clears every shirt).
+const BEARD_CLEAR: float = 0.06
 
 
 static func _mouth_y() -> float:
@@ -1597,12 +1600,18 @@ static func _face_point(y: float, a: float, out: float) -> Vector3:
 ## A thick patch of beard across angles -span..span between heights top(a) and bottom(a),
 ## `thick(u, v)` off the skin (thin at the edges so it meets the skin).
 static func _beard_patch(k: OutfitMeshKit, span: float, top: Callable, bottom: Callable, thick: Callable, color: Color, nu: int = 36, nv: int = 16) -> void:
+	var neck: Callable = _shirt_top()
 	for side: int in 2:
 		var at := func(u: float, v: float) -> Vector3:
 			var a: float = (u - 0.5) * 2.0 * span
 			var y: float = lerpf(top.call(a), bottom.call(a), v)
 			var edge: float = pow(sin(PI * u), 0.4) * pow(sin(PI * clampf(v * 0.5 + 0.08, 0.0, 0.5) * 2.0), 0.3)
 			var th: float = 0.006 + (thick.call(u, v) as float) * edge if side == 0 else 0.004
+			# Below the neckline the beard lies ON the shirt (collars, lapels, a stethoscope stand
+			# up to ~5 cm off the skin): lift it clear, so no shirt pokes through a long beard.
+			var t: float = y / AvatarVisuals.BODY_HEIGHT + 0.5
+			var n: float = neck.call(a)
+			th += BEARD_CLEAR * smoothstep(n + 0.06, n - 0.02, t)
 			return _face_point(y, a, th)
 		var col: Color = color if side == 0 else color.darkened(0.4)
 		k.surface(at, nu, nv, func(_u: float, _v: float) -> Color: return col, func(p: Vector3) -> Vector3:
@@ -1735,7 +1744,10 @@ static func _glasses(k: OutfitMeshKit, id: StringName) -> void:
 				var s: float = float(i) / 10.0
 				var y: float = p.y - r * 1.1 - s * 0.32
 				var x: float = p.x + 0.04 + s * 0.12
-				k.sphere(Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.02), Vector3.ONE * 0.009, GOLD.darkened(0.1), 6, 3)
+				# Over a shirt's collar further down, not through it.
+				var n: float = _shirt_top().call(asin(clampf(x / 0.45, -1.0, 1.0)))
+				var lift: float = BEARD_CLEAR * smoothstep(n + 0.06, n - 0.02, y / AvatarVisuals.BODY_HEIGHT + 0.5)
+				k.sphere(Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.02 - lift), Vector3.ONE * 0.009, GOLD.darkened(0.1), 6, 3)
 		&"eyes_shades":
 			# The tinted lenses are their own see-through surface (`shade_lenses`), inside the rims.
 			for side: float in [-1.0, 1.0]:
