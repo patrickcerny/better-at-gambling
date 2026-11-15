@@ -93,6 +93,16 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.45 Casino Hold'em river bet
+- Patrick: "Poker river bet". Before, the turn and the river came out together straight after the
+  CALL, with no betting in between. Now the turn comes out on its own (state `RIVER`, appended to
+  `HoldemLogic.State` so the older numbers stay), and every called hand puts down a RIVER BET (one
+  ante) or CHECKs on its own clock (`BalanceConfig.holdem_river_time` 10 s; out of time, standing up
+  or the match end = check). The river bet pays 1:1 like the call, comes back when the dealer does
+  not qualify or ties. Turn, river and the dealer's two are still drawn together (house rule and
+  luck unchanged, judged on ante + call); river and dealer stay in `hidden` on the server until the
+  showdown. Chips go on the CALL spot and settle with the hand. Same two buttons in the overlay
+  (C = river bet, F = check). Protocol 16. The RTP sim checks the river, so its numbers are unchanged.
 ### 2026-11-15 / 0.9.43 end screen with the stats stays up for 10 s
 - Patrick: "Es hat auch den endscreen mit den stats einfach direct geskipped lass den verpflichtend paar
   sekunden bleiben bis man leaven kann". Cause: PLAY AGAIN had the focus from the first frame, so a
