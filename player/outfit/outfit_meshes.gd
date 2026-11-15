@@ -548,11 +548,14 @@ static func _hat(k: OutfitMeshKit, id: StringName) -> void:
 			for i: int in 28:  # the twisted cord
 				var ang: float = TAU * float(i) / 28.0
 				k.sphere(Vector3(sin(ang) * 0.318, 0.055, cos(ang) * 0.318 * D), Vector3(0.028, 0.022, 0.028), [RED, CREAM][i % 2], 6, 3)
-			k.sphere(Vector3(0.29, 0.21, 0.1), Vector3(0.022, 0.2, 0.045), Color("#7A5A3A"), 8, 5, Basis(Vector3.BACK, -0.45) * Basis(Vector3.RIGHT, 0.25))
-			k.sphere(Vector3(0.36, 0.33, 0.14), Vector3(0.012, 0.09, 0.03), Color("#C9B79A"), 6, 3, Basis(Vector3.BACK, -0.6))
+			# The feather tucked in the cord on the outside (2026-11-15: it went through the crown).
+			var fb := Basis(Vector3.BACK, -0.35) * Basis(Vector3.RIGHT, 0.2)
+			var foot := Vector3(0.33, 0.07, 0.12)
+			k.sphere(foot + fb * Vector3(0, 0.19, 0), Vector3(0.022, 0.2, 0.045), Color("#7A5A3A"), 8, 5, fb)
+			k.sphere(foot + fb * Vector3(0, 0.36, 0) + Vector3(0.02, 0, 0), Vector3(0.012, 0.09, 0.03), Color("#C9B79A"), 6, 3, Basis(Vector3.BACK, -0.5))
 			for i: int in 7:  # the tuft
 				var a: float = -0.6 + float(i) * 0.2
-				k.sphere(Vector3(0.28 + sin(a) * 0.04, 0.14 + cos(a) * 0.08, 0.17), Vector3(0.03, 0.09, 0.03), Color("#4A3E34").lightened(_hash(i, 1, 9) * 0.25), 6, 3, Basis(Vector3.BACK, a))
+				k.sphere(Vector3(0.36 + sin(a) * 0.04, 0.12 + cos(a) * 0.08, 0.16), Vector3(0.03, 0.09, 0.03), Color("#4A3E34").lightened(_hash(i, 1, 9) * 0.25), 6, 3, Basis(Vector3.BACK, a))
 		&"hat_golf":
 			var tweed := Color("#9C8A6A")
 			k.dome(Vector3(0, -0.03, 0.02), Vector3(0.36, 0.2, 0.37), tweed, 18)
