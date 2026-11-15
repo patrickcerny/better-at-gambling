@@ -93,6 +93,16 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.24 voice through Steam
+- Patrick: fifine USB mic still too quiet at Mic volume 400 %, then "use this approach" (GodotSteam voice).
+- `VoiceSteamSource`: the microphone is recorded by Steam (startVoiceRecording/getVoice), decompressed
+  to 16 kHz and fed into the same capture path (Mic volume, gate, auto level, 40 ms frames, relay,
+  proximity). Steam's own mic choice, input volume and automatic gain apply (Steam > Settings > Voice).
+  Steam's speech-only stream is filled with silence on the clock so gates and talk spurts still end.
+- Settings > Audio > Steam voice (default on); off, or without Steam, reads the audio driver as before.
+- Evidence: `tests/unit/test_voice_steam_source.gd` (fake GodotSteam), voice unit/integration/ui
+  and settings tests green locally (Godot 4.7.2 headless). Not yet heard with a real Steam client.
+
 ### 2026-11-15 / 0.9.23 outfits rework
 - Shop: coin packs for real money (+ next to the Coins), 8 animated skins (`vfx/shaders/bean_skin.gdshader`;
   Gold free at level 25, Rainbow at 50), 8 more colours (24), eyes / mouths / beards as new outfit

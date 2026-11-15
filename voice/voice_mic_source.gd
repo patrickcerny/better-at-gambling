@@ -15,12 +15,26 @@ const DEFAULT_DEVICE: String = "Default"
 const STALE_SECONDS: float = 0.5
 const KEEP_SECONDS: float = 0.1
 
+## The source a capture should read now: Steam voice when Steam runs and Settings > Audio >
+## Steam voice is on, else the audio driver.
+static func make() -> VoiceMicSource:
+	return VoiceSteamSource.new() if VoiceSteamSource.wanted() else VoiceMicSource.new()
+
+
+## True for the sources `make` hands out (tests put in fakes of their own, which are kept).
+static func is_stock(s: VoiceMicSource) -> bool:
+	return s != null and (s.get_script() == VoiceMicSource or s is VoiceSteamSource)
+
+
 ## Live `VoiceMicSource`s holding the input device open (the settings panel's mic test can
 ## overlap the voice channel for a frame): the device stops when the last one lets go.
 static var _users: int = 0
 
 ## Why `start` failed ("" while fine), for the HUD, the settings panel and the log.
 var error: String = ""
+## True when samples flow at `rate()` without a break, so the capture may measure the rate and
+## warn about a silent microphone (`VoiceSteamSource` fills Steam's speech-only stream instead).
+var continuous: bool = true
 ## Stale frames `read_all` threw away (they still count as delivered for the rate check).
 var skipped: int = 0
 var _started: bool = false
