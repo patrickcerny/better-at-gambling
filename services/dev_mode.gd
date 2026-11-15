@@ -29,6 +29,8 @@ const COSMETIC_IDS: Array[int] = [
 	76561199081785301,
 	76561198971147660,
 	76561198358513331,
+	76561198138593759,
+	76561198124973959,
 ]
 ## The one account that counts as "the dev" for Beat the Dev (Patrick only).
 const THE_DEV: int = 76561198325616486
