@@ -1,7 +1,5 @@
 extends SceneTree
-## Writes tools/steam/itemdefs.json from the cosmetics shop: one Steam Inventory item definition
-## per paid outfit piece (`CosmeticDef.steam_item`), one bundle per pack (`CosmeticPack`) and one
-## per coin pack (`CoinPack`: the game uses it up and adds the Coins). Packs taken out of the shop
+## Writes tools/steam/itemdefs.json from the cosmetics shop (see `itemdefs`). Packs taken out of the shop
 ## stay listed, hidden (`RETIRED`): Steam never deletes an item definition.
 ## Upload it in Steamworks (App 5623410 → Inventory Service → Item Definitions).
 ##   tools/godot/godot --headless --path . -s tools/steam/make_itemdefs.gd
@@ -23,22 +21,48 @@ func _init() -> void:
 	quit()
 
 
-## The whole file: {appid, items}.
+## The whole file: {appid, items}. Gold Coins (Patrick 2026-11-15): one Gold Coin item
+## (`CoinPack.GOLD_ITEM`), gold packs sold for money that grant N of them, premium pieces and sets
+## not sold for money but exchanged for Gold Coins ("exchange": "3100x75"), and the other pieces of
+## a set as hidden items its bundle grants.
 static func itemdefs(shop: CosmeticShop) -> Dictionary:
 	var items: Array = []
-	for d: CosmeticDef in shop.items:
-		if not d.steam_buyable():
-			continue
+	items.append({
+		"itemdefid": CoinPack.GOLD_ITEM,
+		"type": "item",
+		"name": "Gold Coin",
+		"description": "Spent on premium pieces and sets in the cosmetics shop of Better at Gambling.",
+		"store_hidden": true,
+		"tradable": false,
+		"marketable": false,
+	})
+	for c: CoinPack in shop.coin_packs:
 		items.append({
-			"itemdefid": d.steam_item,
-			"type": "item",
-			"name": d.display_name,
-			"description": "%s for your bean in Better at Gambling.%s" % [String(d.kind).capitalize(), " Only sold here." if d.money_only else ""],
-			"price": price(d.cents),
-			"store_tags": String(d.kind),
+			"itemdefid": c.steam_item,
+			"type": "bundle",
+			"bundle": "%dx%d" % [CoinPack.GOLD_ITEM, c.gold],
+			"name": "%d Gold Coins" % c.gold,
+			"description": "%d Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling." % c.gold,
+			"price": price(c.cents),
+			"store_tags": "gold",
 			"tradable": false,
 			"marketable": false,
 		})
+	for d: CosmeticDef in shop.items:
+		if d.steam_item <= 0:
+			continue
+		var row: Dictionary = {
+			"itemdefid": d.steam_item,
+			"type": "item",
+			"name": d.display_name,
+			"description": "%s for your bean in Better at Gambling." % String(d.kind).capitalize(),
+			"store_hidden": true,
+			"tradable": false,
+			"marketable": false,
+		}
+		if d.premium():
+			row["exchange"] = "%dx%d" % [CoinPack.GOLD_ITEM, d.gold]
+		items.append(row)
 	for k: CosmeticPack in shop.packs:
 		var grants := PackedStringArray()
 		for id: StringName in k.pieces:
@@ -49,22 +73,10 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"itemdefid": k.steam_item,
 			"type": "bundle",
 			"bundle": ";".join(grants),
+			"exchange": "%dx%d" % [CoinPack.GOLD_ITEM, k.gold],
 			"name": k.display_name,
-			# Counts what the bundle grants: free pieces in the outfit are everyone's already.
-			"description": "The whole %s outfit (%d pieces), cheaper than one by one." % [k.display_name, grants.size()],
-			"price": price(k.cents),
-			"store_tags": "pack",
-			"tradable": false,
-			"marketable": false,
-		})
-	for c: CoinPack in shop.coin_packs:
-		items.append({
-			"itemdefid": c.steam_item,
-			"type": "item",
-			"name": "%d Coins" % c.coins,
-			"description": "%d Coins to spend in the cosmetics shop of Better at Gambling. Used up when they arrive in your wallet." % c.coins,
-			"price": price(c.cents),
-			"store_tags": "coins",
+			"description": "The whole %s outfit (%d pieces) for Gold Coins." % [k.display_name, grants.size()],
+			"store_hidden": true,
 			"tradable": false,
 			"marketable": false,
 		})

@@ -27,17 +27,17 @@ const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_
 @export var id: StringName = &""
 @export var kind: StringName = KIND_COLOR
 @export var display_name: String = ""
-## Price in Coins; 0 = free and always owned.
+## Price in (red) Coins, earned by playing; 0 = free and always owned (unless `gold` is set).
 @export var price: int = 0
 ## Unlocked for free at this player level (0 = never): before that it can be bought (Patrick
 ## 2026-11-14: "some skins behind a level wall, or you can buy them").
 @export var level: int = 0
-## Only for real money through Steam (no Coin price; `price` is ignored).
-@export var money_only: bool = false
-## Real-money price in euro cents (0 = not sold for money). The price shown comes from Steam
-## (the player's currency); this is the reference written into tools/steam/itemdefs.json.
-@export var cents: int = 0
-## The Steam Inventory item definition that grants this piece (0 = none).
+## Premium: the price in Gold Coins (bought with real money only), 0 = a normal piece. A premium
+## piece has no red Coin price (Patrick 2026-11-15: "Goldcoins nur für echtgeld, red coins durch
+## spielen"; red for normal, gold for premium).
+@export var gold: int = 0
+## The Steam Inventory item definition that grants this piece (0 = none): premium pieces (exchanged
+## for Gold Coins) and every piece of a set (granted by the set's bundle).
 @export var steam_item: int = 0
 ## Outfit pieces: up to three colours for the shop tile's swatch.
 @export var swatch: PackedColorArray = PackedColorArray()
@@ -46,14 +46,14 @@ const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_
 
 
 func is_free() -> bool:
-	return price <= 0 and not money_only and level <= 0
+	return price <= 0 and gold <= 0 and level <= 0
 
 
-## Whether it can be bought with Coins.
+## Whether it can be bought with red Coins.
 func coin_buyable() -> bool:
-	return not money_only and price > 0
+	return gold <= 0 and price > 0
 
 
-## Whether it can be bought with real money through Steam.
-func steam_buyable() -> bool:
-	return steam_item > 0 and cents > 0
+## Premium: bought with Gold Coins through the Steam inventory.
+func premium() -> bool:
+	return gold > 0 and steam_item > 0

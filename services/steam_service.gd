@@ -25,8 +25,8 @@ signal lobby_members_changed(lobby_id: int)
 signal store_changed
 ## A purchase ended: ok (paid, the inventory follows) or not (cancelled or failed).
 signal purchase_finished(ok: bool)
-## Coins bought with real money arrived (after Steam used up the coin pack).
-signal coins_added(amount: int)
+## A Gold Coin purchase (exchange) ended: ok (the piece or set is in the inventory) or not.
+signal gold_spent(ok: bool)
 
 ## The game's own Steamworks App ID (was 480 "Spacewar" for tests until 0.9.16).
 const APP_ID: int = 5623410
@@ -58,10 +58,12 @@ var currency: String = ""
 var prices: Dictionary[int, int] = {}
 ## A purchase is waiting for the overlay.
 var buying: bool = false
-## Coin packs being consumed: result handle -> Coins to add when Steam confirms.
-var _consuming: Dictionary[int, int] = {}
-## Inventory item instances with a consume on its way (never consumed twice).
-var _consuming_items: Array[int] = []
+## Gold Coins in the Steam inventory (`CoinPack.GOLD_ITEM` stacks added up).
+var gold: int = 0
+## The Gold Coin stacks: [{item_id, quantity}] (what an exchange spends from).
+var _gold_stacks: Array[Dictionary] = []
+## Exchanges on their way: result handle -> the item definition bought.
+var _exchanging: Dictionary[int, int] = {}
 
 
 func _ready() -> void:
@@ -166,11 +168,13 @@ func _on_profile_changed() -> void:
 	unlock_achievements(Achievements.from_profile(ProfileManager.profile))
 
 
-# --- Real-money store (Steam Inventory Service) -------------------------------------------------
-# Every paid outfit piece and every pack is a Steam item definition (`CosmeticDef.steam_item`,
-# `CosmeticPack.steam_item`; tools/steam/itemdefs.json is what Steamworks holds). Steam charges,
-# converts the price and keeps the record: on start and after each purchase the inventory is read
-# and handed to `ProfileManager.set_steam_owned`. Handlers take optional arguments so a GodotSteam
+# --- Gold Coins and premium pieces (Steam Inventory Service) -------------------------------------
+# Gold Coins are bought for real money only (Patrick 2026-11-15): a gold pack (`CoinPack`) is a
+# Steam bundle granting `CoinPack.GOLD_ITEM` items, which stay in the Steam inventory. Premium
+# pieces and sets are item definitions (`CosmeticDef.steam_item`, `CosmeticPack.steam_item`) with
+# an exchange recipe in Gold Coins (tools/steam/itemdefs.json is what Steamworks holds), so Steam
+# keeps the balance and what was bought. On start, after each purchase and exchange the inventory is
+# read: the pieces go to `ProfileManager.set_steam_owned`, the Gold Coins to `gold`. Handlers take optional arguments so a GodotSteam
 # version with a slightly different signal never breaks the connection.
 
 func _start_store() -> void:
@@ -206,8 +210,8 @@ func price_text(def: int) -> String:
 	return format_price(prices[def], currency)
 
 
-## Opens the Steam overlay to pay for item definition `def` (a piece or a pack). False when the
-## store is not ready or a purchase is already open.
+## Opens the Steam overlay to pay for item definition `def` (a gold pack). False when the store is
+## not ready or a purchase is already open.
 func buy_item(def: int) -> bool:
 	if not _available or buying or def <= 0:
 		return false
@@ -251,58 +255,60 @@ static func owned_from_items(items: Array, shop: CosmeticShop) -> Array[StringNa
 	return out
 
 
-## The coin packs in an inventory listing that still have to be turned into Coins:
-## [{item_id, quantity, coins}] (coins = the pack's Coins times the quantity).
-static func coin_stacks(items: Array, shop: CosmeticShop) -> Array[Dictionary]:
+## The Gold Coin stacks in an inventory listing: [{item_id, quantity}].
+static func gold_stacks(items: Array) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for it: Variant in items:
 		if not it is Dictionary:
 			continue
 		var row: Dictionary = it
-		var found: Resource = shop.by_steam_item(int(row.get("item_definition", 0)))
 		var qty: int = int(row.get("quantity", 1))
-		if found is CoinPack and qty > 0:
-			out.append({"item_id": int(row.get("item_id", 0)), "quantity": qty, "coins": (found as CoinPack).coins * qty})
+		if int(row.get("item_definition", 0)) == CoinPack.GOLD_ITEM and qty > 0:
+			out.append({"item_id": int(row.get("item_id", 0)), "quantity": qty})
 	return out
 
 
+## Which stacks pay `cost` Gold Coins: [item ids, quantities], empty when they don't reach.
+static func gold_inputs(stacks: Array[Dictionary], cost: int) -> Array:
+	var ids := PackedInt64Array()
+	var qty := PackedInt32Array()
+	var left: int = cost
+	for st: Dictionary in stacks:
+		if left <= 0:
+			break
+		var take: int = mini(int(st["quantity"]), left)
+		ids.append(int(st["item_id"]))
+		qty.append(take)
+		left -= take
+	return [] if left > 0 or cost <= 0 else [ids, qty]
+
+
+## Buys item definition `def` (a premium piece or a set) for `cost` Gold Coins: Steam exchanges
+## the coins for it (the recipe in its item definition). False when Steam isn't running, the Gold
+## doesn't reach or an exchange is already on its way; the answer comes as `gold_spent`.
+func buy_with_gold(def: int, cost: int) -> bool:
+	if not _available or def <= 0 or not _exchanging.is_empty():
+		return false
+	var inputs: Array = gold_inputs(_gold_stacks, cost)
+	if inputs.is_empty():
+		return false
+	var handle: int = int(steam.call("exchangeItems", PackedInt64Array([def]), PackedInt32Array([1]), inputs[0], inputs[1]))
+	if handle <= 0:
+		return false
+	_exchanging[handle] = def
+	return true
+
+
 func _on_inventory_result(result: int = 0, handle: int = 0, _a: Variant = null, _b: Variant = null) -> void:
-	if _consuming.has(handle):
-		_finish_consume(result, handle)
+	if _exchanging.has(handle):
+		_exchanging.erase(handle)
+		steam.call("destroyResult", handle)
+		if result != 1:
+			Log.warn(&"steam", "gold exchange failed (result %d)" % result)
+		gold_spent.emit(result == 1)
+		refresh_inventory()
 		return
 	_read_inventory(result, handle)
-
-
-## Coins bought: the coin pack item is used up in the Steam inventory, and only when Steam says
-## that worked are the Coins added (so a pack is never paid out twice, or not at all).
-func _consume_coin_packs(items: Array) -> void:
-	for stack: Dictionary in coin_stacks(items, CosmeticShop.default()):
-		var item_id: int = int(stack["item_id"])
-		if item_id in _consuming_items:
-			continue
-		var handle: int = int(steam.call("consumeItem", item_id, int(stack["quantity"])))
-		if handle <= 0:
-			continue
-		_consuming[handle] = int(stack["coins"])
-		_consuming_items.append(item_id)
-
-
-func _finish_consume(result: int, handle: int) -> void:
-	var coins: int = int(_consuming[handle])
-	_consuming.erase(handle)
-	var items: Variant = steam.call("getResultItems", handle)
-	steam.call("destroyResult", handle)
-	if items is Array:
-		for it: Variant in items:
-			if it is Dictionary:
-				_consuming_items.erase(int((it as Dictionary).get("item_id", 0)))
-	if result != 1:
-		Log.warn(&"steam", "coin pack not used up (result %d), trying again later" % result)
-		_consuming_items.clear()
-		return
-	var added: int = ProfileManager.add_coins(coins)
-	Log.info(&"steam", "coins bought: +%d" % added)
-	coins_added.emit(added)
 
 
 func _on_inventory_full(handle: int = 0, _a: Variant = null, _b: Variant = null) -> void:
@@ -317,9 +323,12 @@ func _read_inventory(result: int, handle: int) -> void:
 	steam.call("destroyResult", handle)
 	if not items is Array:
 		return
-	_consume_coin_packs(items as Array)
+	_gold_stacks = gold_stacks(items as Array)
+	gold = 0
+	for st: Dictionary in _gold_stacks:
+		gold += int(st["quantity"])
 	var ids: Array[StringName] = owned_from_items(items as Array, CosmeticShop.default())
-	Log.info(&"steam", "inventory: %d pieces" % ids.size())
+	Log.info(&"steam", "inventory: %d pieces, %d Gold Coins" % [ids.size(), gold])
 	ProfileManager.set_steam_owned(ids)
 	store_changed.emit()
 
@@ -332,11 +341,6 @@ func _on_prices(result: int = 0, code: Variant = "", _a: Variant = null) -> void
 	prices.clear()
 	var shop: CosmeticShop = CosmeticShop.default()
 	var defs: Array[int] = []
-	for d: CosmeticDef in shop.items:
-		if d.steam_item > 0:
-			defs.append(d.steam_item)
-	for k: CosmeticPack in shop.packs:
-		defs.append(k.steam_item)
 	for c: CoinPack in shop.coin_packs:
 		defs.append(c.steam_item)
 	for def: int in defs:

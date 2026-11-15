@@ -1,31 +1,30 @@
-# Real-money cosmetics (Steam Inventory Service)
+# Gold Coins and premium cosmetics (Steam Inventory Service)
 
-Patrick 2026-11-14: pieces cost 0,50 to 1 euro, some are only sold for money, full packs are
-50 cents cheaper than all their pieces one by one. Direct purchase only: no loot boxes, no random
-drops, no second currency (casino theme, Austrian/Belgian rules on paid randomness).
+Patrick 2026-11-15: two currencies. Red Coins are earned by playing (matches, every level up) and
+buy the normal pieces. Gold Coins only come for real money and buy the premium pieces and the sets.
+Direct purchase only: no loot boxes, no random drops (casino theme, Austrian/Belgian rules on paid
+randomness). Before that (2026-11-14) pieces were sold one by one for 0,50 to 1 euro; that was
+never uploaded to Steam.
 
 ## How it works
 
-- Catalog: `data/progression/cosmetics_shop.tres`. Every paid outfit piece has `cents` (reference
-  euro price) and `steam_item` (its Steam item definition, 100+). `money_only` pieces have no
-  Coins price. Packs (`CosmeticPack`, 1000+) are Steam bundles granting their pieces.
-  Prices by Coins tier: up to 300 Coins = 0,50 €, up to 500 = 0,75 €, above = 1,00 €;
-  money-only pieces 1,00 €; a pack = its pieces minus 0,50 €.
-- `SteamSvc` (services/steam_service.gd) reads prices (`requestPrices`, the player's currency) and
-  the inventory (`getAllItems`) on start, when the shop opens and after a purchase, and hands the
-  owned pieces to `ProfileManager.set_steam_owned`. Steam is the record; nothing about Steam
-  purchases is saved in profile.cfg. BUY WITH STEAM / BUY PACK call `startPurchase`, which opens
-  the Steam overlay.
-- Without Steam the Steam buttons are greyed out; the reference euro prices still show.
-- Animated skins (200+) are the pricier tier: 1,49 € or 1,99 €, money only. Gold Rush (level 25)
-  and Rainbow (level 50) are also free at that level (`CosmeticDef.level`). Eyes 300+, mouths 310+,
-  beards 320+.
-- Coin packs (`CoinPack`, 3000+: 500 / 1200 / 3500 Coins for 0,99 / 1,99 / 4,99 €) are consumable
-  Steam items. After a purchase `SteamSvc` finds them in the inventory, calls `consumeItem` and
-  credits the Coins (`ProfileManager.add_coins`) only on an OK result for that handle, so a pack is
-  never counted twice. The + next to the Coins in the shop opens the COINS page.
-- Retired item definitions are never reused: 1009 (Holiday Mode, removed from the shop) stays in
-  itemdefs.json as `store_hidden` so owners keep its pieces.
+- Catalog: `data/progression/cosmetics_shop.tres`. Normal pieces have `price` (red Coins), saved in
+  profile.cfg. Premium pieces have `gold` (Gold Coins, 50 to 200; skins 149/199) and `steam_item`
+  (100+). Sets (`CosmeticPack`, 1000+) have `gold` and are Steam bundles granting their pieces, so
+  every non-free piece of a set has a `steam_item` too (hidden, only granted by the set).
+- Gold Coin: item definition 3100 (`CoinPack.GOLD_ITEM`). Gold packs (`CoinPack`, 3000+: 100 / 220 /
+  600 Gold for 0,99 / 1,99 / 4,99 €) are bundles granting that many Gold Coins; they are the only
+  item definitions with a price. The + next to the Gold in the shop opens the GOLD page; BUY WITH
+  STEAM calls `startPurchase` (Steam overlay).
+- Premium pieces and sets carry an `exchange` recipe ("3100x75"). BUY FOR N GOLD calls
+  `SteamSvc.buy_with_gold`, which picks Gold Coin stacks (`gold_inputs`) and calls `exchangeItems`;
+  Steam takes the coins and grants the piece. The balance and what was bought stay in the Steam
+  inventory (nothing about Gold is saved in profile.cfg), read on start, when the shop opens and
+  after each purchase or exchange (`SteamSvc.gold`, `ProfileManager.set_steam_owned`).
+- Without Steam there is no Gold: premium pieces and sets say GOLD NEEDS STEAM.
+- Gold Rush (level 25) and Rainbow (level 50) skins are also free at that level (`CosmeticDef.level`).
+- Retired item definitions are never reused: 1009 (Holiday Mode) stays in itemdefs.json as
+  `store_hidden`.
 
 ## Steamworks setup (once, and after catalog changes)
 

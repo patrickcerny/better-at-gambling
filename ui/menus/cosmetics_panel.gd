@@ -10,11 +10,11 @@ extends PanelContainer
 ## the preferred one or puts a piece on (worn from the next join on, and in the lobby at once
 ## through `set_color` / `set_outfit`); TAKE OFF takes a piece off. Coins are out-of-match money:
 ## the tables never take them. BACK (or Esc) closes.
-## Real money (Patrick 2026-11-14): every paid piece can also be bought through Steam for 0,50 to
-## 1 euro, a few only that way (`CosmeticDef.money_only`), and the PACKS tab sells whole outfits
-## 50 cents under their pieces (`CosmeticPack`). The STEAM button opens the Steam overlay
-## (`SteamSvc.buy_item`); Steam's inventory then says what is owned. Without Steam it is greyed out.
-## The + next to the wallet opens the COINS page: Coins for real money (`CoinPack`). Some items
+## Two currencies (Patrick 2026-11-15): red Coins are earned by playing and buy the normal pieces;
+## Gold Coins only come for real money (the + next to them opens the GOLD page, `CoinPack`, bought
+## in the Steam overlay) and buy the premium pieces (`CosmeticDef.gold`) and the PACKS tab's whole
+## outfits (`CosmeticPack`) through the Steam inventory (`SteamSvc.buy_with_gold`). Without Steam
+## there is no Gold. Some items
 ## unlock for free at a player level (`CosmeticDef.level`, a LV badge on the tile) and can be
 ## bought before that.
 
@@ -30,7 +30,7 @@ const KIND_TITLES: Dictionary = {
 	CosmeticDef.KIND_COLOR: "COLOURS", CosmeticDef.KIND_SKIN: "SKINS", CosmeticDef.KIND_HAT: "HATS",
 	CosmeticDef.KIND_SHIRT: "SHIRTS", CosmeticDef.KIND_PANTS: "TROUSERS", CosmeticDef.KIND_CAPE: "CAPES",
 	CosmeticDef.KIND_BOOTS: "BOOTS", CosmeticDef.KIND_EYES: "EYES", CosmeticDef.KIND_MOUTH: "MOUTHS",
-	CosmeticDef.KIND_BEARD: "BEARDS", KIND_PACK: "PACKS", KIND_COINS: "COINS",
+	CosmeticDef.KIND_BEARD: "BEARDS", KIND_PACK: "PACKS", KIND_COINS: "GOLD",
 }
 ## The packs tab's key (not a `CosmeticDef` kind).
 const KIND_PACK: StringName = &"pack"
@@ -77,6 +77,8 @@ var action_button: Button
 var steam_button: Button
 var status_label: Label
 var coins_label: Label
+## The Gold Coins in the Steam inventory.
+var gold_label: Label
 ## The + next to the wallet: opens the COINS page.
 var coins_button: Button
 var back_button: Button
@@ -138,14 +140,30 @@ func _ready() -> void:
 	coins_label.theme_type_variation = &"HeadingLabel"
 	coins_label.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
 	wrow.add_child(coins_label)
+	coins_label.add_theme_color_override(&"font_color", Palette.COIN_RED)
+	coins_label.tooltip_text = "Coins: earned by playing"
+	coins_label.mouse_filter = Control.MOUSE_FILTER_STOP
 	var coin := CoinIcon.make(40.0)
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	wrow.add_child(coin)
-	# The + sits inside the wallet, a round button in the coin's own gold.
+	var gap := Control.new()
+	gap.custom_minimum_size.x = 14
+	wrow.add_child(gap)
+	gold_label = Label.new()
+	gold_label.name = "Gold"
+	gold_label.theme_type_variation = &"HeadingLabel"
+	gold_label.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
+	gold_label.tooltip_text = "Gold Coins: bought with real money, for premium pieces and sets"
+	gold_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	wrow.add_child(gold_label)
+	var gcoin := CoinIcon.make(40.0, true)
+	gcoin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	wrow.add_child(gcoin)
+	# The + sits inside the wallet next to the Gold, a round button in the coin's own gold.
 	coins_button = Button.new()
 	coins_button.name = "BuyCoins"
 	coins_button.text = "+"
-	coins_button.tooltip_text = "Buy Coins"
+	coins_button.tooltip_text = "Buy Gold Coins"
 	coins_button.toggle_mode = true
 	coins_button.custom_minimum_size = Vector2(40, 40)
 	coins_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -165,7 +183,7 @@ func _ready() -> void:
 	var hint := Label.new()
 	hint.theme_type_variation = &"SmallLabel"
 	hint.add_theme_color_override(&"font_color", MUTED)
-	hint.text = "Coins come from playing matches (and every level up), or with + through Steam. They only buy cosmetics: the tables take $, which starts fresh every match."
+	hint.text = "Red Coins come from playing matches and every level up, Gold Coins only with + through Steam (for premium pieces and sets). Both only buy cosmetics: the tables take $, which starts fresh every match."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(hint)
 	var body := HBoxContainer.new()
@@ -301,6 +319,7 @@ func _ready() -> void:
 	ProfileManager.changed.connect(_refresh)
 	SteamSvc.store_changed.connect(_refresh)
 	SteamSvc.purchase_finished.connect(_on_purchase_finished)
+	SteamSvc.gold_spent.connect(_on_gold_spent)
 	resized.connect(_fit_columns)
 	tabs.resized.connect(_fit_columns)  # the tile area settles after the panel: count columns from it
 
@@ -378,7 +397,7 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 	b.name = String(id)
 	b.toggle_mode = true
 	b.custom_minimum_size = TILE
-	b.tooltip_text = title if d != null else "%s: %d pieces, %s cheaper than one by one" % [title, pack.pieces.size(), SteamSvc.format_price(CosmeticPack.DISCOUNT_CENTS, "EUR")]
+	b.tooltip_text = title if d != null else "%s: a set of %d pieces for Gold Coins" % [title, pack.pieces.size()]
 	b.clip_contents = true
 	SettingsPanel.style_tab(b)
 	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
@@ -430,13 +449,13 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 	return b
 
 
-## A coin pack's tile: a pile of Coins, how many, and the Steam price.
+## A gold pack's tile: a pile of Gold Coins, how many, and the Steam price.
 func _coin_tile(c: CoinPack) -> Button:
 	var b := Button.new()
 	b.name = String(c.id)
 	b.toggle_mode = true
 	b.custom_minimum_size = TILE
-	b.tooltip_text = "%s Coins" % Hud._thousands(c.coins)
+	b.tooltip_text = "%s Gold Coins" % Hud._thousands(c.gold)
 	SettingsPanel.style_tab(b)
 	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
 		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
@@ -455,7 +474,7 @@ func _coin_tile(c: CoinPack) -> Button:
 	pile.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var n: int = 1 + shop.coin_packs.find(c)
 	for i: int in n:
-		var ci := CoinIcon.make(72.0 - float(n - 1) * 6.0)
+		var ci := CoinIcon.make(72.0 - float(n - 1) * 6.0, true)
 		ci.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		pile.add_child(ci)
 	box.add_child(pile)
@@ -463,7 +482,7 @@ func _coin_tile(c: CoinPack) -> Button:
 	label.name = "Name"
 	label.theme_type_variation = &"HeadingLabel"
 	label.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
-	label.text = Hud._thousands(c.coins)
+	label.text = Hud._thousands(c.gold)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(label)
@@ -613,12 +632,10 @@ static func money_text(def: int, cents: int) -> String:
 	return t if t != "" else SteamSvc.format_price(cents, "EUR")
 
 
-## STEAM: opens the Steam overlay to pay for the picked piece or pack.
+## STEAM: opens the Steam overlay to pay for the picked gold pack.
 func press_steam() -> void:
-	var d: CosmeticDef = shop.find(selected)
-	var pack: CosmeticPack = shop.find_pack(selected)
 	var coin_pack: CoinPack = shop.find_coin_pack(selected)
-	var def: int = d.steam_item if d != null else (pack.steam_item if pack != null else (coin_pack.steam_item if coin_pack != null else 0))
+	var def: int = coin_pack.steam_item if coin_pack != null else 0
 	if def <= 0 or not SteamSvc.is_available():
 		status_label.text = "Buying with real money needs Steam running."
 		return
@@ -632,13 +649,38 @@ func press_steam() -> void:
 func _on_purchase_finished(ok: bool) -> void:
 	if not visible:
 		return
-	status_label.text = "Thanks! It shows up here in a moment." if ok else "Purchase cancelled."
+	status_label.text = "Thanks! Your Gold Coins show up in a moment." if ok else "Purchase cancelled."
+	_refresh()
+
+
+## A premium piece or a set paid in Gold Coins: Steam exchanges them (the answer: `_on_gold_spent`).
+func _buy_with_gold(title: String, def: int, cost: int) -> void:
+	if not SteamSvc.is_available():
+		status_label.text = "Gold Coins need Steam running."
+	elif SteamSvc.gold < cost:
+		status_label.text = "Not enough Gold Coins: %s more to go (+ next to them)." % Hud._thousands(cost - SteamSvc.gold)
+	elif SteamSvc.buy_with_gold(def, cost):
+		status_label.text = "Buying %s..." % title
+	else:
+		status_label.text = "Can't buy that right now, try again in a moment."
+	_refresh()
+
+
+func _on_gold_spent(ok: bool) -> void:
+	if not visible:
+		return
+	status_label.text = "Bought! Wear it whenever you like." if ok else "That didn't go through: no Gold Coins were spent."
+	if ok:
+		Audio.play(&"cash_register", &"UI", -6.0)
 	_refresh()
 
 
 ## BUY when not owned (refused with a message when the Coins don't reach), else WEAR / TAKE OFF.
 func press_action() -> void:
 	var pack: CosmeticPack = shop.find_pack(selected)
+	if pack != null and not ProfileManager.profile.owns_pack(pack):
+		_buy_with_gold(pack.display_name, pack.steam_item, pack.gold)
+		return
 	if pack != null:
 		if ProfileManager.profile.owns_pack(pack):
 			for id: StringName in pack.pieces:
@@ -652,6 +694,9 @@ func press_action() -> void:
 	if d == null:
 		return
 	var p: PlayerProfile = ProfileManager.profile
+	if not p.owns(d.id) and d.premium():
+		_buy_with_gold(d.display_name, d.steam_item, d.gold)
+		return
 	if not p.owns(d.id):
 		var err: StringName = ProfileManager.buy(d.id)
 		match err:
@@ -659,7 +704,7 @@ func press_action() -> void:
 				status_label.text = "Bought %s! Wear it whenever you like." % d.display_name
 				Audio.play(&"cash_register", &"UI", -6.0)
 			&"not_enough_coins":
-				status_label.text = "Not enough Coins: %d more to go. Play matches to earn them%s." % [d.price - p.coins, (", or buy it with Steam" if d.steam_buyable() else "")]
+				status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (d.price - p.coins)
 				Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
 			&"level":
 				status_label.text = "Reach level %d to unlock it (you're level %d)." % [d.level, p.level]
@@ -698,25 +743,24 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 		label.text = "WEARING"
 	elif p.owns(d.id):
 		label.text = "FREE" if d.is_free() else "OWNED"
-	elif not d.coin_buyable() and d.steam_buyable():
-		label.text = money_text(d.steam_item, d.cents)
-		coin.visible = false
+	elif d.premium():
+		label.text = Hud._thousands(d.gold)
 	elif not d.coin_buyable():
 		label.text = "LEVEL %d" % d.level
 		coin.visible = false
 	else:
 		label.text = "%s" % Hud._thousands(d.price)
-	var short: bool = not p.owns(d.id) and d.coin_buyable() and p.coins < d.price
-	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else (TOO_DEAR if short else Palette.COIN_GOLD)))
+	coin.set_gold(d.premium())
+	var short: bool = not p.owns(d.id) and ((d.coin_buyable() and p.coins < d.price) or (d.premium() and SteamSvc.gold < d.gold))
+	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else (TOO_DEAR if short else (Palette.COIN_GOLD if d.premium() else Palette.COIN_RED))))
 	coin.modulate = Color(1, 1, 1, 0.5) if short else Color.WHITE
 
 
-## Whether piece `d` can be had right now: enough Coins, or Steam running to buy it with money.
+## Whether piece `d` can be had right now: enough Coins, or enough Gold for a premium one.
 static func _can_get_now(p: PlayerProfile, d: CosmeticDef) -> bool:
-	var steam: bool = d.steam_buyable() and SteamSvc.is_available()
-	if d.coin_buyable():
-		return p.coins >= d.price or steam
-	return steam
+	if d.premium():
+		return SteamSvc.is_available() and SteamSvc.gold >= d.gold
+	return d.coin_buyable() and p.coins >= d.price
 
 
 func _refresh() -> void:
@@ -724,6 +768,7 @@ func _refresh() -> void:
 		return
 	var p: PlayerProfile = ProfileManager.profile
 	coins_label.text = Hud._thousands(p.coins)
+	gold_label.text = Hud._thousands(SteamSvc.gold)
 	for id: StringName in tiles:
 		var d: CosmeticDef = shop.find(id)
 		var b: Button = tiles[id]
@@ -757,8 +802,8 @@ func _refresh() -> void:
 		return
 	var coin_pack: CoinPack = shop.find_coin_pack(selected)
 	if coin_pack != null:
-		item_name.text = "%s COINS" % Hud._thousands(coin_pack.coins)
-		item_kind.text = "COINS FOR COSMETICS"
+		item_name.text = "%s GOLD COINS" % Hud._thousands(coin_pack.gold)
+		item_kind.text = "FOR PREMIUM PIECES AND SETS"
 		price_row.visible = true
 		price_label.text = money_text(coin_pack.steam_item, coin_pack.cents)
 		price_label.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
@@ -787,9 +832,16 @@ func _refresh() -> void:
 	_dress_preview(p)
 	action_button.disabled = false
 	action_button.visible = true
-	_show_steam_button(not p.owns(sel.id) and sel.steam_buyable(), sel.steam_item, sel.cents, "BUY WITH STEAM")
-	if not p.owns(sel.id) and not sel.coin_buyable() and sel.steam_buyable():
-		action_button.visible = false  # real money only: the Steam button is the way
+	steam_button.visible = false
+	if not p.owns(sel.id) and sel.premium():
+		if not SteamSvc.is_available():
+			action_button.text = "GOLD NEEDS STEAM"
+			action_button.disabled = true
+		elif SteamSvc.gold < sel.gold:
+			action_button.text = "%s MORE GOLD NEEDED" % Hud._thousands(sel.gold - SteamSvc.gold)
+			action_button.disabled = true
+		else:
+			action_button.text = "BUY FOR %s GOLD" % Hud._thousands(sel.gold)
 	elif not p.owns(sel.id) and not sel.coin_buyable():
 		action_button.text = "LEVEL %d" % sel.level  # only levelling up unlocks it
 		action_button.disabled = true
@@ -797,7 +849,7 @@ func _refresh() -> void:
 		action_button.text = "%s MORE COINS NEEDED" % Hud._thousands(sel.price - p.coins)
 		action_button.disabled = true
 	elif not p.owns(sel.id):
-		action_button.text = "BUY FOR COINS" if sel.steam_buyable() else "BUY"
+		action_button.text = "BUY"
 	elif sel.kind == CosmeticDef.KIND_COLOR and p.preferred_color == sel.color_index:
 		action_button.text = "WEARING"
 		action_button.disabled = true
@@ -846,7 +898,7 @@ func _refresh_look(p: PlayerProfile) -> void:
 	if to_buy > 0:
 		look_label.text += " · %s COINS TOGETHER" % Hud._thousands(total)
 	if unbuyable > 0:
-		look_label.text += " · %d NEED A LEVEL OR STEAM" % unbuyable
+		look_label.text += " · %d NEED GOLD OR A LEVEL" % unbuyable
 	look_button.visible = true
 	if to_buy > 0:
 		look_button.text = "BUY ALL · %s" % Hud._thousands(total)
@@ -860,18 +912,19 @@ func _refresh_look(p: PlayerProfile) -> void:
 
 ## A pack's tile price: OWNED when every piece is, else the Steam price.
 static func _show_pack_price(label: Label, coin: CoinIcon, p: PlayerProfile, pack: CosmeticPack) -> void:
-	coin.visible = false
 	var owned: bool = p.owns_pack(pack)
-	label.text = "OWNED" if owned else money_text(pack.steam_item, pack.cents)
-	label.add_theme_color_override(&"font_color", Palette.CREAM if owned else Palette.COIN_GOLD)
+	coin.visible = not owned
+	coin.set_gold(true)
+	label.text = "OWNED" if owned else Hud._thousands(pack.gold)
+	var short: bool = not owned and SteamSvc.gold < pack.gold
+	label.add_theme_color_override(&"font_color", Palette.CREAM if owned else (TOO_DEAR if short else Palette.COIN_GOLD))
 
 
 ## The stage for a pack: the bean in the whole outfit, its price and what it saves; WEAR ALL once
 ## it is owned.
 func _refresh_pack(p: PlayerProfile, pack: CosmeticPack) -> void:
 	item_name.text = pack.display_name.to_upper()
-	var single: String = SteamSvc.format_price(shop.pieces_cents(pack), "EUR")
-	item_kind.text = "PACK OF %d · %s ONE BY ONE" % [pack.pieces.size(), single]
+	item_kind.text = "SET OF %d PIECES" % pack.pieces.size()
 	price_row.visible = true
 	_show_pack_price(price_label, price_coin, p, pack)
 	var worn_color: int = p.preferred_color if p.preferred_color >= 0 else 0
@@ -880,10 +933,19 @@ func _refresh_pack(p: PlayerProfile, pack: CosmeticPack) -> void:
 	if preview.outfit != dress:
 		preview.set_outfit(dress)
 	var owned: bool = p.owns_pack(pack)
-	action_button.visible = owned
+	action_button.visible = true
 	action_button.disabled = false
-	action_button.text = "WEAR ALL"
-	_show_steam_button(not owned, pack.steam_item, pack.cents, "BUY PACK")
+	steam_button.visible = false
+	if owned:
+		action_button.text = "WEAR ALL"
+	elif not SteamSvc.is_available():
+		action_button.text = "GOLD NEEDS STEAM"
+		action_button.disabled = true
+	elif SteamSvc.gold < pack.gold:
+		action_button.text = "%s MORE GOLD NEEDED" % Hud._thousands(pack.gold - SteamSvc.gold)
+		action_button.disabled = true
+	else:
+		action_button.text = "BUY FOR %s GOLD" % Hud._thousands(pack.gold)
 
 
 ## The Steam button: shown when real money can buy the pick, greyed out without Steam.

@@ -206,9 +206,7 @@ script = ExtResource("2")
 id = &"skin_felt"
 kind = &"skin"
 display_name = "Lucky Felt"
-price = 0
-money_only = true
-cents = 149
+gold = 149
 steam_item = 204
 swatch = PackedColorArray(0.1529, 0.3686, 0.2863, 1, 0.1176, 0.2902, 0.2275, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -217,9 +215,7 @@ script = ExtResource("2")
 id = &"skin_candy"
 kind = &"skin"
 display_name = "Candy Swirl"
-price = 0
-money_only = true
-cents = 149
+gold = 149
 steam_item = 205
 swatch = PackedColorArray(0.8902, 0.6039, 0.651, 1, 0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -228,9 +224,7 @@ script = ExtResource("2")
 id = &"skin_ocean"
 kind = &"skin"
 display_name = "Deep Sea"
-price = 0
-money_only = true
-cents = 149
+gold = 149
 steam_item = 206
 swatch = PackedColorArray(0.1216, 0.3059, 0.4196, 1, 0.2431, 0.549, 0.5333, 1, 0.6235, 0.8157, 0.7843, 1)
 
@@ -239,9 +233,7 @@ script = ExtResource("2")
 id = &"skin_marble"
 kind = &"skin"
 display_name = "Marble"
-price = 0
-money_only = true
-cents = 149
+gold = 149
 steam_item = 207
 swatch = PackedColorArray(0.9294, 0.902, 0.8549, 1, 0.549, 0.5176, 0.4706, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -250,10 +242,8 @@ script = ExtResource("2")
 id = &"skin_gold"
 kind = &"skin"
 display_name = "Gold Rush"
-price = 0
 level = 25
-money_only = true
-cents = 199
+gold = 199
 steam_item = 200
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.9647, 0.8902, 0.6314, 1, 0.5412, 0.4157, 0.1647, 1)
 
@@ -262,10 +252,8 @@ script = ExtResource("2")
 id = &"skin_rainbow"
 kind = &"skin"
 display_name = "Rainbow"
-price = 0
 level = 50
-money_only = true
-cents = 199
+gold = 199
 steam_item = 201
 swatch = PackedColorArray(0.7255, 0.2784, 0.2431, 1, 0.8392, 0.6588, 0.2941, 1, 0.2431, 0.549, 0.5333, 1)
 
@@ -274,9 +262,7 @@ script = ExtResource("2")
 id = &"skin_lava"
 kind = &"skin"
 display_name = "Molten Lava"
-price = 0
-money_only = true
-cents = 199
+gold = 199
 steam_item = 202
 swatch = PackedColorArray(0.1647, 0.08627, 0.07059, 1, 0.851, 0.4667, 0.1686, 1, 0.949, 0.7569, 0.3059, 1)
 
@@ -285,9 +271,7 @@ script = ExtResource("2")
 id = &"skin_galaxy"
 kind = &"skin"
 display_name = "Starry Night"
-price = 0
-money_only = true
-cents = 199
+gold = 199
 steam_item = 203
 swatch = PackedColorArray(0.1176, 0.1373, 0.2824, 1, 0.3059, 0.1647, 0.4196, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -313,7 +297,6 @@ id = &"hat_police"
 kind = &"hat"
 display_name = "Police Cap"
 price = 250
-cents = 50
 steam_item = 100
 swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -323,7 +306,6 @@ id = &"hat_bowler"
 kind = &"hat"
 display_name = "Bowler Hat"
 price = 250
-cents = 50
 steam_item = 101
 swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -333,7 +315,6 @@ id = &"hat_chef"
 kind = &"hat"
 display_name = "Chef's Toque"
 price = 250
-cents = 50
 steam_item = 102
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1)
 
@@ -343,7 +324,6 @@ id = &"hat_surgeon"
 kind = &"hat"
 display_name = "Surgeon's Cap"
 price = 250
-cents = 50
 steam_item = 167
 swatch = PackedColorArray(0.3686, 0.6196, 0.6039, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -353,7 +333,6 @@ id = &"hat_cone"
 kind = &"hat"
 display_name = "Traffic Cone"
 price = 300
-cents = 50
 steam_item = 103
 swatch = PackedColorArray(0.851, 0.4667, 0.1686, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -363,7 +342,6 @@ id = &"hat_hair_slick"
 kind = &"hat"
 display_name = "Slick Side Part"
 price = 300
-cents = 50
 steam_item = 165
 swatch = PackedColorArray(0.2275, 0.1647, 0.1176, 1, 0.3529, 0.2275, 0.1412, 1)
 
@@ -373,7 +351,6 @@ id = &"hat_golf"
 kind = &"hat"
 display_name = "Golf Flat Cap"
 price = 300
-cents = 50
 steam_item = 170
 swatch = PackedColorArray(0.6118, 0.5412, 0.4157, 1, 0.4784, 0.4157, 0.3137, 1)
 
@@ -383,7 +360,6 @@ id = &"hat_fedora"
 kind = &"hat"
 display_name = "Fedora"
 price = 350
-cents = 75
 steam_item = 104
 swatch = PackedColorArray(0.3529, 0.2902, 0.2353, 1, 0.1098, 0.102, 0.09804, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -393,7 +369,6 @@ id = &"hat_firefighter"
 kind = &"hat"
 display_name = "Fire Helmet"
 price = 350
-cents = 75
 steam_item = 105
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -403,7 +378,6 @@ id = &"hat_cowboy"
 kind = &"hat"
 display_name = "Cowboy Hat"
 price = 400
-cents = 75
 steam_item = 106
 swatch = PackedColorArray(0.6902, 0.4784, 0.2706, 1, 0.3529, 0.2275, 0.1412, 1)
 
@@ -413,7 +387,6 @@ id = &"hat_propeller"
 kind = &"hat"
 display_name = "Propeller Cap"
 price = 400
-cents = 75
 steam_item = 107
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.8863, 0.698, 0.2275, 1, 0.1843, 0.3647, 0.6588, 1)
 
@@ -423,7 +396,6 @@ id = &"hat_pilot"
 kind = &"hat"
 display_name = "Captain's Cap"
 price = 400
-cents = 75
 steam_item = 166
 swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.9569, 0.9373, 0.8941, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -433,7 +405,6 @@ id = &"hat_tyrolean"
 kind = &"hat"
 display_name = "Tyrolean Hat"
 price = 450
-cents = 75
 steam_item = 169
 swatch = PackedColorArray(0.2431, 0.4196, 0.2706, 1, 0.9569, 0.9373, 0.8941, 1, 0.3529, 0.2275, 0.1412, 1)
 
@@ -443,7 +414,6 @@ id = &"hat_pirate"
 kind = &"hat"
 display_name = "Pirate Tricorn"
 price = 500
-cents = 75
 steam_item = 108
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -453,7 +423,6 @@ id = &"hat_top"
 kind = &"hat"
 display_name = "Top Hat"
 price = 500
-cents = 75
 steam_item = 109
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -463,7 +432,6 @@ id = &"hat_wizard"
 kind = &"hat"
 display_name = "Wizard Hat"
 price = 600
-cents = 100
 steam_item = 111
 swatch = PackedColorArray(0.1804, 0.2431, 0.4784, 1, 0.8863, 0.698, 0.2275, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -472,9 +440,7 @@ script = ExtResource("2")
 id = &"hat_viking"
 kind = &"hat"
 display_name = "Viking Helmet"
-price = 600
-money_only = true
-cents = 100
+gold = 100
 steam_item = 110
 swatch = PackedColorArray(0.549, 0.5686, 0.5961, 1, 0.9137, 0.8627, 0.7373, 1)
 
@@ -483,9 +449,7 @@ script = ExtResource("2")
 id = &"hat_crown"
 kind = &"hat"
 display_name = "Crown"
-price = 1000
-money_only = true
-cents = 100
+gold = 100
 steam_item = 112
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -494,9 +458,7 @@ script = ExtResource("2")
 id = &"hat_knight"
 kind = &"hat"
 display_name = "Knight's Helm"
-price = 0
-money_only = true
-cents = 100
+gold = 100
 steam_item = 168
 swatch = PackedColorArray(0.7216, 0.7373, 0.7608, 1, 0.549, 0.5686, 0.5961, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -522,7 +484,6 @@ id = &"shirt_kid"
 kind = &"shirt"
 display_name = "Star Tee"
 price = 200
-cents = 50
 steam_item = 176
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.8863, 0.698, 0.2275, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -532,7 +493,6 @@ id = &"shirt_police"
 kind = &"shirt"
 display_name = "Police Shirt"
 price = 250
-cents = 50
 steam_item = 113
 swatch = PackedColorArray(0.4902, 0.6118, 0.7686, 1, 0.1373, 0.1882, 0.2902, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -542,7 +502,6 @@ id = &"shirt_chef"
 kind = &"shirt"
 display_name = "Chef's Jacket"
 price = 250
-cents = 50
 steam_item = 115
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -552,7 +511,6 @@ id = &"shirt_jailbird"
 kind = &"shirt"
 display_name = "Jailbird"
 price = 250
-cents = 50
 steam_item = 116
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -562,7 +520,6 @@ id = &"shirt_polo"
 kind = &"shirt"
 display_name = "Golf Polo"
 price = 250
-cents = 50
 steam_item = 178
 swatch = PackedColorArray(0.8902, 0.6039, 0.651, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -572,7 +529,6 @@ id = &"shirt_business"
 kind = &"shirt"
 display_name = "Business Suit"
 price = 300
-cents = 50
 steam_item = 114
 swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -582,7 +538,6 @@ id = &"shirt_referee"
 kind = &"shirt"
 display_name = "Referee"
 price = 300
-cents = 50
 steam_item = 117
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1, 0.7216, 0.7373, 0.7608, 1)
 
@@ -592,7 +547,6 @@ id = &"shirt_flannel"
 kind = &"shirt"
 display_name = "Lumberjack Flannel"
 price = 300
-cents = 50
 steam_item = 118
 swatch = PackedColorArray(0.6588, 0.1961, 0.1725, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -602,7 +556,6 @@ id = &"shirt_firefighter"
 kind = &"shirt"
 display_name = "Fire Coat"
 price = 350
-cents = 75
 steam_item = 119
 swatch = PackedColorArray(0.5412, 0.4157, 0.2275, 1, 0.8863, 0.698, 0.2275, 1, 0.7216, 0.7373, 0.7608, 1)
 
@@ -612,7 +565,6 @@ id = &"shirt_hawaiian"
 kind = &"shirt"
 display_name = "Hawaiian Shirt"
 price = 350
-cents = 75
 steam_item = 120
 swatch = PackedColorArray(0.7843, 0.3137, 0.2275, 1, 0.9137, 0.8627, 0.7373, 1, 0.8863, 0.698, 0.2275, 1)
 
@@ -622,7 +574,6 @@ id = &"shirt_sweater"
 kind = &"shirt"
 display_name = "Cozy Sweater"
 price = 350
-cents = 75
 steam_item = 121
 swatch = PackedColorArray(0.1529, 0.3686, 0.2863, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -632,7 +583,6 @@ id = &"shirt_pilot"
 kind = &"shirt"
 display_name = "Pilot's Shirt"
 price = 350
-cents = 75
 steam_item = 171
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.1373, 0.1882, 0.2902, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -642,7 +592,6 @@ id = &"shirt_doctor"
 kind = &"shirt"
 display_name = "Lab Coat"
 price = 350
-cents = 75
 steam_item = 172
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.3686, 0.6196, 0.6039, 1, 0.549, 0.5686, 0.5961, 1)
 
@@ -652,7 +601,6 @@ id = &"shirt_dealer"
 kind = &"shirt"
 display_name = "Dealer Vest"
 price = 450
-cents = 75
 steam_item = 122
 swatch = PackedColorArray(0.4078, 0.1216, 0.1725, 1, 0.9569, 0.9373, 0.8941, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -662,7 +610,6 @@ id = &"shirt_bavarian"
 kind = &"shirt"
 display_name = "Trachten Vest"
 price = 450
-cents = 75
 steam_item = 177
 swatch = PackedColorArray(0.2431, 0.4196, 0.2706, 1, 0.9569, 0.9373, 0.8941, 1, 0.1843, 0.3647, 0.6588, 1)
 
@@ -672,7 +619,6 @@ id = &"shirt_hero"
 kind = &"shirt"
 display_name = "Super Suit"
 price = 500
-cents = 75
 steam_item = 123
 swatch = PackedColorArray(0.1843, 0.3647, 0.6588, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -682,7 +628,6 @@ id = &"shirt_captain"
 kind = &"shirt"
 display_name = "Captain's Coat"
 price = 600
-cents = 100
 steam_item = 173
 swatch = PackedColorArray(0.4784, 0.1216, 0.1333, 1, 0.851, 0.6824, 0.3216, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -692,7 +637,6 @@ id = &"shirt_wizard"
 kind = &"shirt"
 display_name = "Wizard Robe"
 price = 600
-cents = 100
 steam_item = 175
 swatch = PackedColorArray(0.1804, 0.2431, 0.4784, 1, 0.8863, 0.698, 0.2275, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -701,9 +645,7 @@ script = ExtResource("2")
 id = &"shirt_tux"
 kind = &"shirt"
 display_name = "Tuxedo"
-price = 600
-money_only = true
-cents = 100
+gold = 100
 steam_item = 124
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -712,9 +654,7 @@ script = ExtResource("2")
 id = &"shirt_knight"
 kind = &"shirt"
 display_name = "Knight's Tabard"
-price = 700
-money_only = true
-cents = 100
+gold = 100
 steam_item = 125
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.549, 0.5686, 0.5961, 1)
 
@@ -723,9 +663,7 @@ script = ExtResource("2")
 id = &"shirt_royal"
 kind = &"shirt"
 display_name = "Royal Doublet"
-price = 0
-money_only = true
-cents = 100
+gold = 100
 steam_item = 174
 swatch = PackedColorArray(0.3059, 0.1647, 0.4196, 1, 0.851, 0.6824, 0.3216, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -751,7 +689,6 @@ id = &"pants_police"
 kind = &"pants"
 display_name = "Police Trousers"
 price = 250
-cents = 50
 steam_item = 126
 swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.851, 0.6824, 0.3216, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -761,7 +698,6 @@ id = &"pants_suit"
 kind = &"pants"
 display_name = "Suit Trousers"
 price = 250
-cents = 50
 steam_item = 127
 swatch = PackedColorArray(0.2314, 0.2471, 0.2902, 1, 0.3529, 0.2275, 0.1412, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -771,7 +707,6 @@ id = &"pants_chef"
 kind = &"pants"
 display_name = "Chef's Checks"
 price = 250
-cents = 50
 steam_item = 128
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -781,7 +716,6 @@ id = &"pants_jailbird"
 kind = &"pants"
 display_name = "Jailbird Trousers"
 price = 250
-cents = 50
 steam_item = 129
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -791,7 +725,6 @@ id = &"pants_pilot"
 kind = &"pants"
 display_name = "Pilot Trousers"
 price = 250
-cents = 50
 steam_item = 179
 swatch = PackedColorArray(0.1373, 0.1882, 0.2902, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -801,7 +734,6 @@ id = &"pants_scrubs"
 kind = &"pants"
 display_name = "Scrubs"
 price = 250
-cents = 50
 steam_item = 180
 swatch = PackedColorArray(0.3686, 0.6196, 0.6039, 1, 0.2902, 0.5176, 0.502, 1)
 
@@ -811,7 +743,6 @@ id = &"pants_firefighter"
 kind = &"pants"
 display_name = "Fire Trousers"
 price = 300
-cents = 50
 steam_item = 130
 swatch = PackedColorArray(0.5412, 0.4157, 0.2275, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -821,7 +752,6 @@ id = &"pants_boxers"
 kind = &"pants"
 display_name = "Lucky Boxers"
 price = 300
-cents = 50
 steam_item = 131
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.4902, 0.6118, 0.7686, 1)
 
@@ -831,7 +761,6 @@ id = &"pants_overalls"
 kind = &"pants"
 display_name = "Dungarees"
 price = 300
-cents = 50
 steam_item = 185
 swatch = PackedColorArray(0.2431, 0.3608, 0.5333, 1, 0.8863, 0.698, 0.2275, 1)
 
@@ -841,7 +770,6 @@ id = &"pants_golf"
 kind = &"pants"
 display_name = "Golf Argyle"
 price = 350
-cents = 75
 steam_item = 132
 swatch = PackedColorArray(0.8902, 0.6039, 0.651, 1, 0.2431, 0.4196, 0.2706, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -851,7 +779,6 @@ id = &"pants_pirate"
 kind = &"pants"
 display_name = "Pirate Breeches"
 price = 350
-cents = 75
 steam_item = 133
 swatch = PackedColorArray(0.4196, 0.2902, 0.1804, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -861,7 +788,6 @@ id = &"pants_clown"
 kind = &"pants"
 display_name = "Clown Pants"
 price = 400
-cents = 75
 steam_item = 134
 swatch = PackedColorArray(0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1, 0.1843, 0.3647, 0.6588, 1)
 
@@ -871,7 +797,6 @@ id = &"pants_breeches"
 kind = &"pants"
 display_name = "Captain's Breeches"
 price = 400
-cents = 75
 steam_item = 181
 swatch = PackedColorArray(0.1647, 0.1412, 0.1255, 1, 0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -881,7 +806,6 @@ id = &"pants_chaps"
 kind = &"pants"
 display_name = "Cowboy Chaps"
 price = 400
-cents = 75
 steam_item = 186
 swatch = PackedColorArray(0.5412, 0.3529, 0.1961, 1, 0.2431, 0.3608, 0.5333, 1, 0.7216, 0.7373, 0.7608, 1)
 
@@ -891,7 +815,6 @@ id = &"pants_hero"
 kind = &"pants"
 display_name = "Super Briefs"
 price = 450
-cents = 75
 steam_item = 135
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.1843, 0.3647, 0.6588, 1, 0.8863, 0.698, 0.2275, 1)
 
@@ -901,7 +824,6 @@ id = &"pants_wizard"
 kind = &"pants"
 display_name = "Wizard Robe Skirt"
 price = 450
-cents = 75
 steam_item = 184
 swatch = PackedColorArray(0.1804, 0.2431, 0.4784, 1, 0.8863, 0.698, 0.2275, 1)
 
@@ -911,7 +833,6 @@ id = &"pants_kilt"
 kind = &"pants"
 display_name = "Tartan Kilt"
 price = 500
-cents = 75
 steam_item = 136
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.2431, 0.4196, 0.2706, 1, 0.4196, 0.2902, 0.1804, 1)
 
@@ -920,9 +841,7 @@ script = ExtResource("2")
 id = &"pants_tux"
 kind = &"pants"
 display_name = "Tuxedo Trousers"
-price = 500
-money_only = true
-cents = 100
+gold = 100
 steam_item = 137
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4078, 0.1216, 0.1725, 1)
 
@@ -931,9 +850,7 @@ script = ExtResource("2")
 id = &"pants_lederhosen"
 kind = &"pants"
 display_name = "Lederhosen"
-price = 600
-money_only = true
-cents = 100
+gold = 100
 steam_item = 138
 swatch = PackedColorArray(0.4196, 0.2902, 0.1804, 1, 0.9137, 0.8627, 0.7373, 1)
 
@@ -942,9 +859,7 @@ script = ExtResource("2")
 id = &"pants_royal"
 kind = &"pants"
 display_name = "Royal Breeches"
-price = 0
-money_only = true
-cents = 100
+gold = 100
 steam_item = 182
 swatch = PackedColorArray(0.3059, 0.1647, 0.4196, 1, 0.851, 0.6824, 0.3216, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -953,9 +868,7 @@ script = ExtResource("2")
 id = &"pants_knight"
 kind = &"pants"
 display_name = "Knight's Greaves"
-price = 0
-money_only = true
-cents = 100
+gold = 100
 steam_item = 183
 swatch = PackedColorArray(0.7216, 0.7373, 0.7608, 1, 0.549, 0.5686, 0.5961, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -981,7 +894,6 @@ id = &"cape_hero"
 kind = &"cape"
 display_name = "Hero Cape"
 price = 300
-cents = 50
 steam_item = 139
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -992,7 +904,6 @@ kind = &"cape"
 display_name = "Rainbow Cape"
 price = 350
 level = 40
-cents = 75
 steam_item = 140
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.851, 0.6824, 0.3216, 1, 0.2431, 0.549, 0.5333, 1)
 
@@ -1002,7 +913,6 @@ id = &"cape_patchwork"
 kind = &"cape"
 display_name = "Patchwork Quilt"
 price = 350
-cents = 75
 steam_item = 141
 swatch = PackedColorArray(0.2431, 0.549, 0.5333, 1, 0.851, 0.6824, 0.3216, 1, 0.8902, 0.6039, 0.651, 1)
 
@@ -1012,7 +922,6 @@ id = &"cape_detective"
 kind = &"cape"
 display_name = "Detective Cape"
 price = 400
-cents = 75
 steam_item = 142
 swatch = PackedColorArray(0.6275, 0.4706, 0.3137, 1, 0.3529, 0.2275, 0.1412, 1)
 
@@ -1022,7 +931,6 @@ id = &"cape_leopard"
 kind = &"cape"
 display_name = "Leopard Print"
 price = 400
-cents = 75
 steam_item = 143
 swatch = PackedColorArray(0.7882, 0.5882, 0.3059, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -1032,7 +940,6 @@ id = &"cape_knight"
 kind = &"cape"
 display_name = "Knight's Cloak"
 price = 450
-cents = 75
 steam_item = 144
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.549, 0.5686, 0.5961, 1)
 
@@ -1042,7 +949,6 @@ id = &"cape_matador"
 kind = &"cape"
 display_name = "Matador Cape"
 price = 450
-cents = 75
 steam_item = 145
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -1052,7 +958,6 @@ id = &"cape_wizard"
 kind = &"cape"
 display_name = "Starry Cloak"
 price = 500
-cents = 75
 steam_item = 146
 swatch = PackedColorArray(0.1804, 0.2431, 0.4784, 1, 0.8863, 0.698, 0.2275, 1, 0.3059, 0.1647, 0.4196, 1)
 
@@ -1062,7 +967,6 @@ id = &"cape_vampire"
 kind = &"cape"
 display_name = "Vampire Cloak"
 price = 550
-cents = 100
 steam_item = 147
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4784, 0.1216, 0.1333, 1)
 
@@ -1072,7 +976,6 @@ id = &"cape_card_shark"
 kind = &"cape"
 display_name = "Card Shark"
 price = 600
-cents = 100
 steam_item = 148
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9137, 0.8627, 0.7373, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -1082,7 +985,6 @@ id = &"cape_money"
 kind = &"cape"
 display_name = "Money Cape"
 price = 700
-cents = 100
 steam_item = 149
 swatch = PackedColorArray(0.2471, 0.4784, 0.2902, 1, 0.9137, 0.8627, 0.7373, 1)
 
@@ -1091,9 +993,7 @@ script = ExtResource("2")
 id = &"cape_royal"
 kind = &"cape"
 display_name = "Royal Robe"
-price = 900
-money_only = true
-cents = 100
+gold = 100
 steam_item = 150
 swatch = PackedColorArray(0.3059, 0.1647, 0.4196, 1, 0.9569, 0.9373, 0.8941, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -1102,9 +1002,7 @@ script = ExtResource("2")
 id = &"cape_high_roller"
 kind = &"cape"
 display_name = "High Roller"
-price = 1200
-money_only = true
-cents = 100
+gold = 100
 steam_item = 151
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1)
 
@@ -1130,7 +1028,6 @@ id = &"boots_oxford"
 kind = &"boots"
 display_name = "Oxford Shoes"
 price = 200
-cents = 50
 steam_item = 152
 swatch = PackedColorArray(0.3529, 0.2275, 0.1412, 1, 0.9137, 0.8627, 0.7373, 1)
 
@@ -1140,7 +1037,6 @@ id = &"boots_police"
 kind = &"boots"
 display_name = "Police Boots"
 price = 250
-cents = 50
 steam_item = 153
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1)
 
@@ -1150,7 +1046,6 @@ id = &"boots_clogs"
 kind = &"boots"
 display_name = "Chef's Clogs"
 price = 250
-cents = 50
 steam_item = 154
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.9137, 0.8627, 0.7373, 1)
 
@@ -1160,7 +1055,6 @@ id = &"boots_pilot"
 kind = &"boots"
 display_name = "Polished Shoes"
 price = 250
-cents = 50
 steam_item = 187
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.2314, 0.2471, 0.2902, 1)
 
@@ -1170,7 +1064,6 @@ id = &"boots_firefighter"
 kind = &"boots"
 display_name = "Fire Boots"
 price = 300
-cents = 50
 steam_item = 155
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.8863, 0.698, 0.2275, 1)
 
@@ -1180,7 +1073,6 @@ id = &"boots_flippers"
 kind = &"boots"
 display_name = "Flippers"
 price = 300
-cents = 50
 steam_item = 156
 swatch = PackedColorArray(0.2431, 0.549, 0.5333, 1)
 
@@ -1190,7 +1082,6 @@ id = &"boots_golf"
 kind = &"boots"
 display_name = "Golf Spikes"
 price = 300
-cents = 50
 steam_item = 193
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.3529, 0.2275, 0.1412, 1)
 
@@ -1200,7 +1091,6 @@ id = &"boots_bunny"
 kind = &"boots"
 display_name = "Bunny Slippers"
 price = 350
-cents = 75
 steam_item = 157
 swatch = PackedColorArray(0.8902, 0.6039, 0.651, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -1210,7 +1100,6 @@ id = &"boots_clown"
 kind = &"boots"
 display_name = "Clown Shoes"
 price = 350
-cents = 75
 steam_item = 158
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.8863, 0.698, 0.2275, 1, 0.9137, 0.8627, 0.7373, 1)
 
@@ -1220,7 +1109,6 @@ id = &"boots_wizard"
 kind = &"boots"
 display_name = "Curly Slippers"
 price = 350
-cents = 75
 steam_item = 190
 swatch = PackedColorArray(0.3059, 0.1647, 0.4196, 1, 0.8863, 0.698, 0.2275, 1)
 
@@ -1230,7 +1118,6 @@ id = &"boots_cowboy"
 kind = &"boots"
 display_name = "Cowboy Boots"
 price = 400
-cents = 75
 steam_item = 159
 swatch = PackedColorArray(0.6902, 0.4784, 0.2706, 1, 0.7216, 0.7373, 0.7608, 1)
 
@@ -1240,7 +1127,6 @@ id = &"boots_pirate"
 kind = &"boots"
 display_name = "Pirate Boots"
 price = 400
-cents = 75
 steam_item = 160
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.4196, 0.2902, 0.1804, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -1250,7 +1136,6 @@ id = &"boots_hero"
 kind = &"boots"
 display_name = "Hero Boots"
 price = 400
-cents = 75
 steam_item = 189
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.8863, 0.698, 0.2275, 1)
 
@@ -1260,7 +1145,6 @@ id = &"boots_haferl"
 kind = &"boots"
 display_name = "Haferl Shoes"
 price = 400
-cents = 75
 steam_item = 192
 swatch = PackedColorArray(0.3529, 0.2275, 0.1412, 1, 0.9137, 0.8627, 0.7373, 1, 0.2431, 0.4196, 0.2706, 1)
 
@@ -1270,7 +1154,6 @@ id = &"boots_skates"
 kind = &"boots"
 display_name = "Roller Skates"
 price = 450
-cents = 75
 steam_item = 161
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
 
@@ -1280,7 +1163,6 @@ id = &"boots_spats"
 kind = &"boots"
 display_name = "Spats"
 price = 450
-cents = 75
 steam_item = 162
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -1291,7 +1173,6 @@ kind = &"boots"
 display_name = "Light-Up Sneakers"
 price = 450
 level = 45
-cents = 75
 steam_item = 191
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.7608, 0.2314, 0.1961, 1, 0.2431, 0.549, 0.5333, 1)
 
@@ -1300,9 +1181,7 @@ script = ExtResource("2")
 id = &"boots_knight"
 kind = &"boots"
 display_name = "Knight's Sabatons"
-price = 600
-money_only = true
-cents = 100
+gold = 100
 steam_item = 163
 swatch = PackedColorArray(0.549, 0.5686, 0.5961, 1)
 
@@ -1311,9 +1190,7 @@ script = ExtResource("2")
 id = &"boots_gold"
 kind = &"boots"
 display_name = "Golden High-Tops"
-price = 900
-money_only = true
-cents = 100
+gold = 100
 steam_item = 164
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.4078, 0.1216, 0.1725, 1, 0.9569, 0.9373, 0.8941, 1)
 
@@ -1322,9 +1199,7 @@ script = ExtResource("2")
 id = &"boots_royal"
 kind = &"boots"
 display_name = "Royal Buckle Shoes"
-price = 0
-money_only = true
-cents = 100
+gold = 100
 steam_item = 188
 swatch = PackedColorArray(0.3059, 0.1647, 0.4196, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -1335,7 +1210,6 @@ kind = &"eyes"
 display_name = "Long Lashes"
 price = 150
 level = 5
-cents = 50
 steam_item = 300
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 1, 0.9922, 0.9686, 1)
 
@@ -1345,7 +1219,6 @@ id = &"eyes_glasses"
 kind = &"eyes"
 display_name = "Round Specs"
 price = 200
-cents = 50
 steam_item = 301
 swatch = PackedColorArray(0.3529, 0.2275, 0.1412, 1, 1, 0.9922, 0.9686, 1)
 
@@ -1355,7 +1228,6 @@ id = &"eyes_cat"
 kind = &"eyes"
 display_name = "Cat Eyes"
 price = 250
-cents = 50
 steam_item = 302
 swatch = PackedColorArray(0.498, 0.6353, 0.3529, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -1365,7 +1237,6 @@ id = &"eyes_star"
 kind = &"eyes"
 display_name = "Star Eyes"
 price = 300
-cents = 50
 steam_item = 303
 swatch = PackedColorArray(0.8863, 0.698, 0.2275, 1, 1, 0.9922, 0.9686, 1)
 
@@ -1375,7 +1246,6 @@ id = &"eyes_heart"
 kind = &"eyes"
 display_name = "Heart Eyes"
 price = 350
-cents = 75
 steam_item = 304
 swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 1, 0.9922, 0.9686, 1)
 
@@ -1385,7 +1255,6 @@ id = &"eyes_dollar"
 kind = &"eyes"
 display_name = "Dollar Eyes"
 price = 500
-cents = 75
 steam_item = 305
 swatch = PackedColorArray(0.2471, 0.4784, 0.2902, 1, 1, 0.9922, 0.9686, 1)
 
@@ -1395,7 +1264,6 @@ id = &"eyes_monocle"
 kind = &"eyes"
 display_name = "Monocle"
 price = 600
-cents = 100
 steam_item = 306
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.1098, 0.102, 0.09804, 1)
 
@@ -1404,9 +1272,7 @@ script = ExtResource("2")
 id = &"eyes_shades"
 kind = &"eyes"
 display_name = "Aviator Shades"
-price = 0
-money_only = true
-cents = 100
+gold = 100
 steam_item = 307
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -1415,10 +1281,8 @@ script = ExtResource("2")
 id = &"eyes_spiral"
 kind = &"eyes"
 display_name = "Hypno Eyes"
-price = 0
 level = 30
-money_only = true
-cents = 100
+gold = 100
 steam_item = 308
 swatch = PackedColorArray(0.3059, 0.1647, 0.4196, 1, 1, 0.9922, 0.9686, 1)
 
@@ -1429,7 +1293,6 @@ kind = &"mouth"
 display_name = "Cheeky Tongue"
 price = 200
 level = 10
-cents = 50
 steam_item = 310
 swatch = PackedColorArray(0.9294, 0.4196, 0.451, 1, 0.1294, 0.07843, 0.05882, 1)
 
@@ -1439,7 +1302,6 @@ id = &"mouth_buck"
 kind = &"mouth"
 display_name = "Buck Teeth"
 price = 200
-cents = 50
 steam_item = 311
 swatch = PackedColorArray(0.9804, 0.9608, 0.902, 1, 0.1294, 0.07843, 0.05882, 1)
 
@@ -1449,7 +1311,6 @@ id = &"mouth_lipstick"
 kind = &"mouth"
 display_name = "Lipstick"
 price = 250
-cents = 50
 steam_item = 313
 swatch = PackedColorArray(0.702, 0.1412, 0.1804, 1, 0.4784, 0.1216, 0.1333, 1)
 
@@ -1459,7 +1320,6 @@ id = &"mouth_gold"
 kind = &"mouth"
 display_name = "Gold Tooth"
 price = 400
-cents = 75
 steam_item = 312
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.9804, 0.9608, 0.902, 1)
 
@@ -1469,7 +1329,6 @@ id = &"mouth_fangs"
 kind = &"mouth"
 display_name = "Vampire Fangs"
 price = 450
-cents = 75
 steam_item = 314
 swatch = PackedColorArray(0.9804, 0.9608, 0.902, 1, 0.4784, 0.1216, 0.1333, 1)
 
@@ -1478,9 +1337,7 @@ script = ExtResource("2")
 id = &"mouth_grill"
 kind = &"mouth"
 display_name = "Gold Grill"
-price = 0
-money_only = true
-cents = 100
+gold = 100
 steam_item = 315
 swatch = PackedColorArray(0.851, 0.6824, 0.3216, 1, 0.9647, 0.8902, 0.6314, 1)
 
@@ -1491,7 +1348,6 @@ kind = &"beard"
 display_name = "Gentleman's Mustache"
 price = 250
 level = 8
-cents = 50
 steam_item = 320
 swatch = PackedColorArray(0.2902, 0.2039, 0.1412, 1)
 
@@ -1501,7 +1357,6 @@ id = &"beard_goatee"
 kind = &"beard"
 display_name = "Goatee"
 price = 250
-cents = 50
 steam_item = 321
 swatch = PackedColorArray(0.1804, 0.1333, 0.102, 1)
 
@@ -1511,7 +1366,6 @@ id = &"beard_handlebar"
 kind = &"beard"
 display_name = "Handlebar"
 price = 400
-cents = 75
 steam_item = 322
 swatch = PackedColorArray(0.1098, 0.102, 0.09804, 1, 0.2314, 0.1647, 0.1176, 1)
 
@@ -1521,7 +1375,6 @@ id = &"beard_full"
 kind = &"beard"
 display_name = "Lumberjack Beard"
 price = 450
-cents = 75
 steam_item = 323
 swatch = PackedColorArray(0.6275, 0.3216, 0.1765, 1, 0.4784, 0.2431, 0.1333, 1)
 
@@ -1531,7 +1384,6 @@ id = &"beard_santa"
 kind = &"beard"
 display_name = "Santa Beard"
 price = 500
-cents = 75
 steam_item = 324
 swatch = PackedColorArray(0.9569, 0.9373, 0.8941, 1, 0.8627, 0.8392, 0.7922, 1)
 
@@ -1541,7 +1393,6 @@ id = &"beard_wizard"
 kind = &"beard"
 display_name = "Wizard Beard"
 price = 600
-cents = 100
 steam_item = 325
 swatch = PackedColorArray(0.8471, 0.8314, 0.8, 1, 0.7216, 0.698, 0.651, 1)
 
@@ -1550,10 +1401,8 @@ script = ExtResource("2")
 id = &"beard_viking"
 kind = &"beard"
 display_name = "Viking Braids"
-price = 0
 level = 35
-money_only = true
-cents = 100
+gold = 100
 steam_item = 326
 swatch = PackedColorArray(0.7098, 0.3961, 0.1804, 1, 0.851, 0.6824, 0.3216, 1)
 
@@ -1562,7 +1411,7 @@ script = ExtResource("3")
 id = &"pack_police"
 display_name = "Police Squad"
 pieces = Array[StringName]([&"hat_police", &"shirt_police", &"pants_police", &"boots_police"])
-cents = 150
+gold = 150
 steam_item = 1000
 
 [sub_resource type="Resource" id="p1"]
@@ -1570,7 +1419,7 @@ script = ExtResource("3")
 id = &"pack_business"
 display_name = "Businessman"
 pieces = Array[StringName]([&"hat_hair_slick", &"shirt_business", &"pants_suit", &"boots_oxford"])
-cents = 150
+gold = 150
 steam_item = 1001
 
 [sub_resource type="Resource" id="p2"]
@@ -1578,7 +1427,7 @@ script = ExtResource("3")
 id = &"pack_black_tie"
 display_name = "Black Tie"
 pieces = Array[StringName]([&"hat_top", &"shirt_tux", &"pants_tux", &"boots_spats"])
-cents = 300
+gold = 300
 steam_item = 1002
 
 [sub_resource type="Resource" id="p3"]
@@ -1586,7 +1435,7 @@ script = ExtResource("3")
 id = &"pack_chef"
 display_name = "Head Chef"
 pieces = Array[StringName]([&"hat_chef", &"shirt_chef", &"pants_chef", &"boots_clogs"])
-cents = 150
+gold = 150
 steam_item = 1003
 
 [sub_resource type="Resource" id="p4"]
@@ -1594,7 +1443,7 @@ script = ExtResource("3")
 id = &"pack_firefighter"
 display_name = "Fire Brigade"
 pieces = Array[StringName]([&"hat_firefighter", &"shirt_firefighter", &"pants_firefighter", &"boots_firefighter"])
-cents = 200
+gold = 200
 steam_item = 1004
 
 [sub_resource type="Resource" id="p5"]
@@ -1602,7 +1451,7 @@ script = ExtResource("3")
 id = &"pack_pirate"
 display_name = "Pirate Captain"
 pieces = Array[StringName]([&"hat_pirate", &"shirt_captain", &"pants_breeches", &"boots_pirate"])
-cents = 275
+gold = 275
 steam_item = 1005
 
 [sub_resource type="Resource" id="p6"]
@@ -1610,7 +1459,7 @@ script = ExtResource("3")
 id = &"pack_royal"
 display_name = "Royal Highness"
 pieces = Array[StringName]([&"hat_crown", &"shirt_royal", &"pants_royal", &"cape_royal", &"boots_royal"])
-cents = 450
+gold = 450
 steam_item = 1006
 
 [sub_resource type="Resource" id="p7"]
@@ -1618,7 +1467,7 @@ script = ExtResource("3")
 id = &"pack_hero"
 display_name = "Superhero"
 pieces = Array[StringName]([&"shirt_hero", &"pants_hero", &"cape_hero", &"boots_hero"])
-cents = 225
+gold = 225
 steam_item = 1007
 
 [sub_resource type="Resource" id="p8"]
@@ -1626,7 +1475,7 @@ script = ExtResource("3")
 id = &"pack_cowboy"
 display_name = "Wild West"
 pieces = Array[StringName]([&"hat_cowboy", &"shirt_flannel", &"pants_chaps", &"boots_cowboy"])
-cents = 225
+gold = 225
 steam_item = 1008
 
 [sub_resource type="Resource" id="p9"]
@@ -1634,7 +1483,7 @@ script = ExtResource("3")
 id = &"pack_pilot"
 display_name = "Pilot"
 pieces = Array[StringName]([&"hat_pilot", &"shirt_pilot", &"pants_pilot", &"boots_pilot"])
-cents = 200
+gold = 200
 steam_item = 1010
 
 [sub_resource type="Resource" id="p10"]
@@ -1642,7 +1491,7 @@ script = ExtResource("3")
 id = &"pack_doctor"
 display_name = "Doctor"
 pieces = Array[StringName]([&"hat_surgeon", &"shirt_doctor", &"pants_scrubs", &"boots_clogs"])
-cents = 175
+gold = 175
 steam_item = 1011
 
 [sub_resource type="Resource" id="p11"]
@@ -1650,7 +1499,7 @@ script = ExtResource("3")
 id = &"pack_knight"
 display_name = "Knight"
 pieces = Array[StringName]([&"hat_knight", &"shirt_knight", &"pants_knight", &"cape_knight", &"boots_knight"])
-cents = 425
+gold = 425
 steam_item = 1012
 
 [sub_resource type="Resource" id="p12"]
@@ -1658,7 +1507,7 @@ script = ExtResource("3")
 id = &"pack_wizard"
 display_name = "Wizard"
 pieces = Array[StringName]([&"hat_wizard", &"shirt_wizard", &"pants_wizard", &"cape_wizard", &"boots_wizard", &"beard_wizard"])
-cents = 475
+gold = 475
 steam_item = 1013
 
 [sub_resource type="Resource" id="p13"]
@@ -1666,7 +1515,7 @@ script = ExtResource("3")
 id = &"pack_kids"
 display_name = "Playground"
 pieces = Array[StringName]([&"hat_propeller", &"shirt_kid", &"pants_overalls", &"boots_light"])
-cents = 200
+gold = 200
 steam_item = 1014
 
 [sub_resource type="Resource" id="p14"]
@@ -1674,7 +1523,7 @@ script = ExtResource("3")
 id = &"pack_bavarian"
 display_name = "Bavarian"
 pieces = Array[StringName]([&"hat_tyrolean", &"shirt_bavarian", &"pants_lederhosen", &"boots_haferl"])
-cents = 275
+gold = 275
 steam_item = 1015
 
 [sub_resource type="Resource" id="p15"]
@@ -1682,27 +1531,27 @@ script = ExtResource("3")
 id = &"pack_golfer"
 display_name = "Golfer"
 pieces = Array[StringName]([&"hat_golf", &"shirt_polo", &"pants_golf", &"boots_golf"])
-cents = 175
+gold = 175
 steam_item = 1016
 
 [sub_resource type="Resource" id="k0"]
 script = ExtResource("4")
-id = &"coins_500"
-coins = 500
+id = &"gold_100"
+gold = 100
 cents = 99
 steam_item = 3000
 
 [sub_resource type="Resource" id="k1"]
 script = ExtResource("4")
-id = &"coins_1200"
-coins = 1200
+id = &"gold_220"
+gold = 220
 cents = 199
 steam_item = 3001
 
 [sub_resource type="Resource" id="k2"]
 script = ExtResource("4")
-id = &"coins_3500"
-coins = 3500
+id = &"gold_600"
+gold = 600
 cents = 499
 steam_item = 3002
 

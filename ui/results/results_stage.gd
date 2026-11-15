@@ -616,7 +616,7 @@ func _build_xp_panel(root: Control) -> void:
 	ch.add_child(coin)
 	coins_line = Label.new()
 	coins_line.name = "Coins"
-	coins_line.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
+	coins_line.add_theme_color_override(&"font_color", Palette.COIN_RED)
 	coins_line.tooltip_text = "Coins buy cosmetics in the main menu. Your $ stays here: it starts fresh next match."
 	var summary: Dictionary = progress_summary
 	var coins: int = int(summary.get("coins", row.get("coins", 0)))

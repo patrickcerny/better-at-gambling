@@ -161,7 +161,7 @@ func _card(lvl: int, cfg: ProgressionConfig) -> PanelContainer:
 	var coins := Label.new()
 	coins.name = "Coins"
 	coins.theme_type_variation = &"HeadingLabel"
-	coins.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
+	coins.add_theme_color_override(&"font_color", Palette.COIN_RED)
 	coins.text = "+%s" % Hud._thousands(cfg.level_coins(lvl))
 	row.add_child(coins)
 	var ci := CoinIcon.make(26.0)

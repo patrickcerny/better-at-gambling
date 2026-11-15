@@ -105,6 +105,10 @@
 - Faces: see-through shades (second surface, `OutfitMeshes.lens_material`), moustaches sit above
   the mouth (`MOUSTACHE_LIFT`), beards start lower, businessman hair redone, cape clasps gone.
 - Lobby colour plaques removed (colour/skin only in the menu shop). Rank hidden in solo.
+- Two currencies (Patrick: red Coins by playing, Gold Coins only for real money): normal pieces cost
+  red Coins, premium pieces and sets cost Gold (Steam items exchanged through `exchangeItems`); gold
+  packs are the only real-money items. docs/STEAM_INVENTORY.md; itemdefs.json regenerated (not
+  uploaded).
 ### 2026-11-15 / 0.9.25 "Beat the Dev" achievement
 - New Steam achievement `ACH_BEAT_THE_DEV` (20th): finish an online match ranked ahead of the
   developer (`DevMode.STEAM_IDS`) or of anyone who already holds it, so it spreads. Standings rows

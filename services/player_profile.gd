@@ -94,8 +94,8 @@ func owned_colors() -> Array[int]:
 	return out
 
 
-## Buys `id` with Coins. Returns &"" when bought, else why not: &"unknown", &"owned",
-## &"steam_only" (real money only), &"level" (only unlocked by levelling up) or
+## Buys `id` with (red) Coins. Returns &"" when bought, else why not: &"unknown", &"owned",
+## &"gold" (premium: Gold Coins through Steam), &"level" (only unlocked by levelling up) or
 ## &"not_enough_coins". Nothing changes on a refusal.
 func buy(id: StringName) -> StringName:
 	var d: CosmeticDef = shop.find(id)
@@ -104,7 +104,7 @@ func buy(id: StringName) -> StringName:
 	if owns(id):
 		return &"owned"
 	if not d.coin_buyable():
-		return &"steam_only" if d.steam_buyable() else &"level"
+		return &"gold" if d.premium() else &"level"
 	if coins < d.price:
 		return &"not_enough_coins"
 	coins -= d.price
@@ -112,7 +112,7 @@ func buy(id: StringName) -> StringName:
 	return &""
 
 
-## Adds Coins bought with real money (`SteamSvc`), up to MAX_COINS. Returns how many were added.
+## Adds (red) Coins (developer mode, tests), up to MAX_COINS. Returns how many were added.
 func add_coins(amount: int) -> int:
 	var before: int = coins
 	coins = clampi(coins + maxi(amount, 0), 0, MAX_COINS)
@@ -251,7 +251,7 @@ func sanitize() -> void:
 	for kind: StringName in outfit:
 		var d: CosmeticDef = shop.find(outfit[kind])
 		# Steam pieces stay put: the Steam inventory arrives after the profile is loaded.
-		if kind in CosmeticDef.OUTFIT_KINDS and d != null and d.kind == kind and (owns(d.id) or d.steam_buyable()):
+		if kind in CosmeticDef.OUTFIT_KINDS and d != null and d.kind == kind and (owns(d.id) or d.steam_item > 0):
 			worn[kind] = d.id
 	outfit = worn
 	matches = maxi(matches, 0)

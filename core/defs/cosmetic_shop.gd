@@ -59,13 +59,13 @@ func by_steam_item(def: int) -> Resource:
 	return null
 
 
-## The pieces' euro cents added up (what a pack would cost piece by piece).
-func pieces_cents(pack: CosmeticPack) -> int:
+## The pack's premium pieces' Gold added up (what they would cost one by one).
+func pieces_gold(pack: CosmeticPack) -> int:
 	var sum: int = 0
 	for id: StringName in pack.pieces:
 		var d: CosmeticDef = find(id)
 		if d != null:
-			sum += d.cents
+			sum += d.gold
 	return sum
 
 

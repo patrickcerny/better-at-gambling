@@ -58,7 +58,7 @@ func _ready() -> void:
 	coins.add_child(icon)
 	coins_label = Label.new()
 	coins_label.name = "Coins"
-	coins_label.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
+	coins_label.add_theme_color_override(&"font_color", Palette.COIN_RED)
 	coins_label.tooltip_text = "Coins: earned by playing, spent on cosmetics. Never on the tables."
 	coins.add_child(coins_label)
 	ProfileManager.changed.connect(refresh)

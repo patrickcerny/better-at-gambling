@@ -31,6 +31,8 @@ const PLAYER_COLOR_NAMES: Array[String] = [
 ]
 ## The Coins (out-of-match currency) gold.
 const COIN_GOLD := Color("#F5C542")
+## Red Coins (earned by playing; Patrick 2026-11-15: gold only for real money, red by playing).
+const COIN_RED := Color("#E8604F")
 
 
 ## Player colour by index (wraps).

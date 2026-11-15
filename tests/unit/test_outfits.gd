@@ -42,7 +42,7 @@ func test_fifteen_pieces_per_slot_each_with_a_model() -> void:
 			assert_false(d.id in ids, "%s is listed once" % d.id)
 			ids.append(d.id)
 			assert_false(d.is_free(), "%s is bought or unlocked" % d.id)
-			assert_true(d.coin_buyable() or d.steam_buyable() or d.level > 0, "%s can be had somehow" % d.id)
+			assert_true(d.coin_buyable() or d.premium() or d.level > 0, "%s can be had somehow" % d.id)
 	for d: CosmeticDef in shop.of_kind(CosmeticDef.KIND_BEARD):
 		assert_true(OutfitMeshes.has_model(d.id), "%s has a model" % d.id)
 	for d: CosmeticDef in shop.of_kind(CosmeticDef.KIND_SKIN):
