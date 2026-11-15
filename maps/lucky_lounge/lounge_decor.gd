@@ -57,6 +57,9 @@ var _velvet_mat: StandardMaterial3D
 var _marble_mat: StandardMaterial3D
 var _wood_mat: StandardMaterial3D
 var _mats: Dictionary = {}
+## Each arched window with its curtains: [window, curtains]. Hidden while a tall game stands in front
+## (a floor layout can put Plinko or a cabinet on a wall with windows; the velvet would cut through it).
+var _window_sets: Array = []
 
 
 func _init(p_map: LuckyLounge = null) -> void:
@@ -102,6 +105,9 @@ func _ready() -> void:
 	_waiting_room()
 	_environment()
 	_flush()
+	_clear_windows()
+	if not map.floor_changed.is_connected(_clear_windows):
+		map.floor_changed.connect(_clear_windows)
 
 
 # --- Materials --------------------------------------------------------------------------------
@@ -432,6 +438,57 @@ func _windows() -> void:
 		curtains.rotation.y = atan2(n.x, n.z)
 		_recolor(curtains, {"Couch_Blue": curtain_red, "LightMetal": _gold_mat})
 		add_child(curtains)
+		_window_sets.append([win, curtains])
+
+
+## Hides every window (and its curtains) a game on the floor would clip: a game's colliders reach
+## into the curtains' box and stand taller than their hem (a slot cabinet under the sill is fine).
+func _clear_windows() -> void:
+	var games: Array[AABB] = []
+	for sid: StringName in map.stations:
+		var st: StationBase = map.stations[sid]
+		if is_instance_valid(st) and st.is_inside_tree():
+			var b: AABB = _collider_box(st)
+			if b.size != Vector3.ZERO:
+				games.append(b)
+	for pair: Array in _window_sets:
+		var win: Node3D = pair[0]
+		var curtains: Node3D = pair[1]
+		var zone: AABB = _mesh_box(curtains).merge(_mesh_box(win)).grow(0.05)
+		var blocked: bool = false
+		for g: AABB in games:
+			if g.end.y > zone.position.y + 0.25 and g.intersects(zone):
+				blocked = true
+				break
+		win.visible = not blocked
+		curtains.visible = not blocked
+
+
+## World box round a node's meshes.
+static func _mesh_box(root: Node3D) -> AABB:
+	var out := AABB()
+	var first: bool = true
+	for n: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = n
+		var b: AABB = mi.global_transform * mi.get_aabb()
+		out = b if first else out.merge(b)
+		first = false
+	return out
+
+
+## World box round a station's solid colliders (its static bodies; not the interact areas).
+static func _collider_box(st: Node3D) -> AABB:
+	var out := AABB()
+	var first: bool = true
+	for body: Node in st.find_children("*", "StaticBody3D", true, false):
+		for cs: Node in body.find_children("*", "CollisionShape3D", true, false):
+			var shape: Shape3D = (cs as CollisionShape3D).shape
+			if shape == null or (cs as CollisionShape3D).disabled:
+				continue
+			var b: AABB = (cs as CollisionShape3D).global_transform * shape.get_debug_mesh().get_aabb()
+			out = b if first else out.merge(b)
+			first = false
+	return out
 
 
 func _doors() -> void:
