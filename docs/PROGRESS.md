@@ -93,6 +93,11 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.36 lobby browser
+- Patrick: "If i have 4 friends in the lobby, it shows 4 times the same lobby." JOIN A FRIEND listed one
+  row per friend; `SteamSvc.friend_lobbies` now groups by lobby (`group_friend_lobbies`) with the
+  friends' names ("Anna, Ben and 2 more"), players x/8, other-version lobbies greyed. BROWSE LOBBIES
+  rows show which friends are in, list friends' lobbies first then the fullest, each lobby once.
 ### 2026-11-15 / 0.9.34 open eyes in shop pictures
 - Shop thumbnails were sometimes taken mid-blink (slit eyes); the thumbnail bean never blinks now (`AvatarVisuals.no_blink`).
 

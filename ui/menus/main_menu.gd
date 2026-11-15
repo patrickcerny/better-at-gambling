@@ -516,6 +516,8 @@ const FRIENDS_REFRESH: float = 3.0
 const BROWSE_REFRESH: float = 8.0
 var _friends_timer: float = 0.0
 var _browse_timer: float = 0.0
+## Lobby id -> names of your friends in it (from "Join a friend"), for BROWSE LOBBIES.
+var _friend_lobby_ids: Dictionary = {}
 
 
 ## Host button state and the friends' parties (Steam only).
@@ -527,18 +529,63 @@ func _refresh_steam_entries() -> void:
 	friends_box.visible = on
 	if not on:
 		return
-	for c: Node in _friends_list.get_children():
-		c.queue_free()
 	var parties: Array[Dictionary] = SteamSvc.friend_lobbies()
+	_friend_lobby_ids.clear()
+	for f: Dictionary in parties:
+		_friend_lobby_ids[int(f["lobby"])] = (f["friends"] as Array).duplicate()
+	_fill_friends(parties)
+
+
+## JOIN A FRIEND: one row per lobby (never one per friend), with who of your friends is in it.
+func _fill_friends(parties: Array[Dictionary]) -> void:
+	for c: Node in _friends_list.get_children():
+		_friends_list.remove_child(c)
+		c.queue_free()
 	if parties.is_empty():
 		var none := Label.new()
 		none.text = "No friends in a lobby right now."
 		none.theme_type_variation = &"MutedLabel"
 		_friends_list.add_child(none)
 	for f: Dictionary in parties:
-		var lobby: int = int(f["lobby"])
+		var friends: Array = f["friends"]
 		var party: String = str(f.get("party", ""))
-		_friends_list.add_child(_button("Join %s" % (party if party != "" else "%s's lobby" % str(f["name"])), func() -> void: _join_steam_lobby(lobby)))
+		var title: String = party if party != "" else "%s's lobby" % str(friends[0])
+		var build: String = str(f.get("build", ""))
+		var same: bool = build == "" or build == Protocol.BUILD_ID
+		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if same else "Version %s (you have %s)" % [build, Protocol.BUILD_ID]
+		_friends_list.add_child(_lobby_row(int(f["lobby"]), title, sub, int(f.get("members", 0)), int(f.get("max", 0)), same))
+
+
+## One lobby: name, a small line under it, players, JOIN.
+func _lobby_row(lid: int, title_text: String, sub_text: String, members: int, max_members: int, joinable: bool = true) -> Control:
+	var row := HBoxContainer.new()
+	row.name = "Lobby%d" % lid
+	row.add_theme_constant_override(&"separation", 12)
+	var text := VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_theme_constant_override(&"separation", 0)
+	row.add_child(text)
+	var title := Label.new()
+	title.text = title_text
+	title.clip_text = true
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	text.add_child(title)
+	if sub_text != "":
+		var sub := Label.new()
+		sub.text = sub_text
+		sub.theme_type_variation = &"MutedLabel"
+		sub.clip_text = true
+		sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		text.add_child(sub)
+	var count := Label.new()
+	count.text = "%d/%d" % [members, max_members if max_members > 0 else Protocol.MAX_PLAYERS] if members > 0 else ""
+	count.custom_minimum_size = Vector2(56, 0)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(count)
+	var join := _button("Join", func() -> void: _join_steam_lobby(lid), 120.0)
+	join.disabled = not joinable
+	row.add_child(join)
+	return row
 
 
 func _process(delta: float) -> void:
@@ -599,6 +646,9 @@ func _join_steam_lobby(lobby_id: int) -> void:
 ## Asks Steam for the public lobbies again (the list redraws when they arrive).
 func _refresh_browse() -> void:
 	_browse_timer = 0.0
+	_friend_lobby_ids.clear()
+	for f: Dictionary in SteamSvc.friend_lobbies():
+		_friend_lobby_ids[int(f["lobby"])] = (f["friends"] as Array).duplicate()
 	if not SteamSvc.request_public_lobbies() and _browse_list.get_child_count() == 0:
 		_fill_browse([])
 
@@ -608,7 +658,25 @@ func _on_public_lobbies(lobbies: Array[Dictionary]) -> void:
 		_fill_browse(lobbies)
 
 
-## One row per public lobby: its name, players and JOIN; full ones are left out by Steam.
+## Lobbies with your friends first, then the fullest (a game about to start), each lobby once.
+static func sort_public_lobbies(lobbies: Array[Dictionary], friend_lobbies_: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var ids: Dictionary[int, bool] = {}
+	for l: Dictionary in lobbies:
+		if not ids.has(int(l["lobby"])):
+			ids[int(l["lobby"])] = true
+			out.append(l)
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var fa: int = (friend_lobbies_.get(int(a["lobby"]), []) as Array).size()
+		var fb: int = (friend_lobbies_.get(int(b["lobby"]), []) as Array).size()
+		if fa != fb:
+			return fa > fb
+		return int(a["members"]) > int(b["members"]))
+	return out
+
+
+## One row per public lobby: its name, your friends in it, players and JOIN; full ones are left
+## out by Steam.
 func _fill_browse(lobbies: Array[Dictionary]) -> void:
 	var had_focus: bool = _browse_list.get_viewport() != null and _browse_list.is_ancestor_of(_browse_list.get_viewport().gui_get_focus_owner())
 	for c: Node in _browse_list.get_children():
@@ -619,22 +687,11 @@ func _fill_browse(lobbies: Array[Dictionary]) -> void:
 		none.text = "No public lobbies right now. Create one!"
 		none.theme_type_variation = &"MutedLabel"
 		_browse_list.add_child(none)
-	for l: Dictionary in lobbies:
+	for l: Dictionary in sort_public_lobbies(lobbies, _friend_lobby_ids):
 		var lid: int = int(l["lobby"])
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override(&"separation", 12)
-		var title := Label.new()
-		title.text = str(l["name"])
-		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		title.clip_text = true
-		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		row.add_child(title)
-		var count := Label.new()
-		count.text = "%d/%d" % [int(l["members"]), int(l["max"])]
-		row.add_child(count)
-		var join := _button("Join", func() -> void: _join_steam_lobby(lid), 120.0)
-		row.add_child(join)
-		_browse_list.add_child(row)
+		var friends: Array = _friend_lobby_ids.get(lid, [])
+		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if not friends.is_empty() else ""
+		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"])))
 	if had_focus:
 		_browse_refresh.grab_focus()
 

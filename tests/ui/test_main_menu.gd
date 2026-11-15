@@ -151,6 +151,12 @@ func test_browse_list_rows() -> void:
 	assert_true("3/8" in texts)
 	assert_true("Lobby" in texts, "an empty name gets a stand-in")
 	assert_true("1/%d" % Protocol.MAX_PLAYERS in texts)
+	var sorted: Array[Dictionary] = menu.call(&"sort_public_lobbies", [SteamSvc.public_lobby_entry(1, "a", 2, 8), SteamSvc.public_lobby_entry(2, "b", 6, 8), SteamSvc.public_lobby_entry(3, "c", 1, 8), SteamSvc.public_lobby_entry(2, "b", 6, 8)] as Array[Dictionary], {3: ["Anna"]})
+	assert_eq(sorted.map(func(l: Dictionary) -> int: return int(l["lobby"])), [3, 2, 1], "friends first, then fullest, each once")
+	menu.call(&"_fill_friends", SteamSvc.group_friend_lobbies([{"name": "Anna", "lobby": 5, "party": "", "build": Protocol.BUILD_ID}, {"name": "Ben", "lobby": 5, "party": "", "build": Protocol.BUILD_ID}] as Array[Dictionary]))
+	var friends_list: Node = menu.find_child("JoinFriend", true, false)
+	assert_eq(friends_list.find_children("Lobby*", "HBoxContainer", true, false).size(), 1, "two friends, one lobby row")
+	assert_true("Friends: Anna and Ben" in _label_texts(friends_list))
 	menu.call(&"_fill_browse", [] as Array[Dictionary])
 	assert_eq(list.get_child_count(), 1, "just the 'no lobbies' line")
 
