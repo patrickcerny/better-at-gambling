@@ -20,7 +20,7 @@ name: Build & release
 on:
   push:
     branches: [main]
-    paths-ignore: ["docs/**", "**/*.md", "deploy/**", "services/orchestrator/**"]
+    paths-ignore: ["docs/**", "**/*.md", "deploy/**", "services/orchestrator/**", "website/**"]
   workflow_dispatch:
     inputs:
       steam:

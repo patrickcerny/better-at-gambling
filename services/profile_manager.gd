@@ -18,6 +18,8 @@ var path: String = PATH
 var persist: bool = true
 ## Pieces in the Steam inventory (`SteamSvc`), kept across `reload`.
 var steam_owned: Array[StringName] = []
+## Developer mode's "every cosmetic" (`DevMode.set_unlock_all`), kept across `reload`, never saved.
+var dev_unlock_all: bool = false
 
 
 func _ready() -> void:
@@ -40,6 +42,19 @@ func reload() -> void:
 	if err != OK and err != ERR_FILE_NOT_FOUND:
 		Log.warn(&"profile", "could not load %s (error %d), starting fresh" % [path, err])
 	profile.steam_owned = steam_owned.duplicate()
+	profile.dev_all = dev_unlock_all
+	changed.emit()
+
+
+## Developer mode: every cosmetic owned (on) or back to what the player really has (off).
+func set_dev_unlock_all(on: bool) -> void:
+	if on == dev_unlock_all:
+		return
+	dev_unlock_all = on
+	profile.dev_all = on
+	if not on:
+		profile.sanitize()  # take off pieces that were only lent
+		save()
 	changed.emit()
 
 

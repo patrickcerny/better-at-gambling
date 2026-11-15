@@ -11,10 +11,11 @@ extends RefCounted
 
 const RECIPES: Array[StringName] = [
 	&"bad_luck_monkey", &"banana_peel", &"black_cat", &"bodyguard", &"bouncer", &"boxing_glove",
-	&"bribe", &"credit_card", &"double_down", &"energy_drink", &"fake_cash", &"get_out_of_jail_free",
+	&"bribe", &"credit_card", &"dog_collar", &"double_down", &"energy_drink", &"fake_cash",
+	&"get_out_of_jail_free",
 	&"golden_chip", &"grease", &"hot_hands", &"jackpot_magnet", &"loaded_reels", &"lucky_clover",
 	&"mirror", &"out_of_order", &"pickpocket", &"robin_hood", &"rock_paper_scissors", &"scissors",
-	&"sunglasses", &"vip_pass", &"wild_card",
+	&"scratch_ticket", &"sunglasses", &"vip_pass", &"wild_card",
 ]
 
 const FUR := Color(0.42, 0.26, 0.15)
@@ -155,6 +156,57 @@ static func text(p: Node3D, s: String, px: float, pos: Vector3, m: Material, rot
 		return t)
 	# TextMesh faces +z; turn it to face -z.
 	return _put(p, mesh, pos, m, rot + Vector3(0, 180, 0))
+
+
+## A flat shape: the outline `pts` (x-y, counter-clockwise or not) extruded `depth` along z,
+## centred on z = 0, with crisp edges (a blade, a lightning bolt).
+static func slab(p: Node3D, pts: PackedVector2Array, depth: float, pos: Vector3, m: Material, rot: Vector3 = Vector3.ZERO, name: String = "") -> MeshInstance3D:
+	var key: String = "slab%s|%.3f" % [str(pts), depth]
+	var mesh: Mesh = _mesh(key, func() -> Mesh:
+		var tris: PackedInt32Array = Geometry2D.triangulate_polygon(pts)
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var h: float = depth * 0.5
+		for i: int in range(0, tris.size(), 3):
+			var a: Vector2 = pts[tris[i]]
+			var b: Vector2 = pts[tris[i + 1]]
+			var c: Vector2 = pts[tris[i + 2]]
+			var ccw: bool = (b - a).cross(c - a) > 0.0
+			# Front (-z) and back (+z) faces, wound so they face outward (Godot: clockwise = front).
+			for face: float in [-1.0, 1.0]:
+				var out: bool = (face < 0.0) == ccw
+				var q: Array = [a, b, c] if out else [a, c, b]
+				for v: Vector2 in q:
+					st.set_normal(Vector3(0, 0, face))
+					st.add_vertex(Vector3(v.x, v.y, face * h))
+		var n: int = pts.size()
+		var area: float = 0.0
+		for i: int in n:
+			area += pts[i].cross(pts[(i + 1) % n])
+		for i: int in n:
+			var a2: Vector2 = pts[i]
+			var b2: Vector2 = pts[(i + 1) % n]
+			var e: Vector2 = b2 - a2
+			var nrm := Vector3(e.y, -e.x, 0.0).normalized() * (1.0 if area > 0.0 else -1.0)
+			var quad: Array[Vector3] = [Vector3(a2.x, a2.y, -h), Vector3(b2.x, b2.y, -h), Vector3(b2.x, b2.y, h), Vector3(a2.x, a2.y, h)]
+			var order: Array = [0, 2, 1, 0, 3, 2] if area > 0.0 else [0, 1, 2, 0, 2, 3]
+			for k: int in order:
+				st.set_normal(nrm)
+				st.add_vertex(quad[k])
+		return st.commit())
+	return _put(p, mesh, pos, m, rot, Vector3.ONE, name)
+
+
+## A rectangle `w` × `h` centred on the origin with corners rounded by `rad` (an outline for `slab`).
+static func rounded_rect(w: float, h: float, rad: float, segs: int = 4) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var cs: Array[Vector2] = [Vector2(w * 0.5 - rad, h * 0.5 - rad), Vector2(-w * 0.5 + rad, h * 0.5 - rad),
+		Vector2(-w * 0.5 + rad, -h * 0.5 + rad), Vector2(w * 0.5 - rad, -h * 0.5 + rad)]
+	for k: int in 4:
+		for i: int in segs + 1:
+			var a: float = PI * 0.5 * k + PI * 0.5 * i / segs
+			pts.append(cs[k] + Vector2(cos(a), sin(a)) * rad)
+	return pts
 
 
 static func pivot(p: Node3D, name: String, pos: Vector3, rot: Vector3 = Vector3.ZERO) -> Node3D:
@@ -370,6 +422,31 @@ func _die(p: Node3D, pos: Vector3, name: String) -> Node3D:
 	return d
 
 
+func _dog_collar(r: Node3D, idle: ItemIdle) -> void:
+	# A red leather collar with gold studs and buckle, tipped toward you, a gold "$" tag swinging.
+	var leather: Material = mat(Color(0.62, 0.12, 0.11), 0.05, 0.5)
+	var c: Node3D = pivot(r, "Collar", Vector3(0, 0.5, 0))
+	var band: Node3D = pivot(c, "Band", Vector3.ZERO, Vector3(-70, 0, 0))
+	ring(band, 0.27, 0.34, Vector3.ZERO, leather, Vector3.ZERO, Vector3(1, 1.9, 1))
+	var stud: Material = mat(Palette.COIN_GOLD, 0.6, 0.25)
+	for i: int in 9:
+		var a: float = deg_to_rad(36.0 + i * 36.0)
+		ball(band, Vector3(0.024, 0.024, 0.024), Vector3(sin(a) * 0.345, 0, -cos(a) * 0.345), stud, Vector3.ZERO, 8)
+	# The buckle on the near side (local -z): a gold frame and its tongue.
+	var g: Material = gold()
+	for sy: float in [-1.0, 1.0]:
+		box(band, Vector3(0.15, 0.025, 0.03), Vector3(0, sy * 0.075, -0.35), g)
+		box(band, Vector3(0.025, 0.17, 0.03), Vector3(sy * 0.065, 0, -0.35), g)
+	box(band, Vector3(0.11, 0.018, 0.02), Vector3(0, 0, -0.36), g)
+	# The tag hangs from the bottom of the band.
+	var tag: Node3D = pivot(c, "Tag", Vector3(0, -0.3, -0.13))
+	ring(tag, 0.02, 0.032, Vector3(0, -0.03, 0), g, Vector3(0, 90, 90))
+	cyl(tag, 0.09, 0.09, 0.025, Vector3(0, -0.13, 0), g, Vector3(90, 0, 0), 18)
+	text(tag, "$", 0.0026, Vector3(0, -0.13, -0.016), mat(Palette.VIP_BURGUNDY), Vector3.ZERO, 0.008)
+	idle.add(tag, ItemIdle.Kind.SWING, 0.3, 2.6, Vector3.FORWARD)
+	idle.add(c, ItemIdle.Kind.SWING, 0.06, 1.3, Vector3.UP)
+
+
 func _double_down(r: Node3D, idle: ItemIdle) -> void:
 	var orbit: Node3D = pivot(r, "Orbit", Vector3(0, 0.45, 0))
 	var a: Node3D = _die(orbit, Vector3(-0.2, 0.08, 0), "DieA")
@@ -387,14 +464,17 @@ func _energy_drink(r: Node3D, idle: ItemIdle) -> void:
 	cyl(can, 0.26, 0.26, 0.82, Vector3(0, 0.45, 0), body, Vector3.ZERO, 20)
 	cyl(can, 0.22, 0.26, 0.05, Vector3(0, 0.885, 0), mat(SILVER, 0.6, 0.28), Vector3.ZERO, 20)
 	cyl(can, 0.26, 0.22, 0.05, Vector3(0, 0.015, 0), mat(SILVER, 0.6, 0.28), Vector3.ZERO, 20)
-	cyl(can, 0.265, 0.265, 0.16, Vector3(0, 0.66, 0), mat(Palette.CREAM, 0.2, 0.5), Vector3.ZERO, 20)
-	text(can, "VOLT", 0.0042, Vector3(0, 0.66, -0.262), mat(Palette.CASINO_RED, 0.0, 0.5), Vector3.ZERO, 0.02)
+	cyl(can, 0.265, 0.265, 0.17, Vector3(0, 0.66, 0), mat(Palette.CREAM, 0.2, 0.5), Vector3.ZERO, 20)
+	# VOLT wraps around the can, one letter at a time (the reader's right is -x).
+	var red: Material = mat(Palette.CASINO_RED, 0.0, 0.5)
+	var word: String = "VOLT"
+	for i: int in word.length():
+		var a: float = deg_to_rad((1.5 - i) * 19.0)
+		text(can, word[i], 0.0034, Vector3(sin(a) * 0.262, 0.655, -cos(a) * 0.262), red, Vector3(0, -rad_to_deg(a), 0), 0.015)
 	# Lightning bolt.
-	var bolt: Node3D = pivot(can, "Bolt", Vector3(0, 0.38, -0.27))
-	var g: Material = mat(Palette.COIN_GOLD, 0.6, 0.3, 0.3)
-	box(bolt, Vector3(0.07, 0.2, 0.02), Vector3(0.03, 0.08, 0), g, Vector3(0, 0, -25))
-	box(bolt, Vector3(0.12, 0.05, 0.02), Vector3(0, 0, 0), g, Vector3(0, 0, 10))
-	box(bolt, Vector3(0.07, 0.2, 0.02), Vector3(-0.03, -0.08, 0), g, Vector3(0, 0, -25))
+	var bolt := PackedVector2Array([Vector2(0.03, 0.15), Vector2(-0.07, -0.01), Vector2(-0.008, -0.01),
+		Vector2(-0.04, -0.15), Vector2(0.07, 0.025), Vector2(0.008, 0.025)])
+	slab(can, bolt, 0.02, Vector3(0, 0.37, -0.262), mat(Palette.COIN_GOLD, 0.6, 0.3, 0.35), Vector3.ZERO, "Bolt")
 	ring(can, 0.03, 0.045, Vector3(0.05, 0.92, 0), mat(SILVER, 0.6, 0.3), Vector3(0, 0, 0), Vector3(1, 0.4, 1.4))
 	var bubble: Material = mat(Color(0.85, 1.0, 0.85), 0.0, 0.1, 0.4, 0.6)
 	for i: int in 4:
@@ -402,20 +482,18 @@ func _energy_drink(r: Node3D, idle: ItemIdle) -> void:
 		idle.add(b, ItemIdle.Kind.RISE, 0.35, 0.8, Vector3.UP, i * 0.27)
 	idle.add(can, ItemIdle.Kind.SWING, 0.035, 22.0, Vector3.FORWARD)
 
-
 func _fake_cash(r: Node3D, idle: ItemIdle) -> void:
-	# A wad of bills that are a shade too purple, a "?" on the band.
-	var bill: Material = mat(Color(0.52, 0.55, 0.62), 0.0, 0.8)
-	var bill2: Material = mat(Color(0.58, 0.5, 0.64), 0.0, 0.8)
+	# A wad of bills that are a shade too minty and too purple, a "?" on the band.
+	var bill: Material = mat(Color(0.6, 0.74, 0.5), 0.0, 0.8)
+	var bill2: Material = mat(Color(0.66, 0.54, 0.76), 0.0, 0.8)
 	for i: int in 6:
 		box(r, Vector3(0.8, 0.04, 0.42), Vector3(0, 0.05 + i * 0.045, 0), bill if i % 2 == 0 else bill2, Vector3(0, (i % 3 - 1) * 4, 0))
 	box(r, Vector3(0.16, 0.3, 0.44), Vector3(0, 0.17, 0), mat(Palette.CREAM, 0.0, 0.7))
 	text(r, "?", 0.006, Vector3(0, 0.17, -0.23), mat(Palette.CASINO_RED), Vector3.ZERO, 0.01)
 	var top: Node3D = pivot(r, "TopBill", Vector3(-0.4, 0.32, 0))
 	box(top, Vector3(0.8, 0.015, 0.42), Vector3(0.4, 0, 0), bill2)
-	text(top, "$", 0.006, Vector3(0.62, 0.01, 0), mat(Color(0.3, 0.3, 0.4)), Vector3(-90, 0, 0), 0.005)
+	text(top, "$", 0.006, Vector3(0.62, 0.01, 0), mat(Color(0.35, 0.25, 0.45)), Vector3(-90, 0, 0), 0.005)
 	idle.add(top, ItemIdle.Kind.SWING, 0.18, 3.5, Vector3.FORWARD)
-
 
 func _get_out_of_jail_free(r: Node3D, idle: ItemIdle) -> void:
 	# A big gold key on a ring, a cream tag that says FREE.
@@ -487,16 +565,28 @@ func _hot_hands(r: Node3D, idle: ItemIdle) -> void:
 
 
 func _jackpot_magnet(r: Node3D, idle: ItemIdle) -> void:
-	var red: Material = mat(Palette.CASINO_RED, 0.2, 0.35)
+	var red: Material = mat(Palette.CASINO_RED.darkened(0.12), 0.1, 0.5)
 	var tip: Material = mat(SILVER, 0.6, 0.3)
 	var mag: Node3D = pivot(r, "Magnet", Vector3(0, 0.0, 0))
-	var n: int = 9
-	for i: int in n:
-		var a: float = PI * i / (n - 1)
-		box(mag, Vector3(0.16, 0.13, 0.18), Vector3(cos(a) * 0.24, 0.62 + sin(a) * 0.24, 0), red, Vector3(0, 0, rad_to_deg(a) + 90))
+	# A smooth horseshoe: outer arc, the left leg down, inner arc back, the right leg down.
+	var pts := PackedVector2Array()
+	var ro: float = 0.31
+	var ri: float = 0.14
+	var cy: float = 0.62
+	var foot: float = 0.33
+	pts.append(Vector2(ro, foot))
+	for i: int in 13:
+		var a: float = PI * i / 12.0
+		pts.append(Vector2(cos(a) * ro, cy + sin(a) * ro))
+	pts.append(Vector2(-ro, foot))
+	pts.append(Vector2(-ri, foot))
+	for i: int in 13:
+		var a: float = PI - PI * i / 12.0
+		pts.append(Vector2(cos(a) * ri, cy + sin(a) * ri))
+	pts.append(Vector2(ri, foot))
+	slab(mag, pts, 0.18, Vector3.ZERO, red, Vector3.ZERO, "Horseshoe")
 	for sx: float in [-1.0, 1.0]:
-		box(mag, Vector3(0.16, 0.3, 0.18), Vector3(sx * 0.24, 0.47, 0), red)
-		box(mag, Vector3(0.165, 0.12, 0.185), Vector3(sx * 0.24, 0.27, 0), tip)
+		box(mag, Vector3(ro - ri + 0.005, 0.12, 0.185), Vector3(sx * (ro + ri) * 0.5, foot - 0.06, 0), tip)
 	var orbit: Node3D = pivot(r, "Coins", Vector3(0, 0.15, 0))
 	var coin: Material = mat(Palette.COIN_GOLD, 0.55, 0.28)
 	for i: int in 3:
@@ -506,7 +596,6 @@ func _jackpot_magnet(r: Node3D, idle: ItemIdle) -> void:
 		idle.add(c, ItemIdle.Kind.BOB, 0.04, 4.0, Vector3.UP, i * 2.0)
 	idle.add(orbit, ItemIdle.Kind.SPIN, 0.0, 2.2, Vector3.UP)
 	idle.add(mag, ItemIdle.Kind.SWING, 0.08, 1.4, Vector3.FORWARD)
-
 
 func _loaded_reels(r: Node3D, idle: ItemIdle) -> void:
 	# A tiny slot machine: burgundy cabinet, gold trim, three reels spinning, a lever.
@@ -585,36 +674,66 @@ func _out_of_order(r: Node3D, idle: ItemIdle) -> void:
 
 
 func _pickpocket(r: Node3D, idle: ItemIdle) -> void:
-	# A fat leather wallet, half open, cash sticking out and a gold clasp.
+	# A fat leather wallet, half open with cash sticking out, hooked on a fishing line and being
+	# reeled away.
 	var leather: Material = mat(LEATHER, 0.1, 0.55)
-	var cash: Node3D = pivot(r, "Cash", Vector3(0, 0.55, 0))
+	var dark: Material = mat(LEATHER.darkened(0.3), 0.1, 0.6)
+	var stitch: Material = mat(Palette.CREAM, 0.0, 0.7)
+	var steel: Material = mat(SILVER, 0.6, 0.25)
+	var catch_: Node3D = pivot(r, "Caught", Vector3(0, 1.2, 0))
+	var w: Node3D = pivot(catch_, "Wallet", Vector3(0, -0.95, 0))
+	var cash: Node3D = pivot(w, "Cash", Vector3(0, 0.5, 0))
 	for i: int in 3:
-		box(cash, Vector3(0.6, 0.3, 0.012), Vector3((i - 1) * 0.04, i * 0.02, (i - 1) * 0.02), mat(BILL, 0.0, 0.8), Vector3(0, 0, (i - 1) * 6))
-	text(cash, "$", 0.005, Vector3(-0.2, 0.05, -0.04), mat(Color(0.2, 0.35, 0.2)), Vector3.ZERO, 0.01)
-	box(r, Vector3(0.7, 0.5, 0.05), Vector3(0, 0.3, 0.04), leather, Vector3(-8, 0, 0))
-	box(r, Vector3(0.7, 0.44, 0.05), Vector3(0, 0.28, -0.06), leather, Vector3(8, 0, 0))
-	box(r, Vector3(0.71, 0.03, 0.12), Vector3(0, 0.05, -0.01), mat(LEATHER.darkened(0.25), 0.1, 0.6))
-	box(r, Vector3(0.08, 0.06, 0.02), Vector3(0, 0.44, -0.095), gold(), Vector3(8, 0, 0))
-	for k: int in 7:
-		box(r, Vector3(0.03, 0.006, 0.004), Vector3(-0.3 + k * 0.1, 0.48, -0.09), mat(Palette.CREAM), Vector3(8, 0, 0))
-	idle.add(cash, ItemIdle.Kind.BOB, 0.05, 3.0, Vector3.UP)
-
+		box(cash, Vector3(0.58, 0.3, 0.012), Vector3((i - 1) * 0.04, i * 0.02, (i - 1) * 0.02), mat(BILL, 0.0, 0.8), Vector3(0, 0, (i - 1) * 6))
+	text(cash, "$", 0.005, Vector3(0.18, 0.05, -0.04), mat(Color(0.2, 0.35, 0.2)), Vector3.ZERO, 0.01)
+	var shape: PackedVector2Array = rounded_rect(0.7, 0.46, 0.07)
+	slab(w, shape, 0.05, Vector3(0, 0.28, 0.05), leather, Vector3(-8, 0, 0), "Back")
+	var front: Node3D = pivot(w, "Front", Vector3(0, 0.25, -0.05), Vector3(8, 0, 0))
+	slab(front, rounded_rect(0.7, 0.4, 0.07), 0.05, Vector3.ZERO, leather)
+	for k: int in 9:
+		box(front, Vector3(0.04, 0.008, 0.004), Vector3(-0.28 + k * 0.07, 0.16, -0.027), stitch)
+	for sx: float in [-1.0, 1.0]:
+		for k: int in 4:
+			box(front, Vector3(0.008, 0.04, 0.004), Vector3(sx * 0.31, 0.11 - k * 0.07, -0.027), stitch)
+	# The snap tab over the top edge.
+	slab(front, rounded_rect(0.14, 0.15, 0.05), 0.02, Vector3(0, 0.14, -0.035), dark)
+	ball(front, Vector3(0.026, 0.026, 0.014), Vector3(0, 0.11, -0.05), gold(), Vector3.ZERO, 10)
+	cyl(w, 0.05, 0.05, 0.71, Vector3(0, 0.05, 0.0), dark, Vector3(0, 0, 90), 10)
+	# The hook through the cash and the line up to the rod.
+	var hook := PackedVector2Array([Vector2(-0.012, 0.18), Vector2(0.012, 0.18), Vector2(0.012, -0.02),
+		Vector2(0.0, -0.06), Vector2(-0.04, -0.075), Vector2(-0.085, -0.05), Vector2(-0.1, 0.0),
+		Vector2(-0.075, 0.04), Vector2(-0.08, -0.01), Vector2(-0.06, -0.045), Vector2(-0.03, -0.05),
+		Vector2(-0.012, -0.025)])
+	slab(w, hook, 0.02, Vector3(0.03, 0.72, -0.03), steel, Vector3.ZERO, "Hook")
+	ring(w, 0.012, 0.022, Vector3(0.03, 0.91, -0.03), steel, Vector3(90, 0, 0))
+	cyl(catch_, 0.005, 0.005, 0.32, Vector3(0.03, -0.0, -0.03), mat(Palette.CREAM, 0.0, 0.5), Vector3.ZERO, 5)
+	idle.add(cash, ItemIdle.Kind.BOB, 0.04, 3.0, Vector3.UP)
+	idle.add(catch_, ItemIdle.Kind.SWING, 0.12, 1.8, Vector3.FORWARD)
+	idle.add(w, ItemIdle.Kind.BOB, 0.05, 1.1, Vector3.UP)
 
 func _robin_hood(r: Node3D, idle: ItemIdle) -> void:
 	# A longbow with an arrow on the string, the arrow drawing back and forth. Bow in the y-z plane.
 	var wood: Material = mat(WOOD, 0.0, 0.55)
 	var bow: Node3D = pivot(r, "Bow", Vector3(0, 0.5, 0))
-	var n: int = 11
-	var tips: Array[Vector3] = []
+	# One smooth limb: a crescent in (z, y), thick at the grip and tapering to the tips; turned so
+	# its x runs along z.
+	var n: int = 14
+	var outer := PackedVector2Array()
+	var inner := PackedVector2Array()
 	for i: int in n:
 		var a: float = lerpf(-1.1, 1.1, float(i) / (n - 1))
-		var pos := Vector3(0, sin(a) * 0.5, -cos(a) * 0.22 + 0.1)
-		cyl(bow, 0.028, 0.028, 0.12, pos, wood, Vector3(rad_to_deg(-a) * 0.6, 0, 0), 8)
-		if i == 0 or i == n - 1:
-			tips.append(pos)
-	box(bow, Vector3(0.07, 0.14, 0.07), Vector3(0, 0, -0.12), mat(Palette.FELT_GREEN, 0.0, 0.8))
+		var z: float = -cos(a) * 0.22 + 0.1
+		var t: float = 0.034 * (1.0 - 0.55 * absf(a) / 1.1)
+		outer.append(Vector2(z - t, sin(a) * 0.5))
+		inner.append(Vector2(z + t, sin(a) * 0.5))
+	inner.reverse()
+	slab(bow, outer + inner, 0.05, Vector3.ZERO, wood, Vector3(0, -90, 0), "Limb")
+	var tips: Array[Vector3] = [Vector3(0, sin(-1.1) * 0.5, -cos(1.1) * 0.22 + 0.1), Vector3(0, sin(1.1) * 0.5, -cos(1.1) * 0.22 + 0.1)]
+	cyl(bow, 0.045, 0.045, 0.16, Vector3(0, 0, -0.12), mat(Palette.FELT_GREEN, 0.0, 0.8), Vector3.ZERO, 10)
+	for k: int in 2:
+		cyl(bow, 0.048, 0.048, 0.015, Vector3(0, -0.07 + k * 0.14, -0.12), gold(), Vector3.ZERO, 10)
 	for t: Vector3 in tips:
-		ball(bow, Vector3.ONE * 0.035, t, gold())
+		ball(bow, Vector3.ONE * 0.03, t, gold())
 	var str_m: Material = mat(Palette.CREAM, 0.0, 0.6)
 	var nock := Vector3(0, 0, 0.12)
 	for t: Vector3 in tips:
@@ -630,36 +749,77 @@ func _robin_hood(r: Node3D, idle: ItemIdle) -> void:
 	idle.add(arrow, ItemIdle.Kind.BOB, 0.05, 2.0, Vector3.BACK)
 	idle.add(bow, ItemIdle.Kind.SWING, 0.08, 1.3, Vector3.RIGHT)
 
-
 func _rock_paper_scissors(r: Node3D, idle: ItemIdle) -> void:
-	var orbit: Node3D = pivot(r, "Orbit", Vector3(0, 0.45, 0))
-	var rock: Node3D = pivot(orbit, "Rock", Vector3(0, 0, -0.28))
+	# Rock and paper side by side, the scissors standing behind them, each hopping in turn.
+	var group: Node3D = pivot(r, "Group", Vector3.ZERO)
+	var rock: Node3D = pivot(group, "Rock", Vector3(0.21, 0.17, -0.04))
 	ball(rock, Vector3(0.17, 0.14, 0.15), Vector3.ZERO, mat(Color(0.5, 0.48, 0.46), 0.0, 0.95), Vector3(10, 20, 0), 6)
-	ball(rock, Vector3(0.09, 0.08, 0.08), Vector3(0.08, 0.06, -0.05), mat(Color(0.56, 0.53, 0.5), 0.0, 0.95), Vector3.ZERO, 6)
-	var paper: Node3D = pivot(orbit, "Paper", Vector3(cos(PI / 6.0) * 0.28, 0, sin(PI / 6.0) * 0.28))
-	box(paper, Vector3(0.24, 0.3, 0.01), Vector3.ZERO, mat(Palette.CREAM, 0.0, 0.8), Vector3(0, 0, 8))
+	ball(rock, Vector3(0.09, 0.08, 0.08), Vector3(-0.07, 0.07, -0.06), mat(Color(0.58, 0.55, 0.52), 0.0, 0.95), Vector3.ZERO, 6)
+	var paper: Node3D = pivot(group, "Paper", Vector3(-0.22, 0.2, -0.06), Vector3(0, 0, -8))
+	box(paper, Vector3(0.24, 0.3, 0.012), Vector3.ZERO, mat(Palette.CREAM, 0.0, 0.8))
 	for k: int in 4:
-		box(paper, Vector3(0.16, 0.008, 0.012), Vector3(0, 0.08 - k * 0.05, 0), mat(Color(0.6, 0.65, 0.8)), Vector3(0, 0, 8))
-	var sc: Node3D = pivot(orbit, "Scissors", Vector3(-cos(PI / 6.0) * 0.28, 0, sin(PI / 6.0) * 0.28))
-	sc.scale = Vector3.ONE * 0.38
+		box(paper, Vector3(0.16, 0.008, 0.012), Vector3(0, 0.08 - k * 0.05, -0.004), mat(Color(0.6, 0.65, 0.8)))
+	var sc: Node3D = pivot(group, "Scissors", Vector3(0, 0.28, 0.12))
+	sc.scale = Vector3.ONE * 0.5
 	_scissors(sc, idle)
+	var i: int = 0
 	for n: Node3D in [rock, paper, sc]:
-		idle.add(n, ItemIdle.Kind.BOB, 0.05, 3.0, Vector3.UP, n.get_index() * 2.1)
-	idle.add(orbit, ItemIdle.Kind.SPIN, 0.0, 1.0, Vector3.UP)
-
+		idle.add(n, ItemIdle.Kind.BOB, 0.04, 3.0, Vector3.UP, i * 2.1)
+		i += 1
+	idle.add(group, ItemIdle.Kind.SWING, 0.25, 0.9, Vector3.UP)
 
 func _scissors(r: Node3D, idle: ItemIdle) -> void:
-	var steel: Material = mat(SILVER, 0.6, 0.22)
-	var handle: Material = mat(Palette.CASINO_RED, 0.1, 0.35)
+	# Tailor's scissors: two steel blades crossing at a gold screw, chunky red finger loops.
+	var steel: Material = mat(Color(0.86, 0.87, 0.9), 0.55, 0.18)
+	var edge: Material = mat(Color(0.97, 0.97, 1.0), 0.4, 0.1, 0.25)
+	var red: Material = mat(Palette.CASINO_RED, 0.05, 0.3)
+	var screw := Vector3(0, 0.56, 0)
 	for side: float in [-1.0, 1.0]:
-		var half: Node3D = pivot(r, "Half" + ("L" if side < 0.0 else "R"), Vector3(0, 0.45, 0))
-		var blade: MeshInstance3D = cyl(half, 0.008, 0.06, 0.55, Vector3(side * 0.015, 0.27, 0), steel, Vector3(0, 0, 0), 4)
-		blade.scale = Vector3(1.7, 0.55, 0.3)
-		ring(half, 0.06, 0.1, Vector3(-side * 0.11, -0.3, 0), handle, Vector3(90, 0, 0), Vector3(1, 1, 1.3))
-		cyl(half, 0.03, 0.03, 0.22, Vector3(-side * 0.05, -0.12, 0), handle, Vector3(0, 0, side * 25), 8)
-		half.rotation_degrees = Vector3(0, 0, side * -12)
-		idle.add(half, ItemIdle.Kind.SWING, 0.2, 5.0, Vector3.FORWARD * side)
-	cyl(r, 0.03, 0.03, 0.06, Vector3(0, 0.45, 0), gold(), Vector3(90, 0, 0), 10)
+		var half: Node3D = pivot(r, "Half" + ("L" if side < 0.0 else "R"), screw)
+		var z: float = side * 0.016
+		# Blade: the cutting edge straight along x = 0, the back curving out to `side`.
+		var blade := PackedVector2Array([Vector2(0.0, -0.04), Vector2(0.0, 0.46), Vector2(side * 0.012, 0.47),
+			Vector2(side * 0.05, 0.36), Vector2(side * 0.075, 0.2), Vector2(side * 0.08, 0.05), Vector2(side * 0.06, -0.06)])
+		slab(half, blade, 0.03, Vector3(0, 0, z), steel)
+		box(half, Vector3(0.008, 0.44, 0.032), Vector3(side * 0.004, 0.22, z), edge)
+		# Shank down to the loop on the other side, in red plastic.
+		var shank := PackedVector2Array([Vector2(side * 0.05, -0.02), Vector2(-side * 0.03, -0.03),
+			Vector2(-side * 0.13, -0.22), Vector2(-side * 0.06, -0.24)])
+		slab(half, shank, 0.04, Vector3(0, 0, z), red)
+		var loop_c := Vector3(-side * 0.14, -0.33, z)
+		ring(half, 0.065, 0.11, loop_c, red, Vector3(90, 0, 0), Vector3(1.0, 1.0, 1.25) if side > 0.0 else Vector3(1.15, 1.0, 1.4))
+		half.rotation_degrees = Vector3(0, 0, side * 9)
+		idle.add(half, ItemIdle.Kind.SWING, 0.13, 4.0, Vector3.FORWARD * side)
+	cyl(r, 0.035, 0.035, 0.09, screw, gold(), Vector3(90, 0, 0), 12)
+	ball(r, Vector3(0.022, 0.022, 0.012), screw + Vector3(0, 0, -0.045), mat(Palette.COIN_GOLD, 0.6, 0.25))
+
+
+func _scratch_ticket(r: Node3D, idle: ItemIdle) -> void:
+	# A gold-edged scratch card, six silver windows, two scratched open to a lucky 7, a coin
+	# scratching the next one.
+	var card: Node3D = pivot(r, "Card", Vector3(0, 0.5, 0))
+	box(card, Vector3(0.64, 0.92, 0.02), Vector3.ZERO, gold())
+	box(card, Vector3(0.58, 0.86, 0.025), Vector3.ZERO, mat(Palette.CREAM, 0.0, 0.6))
+	var burg: Material = mat(Palette.VIP_BURGUNDY, 0.1, 0.45)
+	box(card, Vector3(0.58, 0.18, 0.03), Vector3(0, 0.31, 0), burg)
+	text(card, "SCRATCH", 0.0019, Vector3(0, 0.31, -0.018), gold(), Vector3.ZERO, 0.006)
+	var foil: Material = mat(Color(0.75, 0.76, 0.8), 0.75, 0.3)
+	var seven: Material = mat(Palette.CASINO_RED, 0.0, 0.5)
+	for row: int in 2:
+		for col: int in 3:
+			var at := Vector3((1 - col) * 0.17, 0.07 - row * 0.2, -0.016)
+			if row == 0 and col < 2:
+				box(card, Vector3(0.14, 0.15, 0.006), at, mat(Palette.CREAM.darkened(0.06), 0.0, 0.7))
+				text(card, "7", 0.0022, at + Vector3(0, 0, -0.004), seven, Vector3.ZERO, 0.006)
+				box(card, Vector3(0.04, 0.025, 0.008), at + Vector3(0.05, -0.06, 0), foil, Vector3(0, 0, 20))
+			else:
+				box(card, Vector3(0.14, 0.15, 0.01), at, foil)
+	text(card, "WIN $500", 0.0014, Vector3(0, -0.34, -0.016), burg, Vector3.ZERO, 0.005)
+	# The coin scratching the third window of the top row.
+	var coin: Node3D = pivot(card, "Coin", Vector3(-0.17, 0.05, -0.05))
+	cyl(coin, 0.075, 0.075, 0.02, Vector3(0, 0.05, 0), mat(Palette.COIN_GOLD, 0.6, 0.28), Vector3(-60, 0, 25), 16)
+	idle.add(coin, ItemIdle.Kind.BOB, 0.045, 9.0, Vector3.RIGHT)
+	idle.add(card, ItemIdle.Kind.SWING, 0.12, 1.5, Vector3.UP)
 
 
 func _sunglasses(r: Node3D, idle: ItemIdle) -> void:
@@ -680,17 +840,16 @@ func _sunglasses(r: Node3D, idle: ItemIdle) -> void:
 func _vip_pass(r: Node3D, idle: ItemIdle) -> void:
 	var pass_: Node3D = pivot(r, "Pass", Vector3(0, 1.0, 0))
 	var strap: Material = mat(Palette.VIP_BURGUNDY, 0.0, 0.8)
-	for sx: float in [-1.0, 1.0]:
-		box(pass_, Vector3(0.05, 0.3, 0.01), Vector3(sx * 0.08, -0.12, 0), strap, Vector3(0, 0, sx * 28))
+	# The lanyard: a flat ribbon loop above the clip.
+	ring(pass_, 0.15, 0.18, Vector3(0, 0.0, 0.02), strap, Vector3(90, 0, 0), Vector3(0.7, 0.25, 1.45))
 	ring(pass_, 0.02, 0.035, Vector3(0, -0.27, 0), gold(), Vector3(90, 0, 0))
 	box(pass_, Vector3(0.08, 0.06, 0.02), Vector3(0, -0.31, 0), gold())
 	box(pass_, Vector3(0.52, 0.72, 0.025), Vector3(0, -0.7, 0), gold())
 	box(pass_, Vector3(0.46, 0.66, 0.03), Vector3(0, -0.7, 0), mat(Palette.VIP_BURGUNDY, 0.1, 0.4))
-	text(pass_, "VIP", 0.0065, Vector3(0, -0.62, -0.02), gold(), Vector3.ZERO, 0.02)
-	star(pass_, Vector3(0, -0.88, -0.02), 0.09, gold())
-	text(pass_, "ALL ACCESS", 0.0016, Vector3(0, -0.78, -0.017), mat(Palette.CREAM), Vector3.ZERO, 0.005)
+	text(pass_, "VIP", 0.0062, Vector3(0, -0.56, -0.02), gold(), Vector3.ZERO, 0.02)
+	text(pass_, "ALL ACCESS", 0.0016, Vector3(0, -0.8, -0.017), mat(Palette.CREAM), Vector3.ZERO, 0.005)
+	star(pass_, Vector3(0, -0.94, -0.02), 0.08, gold())
 	idle.add(pass_, ItemIdle.Kind.SWING, 0.18, 1.7, Vector3.FORWARD)
-
 
 func _wild_card(r: Node3D, idle: ItemIdle) -> void:
 	var card: Node3D = pivot(r, "Card", Vector3(0, 0.5, 0))

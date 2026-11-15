@@ -43,6 +43,10 @@ var cosmetics: CosmeticsPanel
 ## Level, XP bar and Coins in the top-left corner.
 var profile_badge: ProfileBadge
 var how_to_play: HowToPlayPanel
+## DEV MODE under TUTORIAL and the panel it opens: only for Patrick's Steam account (`DevMode`);
+## for everyone else neither exists.
+var dev_entry: Button
+var dev_panel: DevPanel
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
 ## What the tutorial opened on the first PRACTICE / PLAY ONLINE carries on to when it closes.
@@ -156,6 +160,8 @@ func _ready() -> void:
 	how_to_play.visible = false
 	_column.add_child(how_to_play)
 	how_to_play.closed.connect(_on_tutorial_closed)
+	if DevMode.allowed():
+		_build_dev()
 	_build_online()
 	_practice.grab_focus()
 	Audio.set_mood(&"menu")
@@ -220,6 +226,43 @@ func _build_online() -> void:
 	_online_box.add_child(_button("Back", _show_main))
 
 
+## Developer mode (Patrick only): DEV MODE under TUTORIAL and its panel.
+func _build_dev() -> void:
+	dev_entry = Button.new()
+	dev_entry.name = "DevMode"
+	dev_entry.text = "DEV MODE"
+	dev_entry.custom_minimum_size = _tutorial.custom_minimum_size
+	dev_entry.alignment = _tutorial.alignment
+	dev_entry.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
+	_main_box.add_child(dev_entry)
+	_main_box.move_child(dev_entry, _tutorial.get_index() + 1)
+	dev_panel = DevPanel.new()
+	dev_panel.visible = false
+	_column.add_child(dev_panel)
+	dev_entry.pressed.connect(func() -> void:
+		if _busy:
+			return
+		_settings.close()
+		cosmetics.close()
+		_hide_boxes()
+		dev_panel.open())
+	dev_panel.closed.connect(func() -> void:
+		_show_main()
+		dev_entry.grab_focus())
+	dev_panel.practice_requested.connect(start_dev_practice)
+
+
+## Developer mode's practice: a casino with dummies, or straight into one minigame.
+func start_dev_practice(settings: Dictionary) -> void:
+	if not DevMode.allowed():
+		return
+	DevMode.mark_used()
+	SceneRouter.practice_settings = settings
+	practice_requested.emit(SceneRouter.practice_settings)
+	if load_match:
+		SceneRouter.goto(SceneRouter.MATCH)
+
+
 ## PRACTICE: the solo casino match straight away (the match scene merges
 ## `SceneRouter.practice_settings` over the command line's).
 func start_practice() -> void:
@@ -242,6 +285,8 @@ func _hide_boxes() -> void:
 	_set_logo_visible(false)
 	_online_box.visible = false
 	how_to_play.visible = false
+	if dev_panel != null:
+		dev_panel.visible = false
 
 
 func _show_online() -> void:
@@ -441,5 +486,6 @@ func _join_steam_lobby(lobby_id: int) -> void:
 	_connect(func() -> Error: return Net.steam_party.join_host(host_id, name_, SceneRouter.profile_cosmetics()), "JOINING")
 
 
+## QUIT asks first (Patrick: "Are you sure Dialog after quit game or leave game").
 func _on_quit_pressed() -> void:
-	get_tree().quit()
+	ConfirmDialog.ask(self, "QUIT THE GAME?", "", "QUIT", func() -> void: get_tree().quit())

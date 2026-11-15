@@ -14,6 +14,9 @@ var current_def: MinigameDefinition = null
 var _last_id: StringName = &""
 ## Games played since the bag was last refilled.
 var _played: Dictionary[StringName, bool] = {}
+## Developer mode (`MatchServer.dev_minigame_now`): the next `pick` takes this game if it is in the
+## rotation and enough players are there, then it is cleared.
+var forced_next: StringName = &""
 
 
 func _init(p_defs: Array[MinigameDefinition], p_bank: QuestionBank) -> void:
@@ -52,6 +55,12 @@ func pick(rng: SeededRng, player_count: int = 2) -> MinigameDefinition:
 	var playable: Array[MinigameDefinition] = defs.filter(func(d: MinigameDefinition) -> bool: return player_count >= d.min_players)
 	if playable.is_empty():
 		return null
+	if forced_next != &"":
+		var want: StringName = forced_next
+		forced_next = &""
+		for d: MinigameDefinition in playable:
+			if d.id == want:
+				return d
 	# The bag: games not played since the last refill. Empty (everyone has come) -> refill.
 	var pool: Array[MinigameDefinition] = playable.filter(func(d: MinigameDefinition) -> bool: return not _played.has(d.id))
 	if pool.is_empty():

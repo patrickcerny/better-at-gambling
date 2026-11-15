@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-14 / outfits rework (branch claude/project-thread-vj2yq8, not on main yet)
+### 2026-11-15 / 0.9.23 outfits rework
 - Shop: coin packs for real money (+ next to the Coins), 8 animated skins (`vfx/shaders/bean_skin.gdshader`;
   Gold free at level 25, Rainbow at 50), 8 more colours (24), eyes / mouths / beards as new outfit
   slots (9 slots, PROTOCOL_VERSION 14), level badges on tiles.
@@ -105,6 +105,23 @@
   triangles (test_outfits).
 - Look-dev: `scripts/screenshot.sh res://tools/dev/outfit_shot.tscn <name> 90 --kind sets|skin|eyes|mouth|beard
   [--only a,b] [--cols N] [--zoom 0.5] [--low]`.
+### 2026-11-14 / 0.9.22 developer mode, three-part tutorial, "Are you sure?"
+- Developer mode for Patrick only (`DevMode.STEAM_IDS`, his SteamID64 still to add): DEV MODE in
+  the main menu (Coins, levels, every cosmetic until the game closes, a practice casino with
+  dummies, any minigame straight away) and DEV TOOLS in a Practice match's pause menu (money, any
+  item, the next minigame now). Steam achievements stay off for the run once it is used.
+- Tutorial tabs THE CASINO / THE ITEMS (every item with its model) / THE MINIGAMES (picture grid,
+  a page per game).
+- LEAVE TO MENU, QUIT GAME, QUIT and LEAVE LOBBY ask first (`ConfirmDialog`).
+### 2026-11-14 / 0.9.21 item model review
+- Patrick: "the scissors look bad, go through every model". All 33 checked up close, in a bean's
+  hand and in first person. Rebuilt: scissors (steel blades, red loops, gold screw; `ItemArt.slab`
+  extrudes flat outlines), rock-paper-scissors (scissors no longer hidden), bow (one smooth limb),
+  wallet (rounded, stitched, on a fishing hook), magnet (smooth horseshoe), energy drink (VOLT wraps
+  the can), VIP pass (ribbon lanyard, text spaced), fake cash (mint and purple bills).
+- Scratch ticket and dog collar are hand-built now (the model files read as a dollar bill and a thin
+  ring); both hang from the hand like the pickpocket's wallet.
+- The key line no longer promises E for the item while E belongs to the megaphone / a table.
 ### 2026-11-14 / 0.9.20 real-money cosmetics + voice level
 - Steam Inventory purchases: every paid piece also 0,50-1 EUR, ten pieces money only, ten packs
   50 cents under their pieces (PACKS tab). See docs/STEAM_INVENTORY.md; Steamworks still needs

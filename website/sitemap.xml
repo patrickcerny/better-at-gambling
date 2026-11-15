@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  <url>
+    <loc>https://betteratgambling.com/</loc>
+    <lastmod>2026-11-14</lastmod>
+    <priority>1.0</priority>
+    <video:video>
+      <video:thumbnail_loc>https://betteratgambling.com/assets/img/trailer_poster.jpg</video:thumbnail_loc>
+      <video:title>Better at Gambling trailer</video:title>
+      <video:description>Gameplay trailer of the casino party game Better at Gambling.</video:description>
+      <video:content_loc>https://betteratgambling.com/assets/video/trailer_720p.mp4</video:content_loc>
+      <video:duration>52</video:duration>
+    </video:video>
+  </url>
+  <url><loc>https://betteratgambling.com/impressum</loc><lastmod>2026-11-14</lastmod><priority>0.2</priority></url>
+  <url><loc>https://betteratgambling.com/datenschutz</loc><lastmod>2026-11-14</lastmod><priority>0.2</priority></url>
+</urlset>

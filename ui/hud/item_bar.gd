@@ -141,7 +141,20 @@ func hint_text() -> String:
 		return InputGlyphs.fill("[{interact}] use   [{leave_station}] put away   [{bet_chip_prev} / {bet_chip_next}] switch")
 	if seated:
 		return "[Shift+%d] again: use" % (selected + 1)
+	if e_taken:
+		return "[LMB] use   [RMB] put away   [wheel] switch"  # E is the table's / megaphone's now
 	return InputGlyphs.fill("[LMB / {interact}] use   [RMB] put away   [wheel] switch")
+
+
+## E belongs to something in reach (a table, the shop, the megaphone): the item is LMB only, and the
+## key line says so instead of promising E.
+var e_taken: bool = false
+
+
+func set_e_taken(v: bool) -> void:
+	if v != e_taken:
+		e_taken = v
+		keys_label.text = hint_text()
 
 
 func _fill_info(item: StringName) -> void:

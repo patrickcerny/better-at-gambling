@@ -38,6 +38,8 @@ func _ready() -> void:
 	match view:
 		"hands":
 			_hands(picked, cam, args.has("side"), args.has("far"))
+		"close":
+			_close(picked, cam, args.get_float("turn", 155.0))
 		"first":
 			_first(picked[0], cam)
 		_:
@@ -93,6 +95,24 @@ func _models(items: Array[StringName], cam: Camera3D) -> void:
 	var rows: int = ceili(items.size() / float(cols))
 	cam.position = Vector3(0, 0.55 + rows * gap * 0.41, 0.6 + maxf(cols * 0.55, rows * 0.9))
 	cam.look_at(Vector3(0, 0.55 + rows * gap * 0.41 - 0.15, 0))
+
+
+## Up to 6 items big, in a 3 × 2 grid, turned `turn` degrees (180 = straight on).
+func _close(items: Array[StringName], cam: Camera3D, turn: float) -> void:
+	for i: int in mini(items.size(), 6):
+		var m: Node3D = ItemModels.make(items[i], 0.8)
+		m.position = Vector3((i % 3 - 1) * 1.15, 1.6 - (i / 3) * 1.0, 0)
+		m.rotation_degrees = Vector3(12, turn, 0)
+		add_child(m)
+		var l := Label3D.new()
+		l.text = String(items[i])
+		l.font_size = 28
+		l.pixel_size = 0.0025
+		l.modulate = Palette.CREAM
+		l.position = m.position + Vector3(0, -0.47, 0.2)
+		add_child(l)
+	cam.position = Vector3(0, 1.1, 4.4)
+	cam.look_at(Vector3(0, 1.1, 0))
 
 
 func _hands(items: Array[StringName], cam: Camera3D, side: bool, far: bool) -> void:

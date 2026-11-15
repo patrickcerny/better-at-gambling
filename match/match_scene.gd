@@ -63,6 +63,8 @@ var nearest_station: StationBase = null
 var results_panel: ResultsStage = null
 ## The Escape menu (RESUME / LEAVE / QUIT GAME, settings behind its gear); built on first use.
 var pause_menu: PauseMenu = null
+## Developer mode's in-match tools (Practice, Patrick only), built on first use.
+var dev_panel: DevMatchPanel = null
 var _shown_jackpot: int = -1
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
@@ -508,7 +510,9 @@ func _start_local(cmd: Cmdline) -> void:
 	server.set_server_position(id, def.spawn_points[0])
 	if cmd.has("bean-color"):  # dev/screenshots
 		(server.state.players[id] as PlayerState).bean_color = posmod(cmd.get_int("bean-color", 0), Cosmetics.COLOR_COUNT)
-	for i: int in clampi(cmd.get_int("dummies", test_dummies), 0, 7):
+	# Developer mode's practice (`DevPanel`) brings its own dummies.
+	var practice_dummies: int = int(SceneRouter.practice_settings.get("dummies", test_dummies))
+	for i: int in clampi(cmd.get_int("dummies", practice_dummies), 0, 7):
 		# Dev/screenshots: `--dummy-colors` dresses the dummies in the colours bought with Coins.
 		var did: int = _add_dummy(i, Cosmetics.SLOT_COLORS + i if cmd.has_flag("dummy-colors") else -1)
 		# A step ahead of the spawn, still in the start room (clear of its north wall at z 8.4).
@@ -2319,6 +2323,9 @@ func _expire_predictions() -> void:
 func _on_pause() -> void:
 	if results_panel != null:
 		return
+	if dev_panel != null and dev_panel.visible:
+		dev_panel.close()  # back to play
+		return
 	if pause_menu != null and pause_menu.visible:
 		pause_menu.back()  # settings → pause menu → play
 	elif router.mode == InputRouter.Mode.MENU:
@@ -2330,6 +2337,8 @@ func _on_pause() -> void:
 			pause_menu.resumed.connect(_resume_play)
 			pause_menu.leave_requested.connect(_leave_to_menu)
 			pause_menu.quit_requested.connect(_quit_game)
+			pause_menu.dev_requested.connect(_open_dev_tools)
+			pause_menu.set_dev_available(dev_tools_available())
 			pause_layer = CanvasLayer.new()
 			pause_layer.name = "PauseLayer"
 			pause_layer.layer = PAUSE_LAYER
@@ -2337,6 +2346,26 @@ func _on_pause() -> void:
 			pause_layer.add_child(pause_menu)
 		router.set_mode(InputRouter.Mode.MENU)
 		pause_menu.open()
+
+
+## Developer mode in a match: Patrick only (`DevMode`), and only in Practice, where the server
+## runs on this PC (never online, so a host can't change a friends' match).
+func dev_tools_available() -> bool:
+	return role == Role.PRACTICE and _owns_server and server != null and DevMode.allowed()
+
+
+## DEV TOOLS in the pause menu: the dev panel over the game (the cursor stays free while it is open).
+func _open_dev_tools() -> void:
+	if not dev_tools_available():
+		_resume_play()
+		return
+	if dev_panel == null:
+		dev_panel = DevMatchPanel.new()
+		dev_panel.name = "DevMatchPanel"
+		dev_panel.setup(self)
+		dev_panel.closed.connect(_resume_play)
+		pause_layer.add_child(dev_panel)
+	dev_panel.open()
 
 
 ## QUIT GAME in the pause menu: say goodbye to the room server, then close the game.

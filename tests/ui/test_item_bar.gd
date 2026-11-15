@@ -112,3 +112,17 @@ func test_duel_tie_lets_you_pick_again() -> void:
 	assert_string_contains(panel.status_label.text, "Tie")
 	assert_false(panel.buttons[0].disabled, "pick again")
 	assert_true(panel.is_open())
+
+
+func test_key_line_drops_e_while_e_belongs_to_something_in_reach() -> void:
+	if InputGlyphs.gamepad:
+		pass_test("keyboard only")
+		return
+	bar.set_inventory([&"scissors"])
+	bar.set_held(0)
+	assert_true(bar.keys_label.text.contains("E"), "E uses the item with nothing in reach")
+	bar.set_e_taken(true)
+	assert_false(bar.keys_label.text.contains("E]"), "the megaphone / table owns E now")
+	assert_true(bar.keys_label.text.contains("LMB"))
+	bar.set_e_taken(false)
+	assert_true(bar.keys_label.text.contains("E"))
