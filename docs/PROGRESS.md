@@ -93,6 +93,19 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.33 shop vs wardrobe, level pass rework, pass-only cosmetics
+- Shop is a storefront (striped awning, wallet, three FEATURED premium cards a day); MY COSMETICS is a
+  wardrobe (dark wood, WEARING column with one slot per kind, "N OF M OWNED", no prices or wallet).
+- Gold "+" is a drawn gold coin button (`GoldPlusButton`); gold prices stay gold when you are short.
+- Level pass rework (Patrick: "SUPER ugly streched"): fixed-size cards on a numbered track filled by
+  XP, spotlight on the next cosmetic reward on a turning bean.
+- 11 new level-pass-only cosmetics (no price; the shop shows "LEVEL PASS · LEVEL N"): Laurel Wreath 12,
+  Gilded Loafers 18, Dealer's Visor 22, Jackpot Cape 28, Golden Halo 33, Jester Cap 38, Lucky Dice 42,
+  Card Table Cape 55, Chip Tower 65, Golden Top Hat 80, Legend's Mantle 99. Cape text no longer mirrored.
+- Steam item store showed "1-3 of 3" but no items: gold packs had no pictures. itemdefs now carry
+  icon_url/icon_url_large (tools/steam/icons, served from the public repo). StartPurchase failures are
+  logged and shown as "Steam couldn't start the purchase".
+
 ### 2026-11-15 / 0.9.32 voice rework
 - Patrick (0.9.28): Steam voice silent; without it, Mic volume 400 % needed for normal loudness.
 - Cause: raw mics speak at -35..-50 dBFS; the open-mic gate and the auto level hung on a fixed
