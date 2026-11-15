@@ -93,6 +93,17 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.39 Plinko machine clean (curtains, pegs)
+- Patrick sent a screenshot of the High Risk Plinko machine: a red window curtain cut through the left of
+  the board, the outer pegs poked out of the side frame and the lower pegs read as tilted sticks. A
+  random floor layout can put Plinko on the north-west wall, in front of an arched window. `LoungeDecor`
+  now hides a window and its curtains while a game's colliders reach into them and stand above the hem
+  (`_clear_windows`, run at build and on the new `LuckyLounge.floor_changed` from `apply_floor_plan`;
+  slot cabinets under the sill keep their windows). Plinko's face moved forward to just behind the
+  chips (`FACE_FRONT_Z`), so pegs are short studs instead of 18 cm sticks, and the odd rows' outer
+  pegs (on the rails' inner face) are no longer drawn (`peg_drawn`; physics unchanged, the edge flash
+  stays inside the rail). Checked: headless probe (full floor keeps all 11 windows, Plinko moved to
+  x = -11 hides exactly that window), test_plinko*, test_floor_plan green.
 ### 2026-11-15 / 0.9.38 grabbed knocked-out players froze for everyone else
 - Patrick: "Sometimes after i knock out a player too often, the skin gets stuck. The player (in his view)
   is walking around and stuff, but the lobby is not registering any movements". Grabbing a knocked-out
