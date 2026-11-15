@@ -351,6 +351,7 @@ func end_ragdoll(at: Vector3 = Vector3.INF) -> void:
 func set_held(by: PlayerAvatar) -> void:
 	if state == State.SEATED:
 		_leave_seat()
+	_drop_ragdoll()
 	holder = by
 	state = State.HELD
 	_collision.disabled = true
@@ -362,6 +363,7 @@ func set_held(by: PlayerAvatar) -> void:
 func set_carried(by: Node3D) -> void:
 	if state == State.SEATED:
 		_leave_seat()
+	_drop_ragdoll()
 	holder = null
 	carrier = by
 	state = State.HELD
@@ -689,6 +691,16 @@ func _holding_someone() -> bool:
 		if p is PlayerAvatar and (p as PlayerAvatar).holder == self:
 			return true
 	return false
+
+
+## Picked up while lying ragdolled (grabbing a knocked-out bean): the ragdoll goes away first, or
+## it stayed behind on the floor and the bean never counted as having got up.
+func _drop_ragdoll() -> void:
+	if state != State.RAGDOLL:
+		return
+	var ko: bool = visuals.knocked_out
+	end_ragdoll(global_position + Vector3(0, 0.5, 0))
+	visuals.set_knocked_out(ko)
 
 
 func _detach_from_holder() -> void:

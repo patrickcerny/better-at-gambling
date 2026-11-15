@@ -753,10 +753,14 @@ func _process(delta: float) -> void:
 		var a: PlayerAvatar = avatars[pid]
 		if a.global_position.y < -5.0 and a.state != PlayerAvatar.State.AWAY and _simulates(a):
 			Log.warn(&"match", "player %d fell out of the world at %s, respawning" % [pid, a.global_position])
-			if a.state == PlayerAvatar.State.RAGDOLL:
+			var was_down: bool = a.state == PlayerAvatar.State.RAGDOLL
+			if was_down:
 				a.end_ragdoll(LuckyLounge.RESPAWN_POS)
 				_ko_until.erase(pid)
+				_down_until.erase(pid)
 			a.teleport(LuckyLounge.RESPAWN_POS, 0.0)
+			if was_down:
+				_got_up(pid)  # the owner's client must hear it, or its bean stays a ragdoll
 			_report_position(pid)
 	# Knockouts end on the server's clock; get up where the ragdoll stopped.
 	for pid: int in _ko_until.keys():
@@ -773,6 +777,7 @@ func _process(delta: float) -> void:
 			if a != null and a.state == PlayerAvatar.State.RAGDOLL and not _ko_until.has(pid):
 				a.end_ragdoll()
 				_got_up(pid)
+	_release_stale_bodies()
 	for pid: int in _respawn_at.keys():
 		if _clock >= _respawn_at[pid]:
 			_respawn_at.erase(pid)
@@ -935,6 +940,22 @@ func _open_lobby_panel(focus: StringName) -> void:
 		return
 	router.set_play_mode(InputRouter.Mode.MENU)
 	lobby_panel.open(focus)
+
+
+## Host safety net: the server still simulates a body that is back on its feet with nothing left
+## to wait for (a knockout ended while the bean was held, a ragdoll cut short). Without this the
+## server kept ignoring that player's moves for good: they walked around on their own screen while
+## everybody else saw them frozen.
+func _release_stale_bodies() -> void:
+	if not _owns_server or server == null:
+		return
+	for pid: int in avatars:
+		if not server.is_server_owned(pid) or _ko_until.has(pid) or _down_until.has(pid) or _respawn_at.has(pid):
+			continue
+		var a: PlayerAvatar = avatars[pid]
+		if a.is_standing():
+			Log.info(&"match", "player %d was standing but still server-owned: handing the body back" % pid)
+			_got_up(pid)
 
 
 ## Ragdoll over: the server records it and hands the body back to its owner.

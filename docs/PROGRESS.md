@@ -93,6 +93,25 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.38 grabbed knocked-out players froze for everyone else
+- Patrick: "Sometimes after i knock out a player too often, the skin gets stuck. The player (in his view)
+  is walking around and stuff, but the lobby is not registering any movements". Grabbing a knocked-out
+  bean (to shake or carry it) switched the avatar from RAGDOLL to HELD without removing the ragdoll, so
+  the host's knockout timer (it only gets RAGDOLL bodies up) never called `report_got_up` and the server
+  kept the body server-owned: `can_move` stayed false and every MOVE from that player was dropped. Fixes:
+  `PlayerAvatar.set_held`/`set_carried` end a ragdoll first (`_drop_ragdoll`, keeps the KO birdies);
+  `MatchScene._release_stale_bodies` (host) hands back any standing body that is still server-owned with
+  no knockout/knockdown/respawn pending; the kill floor now reports `_got_up` for a ragdoll it ends (the
+  owner's client never heard it and stayed a ragdoll). Test: tests/physics/test_grab_knocked_out.gd
+  (fails without the fix).
+### 2026-11-15 / 0.9.37 split hands clear of the blackjack panel
+- Patrick: "when im the 4. player on the blackjack table and i split the hand, the second hand is under
+  the UI". Every seat camera looked at the table's middle, so the far-right seat's cards sat right of
+  the screen's middle and hand 2 (always to the right) went under the panel docked on the right (it is
+  widest after a split). Seat cameras now aim at their own cards and turn 16.5° right
+  (`BlackjackStation.SEAT_VIEW_TURN`): both hands sit left of ~58 % of the screen for every seat at
+  FOV 70–110 on 16:9 and 4:3 (test in test_blackjack_split_view.gd). `blackjack_cards_shot` gained
+  `--fov` and `--ui`.
 ### 2026-11-15 / 0.9.36 lobby browser
 - Patrick: "If i have 4 friends in the lobby, it shows 4 times the same lobby." JOIN A FRIEND listed one
   row per friend; `SteamSvc.friend_lobbies` now groups by lobby (`group_friend_lobbies`) with the

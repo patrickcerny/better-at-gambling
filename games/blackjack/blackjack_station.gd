@@ -36,10 +36,12 @@ func _build_visuals() -> void:
 		cards.spots[i + SPLIT_KEY] = hand_spots[i][2]
 		var eye := Node3D.new()
 		eye.name = "SeatCamera%d" % i
-		# Leaning in over the rail: your own cards low in view, the dealer's rack above them.
+		# Leaning in over the rail: your own cards low in view, the dealer's rack above them. The
+		# view aims at your own cards, then turns right so they (both hands after a split) sit
+		# left of the middle, clear of the blackjack panel docked on the right.
 		eye.position = pos - to_seat * SEAT_EYE_LEAN + Vector3(0, SEAT_EYE_HEIGHT, 0)
-		var look: Vector3 = SEAT_LOOK_AT - eye.position
-		eye.rotation = Vector3(SEAT_EYE_PITCH, atan2(-look.x, -look.z), 0.0)
+		var look: Vector3 = at - eye.position
+		eye.rotation = Vector3(SEAT_EYE_PITCH, atan2(-look.x, -look.z) - SEAT_VIEW_TURN, 0.0)
 		add_child(eye)
 		seat_cameras.append(eye)
 	camera_anchor = Node3D.new()
@@ -67,8 +69,11 @@ const SPLIT_FAN: float = 0.06
 const SEAT_EYE_LEAN: float = 0.5
 const SEAT_EYE_HEIGHT: float = 1.5
 const SEAT_EYE_PITCH: float = deg_to_rad(-26.0)
-## Every seat's view is turned towards this point (between the dealer's rack and the hands).
-const SEAT_LOOK_AT: Vector3 = Vector3(0.0, 0.0, 0.2)
+## How far each seat's view turns right of its own cards. Every seat used to look at the table's
+## middle, so the far-right seat's cards sat right of the screen's middle and its second hand
+## after a split ended up under the panel (Patrick, seat 4). Now your cards sit at ~40 % of the
+## screen width for every seat and field of view; the dealer's cards stay within ~30° of the middle.
+const SEAT_VIEW_TURN: float = deg_to_rad(16.5)
 
 var cards: TableCards
 ## Per seat: the card spots [single hand, split hand 1, split hand 2] (TableCards spot arrays).
