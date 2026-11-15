@@ -60,7 +60,8 @@ var bytes_sent: int = 0
 var mic_active: bool = false
 ## Why the microphone could not start ("" when it did, or was never asked to).
 var mic_error: String = ""
-## Where microphone samples come from (tests swap in a fake).
+## Where microphone samples come from: Steam voice or the audio driver (`VoiceMicSource.make`,
+## picked again at every `start_microphone`; tests swap in a fake, which is kept).
 var source: VoiceMicSource = VoiceMicSource.new()
 ## Microphone frames read since `start_microphone` (stereo frames at the device rate).
 var mic_frames: int = 0
@@ -94,6 +95,8 @@ var _first_frame_logged: bool = false
 var _rate_t0: int = -1
 var _rate_frames: int = 0
 var _rate_skipped_at: int = 0
+## The microphone was opened through Steam voice.
+var _steam_voice: bool = false
 
 
 ## Starts reading the microphone. False when there is none to read (headless, input disabled in
@@ -102,6 +105,8 @@ var _rate_skipped_at: int = 0
 func start_microphone() -> bool:
 	if mic_active:
 		return true
+	if VoiceMicSource.is_stock(source):
+		source = VoiceMicSource.make()
 	if source.start() != OK:
 		if mic_error != source.error:
 			mic_error = source.error
@@ -121,6 +126,7 @@ func start_microphone() -> bool:
 	rate_override = 0.0
 	_pending.clear()
 	agc.reset()
+	_steam_voice = source is VoiceSteamSource
 	Log.info(&"voice", "microphone opened: device \"%s\" at %d Hz (driver %s)" % [source.device(), roundi(source.rate()), AudioServer.get_driver_name()])
 	return true
 
@@ -142,6 +148,10 @@ func _ready() -> void:
 func _sync_gain() -> void:
 	gain = Settings.mic_gain()
 	auto_level = bool(Settings.get_value("voice", "auto_level"))
+	# Settings > Audio > Steam voice switched while the microphone runs: reopen it from the other source.
+	if mic_active and VoiceMicSource.is_stock(source) and VoiceSteamSource.wanted() != _steam_voice:
+		stop_microphone()
+		start_microphone()
 
 
 func _exit_tree() -> void:
@@ -173,14 +183,15 @@ func _process(delta: float) -> void:
 	var buf: PackedVector2Array = source.read_all()
 	if not buf.is_empty():
 		mic_frames += buf.size()
-		_check_rate(buf.size())
+		if source.continuous:
+			_check_rate(buf.size())
 		feed_stereo(buf, input_rate())
 		mic_peak = maxf(mic_peak, level)
 		if not _first_audio_logged:
 			_first_audio_logged = true
 			Log.info(&"voice", "microphone: first audio after %.1f s (%d frames, level %s)" % [_mic_for, buf.size(), db_text(level)])
 	_mic_for += delta
-	if not _warned_silent and _mic_for >= SILENT_WARN_SECONDS and mic_peak <= 0.0:
+	if source.continuous and not _warned_silent and _mic_for >= SILENT_WARN_SECONDS and mic_peak <= 0.0:
 		_warned_silent = true
 		var what: String = "no audio" if mic_frames == 0 else "only silence"
 		Log.warn(&"voice", "microphone \"%s\" delivered %s in %.0f s (%d frames at %d Hz): muted, blocked in the Windows privacy settings, or the wrong device (Settings > Audio)" % [source.device(), what, _mic_for, mic_frames, roundi(source.rate())])

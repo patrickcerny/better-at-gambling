@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-15 / 0.9.25 shop fixes, level pass, try-on look, inventory
+### 2026-11-15 / 0.9.26 shop fixes, level pass, try-on look, inventory
 - Shop: tiles fill the width, + inside the coin pill, unaffordable/level-locked items greyed out with
   "N MORE COINS NEEDED". Try-ons stack across tabs (`CosmeticsPanel.trying`), clicking a picked tile
   takes it off, BUY ALL / WEAR ALL / RESET for the tried-on look.
@@ -105,6 +105,24 @@
 - Faces: see-through shades (second surface, `OutfitMeshes.lens_material`), moustaches sit above
   the mouth (`MOUSTACHE_LIFT`), beards start lower, businessman hair redone, cape clasps gone.
 - Lobby colour plaques removed (colour/skin only in the menu shop). Rank hidden in solo.
+### 2026-11-15 / 0.9.25 "Beat the Dev" achievement
+- New Steam achievement `ACH_BEAT_THE_DEV` (20th): finish an online match ranked ahead of the
+  developer (`DevMode.STEAM_IDS`) or of anyone who already holds it, so it spreads. Standings rows
+  carry `steam_id` (from the bridge-stamped "steam:<id>" uid; PROTOCOL_VERSION 15);
+  `Achievements.steam_ids_beaten` picks the players behind, `SteamSvc.check_beat_the_dev` unlocks
+  at once for the dev or asks Steam (`requestUserStats` + `getUserAchievement`) for the others.
+  Ties don't count. Icons in docs/steam/achievements/ACH_BEAT_THE_DEV_*.png; the Steamworks entry
+  still has to be added and published. Patrick's SteamID64 is now in `DevMode.STEAM_IDS` (dev mode on for him).
+### 2026-11-15 / 0.9.24 voice through Steam
+- Patrick: fifine USB mic still too quiet at Mic volume 400 %, then "use this approach" (GodotSteam voice).
+- `VoiceSteamSource`: the microphone is recorded by Steam (startVoiceRecording/getVoice), decompressed
+  to 16 kHz and fed into the same capture path (Mic volume, gate, auto level, 40 ms frames, relay,
+  proximity). Steam's own mic choice, input volume and automatic gain apply (Steam > Settings > Voice).
+  Steam's speech-only stream is filled with silence on the clock so gates and talk spurts still end.
+- Settings > Audio > Steam voice (default on); off, or without Steam, reads the audio driver as before.
+- Evidence: `tests/unit/test_voice_steam_source.gd` (fake GodotSteam), voice unit/integration/ui
+  and settings tests green locally (Godot 4.7.2 headless). Not yet heard with a real Steam client.
+
 ### 2026-11-15 / 0.9.23 outfits rework
 - Shop: coin packs for real money (+ next to the Coins), 8 animated skins (`vfx/shaders/bean_skin.gdshader`;
   Gold free at level 25, Rainbow at 50), 8 more colours (24), eyes / mouths / beards as new outfit

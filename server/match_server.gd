@@ -1154,11 +1154,20 @@ func _reset_stats(id: int) -> void:
 
 
 ## Final ranking: money, then quiz points, then biggest win; ties share placement.
+## The SteamID64 in a "steam:<id>" uid (the host's bridge stamps it, so it can't be faked), else 0.
+static func steam_id_of_uid(uid: String) -> int:
+	if not uid.begins_with("steam:"):
+		return 0
+	var rest: String = uid.substr(6)
+	return int(rest) if rest.is_valid_int() else 0
+
+
 func get_standings() -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for id: int in state.players:
 		var p: PlayerState = state.players[id]
-		rows.append({"player": id, "name": p.display_name, "money": economy.balance(id), "quiz_points": p.quiz_points, "biggest_win": p.biggest_win})
+		rows.append({"player": id, "name": p.display_name, "money": economy.balance(id), "quiz_points": p.quiz_points, "biggest_win": p.biggest_win,
+			"steam_id": steam_id_of_uid(p.uid)})
 		if not running and money_history.samples() > 0:
 			rows[-1]["series"] = money_history.of(id)  # results graph: ~60 ints per player at most
 	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:

@@ -57,6 +57,7 @@ var input_device: OptionButton
 var input_devices: PackedStringArray = PackedStringArray()
 var mic_gain_slider: HSlider
 var auto_level_check: CheckButton
+var steam_voice_check: CheckButton
 var mic_meter: ProgressBar
 ## The microphone the meter reads when no match is running (main menu): started while the AUDIO
 ## tab shows, stopped when it closes. In a match the meter reads the voice channel's capture.
@@ -186,6 +187,7 @@ func _build_audio(page: VBoxContainer) -> void:
 	input_device.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	input_device.clip_text = true
 	input_device.custom_minimum_size = Vector2(200, 0)
+	input_device.tooltip_text = "Used when Steam voice is off. With Steam voice on, Steam's own microphone setting counts (Steam > Settings > Voice)."
 	input_device.item_selected.connect(func(i: int) -> void: Settings.change("voice", "input_device", input_devices[i]))
 	device_row.add_child(input_device)
 	mic_gain_slider = _slider(page, "Mic volume (your voice)", "voice", "mic_gain", 0.0, Settings.MAX_MIC_GAIN, 0.05, true)
@@ -193,6 +195,9 @@ func _build_audio(page: VBoxContainer) -> void:
 	auto_level_check = _check(page, "Auto mic level", "voice", "auto_level")
 	auto_level_check.name = "AutoLevel"
 	auto_level_check.tooltip_text = "Brings a quiet microphone up to a normal speaking level."
+	steam_voice_check = _check(page, "Steam voice", "voice", "steam_voice")
+	steam_voice_check.name = "SteamVoice"
+	steam_voice_check.tooltip_text = "Records your voice through Steam (its microphone, volume and automatic gain: Steam > Settings > Voice). Off: straight from the microphone picked above."
 	var check_row := _row(page, "Hear yourself")
 	mic_check_button = Button.new()
 	mic_check_button.name = "TestMic"
