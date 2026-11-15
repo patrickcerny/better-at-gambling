@@ -51,17 +51,17 @@ func _process(_delta: float) -> void:
 		bridge.poll()
 
 
-## Steps 1-3 of hosting: room server process, Steam lobby, bridge. Returns the loopback port to
+## Steps 1-3 of hosting: room server process, Steam lobby (public or private), bridge. Returns the loopback port to
 ## join (`join_own_party`), or 0 with `last_error` set.
-func start_hosting(display_name: String) -> int:
+func start_hosting(display_name: String, public: bool = false) -> int:
 	last_error = ""
 	if not SteamSvc.is_available():
-		last_error = "Start Steam to host."
+		last_error = "Steam is not running."
 		return 0
 	stop_hosting()
 	if await spawn_room_server("steam:%d" % SteamSvc.get_steam_id()) == 0:
 		return 0
-	if not SteamSvc.create_lobby("%s's lobby" % display_name, Protocol.MAX_PLAYERS):
+	if not SteamSvc.create_lobby("%s's lobby" % display_name, Protocol.MAX_PLAYERS, public):
 		last_error = SteamSvc.last_error
 		stop_hosting()
 		return 0
@@ -142,7 +142,7 @@ static func check_lobby(info: Dictionary, my_steam_id: int) -> String:
 	if str(info.get("game", "")) != SteamSvc.LOBBY_GAME:
 		return "That Steam lobby is not a Better at Gambling lobby."
 	if str(info.get("build", "")) != Protocol.BUILD_ID:
-		return "Your friend is on version %s, you are on %s. Both need the same version." % [str(info.get("build", "?")), Protocol.BUILD_ID]
+		return "The host is on version %s, you are on %s. Both need the same version." % [str(info.get("build", "?")), Protocol.BUILD_ID]
 	if int(info.get("owner", 0)) == 0:
 		return "The lobby has no host any more."
 	if int(info.get("owner", 0)) == my_steam_id:

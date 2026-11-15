@@ -17,9 +17,11 @@ const DEFAULTS: Dictionary = {
 	## microphone: a name from `AudioServer.get_input_device_list()` ("Default": the system's), and
 	## `mic_gain`: how loud your own voice goes out (0..`MAX_MIC_GAIN`, 1 = as the mic hears it),
 	## `auto_level`: lift a quiet microphone to a normal speaking level first (`VoiceAgc`).
+	## `steam_voice`: record through Steam Voice when Steam runs (`VoiceSteamSource`: Steam's mic,
+	## input volume and automatic gain), else straight from the audio driver.
 	## Open mic by default (0.9.12; §2.22 "proximity voice is on by default"): with push-to-talk
 	## as the default almost nobody held T, and a whole casino round carried 15 frames of voice.
-	"voice": {"mode": "open_mic", "input_device": "Default", "mic_gain": 1.0, "auto_level": true},
+	"voice": {"mode": "open_mic", "input_device": "Default", "mic_gain": 1.0, "auto_level": true, "steam_voice": true},
 	## `stick_sensitivity` scales the gamepad's right-stick look.
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false, "stick_sensitivity": 1.0},
 	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
