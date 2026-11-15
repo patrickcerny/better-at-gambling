@@ -125,9 +125,18 @@ func test_the_shop_sells_packs_and_money_only_pieces_through_steam() -> void:
 	panel.select(&"hat_crown")
 	assert_false(panel.action_button.visible, "no Coins price for the crown")
 	assert_eq((panel.tiles[&"hat_crown"].find_child("Price", true, false) as Label).text, "1,00 €")
+	ProfileManager.profile.coins = 0
+	panel.select(&"hat_police")
+	assert_true(panel.action_button.disabled, "too few Coins: no buying")
+	assert_string_contains(panel.action_button.text, "MORE COINS NEEDED")
+	assert_ne((panel.tiles[&"hat_police"].find_child("Picture", true, false) as Control).modulate, Color.WHITE, "out of reach: greyed out")
+	ProfileManager.profile.coins = 99999
+	panel.select(&"hat_crown")
 	panel.select(&"hat_police")
 	assert_true(panel.action_button.visible)
+	assert_false(panel.action_button.disabled)
 	assert_eq(panel.action_button.text, "BUY FOR COINS")
+	assert_eq((panel.tiles[&"hat_police"].find_child("Picture", true, false) as Control).modulate, Color.WHITE)
 	assert_true(panel.steam_button.visible, "or with Steam")
 	ProfileManager.set_steam_owned(CosmeticShop.default().find_pack(&"pack_royal").pieces)
 	panel.select(&"pack_royal")

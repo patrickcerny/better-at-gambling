@@ -179,6 +179,7 @@ func _process(delta: float) -> void:
 	var t: int = int(ceil(maxf(state.time_left, 0.0)))
 	timer_label.text = "%02d:%02d" % [t / 60, t % 60]
 	rank_label.text = "%s / %d" % [_ordinal(state.rank_of(local_id)), maxi(state.balances.size(), 1)]
+	rank_label.visible = state.balances.size() > 1  # alone (practice): no "1st / 1"
 	jackpot_label.text = "JACKPOT $%s" % _thousands(state.jackpot)
 	in_play_label.text = in_play_text(state, local_id)
 	in_play_label.visible = in_play_label.text != ""

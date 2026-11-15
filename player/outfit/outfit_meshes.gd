@@ -416,12 +416,7 @@ static func _hat(k: OutfitMeshKit, id: StringName) -> void:
 				k.cylinder(Vector3(side * 0.51, 0.25, 0), 0.03, 0.055, 0.17, CREAM, 8, Basis(Vector3.BACK, -side * 0.45))
 				k.cylinder(Vector3(side * 0.535, 0.37, 0), 0.0, 0.03, 0.1, CREAM.darkened(0.1), 8, Basis(Vector3.BACK, side * 0.1))
 		&"hat_hair_slick":
-			var hair := Color("#3A2A1E")
-			k.dome(Vector3(0, -0.07, 0.01), Vector3(0.36, 0.31, 0.355), hair, 18)
-			k.sphere(Vector3(-0.08, 0.17, -0.19), Vector3(0.24, 0.11, 0.16), hair.lightened(0.05), 14, 7, Basis(Vector3.BACK, 0.25))
-			k.sphere(Vector3(0.12, 0.19, -0.12), Vector3(0.2, 0.09, 0.17), hair, 12, 6, Basis(Vector3.BACK, -0.2))
-			k.sphere(Vector3(0.14, 0.235, 0.02), Vector3(0.012, 0.012, 0.25), hair.darkened(0.5), 6, 3)  # the side part
-			k.sphere(Vector3(-0.1, 0.26, -0.13), Vector3(0.09, 0.016, 0.05), hair.lightened(0.4), 8, 3, Basis(Vector3.BACK, 0.25))
+			_slick_hair(k)
 		&"hat_pilot":
 			k.cylinder(Vector3(0, 0.09, 0), 0.34, 0.33, 0.18, NAVY, 18, Basis.IDENTITY, D)
 			k.cylinder(Vector3(0, 0.035, 0), 0.338, 0.338, 0.06, BLACK, 18, Basis.IDENTITY, D)
@@ -1268,9 +1263,10 @@ static func _cape_glyph(k: OutfitMeshKit, text: String, v: float, color: Color, 
 
 
 ## The two clasps at the front of the shoulders where the cape is tied.
-static func _clasps(k: OutfitMeshKit, color: Color) -> void:
-	for side: float in [-1.0, 1.0]:
-		k.sphere(OutfitMeshKit.body_point(CAPE_TOP_T - 0.02, side * 1.15, 0.035), Vector3.ONE * 0.035, color, 8, 4)
+## No clasp balls on the shoulders any more (Patrick 2026-11-15: "sieht komisch aus"); the capes
+## keep their calls so a cleaner clasp can come back in one place.
+static func _clasps(_k: OutfitMeshKit, _color: Color) -> void:
+	pass
 
 
 # --- Boots --------------------------------------------------------------------------------------
@@ -1556,6 +1552,37 @@ static func _beard(k: OutfitMeshKit, id: StringName) -> void:
 					return my - 0.66 + 0.5 * pow(absf(a) / 1.15, 1.1),
 				func(u: float, v: float) -> float:
 					return 0.03 + 0.03 * v + 0.007 * sin(u * 40.0 + v * 6.0), c, 36, 24)
+
+
+## Slicked-back businessman hair: a layer that hugs the head (drawn in body space, not on the hat
+## frame), a curved hairline down to short sideburns, a side part and a combed-back quiff.
+static func _slick_hair(k: OutfitMeshKit) -> void:
+	var keep: Transform3D = k.xf
+	k.xf = Transform3D.IDENTITY
+	var hair := Color("#3A2A1E")
+	var line := func(a: float) -> float:
+		var front: float = pow((1.0 + cos(a)) * 0.5, 2.0)  # 1 at the forehead
+		var temple: float = exp(-pow((absf(a) - 1.45) / 0.22, 2.0))  # sideburns by the ears
+		return lerpf(0.78, 0.89, front) - 0.05 * temple
+	var at := func(u: float, v: float) -> Vector3:
+		var a: float = (u - 0.5) * TAU
+		var t0: float = line.call(a)
+		var t: float = lerpf(t0, 1.0, v)
+		var edge: float = smoothstep(0.0, 0.18, v)  # thin at the hairline
+		var quiff: float = exp(-pow((a - 0.25) / 0.7, 2.0)) * exp(-pow((v - 0.35) / 0.3, 2.0))
+		var thick: float = (0.026 + 0.075 * quiff) * edge
+		var top: float = smoothstep(0.85, 1.0, v)  # over the crown: lift instead of push out
+		var r: float = AvatarVisuals.radius_at(t) + thick * (1.0 - top)
+		return Vector3(sin(a) * r, (t - 0.5) * AvatarVisuals.BODY_HEIGHT + thick * top + 0.004,
+				AvatarVisuals.bend_at(t) - cos(a) * r * AvatarVisuals.BODY_DEPTH)
+	var paint := func(u: float, v: float) -> Color:
+		var a: float = (u - 0.5) * TAU
+		if absf(a - 0.55) < 0.025 and v < 0.75:
+			return hair.darkened(0.45)  # the side part
+		var comb: float = sin((a * 7.0 + v * 9.0 * signf(a - 0.55)) * 2.0)
+		return hair.lightened(0.07) if comb > 0.75 else hair
+	k.surface(at, 72, 24, paint, func(q: Vector3) -> Vector3: return Vector3(q.x, q.y + 0.3, q.z).normalized())
+	k.xf = keep
 
 
 ## Glasses, a monocle or shades in front of the eyes (nothing for pieces that only change the eyes).

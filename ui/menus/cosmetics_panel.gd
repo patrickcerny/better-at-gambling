@@ -44,6 +44,8 @@ const TAB_ICONS: Dictionary = {
 	CosmeticDef.KIND_BEARD: &"beard_full", KIND_PACK: &"pack_royal",
 }
 const MUTED := Color("#B9A98C")
+## A Coins price the wallet can't pay yet.
+const TOO_DEAR := Color("#D9705F")
 
 ## Item id -> its tile (a toggle Button).
 var tiles: Dictionary[StringName, Button] = {}
@@ -117,15 +119,27 @@ func _ready() -> void:
 	var coin := CoinIcon.make(40.0)
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	wrow.add_child(coin)
+	# The + sits inside the wallet, a round button in the coin's own gold.
 	coins_button = Button.new()
 	coins_button.name = "BuyCoins"
 	coins_button.text = "+"
 	coins_button.tooltip_text = "Buy Coins"
-	coins_button.theme_type_variation = &"ActionButton"
-	coins_button.custom_minimum_size = Vector2(56, 56)
+	coins_button.toggle_mode = true
+	coins_button.custom_minimum_size = Vector2(40, 40)
 	coins_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	coins_button.focus_mode = Control.FOCUS_NONE
+	coins_button.add_theme_font_size_override(&"font_size", 30)
+	var ink := Color("#5A3A0E")
+	for st: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_hover_pressed_color", &"font_focus_color"]:
+		coins_button.add_theme_color_override(st, ink)
+	var looks: Dictionary = {&"normal": Palette.COIN_GOLD, &"hover": Palette.COIN_GOLD.lightened(0.18),
+		&"pressed": Palette.COIN_GOLD.lightened(0.3), &"hover_pressed": Palette.COIN_GOLD.lightened(0.3), &"focus": Palette.COIN_GOLD}
+	for st: StringName in looks:
+		var sb: StyleBoxFlat = _box(looks[st], Palette.COIN_GOLD.darkened(0.35), 3, 20, 0)
+		sb.content_margin_top = -4.0  # the + sits in the middle of the round
+		coins_button.add_theme_stylebox_override(st, sb)
 	coins_button.pressed.connect(func() -> void: show_kind(KIND_COINS))
-	head.add_child(coins_button)
+	wrow.add_child(coins_button)
 	var hint := Label.new()
 	hint.theme_type_variation = &"SmallLabel"
 	hint.add_theme_color_override(&"font_color", MUTED)
@@ -242,6 +256,7 @@ func _ready() -> void:
 	SteamSvc.store_changed.connect(_refresh)
 	SteamSvc.purchase_finished.connect(_on_purchase_finished)
 	resized.connect(_fit_columns)
+	tabs.resized.connect(_fit_columns)  # the tile area settles after the panel: count columns from it
 
 
 ## A scrolling grid of tiles as a new page of `tabs`.
@@ -557,7 +572,17 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 		coin.visible = false
 	else:
 		label.text = "%s" % Hud._thousands(d.price)
-	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else Palette.COIN_GOLD))
+	var short: bool = not p.owns(d.id) and d.coin_buyable() and p.coins < d.price
+	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else (TOO_DEAR if short else Palette.COIN_GOLD)))
+	coin.modulate = Color(1, 1, 1, 0.5) if short else Color.WHITE
+
+
+## Whether piece `d` can be had right now: enough Coins, or Steam running to buy it with money.
+static func _can_get_now(p: PlayerProfile, d: CosmeticDef) -> bool:
+	var steam: bool = d.steam_buyable() and SteamSvc.is_available()
+	if d.coin_buyable():
+		return p.coins >= d.price or steam
+	return steam
 
 
 func _refresh() -> void:
@@ -572,6 +597,13 @@ func _refresh() -> void:
 		var badge: Node = b.get_node_or_null("Level")
 		if badge != null:
 			(badge as Control).visible = d != null and not p.owns(id)
+		# Out of reach for now (level not reached and no Coins price, or too few Coins): greyed out.
+		var locked: bool = d != null and not p.owns(id) and not _can_get_now(p, d)
+		var pic: Control = b.find_child("Picture", true, false) as Control
+		if pic != null:
+			pic.modulate = Color(0.45, 0.45, 0.45, 0.8) if locked else Color.WHITE
+		if badge != null:
+			(badge as Label).add_theme_color_override(&"font_color", MUTED if locked else Palette.VIP_GOLD)
 		var coin_pack: CoinPack = shop.find_coin_pack(id)
 		if coin_pack != null:
 			var pl: Label = b.find_child("Price", true, false) as Label
@@ -629,6 +661,9 @@ func _refresh() -> void:
 	elif not p.owns(sel.id) and not sel.coin_buyable():
 		action_button.text = "LEVEL %d" % sel.level  # only levelling up unlocks it
 		action_button.disabled = true
+	elif not p.owns(sel.id) and p.coins < sel.price:
+		action_button.text = "%s MORE COINS NEEDED" % Hud._thousands(sel.price - p.coins)
+		action_button.disabled = true
 	elif not p.owns(sel.id):
 		action_button.text = "BUY FOR COINS" if sel.steam_buyable() else "BUY"
 	elif sel.kind == CosmeticDef.KIND_COLOR and p.preferred_color == sel.color_index:
@@ -684,11 +719,15 @@ func _fit_columns() -> void:
 	if tabs == null:
 		return
 	var w: float = tabs.size.x - 24.0
-	var cols: int = clampi(int(floor((w + 14.0) / (TILE.x + 14.0))), 2, 6)
+	var cols: int = clampi(int(floor((w + 14.0) / (TILE.x + 14.0))), 2, 8)
 	for scroll: Node in tabs.get_children():
 		var grid: GridContainer = scroll.get_node_or_null("Grid") as GridContainer
 		if grid != null:
 			grid.columns = cols
+			# The tiles share the whole width (no empty strip to the right).
+			var tw: float = maxf(TILE.x, floor((w - 14.0 * float(cols - 1)) / float(cols)))
+			for t: Node in grid.get_children():
+				(t as Control).custom_minimum_size.x = tw
 
 
 func open() -> void:

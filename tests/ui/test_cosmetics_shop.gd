@@ -39,10 +39,8 @@ func test_buy_refuse_and_wear() -> void:
 	ProfileManager.profile.coins = mint.price - 30
 	panel.select(&"color_mint")
 	assert_eq(panel.preview.color, Palette.player_color(mint.color_index), "the preview wears it")
-	assert_string_contains(panel.action_button.text, "BUY")
-	panel.action_button.pressed.emit()
-	assert_string_contains(panel.status_label.text, "Not enough Coins")
-	assert_string_contains(panel.status_label.text, "30 more")
+	assert_eq(panel.action_button.text, "30 MORE COINS NEEDED", "the button says what is missing")
+	assert_true(panel.action_button.disabled)
 	assert_false(ProfileManager.profile.owns(&"color_mint"))
 	assert_eq(ProfileManager.profile.coins, mint.price - 30)
 	# Enough.

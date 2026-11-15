@@ -78,8 +78,6 @@ var net_world: NetWorld
 var lobby_panel: LobbyPanel
 var shop_panel: ShopPanel
 var odd_jobs: OddJobsController
-## The colour panels at the pedestals' feet (`ColorPlaque`): yours sets your bean's colour.
-var color_panel: ColorPanelController
 ## The cosmetics shop, opened from the lobby panel.
 var cosmetics_panel: CosmeticsPanel
 var connection_label: Label
@@ -221,16 +219,13 @@ func _ready() -> void:
 			router.set_play_mode(InputRouter.Mode.WALK))
 	lobby_panel.leave_requested.connect(_leave_to_menu)
 	ui_layer.add_child(lobby_panel)
-	# The cosmetics shop from the lobby's settings tablet: a colour put on there goes on the bean
-	# at once (`set_color`), like one picked at the pedestal's colour panel; so do outfit pieces
-	# (`set_outfit`).
+	# The cosmetics shop from the lobby's settings tablet: outfit pieces put on there go on the bean
+	# at once (`set_outfit`). Colour and skin stay as they joined (Patrick 2026-11-15: no changing
+	# them in the lobby); a new pick counts from the next match.
 	cosmetics_panel = CosmeticsPanel.new()
 	ui_layer.add_child(cosmetics_panel)
-	cosmetics_panel.color_worn.connect(func(c: int) -> void:
-		if color_panel != null and view.state.phase == Phase.Id.LOBBY:
-			color_panel.choose(c))
 	cosmetics_panel.outfit_worn.connect(func(kind: StringName, id: StringName) -> void:
-		if view.state.phase in [Phase.Id.LOBBY, Phase.Id.RESULTS]:
+		if kind != CosmeticDef.KIND_SKIN and view.state.phase in [Phase.Id.LOBBY, Phase.Id.RESULTS]:
 			Net.send_intent(Intents.make(&"set_outfit", {"kind": kind, "item": String(id)})))
 	cosmetics_panel.closed.connect(func() -> void:
 		if router.mode == InputRouter.Mode.MENU and results_panel == null:
@@ -294,8 +289,6 @@ func _ready() -> void:
 	add_child(items_ctl)
 	odd_jobs = OddJobsController.new(self)
 	add_child(odd_jobs)
-	color_panel = ColorPanelController.new(self)
-	add_child(color_panel)
 	Net.event_received.connect(_on_event)
 	net_world = NetWorld.new()
 	net_world.name = "NetWorld"
@@ -2120,8 +2113,6 @@ func _on_interact() -> void:
 		return
 	if local == null or not local.is_standing():
 		return
-	if color_panel.try_press():
-		return
 	var lobby_spot: StringName = _lobby_spot()
 	if lobby_spot != &"":
 		_open_lobby_panel(lobby_spot)
@@ -2157,8 +2148,6 @@ func _on_grab() -> void:
 	if stage is WalkableStage and (stage as WalkableStage).on_grab_pressed():
 		return  # a walkable minigame's own use of the click (Bat Heist: the bat)
 	if odd_jobs.try_press():
-		return
-	if color_panel.try_press():
 		return
 	grab_in_front()
 
@@ -2412,10 +2401,6 @@ func _update_prompt() -> void:
 		&"settings":
 			hud.set_prompt(InputGlyphs.fill("[{interact}] Lobby settings" if view.state.leader == local_id else "[{interact}] Lobby settings (only the leader ★ can change them)"))
 			return
-	var color_prompt: String = color_panel.prompt()
-	if color_prompt != "":
-		hud.set_prompt(color_prompt)
-		return
 	var floor_prompt: String = casino_floor.prompt() if casino_floor != null else ""
 	if floor_prompt != "":
 		hud.set_prompt(floor_prompt)

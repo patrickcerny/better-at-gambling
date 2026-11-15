@@ -1,8 +1,7 @@
 extends Node
-## Dev: look-dev shots for the cosmetics shop, the profile line and the pedestal colour panel.
+## Dev: look-dev shots for the cosmetics shop and the profile line.
 ## Run with scripts/screenshot.sh res://tools/dev/cosmetics_shot.tscn <name> 90 --view <view>:
 ## `shop` (the main menu with the shop open on Gold), `menu` (the main menu and its profile line),
-## `plaque` (a ready pedestal and its colour panel close up, a bought colour worn and one hovered),
 ## `results` (the results screen with YOUR PROGRESS). The profile is in memory only: nothing is
 ## written to user://profile.cfg.
 
@@ -19,8 +18,6 @@ func _ready() -> void:
 	ProfileManager.changed.emit()
 	var view: String = Cmdline.parse(OS.get_cmdline_user_args()).get_string("view", "shop")
 	match view:
-		"plaque":
-			_plaque()
 		"results":
 			_results()
 		_:
@@ -39,35 +36,6 @@ func _ready() -> void:
 				await get_tree().process_frame
 				var r: Rect2 = shop.get_global_rect()
 				Log.info(&"shot", "shop rect %s in viewport %s, min %s" % [r, get_viewport().get_visible_rect().size, shop.get_combined_minimum_size()])
-
-
-func _plaque() -> void:
-	var map := LuckyLounge.new()
-	map.bake_navmesh = false
-	add_child(map)
-	var free: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7, 9]
-	map.color_plaques[0].show_colors(free, 9, [1], true)
-	map.color_plaques[0].set_hovered(4)
-	map.color_plaques[1].show_colors([0, 1, 2, 3, 4, 5, 6, 7, 15], 15, [], false)
-	map.set_pedestal(0, "Patrick", false)
-	map.set_pedestal(1, "Chip", true)
-	var bean := AvatarVisuals.new()
-	add_child(bean)
-	bean.set_color(Palette.player_color(9))
-	bean.global_position = LuckyLounge.PEDESTALS[0] + Vector3(0.1, 0, -2.6)
-	bean.rotation.y = PI * 0.85
-	var other := AvatarVisuals.new()
-	add_child(other)
-	other.set_color(Palette.player_color(15))
-	other.global_position = LuckyLounge.PEDESTALS[1] + Vector3(0, LuckyLounge.PEDESTAL_TOP, 0)
-	other.rotation.y = PI
-	var cam := Camera3D.new()
-	add_child(cam)
-	var plaque: Vector3 = map.color_plaques[0].global_position
-	cam.global_position = plaque + Vector3(0.9, 1.35, -1.3)
-	cam.look_at(plaque + Vector3(-0.2, 0.8, 0.0))
-	cam.fov = 60.0
-	cam.current = true
 
 
 func _results() -> void:
