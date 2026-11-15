@@ -423,6 +423,63 @@ static func _hat(k: OutfitMeshKit, id: StringName) -> void:
 			k.prism(OutfitMeshKit.star_poly(5, 0.035, 0.016), 0.012, Transform3D(Basis(Vector3.RIGHT, 0.2).rotated(Vector3.UP, PI * 0.8), Vector3(0.12, 0.3, -0.18)), _glow(YELLOW, 0.45))
 			k.prism(_crescent(0.05), 0.012, Transform3D(Basis(Vector3.RIGHT, 0.2).rotated(Vector3.UP, PI * 1.2), Vector3(-0.15, 0.32, -0.17)), _glow(CREAM, 0.35))
 			k.prism(OutfitMeshKit.star_poly(5, 0.03, 0.014), 0.012, Transform3D(Basis(Vector3.RIGHT, 0.1).rotated(Vector3.UP, PI * 0.25), Vector3(0.24, 0.16, 0.2)), _glow(YELLOW, 0.45))
+		# Level pass only (Patrick 2026-11-15: new single cosmetics as pass rewards, not for sale).
+		&"hat_laurel":
+			var leaf := GREEN.lerp(GOLD, 0.75)
+			for i: int in 18:
+				var ang: float = PI * 0.12 + (TAU - PI * 0.24) * float(i) / 17.0
+				var at := Vector3(sin(ang) * 0.35, 0.06 + 0.02 * sin(float(i) * 1.7), cos(ang) * 0.33)
+				for side: float in [-1.0, 1.0]:
+					k.sphere(at + Vector3(0, side * 0.025, 0), Vector3(0.07, 0.022, 0.03), leaf if i % 2 == 0 else leaf.darkened(0.15), 8, 3, Basis(Vector3.UP, ang) * Basis(Vector3.BACK, side * 0.5))
+			k.torus(Vector3(0, 0.06, 0), 0.335, 0.355, GOLD.darkened(0.1), 18, Basis.IDENTITY, D)
+		&"hat_dealer_visor":
+			var visor := Color("#2F7A55")
+			k.torus(Vector3(0, 0.05, 0), 0.34, 0.37, visor.darkened(0.25), 18, Basis.from_scale(Vector3(1, 0.6, 1)), D)
+			k.dome(Vector3(0, 0.035, -0.3), Vector3(0.32, 0.03, 0.24), visor, 16, Basis(Vector3.RIGHT, -0.25))
+			k.dome(Vector3(0, 0.045, -0.3), Vector3(0.3, 0.012, 0.21), _glow(Color("#5FC28E"), 0.25), 16, Basis(Vector3.RIGHT, -0.25))
+			k.box(Vector3(0, 0.09, -0.355), Vector3(0.16, 0.05, 0.01), CREAM)
+			k.prism(OutfitMeshKit.spade_poly(0.035), 0.008, Transform3D(Basis.IDENTITY.rotated(Vector3.UP, PI), Vector3(0, 0.09, -0.362)), BLACK)
+		&"hat_halo":
+			k.torus(Vector3(0, 0.42, 0.02), 0.2, 0.26, _glow(GOLD, 0.55), 24, Basis.from_scale(Vector3(1, 0.5, 1)))
+			k.torus(Vector3(0, 0.425, 0.02), 0.215, 0.245, _glow(YELLOW, 0.8), 24, Basis.from_scale(Vector3(1, 0.35, 1)))
+		&"hat_jester":
+			k.dome(Vector3(0, -0.01, 0), Vector3(0.36, 0.3, 0.35), RED, 14)
+			k.torus(Vector3(0, 0.02, 0), 0.33, 0.39, GOLD, 16, Basis.IDENTITY, D)
+			for i: int in 3:  # three horns (left, back, right) rising out and flopping down, a bell on each
+				var a: float = (float(i) - 1.0) * PI * 0.5
+				var h := Vector3(sin(a), 0.0, cos(a))
+				var axis := Vector3(cos(a), 0.0, -sin(a))
+				var col: Color = [GOLD, PURPLE, GOLD][i]
+				var base := Vector3(0, 0.16, 0) + h * 0.12
+				var b1 := Basis(axis, 0.55)
+				k.cylinder(base + b1 * Vector3(0, 0.17, 0), 0.06, 0.13, 0.34, col, 10, b1)
+				var tip: Vector3 = base + b1 * Vector3(0, 0.33, 0)
+				var b2 := Basis(axis, 1.9)
+				k.cylinder(tip + b2 * Vector3(0, 0.12, 0), 0.0, 0.062, 0.25, col, 8, b2)
+				k.sphere(tip + b2 * Vector3(0, 0.27, 0), Vector3.ONE * 0.05, GOLD, 8, 4)
+		&"hat_dice":
+			for i: int in 2:
+				var c := Vector3(-0.12 + 0.25 * float(i), 0.15 + 0.03 * float(i), 0.02 - 0.05 * float(i))
+				var b := Basis(Vector3.UP, 0.5 - float(i)) * Basis(Vector3.RIGHT, 0.15 * float(i))
+				k.box(c, Vector3.ONE * 0.22, WHITE, b)
+				var pips: Array = [[Vector2.ZERO], [Vector2(-0.05, -0.05), Vector2(0.05, 0.05)]][i]
+				for f: int in 3:  # the front, the side, the top
+					var face: Basis = [b, b * Basis(Vector3.UP, PI * 0.5), b * Basis(Vector3.RIGHT, -PI * 0.5)][f]
+					for pip: Vector2 in (pips if f == 0 else ([Vector2(-0.05, 0.05), Vector2.ZERO, Vector2(0.05, -0.05)] if f == 1 else [Vector2(-0.05, -0.05), Vector2(0.05, -0.05), Vector2(-0.05, 0.05), Vector2(0.05, 0.05)])):
+						k.sphere(c + face * Vector3(pip.x, pip.y, -0.11), Vector3(0.022, 0.022, 0.008), RED if f == 0 and i == 0 else BLACK, 6, 3, face)
+		&"hat_chip_tower":
+			var chips: Array[Color] = [RED, WHITE, BLUE, RED, GOLD, BLACK, RED]
+			for i: int in chips.size():
+				var off := Vector3(0.012 * sin(float(i) * 2.1), 0.0, 0.012 * cos(float(i) * 1.3))
+				k.cylinder(Vector3(0, 0.04 + 0.055 * float(i), 0) + off, 0.2, 0.2, 0.048, chips[i], 18)
+				for j: int in 6:  # the edge spots
+					var a: float = TAU * float(j) / 6.0 + float(i)
+					k.box(Vector3(sin(a) * 0.2, 0.04 + 0.055 * float(i), cos(a) * 0.2) + off, Vector3(0.05, 0.05, 0.012), WHITE if chips[i] != WHITE else RED, Basis(Vector3.UP, a))
+		&"hat_top_gold":
+			k.cylinder(Vector3(0, 0.23, 0), 0.31, 0.33, 0.46, GOLD, 16, Basis.IDENTITY, D)
+			k.cylinder(Vector3(0, 0.07, 0), 0.336, 0.338, 0.08, BLACK, 16, Basis.IDENTITY, D)
+			k.cylinder(Vector3(0, 0.015, 0), 0.49, 0.49, 0.03, GOLD.darkened(0.15), 18, Basis.IDENTITY, D)
+			k.prism(OutfitMeshKit.star_poly(5, 0.05, 0.022), 0.012, Transform3D(Basis.IDENTITY.rotated(Vector3.UP, PI), Vector3(0, 0.07, -0.345)), _glow(GOLD, 0.5))
 		&"hat_party":
 			var tilt := Basis(Vector3.BACK, -0.28)
 			var cols: Array[Color] = [RED, CREAM, GOLD, RED]
@@ -1144,6 +1201,26 @@ static func _cape(k: OutfitMeshKit, id: StringName) -> void:
 					return RED
 				return WHITE, STEEL)
 			_clasps(k, STEEL)
+		&"cape_jackpot":
+			_cape_sheet(k, -0.78, func(_u: float, v: float) -> Color:
+				return GOLD if v > 0.92 or v < 0.04 else BURGUNDY, GOLD.darkened(0.3))
+			_cape_glyph(k, "777", 0.36, GOLD, 0.26)
+			_clasps(k, GOLD)
+		&"cape_card_table":
+			_cape_sheet(k, -0.78, func(u: float, v: float) -> Color:
+				if v > 0.92:
+					return GOLD.darkened(0.1)
+				return FELT.lightened(0.06) if int(u * 8.0 + v * 8.0) % 2 == 0 else FELT, FELT.darkened(0.3))
+			_cape_emblem(k, OutfitMeshKit.spade_poly(0.13), 0.3, BLACK)
+			_cape_emblem(k, OutfitMeshKit.heart_poly(0.07), 0.62, RED)
+			_clasps(k, GOLD)
+		&"cape_legend":
+			_cape_sheet(k, -0.8, func(u: float, v: float) -> Color:
+				var h: float = _hash(int(u * 16.0), int(v * 14.0), 13)
+				return CREAM if h < 0.06 else (GOLD.darkened(0.2) if v > 0.92 else GOLD), BURGUNDY)
+			_cape_collar(k, GOLD, BURGUNDY, 0.16)
+			_cape_emblem(k, OutfitMeshKit.star_poly(5, 0.13, 0.055), 0.32, _glow(CREAM, 0.4))
+			_clasps(k, GOLD)
 		&"cape_high_roller":
 			_cape_sheet(k, -0.78, func(_u: float, v: float) -> Color:
 				return GOLD.darkened(0.15) if v > 0.93 else GOLD, BURGUNDY)
@@ -1293,7 +1370,10 @@ static func _cape_emblem(k: OutfitMeshKit, poly: PackedVector2Array, v: float, c
 
 static func _cape_glyph(k: OutfitMeshKit, text: String, v: float, color: Color, size: float, lift: float = 0.006) -> void:
 	k.uv2 = Vector2(0.5, v)
-	_glyph(k, text, _cape_frame(v, lift), color, size)
+	# Turned round: the cape's frame faces into the cloth, so text read mirrored from behind.
+	var place: Transform3D = _cape_frame(v, lift)
+	place.basis = place.basis * Basis(Vector3.UP, PI)
+	_glyph(k, text, place, color, size)
 	k.uv2 = Vector2.ZERO
 
 
@@ -1314,6 +1394,10 @@ static func _boots(k: OutfitMeshKit, id: StringName) -> void:
 			_shoe(k, BLACK, BLACK.lightened(0.08))
 			k.cylinder(Vector3(0, 0.1, 0.03), 0.09, 0.1, 0.15, BLACK, 10)
 			k.sphere(Vector3(0.03, 0.05, -0.12), Vector3(0.04, 0.02, 0.03), Color(1, 1, 1, 1).darkened(0.2), 6, 3)
+		&"boots_gilded":
+			_shoe(k, GOLD, GOLD.darkened(0.45))
+			k.box(Vector3(0, 0.06, -0.08), Vector3(0.1, 0.03, 0.04), BURGUNDY, Basis(Vector3.RIGHT, -0.4))
+			k.torus(Vector3(0, 0.07, -0.1), 0.02, 0.032, SILVER, 8, Basis(Vector3.RIGHT, PI * 0.5 - 0.4))
 		&"boots_oxford":
 			_shoe(k, BROWN, BROWN.darkened(0.4))
 			for i: int in 3:

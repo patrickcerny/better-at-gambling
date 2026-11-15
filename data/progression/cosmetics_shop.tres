@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CosmeticShop" load_steps=182 format=3]
+[gd_resource type="Resource" script_class="CosmeticShop" load_steps=193 format=3]
 
 [ext_resource type="Script" path="res://core/defs/cosmetic_shop.gd" id="1"]
 [ext_resource type="Script" path="res://core/defs/cosmetic_def.gd" id="2"]
@@ -1406,6 +1406,94 @@ gold = 100
 steam_item = 326
 swatch = PackedColorArray(0.7098, 0.3961, 0.1804, 1, 0.851, 0.6824, 0.3216, 1)
 
+[sub_resource type="Resource" id="x0"]
+script = ExtResource("2")
+id = &"hat_laurel"
+kind = &"hat"
+display_name = "Laurel Wreath"
+level = 12
+swatch = PackedColorArray(0.85, 0.68, 0.32, 1, 0.36, 0.42, 0.27, 1)
+
+[sub_resource type="Resource" id="x1"]
+script = ExtResource("2")
+id = &"boots_gilded"
+kind = &"boots"
+display_name = "Gilded Loafers"
+level = 18
+swatch = PackedColorArray(0.85, 0.68, 0.32, 1, 0.41, 0.12, 0.17, 1)
+
+[sub_resource type="Resource" id="x2"]
+script = ExtResource("2")
+id = &"hat_dealer_visor"
+kind = &"hat"
+display_name = "Dealer's Visor"
+level = 22
+swatch = PackedColorArray(0.18, 0.48, 0.33, 1, 0.91, 0.86, 0.74, 1)
+
+[sub_resource type="Resource" id="x3"]
+script = ExtResource("2")
+id = &"cape_jackpot"
+kind = &"cape"
+display_name = "Jackpot Cape"
+level = 28
+swatch = PackedColorArray(0.41, 0.12, 0.17, 1, 0.85, 0.68, 0.32, 1)
+
+[sub_resource type="Resource" id="x4"]
+script = ExtResource("2")
+id = &"hat_halo"
+kind = &"hat"
+display_name = "Golden Halo"
+level = 33
+swatch = PackedColorArray(0.85, 0.68, 0.32, 1, 0.89, 0.7, 0.23, 1)
+
+[sub_resource type="Resource" id="x5"]
+script = ExtResource("2")
+id = &"hat_jester"
+kind = &"hat"
+display_name = "Jester Cap"
+level = 38
+swatch = PackedColorArray(0.76, 0.23, 0.2, 1, 0.31, 0.16, 0.42, 1)
+
+[sub_resource type="Resource" id="x6"]
+script = ExtResource("2")
+id = &"hat_dice"
+kind = &"hat"
+display_name = "Lucky Dice"
+level = 42
+swatch = PackedColorArray(0.96, 0.94, 0.89, 1, 0.76, 0.23, 0.2, 1)
+
+[sub_resource type="Resource" id="x7"]
+script = ExtResource("2")
+id = &"cape_card_table"
+kind = &"cape"
+display_name = "Card Table Cape"
+level = 55
+swatch = PackedColorArray(0.15, 0.37, 0.29, 1, 0.85, 0.68, 0.32, 1)
+
+[sub_resource type="Resource" id="x8"]
+script = ExtResource("2")
+id = &"hat_chip_tower"
+kind = &"hat"
+display_name = "Chip Tower"
+level = 65
+swatch = PackedColorArray(0.76, 0.23, 0.2, 1, 0.96, 0.94, 0.89, 1)
+
+[sub_resource type="Resource" id="x9"]
+script = ExtResource("2")
+id = &"hat_top_gold"
+kind = &"hat"
+display_name = "Golden Top Hat"
+level = 80
+swatch = PackedColorArray(0.85, 0.68, 0.32, 1, 0.11, 0.1, 0.1, 1)
+
+[sub_resource type="Resource" id="x10"]
+script = ExtResource("2")
+id = &"cape_legend"
+kind = &"cape"
+display_name = "Legend's Mantle"
+level = 99
+swatch = PackedColorArray(0.85, 0.68, 0.32, 1, 0.41, 0.12, 0.17, 1)
+
 [sub_resource type="Resource" id="p0"]
 script = ExtResource("3")
 id = &"pack_police"
@@ -1557,6 +1645,6 @@ steam_item = 3002
 
 [resource]
 script = ExtResource("1")
-items = Array[ExtResource("2")]([SubResource("c0"), SubResource("c1"), SubResource("c2"), SubResource("c3"), SubResource("c4"), SubResource("c5"), SubResource("c6"), SubResource("c7"), SubResource("c8"), SubResource("c9"), SubResource("c10"), SubResource("c11"), SubResource("c12"), SubResource("c13"), SubResource("c14"), SubResource("c15"), SubResource("c16"), SubResource("c17"), SubResource("c18"), SubResource("c19"), SubResource("c20"), SubResource("c21"), SubResource("c22"), SubResource("c23"), SubResource("o24"), SubResource("o25"), SubResource("o26"), SubResource("o27"), SubResource("o28"), SubResource("o29"), SubResource("o30"), SubResource("o31"), SubResource("o32"), SubResource("o33"), SubResource("o34"), SubResource("o35"), SubResource("o36"), SubResource("o37"), SubResource("o38"), SubResource("o39"), SubResource("o40"), SubResource("o41"), SubResource("o42"), SubResource("o43"), SubResource("o44"), SubResource("o45"), SubResource("o46"), SubResource("o47"), SubResource("o48"), SubResource("o49"), SubResource("o50"), SubResource("o51"), SubResource("o52"), SubResource("o53"), SubResource("o54"), SubResource("o55"), SubResource("o56"), SubResource("o57"), SubResource("o58"), SubResource("o59"), SubResource("o60"), SubResource("o61"), SubResource("o62"), SubResource("o63"), SubResource("o64"), SubResource("o65"), SubResource("o66"), SubResource("o67"), SubResource("o68"), SubResource("o69"), SubResource("o70"), SubResource("o71"), SubResource("o72"), SubResource("o73"), SubResource("o74"), SubResource("o75"), SubResource("o76"), SubResource("o77"), SubResource("o78"), SubResource("o79"), SubResource("o80"), SubResource("o81"), SubResource("o82"), SubResource("o83"), SubResource("o84"), SubResource("o85"), SubResource("o86"), SubResource("o87"), SubResource("o88"), SubResource("o89"), SubResource("o90"), SubResource("o91"), SubResource("o92"), SubResource("o93"), SubResource("o94"), SubResource("o95"), SubResource("o96"), SubResource("o97"), SubResource("o98"), SubResource("o99"), SubResource("o100"), SubResource("o101"), SubResource("o102"), SubResource("o103"), SubResource("o104"), SubResource("o105"), SubResource("o106"), SubResource("o107"), SubResource("o108"), SubResource("o109"), SubResource("o110"), SubResource("o111"), SubResource("o112"), SubResource("o113"), SubResource("o114"), SubResource("o115"), SubResource("o116"), SubResource("o117"), SubResource("o118"), SubResource("o119"), SubResource("o120"), SubResource("o121"), SubResource("o122"), SubResource("o123"), SubResource("o124"), SubResource("o125"), SubResource("o126"), SubResource("o127"), SubResource("o128"), SubResource("o129"), SubResource("o130"), SubResource("o131"), SubResource("o132"), SubResource("o133"), SubResource("o134"), SubResource("o135"), SubResource("o136"), SubResource("o137"), SubResource("o138"), SubResource("o139"), SubResource("o140"), SubResource("o141"), SubResource("o142"), SubResource("o143"), SubResource("o144"), SubResource("o145"), SubResource("o146"), SubResource("o147"), SubResource("o148"), SubResource("o149"), SubResource("o150"), SubResource("o151"), SubResource("o152"), SubResource("o153"), SubResource("o154"), SubResource("o155"), SubResource("o156"), SubResource("o157")])
+items = Array[ExtResource("2")]([SubResource("c0"), SubResource("c1"), SubResource("c2"), SubResource("c3"), SubResource("c4"), SubResource("c5"), SubResource("c6"), SubResource("c7"), SubResource("c8"), SubResource("c9"), SubResource("c10"), SubResource("c11"), SubResource("c12"), SubResource("c13"), SubResource("c14"), SubResource("c15"), SubResource("c16"), SubResource("c17"), SubResource("c18"), SubResource("c19"), SubResource("c20"), SubResource("c21"), SubResource("c22"), SubResource("c23"), SubResource("o24"), SubResource("o25"), SubResource("o26"), SubResource("o27"), SubResource("o28"), SubResource("o29"), SubResource("o30"), SubResource("o31"), SubResource("o32"), SubResource("o33"), SubResource("o34"), SubResource("o35"), SubResource("o36"), SubResource("o37"), SubResource("o38"), SubResource("o39"), SubResource("o40"), SubResource("o41"), SubResource("o42"), SubResource("o43"), SubResource("o44"), SubResource("o45"), SubResource("o46"), SubResource("o47"), SubResource("o48"), SubResource("o49"), SubResource("o50"), SubResource("o51"), SubResource("o52"), SubResource("o53"), SubResource("o54"), SubResource("o55"), SubResource("o56"), SubResource("o57"), SubResource("o58"), SubResource("o59"), SubResource("o60"), SubResource("o61"), SubResource("o62"), SubResource("o63"), SubResource("o64"), SubResource("o65"), SubResource("o66"), SubResource("o67"), SubResource("o68"), SubResource("o69"), SubResource("o70"), SubResource("o71"), SubResource("o72"), SubResource("o73"), SubResource("o74"), SubResource("o75"), SubResource("o76"), SubResource("o77"), SubResource("o78"), SubResource("o79"), SubResource("o80"), SubResource("o81"), SubResource("o82"), SubResource("o83"), SubResource("o84"), SubResource("o85"), SubResource("o86"), SubResource("o87"), SubResource("o88"), SubResource("o89"), SubResource("o90"), SubResource("o91"), SubResource("o92"), SubResource("o93"), SubResource("o94"), SubResource("o95"), SubResource("o96"), SubResource("o97"), SubResource("o98"), SubResource("o99"), SubResource("o100"), SubResource("o101"), SubResource("o102"), SubResource("o103"), SubResource("o104"), SubResource("o105"), SubResource("o106"), SubResource("o107"), SubResource("o108"), SubResource("o109"), SubResource("o110"), SubResource("o111"), SubResource("o112"), SubResource("o113"), SubResource("o114"), SubResource("o115"), SubResource("o116"), SubResource("o117"), SubResource("o118"), SubResource("o119"), SubResource("o120"), SubResource("o121"), SubResource("o122"), SubResource("o123"), SubResource("o124"), SubResource("o125"), SubResource("o126"), SubResource("o127"), SubResource("o128"), SubResource("o129"), SubResource("o130"), SubResource("o131"), SubResource("o132"), SubResource("o133"), SubResource("o134"), SubResource("o135"), SubResource("o136"), SubResource("o137"), SubResource("o138"), SubResource("o139"), SubResource("o140"), SubResource("o141"), SubResource("o142"), SubResource("o143"), SubResource("o144"), SubResource("o145"), SubResource("o146"), SubResource("o147"), SubResource("o148"), SubResource("o149"), SubResource("o150"), SubResource("o151"), SubResource("o152"), SubResource("o153"), SubResource("o154"), SubResource("o155"), SubResource("o156"), SubResource("o157"), SubResource("x0"), SubResource("x1"), SubResource("x2"), SubResource("x3"), SubResource("x4"), SubResource("x5"), SubResource("x6"), SubResource("x7"), SubResource("x8"), SubResource("x9"), SubResource("x10")])
 packs = Array[ExtResource("3")]([SubResource("p0"), SubResource("p1"), SubResource("p2"), SubResource("p3"), SubResource("p4"), SubResource("p5"), SubResource("p6"), SubResource("p7"), SubResource("p8"), SubResource("p9"), SubResource("p10"), SubResource("p11"), SubResource("p12"), SubResource("p13"), SubResource("p14"), SubResource("p15")])
 coin_packs = Array[ExtResource("4")]([SubResource("k0"), SubResource("k1"), SubResource("k2")])

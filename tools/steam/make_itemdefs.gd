@@ -6,6 +6,8 @@ extends SceneTree
 
 const OUT: String = "res://tools/steam/itemdefs.json"
 const APP_ID: int = 5623410  # SteamSvc.APP_ID
+## Pictures for the Steam item store and inventory (tools/steam/icons, served from the public repo).
+const ICON_BASE: String = "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/"
 ## Item definitions already on Steam that the shop no longer sells: kept, hidden from the store.
 const RETIRED: Array[Dictionary] = [
 	{"itemdefid": 1009, "name": "Holiday Mode", "bundle": "107x1;120x1;138x1;156x1"},
@@ -32,6 +34,8 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 		"type": "item",
 		"name": "Gold Coin",
 		"description": "Spent on premium pieces and sets in the cosmetics shop of Better at Gambling.",
+		"icon_url": ICON_BASE + "gold_coin.png",
+		"icon_url_large": ICON_BASE + "gold_coin_large.png",
 		"store_hidden": true,
 		"tradable": false,
 		"marketable": false,
@@ -44,6 +48,9 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"name": "%d Gold Coins" % c.gold,
 			"description": "%d Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling." % c.gold,
 			"price_category": price_category(c.cents),
+			# The item store lists no item without a picture (2026-11-15: "1-3 of 3" and an empty page).
+			"icon_url": ICON_BASE + "gold_%d.png" % c.gold,
+			"icon_url_large": ICON_BASE + "gold_%d_large.png" % c.gold,
 			"store_tags": "gold",
 			"tradable": false,
 			"marketable": false,

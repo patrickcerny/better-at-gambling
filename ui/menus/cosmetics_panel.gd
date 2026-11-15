@@ -974,7 +974,7 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	var short: bool = not p.owns(d.id) and ((d.coin_buyable() and p.coins < d.price) or (d.premium() and SteamSvc.gold < d.gold))
 	# Short of money keeps the currency's colour, only dimmed: a red number next to a Gold Coin read
 	# as a red-coin price (Patrick 2026-11-15).
-	var cur: Color = Palette.COIN_GOLD if d.premium() else Palette.COIN_RED
+	var cur: Color = Palette.COIN_GOLD if d.premium() else (Palette.COIN_RED if d.coin_buyable() else Palette.VIP_GOLD)
 	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else cur))
 	label.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 	coin.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
@@ -1072,7 +1072,7 @@ func _refresh() -> void:
 		else:
 			action_button.text = "BUY FOR %s GOLD" % Hud._thousands(sel.gold)
 	elif not p.owns(sel.id) and not sel.coin_buyable():
-		action_button.text = "LEVEL %d" % sel.level  # only levelling up unlocks it
+		action_button.text = "LEVEL PASS · LEVEL %d" % sel.level  # only levelling up unlocks it
 		action_button.disabled = true
 	elif not p.owns(sel.id) and p.coins < sel.price:
 		action_button.text = "%s MORE COINS NEEDED" % Hud._thousands(sel.price - p.coins)

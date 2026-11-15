@@ -6,6 +6,8 @@
       "type": "item",
       "name": "Gold Coin",
       "description": "Spent on premium pieces and sets in the cosmetics shop of Better at Gambling.",
+      "icon_url": "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/gold_coin.png",
+      "icon_url_large": "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/gold_coin_large.png",
       "store_hidden": true,
       "tradable": false,
       "marketable": false
@@ -17,6 +19,8 @@
       "name": "100 Gold Coins",
       "description": "100 Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling.",
       "price_category": "1;VLV100",
+      "icon_url": "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/gold_100.png",
+      "icon_url_large": "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/gold_100_large.png",
       "store_tags": "gold",
       "tradable": false,
       "marketable": false
@@ -28,6 +32,8 @@
       "name": "220 Gold Coins",
       "description": "220 Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling.",
       "price_category": "1;VLV200",
+      "icon_url": "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/gold_220.png",
+      "icon_url_large": "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/gold_220_large.png",
       "store_tags": "gold",
       "tradable": false,
       "marketable": false
@@ -39,6 +45,8 @@
       "name": "600 Gold Coins",
       "description": "600 Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling.",
       "price_category": "1;VLV500",
+      "icon_url": "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/gold_600.png",
+      "icon_url_large": "https://raw.githubusercontent.com/patrickcerny/better-at-gambling/main/tools/steam/icons/gold_600_large.png",
       "store_tags": "gold",
       "tradable": false,
       "marketable": false
