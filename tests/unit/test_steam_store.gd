@@ -120,8 +120,9 @@ func test_the_itemdefs_file_for_steamworks_matches_the_shop() -> void:
 	assert_true(JSON.parse_string(text) is Dictionary, "itemdefs.json parses")
 	assert_eq(text, JSON.stringify(want, "  ", false) + "\n", "run tools/steam/make_itemdefs.gd after changing the shop")
 	var items: Array = want["items"]
-	assert_true(items.filter(func(i: Dictionary) -> bool: return i.has("price")).is_empty(), "no fixed prices: Valve's regional tiers")
-	var priced: Array = items.filter(func(i: Dictionary) -> bool: return i.has("price_category"))
+	# Fixed EUR/USD prices since 2026-11-15 (Valve tiers left the admin item store empty).
+	assert_true(items.filter(func(i: Dictionary) -> bool: return i.has("price_category")).is_empty(), "no Valve tiers")
+	var priced: Array = items.filter(func(i: Dictionary) -> bool: return i.has("price"))
 	assert_eq(priced.size(), CosmeticShop.default().coin_packs.size(), "only gold packs cost real money")
 	for i: Dictionary in priced:
 		assert_string_contains(str(i["bundle"]), "%dx" % CoinPack.GOLD_ITEM)

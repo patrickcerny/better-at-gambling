@@ -47,7 +47,9 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"bundle": "%dx%d" % [CoinPack.GOLD_ITEM, c.gold],
 			"name": "%d Gold Coins" % c.gold,
 			"description": "%d Gold Coins for premium pieces and sets in the cosmetics shop of Better at Gambling." % c.gold,
-			"price_category": price_category(c.cents),
+			# Fixed prices (Patrick 2026-11-15, "Feste Preise jetzt"): the admin item store stayed
+			# empty with Valve price tiers before release.
+			"price": price(c.cents),
 			# The item store lists no item without a picture (2026-11-15: "1-3 of 3" and an empty page).
 			"icon_url": ICON_BASE + "gold_%d.png" % c.gold,
 			"icon_url_large": ICON_BASE + "gold_%d_large.png" % c.gold,
