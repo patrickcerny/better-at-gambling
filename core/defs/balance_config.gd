@@ -312,6 +312,9 @@ extends Resource
 @export_group("Results")
 ## Seconds the results screen stays up before an online room returns to its lobby on its own.
 @export var results_return_time: float = 60.0
+## Seconds the results screen stays up for everyone before Play again / Leave can be pressed
+## (Patrick, 0.9.43: the end screen got skipped straight away by a key still held from the match).
+@export var results_min_time: float = 10.0
 
 
 ## House Comp after `minigames_played` minigames (the last `comp_amounts` entry from then on).

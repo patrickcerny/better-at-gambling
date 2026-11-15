@@ -4,7 +4,8 @@ extends Node3D
 ## below the top three drops in by the podium, then the podium blocks rise and the beans fall onto
 ## them in order (3rd, 2nd, 1st), the winner floppily celebrates under confetti, last place slumps
 ## under a little rain cloud. Standings (left) and the money-over-time graph (right) slide in, the
-## fun awards pop up one by one, then Play again / Leave. Online, the party leader takes the room
+## fun awards pop up one by one, then Play again / Leave (greyed out with a countdown for the
+## first `results_min_time` seconds, so nobody skips the screen by accident). Online, the party leader takes the room
 ## back to the lobby (or it goes back by itself after a minute); in Practice, Play again starts a
 ## fresh match. Every standings row shows the XP that player earned (the server's `progress` rows,
 ## the same numbers on every screen), and YOUR PROGRESS (the bottom corners) breaks down the
@@ -85,12 +86,21 @@ var _room: bool = false
 var _key_light: SpotLight3D
 var _cam_from: Vector3 = Vector3(0, 3.9, 12.0)
 var _cam_to: Vector3 = Vector3(0, 3.2, 9.0)
+## Seconds the screen stays up before Play again / Leave can be pressed (Patrick, 0.9.43: it got
+## skipped straight away, a Space / Enter / pad A still held from the match pressed the focused
+## button). Set before `setup`; 0 unlocks at once (tests, look-dev shots).
+var lock_seconds: float = -1.0
+var _unlocked: bool = false
+var _play_text: String = ""
+var _leave_text: String = ""
 
 
 func setup(p_state: ClientMatchState, p_local_id: int, room: bool) -> void:
 	state = p_state
 	local_id = p_local_id
 	_room = room
+	if lock_seconds < 0.0:
+		lock_seconds = Registry.balance.results_min_time
 	position = ORIGIN
 	_build_set()
 	ui = CanvasLayer.new()
@@ -114,6 +124,7 @@ func _process(delta: float) -> void:
 	if _xp_t >= 0.0 and _xp_t < 1.0:
 		_xp_t = minf(_xp_t + delta / XP_FILL_SECONDS, 1.0)
 		_show_xp(lerpf(_xp_from, _xp_to, 1.0 - pow(1.0 - _xp_t, 2.0)))
+	_update_lock()
 	if _room and wait_label != null:
 		var leader: bool = state.leader == local_id
 		if play_button.visible != leader:
@@ -121,10 +132,33 @@ func _process(delta: float) -> void:
 			# Hiding the focused button drops the focus, and a new leader's button appears without it:
 			# keep a pad player on a button they can press.
 			var owner_now: Control = get_viewport().gui_get_focus_owner()
-			if owner_now == null or not owner_now.is_visible_in_tree():
+			if _unlocked and (owner_now == null or not owner_now.is_visible_in_tree()):
 				(play_button if leader else leave_button).grab_focus()
 		var secs: int = ceili(maxf(state.results_return_in, 0.0))
 		wait_label.text = ("Back to the lobby in %ds" % secs) if leader else ("Waiting for the lobby leader… back to the lobby in %ds" % secs)
+
+
+## Keeps Play again / Leave greyed out with a countdown for the first `lock_seconds`, then
+## enables them and puts the focus on the one this player can press.
+func _update_lock() -> void:
+	if _unlocked or play_button == null:
+		return
+	if _clock < lock_seconds:
+		var left: int = ceili(lock_seconds - _clock)
+		play_button.text = "%s (%d)" % [_play_text, left]
+		leave_button.text = "%s (%d)" % [_leave_text, left]
+		return
+	_unlocked = true
+	play_button.disabled = false
+	leave_button.disabled = false
+	play_button.text = _play_text
+	leave_button.text = _leave_text
+	(play_button if play_button.visible else leave_button).grab_focus()
+
+
+## True once Play again / Leave can be pressed.
+func is_unlocked() -> bool:
+	return _unlocked
 
 
 func _notification(what: int) -> void:
@@ -558,7 +592,13 @@ func _build_ui() -> void:
 		wait_label.offset_bottom = -8
 		wait_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		root.add_child(wait_label)
-	play_button.grab_focus()
+	_play_text = play_button.text
+	_leave_text = leave_button.text
+	play_button.disabled = true
+	leave_button.disabled = true
+	if _room:
+		play_button.visible = state.leader == local_id
+	_update_lock()
 
 
 ## The server's XP/Coins row for `pid` ({} when the event carried none).

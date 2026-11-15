@@ -46,6 +46,7 @@ func test_new_leader_runs_play_again_in_the_same_room() -> void:
 	assert_eq(fx.server.phases.phase, Phase.Id.RESULTS)
 	assert_eq(int(fx.server.get_snapshot()["lobby"]["leader"]), b, "the results screen shows the new leader")
 	assert_eq(fx.intent(a, &"return_to_lobby")["error"], &"not_leader")
+	fx.server.advance(Registry.balance.results_min_time + 0.1)
 	assert_true(fx.intent(b, &"return_to_lobby")["ok"], "the new leader's Play Again is taken")
 	assert_eq(fx.server.phases.phase, Phase.Id.LOBBY)
 	assert_eq(int(fx.server.get_snapshot()["lobby"]["leader"]), b, "and stays the leader in the lobby")

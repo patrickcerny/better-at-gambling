@@ -190,6 +190,8 @@ func test_play_again_in_the_same_room() -> void:
 	assert_eq((snap["standings"] as Array).size(), 3)
 	assert_true(snap.has("awards"))
 	assert_eq(fx.intent(b, &"return_to_lobby")["error"], &"not_leader")
+	assert_eq(fx.intent(a, &"return_to_lobby")["error"], &"too_early", "the results screen stays up for a while first")
+	s.advance(Registry.balance.results_min_time + 0.1)
 	assert_true(fx.intent(a, &"return_to_lobby")["ok"])
 	assert_eq(s.phases.phase, Phase.Id.LOBBY)
 	assert_eq(fx.of_type(&"match_reset").size(), 1)

@@ -34,4 +34,5 @@ func _ready() -> void:
 	st.awards = Awards.pick(stats, names, 4)
 	var stage := ResultsStage.new()
 	add_child(stage)
+	stage.lock_seconds = 0.0
 	stage.setup(st, 1, false)

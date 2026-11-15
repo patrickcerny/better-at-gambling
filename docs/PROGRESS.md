@@ -93,6 +93,14 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.43 end screen with the stats stays up for 10 s
+- Patrick: "Es hat auch den endscreen mit den stats einfach direct geskipped lass den verpflichtend paar
+  sekunden bleiben bis man leaven kann". Cause: PLAY AGAIN had the focus from the first frame, so a
+  Space / Enter / pad A still held from the match pressed it at once; the leader's press sent
+  `return_to_lobby` and took the whole room back to the lobby. Now PLAY AGAIN / LEAVE are greyed out
+  with a countdown ("LEAVE LOBBY (7)") for `BalanceConfig.results_min_time` (10 s) and only get the
+  focus when they unlock; the server also refuses `return_to_lobby` with `too_early` until 10 s
+  after `match_ended` (`MatchServer.results_lock_in`).
 ### 2026-11-15 / 0.9.42 blackjack soft totals, lobby clipping
 - Patrick: "Soft 17 zb 7 / 17". A soft hand still in play shows both counts ("7 / 17", a lone ace
   "1 / 11") in the panel, the seat panels, the 3D split tags and the dealer's up card;
