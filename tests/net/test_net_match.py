@@ -197,7 +197,7 @@ def _tone_amplitude(x, hz, rate):
     return math.sqrt(max(s1 * s1 + s2 * s2 - c * s1 * s2, 0.0)) * 2.0 / len(x)
 
 
-def _tone_frames(x, hz, rate, frame=320):
+def _tone_frames(x, hz, rate, frame=None):
     """The `hz` component of every 40 ms frame of `x`: (amplitudes, phase jumps). The phase is
     taken against one clock for the whole dump, so a tone played without a break keeps one phase
     from frame to frame; a frame missing in between (dropped on purpose by the jitter buffer,
@@ -207,6 +207,7 @@ def _tone_frames(x, hz, rate, frame=320):
     after each drop the rest of the dump arrives in another phase and partly cancels what came
     before (0.9.13: a listener stalled twice for 0.7 s dropped 35 frames in three places, every
     played frame was the tone at 0.363-0.367, the whole dump read 0.108)."""
+    frame = frame or rate * 40 // 1000
     amps, phases = [], []
     w = 2.0 * math.pi * hz / rate
     for k in range(len(x) // frame):
@@ -289,8 +290,8 @@ def test_voice_from_one_client_is_relayed_by_the_dedicated_server_and_played_by_
     # only the frames his jitter buffer concealed may be off, and the tone runs on in one phase
     # except where a counted frame went missing on the way.
     rate, x = _read_wav(dump.with_name(f"bob_heard_p{a_id}.wav"))
-    assert rate == 8000 and len(x) == dumped * 320, (rate, len(x), dumped)
-    body = x[320 * 3:]
+    assert rate == 16000 and len(x) == dumped * 640, (rate, len(x), dumped)
+    body = x[640 * 3:]
     amps, jumps = _tone_frames(body, tone_hz, rate)
     off = [round(a, 3) for a in amps if abs(a - amp) >= amp * 0.1]
     missing = late + overflowed - backlog + lost + (sent - got_at_server) + (got_at_server - to_bob) + (to_bob - bob_got)

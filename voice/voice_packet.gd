@@ -1,7 +1,7 @@
 class_name VoicePacket
 extends RefCounted
 ## Voice packet framing on `Protocol.CHANNEL_VOICE` (unreliable). Raw bytes, not `Wire` arrays:
-## a 40 ms frame is 320 bytes and `var_to_bytes` would add ~20 more to each. The first byte is
+## a 40 ms frame is 324 bytes and `var_to_bytes` would add ~20 more to each. The first byte is
 ## never `TYPE_ARRAY`, so a stray voice packet is ignored by `Wire.decode`.
 ##
 ## Up (client → server):   [MAGIC, flags, seq lo, seq hi, payload…]

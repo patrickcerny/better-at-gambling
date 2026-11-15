@@ -1,6 +1,6 @@
 class_name VoicePlayback
 extends Node3D
-## One remote speaker's voice (§2.22): jitter buffer → decoder → our own 8 kHz → output-rate
+## One remote speaker's voice (§2.22): jitter buffer → decoder → our own 16 kHz → output-rate
 ## upsampler → `AudioStreamGenerator` in an `AudioStreamPlayer3D` at their head on the `Voice`
 ## bus, plus their mouth flap and the speaker icon over their head. Lives under the speaker's
 ## avatar, so it follows them around.
@@ -20,7 +20,7 @@ extends Node3D
 ## so the mouth and talking state behave exactly as they would with sound (`force_audio` keeps the
 ## real players headless, for tests that listen to the Voice bus).
 
-## Every frame this playback plays (decoded samples at 8 kHz; `--voice-dump`, tests).
+## Every frame this playback plays (decoded samples at 16 kHz; `--voice-dump`, tests).
 signal frame_played(samples: PackedFloat32Array)
 
 const BUS: StringName = &"Voice"
@@ -47,7 +47,7 @@ static var force_audio: bool = false
 var speaker: int = -1
 ## 40 ms voice frames this speaker's playback has played.
 var frames_played: int = 0
-var codec: VoiceCodec = MulawCodec.new()
+var codec: VoiceCodec = AdpcmCodec.new()
 var buffer: VoiceJitterBuffer = VoiceJitterBuffer.new()
 var mouth: VoiceMouth = VoiceMouth.new()
 ## True while the last packet was table/global voice (no distance falloff).
@@ -305,7 +305,7 @@ func _log_first(f: PackedFloat32Array) -> void:
 	if bus >= 0:
 		bus_state = "%.1f dB%s" % [AudioServer.get_bus_volume_db(bus), ", MUTED" if AudioServer.is_bus_mute(bus) else ""]
 	var master: String = "%.1f dB%s" % [AudioServer.get_bus_volume_db(0), ", MUTED" if AudioServer.is_bus_mute(0) else ""]
-	Log.info(&"voice", "first frame played for %s (level %s, %s): output mix rate %d Hz, generator %d Hz (8 kHz upsampled by us), playing %s, %s bus %s, Master %s" % [
+	Log.info(&"voice", "first frame played for %s (level %s, %s): output mix rate %d Hz, generator %d Hz (16 kHz upsampled by us), playing %s, %s bus %s, Master %s" % [
 		_who(), level, vol, roundi(AudioServer.get_mix_rate()), roundi(output_rate), is_playing(), BUS, bus_state, master])
 	if _gen == null and not sink.is_valid():
 		return

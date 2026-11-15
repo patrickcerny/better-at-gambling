@@ -38,8 +38,8 @@ func after_each() -> void:
 
 func _frame(seq: int = 0, flags: int = 0) -> PackedByteArray:
 	var payload := PackedByteArray()
-	payload.resize(VoiceCodec.FRAME_SAMPLES)
-	payload.fill(0x7F)
+	payload.resize(AdpcmCodec.encoded_size(VoiceCodec.FRAME_SAMPLES))
+	payload.fill(0x77)
 	return VoicePacket.make_up(seq, flags, payload)
 
 
@@ -56,7 +56,7 @@ func test_speaker_at_3m_is_relayed_and_at_25m_is_not() -> void:
 	var d: Dictionary = VoicePacket.parse_down(out[near])
 	assert_eq(d["speaker"], speaker)
 	assert_eq(d["flags"], 0, "positional voice")
-	assert_eq((d["payload"] as PackedByteArray).size(), VoiceCodec.FRAME_SAMPLES)
+	assert_eq((d["payload"] as PackedByteArray).size(), AdpcmCodec.encoded_size(VoiceCodec.FRAME_SAMPLES))
 
 
 func test_hearing_radius_edge() -> void:
@@ -151,7 +151,7 @@ func test_malformed_and_unknown_speakers_are_dropped() -> void:
 
 
 func test_bandwidth_cap_per_speaker() -> void:
-	# A steady μ-law speaker (25 frames/s) for 10 s: never throttled.
+	# A steady ADPCM speaker (25 frames/s) for 10 s: never throttled.
 	for i: int in 250:
 		assert_false(_route(i * VoiceCodec.FRAME_SECONDS, _frame(i)).is_empty())
 	assert_eq(relay.dropped_packets, 0)
@@ -224,7 +224,7 @@ func test_client_channel_plays_relayed_voice_and_respects_mutes() -> void:
 	ch.audio_enabled = false
 	ch.setup(null, 1, func(pid: int) -> Node3D: return heads.get(pid, null), null, true)
 	add_child_autofree(ch)
-	var codec := MulawCodec.new()
+	var codec := AdpcmCodec.new()
 	var tone: PackedFloat32Array = VoiceWav.tone(220.0, 0.04, VoiceCodec.SAMPLE_RATE, 0.4)
 	ch.set_muted(3, true)
 	for seq: int in 5:
@@ -279,7 +279,7 @@ func test_client_channel_says_why_voice_is_ignored_and_what_it_heard() -> void:
 	ch.setup(null, 1, func(pid: int) -> Node3D: return head if pid == 2 else null, null, true)
 	add_child_autofree(ch)
 	var old: String = str(Settings.get_value("voice", "mode"))
-	var codec := MulawCodec.new()
+	var codec := AdpcmCodec.new()
 	var tone: PackedFloat32Array = VoiceWav.tone(220.0, 0.04, VoiceCodec.SAMPLE_RATE, 0.4)
 	Settings.change("voice", "mode", "off")
 	ch._on_voice(VoicePacket.make_down(2, 0, 0, codec.encode(tone)))
@@ -309,7 +309,7 @@ func test_voice_dump_writes_what_each_speaker_played() -> void:
 	ch.setup(null, 1, func(pid: int) -> Node3D: return head if pid == 2 else null, null, true)
 	add_child(ch)
 	ch.dump_path = "user://voice_dump_test.wav"
-	var codec := MulawCodec.new()
+	var codec := AdpcmCodec.new()
 	var tone: PackedFloat32Array = VoiceWav.tone(440.0, 0.04, VoiceCodec.SAMPLE_RATE, 0.4)
 	for seq: int in 8:
 		ch._on_voice(VoicePacket.make_down(2, seq, VoicePacket.FLAG_END if seq == 7 else 0, codec.encode(tone)))

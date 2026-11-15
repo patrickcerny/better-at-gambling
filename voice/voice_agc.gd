@@ -15,14 +15,19 @@ extends RefCounted
 
 ## Loud syllables land here (dBFS RMS of a 40 ms frame).
 const TARGET_DB: float = -12.0
-## Most the gain lifts a quiet mic (×16).
-const MAX_BOOST_DB: float = 24.0
+## Most the gain lifts a quiet mic (×32; 0.9.32: a USB mic at a low Windows level speaks at
+## -40..-45 dBFS, 24 dB was not enough).
+const MAX_BOOST_DB: float = 30.0
+## The room may come out at most this loud: the boost stops where it would lift the noise floor
+## (`VoiceVad.floor_db`) over it, but always allows `MIN_CAP_DB`.
+const NOISE_CEILING_DB: float = -36.0
+const MIN_CAP_DB: float = 12.0
 ## Gain rise per speech frame (25 dB/s: a quiet speaker is up to level within the first word).
 const RISE_DB: float = 1.0
 ## Envelope fall per speech frame towards a quieter frame (about 1 s to settle down).
 const ENVELOPE_RELEASE: float = 0.04
-## Frames under this (before the gain) are not speech and leave the gain alone.
-const SPEECH_DB: float = -50.0
+## Frames under this (before the gain) never move the gain, whatever the caller says.
+const SPEECH_DB: float = -72.0
 ## Samples above this are rounded off smoothly by `limit` instead of clipping at full scale.
 const LIMIT_KNEE: float = 0.6
 
@@ -38,9 +43,14 @@ func reset() -> void:
 	envelope_db = -100.0
 
 
-## `frame` lifted to the voice level. `speech`: whether this frame is talking (the caller's gate
-## decision, made on the un-boosted frame); other frames keep the current gain.
-func process(frame: PackedFloat32Array, speech: bool) -> PackedFloat32Array:
+## Most boost for a room whose noise floor sits at `floor_db` (see `NOISE_CEILING_DB`).
+static func max_boost(floor_db: float) -> float:
+	return clampf(NOISE_CEILING_DB - floor_db, MIN_CAP_DB, MAX_BOOST_DB)
+
+
+## `frame` lifted to the voice level. `speech`: whether this frame is talking (`VoiceVad`, judged on
+## the un-boosted frame); other frames keep the current gain. `floor_db`: the room's level.
+func process(frame: PackedFloat32Array, speech: bool, floor_db: float = -100.0) -> PackedFloat32Array:
 	var from_db: float = gain_db
 	var db: float = VoiceCodec.rms_db(frame)
 	if speech and db >= SPEECH_DB:
@@ -48,7 +58,7 @@ func process(frame: PackedFloat32Array, speech: bool) -> PackedFloat32Array:
 			envelope_db = db
 		else:
 			envelope_db += (db - envelope_db) * ENVELOPE_RELEASE
-		var want: float = clampf(TARGET_DB - envelope_db, 0.0, MAX_BOOST_DB)
+		var want: float = clampf(TARGET_DB - envelope_db, 0.0, max_boost(floor_db))
 		gain_db = want if want < gain_db else minf(gain_db + RISE_DB, want)
 	if is_zero_approx(from_db) and is_zero_approx(gain_db):
 		return frame

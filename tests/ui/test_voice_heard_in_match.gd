@@ -14,7 +14,7 @@ var scene: MatchScene
 var cap: AudioEffectCapture = null
 var _bus: int = -1
 var _old_mode: String
-var _codec := MulawCodec.new()
+var _codec := AdpcmCodec.new()
 var _phase: float = 0.0
 var _seq: int = 0
 

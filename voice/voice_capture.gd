@@ -1,7 +1,7 @@
 class_name VoiceCapture
 extends Node
 ## Microphone → voice frames (§2.22). Samples come straight from the audio driver's input buffer
-## (`VoiceMicSource`), are mixed to mono, resampled to 8 kHz, cut into 40 ms frames, gated
+## (`VoiceMicSource`), are mixed to mono, resampled to 16 kHz, cut into 40 ms frames, gated
 ## (push-to-talk / open mic with a level threshold / off) and encoded.
 ##
 ## Without a microphone (headless, input disabled, no device) nothing is captured, but `feed_*`
@@ -9,16 +9,16 @@ extends Node
 
 ## A frame ready to send (a `VoicePacket` up packet).
 signal frame_captured(packet: PackedByteArray)
-## Every 40 ms mono frame at 8 kHz, gated or not (the settings panel's "Test microphone" records
+## Every 40 ms mono frame at 16 kHz, gated or not (the settings panel's "Test microphone" records
 ## these).
 signal frame_processed(frame: PackedFloat32Array)
 
 enum Mode { PUSH_TO_TALK, OPEN_MIC, OFF }
 
-## Open mic: frames louder than this open the gate… (-45 dBFS: a quiet webcam or laptop mic at
-## Windows' default level speaks at -35..-45 dBFS RMS; room hiss sits around -60.)
+## Push-to-talk held back log and the settings meter's colour: frames at least this loud count
+## as clear speech. The open-mic gate itself is `VoiceVad` (relative to the room, 0.9.32).
 const OPEN_MIC_THRESHOLD_DB: float = -45.0
-## …and it stays open this long after the voice drops (no clipped word endings).
+## The open-mic gate stays open this long after the voice drops (no clipped word endings).
 const HANGOVER: float = 0.4
 ## Seconds a started microphone may deliver nothing before we log that it is silent.
 const SILENT_WARN_SECONDS: float = 3.0
@@ -41,7 +41,7 @@ const COMMON_RATES: Array[int] = [8000, 11025, 16000, 22050, 24000, 32000, 44100
 var mode: Mode = Mode.PUSH_TO_TALK
 ## Push-to-talk key state (the channel reads the input map).
 var ptt_pressed: bool = false
-var codec: VoiceCodec = MulawCodec.new()
+var codec: VoiceCodec = AdpcmCodec.new()
 ## Mic volume (Patrick: "change your voice loudness, like an amplifier if the mic is too loud"):
 ## every frame is scaled by this before the level, the open-mic gate and the encoder see it,
 ## clipped to full scale. Follows Settings > Audio > Mic volume (`Settings.mic_gain`).
@@ -50,6 +50,8 @@ var gain: float = 1.0
 ## the Mic volume and the encoder. Follows Settings > Audio > Auto mic level (`voice/auto_level`).
 var auto_level: bool = true
 var agc: VoiceAgc = VoiceAgc.new()
+## Speech detection relative to the room: opens the open-mic gate and moves the automatic level.
+var vad: VoiceVad = VoiceVad.new()
 ## Level of the last frame (RMS, linear).
 var level: float = 0.0
 ## True while the last frame was sent.
@@ -97,6 +99,12 @@ var _rate_frames: int = 0
 var _rate_skipped_at: int = 0
 ## The microphone was opened through Steam voice.
 var _steam_voice: bool = false
+## Speech frames since the microphone opened, and their summed levels, for the one level log line.
+var _speech_frames: int = 0
+var _speech_in_db: float = 0.0
+var _speech_out_db: float = 0.0
+## Speech frames after which the level line is logged (2 s).
+const LEVEL_LOG_FRAMES: int = 50
 
 
 ## Starts reading the microphone. False when there is none to read (headless, input disabled in
@@ -126,6 +134,10 @@ func start_microphone() -> bool:
 	rate_override = 0.0
 	_pending.clear()
 	agc.reset()
+	vad.reset()
+	_speech_frames = 0
+	_speech_in_db = 0.0
+	_speech_out_db = 0.0
 	_steam_voice = source is VoiceSteamSource
 	Log.info(&"voice", "microphone opened: device \"%s\" at %d Hz (driver %s)" % [source.device(), roundi(source.rate()), AudioServer.get_driver_name()])
 	return true
@@ -220,7 +232,7 @@ func _note_held_back(frame: PackedFloat32Array) -> void:
 	if mode == Mode.PUSH_TO_TALK:
 		Log.info(&"voice", "microphone: %.0f s of sound (loudest %s), but push-to-talk was not held: nothing sent yet" % [held_back_seconds, db_text(_held_back_peak)])
 	else:
-		Log.info(&"voice", "microphone: %.0f s of sound (loudest %s) under the open-mic gate (%d dB): nothing sent yet (Mic volume raises it)" % [held_back_seconds, db_text(_held_back_peak), int(OPEN_MIC_THRESHOLD_DB)])
+		Log.info(&"voice", "microphone: %.0f s of sound (loudest %s) under the open-mic gate (room at %s): nothing sent yet" % [held_back_seconds, db_text(_held_back_peak), "%.0f dB" % vad.floor_db])
 
 
 ## The rate the microphone's samples are resampled from: the driver's, unless the device was
@@ -320,25 +332,31 @@ func feed_mono(samples: PackedFloat32Array, rate: float) -> void:
 
 
 func _frame(raw: PackedFloat32Array) -> void:
-	# The gate (and the held-back log) judge the microphone as it is, with the Mic volume: room hiss
-	# must not open it just because the automatic level is turned up for a quiet voice.
+	# Speech is judged before the automatic level, relative to the room (`VoiceVad`): room hiss
+	# never opens the gate just because the level is turned up for a quiet voice.
 	var heard: PackedFloat32Array = apply_gain(raw, gain)
 	var heard_db: float = VoiceCodec.rms_db(heard)
+	var speech: bool = vad.process(heard_db)
 	var want: bool = false
 	match mode:
 		Mode.PUSH_TO_TALK:
 			want = ptt_pressed
 		Mode.OPEN_MIC:
-			if heard_db >= OPEN_MIC_THRESHOLD_DB:
+			if speech:
 				_hang = HANGOVER
 			want = _hang > 0.0
 			_hang -= VoiceCodec.FRAME_SECONDS
 	var frame: PackedFloat32Array = heard
 	if auto_level:
-		# What goes out: the voice lifted to a normal level, then the Mic volume on top.
-		var speech: bool = heard_db >= OPEN_MIC_THRESHOLD_DB
-		frame = VoiceAgc.limit(apply_gain(agc.process(raw, speech), gain))
+		# What goes out: the voice (Mic volume as a trim) lifted to a normal level, rounded off.
+		frame = VoiceAgc.limit(agc.process(heard, speech, vad.floor_db))
 	level = VoiceCodec.rms(frame)
+	if speech and _speech_frames < LEVEL_LOG_FRAMES:
+		_speech_frames += 1
+		_speech_in_db += VoiceCodec.rms_db(raw)
+		_speech_out_db += VoiceCodec.rms_db(frame)
+		if _speech_frames == LEVEL_LOG_FRAMES:
+			Log.info(&"voice", "voice level over 2 s of speech: microphone %.0f dBFS, room %.0f dBFS, Mic volume %d %%, auto level %s, sent at %.0f dBFS" % [_speech_in_db / LEVEL_LOG_FRAMES, vad.floor_db, roundi(gain * 100.0), ("+%.0f dB" % agc.gain_db) if auto_level else "off", _speech_out_db / LEVEL_LOG_FRAMES])
 	frame_age = 0.0
 	frame_processed.emit(frame)
 	if want:

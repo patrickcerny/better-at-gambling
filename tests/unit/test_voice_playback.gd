@@ -6,7 +6,7 @@ extends GutTest
 
 var cam: Camera3D
 var head: Node3D
-var codec := MulawCodec.new()
+var codec := AdpcmCodec.new()
 
 
 func before_each() -> void:
@@ -246,7 +246,7 @@ func test_upsampler_is_continuous_across_any_cut() -> void:
 		cut.append_array(r.process(tone.slice(pos, mini(pos + n, tone.size()))))
 		pos += n
 	cut.append_array(r.process(tone.slice(pos)))
-	assert_eq(whole.size(), tone.size() * 6, "8 → 48 kHz: exactly 6 per sample")
+	assert_eq(whole.size(), tone.size() * 3, "16 → 48 kHz: exactly 3 per sample")
 	assert_eq(cut, whole, "the same in pieces as in one go")
 	var r44 := VoiceResampler.new(VoiceCodec.SAMPLE_RATE, 44100.0)
 	var total: int = 0

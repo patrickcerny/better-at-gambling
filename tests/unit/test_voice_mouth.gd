@@ -48,7 +48,7 @@ func test_playback_path_drives_the_mouth_from_decoded_frames() -> void:
 	var pb := VoicePlayback.new()
 	pb.audio_enabled = false
 	add_child_autofree(pb)
-	var codec := MulawCodec.new()
+	var codec := AdpcmCodec.new()
 	var seq: int = 0
 	var peak: float = 0.0
 	# 0.6 s of tone arriving in real time: one 40 ms frame per tick.
@@ -76,7 +76,7 @@ func test_table_and_global_voice_flag_full_volume() -> void:
 	var pb := VoicePlayback.new()
 	pb.audio_enabled = false
 	add_child_autofree(pb)
-	var codec := MulawCodec.new()
+	var codec := AdpcmCodec.new()
 	var f: PackedFloat32Array = _frames(0.04, 0.2)[0]
 	pb.push_packet(VoicePacket.parse_down(VoicePacket.make_down(2, 0, VoicePacket.FLAG_GLOBAL, codec.encode(f))))
 	assert_true(pb.full_volume)

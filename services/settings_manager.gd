@@ -21,7 +21,7 @@ const DEFAULTS: Dictionary = {
 	## input volume and automatic gain), else straight from the audio driver.
 	## Open mic by default (0.9.12; §2.22 "proximity voice is on by default"): with push-to-talk
 	## as the default almost nobody held T, and a whole casino round carried 15 frames of voice.
-	"voice": {"mode": "open_mic", "input_device": "Default", "mic_gain": 1.0, "auto_level": true, "steam_voice": true},
+	"voice": {"mode": "open_mic", "input_device": "Default", "mic_gain": 1.0, "auto_level": true, "steam_voice": false},
 	## `stick_sensitivity` scales the gamepad's right-stick look.
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false, "stick_sensitivity": 1.0},
 	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
@@ -63,6 +63,7 @@ func _ready() -> void:
 		if err != OK:
 			Log.warn(&"settings", "could not load %s (error %d), using defaults" % [PATH, err])
 	drop_removed_keys()
+	upgrade_voice()
 	for action: StringName in KEYBINDS:
 		if InputMap.has_action(action):
 			_default_events[action] = InputMap.action_get_events(action).duplicate()
@@ -132,6 +133,28 @@ func drop_removed_keys() -> bool:
 	if dropped:
 		save()
 	return dropped
+
+
+## Voice settings revision: 2 is the room-relative gate and automatic level (0.9.32).
+const VOICE_REVISION: int = 2
+
+
+## Brings voice settings saved by older versions to `VOICE_REVISION`, once: the automatic level on
+## and the Mic volume back to 100 % (players turned it up to 400 % to make up for the old fixed
+## gate; with the automatic level that would only drive the limiter), Steam voice off (0.9.24
+## stayed silent for Patrick). True when anything changed (and was saved).
+func upgrade_voice() -> bool:
+	if int(_cfg.get_value("voice", "revision", 0)) >= VOICE_REVISION:
+		return false
+	var had_any: bool = _cfg.has_section("voice")
+	_cfg.set_value("voice", "revision", VOICE_REVISION)
+	if had_any:
+		_cfg.set_value("voice", "auto_level", true)
+		_cfg.set_value("voice", "mic_gain", 1.0)
+		_cfg.set_value("voice", "steam_voice", false)
+		Log.info(&"settings", "voice settings upgraded: automatic level on, Mic volume 100 %, Steam voice off")
+	save()
+	return had_any
 
 
 # --- Key bindings -----------------------------------------------------------------------------

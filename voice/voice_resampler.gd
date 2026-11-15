@@ -3,7 +3,7 @@ extends RefCounted
 ## Streaming rate converter for both voice directions. Down (capture: mix rate →
 ## `VoiceCodec.SAMPLE_RATE`): box-filter decimation, each output sample is the mean of the input
 ## samples it covers, which also takes the edge off aliasing; works for any ratio, including
-## 44.1 kHz. Up (playback: 8 kHz → the output mix rate): linear interpolation between neighbouring
+## 44.1 kHz. Up (playback: 16 kHz → the output mix rate): linear interpolation between neighbouring
 ## input samples. Both keep their phase across calls, so a stream cut into frames of any size
 ## comes out the same as in one piece (no clicks at frame boundaries).
 
@@ -15,7 +15,7 @@ var _count: int = 0
 var _last: float = 0.0
 
 
-func _init(p_from: float, p_to: float = 8000.0) -> void:
+func _init(p_from: float, p_to: float = 16000.0) -> void:
 	from_rate = maxf(p_from, 1.0)
 	to_rate = maxf(p_to, 1.0)
 
