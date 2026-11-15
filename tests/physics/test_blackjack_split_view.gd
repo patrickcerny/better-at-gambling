@@ -146,3 +146,36 @@ func test_split_bets_sit_in_front_of_each_hand_and_pay_per_hand() -> void:
 		if c is ChipStack:
 			left += 1
 	assert_eq(left, 0, "both stacks settled")
+
+
+## Screen x (0 = left edge, 1 = right edge) of a point seen from a seat camera, for a 16:9 or
+## 4:3 screen at vertical field of view `fov` (degrees), as Godot's Camera3D keeps the height.
+func _screen_x(eye: Node3D, p: Vector3, fov: float, aspect: float) -> float:
+	var l: Vector3 = eye.global_transform.affine_inverse() * p
+	return 0.5 + 0.5 * (l.x / -l.z) / (tan(deg_to_rad(fov) * 0.5) * aspect)
+
+
+## Patrick: "when im the 4. player on the blackjack table and i split the hand, the second hand
+## is under the UI". The panel docks on the right and is widest after a split (the HAND n
+## buttons), starting at ~59 % of the screen width; both hands of every seat stay left of it.
+func test_both_split_hands_stay_left_of_the_panel_for_every_seat() -> void:
+	var hands: Dictionary = {}
+	var seats: Array = []
+	for i: int in st.seat_count:
+		seats.append(20 + i)
+		hands[20 + i] = {"stake": 50, "done": false, "active": 1, "cards": [Card.make(8, 0), Card.make(3, 1), Card.make(2, 2)],
+			"split": {"stake": 50, "cards": [Card.make(8, 2), Card.make(10, 3), Card.make(2, 0)], "done": false}}
+	st.show_round({"state": BlackjackLogic.State.ACTING, "seats": seats, "dealer_revealed": false, "dealer": [Card.make(10, 1)], "hands": hands})
+	await wait_seconds(4.0)  # every card dealt and slid into place
+	var half_card: float = TableCards.CARD_SIZE.x * 0.5
+	for seat: int in st.seat_count:
+		var eye: Node3D = st.camera_for_seat(seat)
+		var right: Vector3 = eye.global_basis.x.normalized()
+		for fov: float in [70.0, 85.0, 110.0]:
+			for aspect: float in [16.0 / 9.0, 4.0 / 3.0]:
+				for key: int in [seat, seat + BlackjackStation.SPLIT_KEY]:
+					for n: Node3D in st.cards.pile_nodes(key):
+						var x_right: float = _screen_x(eye, n.global_position + right * half_card, fov, aspect)
+						var x_left: float = _screen_x(eye, n.global_position - right * half_card, fov, aspect)
+						assert_lt(x_right, 0.58, "seat %d hand %d clear of the panel (fov %d, %.2f)" % [seat + 1, 1 if key < 10 else 2, fov, aspect])
+						assert_gt(x_left, 0.02, "seat %d hand %d on screen (fov %d, %.2f)" % [seat + 1, 1 if key < 10 else 2, fov, aspect])
