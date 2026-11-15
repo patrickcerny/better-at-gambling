@@ -158,7 +158,7 @@ func check_beat_the_dev(beaten: Array[int]) -> void:
 		_unlocked.append(Achievements.BEAT_THE_DEV)
 		return
 	for sid: int in beaten:
-		if DevMode.is_dev_id(sid):
+		if DevMode.is_the_dev(sid):
 			unlock_achievements([Achievements.BEAT_THE_DEV])
 			return
 	for sid: int in beaten:

@@ -66,7 +66,7 @@ const DEFS: Dictionary[StringName, Array] = {
 
 ## Patrick 2026-11-15: "a Steam achievement (beat the Dev) where you have to win against me in a
 ## game. Or someone who has beat me". Finishing an online match ranked ahead of a player who is
-## the developer (`DevMode.STEAM_IDS`) or who already holds it unlocks it, so it spreads from
+## the developer (`DevMode.THE_DEV`) or who already holds it unlocks it, so it spreads from
 ## player to player. The rule is here; whether the others hold it is asked from Steam by
 ## `SteamSvc.check_beat_the_dev`.
 const BEAT_THE_DEV: StringName = &"ACH_BEAT_THE_DEV"

@@ -15,9 +15,14 @@ extends RefCounted
 ## Once anything dev was used, Steam achievements stay off until the game restarts (`used`), so
 ## a dev level or dev money never unlocks a real achievement.
 
-## SteamID64s that may use developer mode and count as "the dev" for Beat the Dev (Patrick's
-## account, from his Steam account page 2026-11-15).
-const STEAM_IDS: Array[int] = [76561198325616486]
+## SteamID64s that may use developer mode (Patrick's account, from his Steam account page
+## 2026-11-15; more from him: "gebe dieser nummer access all. Es werden noch mehr steam ids kommen").
+const STEAM_IDS: Array[int] = [
+	76561198325616486,  # Patrick
+	76561198355845610,  # Patrick 2026-11-15
+]
+## The one account that counts as "the dev" for Beat the Dev (Patrick only).
+const THE_DEV: int = 76561198325616486
 
 ## Tests: 1 forces it on, 0 off, -1 asks Steam.
 static var forced: int = -1
@@ -35,6 +40,11 @@ static func allowed() -> bool:
 ## Whether `steam_id` is on the list.
 static func is_dev_id(steam_id: int) -> bool:
 	return steam_id != 0 and steam_id in STEAM_IDS
+
+
+## Whether `steam_id` is the developer himself (Beat the Dev).
+static func is_the_dev(steam_id: int) -> bool:
+	return steam_id != 0 and steam_id == THE_DEV
 
 
 ## Marks the run as touched by dev tools (no achievements from here on).
