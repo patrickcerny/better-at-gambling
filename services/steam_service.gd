@@ -369,6 +369,8 @@ func _on_prices(result: int = 0, code: Variant = "", _a: Variant = null) -> void
 func _on_purchase_result(result: Variant = null, _order: Variant = null, _transaction: Variant = null, _a: Variant = null) -> void:
 	var ok: bool = str(result) in ["success", "1", "true"]
 	if not ok:
+		# StartPurchase itself failed, so the overlay never opened (unreleased app, item not for sale here, old item list).
+		push_warning("Steam StartPurchase failed: %s" % str(result))
 		buying = false
 		purchase_finished.emit(false)
 	# Paid: Steam grants the items, the inventory update follows (also re-read when the overlay closes).

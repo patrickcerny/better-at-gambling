@@ -44,8 +44,6 @@ const TAB_ICONS: Dictionary = {
 	CosmeticDef.KIND_BEARD: &"beard_full", KIND_PACK: &"pack_royal",
 }
 const MUTED := Color("#B9A98C")
-## A Coins price the wallet can't pay yet.
-const TOO_DEAR := Color("#D9705F")
 
 ## Inventory mode (the T-shirt in the menu's corner): only what the player owns, to wear it.
 ## Shop mode (SHOP in the menu) shows everything to buy.
@@ -88,6 +86,23 @@ var tab_buttons: Dictionary[StringName, Button] = {}
 var shop: CosmeticShop
 var thumbnails: CosmeticThumbnails
 var _dim: ColorRect
+## Shop and inventory look like two places, not one page with a different button (Patrick
+## 2026-11-15): the shop is a storefront (striped awning, the wallet, FEATURED cards of the day),
+## the inventory a wardrobe (dark wood, a WEARING column with one slot per kind, how much you own,
+## no prices or wallet).
+var wallet: Control
+var hint_label: Label
+## Shop only: today's featured cards over the tabs.
+var featured_row: HBoxContainer
+## Inventory only: "N OF M OWNED" where the shop has the wallet.
+var owned_label: Label
+## Inventory only: the WEARING column between the stage and the tiles.
+var wardrobe: PanelContainer
+## Kind -> its slot in the WEARING column.
+var slots: Dictionary[StringName, Button] = {}
+var stage: PanelContainer
+## How many featured cards the shop shows.
+const FEATURED: int = 3
 
 
 func _ready() -> void:
@@ -128,7 +143,13 @@ func _ready() -> void:
 	switch_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	switch_button.pressed.connect(func() -> void: set_inventory(not inventory))
 	head.add_child(switch_button)
-	var wallet := PanelContainer.new()
+	owned_label = Label.new()
+	owned_label.name = "Owned"
+	owned_label.theme_type_variation = &"HeadingLabel"
+	owned_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	owned_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(owned_label)
+	wallet = PanelContainer.new()
 	wallet.add_theme_stylebox_override(&"panel", _box(Color("#1E1414"), Color(Palette.WARM_GOLD, 0.6), 2, 28, 18))
 	wallet.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(wallet)
@@ -160,27 +181,14 @@ func _ready() -> void:
 	gcoin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	wrow.add_child(gcoin)
 	# The + sits inside the wallet next to the Gold, a round button in the coin's own gold.
-	coins_button = Button.new()
+	coins_button = GoldPlusButton.make()
 	coins_button.name = "BuyCoins"
-	coins_button.text = "+"
 	coins_button.tooltip_text = "Buy Gold Coins"
-	coins_button.toggle_mode = true
-	coins_button.custom_minimum_size = Vector2(40, 40)
 	coins_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	coins_button.focus_mode = Control.FOCUS_NONE
-	coins_button.add_theme_font_size_override(&"font_size", 30)
-	var ink := Color("#5A3A0E")
-	for st: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_hover_pressed_color", &"font_focus_color"]:
-		coins_button.add_theme_color_override(st, ink)
-	var looks: Dictionary = {&"normal": Palette.COIN_GOLD, &"hover": Palette.COIN_GOLD.lightened(0.18),
-		&"pressed": Palette.COIN_GOLD.lightened(0.3), &"hover_pressed": Palette.COIN_GOLD.lightened(0.3), &"focus": Palette.COIN_GOLD}
-	for st: StringName in looks:
-		var sb: StyleBoxFlat = _box(looks[st], Palette.COIN_GOLD.darkened(0.35), 3, 20, 0)
-		sb.content_margin_top = -4.0  # the + sits in the middle of the round
-		coins_button.add_theme_stylebox_override(st, sb)
 	coins_button.pressed.connect(func() -> void: show_kind(KIND_COINS))
 	wrow.add_child(coins_button)
 	var hint := Label.new()
+	hint_label = hint
 	hint.theme_type_variation = &"SmallLabel"
 	hint.add_theme_color_override(&"font_color", MUTED)
 	hint.text = "Red Coins come from playing matches and every level up, Gold Coins only with + through Steam (for premium pieces and sets). Both only buy cosmetics: the tables take $, which starts fresh every match."
@@ -191,7 +199,7 @@ func _ready() -> void:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body)
 	# Left: the stage.
-	var stage := PanelContainer.new()
+	stage = PanelContainer.new()
 	stage.name = "Stage"
 	stage.add_theme_stylebox_override(&"panel", _stage_style())
 	stage.custom_minimum_size.x = 520
@@ -271,11 +279,18 @@ func _ready() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.custom_minimum_size.y = 26
 	left.add_child(status_label)
-	# Right: icon tabs over the tiles.
+	body.add_child(_build_wardrobe())
+	# Right: (shop) the featured cards, the icon tabs over the tiles.
 	var right := VBoxContainer.new()
 	right.add_theme_constant_override(&"separation", 14)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(right)
+	featured_row = HBoxContainer.new()
+	featured_row.name = "Featured"
+	featured_row.add_theme_constant_override(&"separation", 14)
+	right.add_child(featured_row)
+	for id: StringName in featured_ids():
+		featured_row.add_child(_featured_card(id))
 	var tab_row := HFlowContainer.new()  # wraps onto a second row on narrow screens
 	tab_row.name = "TabIcons"
 	tab_row.add_theme_constant_override(&"h_separation", 8)
@@ -322,6 +337,211 @@ func _ready() -> void:
 	SteamSvc.gold_spent.connect(_on_gold_spent)
 	resized.connect(_fit_columns)
 	tabs.resized.connect(_fit_columns)  # the tile area settles after the panel: count columns from it
+
+
+## Today's featured ids: premium pieces and sets, a new three every day (the same for everyone).
+func featured_ids(day: int = -1) -> Array[StringName]:
+	var pool: Array[StringName] = []
+	for d: CosmeticDef in shop.items:
+		if d.premium():
+			pool.append(d.id)
+	for k: CosmeticPack in shop.packs:
+		pool.append(k.id)
+	var out: Array[StringName] = []
+	if pool.is_empty():
+		return out
+	if day < 0:
+		day = int(Time.get_unix_time_from_system() / 86400.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(day)
+	while out.size() < mini(FEATURED, pool.size()):
+		var id: StringName = pool[rng.randi_range(0, pool.size() - 1)]
+		if id not in out:
+			out.append(id)
+	return out
+
+
+## A wide FEATURED card: the picture, a gold ribbon, the name and the Gold price.
+func _featured_card(id: StringName) -> Button:
+	var d: CosmeticDef = shop.find(id)
+	var pack: CosmeticPack = shop.find_pack(id)
+	var b := Button.new()
+	b.name = "Featured_" + String(id)
+	b.custom_minimum_size = Vector2(0, 118)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.clip_contents = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.tooltip_text = (d.display_name if d != null else pack.display_name)
+	var normal := _box(Color("#3A2318"), Color(Palette.COIN_GOLD, 0.75), 2, 18, 10)
+	var hover := _box(Color("#4A2D1E"), Palette.COIN_GOLD, 3, 18, 10)
+	b.add_theme_stylebox_override(&"normal", normal)
+	b.add_theme_stylebox_override(&"hover", hover)
+	b.add_theme_stylebox_override(&"pressed", hover)
+	b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override(&"separation", 10)
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
+	b.add_child(row)
+	var pic := TextureRect.new()
+	pic.name = "Picture"
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.texture = CosmeticThumbnails.texture_for(id)
+	pic.custom_minimum_size = Vector2(100, 100)
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	row.add_child(pic)
+	var col := VBoxContainer.new()
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override(&"separation", 2)
+	row.add_child(col)
+	var ribbon := PanelContainer.new()
+	ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ribbon.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	ribbon.add_theme_stylebox_override(&"panel", _box(Palette.COIN_GOLD, Palette.COIN_GOLD, 0, 8, 10))
+	col.add_child(ribbon)
+	var rl := Label.new()
+	rl.theme_type_variation = &"SmallLabel"
+	rl.text = "FEATURED" if d != null else "FEATURED SET"
+	rl.add_theme_color_override(&"font_color", Color("#2A1A10"))
+	rl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ribbon.add_child(rl)
+	var name_l := Label.new()
+	name_l.name = "Name"
+	name_l.text = b.tooltip_text.to_upper()
+	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_l.clip_text = true
+	name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(name_l)
+	var pr: Array = _price_widget(22.0, &"SmallLabel")
+	var prow: HBoxContainer = pr[0]
+	prow.name = "PriceRow"
+	prow.alignment = BoxContainer.ALIGNMENT_BEGIN
+	prow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	(pr[1] as Label).name = "Price"
+	col.add_child(prow)
+	b.pressed.connect(func() -> void:
+		show_kind(d.kind if d != null else KIND_PACK)
+		select(id))
+	return b
+
+
+## The inventory's WEARING column: one slot per kind with what is worn there (empty slots show
+## the kind's icon faded); a click opens that kind's tab with the worn piece picked.
+func _build_wardrobe() -> PanelContainer:
+	wardrobe = PanelContainer.new()
+	wardrobe.name = "Wardrobe"
+	wardrobe.add_theme_stylebox_override(&"panel", _box(Color("#1A120C"), Color("#6B4E2E"), 2, 22, 14))
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override(&"separation", 10)
+	wardrobe.add_child(col)
+	var title := Label.new()
+	title.theme_type_variation = &"SmallLabel"
+	title.text = "WEARING"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	col.add_child(title)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override(&"h_separation", 8)
+	grid.add_theme_constant_override(&"v_separation", 8)
+	col.add_child(grid)
+	for kind: StringName in CosmeticDef.KINDS:
+		if shop.of_kind(kind).is_empty():
+			continue
+		var b := Button.new()
+		b.name = "Slot_" + String(kind)
+		b.custom_minimum_size = Vector2(72, 72)
+		b.expand_icon = true
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.focus_mode = Control.FOCUS_NONE
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		b.add_theme_stylebox_override(&"normal", _box(Color("#2A1D14"), Color("#5A4128"), 2, 14, 6))
+		b.add_theme_stylebox_override(&"hover", _box(Color("#36261A"), Palette.WARM_GOLD, 2, 14, 6))
+		b.add_theme_stylebox_override(&"pressed", _box(Color("#36261A"), Palette.WARM_GOLD, 2, 14, 6))
+		b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+		b.pressed.connect(func() -> void:
+			show_kind(kind)
+			var worn: StringName = worn_in(ProfileManager.profile, kind)
+			if worn != &"":
+				select(worn))
+		slots[kind] = b
+		grid.add_child(b)
+	return wardrobe
+
+
+## The id worn in slot `kind` (the colour for KIND_COLOR), &"" when nothing is.
+func worn_in(p: PlayerProfile, kind: StringName) -> StringName:
+	if kind == CosmeticDef.KIND_COLOR:
+		var c: CosmeticDef = shop.color_item(p.preferred_color if p.preferred_color >= 0 else 0)
+		return c.id if c != null else &""
+	return p.outfit.get(kind, &"")
+
+
+## The shop's featured prices, the wardrobe's slots and the owned count.
+func _refresh_places(p: PlayerProfile) -> void:
+	if featured_row != null:
+		for card: Node in featured_row.get_children():
+			var id := StringName(String(card.name).trim_prefix("Featured_"))
+			var row: Node = card.find_child("PriceRow", true, false)
+			var d: CosmeticDef = shop.find(id)
+			if d != null:
+				_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
+			elif shop.find_pack(id) != null:
+				_show_pack_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, shop.find_pack(id))
+	for kind: StringName in slots:
+		var b: Button = slots[kind]
+		var worn: StringName = worn_in(p, kind)
+		var title: String = str(KIND_TITLES.get(kind, kind)).capitalize()
+		if worn != &"":
+			b.icon = CosmeticThumbnails.texture_for(worn)
+			b.modulate = Color.WHITE
+			var d: CosmeticDef = shop.find(worn)
+			b.tooltip_text = "%s: %s" % [title, d.display_name if d != null else String(worn)]
+		else:
+			b.icon = CosmeticThumbnails.texture_for(TAB_ICONS.get(kind, &""))
+			b.modulate = Color(1, 1, 1, 0.3)
+			b.tooltip_text = "%s: nothing" % title
+	var owned: int = 0
+	for d: CosmeticDef in shop.items:
+		if p.owns(d.id):
+			owned += 1
+	owned_label.text = "%d OF %d OWNED" % [owned, shop.items.size()]
+
+
+func _draw() -> void:
+	if inventory:
+		# The wardrobe: vertical planks of slightly different browns, with dark seams.
+		var inset: float = 18.0
+		var plank: float = 120.0
+		var x: float = inset
+		var i: int = 0
+		while x < size.x - inset:
+			var w: float = minf(plank, size.x - inset - x)
+			var shade: Color = Color("#22180F") if i % 3 == 0 else (Color("#1D150F") if i % 3 == 1 else Color("#251A11"))
+			draw_rect(Rect2(x, 18.0, w, size.y - 36.0), shade)  # clear of the rounded corners
+			if i > 0:
+				draw_line(Vector2(x, 18.0), Vector2(x, size.y - 18.0), Color(0, 0, 0, 0.45), 2.0)
+			x += plank
+			i += 1
+		return
+	# The storefront's awning: deep red and cream stripes over the top edge, scalloped below.
+	var x0: float = 30.0
+	var x1: float = size.x - 30.0
+	var stripe: float = 44.0
+	var top: float = 3.0
+	var h: float = 22.0
+	var n: int = int(ceil((x1 - x0) / stripe))
+	var w: float = (x1 - x0) / float(n)
+	for i: int in n:
+		var col: Color = Color("#8E2F25") if i % 2 == 0 else Color("#F1E3C6")
+		var a: float = x0 + w * float(i)
+		draw_rect(Rect2(a, top, w, h), col)
+		draw_circle(Vector2(a + w * 0.5, top + h), w * 0.5, col)
+	draw_line(Vector2(x0, top + 1.0), Vector2(x1, top + 1.0), Palette.WARM_GOLD, 3.0)
 
 
 ## A scrolling grid of tiles as a new page of `tabs`.
@@ -649,7 +869,7 @@ func press_steam() -> void:
 func _on_purchase_finished(ok: bool) -> void:
 	if not visible:
 		return
-	status_label.text = "Thanks! Your Gold Coins show up in a moment." if ok else "Purchase cancelled."
+	status_label.text = "Thanks! Your Gold Coins show up in a moment." if ok else "Steam couldn't start the purchase. Restart Steam and try again."
 	_refresh()
 
 
@@ -752,8 +972,12 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 		label.text = "%s" % Hud._thousands(d.price)
 	coin.set_gold(d.premium())
 	var short: bool = not p.owns(d.id) and ((d.coin_buyable() and p.coins < d.price) or (d.premium() and SteamSvc.gold < d.gold))
-	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else (TOO_DEAR if short else (Palette.COIN_GOLD if d.premium() else Palette.COIN_RED))))
-	coin.modulate = Color(1, 1, 1, 0.5) if short else Color.WHITE
+	# Short of money keeps the currency's colour, only dimmed: a red number next to a Gold Coin read
+	# as a red-coin price (Patrick 2026-11-15).
+	var cur: Color = Palette.COIN_GOLD if d.premium() else Palette.COIN_RED
+	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else cur))
+	label.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
+	coin.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 
 
 ## Whether piece `d` can be had right now: enough Coins, or enough Gold for a premium one.
@@ -791,11 +1015,14 @@ func _refresh() -> void:
 			pl.add_theme_color_override(&"font_color", Palette.CREAM)
 			continue
 		var row: Node = b.find_child("PriceRow", true, false)
+		# The wardrobe has no prices: only WEARING on what is worn.
+		(row as Control).visible = not inventory or (d != null and _wearing(p, d))
 		if d != null:
 			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
 		else:
 			_show_pack_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, shop.find_pack(id))
 	_refresh_look(p)
+	_refresh_places(p)
 	var pack: CosmeticPack = shop.find_pack(selected)
 	if pack != null:
 		_refresh_pack(p, pack)
@@ -829,6 +1056,8 @@ func _refresh() -> void:
 		item_kind.text += " · FREE AT LEVEL %d" % sel.level
 	price_row.visible = true
 	_show_price(price_label, price_coin, p, sel)
+	if inventory and p.owns(sel.id):
+		price_row.visible = false  # the wardrobe has no prices
 	_dress_preview(p)
 	action_button.disabled = false
 	action_button.visible = true
@@ -917,7 +1146,9 @@ static func _show_pack_price(label: Label, coin: CoinIcon, p: PlayerProfile, pac
 	coin.set_gold(true)
 	label.text = "OWNED" if owned else Hud._thousands(pack.gold)
 	var short: bool = not owned and SteamSvc.gold < pack.gold
-	label.add_theme_color_override(&"font_color", Palette.CREAM if owned else (TOO_DEAR if short else Palette.COIN_GOLD))
+	label.add_theme_color_override(&"font_color", Palette.CREAM if owned else Palette.COIN_GOLD)
+	label.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
+	coin.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 
 
 ## The stage for a pack: the bean in the whole outfit, its price and what it saves; WEAR ALL once
@@ -980,6 +1211,17 @@ func set_inventory(on: bool) -> void:
 	inventory = on
 	title_label.text = "MY COSMETICS" if on else "SHOP"
 	switch_button.text = "OPEN SHOP" if on else "MY COSMETICS"
+	add_theme_stylebox_override(&"panel", _wardrobe_style() if on else _panel_style())
+	wallet.visible = not on
+	owned_label.visible = on
+	featured_row.visible = not on
+	wardrobe.visible = on
+	stage.add_theme_stylebox_override(&"panel", _stage_style(on))
+	stage.custom_minimum_size.x = 440 if on else 520
+	stage.size_flags_stretch_ratio = 0.6 if on else 0.8
+	hint_label.text = ("Everything you own. Pick a piece to try it on, WEAR puts it on; the slots on the left of the grid show what you wear now." if on
+		else "Red Coins come from playing matches and every level up, Gold Coins only with + through Steam (for premium pieces and sets). Both only buy cosmetics: the tables take $, which starts fresh every match.")
+	queue_redraw()
 	if tab_buttons.has(KIND_PACK):
 		tab_buttons[KIND_PACK].visible = not on
 	var sel: CosmeticDef = shop.find(selected)
@@ -1071,15 +1313,29 @@ static func _panel_style() -> StyleBoxFlat:
 	sb.set_border_width_all(3)
 	sb.set_corner_radius_all(26)
 	sb.set_content_margin_all(36)
+	sb.content_margin_top = 64  # room for the awning
 	sb.shadow_color = Color(0, 0, 0, 0.55)
 	sb.shadow_size = 24
 	return sb
 
 
-static func _stage_style() -> StyleBoxFlat:
+## The inventory's frame: a dark wood wardrobe instead of the shop's casino red.
+static func _wardrobe_style() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("#2E1C1C")
-	sb.border_color = Color(Palette.WARM_GOLD, 0.35)
+	sb.bg_color = Color("#1D150F")
+	sb.border_color = Color("#7A5A34")
+	sb.set_border_width_all(6)
+	sb.set_corner_radius_all(18)
+	sb.set_content_margin_all(36)
+	sb.shadow_color = Color(0, 0, 0, 0.55)
+	sb.shadow_size = 24
+	return sb
+
+
+static func _stage_style(wood: bool = false) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color("#2B1E14", 0.92) if wood else Color("#2E1C1C")
+	sb.border_color = Color("#7A5A34") if wood else Color(Palette.WARM_GOLD, 0.35)
 	sb.set_border_width_all(2)
 	sb.set_corner_radius_all(22)
 	sb.set_content_margin_all(22)
