@@ -1,5 +1,5 @@
 extends GutTest
-## The table and minigame achievements of 0.9.29 (`AchievementTracker`): streaks over the server
+## The table and minigame achievements of 0.9.30 (`AchievementTracker`): streaks over the server
 ## events a client sees in one match.
 
 const ME: int = 1

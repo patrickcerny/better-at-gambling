@@ -263,7 +263,7 @@ func join_server(host: String, port: int, hello: Dictionary, opts: Dictionary = 
 	mode = Mode.CLIENT
 	room["host"] = host
 	room["port"] = port
-	_hello = hello.duplicate()
+	_hello = wire_hello(hello)
 	_hello["protocol"] = Protocol.PROTOCOL_VERSION
 	if not _hello.has("build"):
 		_hello["build"] = Protocol.BUILD_ID
@@ -273,6 +273,19 @@ func join_server(host: String, port: int, hello: Dictionary, opts: Dictionary = 
 	transport.connection_failed.connect(func() -> void: _on_client_lost("Could not reach the server."))
 	Log.info(&"net", "connecting to %s:%d" % [host, port])
 	return OK
+
+
+## The hello as plain wire data: the server's `WireGuard` drops anything else without a word, so
+## packed arrays (the worn outfit is a PackedStringArray since 0.9.18) go out as plain Arrays.
+## Without this every join timed out with "The server did not answer." (0.9.28 on Steam).
+static func wire_hello(hello: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for k: Variant in hello:
+		var v: Variant = hello[k]
+		if v is PackedStringArray:
+			v = Array(v as PackedStringArray)
+		out[k] = v
+	return out
 
 
 func _on_client_peer_connected(_id: int) -> void:

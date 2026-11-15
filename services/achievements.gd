@@ -39,7 +39,7 @@ const DEFS: Dictionary[StringName, Array] = {
 	&"ACH_HOUSE_COMP": ["On the House", "Get a comp from the house."],
 	&"ACH_SHOPPING": ["Dressed to Impress", "Buy something in the cosmetics shop."],
 	&"ACH_BEAT_THE_DEV": ["Beat the Dev", "Finish an online match ahead of the developer, or ahead of someone who already has this achievement."],
-	# 0.9.29: tables, minigames and a few proud failures (`AchievementTracker`).
+	# 0.9.30: tables, minigames and a few proud failures (`AchievementTracker`).
 	&"ACH_BJ_NATURAL": ["Natural", "Get a blackjack."],
 	&"ACH_BJ_COLD_STREAK": ["Dealer's Best Friend", "Lose 4 blackjack hands in a row."],
 	&"ACH_BJ_GREEDY": ["Greedy", "Hit on 20 in blackjack and bust."],

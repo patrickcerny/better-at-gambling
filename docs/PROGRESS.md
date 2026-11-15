@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-15 / 0.9.29 22 new Steam achievements
+### 2026-11-15 / 0.9.30 22 new Steam achievements
 - Patrick: "More achievements for next version: lose 4 blackjack hands in a row, hit 2 single
   numbers after each other, get a blackjack, stuff like this". `AchievementTracker` (one per match,
   client side) watches the server events the client already gets and keeps the streaks: blackjack
@@ -102,11 +102,17 @@
   calls, wheel Joker/Logo, Hold'em full house+, 10 lost bets in a row, $1,000+ lost in one bet,
   jail 3x in a match, waiter puddle slip, tripping a waiter, holding the bomb, Split or Steal
   backstab, Fake Cash caught, throwing a player, last in a 3+ player minigame.
-- Steamworks: names/texts EN+DE in docs/steam/achievements_0.9.29.csv, icons drawn by
+- Steamworks: names/texts EN+DE in docs/steam/achievements_0.9.30.csv, icons drawn by
   tools/steam/make_achievement_icons.py into docs/steam/achievements. Not entered/published in
   Steamworks yet (needs Patrick's go).
 - Evidence: tests/unit/test_achievement_tracker.gd (14 tests) + test_achievements.gd green, lint and
   boot smoke green; full suite left to CI.
+### 2026-11-15 / 0.9.29 joining works again
+- Patrick on Steam 0.9.28: "Create Lobby" waited long, then "The server did not answer." Cause: the
+  hello carried the worn outfit as a PackedStringArray (since 0.9.18), which the server's WireGuard
+  drops silently, so no WELCOME ever came (own lobby and friends alike). `NetSession.wire_hello`
+  now sends packed arrays as plain Arrays; `tests/unit/test_wire_hello.gd`. Reproduced and verified
+  with a real `--server --host-mode` process plus a `--connect` client.
 ### 2026-11-15 / 0.9.28 shop fixes, level pass, try-on look, inventory
 - Shop: tiles fill the width, + inside the coin pill, unaffordable/level-locked items greyed out with
   "N MORE COINS NEEDED". Try-ons stack across tabs (`CosmeticsPanel.trying`), clicking a picked tile

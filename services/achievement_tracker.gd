@@ -1,6 +1,6 @@
 class_name AchievementTracker
 extends RefCounted
-## The game and minigame achievements of 0.9.29 (Patrick 2026-11-15: "More achievements for next
+## The game and minigame achievements of 0.9.30 (Patrick 2026-11-15: "More achievements for next
 ## version: lose 4 blackjack hands in a row, hit 2 single numbers after each other, get a
 ## blackjack, stuff like this"). One tracker lives for one match on a client (`MatchScene`): it
 ## watches the server events the client gets anyway and remembers the streaks (losses in a row,
