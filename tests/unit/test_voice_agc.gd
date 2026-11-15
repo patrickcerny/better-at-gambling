@@ -22,11 +22,22 @@ func test_quiet_speech_rises_to_the_target_within_a_second() -> void:
 func test_boost_is_capped() -> void:
 	var agc := VoiceAgc.new()
 	for i: int in 60:
-		agc.process(_frame(0.002), true)  # -57 dBFS: ignored as not speech
+		agc.process(_frame(0.00025), true)  # -75 dBFS: ignored as not speech
 	assert_eq(agc.gain_db, 0.0, "under SPEECH_DB the gain never moves")
 	for i: int in 60:
 		agc.process(_frame(0.005), true)  # -49 dBFS
 	assert_almost_eq(agc.gain_db, VoiceAgc.MAX_BOOST_DB, 0.001)
+
+
+## 0.9.32: the boost never lifts the room over NOISE_CEILING_DB (but always allows MIN_CAP_DB).
+func test_boost_is_capped_by_the_room() -> void:
+	assert_eq(VoiceAgc.max_boost(-70.0), VoiceAgc.MAX_BOOST_DB, "a quiet room: the full boost")
+	assert_almost_eq(VoiceAgc.max_boost(-55.0), VoiceAgc.NOISE_CEILING_DB + 55.0, 0.001)
+	assert_eq(VoiceAgc.max_boost(-30.0), VoiceAgc.MIN_CAP_DB, "a loud room still gets some")
+	var agc := VoiceAgc.new()
+	for i: int in 60:
+		agc.process(_frame(0.005), true, -55.0)
+	assert_almost_eq(agc.gain_db, VoiceAgc.max_boost(-55.0), 0.001)
 
 
 func test_silence_between_words_keeps_the_gain() -> void:

@@ -65,7 +65,7 @@ func test_captured_frames_decode_back_to_the_tone() -> void:
 	cap.mode = VoiceCapture.Mode.OPEN_MIC
 	_feed(VoiceWav.tone(300.0, 1.0, 44100, 0.5), 44100)
 	assert_gt(packets.size(), 20)
-	var codec := MulawCodec.new()
+	var codec := AdpcmCodec.new()
 	var p: Dictionary = VoicePacket.parse_up(packets[10])
 	var decoded: PackedFloat32Array = codec.decode(p["payload"])
 	assert_eq(decoded.size(), VoiceCodec.FRAME_SAMPLES)
@@ -141,19 +141,49 @@ func test_mic_gain_scales_samples_and_clamps_at_full_scale() -> void:
 	assert_almost_eq(VoiceCapture.apply_gain(f, 10.0)[1], 0.4, 0.0001, "gain itself is capped at 400 %")
 
 
-func test_mic_gain_applies_before_the_gate_and_the_encoder() -> void:
+func test_mic_gain_applies_before_the_encoder() -> void:
 	cap.mode = VoiceCapture.Mode.OPEN_MIC
-	# -50 dBFS RMS: under the open-mic gate at 100 %...
-	var quiet: PackedFloat32Array = VoiceWav.tone(300.0, 0.4, 48000, 0.0045)
-	_feed(quiet, 48000)
-	assert_eq(packets.size(), 0, "too quiet to open the gate")
-	# ...but 200 % lifts it by 6 dB, over the -45 dB gate.
+	_feed(_room(-70.0, 1.0), 48000)
+	var quiet: PackedFloat32Array = VoiceWav.tone(300.0, 0.4, 48000, 0.0045)  # -50 dBFS RMS
 	cap.gain = 2.0
 	_feed(quiet, 48000)
-	assert_gt(packets.size(), 5, "amplified speech opens the gate")
-	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[3])["payload"])
+	assert_gt(packets.size(), 5, "speech opens the gate")
+	var decoded: PackedFloat32Array = AdpcmCodec.new().decode(VoicePacket.parse_up(packets[3])["payload"])
 	assert_almost_eq(VoiceCodec.rms(decoded), 0.009 / sqrt(2.0), 0.002, "the encoded frame is the amplified one")
 	assert_almost_eq(cap.level, 0.009 / sqrt(2.0), 0.001, "the meter shows the amplified level")
+
+
+## 0.9.32 (Patrick: "Mic volume at 400 % for normal loudness"): the open-mic gate follows the
+## room, so a quiet microphone in a quiet room opens it at 100 %, and the room alone never does.
+func test_open_mic_gate_follows_the_room() -> void:
+	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	_feed(_room(-68.0, 2.0), 48000)
+	assert_eq(packets.size(), 0, "a quiet room is not speech")
+	_feed(VoiceWav.tone(300.0, 0.4, 48000, 0.0045), 48000)  # -50 dBFS: a weak USB mic
+	assert_gt(packets.size(), 8, "a quiet voice opens the gate at 100 %")
+	var talked: int = packets.size()
+	_feed(_room(-68.0, 2.0), 48000)
+	assert_lte(packets.size() - talked, int(VoiceCapture.HANGOVER / VoiceCodec.FRAME_SECONDS) + 2, "only the hangover after the word")
+	# A loud room (a fan at -45 dBFS) teaches the gate to stay shut.
+	packets.clear()
+	_feed(_room(-45.0, 20.0), 48000)
+	var during_fan: int = packets.size()
+	_feed(_room(-45.0, 2.0), 48000)
+	assert_eq(packets.size(), during_fan, "after a while the fan alone no longer opens it")
+	_feed(VoiceWav.tone(300.0, 0.4, 48000, 0.05), 48000)  # -29 dBFS: speech over the fan
+	assert_gt(packets.size(), during_fan + 8, "speech over the fan does")
+
+
+## Steady room noise at `db` dBFS RMS (white noise, fixed seed) for `seconds` at 48 kHz.
+func _room(db: float, seconds: float) -> PackedFloat32Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var amp: float = db_to_linear(db) * sqrt(3.0)
+	var out := PackedFloat32Array()
+	out.resize(int(48000 * seconds))
+	for i: int in out.size():
+		out[i] = rng.randf_range(-amp, amp)
+	return out
 
 
 func test_mic_gain_follows_the_setting() -> void:
@@ -171,10 +201,11 @@ func test_mic_gain_follows_the_setting() -> void:
 func test_auto_level_lifts_a_quiet_microphone() -> void:
 	cap.auto_level = true
 	cap.mode = VoiceCapture.Mode.OPEN_MIC
+	_feed(_room(-66.0, 1.0), 48000)  # the room first: the gate learns it
 	var quiet: PackedFloat32Array = VoiceWav.tone(300.0, 2.0, 48000, 0.0224)  # -36 dBFS RMS
 	_feed(quiet, 48000)
-	assert_gt(packets.size(), 40, "quiet speech still opens the -45 dB gate")
-	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[packets.size() - 2])["payload"])
+	assert_gt(packets.size(), 40, "quiet speech opens the gate")
+	var decoded: PackedFloat32Array = AdpcmCodec.new().decode(VoicePacket.parse_up(packets[packets.size() - 2])["payload"])
 	assert_between(VoiceCodec.rms_db(decoded), VoiceAgc.TARGET_DB - 1.5, VoiceAgc.TARGET_DB + 1.0, "sent at the voice level, not 24 dB under it")
 	assert_almost_eq(cap.agc.gain_db, VoiceAgc.TARGET_DB + 36.0, 1.0, "+24 dB")
 
@@ -184,7 +215,7 @@ func test_auto_level_never_opens_the_gate_for_room_hiss() -> void:
 	cap.mode = VoiceCapture.Mode.OPEN_MIC
 	_feed(VoiceWav.tone(300.0, 1.0, 48000, 0.0224), 48000)  # speak: the level goes up
 	var spoken: int = packets.size()
-	_feed(VoiceWav.tone(300.0, 2.0, 48000, 0.0014), 48000)  # -60 dBFS hiss
+	_feed(_room(-60.0, 2.0), 48000)  # -60 dBFS hiss
 	assert_lte(packets.size() - spoken, int(VoiceCapture.HANGOVER / VoiceCodec.FRAME_SECONDS) + 2, "only the hangover after the word")
 
 
@@ -192,7 +223,7 @@ func test_auto_level_leaves_a_loud_microphone_alone() -> void:
 	cap.auto_level = true
 	cap.mode = VoiceCapture.Mode.OPEN_MIC
 	_feed(VoiceWav.tone(300.0, 1.0, 48000, 0.5), 48000)
-	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
+	var decoded: PackedFloat32Array = AdpcmCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
 	assert_almost_eq(VoiceCodec.rms(decoded), 0.5 / sqrt(2.0), 0.03, "never turned down")
 	assert_eq(cap.agc.gain_db, 0.0)
 

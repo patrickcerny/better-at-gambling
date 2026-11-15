@@ -12,7 +12,7 @@ extends VoiceMicSource
 ## Steam only delivers audio while it hears speech: the gaps are filled with silence on the clock,
 ## so the stream stays continuous (the open-mic gate closes, talk spurts end, mouths shut).
 
-## Rate Steam decompresses to (Steam accepts 11025..48000; the capture resamples to 8 kHz).
+## Rate Steam decompresses to (Steam accepts 11025..48000; the capture works at 16 kHz).
 const RATE: int = 16000
 ## Silence fills in once Steam is this far behind the clock (its packets come in bursts).
 const LAG_SECONDS: float = 0.12
@@ -29,6 +29,14 @@ static var _steam_users: int = 0
 
 ## Decompressed samples Steam delivered since `start` (silence fill not counted).
 var steam_samples: int = 0
+## How often each `EVoiceResult` came back from getVoice (0 OK, 1 not initialised, 2 not
+## recording, 3 no data, 4 buffer too small, 5 data corrupted, 6 restricted, 7 unsupported codec,
+## 8 receiver outdated, 9 receiver did not answer), for the log.
+var results: Dictionary[int, int] = {}
+## Seconds after `start` the first summary goes to the log.
+const REPORT_AFTER_US: int = 5000000
+var _start_us: int = -1
+var _reported: bool = false
 ## Microsecond clock for the silence fill (tests replace it).
 var clock: Callable = Time.get_ticks_usec
 ## Steam calls that failed (logged once).
@@ -63,6 +71,7 @@ func start() -> Error:
 		return ERR_UNAVAILABLE
 	if _steam_users == 0:
 		_steam.call("startVoiceRecording")
+		Log.info(&"voice", "Steam voice: recording started (Steam's optimal rate %s Hz, decompressing at %d Hz)" % [str(_steam.call("getVoiceOptimalSampleRate")) if _steam.has_method("getVoiceOptimalSampleRate") else "?", RATE])
 	_steam_users += 1
 	_started = true
 	_pending.clear()
@@ -77,6 +86,7 @@ func stop() -> void:
 	if not _started:
 		return
 	_started = false
+	_report("stopped")
 	_steam_users = maxi(_steam_users - 1, 0)
 	if _steam_users == 0 and _steam != null:
 		_steam.call("stopVoiceRecording")
@@ -116,6 +126,10 @@ func _pull() -> void:
 	if not _started:
 		return
 	var now: int = int(clock.call())
+	if _start_us < 0:
+		_start_us = now
+	elif not _reported and now - _start_us >= REPORT_AFTER_US:
+		_report("after 5 s")
 	if _t_us >= 0:
 		_owed += (now - _t_us) / 1000000.0 * RATE
 	_t_us = now
@@ -152,7 +166,9 @@ func _read_steam() -> PackedFloat32Array:
 	if not got is Dictionary:
 		return PackedFloat32Array()
 	var d: Dictionary = got
-	if int(d.get("result", -1)) != VOICE_OK:
+	var res: int = int(d.get("result", -1))
+	results[res] = results.get(res, 0) + 1
+	if res != VOICE_OK:
 		return PackedFloat32Array()
 	var buf: PackedByteArray = d.get("buffer", d.get("voice_data", PackedByteArray()))
 	var written: int = int(d.get("written", d.get("size", buf.size())))
@@ -178,6 +194,15 @@ static func pcm16_to_float(pcm: PackedByteArray, bytes: int) -> PackedFloat32Arr
 	for i: int in n:
 		out[i] = pcm.decode_s16(i * 2) / 32768.0
 	return out
+
+
+## One log line: what getVoice answered and how much voice came of it.
+func _report(when: String) -> void:
+	_reported = true
+	var parts: Array[String] = []
+	for r: int in results:
+		parts.append("%d×%d" % [r, results[r]])
+	Log.info(&"voice", "Steam voice %s: getVoice results %s (result×count: 0 ok, 2 not recording, 3 no data), %.1f s of voice decompressed, %d decompress failures" % [when, ", ".join(PackedStringArray(parts)) if not parts.is_empty() else "none", steam_samples / float(RATE), failures])
 
 
 func _fail(why: String) -> void:

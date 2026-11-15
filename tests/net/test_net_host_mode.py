@@ -178,10 +178,10 @@ def test_voice_goes_both_ways_between_the_host_and_a_friend_in_a_hosted_room(pro
         # that leg were all this backlog (0-1 frames dropped while playing, 0.9.13).
         assert late + overflowed - backlog <= got * 0.05, hops
         rate, x = _read_wav(tmp_path / f"{_base(listener)}_heard_p{s_id}.wav")
-        assert rate == 8000 and len(x) == played * 320, (rate, len(x), played)
+        assert rate == 16000 and len(x) == played * 640, (rate, len(x), played)
         # Every frame played is the speaker's tone at their level (only concealed frames may be
         # off), in one phase except where a counted frame went missing on the way.
-        body = x[320 * 3:]
+        body = x[640 * 3:]
         amps, jumps = _tone_frames(body, tones[_base(speaker)], rate)
         off = [round(a, 3) for a in amps if abs(a - amp) >= amp * 0.1]
         missing = late + overflowed - backlog + lost + (sent - got_at_server) + max(got_at_server - unheard - to_listener, 0) + (to_listener - got)

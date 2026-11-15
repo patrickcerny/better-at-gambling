@@ -3,7 +3,7 @@ extends Node
 ## Settings → Audio → TEST MICROPHONE (Patrick: "Why is the voicechat still not working? Test it
 ## somehow"): records `RECORD_SECONDS` from the selected microphone through the real capture path
 ## (`VoiceCapture`: driver buffer, mono, resampler, 40 ms frames), sends every frame through the
-## voice packet framing and the μ-law codec, and plays it back through the real playback path
+## voice packet framing and the voice codec, and plays it back through the real playback path
 ## (`VoicePlayback`: jitter buffer, decoder, `AudioStreamGenerator`, `Voice` bus, not positional)
 ## at the pace the network would deliver it. You hear yourself, and `verdict` is one short line
 ## ("Microphone works", "Nothing heard, check the microphone", "Playback failed"); the details
@@ -36,7 +36,7 @@ var state: State = State.IDLE
 var verdict: String = ""
 ## Loudest sample recorded (linear).
 var peak: float = 0.0
-## The recorded 40 ms frames (8 kHz mono).
+## The recorded 40 ms frames (16 kHz mono).
 var frames: Array[PackedFloat32Array] = []
 var playback: VoicePlayback = null
 ## Tests: the microphone a capture of our own reads (null: the real driver).
@@ -46,7 +46,7 @@ var _capture: VoiceCapture = null
 var _own_capture: bool = false
 var _t: float = 0.0
 var _pushed: int = 0
-var _codec: MulawCodec = MulawCodec.new()
+var _codec: VoiceCodec = AdpcmCodec.new()
 var _device: String = ""
 var _rate: float = 0.0
 

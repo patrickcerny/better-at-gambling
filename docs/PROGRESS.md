@@ -93,6 +93,38 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.32 voice rework
+- Patrick (0.9.28): Steam voice silent; without it, Mic volume 400 % needed for normal loudness.
+- Cause: raw mics speak at -35..-50 dBFS; the open-mic gate and the auto level hung on a fixed
+  -45 dBFS threshold, so a quiet mic barely opened it and the auto level never lifted it.
+- `VoiceVad` (speech relative to the room's noise floor), `VoiceAgc` driven by it (up to +30 dB,
+  room capped at -36 dBFS), settings upgrade (auto level on, Mic volume 100 %, Steam voice off).
+- `AdpcmCodec`: 16 kHz IMA ADPCM instead of 8 kHz mu-law, same bandwidth (~8.2 KB/s per speaker).
+- Steam voice: getVoice results logged; still off by default until a log shows why it was silent.
+- Evidence: 149 voice/settings GUT tests green locally (Godot 4.7.2 headless). The net voice tests
+  (tests/net) could not run in the cloud container (UDP clients time out, also on unchanged main);
+  CI runs them on the Steam deploy.
+
+### 2026-11-15 / 0.9.30 22 new Steam achievements
+- Patrick: "More achievements for next version: lose 4 blackjack hands in a row, hit 2 single
+  numbers after each other, get a blackjack, stuff like this". `AchievementTracker` (one per match,
+  client side) watches the server events the client already gets and keeps the streaks: blackjack
+  (natural, 4 losses in a row, hit on 20 and bust, 5-card win), roulette (single number, single
+  number on two back-to-back spins at one table, win on 0), slots three 7s, Plinko 10x+, Hi-Lo 5
+  calls, wheel Joker/Logo, Hold'em full house+, 10 lost bets in a row, $1,000+ lost in one bet,
+  jail 3x in a match, waiter puddle slip, tripping a waiter, holding the bomb, Split or Steal
+  backstab, Fake Cash caught, throwing a player, last in a 3+ player minigame.
+- Steamworks: names/texts EN+DE in docs/steam/achievements_0.9.30.csv, icons drawn by
+  tools/steam/make_achievement_icons.py into docs/steam/achievements. Not entered/published in
+  Steamworks yet (needs Patrick's go).
+- Evidence: tests/unit/test_achievement_tracker.gd (14 tests) + test_achievements.gd green, lint and
+  boot smoke green; full suite left to CI.
+### 2026-11-15 / 0.9.29 joining works again
+- Patrick on Steam 0.9.28: "Create Lobby" waited long, then "The server did not answer." Cause: the
+  hello carried the worn outfit as a PackedStringArray (since 0.9.18), which the server's WireGuard
+  drops silently, so no WELCOME ever came (own lobby and friends alike). `NetSession.wire_hello`
+  now sends packed arrays as plain Arrays; `tests/unit/test_wire_hello.gd`. Reproduced and verified
+  with a real `--server --host-mode` process plus a `--connect` client.
 ### 2026-11-15 / 0.9.28 shop fixes, level pass, try-on look, inventory
 - Shop: tiles fill the width, + inside the coin pill, unaffordable/level-locked items greyed out with
   "N MORE COINS NEEDED". Try-ons stack across tabs (`CosmeticsPanel.trying`), clicking a picked tile

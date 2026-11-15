@@ -2,7 +2,7 @@ extends GutTest
 ## Voice reception proved by content (Patrick: "think of a way to test it if the other user
 ## received it"): Alice's and Carol's (fake) microphones play known tones, the server relays with
 ## the real proximity rules, and Bob's `VoicePlayback`s decode them. What Bob plays must be the
-## same tone (dominant frequency by Goertzel), as loud as the source within μ-law tolerance, every
+## same tone (dominant frequency by Goertzel), as loud as the source within ADPCM tolerance, every
 ## frame in order with no gap (a pure tone continues across every frame boundary), and two
 ## speakers talking at once must stay separate.
 
@@ -18,7 +18,7 @@ var ch_bob: VoiceChannel
 var senders: Dictionary[int, VoiceChannel] = {}
 var mics: Dictionary[int, FakeMicTest.FakeMic] = {}
 var avatars_bob: Dictionary[int, Node3D] = {}
-## What Bob's playback played, per speaker (8 kHz samples, in play order).
+## What Bob's playback played, per speaker (16 kHz samples, in play order).
 var heard: Dictionary[int, PackedFloat32Array] = {}
 ## What Bob's playback pushed to its audio generator, per speaker (left channel at `OUT_RATE`).
 var pushed: Dictionary[int, PackedFloat32Array] = {}
@@ -156,7 +156,7 @@ func _check_tone(hz: float) -> void:
 	for other: float in PROBES:
 		if other != hz:
 			assert_lt(tone_amplitude(talk, other), tone_amplitude(talk, hz) * 0.05, "%d Hz is not in it" % roundi(other))
-	assert_almost_eq(VoiceCodec.rms(talk), AMP / sqrt(2.0), AMP / sqrt(2.0) * 0.05, "as loud as Alice's mic (μ-law: within 5 %)")
+	assert_almost_eq(VoiceCodec.rms(talk), AMP / sqrt(2.0), AMP / sqrt(2.0) * 0.05, "as loud as Alice's mic (ADPCM: within 5 %)")
 	assert_lt(worst_boundary_error(talk, hz), AMP * 0.08, "the tone runs on across every frame boundary")
 
 
@@ -188,7 +188,7 @@ func test_a_440hz_tone_reaches_the_generator_at_48khz() -> void:
 		return
 	var sent: int = senders[alice].capture.frames_sent
 	assert_gt(sent, 45, "2 s of 40 ms frames went out")
-	assert_eq(pb.frames_played, sent, "every 8 kHz frame was played (frames_played counts voice frames)")
+	assert_eq(pb.frames_played, sent, "every 16 kHz frame was played (frames_played counts voice frames)")
 	assert_true(pb.is_playing())
 	assert_eq(pb.failure, "")
 	var prime: int = int(VoicePlayback.PRIME_SECONDS * OUT_RATE)

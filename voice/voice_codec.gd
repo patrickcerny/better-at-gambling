@@ -1,15 +1,15 @@
 class_name VoiceCodec
 extends RefCounted
-## Voice codec interface (§2.22) and the voice format every codec shares: 8 kHz mono, 40 ms
-## frames. The rest of the voice code only sees `encode`/`decode`, so a Steam Voice or Opus codec
-## can replace `MulawCodec` later without touching capture, relay or playback.
+## Voice codec interface (§2.22) and the voice format every codec shares: 16 kHz mono, 40 ms
+## frames (8 kHz until 0.9.28). The rest of the voice code only sees `encode`/`decode`
+## (`AdpcmCodec` on the wire; `MulawCodec` was the 8 kHz one).
 
-## Samples per second on the wire (telephone band: plenty for chatter, half the 16 kHz budget).
-const SAMPLE_RATE: int = 8000
+## Samples per second on the wire (wideband speech: up to 8 kHz of audio band).
+const SAMPLE_RATE: int = 16000
 ## One frame per packet.
 const FRAME_MS: int = 40
 ## SAMPLE_RATE × FRAME_MS / 1000.
-const FRAME_SAMPLES: int = 320
+const FRAME_SAMPLES: int = 640
 const FRAME_SECONDS: float = 0.04
 
 

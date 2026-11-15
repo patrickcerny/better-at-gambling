@@ -55,7 +55,7 @@ func test_kiosk_stands_where_the_map_says_without_overlaps() -> void:
 	assert_almost_eq(st.global_position, LuckyLounge.STATIONS[SID][1] as Vector3, Vector3.ONE * 0.001)
 	assert_almost_eq(st.rotation.y, -PI * 0.5, 0.001, "its back to the east wall, the counter facing west into the room")
 	assert_lt(st.global_position.z, LuckyLounge.LOBBY_DOORS_Z, "on the casino floor, not in the entrance hall (Patrick)")
-	assert_lt(st.global_position.distance_to(LuckyLounge.SHOP_POS), 4.0, "by the Gift Shop")
+	assert_gt(st.global_position.distance_to(LuckyLounge.SHOP_POS), 4.0, "well apart from the Gift Shop, not part of it (Patrick)")
 	var mine: Array[AABB] = _solids(scene.map, st, true)
 	assert_gte(mine.size(), 4, "counter, attendant, board posts and stool are solid")
 	for other: AABB in _solids(scene.map, st, false):

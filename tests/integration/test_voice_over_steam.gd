@@ -1,7 +1,7 @@
 extends GutTest
 ## Voice in host mode (Patrick plays over Steam with friends): the host's own game talks to the
 ## room server over loopback, a friend arrives over Steam Networking Messages through the host's
-## `HostBridge`. A real 40 ms μ-law frame goes both ways through the real `SteamTransport` (fake
+## `HostBridge`. A real 40 ms ADPCM frame goes both ways through the real `SteamTransport` (fake
 ## Steam underneath), the bridge, the room server's `Net` voice relay with the real proximity
 ## rules and `RoomHost.player_of` for the bridged peer: same bytes, voice channel, unreliable on
 ## Steam, and the right speaker id on arrival.
@@ -94,7 +94,7 @@ func _pump() -> Dictionary:
 
 func _frame(seq: int) -> PackedByteArray:
 	var tone: PackedFloat32Array = VoiceWav.tone(440.0, VoiceCodec.FRAME_SECONDS, VoiceCodec.SAMPLE_RATE, 0.4)
-	return VoicePacket.make_up(seq, 0, MulawCodec.new().encode(tone))
+	return VoicePacket.make_up(seq, 0, AdpcmCodec.new().encode(tone))
 
 
 func _voice(packets: Array) -> Array[Dictionary]:
@@ -107,7 +107,7 @@ func _voice(packets: Array) -> Array[Dictionary]:
 
 func test_a_friend_over_steam_is_heard_by_the_host() -> void:
 	var up: PackedByteArray = _frame(7)
-	assert_eq(up.size(), 324, "one 40 ms frame: far below Steam's unreliable message limit")
+	assert_eq(up.size(), VoicePacket.UP_HEADER + AdpcmCodec.encoded_size(VoiceCodec.FRAME_SAMPLES), "one 40 ms frame: far below Steam's unreliable message limit")
 	friend.send(NetTransport.SERVER_PEER, Protocol.CHANNEL_VOICE, false, up)
 	var sent: Array[Dictionary] = friend_steam.game_sends(HOST_SID)
 	assert_eq(int(sent[-1]["flags"]), SteamTransport.SEND_UNRELIABLE, "voice goes unreliable over Steam")

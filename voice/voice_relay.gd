@@ -4,7 +4,7 @@ extends RefCounted
 ## speaker is over the bandwidth cap, and readdresses it to every listener in reach (see
 ## `VoiceProximity`). The server never decodes voice.
 
-## Per-speaker cap: 72 kbit/s. One μ-law speaker needs 8.1 KB/s (25 × 324 bytes).
+## Per-speaker cap: 72 kbit/s. One ADPCM speaker needs 8.2 KB/s (25 × 328 bytes).
 const MAX_BYTES_PER_SECOND: float = 9000.0
 ## Burst allowance in seconds of the cap (a short stall flushing queued frames still gets through).
 const BURST_SECONDS: float = 0.5

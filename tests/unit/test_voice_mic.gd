@@ -98,7 +98,7 @@ func test_microphone_frames_at_the_device_rate_become_8k_voice_frames() -> void:
 	assert_gt(cap.mic_frames, 47000, "the driver's samples are read")
 	assert_between(packets.size(), 23, 25, "25 frames of 40 ms per second at 48 kHz in")
 	var p: Dictionary = VoicePacket.parse_up(packets[10])
-	var decoded: PackedFloat32Array = MulawCodec.new().decode(p["payload"])
+	var decoded: PackedFloat32Array = AdpcmCodec.new().decode(p["payload"])
 	assert_eq(decoded.size(), VoiceCodec.FRAME_SAMPLES)
 	assert_almost_eq(VoiceCodec.rms(decoded), 0.4 / sqrt(2.0), 0.03, "the voice survives resampling and μ-law")
 	assert_gt(cap.meter_level(), 0.2, "the settings meter sees the level")
@@ -240,7 +240,7 @@ func test_a_mic_that_only_fills_one_channel_is_not_halved() -> void:
 	cap.mode = VoiceCapture.Mode.PUSH_TO_TALK
 	cap.ptt_pressed = true
 	_talk(1.0)
-	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
+	var decoded: PackedFloat32Array = AdpcmCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
 	assert_almost_eq(VoiceCodec.rms(decoded), 0.4 / sqrt(2.0), 0.03, "the live channel at its own level")
 	var both := PackedVector2Array([Vector2(0.5, 0.3), Vector2(-0.5, -0.3)])
 	assert_almost_eq(VoiceCapture.to_mono(both)[0], 0.4, 0.0001, "two live channels are still averaged")
@@ -279,7 +279,7 @@ func test_a_device_that_runs_at_another_rate_than_it_reports_is_measured_and_res
 		now_usec += 16000
 		cap._process(0.016)
 	assert_between(packets.size(), 23, 26, "25 frames a second again, not 8")
-	var decoded: PackedFloat32Array = MulawCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
+	var decoded: PackedFloat32Array = AdpcmCodec.new().decode(VoicePacket.parse_up(packets[10])["payload"])
 	var crossings: int = 0
 	for i: int in range(1, decoded.size()):
 		if decoded[i - 1] < 0.0 and decoded[i] >= 0.0:
