@@ -93,6 +93,13 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.40 Plinko chips invisible after the floor changed
+- Patrick: "cant see my plinkoballs". When a new floor layout moves Plinko, the server opens a fresh
+  `PlinkoLogic` whose drop ids start at 1 again, but `MatchScene._plinko_seen` still held
+  "plinko_1:1", "plinko_1:2", ... from the old board, so every new drop counted as already shown and
+  no chip fell. The key now includes the board node's instance id (the client builds a new board for a
+  moved station). Not caused by 0.9.39 (his shot still shows the old long pegs); chips fly at z = 0,
+  in front of the 0.9.39 face (front at z = -0.05).
 ### 2026-11-15 / 0.9.39 Plinko machine clean (curtains, pegs)
 - Patrick sent a screenshot of the High Risk Plinko machine: a red window curtain cut through the left of
   the board, the outer pegs poked out of the side frame and the lower pegs read as tilted sticks. A

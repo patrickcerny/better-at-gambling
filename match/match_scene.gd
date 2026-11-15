@@ -128,7 +128,7 @@ var _respawn_at: Dictionary[int, float] = {}
 var _clock: float = 0.0
 var _vip_toast_at: float = -INF
 var _owns_server: bool = false
-var _plinko_seen: Dictionary[String, bool] = {}  # "station:drop_id" (ids count per board)
+var _plinko_seen: Dictionary[String, bool] = {}  # "station:board node:drop_id" (ids count per board)
 var _pad_timer: float = 0.0
 var _pedestal_timer: float = 0.0
 var _countdown_shown: int = -1
@@ -2713,8 +2713,12 @@ func _update_look_lock() -> void:
 
 func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int, seconds: float, risk: StringName) -> void:
 	var st: PlinkoStation = map.stations.get(sid, null) as PlinkoStation
-	var key: String = "%s:%d" % [sid, drop_id]
-	if st == null or _plinko_seen.has(key):
+	if st == null:
+		return
+	# Keyed on the board node too: a new floor layout that moves Plinko builds a fresh board and the
+	# server a fresh logic whose drop ids start at 1 again (they used to count as seen: no chips).
+	var key: String = "%s:%d:%d" % [sid, st.get_instance_id(), drop_id]
+	if _plinko_seen.has(key):
 		return
 	if _plinko_seen.size() > 256:
 		_plinko_seen.erase(_plinko_seen.keys()[0])  # oldest first; long since landed
