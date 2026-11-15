@@ -120,6 +120,8 @@ var _time: float = 0.0
 var _eye_scale: float = 1.0
 var _eye_open: float = 1.0
 var _blink_in: float = 2.5
+## Never blink (shop thumbnails: a picture taken mid-blink showed slit eyes).
+var no_blink: bool = false
 var _mouth_smoothed: float = 0.0
 var _face_mouth: float = 0.0
 var _smile: float = 0.3
@@ -930,7 +932,7 @@ func _animate_face(delta: float, em: Dictionary) -> void:
 		smile = -0.3
 		brow = Vector2(-0.3, 0.6)
 	# Blinking now and then.
-	_blink_in -= delta
+	_blink_in -= delta if not no_blink else 0.0
 	if _blink_in <= 0.0:
 		if _blink_in < -0.11:
 			_blink_in = randf_range(2.2, 5.0)

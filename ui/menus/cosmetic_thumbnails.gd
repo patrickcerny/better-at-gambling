@@ -39,6 +39,7 @@ func _ready() -> void:
 	_bean = AvatarVisuals.new()
 	root.add_child(_bean)
 	_bean.set_color(BEAN_COLOR)
+	_bean.no_blink = true  # always open eyes in the pictures
 	_cam = Camera3D.new()
 	_cam.current = true
 	root.add_child(_cam)
