@@ -35,6 +35,8 @@ func _play(hands: int, favour: float, bonus_favour: float, bonus: bool, luck_poi
 		if call:
 			called += 1
 		t.player_action(1, &"call" if call else &"fold")
+		if call:
+			t.player_action(1, &"check")  # the simple strategy never bets the river: the RTP stays the one tuned above
 		for e: Dictionary in t.drain_events():
 			if e["type"] != &"round_result":
 				continue

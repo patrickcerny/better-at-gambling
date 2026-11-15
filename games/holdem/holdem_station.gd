@@ -136,7 +136,9 @@ static func hand_of(hands: Dictionary, pid: int) -> Dictionary:
 func show_round(pub: Dictionary) -> void:
 	var seat_ids: Array = pub.get("seats", [])
 	var hands: Dictionary = pub.get("hands", {})
-	var deciding: bool = int(pub.get("state", 0)) == HoldemLogic.State.DECIDING
+	var st: int = int(pub.get("state", 0))
+	var deciding: bool = st == HoldemLogic.State.DECIDING
+	var river: bool = st == HoldemLogic.State.RIVER
 	var by_seat: Dictionary = {}
 	var outlined: Array[int] = []
 	for i: int in seat_count:
@@ -146,6 +148,8 @@ func show_round(pub: Dictionary) -> void:
 		if not h.is_empty() and not folded:
 			by_seat[i] = h.get("hole", [])
 			if deciding and StringName(h.get("decision", &"")) == &"":
+				outlined.append(i)
+			elif river and StringName(h.get("decision", &"")) == HoldemLogic.CALL and StringName(h.get("river_decision", &"")) == &"":
 				outlined.append(i)
 		_show_hand_label(i, h)
 	by_seat[BOARD_KEY] = pub.get("board", [])

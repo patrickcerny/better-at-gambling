@@ -155,6 +155,9 @@ extends Resource
 @export var holdem_betting_window: float = 8.0
 ## Each player's clock to FOLD or CALL once the flop is out; out of time = fold (the real rule).
 @export var holdem_action_time: float = 15.0
+## Each called hand's clock to put down the RIVER BET (one more ante) or CHECK once the turn is out;
+## out of time = check.
+@export var holdem_river_time: float = 10.0
 ## Seconds the showdown stays up before the next hand.
 @export var holdem_result_time: float = 4.0
 
