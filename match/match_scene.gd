@@ -284,6 +284,8 @@ func _ready() -> void:
 	hud.bind(view.state, local_id)
 	lobby_panel.bind(view.state, local_id)
 	shop_panel.bind(view.state, local_id)
+	view.state.shop_changed.connect(_on_shop_stock)
+	_on_shop_stock()
 	reward_panel.bind(view.state, local_id)
 	view.state.station_changed.connect(_on_station_state)
 	view.state.players_changed.connect(_sync_avatars)
@@ -2449,6 +2451,12 @@ func _update_prompt() -> void:
 	else:
 		var target: int = _reach_target(true)
 		hud.set_prompt(InputGlyphs.fill("[{interact} / {grab}] Grab %s   [{shove}] Shove") % view.state.player_name(target) if target >= 0 else "")
+
+
+## The round's Gift Shop stock on the booth's display stands (clients only: item models).
+func _on_shop_stock() -> void:
+	if Vfx.enabled() and map != null and map.gift_shop != null:
+		map.gift_shop.set_offers(view.state.shop_offers)
 
 
 ## True when the local player stands at the Gift Shop counter while the casino is open.

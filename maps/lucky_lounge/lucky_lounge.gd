@@ -240,6 +240,8 @@ var vip_gate_area: Area3D
 var nav_region: NavigationRegion3D
 var props_parent: Node3D
 ## The Odd Jobs cabinet's live parts (button, shared bar, lamps) and its red button.
+## The Gift Shop booth (its stands show the round's stock).
+var gift_shop: GiftShopKiosk
 var odd_jobs: OddJobsCabinet
 var odd_jobs_button: Node3D
 var navmesh_ready: bool = false
@@ -850,22 +852,13 @@ func _build_floor_areas() -> void:
 		plant.rotation.y = p.x * 0.7
 
 
-## Gift Shop kiosk: a counter with a striped awning and a sign, four items on sale each round.
+## Gift Shop booth (GiftShopKiosk): counter, back shelves, awning, sign and the ATM, its front to
+## the room (−x). The match scene shows each round's stock on it (`gift_shop.set_offers`).
 func _build_gift_shop() -> void:
-	var c: Vector3 = SHOP_POS + Vector3(1.3, 0, 0)
-	GreyboxKit.box(self, Vector3(1.0, 1.1, 2.2), c + Vector3(0, 0.55, 0), Palette.VIP_BURGUNDY, "ShopCounter")
-	GreyboxKit.box(self, Vector3(1.1, 0.08, 2.3), c + Vector3(0, 1.14, 0), Palette.WARM_GOLD, "ShopCounterTop", false)
-	for z: float in [-1.0, 1.0]:
-		GreyboxKit.box(self, Vector3(0.1, 2.6, 0.1), c + Vector3(-0.5, 1.3, z), Palette.WARM_GOLD, "ShopPost")
-	for i: int in 4:
-		GreyboxKit.box(self, Vector3(1.4, 0.12, 0.58), c + Vector3(-0.2, 2.65, -0.87 + i * 0.58), Palette.CASINO_RED if i % 2 == 0 else Palette.CREAM, "ShopAwning", false)
-	for i: int in 4:
-		GreyboxKit.box(self, Vector3(0.3, 0.3, 0.3), c + Vector3(0.1, 1.33, -0.75 + i * 0.5), [Palette.FELT_GREEN, Palette.WARM_GOLD, Palette.CASINO_RED, Palette.CREAM][i], "ShopGoods", false)
-	_sign_label(c + Vector3(-0.56, 2.15, 0), -PI / 2.0, "GIFT SHOP", 64)
-	var kiosk: Node3D = ItemModels.make_kiosk(1.9)  # Patrick's ATM next to the counter
-	kiosk.position = c + Vector3(0.1, 0, 1.75)
-	kiosk.rotation.y = -PI / 2.0
-	add_child(kiosk)
+	gift_shop = GiftShopKiosk.new()
+	gift_shop.position = SHOP_POS + Vector3(1.3, 0, 0)
+	gift_shop.rotation.y = -PI / 2.0
+	add_child(gift_shop)
 
 
 ## The Odd Jobs cabinet: a low wooden arcade cabinet with one big red button on its deck, the shared

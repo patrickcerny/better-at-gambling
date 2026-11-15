@@ -28,7 +28,6 @@ const GLASS_GLOW: Color = Color(0.45, 0.42, 0.62)
 ## and the mirror/board walls stay free.
 const WINDOWS: Array = [
 	[Vector3(-21.75, 3.5, -11.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, -4.0), Vector3(1, 0, 0), 3.2], [Vector3(-21.75, 3.5, 3.0), Vector3(1, 0, 0), 3.2],
-	[Vector3(21.75, 3.5, 3.0), Vector3(-1, 0, 0), 3.2],
 	[Vector3(35.75, 3.5, -22.5), Vector3(-1, 0, 0), 3.2], [Vector3(35.75, 3.5, -15.5), Vector3(-1, 0, 0), 3.2],
 	[Vector3(-16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2], [Vector3(16.0, 3.9, 15.75), Vector3(0, 0, -1), 3.2],
 	[Vector3(-19.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2], [Vector3(-11.0, 3.5, -15.75), Vector3(0, 0, 1), 3.2],
@@ -390,8 +389,9 @@ func _vip_lounge() -> void:
 # --- Furniture and props ----------------------------------------------------------------------
 
 func _furniture() -> void:
-	# The shop counter in black marble.
-	_retexture_solid("ShopCounter", _marble_mat)
+	# The Gift Shop booth in the room's wood, marble, velvet and brass, its lamps on.
+	if map.gift_shop != null:
+		map.gift_shop.dress(_wood_mat, _marble_mat, _velvet_mat, _brass_mat)
 	_retexture_solid("JailBench", _wood_mat)
 	_retexture_solid("Plinth", _marble_mat)
 	_retexture_solid("Rope", _velvet_mat)
