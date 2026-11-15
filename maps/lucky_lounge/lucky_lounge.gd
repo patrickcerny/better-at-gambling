@@ -75,11 +75,11 @@ const LOBBY_SPAWNS: Array[Vector3] = [
 	Vector3(-9, 0, 11.0), Vector3(9, 0, 11.0), Vector3(-7, 0, 11.6), Vector3(7, 0, 11.6),
 ]
 ## Where players stand to shop at the Gift Shop kiosk (east wall).
-const SHOP_POS: Vector3 = Vector3(19.6, 0, 1.5)
+const SHOP_POS: Vector3 = Vector3(19.6, 0, 0.9)
 ## The Odd Jobs cabinet (button smash for broke players) against the east wall on the Gift Shop's
 ## north side: its centre, and where players stand to use it.
-const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -0.95)
-const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -0.95)
+const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -2.6)
+const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -2.6)
 ## The lobby settings tablet on its brass stand (0.9.4, Patrick: "settings tablet into the lobby
 ## room"), west of the middle of the start room by the host's spot: walk up and press E for the
 ## lobby settings. Where it stands, which way its screen faces (yaw), and how close you must be.
@@ -839,7 +839,7 @@ func _build_floor_areas() -> void:
 	_build_gift_shop()
 	_build_odd_jobs()
 	# Plants and a few obstacles for lanes.
-	for p: Vector3 in [Vector3(-20, 0, 14), Vector3(20, 0, 14), Vector3(-20, 0, -1), Vector3(21.2, 0, -2.5)]:
+	for p: Vector3 in [Vector3(-20, 0, 14), Vector3(20, 0, 14), Vector3(-20, 0, -1), Vector3(21.2, 0, -1.25)]:  # the east one parts the Gift Shop and Odd Jobs
 		var pot: Node3D = GreyboxKit.cylinder(self, 0.35, 0.6, p + Vector3(0, 0.3, 0), Color("#5A3A22"), "Pot")
 		var plant: Node3D = PropModels.dress(pot, [&"plant_1", &"plant_2", &"plant_3"][absi(int(p.x + p.z)) % 3], 0.3, 1.7)
 		plant.rotation.y = p.x * 0.7
@@ -1243,7 +1243,7 @@ func _place_station(sid: StringName, kind: StringName, pos: Vector3, yaw: float)
 ## plant, the east wall between the Race Hall archway, the jail door, the plant and south of the
 ## Gift Shop), each with what may stand there; and the two islands of the plaza inside the lobby
 ## doors. The canonical draw (the full floor) puts Plinko on the north-east wall, the slot banks on
-## the north-west and west walls, the scratch counter beside the Gift Shop and the Sword Tapper's
+## the north-west and west walls, the scratch counter on the east wall south of the Gift Shop (a gap apart) and the Sword Tapper's
 ## pedestals on the west island.
 static func floor_site() -> FloorSite:
 	var s := FloorSite.new()
