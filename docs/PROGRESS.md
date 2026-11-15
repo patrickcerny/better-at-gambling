@@ -93,6 +93,13 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-15 / 0.9.41 thrown and knocked-out beans keep their own look
+- Patrick: "wenn man jemanden wirft, ändert sich das model so weird. Verwende da das normale model und
+  skews nicht so". The ragdoll drew a stand-in bean of its own (plain colour, no skin/face/outfit
+  extras, capsule arms stretched shoulder-to-hand with a sheared basis). RagdollBody is physics only
+  now (meshes hidden); `AvatarVisuals._follow_ragdoll` puts the player's own rig on the torso (rotation
+  only, no scale/shear), arms and legs flail by ragdoll speed (`RagdollBody.speed`), shocked face while
+  flying, KO face from `knocked_out`. Look-dev: bean_shot.tscn --view chaos --at 0.35 / 2.5.
 ### 2026-11-15 / 0.9.40 Plinko chips invisible after the floor changed
 - Patrick: "cant see my plinkoballs". When a new floor layout moves Plinko, the server opens a fresh
   `PlinkoLogic` whose drop ids start at 1 again, but `MatchScene._plinko_seen` still held

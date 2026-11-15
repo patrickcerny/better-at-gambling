@@ -2,9 +2,8 @@ class_name RagdollBody
 extends Node3D
 ## "Active ragdoll lite" (§2.4): 5 rigid bodies (torso, head, two hands, hips) on pin joints.
 ## Spawned when a player is knocked down, thrown or slips; reports hard impacts and settling.
-## The bodies are the physics (simulated on the server, streamed to clients); on top of them sits a
-## purely visual layer (M7) that never touches the simulation: floppy arms from the shoulders to the
-## hands, little kicking legs, hands that flail while the body flies, and X eyes when knocked out.
+## The bodies are the physics (simulated on the server, streamed to clients) and stay invisible: the
+## player's own bean (AvatarVisuals) rides the torso, flailing while it flies.
 
 ## Emitted on a hard hit: `strength` is the speed lost in the collision (m/s), `wall` if the
 ## contact normal was mostly horizontal.
@@ -18,8 +17,6 @@ const SETTLE_SPEED: float = 0.35
 const SETTLE_TIME: float = 0.4
 const MIN_TIME: float = 0.8
 const IMPACT_THRESHOLD: float = 4.5
-## Eye height on the torso (its centre is where the bean's body centre is when standing).
-const EYE_UP: float = AvatarVisuals.EYE_Y - AvatarVisuals.BODY_BOTTOM - AvatarVisuals.BODY_HEIGHT * 0.5
 
 var torso: RigidBody3D
 var head: RigidBody3D
@@ -27,7 +24,7 @@ var hand_l: RigidBody3D
 var hand_r: RigidBody3D
 var hips: RigidBody3D
 var color: Color = Palette.CREAM
-## The outfit the bean wears (`AvatarVisuals.dress`: hat, shirt, trousers and cape ride the torso).
+## The outfit the bean wears (only for reference: the avatar's own visuals draw it).
 var outfit: Dictionary = {}
 var max_time: float = 2.5
 ## Player this ragdoll belongs to.
@@ -44,16 +41,9 @@ var _still: float = 0.0
 var _done: bool = false
 var _prev_vel: Vector3 = Vector3.ZERO
 
-## Visual-only flail layer (built only with a display).
-var _arm_meshes: Array[MeshInstance3D] = []
-var _hand_meshes: Array[MeshInstance3D] = []
-var _leg_pivots: Array[Node3D] = []
-var _eyes: Array[MeshInstance3D] = []
-var _x_eyes: Array[Node3D] = []
 var _dazed: bool = false
-var _vis_t: float = 0.0
 var _vis_prev: Vector3 = Vector3.INF
-var _vis_speed: float = 0.0
+var _puppet_speed: float = 0.0
 
 
 func _ready() -> void:
@@ -150,119 +140,30 @@ func _build() -> void:
 		_pin(torso, hand_l, Vector3(-0.45, 1.1, 0))
 		_pin(torso, hand_r, Vector3(0.45, 1.1, 0))
 		_pin(torso, hips, Vector3(0, 0.4, 0))
-	# The bean look (AvatarVisuals): the jelly-bean body rides the torso and the head is only a
-	# weight; big googly eyes on the face so it still reads as the same bean while flopping.
-	var torso_mesh: MeshInstance3D = torso.get_child(0) as MeshInstance3D
-	torso_mesh.mesh = AvatarVisuals.bean_mesh()
-	torso_mesh.material_override = ToonMaterial.make(color, 0.4)
-	(head.get_child(0) as MeshInstance3D).visible = false
-	(hips.get_child(0) as MeshInstance3D).visible = false
-	var dark: StandardMaterial3D = GreyboxKit.material(Palette.CASINO_BLACK)
-	var white: StandardMaterial3D = GreyboxKit.material(Color("#FFFDF7"))
-	for x: float in [-AvatarVisuals.EYE_SPREAD, AvatarVisuals.EYE_SPREAD]:
-		var e := MeshInstance3D.new()
-		e.mesh = _sphere(AvatarVisuals.EYE_RADIUS)
-		e.material_override = white
-		e.position = Vector3(x, EYE_UP, AvatarVisuals.face_z(EYE_UP, x) + AvatarVisuals.EYE_RADIUS * 0.45)
-		torso.add_child(e)
-		var pupil := MeshInstance3D.new()
-		pupil.mesh = _sphere(AvatarVisuals.EYE_RADIUS * 0.6)
-		pupil.material_override = dark
-		pupil.scale = Vector3(1.0, 1.0, 0.5)
-		pupil.position = Vector3(0.0, 0.0, -AvatarVisuals.EYE_RADIUS * 0.82)
-		e.add_child(pupil)
-		_eyes.append(e)
-	if DisplayServer.get_name() != "headless":
-		_build_flail(mat, dark)
-		AvatarVisuals.dress(torso_mesh, outfit)
-	set_dazed(_dazed)
+	# No look of its own (Patrick: "verwende da das normale model und skews nicht so"): the
+	# player's own AvatarVisuals (skin, face, outfit) follow the torso while ragdolled
+	# (`AvatarVisuals.set_ragdoll`). These bodies are physics only.
+	for b: RigidBody3D in [torso, head, hand_l, hand_r, hips]:
+		(b.get_child(0) as MeshInstance3D).visible = false
 
 
-## Knocked out: the dot eyes turn into little crosses.
+## Kept for callers: the knockout face is drawn by AvatarVisuals now.
 func set_dazed(on: bool) -> void:
 	_dazed = on
-	for e: MeshInstance3D in _eyes:
-		e.visible = not on
-	for x: Node3D in _x_eyes:
-		x.visible = on
 
 
-## Visual arms (shoulder to hand), legs on the hips and X eyes. Children of the bodies or of this
-## node; no collision, no mass.
-func _build_flail(mat: Material, dark: Material) -> void:
-	for i: int in 2:
-		var arm := MeshInstance3D.new()
-		arm.name = "ArmVis%d" % i
-		var cm := CapsuleMesh.new()
-		cm.radius = 0.07
-		cm.height = 1.0
-		arm.mesh = cm
-		arm.material_override = mat
-		add_child(arm)
-		_arm_meshes.append(arm)
-	for hb: RigidBody3D in [hand_l, hand_r]:
-		for c: Node in hb.get_children():
-			if c is MeshInstance3D:
-				_hand_meshes.append(c)
-	for x: float in [-0.14, 0.14]:
-		var pivot := Node3D.new()
-		pivot.name = "LegVis"
-		pivot.position = Vector3(x, -0.12, 0.0)
-		hips.add_child(pivot)
-		var leg := MeshInstance3D.new()
-		var lm := CapsuleMesh.new()
-		lm.radius = 0.09
-		lm.height = 0.34
-		leg.mesh = lm
-		leg.material_override = dark
-		leg.position = Vector3(0.0, -0.12, 0.0)
-		pivot.add_child(leg)
-		_leg_pivots.append(pivot)
-	for x: float in [-AvatarVisuals.EYE_SPREAD, AvatarVisuals.EYE_SPREAD]:
-		var cross := Node3D.new()
-		cross.name = "XEye"
-		cross.position = Vector3(x, EYE_UP, AvatarVisuals.face_z(EYE_UP, x) - 0.01)
-		cross.visible = false
-		torso.add_child(cross)
-		for a: float in [PI * 0.25, -PI * 0.25]:
-			var bar := MeshInstance3D.new()
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.17, 0.04, 0.03)
-			bar.mesh = bm
-			bar.material_override = dark
-			bar.rotation.z = a
-			cross.add_child(bar)
-		_x_eyes.append(cross)
+## How fast the torso moves (m/s): the bean flails its arms and legs while it flies.
+func speed() -> float:
+	return torso.linear_velocity.length() if not puppet else _puppet_speed
 
 
 func _process(delta: float) -> void:
-	if _arm_meshes.is_empty() or torso == null:
+	if not puppet or torso == null or delta <= 0.0:
 		return
-	_vis_t += delta
 	var tp: Vector3 = torso.global_position
-	if _vis_prev != Vector3.INF and delta > 0.0:
-		_vis_speed = lerpf(_vis_speed, (tp - _vis_prev).length() / delta, 0.2)
+	if _vis_prev != Vector3.INF:
+		_puppet_speed = lerpf(_puppet_speed, (tp - _vis_prev).length() / delta, 0.2)
 	_vis_prev = tp
-	# Flail while the body flies; limp once it lies still.
-	var flail: float = clampf((_vis_speed - 0.6) / 5.0, 0.0, 1.0)
-	var tb: Basis = torso.global_basis
-	var hands: Array[RigidBody3D] = [hand_l, hand_r]
-	for i: int in 2:
-		var side: float = -1.0 if i == 0 else 1.0
-		var shoulder: Vector3 = torso.global_transform * Vector3(side * 0.38, 0.3, 0.0)
-		var wiggle: Vector3 = tb * Vector3(side * sin(_vis_t * 19.0 + i) * 0.25, cos(_vis_t * 23.0 + i * 2.0) * 0.3, sin(_vis_t * 15.0 + i) * 0.25) * flail
-		var hand_pos: Vector3 = hands[i].global_position + wiggle
-		if i < _hand_meshes.size():
-			_hand_meshes[i].global_position = hand_pos
-		var arm: MeshInstance3D = _arm_meshes[i]
-		var span: Vector3 = hand_pos - shoulder
-		var length: float = maxf(span.length(), 0.05)
-		var up: Vector3 = span / length
-		var side_axis: Vector3 = up.cross(Vector3.FORWARD if absf(up.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT).normalized()
-		var fwd: Vector3 = side_axis.cross(up).normalized()
-		arm.global_transform = Transform3D(Basis(side_axis, up * length, fwd), shoulder + span * 0.5)
-	for i: int in _leg_pivots.size():
-		_leg_pivots[i].rotation.x = sin(_vis_t * 21.0 + i * PI) * 0.9 * flail
 
 
 func _body(name: String, pos: Vector3, mesh: Mesh, mat: Material, mass: float) -> RigidBody3D:
