@@ -4,8 +4,8 @@ extends Node3D
 ## shop, it looks horrible"). A small hotel-lobby boutique in the casino's own materials
 ## (docs/ART_DIRECTION.md): a mahogany counter with velvet panels in brass frames and a black
 ## marble top, a mahogany back wall with lit shelves of souvenirs, a red-and-cream scalloped awning
-## on turned brass posts, and a burgundy "GIFT SHOP" board with marquee bulbs on top. The ATM
-## stands at the booth's right end under the same awning: the shop's cash machine (decor).
+## on turned brass posts, and a burgundy "GIFT SHOP" board with marquee bulbs on top. (The ATM
+## that stood beside it is gone, Patrick: it did nothing.)
 ##
 ## The four items on sale this round stand on velvet display stands on the counter as their real
 ## 3D models (`ItemModels`), turning slowly, each with a price card in its rarity's colour
@@ -21,17 +21,14 @@ extends Node3D
 ## Counter size (x along the booth, y up, z depth) and where its top surface is.
 const COUNTER: Vector3 = Vector3(2.2, 1.1, 1.0)
 const TOP_Y: float = 1.14
-## The booth's ends along x (the ATM stands at the right end, x ≈ 1.75) and the wall behind it.
+## The booth's ends along x and the wall behind it.
 const LEFT: float = -1.2
-const RIGHT: float = 2.25
+const RIGHT: float = 1.2
 const BACK_Z: float = -0.84
 ## Front of the awning: where the posts stand and the valance hangs.
 const FRONT_Z: float = 0.82
 const AWNING_FRONT_Y: float = 2.55
 const AWNING_BACK_Y: float = 3.02
-## Where the ATM stands (local) and how tall it is.
-const ATM_POS: Vector3 = Vector3(1.75, 0.0, -0.3)
-const ATM_HEIGHT: float = 1.9
 ## The display stands' x positions and how high the items float over them.
 const STANDS: Array[float] = [-0.78, -0.26, 0.26, 0.78]
 const STAND_Z: float = 0.02
@@ -120,18 +117,6 @@ func _build() -> void:
 	_build_awning()
 	_build_sign()
 	_build_stands()
-	# The ATM at the right end, its screen to the room: the shop's cash machine.
-	var atm: Node3D = ItemModels.make_kiosk(ATM_HEIGHT)
-	atm.name = "ShopAtm"
-	atm.position = ATM_POS
-	add_child(atm)
-	var py: float = ATM_HEIGHT + 0.32
-	var pz: float = BACK_Z + 0.1
-	var plaque := GreyboxKit.box(self, Vector3(0.56, 0.18, 0.03), Vector3(ATM_POS.x, py, pz), Palette.VIP_BURGUNDY, "ShopAtmPlaque", false)
-	_skin(plaque, &"velvet")
-	_brass(Vector3(0.6, 0.02, 0.035), Vector3(ATM_POS.x, py - 0.09, pz))
-	_brass(Vector3(0.6, 0.02, 0.035), Vector3(ATM_POS.x, py + 0.09, pz))
-	_label("ShopAtmText", Vector3(ATM_POS.x, py, pz + 0.02), "CASH", 34, Palette.VIP_GOLD)
 
 
 func _build_posts() -> void:
