@@ -27,11 +27,20 @@ signal store_changed
 signal purchase_finished(ok: bool)
 ## Coins bought with real money arrived (after Steam used up the coin pack).
 signal coins_added(amount: int)
+## `request_public_lobbies` finished: [{lobby, name, members, max}] (BROWSE LOBBIES).
+signal public_lobbies_received(lobbies: Array[Dictionary])
 
 ## The game's own Steamworks App ID (was 480 "Spacewar" for tests until 0.9.16).
 const APP_ID: int = 5623410
 const LOBBY_GAME: String = "better_at_gambling"
+## PRIVATE lobbies: only Steam friends (the "Join a friend" list) and invited players get in.
 const LOBBY_TYPE_FRIENDS_ONLY: int = 1
+## PUBLIC lobbies: also listed under BROWSE LOBBIES for everyone on the same version.
+const LOBBY_TYPE_PUBLIC: int = 2
+const LOBBY_COMPARISON_EQUAL: int = 0
+const LOBBY_DISTANCE_FILTER_WORLDWIDE: int = 3
+## At most this many lobbies under BROWSE LOBBIES.
+const PUBLIC_LOBBY_LIMIT: int = 50
 const CHAT_ROOM_ENTER_RESPONSE_SUCCESS: int = 1
 const FRIEND_FLAG_IMMEDIATE: int = 4
 
@@ -56,6 +65,11 @@ var currency: String = ""
 var prices: Dictionary[int, int] = {}
 ## A purchase is waiting for the overlay.
 var buying: bool = false
+## A public lobby list request is on its way.
+var browsing: bool = false
+var _browse_started: int = 0
+## A list request Steam never answered stops blocking new ones after this long.
+const BROWSE_TIMEOUT_MS: int = 15000
 ## Coin packs being consumed: result handle -> Coins to add when Steam confirms.
 var _consuming: Dictionary[int, int] = {}
 ## Inventory item instances with a consume on its way (never consumed twice).
@@ -86,6 +100,7 @@ func _ready() -> void:
 	steam.connect(&"lobby_created", _on_lobby_created)
 	steam.connect(&"lobby_joined", _on_lobby_joined)
 	steam.connect(&"lobby_chat_update", _on_lobby_chat_update)
+	steam.connect(&"lobby_match_list", _on_lobby_match_list)
 	Log.info(&"steam", "Steam on: %s (app %d)" % [_persona, APP_ID])
 	_start_store()
 	# Lifetime achievements follow the profile (level-ups, matches, the shop) and catch up on start.
@@ -371,22 +386,44 @@ func get_steam_id() -> int:
 	return _steam_id
 
 
-## Creates our friends-only party lobby; `lobby_ready` follows. Returns false without Steam.
-func create_lobby(party_name: String, max_members: int) -> bool:
+## Creates our party lobby, public (BROWSE LOBBIES lists it) or private (friends and invites
+## only); `lobby_ready` follows. Returns false without Steam.
+func create_lobby(party_name: String, max_members: int, public: bool = false) -> bool:
 	if not _available:
-		last_error = "Start Steam to host."
+		last_error = "Steam is not running."
 		return false
 	leave_lobby()
 	lobby_owner = true
-	steam.call("createLobby", LOBBY_TYPE_FRIENDS_ONLY, max_members)
+	steam.call("createLobby", LOBBY_TYPE_PUBLIC if public else LOBBY_TYPE_FRIENDS_ONLY, max_members)
 	set_meta(&"party_name", party_name)
+	set_meta(&"party_public", public)
+	return true
+
+
+## Asks Steam for the public lobbies of this game and version, worldwide, with a free seat;
+## `public_lobbies_received` follows. Returns false without Steam or while a request is running.
+func request_public_lobbies() -> bool:
+	if not _available:
+		return false
+	var now: int = Time.get_ticks_msec()
+	if browsing and now - _browse_started < BROWSE_TIMEOUT_MS:
+		return false  # Steam has not answered the last one yet
+	browsing = true
+	_browse_started = now
+	steam.call("addRequestLobbyListStringFilter", "game", LOBBY_GAME, LOBBY_COMPARISON_EQUAL)
+	steam.call("addRequestLobbyListStringFilter", "build", Protocol.BUILD_ID, LOBBY_COMPARISON_EQUAL)
+	steam.call("addRequestLobbyListStringFilter", "public", "1", LOBBY_COMPARISON_EQUAL)
+	steam.call("addRequestLobbyListFilterSlotsAvailable", 1)
+	steam.call("addRequestLobbyListDistanceFilter", LOBBY_DISTANCE_FILTER_WORLDWIDE)
+	steam.call("addRequestLobbyListResultCountFilter", PUBLIC_LOBBY_LIMIT)
+	steam.call("requestLobbyList")
 	return true
 
 
 ## Joins a friend's lobby; `lobby_entered` follows.
 func join_lobby(id: int) -> bool:
 	if not _available or id == 0:
-		last_error = "Start Steam to join friends."
+		last_error = "Steam is not running."
 		return false
 	leave_lobby()
 	lobby_owner = false
@@ -460,6 +497,7 @@ func _on_lobby_created(result: int, id: int) -> void:
 	steam.call("setLobbyData", id, "game", LOBBY_GAME)
 	steam.call("setLobbyData", id, "build", Protocol.BUILD_ID)
 	steam.call("setLobbyData", id, "name", party)
+	steam.call("setLobbyData", id, "public", "1" if bool(get_meta(&"party_public", false)) else "0")
 	steam.call("setLobbyJoinable", id, true)
 	steam.call("setRichPresence", "status", party)
 	Log.info(&"steam", "party lobby %d created" % id)
@@ -476,6 +514,22 @@ func _on_lobby_joined(id: int, _permissions: int, _locked: bool, response: int) 
 	lobby_id = id
 	var owner: int = lobby_owner_of(id)
 	lobby_entered.emit({"lobby_id": id, "ok": true, "owner": owner, "game": lobby_data(id, "game"), "build": lobby_data(id, "build"), "name": lobby_data(id, "name")})
+
+
+func _on_lobby_match_list(lobbies: Array = []) -> void:
+	browsing = false
+	var out: Array[Dictionary] = []
+	for v: Variant in lobbies:
+		var lid: int = int(v)
+		if lid == 0 or lid == lobby_id:
+			continue
+		out.append(public_lobby_entry(lid, lobby_data(lid, "name"), int(steam.call("getNumLobbyMembers", lid)), int(steam.call("getLobbyMemberLimit", lid))))
+	public_lobbies_received.emit(out)
+
+
+## One row of BROWSE LOBBIES.
+static func public_lobby_entry(lid: int, party: String, members: int, max_members: int) -> Dictionary:
+	return {"lobby": lid, "name": party if party.strip_edges() != "" else "Lobby", "members": members, "max": max_members if max_members > 0 else Protocol.MAX_PLAYERS}
 
 
 func _on_lobby_chat_update(id: int, _changed: int, _making_change: int, _state: int) -> void:
