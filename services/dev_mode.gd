@@ -15,11 +15,10 @@ extends RefCounted
 ## Once anything dev was used, Steam achievements stay off until the game restarts (`used`), so
 ## a dev level or dev money never unlocks a real achievement.
 
-## SteamID64s that may use developer mode (Patrick's account, from his Steam account page
+## SteamID64s that may use developer mode: Patrick only ("Dev rechte hab nur ich", 2026-11-16; his account, from his Steam account page
 ## 2026-11-15; more from him: "gebe dieser nummer access all. Es werden noch mehr steam ids kommen").
 const STEAM_IDS: Array[int] = [
 	76561198325616486,  # Patrick
-	76561198355845610,  # Patrick 2026-11-15
 ]
 ## SteamID64s that own every cosmetic and the developer skins, but get NO developer mode (Patrick
 ## 2026-11-15: "nicht entwickelermodus. Skin unlock all nur und den neuen dev skin. Keine dev sachen").
@@ -31,6 +30,7 @@ const COSMETIC_IDS: Array[int] = [
 	76561198358513331,
 	76561198138593759,
 	76561198124973959,
+	76561198355845610,  # had developer mode until 0.10.8 (Patrick 2026-11-16: "der zweite soll unlock all haben aber nicht dev rechte. Dev rechte hab nur ich")
 ]
 ## The one account that counts as "the dev" for Beat the Dev (Patrick only).
 const THE_DEV: int = 76561198325616486
