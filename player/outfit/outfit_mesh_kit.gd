@@ -528,6 +528,13 @@ static func spade_poly(size: float) -> PackedVector2Array:
 	for i: int in heart.size():
 		var q: Vector2 = heart[i]
 		p.append(Vector2(q.x, -q.y + size * 0.12))
+	# The stem, flaring out below the two lobes (without it the spade read as an upside-down
+	# heart, Patrick 2026-11-16). The outline starts at the notch, so the stem closes it.
+	var n: Vector2 = p[0]
+	p.append(Vector2(-size * 0.05, n.y - size * 0.12))
+	p.append(Vector2(-size * 0.2, n.y - size * 0.45))
+	p.append(Vector2(size * 0.2, n.y - size * 0.45))
+	p.append(Vector2(size * 0.05, n.y - size * 0.12))
 	return p
 
 
