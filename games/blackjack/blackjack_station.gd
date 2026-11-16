@@ -160,7 +160,7 @@ func _show_hand_tags(split_seats: Dictionary[int, Dictionary], outlined: Array[i
 				hand_tags[key] = tag
 			var h: Dictionary = split_seats[i] if hand == 0 else split_seats[i]["split"]
 			var total: int = HandEval.total(_ints(h.get("cards", [])))
-			tag.text = ("%d  BUST" % total) if total > 21 else str(total)
+			tag.text = ("%d  BUST" % total) if total > 21 else HandEval.total_text(_ints(h.get("cards", [])), bool(split_seats[i].get("first_done", false)) if hand == 0 else bool(split_seats[i].get("done", false)))
 			tag.modulate = Palette.VIP_GOLD if outlined.has(key) else Palette.CREAM
 			tag.position = _over_hand(key, TAG_HEIGHT)
 			tag.visible = total > 0
@@ -239,7 +239,8 @@ func _show_dealer_total(dealer: Array) -> void:
 		if int(c) != TableCards.FACE_DOWN:
 			shown.append(int(c))
 	dealer_total_label.visible = not shown.is_empty()
-	dealer_total_label.text = str(HandEval.total(shown)) if not shown.is_empty() else ""
+	# Only the up card showing: a soft ace reads "1 / 11"; the revealed hand shows its best total.
+	dealer_total_label.text = HandEval.total_text(shown, shown.size() >= 2) if not shown.is_empty() else ""
 
 
 ## Half-moon geometry, measured from the arc centre: the straight edge is on z = ARC_CENTRE.z and

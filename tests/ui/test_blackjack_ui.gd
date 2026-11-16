@@ -71,3 +71,14 @@ func test_split_panel_fits_on_screen() -> void:
 	await wait_process_frames(2)
 	assert_true(ui.panel.get_global_rect().size.x <= root.size.x, "the panel still fits on screen")
 	assert_true(root.get_global_rect().encloses(ui.panel.get_global_rect()), "inside the screen")
+
+
+func test_soft_hand_shows_both_totals_until_done() -> void:
+	var st: Dictionary = {"state": BlackjackLogic.State.ACTING, "timer": 6.0, "seats": [1, -1, -1, -1], "dealer": [Card.make(1, 1)], "dealer_revealed": false,
+		"hands": {1: {"stake": 50, "cards": [Card.make(1, 0), Card.make(6, 1)], "done": false, "total": 17, "can_split": false, "clock": 6.0}}}
+	ui.update_state(st, {})
+	assert_eq(ui.total_label.text, "7 / 17", "soft 17 reads both ways while you play it")
+	assert_string_contains(ui.seat_labels[0].text, "7 / 17")
+	st["hands"][1]["done"] = true
+	ui.update_state(st, {})
+	assert_eq(ui.total_label.text, "17", "stood: the best total only")

@@ -1,7 +1,7 @@
 extends GutTest
 ## Casino Hold'em table logic (`HoldemLogic`): four seats against one dealer and one board, ante
 ## (+ the optional AA Bonus), two hole cards and the flop, FOLD or CALL (twice the ante) on each
-## player's own clock (out of time = fold), turn, river, the dealer qualifies with fours or
+## player's own clock (out of time = fold), the turn, RIVER BET or CHECK (out of time = check), river, the dealer qualifies with fours or
 ## better; every payout branch, the bonus paytable, refunds at a minigame, standing up, the match
 ## end, the quiet house rule (never sent) and luck.
 
@@ -115,6 +115,13 @@ func test_betting_window_then_the_deal() -> void:
 	assert_eq(seen.size(), 7)
 
 
+## Player `p` calls, then checks once the turn is out (the plain line that goes to the showdown).
+func _call_check(p: int) -> void:
+	assert_true(t.player_action(p, &"call")["ok"])
+	assert_eq(t.state, HoldemLogic.State.RIVER, "the turn is out, the river bet open")
+	assert_true(t.player_action(p, &"check")["ok"])
+
+
 func test_fold_loses_the_ante() -> void:
 	_deal_one("2C 7D 9S 5H KD QC 3S 4C 4D")
 	assert_eq(t.player_action(1, &"fold")["ok"], true)
@@ -131,7 +138,7 @@ func test_fold_loses_the_ante() -> void:
 func test_dealer_does_not_qualify_ante_pays_the_paytable_call_pushes() -> void:
 	# A flush, ace high; the dealer has king high.
 	_deal_one("AH 9H 7H 4H 2H KS 3D QC JD")
-	assert_true(t.player_action(1, &"call")["ok"])
+	_call_check(1)
 	var calls: Array[Dictionary] = _types(&"bet_placed").filter(func(e: Dictionary) -> bool: return StringName(e["details"]["type"]) == &"call")
 	assert_eq(int(calls[0]["amount"]), 20, "the call is twice the ante")
 	var r: Dictionary = _results(1)[0]
@@ -150,7 +157,7 @@ func test_dealer_does_not_qualify_ante_pays_the_paytable_call_pushes() -> void:
 
 func test_player_beats_a_qualifying_dealer() -> void:
 	_deal_one("AS AD 9C 5H 2S KD 7C 4C 4D")
-	t.player_action(1, &"call")
+	_call_check(1)
 	var r: Dictionary = _results(1)[0]
 	assert_eq(StringName(r["details"]["outcome"]), &"win")
 	assert_eq(int(r["returned"]), 20 + 40, "ante 1:1 (a pair), call 1:1")
@@ -160,7 +167,7 @@ func test_player_beats_a_qualifying_dealer() -> void:
 func test_a_tie_pushes_both() -> void:
 	# Both play the board's aces with king, queen, jack.
 	_deal_one("2C 3D AS AD KS QH JC 4C 5D")
-	t.player_action(1, &"call")
+	_call_check(1)
 	var r: Dictionary = _results(1)[0]
 	assert_eq(StringName(r["details"]["outcome"]), &"push")
 	assert_eq(int(r["returned"]), 30)
@@ -169,7 +176,7 @@ func test_a_tie_pushes_both() -> void:
 
 func test_the_dealer_takes_both() -> void:
 	_deal_one("2C 7D 9S 5H KD QC 3S 4C 4D")
-	t.player_action(1, &"call")
+	_call_check(1)
 	var r: Dictionary = _results(1)[0]
 	assert_eq(StringName(r["details"]["outcome"]), &"lose")
 	assert_eq(int(r["returned"]), 0)
@@ -251,6 +258,11 @@ func test_everyone_on_their_own_clock() -> void:
 	assert_eq(t.state, HoldemLogic.State.DECIDING, "player 1 still deciding")
 	assert_eq(t.player_action(2, &"fold")["error"], &"no_active_hand", "one decision per hand")
 	t.player_action(1, &"call")
+	assert_eq(t.state, HoldemLogic.State.RIVER)
+	t.player_action(2, &"check")
+	assert_eq(t.state, HoldemLogic.State.RIVER, "player 1 still on the river")
+	assert_eq(t.player_action(2, &"river")["error"], &"no_active_hand", "one river decision per hand")
+	t.player_action(1, &"check")
 	assert_eq(t.state, HoldemLogic.State.PAYOUT)
 	assert_eq(_types(&"holdem_showdown").size(), 1)
 	assert_eq(_results(1).size(), 1)
@@ -350,6 +362,9 @@ func test_money_is_conserved_over_many_hands() -> void:
 		for p: int in [1, 2]:
 			var h: Dictionary = t.hands[p]
 			t.player_action(p, &"call" if HoldemLogic.simple_call(h["hole"], t.board) else &"fold")
+		if t.state == HoldemLogic.State.RIVER:
+			for p: int in [1, 2]:
+				t.player_action(p, &"river" if r.chance(0.5) else &"check")
 		var paid: int = 0
 		for e: Dictionary in t.drain_events():
 			if e["type"] == &"round_result":
@@ -401,6 +416,7 @@ func _wins_out_of(n: int, favour: float, lk: int) -> int:
 		t.place_bet(1, {"amount": 10})
 		t.tick(fx.balance.holdem_betting_window + 0.1)
 		t.player_action(1, &"call")
+		t.player_action(1, &"check")
 		var r: Array[Dictionary] = _results(1)
 		if int(r.back()["returned"]) >= 30:
 			won += 1
@@ -424,3 +440,122 @@ func _bonus_hits(n: int, favour: float) -> int:
 		t.tick(fx.balance.holdem_result_time + 0.1)
 		t.events.clear()
 	return hits
+
+
+# --- River bet ----------------------------------------------------------------------------------
+
+
+func test_the_turn_comes_then_the_river_bet() -> void:
+	_deal_one("AS AD 9C 5H 2S KD 7C 4C 4D")
+	assert_eq(t.player_action(1, &"river")["error"], &"unknown_action", "no river bet before the call")
+	t.player_action(1, &"call")
+	assert_eq(t.state, HoldemLogic.State.RIVER)
+	var pub: Dictionary = t.get_public_state()
+	assert_eq(pub["board"], _h("9C 5H 2S KD"), "the turn is out")
+	assert_eq(pub["dealer"], [], "the dealer's cards stay down")
+	assert_eq(int(pub["dealer_down"]), 2)
+	assert_false(pub.has("hidden"), "the river is not on the wire")
+	assert_almost_eq(float(pub["hands"][1]["clock"]), fx.balance.holdem_river_time, 0.001)
+	assert_eq(_types(&"holdem_turn").size(), 1)
+	assert_eq(t.player_action(1, &"call")["error"], &"unknown_action", "the call is in")
+	assert_eq(t.player_action(1, &"fold")["error"], &"unknown_action", "a called hand can't fold any more")
+	assert_true(t.has_stake(1))
+
+
+func test_a_river_bet_pays_one_to_one_when_the_hand_wins() -> void:
+	_deal_one("AS AD 9C 5H 2S KD 7C 4C 4D")
+	t.player_action(1, &"call")
+	assert_true(t.player_action(1, &"river")["ok"])
+	var bets: Array[Dictionary] = _types(&"bet_placed").filter(func(e: Dictionary) -> bool: return bool(e["details"].get("river", false)))
+	assert_eq(int(bets[0]["amount"]), 10, "the river bet is one ante")
+	assert_eq(StringName(bets[0]["details"]["type"]), &"call", "on the call spot")
+	var r: Dictionary = _results(1)[0]
+	assert_eq(StringName(r["details"]["outcome"]), &"win")
+	assert_eq(int(r["stake"]), 40)
+	assert_eq(int(r["returned"]), 20 + 40 + 20, "ante 1:1, call 1:1, river bet 1:1")
+	assert_eq(fx.economy.balance(1), 1040)
+	assert_eq(StringName(t.get_public_state()["hands"][1]["river_decision"]), &"river")
+
+
+func test_a_river_bet_is_lost_with_the_hand() -> void:
+	_deal_one("2C 7D 9S 5H KD QC 3S 4C 4D")
+	t.player_action(1, &"call")
+	t.player_action(1, &"river")
+	assert_eq(int(_results(1)[0]["returned"]), 0)
+	assert_eq(fx.economy.balance(1), 960)
+
+
+func test_a_river_bet_comes_back_when_the_dealer_does_not_qualify_or_ties() -> void:
+	_deal_one("AH 9H 7H 4H 2H KS 3D QC JD")
+	t.player_action(1, &"call")
+	t.player_action(1, &"river")
+	assert_eq(int(_results(1)[0]["returned"]), 10 + 10 * 2 + 20 + 10, "ante 2:1 for the flush, call and river bet back")
+	assert_eq(fx.economy.balance(1), 1020)
+	t.tick(fx.balance.holdem_result_time + 0.1)
+	t.events.clear()
+	_deal_one("2C 3D AS AD KS QH JC 4C 5D")
+	t.player_action(1, &"call")
+	t.player_action(1, &"river")
+	assert_eq(StringName(_results(1)[0]["details"]["outcome"]), &"push")
+	assert_eq(int(_results(1)[0]["returned"]), 40, "a tie gives all three back")
+
+
+func test_out_of_time_on_the_river_checks() -> void:
+	_deal_one("AS AD 9C 5H 2S KD 7C 4C 4D")
+	t.player_action(1, &"call")
+	t.tick(fx.balance.holdem_river_time * 0.5)
+	assert_eq(t.state, HoldemLogic.State.RIVER)
+	t.tick(fx.balance.holdem_river_time * 0.5 + 0.1)
+	assert_eq(t.state, HoldemLogic.State.PAYOUT, "the clock checked")
+	assert_eq(int(_results(1)[0]["returned"]), 60, "ante and call only")
+	assert_eq(StringName(t.get_public_state()["hands"][1]["river_decision"]), &"check")
+
+
+func test_the_river_bet_needs_the_money() -> void:
+	fx.economy.apply(1, -1000 + 30, &"test")
+	_deal_one("AS AD 9C 5H 2S KD 7C 4C 4D")
+	t.player_action(1, &"call")
+	assert_eq(t.player_action(1, &"river")["error"], &"insufficient_funds")
+	assert_eq(t.state, HoldemLogic.State.RIVER, "still free to check")
+	assert_true(t.player_action(1, &"check")["ok"])
+
+
+func test_refund_and_auto_resolve_on_the_river() -> void:
+	_deal_one("AS AD 9C 5H 2S KD 7C 4C 4D")
+	t.player_action(1, &"call")
+	t.player_action(1, &"river")
+	assert_eq(t.state, HoldemLogic.State.PAYOUT, "alone at the table: the river bet ends the decisions")
+	assert_eq(fx.economy.balance(1), 1040)
+	t.tick(fx.balance.holdem_result_time + 0.1)
+	# Two players: one bets the river, the minigame starts before the other decides.
+	t.place_bet(1, {"amount": 10})
+	t.place_bet(2, {"amount": 10})
+	t.tick(fx.balance.holdem_betting_window + 0.1)
+	t.player_action(1, &"call")
+	t.player_action(2, &"call")
+	var before: int = fx.economy.balance(1)
+	t.player_action(1, &"river")
+	t.refund_all()
+	assert_eq(fx.economy.balance(1), before + 30, "ante, call and river bet back (−10 for the river bet, +40)")
+	assert_eq(t.state, HoldemLogic.State.IDLE)
+	assert_eq(t.hidden, [] as Array[int])
+	# And the match end plays an open river out as a check.
+	t.place_bet(1, {"amount": 10})
+	t.tick(fx.balance.holdem_betting_window + 0.1)
+	t.player_action(1, &"call")
+	t.auto_resolve()
+	assert_eq(t.state, HoldemLogic.State.IDLE)
+	assert_false(t.has_stake(1))
+
+
+func test_standing_up_on_the_river_checks() -> void:
+	t.place_bet(1, {"amount": 10})
+	t.place_bet(2, {"amount": 10})
+	t.tick(fx.balance.holdem_betting_window + 0.1)
+	t.player_action(1, &"call")
+	t.player_action(2, &"call")
+	t.player_action(1, &"river")
+	t.leave(2)
+	assert_eq(t.state, HoldemLogic.State.PAYOUT)
+	assert_eq(int(_results(1)[0]["stake"]), 40)
+	assert_eq(int(_results(2)[0]["stake"]), 30, "checked when they stood up")
