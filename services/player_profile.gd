@@ -56,6 +56,8 @@ var achieved: Array[StringName] = []
 var collected: Array[StringName] = []
 ## Daily Spin pieces won but not looked at in the COLLECT tab yet (owned already).
 var unseen: Array[StringName] = []
+## Full turns of the main menu logo, ever (`LogoSpin`; 1000 = `Achievements.LOGO_SPINNER`).
+var logo_spins: int = 0
 
 var config: ProgressionConfig
 var shop: CosmeticShop
@@ -326,6 +328,7 @@ func to_config(cfg: ConfigFile) -> void:
 	cfg.set_value("stats", "wins", wins)
 	cfg.set_value("stats", "online_wins", online_wins)
 	cfg.set_value("stats", "biggest_win", biggest_win)
+	cfg.set_value("stats", "logo_spins", logo_spins)
 	cfg.set_value("stats", "applied", PackedStringArray(applied))
 	for key: StringName in LIFETIME_KEYS:
 		cfg.set_value("lifetime", String(key), int(lifetime.get(key, 0)))
@@ -354,6 +357,7 @@ func from_config(cfg: ConfigFile) -> void:
 	wins = _int(cfg.get_value("stats", "wins", 0))
 	online_wins = _int(cfg.get_value("stats", "online_wins", 0))
 	biggest_win = _int(cfg.get_value("stats", "biggest_win", 0))
+	logo_spins = _int(cfg.get_value("stats", "logo_spins", 0))
 	daily_last = _int(cfg.get_value("daily", "last_spin", 0))
 	lifetime.clear()
 	for key: StringName in LIFETIME_KEYS:
@@ -420,6 +424,7 @@ func sanitize() -> void:
 		if not id in held:
 			held.append(id)
 	achieved = held
+	logo_spins = clampi(logo_spins, 0, MAX_STAT)
 	var life: Dictionary[StringName, int] = {}
 	for key: StringName in LIFETIME_KEYS:
 		life[key] = clampi(int(lifetime.get(key, 0)), 0, MAX_STAT)

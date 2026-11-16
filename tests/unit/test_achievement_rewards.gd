@@ -5,8 +5,6 @@ extends GutTest
 ## level-pass pieces and Daily Spin wins, and all of that survives a save and load.
 
 const PATH: String = "user://test_achievement_rewards.cfg"
-## Achievements that live on other branches until they reach main.
-const LATER: Array[StringName] = [&"ACH_LOGO_SPINNER"]
 
 
 func after_each() -> void:
@@ -36,7 +34,7 @@ func test_every_achievement_has_exactly_one_reward() -> void:
 				n += 1
 		assert_eq(n, 1, "%s has one reward" % ach)
 	for d: CosmeticDef in _rewards():
-		assert_true(Achievements.DEFS.has(d.achievement) or d.achievement in LATER, "%s: %s is a real achievement" % [d.id, d.achievement])
+		assert_true(Achievements.DEFS.has(d.achievement), "%s: %s is a real achievement" % [d.id, d.achievement])
 
 
 func test_rewards_cannot_be_bought_levelled_or_spun() -> void:

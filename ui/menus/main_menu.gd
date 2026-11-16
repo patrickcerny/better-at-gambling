@@ -75,6 +75,9 @@ var version_check: VersionCheck
 ## The trophy left of the "?": global leaderboards and your lifetime stats (`LeaderboardPanel`).
 var trophy_button: TrophyButton
 var leaderboards: LeaderboardPanel
+## Settings, cosmetics, level pass, leaderboards, daily spin, tutorial and dev panel: opening one
+## closes whichever other one is open (Patrick 2026-11-16).
+var dialogs := DialogGroup.new()
 ## What the tutorial opened on the first PRACTICE / PLAY ONLINE carries on to when it closes.
 var _after_tutorial: Callable = Callable()
 ## Who gets the focus back when the tutorial closes to the main entries.
@@ -130,9 +133,7 @@ func _ready() -> void:
 	_settings = SettingsPanel.new()
 	add_child(_settings)
 	_settings.closed.connect(func() -> void: _settings_button.grab_focus())
-	_settings_button.pressed.connect(func() -> void:
-		cosmetics.close()
-		_settings.open(false))
+	_settings_button.pressed.connect(func() -> void: _settings.open(false))
 	# The cosmetics shop: the T-shirt left of the gear and the COSMETICS entry.
 	cosmetics_button = TShirtButton.new()
 	cosmetics_button.name = "CosmeticsButton"
@@ -153,11 +154,9 @@ func _ready() -> void:
 	cosmetics_button.tooltip_text = "My cosmetics"
 	cosmetics_button.pressed.connect(func() -> void:
 		cosmetics_opener[0] = cosmetics_button
-		_settings.close()
 		cosmetics.open(true))  # the T-shirt: your own things, to wear
 	_cosmetics_entry.pressed.connect(func() -> void:
 		cosmetics_opener[0] = _cosmetics_entry
-		_settings.close()
 		cosmetics.open())
 	# Rewards waiting in the shop's COLLECT tab: a red dot with the count on both shop buttons.
 	_shop_dots = [NotifyDot.attach(cosmetics_button), NotifyDot.attach(_cosmetics_entry, true)]
@@ -171,9 +170,7 @@ func _ready() -> void:
 	# Click the profile line: the level pass (every level's Coins and unlocks).
 	level_pass = LevelPassPanel.new()
 	add_child(level_pass)
-	profile_badge.pressed.connect(func() -> void:
-		_settings.close()
-		level_pass.open())
+	profile_badge.pressed.connect(level_pass.open)
 	level_pass.item_pressed.connect(func(id: StringName) -> void:
 		level_pass.close()
 		cosmetics.open()
@@ -195,8 +192,6 @@ func _ready() -> void:
 	help_button.pressed.connect(func() -> void:
 		if _busy:
 			return  # joining: the online box stays up with its status
-		_settings.close()
-		cosmetics.close()
 		_after_tutorial = Callable()
 		_show_tutorial(help_button))
 	_build_leaderboards()
@@ -210,6 +205,8 @@ func _ready() -> void:
 	if DevMode.allowed():
 		_build_dev()
 	_build_online()
+	for d: Control in [_settings, cosmetics, level_pass, leaderboards, daily_spin, how_to_play, dev_panel]:
+		dialogs.add(d)
 	_practice.grab_focus()
 	Audio.set_mood(&"menu")
 	if DisplayServer.get_name() != "headless":
@@ -260,9 +257,6 @@ func _build_leaderboards() -> void:
 	trophy_button.pressed.connect(func() -> void:
 		if _busy:
 			return
-		_settings.close()
-		cosmetics.close()
-		level_pass.close()
 		leaderboards.open())
 
 
@@ -273,11 +267,6 @@ func _build_daily() -> void:
 		_refresh_daily()
 		if daily_button.is_visible_in_tree():
 			daily_button.grab_focus())
-	var open_daily := func() -> void:
-		_settings.close()
-		cosmetics.close()
-		level_pass.close()
-		daily_spin.open()
 	# The big wheel above the three corner buttons, as wide as they are together.
 	daily_button = DailySpinButton.new()
 	daily_button.name = "DailySpinButton"
@@ -290,7 +279,7 @@ func _build_daily() -> void:
 	daily_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	add_child(daily_button)
 	move_child(daily_button, daily_spin.get_index())  # under the wheel panel
-	daily_button.pressed.connect(open_daily)
+	daily_button.pressed.connect(daily_spin.open)
 	_refresh_daily()
 
 
@@ -399,9 +388,6 @@ func _build_dev() -> void:
 	dev_entry.pressed.connect(func() -> void:
 		if _busy:
 			return
-		_settings.close()
-		cosmetics.close()
-		level_pass.close()
 		dev_panel.open())
 	dev_panel.closed.connect(func() -> void:
 		if dev_entry.is_visible_in_tree():
@@ -531,7 +517,14 @@ func _show_tutorial(opener: Control) -> void:
 
 
 ## DONE / SKIP / Esc: remembered as seen; on to the chosen match or box, or back to the entries.
+## Closed because another dialog opened (settings, cosmetics, ...): just back to the entries.
 func _on_tutorial_closed() -> void:
+	if dialogs.replacing != null:
+		# Not `_show_main()`: its `_hide_boxes()` would close the dialog that is opening.
+		_after_tutorial = Callable()
+		_set_logo_visible(true)
+		_main_box.visible = true
+		return
 	Settings.set_value("tutorial", "seen", true)
 	Settings.save()
 	var next: Callable = _after_tutorial

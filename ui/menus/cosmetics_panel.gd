@@ -1416,9 +1416,11 @@ func _build_collect_page(tab_row: Container) -> void:
 	collect_dot = NotifyDot.attach(tab)
 
 
-## [name, description] of achievement `id` (`Achievements.DEFS`); one not in this build is hidden.
+## [name, description] of achievement `id` (`Achievements.DEFS`); a hidden one not held yet stays a secret.
 static func achievement_text(id: StringName) -> Array:
 	var def: Variant = Achievements.DEFS.get(id, null)
+	if id in Achievements.HIDDEN and not id in ProfileManager.profile.achieved:
+		def = null
 	if def is Array and (def as Array).size() >= 2:
 		return [str(def[0]), str(def[1])]
 	return ["???", "a hidden achievement"]
