@@ -48,6 +48,9 @@ const MUTED := Color("#B9A98C")
 ## Inventory mode (the T-shirt in the menu's corner): only what the player owns, to wear it.
 ## Shop mode (SHOP in the menu) shows everything to buy.
 var inventory: bool = false
+## Opened in a match lobby: colour and skin stay as the player joined (Patrick 2026-11-15) and
+## count from the next match, so the panel says so instead of "from now on".
+var next_match_look: bool = false
 var title_label: Label
 ## Switches between the shop and the inventory.
 var switch_button: Button
@@ -779,8 +782,7 @@ func select(id: StringName) -> void:
 	selected = id
 	if d != null:
 		trying[d.kind] = id
-		if d.kind == CosmeticDef.KIND_COLOR:
-			trying.erase(CosmeticDef.KIND_SKIN)  # a plain colour shows without the animated skin
+		_one_look(d)
 	status_label.text = ""
 	if preview != null:
 		preview.face(d != null and d.kind == CosmeticDef.KIND_CAPE)
@@ -788,13 +790,26 @@ func select(id: StringName) -> void:
 	_refresh()
 
 
+## Plain colours and animated skins share one page and one look: trying one on drops a try-on of
+## the other, so only one tile there is ever picked (Patrick 2026-11-16: "why are there 2
+## selected?").
+func _one_look(d: CosmeticDef) -> void:
+	if d.kind == CosmeticDef.KIND_COLOR:
+		trying.erase(CosmeticDef.KIND_SKIN)  # a plain colour shows without the animated skin
+	elif d.kind == CosmeticDef.KIND_SKIN:
+		trying.erase(CosmeticDef.KIND_COLOR)
+
+
 ## A click on a tile: picks it, or (picked already) takes that try-on back off.
 func _on_tile_pressed(id: StringName) -> void:
 	var d: CosmeticDef = shop.find(id)
 	if d != null and selected == id and trying.get(d.kind, &"") == id:
+		if d.kind == CosmeticDef.KIND_COLOR or d.kind == CosmeticDef.KIND_SKIN:
+			return  # the bean always has a colour or a skin: a second click keeps the pick
 		untry(d.kind)
 	elif d != null and selected != id and trying.get(d.kind, &"") == id:
 		selected = id  # stacked further back: just bring it to the front
+		_one_look(d)
 		_refresh()
 	else:
 		select(id)
@@ -866,6 +881,9 @@ func press_look() -> void:
 		if not p.owns(d.id):
 			continue
 		if d.kind == CosmeticDef.KIND_COLOR:
+			if p.outfit.get(CosmeticDef.KIND_SKIN, &"") != &"" and not trying.has(CosmeticDef.KIND_SKIN):
+				ProfileManager.take_off(CosmeticDef.KIND_SKIN)  # the plain colour shows, as on the stage
+				outfit_worn.emit(CosmeticDef.KIND_SKIN, &"")
 			ProfileManager.set_preferred_color(d.color_index)
 			color_worn.emit(d.color_index)
 			n += 1
@@ -1043,16 +1061,32 @@ func press_action() -> void:
 		if p.preferred_color != d.color_index:
 			ProfileManager.set_preferred_color(d.color_index)
 			color_worn.emit(d.color_index)
-		status_label.text = "Your bean wears %s from now on." % d.display_name
+		status_label.text = "Your bean is %s %s." % [d.display_name, _from_when()]
 	elif d.kind in CosmeticDef.OUTFIT_KINDS:
+		var the: String = "" if d.kind == CosmeticDef.KIND_SKIN else "the "
 		if p.is_worn(d.id):
 			ProfileManager.take_off(d.kind)
-			status_label.text = "Took off the %s." % d.display_name
+			if d.kind == CosmeticDef.KIND_SKIN:
+				var c: CosmeticDef = shop.color_item(p.preferred_color if p.preferred_color >= 0 else 0)
+				status_label.text = "Took off %s: your bean is %s again %s." % [d.display_name, c.display_name if c != null else "plain", _from_when()]
+			else:
+				status_label.text = "Took off the %s." % d.display_name
 			outfit_worn.emit(d.kind, &"")
 		elif ProfileManager.wear(d.id):
-			status_label.text = "Your bean wears the %s from now on." % d.display_name
+			status_label.text = "Your bean wears %s%s %s." % [the, d.display_name, _from_when() if d.kind == CosmeticDef.KIND_SKIN else "from now on"]
 			outfit_worn.emit(d.kind, d.id)
 	_refresh()
+
+
+## When a new colour or skin shows: at once, or in a match lobby from the next match.
+func _from_when() -> String:
+	return "from your next match" if next_match_look else "from now on"
+
+
+## Whether colour `d` is the player's picked colour while an animated skin covers it: the bean
+## shows the skin, pedestals, scoreboards and graphs still show this colour (`PlayerColors`).
+static func _player_colour_under_skin(p: PlayerProfile, d: CosmeticDef) -> bool:
+	return d.kind == CosmeticDef.KIND_COLOR and p.preferred_color == d.color_index and p.outfit.get(CosmeticDef.KIND_SKIN, &"") != &""
 
 
 ## Whether item `d` is what the bean wears now (its colour or one of its outfit pieces).
@@ -1069,6 +1103,8 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	coin.visible = not p.owns(d.id)
 	if wearing:
 		label.text = "WEARING"
+	elif _player_colour_under_skin(p, d):
+		label.text = "PLAYER COLOUR"  # what pedestals, scoreboards and graphs show (`PlayerColors`)
 	elif p.owns(d.id):
 		label.text = "FREE" if d.is_free() else ("DEVELOPER" if d.dev_only else ("JACKPOT" if d.wheel_only else "OWNED"))
 	elif d.premium():
@@ -1086,7 +1122,7 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	# Short of money keeps the currency's colour, only dimmed: a red number next to a Gold Coin read
 	# as a red-coin price (Patrick 2026-11-15).
 	var cur: Color = Palette.COIN_GOLD if d.premium() else (Palette.COIN_RED if d.coin_buyable() else Palette.VIP_GOLD)
-	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else cur))
+	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing or _player_colour_under_skin(p, d) else (Palette.CREAM if p.owns(d.id) else cur))
 	label.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 	coin.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 
@@ -1128,7 +1164,7 @@ func _refresh() -> void:
 			continue
 		var row: Node = b.find_child("PriceRow", true, false)
 		# The wardrobe has no prices: only WEARING on what is worn.
-		(row as Control).visible = not inventory or (d != null and _wearing(p, d))
+		(row as Control).visible = not inventory or (d != null and (_wearing(p, d) or _player_colour_under_skin(p, d)))
 		if d != null:
 			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
 		else:
@@ -1164,6 +1200,10 @@ func _refresh() -> void:
 		return
 	item_name.text = sel.display_name.to_upper()
 	item_kind.text = str(KIND_TITLES.get(sel.kind, "")).trim_suffix("S").replace("TROUSER", "TROUSERS")
+	if sel.kind == CosmeticDef.KIND_COLOR:
+		item_kind.text = "COLOUR"
+	elif sel.kind == CosmeticDef.KIND_SKIN:
+		item_kind.text = "ANIMATED SKIN"
 	if sel.level > 0 and not p.owns(sel.id):
 		item_kind.text += " · FREE AT LEVEL %d" % sel.level
 	price_row.visible = true
@@ -1193,7 +1233,7 @@ func _refresh() -> void:
 		action_button.disabled = true
 	elif not p.owns(sel.id):
 		action_button.text = "BUY"
-	elif sel.kind == CosmeticDef.KIND_COLOR and p.preferred_color == sel.color_index:
+	elif sel.kind == CosmeticDef.KIND_COLOR and _wearing(p, sel):
 		action_button.text = "WEARING"
 		action_button.disabled = true
 	elif sel.kind in CosmeticDef.OUTFIT_KINDS and p.is_worn(sel.id):
@@ -1356,10 +1396,10 @@ func open(as_inventory: bool = false) -> void:
 	set_inventory(as_inventory)
 	SteamSvc.refresh_inventory()  # bought on another PC, or in the Steam store
 	var p: PlayerProfile = ProfileManager.profile
-	var worn: CosmeticDef = shop.color_item(p.preferred_color)
+	var worn: StringName = worn_in(p, CosmeticDef.KIND_COLOR)  # the skin when one covers the colour
 	selected = &""
 	trying.clear()
-	select(worn.id if worn != null else (shop.items[0].id if not shop.items.is_empty() else &""))
+	select(worn if worn != &"" else (shop.items[0].id if not shop.items.is_empty() else &""))
 	status_label.text = ""
 	_refresh()
 	back_button.text = "BACK %s" % InputGlyphs.hint(&"ui_cancel")
