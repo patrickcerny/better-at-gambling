@@ -231,6 +231,11 @@ func wear(kind: StringName, id: StringName) -> void:
 					seg.material_override = _skin_mat
 		CosmeticDef.KIND_MOUTH:
 			_mouth_mat.set_shader_parameter(&"style", OutfitMeshes.mouth_style(id))
+			if id == Cigarette.ID:  # animated: bobs, glows, smokes
+				var cig := Cigarette.new()
+				body.add_child(cig)
+				_outfit_nodes[kind] = cig
+				return
 			var mm: ArrayMesh = OutfitMeshes.mesh(id)  # a party horn, a straw
 			if mm != null:
 				var mmi: MeshInstance3D = _outfit_mesh(mm, "OutfitMouth")
