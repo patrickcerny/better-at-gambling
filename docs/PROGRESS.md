@@ -93,6 +93,19 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.54 Table UIs redesigned, roulette inside bets
+- Patrick: "KOMPLETTER redesign des UI's der games" and "Roulette UI ausbauen und besser betten kann auf
+  mehrere zahlen". Every table overlay shares `TableSkin`: walnut panel in a brass frame with corner
+  studs, engraved title between brass rules (`DecoRule`), felt status band, draining `CountdownBar`,
+  drawn casino chips (`ChipToken` in `BetPanel`), brass plaque buttons (gold / felt / red / ghost),
+  a WIN / LOST / PUSH ribbon summed per round from `round_result`. Blackjack, Hi-Lo and Hold'em show
+  drawn cards (`CardRow` over the minigames' `CardFace`).
+- Roulette: `RouletteBoard` draws the layout and takes every real bet by mouse position: straight 35:1,
+  split 17:1 (value lo*100+hi, zero splits), street 11:1, corner 8:1 (0 = first four), six line 5:1,
+  dozens, columns, even money. Hover lights the covered numbers with name and payout; last numbers
+  strip; REBET. `RouletteLogic.covered/split_value/bet_name`, 3D chip spots on the lines/corners.
+- Tests: unit test_roulette (new inside bets, every layout point is a valid bet, chip point = click
+  point), tests/ui green except the pre-existing pause-menu `set_dev_available` Nil error (also on main).
 ### 2026-11-16 / 0.9.53 Baccarat
 - Patrick: "Adde Baccarat". New table game `baccarat` (Punto Banco, 8-deck shoe, standard tableau):
   PLAYER 1:1, BANKER 1:1 less 5%, TIE 9:1, P PAIR / B PAIR 11:1, Player and Banker push on a tie.
