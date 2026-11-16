@@ -83,7 +83,7 @@ const SHOP_POS: Vector3 = Vector3(19.6, 0, 0.9)
 ## north side: its centre, and where players stand to use it.
 const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -2.6)
 const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -2.6)
-## The lobby settings board (0.9.41, Patrick: "mach lieber da eine große tafel an der wand"):
+## The lobby settings board (0.9.46, Patrick: "mach lieber da eine große tafel an der wand"):
 ## a big framed board on the start room's north wall, west of the lobby doors, that shows the
 ## lobby's settings to everyone, live. Only the host opens the settings there (walk up, press E).
 ## Where its middle hangs (x, wall face z), its size, and the spot in front of it you use it from.
@@ -772,7 +772,7 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	_set_glow(0.0, i)
 
 
-## The marble stair up to the column from the room side (−z), 0.9.41 (Patrick: "mach die stairs
+## The marble stair up to the column from the room side (−z), 0.9.46 (Patrick: "mach die stairs
 ## noch besser"): four solid steps that stand on the floor and run back into the column (no
 ## floating slabs), each with a polished tread that overhangs its riser and a thin gold nosing,
 ## flanked by two dark marble cheek walls that follow the slope with a gold cap rail and end in a

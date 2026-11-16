@@ -93,6 +93,18 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.46 pedestal stairs and the lobby settings board
+- Patrick: "mach die stairs noch besser". The pedestal stairs were four thin slabs hanging in the
+  air over a visible wedge. Now `_build_stair`: four solid steps standing on the floor and running
+  into the column, polished treads that overhang their risers with a gold nosing and a shadow line,
+  dark marble cheek walls along the slope with a gold cap rail, newel posts with gold balls at the
+  foot. Walking is still the one invisible wedge (no lips), 0.9 m wide; 1.1 m gap between stairs.
+- Patrick: "mach lieber da eine große tafel an der wand ... settings LESBAR (nur host kann ui öffnen
+  und verändern)". The brass tablet stand is gone; a 4.2 x 2.7 m framed felt board hangs on the start
+  room's north wall west of the lobby doors (`SETTINGS_BOARD_*`) with a picture light, showing mode,
+  minigames, gambling minutes, items and the minigame pick live for everyone, and the host in the
+  footer. E in front of it opens the lobby settings for the host only; anyone else gets a toast.
+  Tests: `test_start_room_and_jail.gd` (board follows the settings, non-host cannot open).
 ### 2026-11-15 / 0.9.45 Casino Hold'em river bet
 - Patrick: "Poker river bet". Before, the turn and the river came out together straight after the
   CALL, with no betting in between. Now the turn comes out on its own (state `RIVER`, appended to
