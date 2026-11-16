@@ -46,6 +46,9 @@ var invite_button: Button
 var minigames_button: Button
 ## Opens the cosmetics shop (bean colours) without leaving the lobby.
 var cosmetics_button: Button
+## Leader only: START NOW starts the doors' countdown without waiting for everyone to be ready
+## (Patrick 2026-11-16: "Lobby can force start").
+var start_button: Button
 var selector: MinigameSelector
 ## Player id whose KICK was pressed once (the second press kicks), and when it disarms.
 var _kick_armed: int = -1
@@ -244,6 +247,14 @@ func _build() -> void:
 	invite_button.tooltip_text = "Invite friends (Steam overlay)"
 	invite_button.pressed.connect(func() -> void: SteamSvc.invite_friends())
 	bottom.add_child(invite_button)
+	start_button = Button.new()
+	start_button.name = "StartNow"
+	start_button.text = "START NOW"
+	start_button.theme_type_variation = &"ActionButton"
+	start_button.add_theme_font_size_override(&"font_size", 26)
+	start_button.tooltip_text = "Start the match without waiting for everyone to be ready"
+	start_button.pressed.connect(func() -> void: Net.send_intent(Intents.make(&"force_start", {})))
+	bottom.add_child(start_button)
 	_close_button = Button.new()
 	_close_button.name = "Close"
 	_close_button.text = "CLOSE"
@@ -456,6 +467,8 @@ func _refresh() -> void:
 		ready.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if is_ready else MUTED)
 		(r["pill"] as PanelContainer).add_theme_stylebox_override(&"panel", _pill_box(is_ready))
 	var leader: bool = local_id == state.leader
+	start_button.visible = leader and state.room_mode
+	start_button.disabled = state.countdown > 0.0
 	_settings_note.text = "You lead this lobby: the settings are yours." if leader else "Only the lobby leader (★) can change these."
 	var presets: MatchPresets = Registry.presets
 	var mg: int = int(state.lobby_settings.get("minigames", presets.default_minigames))
