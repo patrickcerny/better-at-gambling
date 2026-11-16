@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.10.11 Click the wheel to spin
+### 2026-11-16 / 0.10.16 Click the wheel to spin
 - Patrick: "be able to click the wheel to spin it". A click on the Daily Spin wheel (rim included) spins
   it like SPIN while a spin is free; the hand cursor shows when it can.
 - Checked Patrick's rule "no money or level locked skins": the mystery piece only draws red-Coin shop
