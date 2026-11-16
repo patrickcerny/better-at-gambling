@@ -166,8 +166,9 @@ func owned_colors() -> Array[int]:
 
 ## Buys `id` with (red) Coins. Returns &"" when bought, else why not: &"unknown", &"owned",
 ## &"gold" (premium: Gold Coins through Steam), &"level" (only unlocked by levelling up) or
-## &"not_enough_coins". Nothing changes on a refusal.
-func buy(id: StringName) -> StringName:
+## &"not_enough_coins". Nothing changes on a refusal. `deal_day` (a `DailyDeals.today` day number,
+## -1 = none): a piece on deal that day costs the deal price.
+func buy(id: StringName, deal_day: int = -1) -> StringName:
 	var d: CosmeticDef = shop.find(id)
 	if d == null:
 		return &"unknown"
@@ -175,9 +176,10 @@ func buy(id: StringName) -> StringName:
 		return &"owned"
 	if not d.coin_buyable():
 		return &"gold" if d.premium() else &"level"
-	if coins < d.price:
+	var price: int = DailyDeals.coin_price(shop, d, deal_day) if deal_day >= 0 else d.price
+	if coins < price:
 		return &"not_enough_coins"
-	coins -= d.price
+	coins -= price
 	owned.append(id)
 	return &""
 

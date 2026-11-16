@@ -59,7 +59,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x149"
+      "exchange": "3100x149;3100x104"
     },
     {
       "itemdefid": 205,
@@ -69,7 +69,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x149"
+      "exchange": "3100x149;3100x104"
     },
     {
       "itemdefid": 206,
@@ -79,7 +79,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x149"
+      "exchange": "3100x149;3100x104"
     },
     {
       "itemdefid": 207,
@@ -89,7 +89,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x149"
+      "exchange": "3100x149;3100x104"
     },
     {
       "itemdefid": 200,
@@ -99,7 +99,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x199"
+      "exchange": "3100x199;3100x139"
     },
     {
       "itemdefid": 201,
@@ -109,7 +109,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x199"
+      "exchange": "3100x199;3100x139"
     },
     {
       "itemdefid": 202,
@@ -119,7 +119,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x199"
+      "exchange": "3100x199;3100x139"
     },
     {
       "itemdefid": 203,
@@ -129,7 +129,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x199"
+      "exchange": "3100x199;3100x139"
     },
     {
       "itemdefid": 100,
@@ -283,7 +283,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 112,
@@ -293,7 +293,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 168,
@@ -303,7 +303,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 176,
@@ -475,7 +475,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 125,
@@ -485,7 +485,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 174,
@@ -495,7 +495,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 126,
@@ -658,7 +658,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 138,
@@ -668,7 +668,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 182,
@@ -678,7 +678,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 183,
@@ -688,7 +688,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 139,
@@ -797,7 +797,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 151,
@@ -807,7 +807,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 152,
@@ -970,7 +970,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 164,
@@ -980,7 +980,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 188,
@@ -990,7 +990,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 300,
@@ -1063,7 +1063,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 308,
@@ -1073,7 +1073,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 310,
@@ -1128,7 +1128,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 320,
@@ -1192,7 +1192,7 @@
       "store_hidden": true,
       "tradable": false,
       "marketable": false,
-      "exchange": "3100x100"
+      "exchange": "3100x100;3100x70"
     },
     {
       "itemdefid": 208,
@@ -1207,7 +1207,7 @@
       "itemdefid": 1000,
       "type": "bundle",
       "bundle": "100x1;113x1;126x1;153x1",
-      "exchange": "3100x150",
+      "exchange": "3100x150;3100x105",
       "name": "Police Squad",
       "description": "The whole Police Squad outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1218,7 +1218,7 @@
       "itemdefid": 1001,
       "type": "bundle",
       "bundle": "165x1;114x1;127x1;152x1",
-      "exchange": "3100x150",
+      "exchange": "3100x150;3100x105",
       "name": "Businessman",
       "description": "The whole Businessman outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1229,7 +1229,7 @@
       "itemdefid": 1002,
       "type": "bundle",
       "bundle": "109x1;124x1;137x1;162x1",
-      "exchange": "3100x300",
+      "exchange": "3100x300;3100x210",
       "name": "Black Tie",
       "description": "The whole Black Tie outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1240,7 +1240,7 @@
       "itemdefid": 1003,
       "type": "bundle",
       "bundle": "102x1;115x1;128x1;154x1",
-      "exchange": "3100x150",
+      "exchange": "3100x150;3100x105",
       "name": "Head Chef",
       "description": "The whole Head Chef outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1251,7 +1251,7 @@
       "itemdefid": 1004,
       "type": "bundle",
       "bundle": "105x1;119x1;130x1;155x1",
-      "exchange": "3100x200",
+      "exchange": "3100x200;3100x140",
       "name": "Fire Brigade",
       "description": "The whole Fire Brigade outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1262,7 +1262,7 @@
       "itemdefid": 1005,
       "type": "bundle",
       "bundle": "108x1;173x1;181x1;160x1",
-      "exchange": "3100x275",
+      "exchange": "3100x275;3100x193",
       "name": "Pirate Captain",
       "description": "The whole Pirate Captain outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1273,7 +1273,7 @@
       "itemdefid": 1006,
       "type": "bundle",
       "bundle": "112x1;174x1;182x1;150x1;188x1",
-      "exchange": "3100x450",
+      "exchange": "3100x450;3100x315",
       "name": "Royal Highness",
       "description": "The whole Royal Highness outfit (5 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1284,7 +1284,7 @@
       "itemdefid": 1007,
       "type": "bundle",
       "bundle": "123x1;135x1;139x1;189x1",
-      "exchange": "3100x225",
+      "exchange": "3100x225;3100x158",
       "name": "Superhero",
       "description": "The whole Superhero outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1295,7 +1295,7 @@
       "itemdefid": 1008,
       "type": "bundle",
       "bundle": "106x1;118x1;186x1;159x1",
-      "exchange": "3100x225",
+      "exchange": "3100x225;3100x158",
       "name": "Wild West",
       "description": "The whole Wild West outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1306,7 +1306,7 @@
       "itemdefid": 1010,
       "type": "bundle",
       "bundle": "166x1;171x1;179x1;187x1",
-      "exchange": "3100x200",
+      "exchange": "3100x200;3100x140",
       "name": "Pilot",
       "description": "The whole Pilot outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1317,7 +1317,7 @@
       "itemdefid": 1011,
       "type": "bundle",
       "bundle": "167x1;172x1;180x1;154x1",
-      "exchange": "3100x175",
+      "exchange": "3100x175;3100x123",
       "name": "Doctor",
       "description": "The whole Doctor outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1328,7 +1328,7 @@
       "itemdefid": 1012,
       "type": "bundle",
       "bundle": "168x1;125x1;183x1;144x1;163x1",
-      "exchange": "3100x425",
+      "exchange": "3100x425;3100x298",
       "name": "Knight",
       "description": "The whole Knight outfit (5 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1339,7 +1339,7 @@
       "itemdefid": 1013,
       "type": "bundle",
       "bundle": "111x1;175x1;184x1;146x1;190x1;325x1",
-      "exchange": "3100x475",
+      "exchange": "3100x475;3100x333",
       "name": "Wizard",
       "description": "The whole Wizard outfit (6 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1350,7 +1350,7 @@
       "itemdefid": 1014,
       "type": "bundle",
       "bundle": "107x1;176x1;185x1;191x1",
-      "exchange": "3100x200",
+      "exchange": "3100x200;3100x140",
       "name": "Playground",
       "description": "The whole Playground outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1361,7 +1361,7 @@
       "itemdefid": 1015,
       "type": "bundle",
       "bundle": "169x1;177x1;138x1;192x1",
-      "exchange": "3100x275",
+      "exchange": "3100x275;3100x193",
       "name": "Bavarian",
       "description": "The whole Bavarian outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,
@@ -1372,7 +1372,7 @@
       "itemdefid": 1016,
       "type": "bundle",
       "bundle": "170x1;178x1;132x1;193x1",
-      "exchange": "3100x175",
+      "exchange": "3100x175;3100x123",
       "name": "Golfer",
       "description": "The whole Golfer outfit (4 pieces) for Gold Coins.",
       "store_hidden": true,

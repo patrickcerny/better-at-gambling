@@ -10,9 +10,11 @@ var menu: Control
 
 func before_each() -> void:
 	ProfileManager.reload()  # fresh, in memory under GUT
+	DailyDeals.off = true  # normal prices: the day's deals are tested in test_daily_deals
 
 
 func after_each() -> void:
+	DailyDeals.off = false
 	ProfileManager.reload()
 
 
