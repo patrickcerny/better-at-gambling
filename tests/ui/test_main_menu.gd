@@ -292,3 +292,59 @@ func test_trophy_opens_leaderboards_and_stats() -> void:
 	assert_gt(panel.stats_grid.get_child_count(), 20)
 	panel.close()
 	assert_false(panel.visible)
+
+
+## Patrick 2026-11-16: "I can open different dialogs (tutorial settings) over each other. Close the
+## other one if I open the other." Opening any menu dialog closes whichever one was open.
+func test_opening_a_dialog_closes_the_open_one() -> void:
+	var tutorial: Button = menu.get_node("Center/Column/VBox/Tutorial")
+	var gear: Button = menu.get_node("SettingsButton")
+	tutorial.pressed.emit()
+	await wait_process_frames(1)
+	assert_true(menu.how_to_play.visible)
+	gear.pressed.emit()
+	await wait_process_frames(1)
+	assert_true(menu._settings.visible, "settings open")
+	assert_false(menu.how_to_play.visible, "the tutorial closed")
+	assert_true((menu.get_node("Center/Column/VBox") as Control).visible, "the entries are back behind it")
+	tutorial.pressed.emit()
+	await wait_process_frames(1)
+	assert_true(menu.how_to_play.visible)
+	assert_false(menu._settings.visible, "and the other way round")
+	menu.trophy_button.pressed.emit()
+	assert_true(menu.leaderboards.visible)
+	assert_false(menu.how_to_play.visible)
+	menu.cosmetics_button.pressed.emit()
+	assert_true(menu.cosmetics.visible)
+	assert_false(menu.leaderboards.visible)
+	menu.profile_badge.pressed.emit()
+	assert_true(menu.level_pass.visible)
+	assert_false(menu.cosmetics.visible)
+	menu.daily_button.pressed.emit()
+	assert_true(menu.daily_spin.visible)
+	assert_false(menu.level_pass.visible)
+	gear.pressed.emit()
+	assert_true(menu._settings.visible)
+	assert_false(menu.daily_spin.visible)
+	var open := 0
+	for d: Control in menu.dialogs.members:
+		if d.visible:
+			open += 1
+	assert_eq(open, 1, "only ever one")
+	menu._settings.close()
+
+
+## The first-run tutorial before PRACTICE: replaced by another dialog, it does not go on into the
+## match and does not count as seen.
+func test_replaced_first_run_tutorial_does_not_start_the_match() -> void:
+	Settings.set_value("tutorial", "seen", false)
+	menu.load_match = false
+	watch_signals(menu)
+	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
+	await wait_process_frames(1)
+	assert_true(menu.how_to_play.visible)
+	(menu.get_node("SettingsButton") as Button).pressed.emit()
+	assert_false(menu.how_to_play.visible)
+	assert_signal_not_emitted(menu, "practice_requested")
+	assert_false(bool(Settings.get_value("tutorial", "seen", false)))
+	menu._settings.close()
