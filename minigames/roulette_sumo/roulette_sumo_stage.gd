@@ -38,6 +38,8 @@ var _ball_spin: Node3D = null
 var _omega: float = 0.0
 var _angle: float = 0.0
 var _cooldown: float = 0.0
+## Start grace left (s, from `roulette_sumo_begin`): the wheel stands still and nobody drifts.
+var _grace: float = 0.0
 var _predicted_push: float = -1.0
 var _gauge_fill: ColorRect = null
 var _gauge_label: Label = null
@@ -78,6 +80,7 @@ func apply_state(st: Dictionary) -> void:
 	done = str(st.get("state", "")) == "done"
 	winner = int(st.get("winner", -1))
 	_omega = float(st.get("omega", _omega))
+	_grace = float(st.get("grace", 0.0))
 	_angle = float(st.get("angle", _angle))
 	_read_ball(st.get("ball", {}), true)
 	out.clear()
@@ -153,17 +156,22 @@ func on_event(ev: Dictionary) -> void:
 			_read_ball(ev.get("ball", {}), false)
 			if ball_node != null and not _is_dedicated() and Vfx.enabled():
 				Audio.play_at(&"ball_roll", ball_node, -14.0, randf_range(0.8, 1.0))
+		&"roulette_sumo_begin":
+			_grace = float(ev.get("grace", 0.0))
+		&"roulette_sumo_spin":
+			_grace = 0.0
 		&"player_knocked_down":
 			_aim_knockdown(int(ev["target"]), StringName(ev.get("cause", &"")))
 	if _is_dedicated():
 		return  # the dedicated server only needs the room's floor (and the tumble's direction)
 	match StringName(ev["type"]):
 		&"minigame_go":
+			banner("GET READY…", Palette.CREAM, 1.2)
+			_say("Find your feet. The wheel starts in a moment!", QuizHost.Pose.DRUMROLL)
+		&"roulette_sumo_spin":
 			banner("SPIN!", Palette.VIP_GOLD, 1.4)
 			Audio.play(&"countdown_beep", &"SFX", -4.0, 1.2)
 			_say("Push them off and keep walking. Spin it up!", QuizHost.Pose.DRUMROLL)
-		&"roulette_sumo_begin":
-			feed("Last bean on the wheel wins", Palette.VIP_GOLD)
 		&"roulette_sumo_push":
 			_on_push(ev)
 		&"roulette_sumo_ball_hit":
@@ -201,16 +209,11 @@ func _on_push(ev: Dictionary) -> void:
 	var dir: Vector3 = _wire_dir(ev.get("dir", []))
 	var strength: float = float(ev.get("strength", RouletteSumoLogic.PUSH_STRENGTH))
 	create_tween().tween_callback(func() -> void: _shoved(target, dir, strength, false)).set_delay(AvatarVisuals.SWING_CONTACT)
-	if target == local_id:
-		feed("%s pushed you" % player_name(by), player_color(by))
-	elif by == local_id:
-		feed("You pushed %s" % player_name(target), player_color(by))
 
 
 func _on_ball_hit(ev: Dictionary) -> void:
 	var pid: int = int(ev["player"])
 	_shoved(pid, _wire_dir(ev.get("dir", [])), float(ev.get("strength", RouletteSumoLogic.BALL_PUSH)), true)
-	feed("The ball bumped %s" % player_name(pid), Palette.CREAM)
 	if pid == local_id:
 		banner("BUMPED!", Palette.CREAM, 0.8)
 	elif randf() < 0.4:
@@ -251,11 +254,8 @@ func _on_out(ev: Dictionary) -> void:
 			Vfx.floating_text(self, a.global_position + Vector3(0, 1.8, 0), "OUT!", Palette.LOSS_RED, 120, 1.0, 1.2)
 	if names.is_empty():
 		return
-	var place: int = int(ev.get("place", 0))
 	if cause == &"dropout":
-		feed("%s left the game" % " & ".join(names), Color(Palette.CREAM, 0.7))
 		return
-	feed("%s fell off  (#%d)" % [" & ".join(names), place], Palette.LOSS_RED)
 	if local_id in ev.get("players", []):
 		banner("OFF THE WHEEL!", Palette.LOSS_RED, 1.6)
 		Audio.play(&"loss_sting", &"SFX", -6.0)
@@ -271,9 +271,7 @@ func _announce(ranking: Array, reason: StringName) -> void:
 			top.append(int(row["player"]))
 	if top.size() == 1:
 		var w: int = top[0]
-		var how: String = "CLOSEST TO THE MIDDLE" if reason == &"time" else "LAST ON THE WHEEL"
 		banner("YOU WIN!" if w == local_id else "%s WINS!" % player_name(w).to_upper(), Palette.VIP_GOLD, 3.0)
-		feed("%s: %s" % [player_name(w), how.to_lower()], Palette.VIP_GOLD)
 		_say("%s stays on my wheel. The winner!" % player_name(w) if reason != &"time" else "Time! %s held the middle. The winner!" % player_name(w), QuizHost.Pose.HAPPY, 4.0)
 		var wa: PlayerAvatar = avatar(w)
 		if wa != null:
@@ -320,7 +318,10 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-	if going and not over and not done:
+	if going and not over and not done and _grace > 0.0:
+		_grace = maxf(_grace - delta, 0.0)  # the start grace: the wheel waits (the server's spin event ends it)
+		_omega = 0.0
+	elif going and not over and not done:
 		clock = minf(clock + delta, RouletteSumoLogic.GAME_SECONDS)
 		_omega = RouletteSumoLogic.omega_at(clock)
 		_angle = RouletteSumoLogic.wheel_angle(clock)
@@ -392,17 +393,22 @@ func _refresh_status() -> void:
 	if status_label == null:
 		return
 	var on: Array[int] = alive_players()
-	var lines: PackedStringArray = ["ON THE WHEEL  %d/%d" % [on.size(), roster.size()]]
+	var rows: Array = []
+	var gone: Array = []
 	for p: int in roster:
-		var who: String = "YOU" if p == local_id else player_name(p)
-		var tag: String = "on"
+		var r: Dictionary = {"player": p, "leader": p == winner}
+		if p == winner:
+			r["tag"] = "WINNER"
+			r["tag_color"] = Palette.VIP_GOLD
 		if p in out:
-			tag = "OUT"
-		elif p == winner:
-			tag = "WINNER"
-		lines.append("%s  %s" % [who, tag])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 26)
+			r["status"] = &"out"
+			gone.append(r)
+		else:
+			rows.append(r)
+	rows.append_array(gone)
+	for r: Dictionary in rows:
+		r["rank"] = 0  # who is still in has no order
+	show_board("ON THE WHEEL  %d / %d" % [on.size(), roster.size()], rows)
 
 
 # --- The ball -------------------------------------------------------------------------------------

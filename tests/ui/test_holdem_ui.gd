@@ -100,11 +100,9 @@ func test_the_aa_bonus_explains_itself() -> void:
 
 func test_the_left_stick_picks_the_aa_bonus() -> void:
 	InputGlyphs.set_gamepad(true)
+	# The table's stick picker (StationUi._pad_step) reads the stick each frame.
 	var push := func(v: float) -> void:
-		var ev := InputEventJoypadMotion.new()
-		ev.axis = JOY_AXIS_LEFT_X
-		ev.axis_value = v
-		ui._unhandled_input(ev)
+		ui._pad_step(Vector2(v, 0.0), 0.016)
 	push.call(1.0)
 	assert_eq(ui.bonus, ui.bonus_sizes[1], "right: the next size")
 	push.call(0.9)

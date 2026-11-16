@@ -317,10 +317,10 @@ func _make_chip_buttons() -> void:
 		b.text = "$%d" % chips[i]
 		var side: float = clampf(minf(chip_size.x, chip_size.y) + 8.0, 44.0, 72.0)
 		b.custom_minimum_size = Vector2(side, side)
-		b.focus_mode = Control.FOCUS_ALL
+		# No GUI focus: chips are picked with 1-4 / the shoulder buttons, and a focused chip took the
+		# d-pad (items) and A (bet) away from a gamepad at the table.
+		b.focus_mode = Control.FOCUS_NONE
 		var idx: int = i
 		b.pressed.connect(func() -> void: select_chip(idx))
 		_chips_row.add_child(b)
 		_chip_buttons.append(b)
-	if not _chip_buttons.is_empty():
-		_chip_buttons[0].grab_focus()

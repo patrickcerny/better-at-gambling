@@ -96,7 +96,7 @@ func on_event(ev: Dictionary) -> void:
 		&"megaphone_dropped":
 			_at(int(ev["player"]), &"ui_click", -10.0, 0.7)
 		&"effect_ended":
-			if int(ev["player"]) == me:
+			if int(ev["player"]) == me and StringName(ev.get("reason", &"")) != &"paused":
 				Audio.play(&"ui_hover", &"UI", -10.0, 0.8)
 
 

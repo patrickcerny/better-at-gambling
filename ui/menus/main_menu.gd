@@ -338,6 +338,7 @@ func _build_online() -> void:
 	_online_box.add_child(_name_edit)
 	_name_edit.text_submitted.connect(func(_t: String) -> void: _save_name())
 	_name_edit.focus_exited.connect(_save_name)
+	PadKeyboard.attach(_name_edit)  # A on it with a gamepad: Steam's keyboard (Deck) or ours
 	var kind_row := HBoxContainer.new()
 	kind_row.name = "LobbyKind"
 	kind_row.add_theme_constant_override(&"separation", 8)

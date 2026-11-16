@@ -31,8 +31,6 @@ var bonus_buttons: Array[Button] = []
 ## The AA Bonus sizes on offer (0 = off), and the one picked.
 var bonus_sizes: Array[int] = [0]
 var bonus: int = 0
-## The left stick's last side while picking the AA Bonus (0 = middle).
-var _stick_dir: int = 0
 var others_label: Label
 
 
@@ -169,7 +167,7 @@ func set_bonus(amount: int) -> void:
 	_refresh()
 
 
-## One AA Bonus size along (gamepad: the left stick left / right), stopping at the ends.
+## One AA Bonus size along, stopping at the ends (the gamepad picks it with StationUi's stick picker).
 func step_bonus(dir: int) -> void:
 	var i: int = clampi(bonus_sizes.find(bonus) + dir, 0, bonus_sizes.size() - 1)
 	set_bonus(bonus_sizes[i])
@@ -266,6 +264,28 @@ func _rules_text() -> String:
 		+ "AA BONUS (optional side bet on your 2 cards + the 3 flop cards, Pair of Aces or better wins, paid even if you fold):  " + "  ·  ".join(bonus_lines))
 
 
+## Gamepad: while bets are open the stick picks the AA bonus (the frame is the chosen size);
+## A still deals.
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	if bonus_row != null and bonus_row.is_visible_in_tree():
+		out.assign(bonus_buttons)
+	return out
+
+
+func _pad_selected(i: int) -> void:
+	if i < bonus_sizes.size():
+		set_bonus(bonus_sizes[i])
+
+
+func _pad_current() -> int:
+	return bonus_sizes.find(bonus)
+
+
+func _pad_activate(_i: int) -> bool:
+	return false
+
+
 func _hint_text() -> String:
 	if InputGlyphs.gamepad:
 		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  [Left stick] AA bonus  [{bet_confirm}] deal\n[{bj_hit}] call / river bet  [{bj_stand}] fold / check  [{leave_station}] stand up")
@@ -286,12 +306,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		fold_btn.pressed.emit()
 	elif bet_panel.visible and key == KEY_B:
 		cycle_bonus()
-	elif bet_panel.visible and event is InputEventJoypadMotion and (event.is_action(&"move_right") or event.is_action(&"move_left")):
-		# The stick steps once per push (back to the middle to step again).
-		var dir: int = 1 if event.is_action_pressed(&"move_right") else (-1 if event.is_action_pressed(&"move_left") else 0)
-		if dir != 0 and _stick_dir == 0:
-			step_bonus(dir)
-		_stick_dir = dir
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -398,7 +412,11 @@ func _dealer_text() -> String:
 	if dealer.is_empty() and down == 0:
 		return ""
 	if dealer.is_empty():
-		return "DEALER  " + "  ".join(PackedStringArray(["??", "??"]).slice(0, down))
+		var out_down: String = "DEALER  " + "  ".join(PackedStringArray(["??", "??"]).slice(0, down))
+		var peek: Array = priv.get("peek", [])
+		if not peek.is_empty():  # Sunglasses: only your own private state has them
+			out_down += "  ·  SUNGLASSES: %s" % "  ".join(_labels(peek))
+		return out_down
 	var out: String = "DEALER  %s  ·  %s" % ["  ".join(_labels(dealer)), String(pub.get("dealer_hand", ""))]
 	if not bool(pub.get("qualifies", true)):
 		out += "  ·  does not qualify"

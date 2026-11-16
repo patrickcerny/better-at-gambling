@@ -2,7 +2,7 @@ class_name ModifierItemEffect
 extends ItemEffect
 ## Items that are one ModifierStack entry on their target (Lucky Clover, Black Cat, Hot Hands,
 ## Loaded Reels, Double Trouble, Golden Chip, Bodyguard, Mirror, Spring Glove). Tuned in the
-## item's `params`: `luck`, `game` (one game only), `rounds` (uses), `payout_multiplier`,
+## item's `params`: `luck`, `game` (one game only, or a list of games), `rounds` (uses), `payout_multiplier`,
 ## `consume_on_win`, `refund_on_loss`, `flags` (names other systems look for) and `segment_end`
 ## (also runs out when the casino segment closes). `def.duration` is the time limit (0 = none).
 ## Using the same item again stacks (luck stays clamped to ±3).
@@ -12,7 +12,12 @@ func activate(ctx: ItemContext) -> Dictionary:
 	var m := Modifier.new()
 	m.id = ctx.def.id
 	m.source_player = ctx.user
-	m.game_id = StringName(ctx.param("game", ""))
+	var game: Variant = ctx.param("game", "")
+	if game is Array:
+		for g: Variant in game:
+			m.games.append(StringName(g))
+	else:
+		m.game_id = StringName(game)
 	m.luck = float(ctx.param("luck", 0))
 	m.payout_multiplier = float(ctx.param("payout_multiplier", 1.0))
 	m.consume_on_win = bool(ctx.param("consume_on_win", false))

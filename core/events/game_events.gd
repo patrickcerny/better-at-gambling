@@ -27,6 +27,7 @@ const SCHEMA: Dictionary = {
 	&"discard_needed": ["player", "item", "seconds"],
 	&"item_discarded": ["player", "item"],
 	&"effect_ended": ["player", "item", "reason"],
+	&"effect_resumed": ["player", "item", "seconds"],
 	&"bodyguard_saved": ["player", "attacker"],
 	&"banana_placed": ["peel", "owner", "pos", "seconds"],
 	&"banana_slip": ["peel", "player", "owner", "result", "victim", "amount"],

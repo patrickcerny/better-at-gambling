@@ -349,10 +349,17 @@ func _apply(ev: Dictionary) -> void:
 			players_changed.emit()
 		&"item_used":
 			_on_item_used(ev)
-		&"effect_ended":
+		&"effect_ended":  # also `reason` paused: put aside for a minigame
 			var pid: int = int(ev["player"])
 			var list: Array = effects.get(pid, [])
 			list.erase(StringName(ev["item"]))
+			effects_changed.emit(pid)
+		&"effect_resumed":  # back from the minigame: the effect runs on
+			var pid: int = int(ev["player"])
+			if not effects.has(pid):
+				effects[pid] = []
+			if not (effects[pid] as Array).has(StringName(ev["item"])):
+				effects[pid].append(StringName(ev["item"]))
 			effects_changed.emit(pid)
 		&"monkey_passed":
 			var from: int = int(ev["from"])

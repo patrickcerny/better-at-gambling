@@ -6,7 +6,7 @@ extends WalkableStage
 ## over one takes it (it shrinks into their hand) and every bean's hand is fanned over their head
 ## (`HandFan`, with its name: "PAIR", "FLUSH"...). The overlay shows the clock, everyone's hand
 ## name (top left), the feed, Lucky's lines (bottom left) and our own hand as five big cards along
-## the bottom: number keys 1–5 or the mouse wheel pick the card E drops (the worst card unless we
+## the bottom: number keys 1–5, the mouse wheel or the d-pad pick the card E drops (the worst card unless we
 ## picked one). At the whistle the hands fan out big over every head and a showdown table lists
 ## them best first; Lucky names the winner.
 ##
@@ -157,10 +157,23 @@ func _input(event: InputEvent) -> void:
 		return
 	var mb := event as InputEventMouseButton
 	if mb != null and mb.pressed and (mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN):
-		var n: int = my_hand().size()
-		var cur: int = selected if selected >= 0 else 0
-		select_slot(posmod(cur + (1 if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1), n))
+		step_slot(1 if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
 		get_viewport().set_input_as_handled()
+		return
+	# Gamepad: d-pad left / right walks the hand (this room has no items for the d-pad to use).
+	var jb := event as InputEventJoypadButton
+	if jb != null and jb.pressed and (jb.button_index == JOY_BUTTON_DPAD_LEFT or jb.button_index == JOY_BUTTON_DPAD_RIGHT):
+		step_slot(1 if jb.button_index == JOY_BUTTON_DPAD_RIGHT else -1)
+		get_viewport().set_input_as_handled()
+
+
+## Moves the picked card `by` slots along the hand (wrapping round).
+func step_slot(by: int) -> void:
+	var n: int = my_hand().size()
+	if n == 0:
+		return
+	var cur: int = selected if selected >= 0 and selected < n else 0
+	select_slot(posmod(cur + by, n))
 
 
 # --- Events -------------------------------------------------------------------------------------
@@ -196,8 +209,6 @@ func on_event(ev: Dictionary) -> void:
 		&"minigame_eliminated":
 			for p: Variant in ev.get("players", []):
 				_drop_player(int(p))
-				if StringName(ev.get("cause", &"")) == &"dropout":
-					feed("%s left the game" % player_name(int(p)), Color(Palette.CREAM, 0.7))
 		&"rewards_started":
 			_close_showdown()
 	_refresh_hud()
@@ -213,12 +224,9 @@ func _on_picked(pid: int, fid: int, card: int, hand: Array) -> void:
 		Audio.play_at(&"card_flip", a, -4.0, 1.1)
 	if pid == local_id:
 		Audio.play(&"chime", &"SFX", -10.0, 1.4)
-		feed("You picked up the %s" % PokerHand.card_name(card).to_lower(), Palette.MONEY_GREEN)
 		var tuple: Array[int] = PokerHand.evaluate(hand)
 		if int(tuple[0]) >= PokerHand.Category.PAIR and hand_names.get(pid, "") != "":
 			_flash_bar_title()
-	elif hand.size() >= HAND_MAX:
-		feed("%s has a full hand: %s" % [player_name(pid), PokerHand.name_of(PokerHand.evaluate(hand)).to_lower()], player_color(pid))
 
 
 func _on_dropped(ev: Dictionary) -> void:
@@ -238,15 +246,12 @@ func _on_dropped(ev: Dictionary) -> void:
 		Audio.play(&"whoosh", &"SFX", -6.0, 1.3)
 		if a != null:
 			Vfx.floating_text(self, a.global_position + Vector3(0, 2.2, 0), "DROPPED!", Palette.LOSS_RED, 90, 0.8, 1.0)
-		feed("%s knocked the %s out of %s's hand" % [player_name(by), PokerHand.card_name(card).to_lower(), player_name(pid)], player_color(by))
 		if pid == local_id:
 			banner("SHOVED! YOU DROPPED A CARD", Palette.LOSS_RED, 1.2)
 		elif by == local_id:
 			banner("THEY DROPPED THE %s!" % PokerHand.card_name(card), Palette.MONEY_GREEN, 1.0)
 	else:
 		Audio.play(&"card_flip", &"UI", -8.0, 0.9)
-		if pid == local_id:
-			feed("You dropped the %s" % PokerHand.card_name(card).to_lower(), Color(Palette.CREAM, 0.8))
 
 
 func _on_over(ev: Dictionary) -> void:
@@ -435,15 +440,25 @@ func _refresh_hud() -> void:
 	_refresh_bar()
 	if status_label == null:
 		return
-	var lines: PackedStringArray = ["HANDS"]
+	var order: Array[int] = []
 	for p: int in roster:
-		if p in gone:
-			continue
-		var who: String = "YOU" if p == local_id else player_name(p)
+		if p not in gone:
+			order.append(p)
+	var tuples: Dictionary = {}
+	for p: int in order:
+		tuples[p] = PokerHand.evaluate(hands.get(p, []))
+	order.sort_custom(func(a: int, b: int) -> bool:
+		var c: int = PokerHand.compare(tuples[a], tuples[b])
+		return c > 0 if c != 0 else a < b)
+	var rows: Array = []
+	for i: int in order.size():
+		var p: int = order[i]
 		var n: int = (hands.get(p, []) as Array).size()
-		lines.append("%s  %s  (%d)" % [who, hand_names.get(p, "NO CARDS"), n])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 24)
+		rows.append({"player": p, "score_text": str(hand_names.get(p, "NO CARDS")) if n > 0 else "—",
+			"detail": "%d card%s" % [n, "" if n == 1 else "s"],
+			"leader": i == 0 and n > 0 and (order.size() == 1 or PokerHand.compare(tuples[p], tuples[order[1]]) > 0)})
+	MinigameScoreboard.rank_rows(rows, "score_text")
+	show_board("HANDS", rows)
 
 
 # --- Our hand bar -------------------------------------------------------------------------------
@@ -524,7 +539,8 @@ func _refresh_bar() -> void:
 		_bar.add_child(slot)
 	var tuple: Array[int] = PokerHand.evaluate(hand)
 	_bar_title.text = PokerHand.describe(tuple) if not hand.is_empty() else "YOUR HAND"
-	_bar_hint.text = InputGlyphs.fill("[{interact}] DROP  ·  1-5 / WHEEL: PICK A CARD") if not hand.is_empty() else "WALK OVER CARDS TO PICK THEM UP"
+	var pick: String = "D-PAD ◀ ▶" if InputGlyphs.gamepad else "1-5 / WHEEL"
+	_bar_hint.text = InputGlyphs.fill("[{interact}] DROP  ·  %s: PICK A CARD" % pick) if not hand.is_empty() else "WALK OVER CARDS TO PICK THEM UP"
 	_bar_panel.visible = local_id in roster and local_id not in gone and not over and not done
 
 

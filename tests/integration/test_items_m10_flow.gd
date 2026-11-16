@@ -56,5 +56,5 @@ func test_sunglasses_used_before_sitting_show_the_hole_card() -> void:
 		pass_test("the round already ended on a natural")
 		return
 	var priv: Dictionary = fx.server.get_private_snapshot(p)["station"]
-	assert_true(priv.has("hole_card"), "the hole card reaches the wearer: %s" % priv)
-	assert_false(fx.server.get_private_snapshot(fx.player_ids[1])["station"].has("hole_card"))
+	assert_true(priv.has("peek"), "the hole card reaches the wearer: %s" % priv)
+	assert_false(fx.server.get_private_snapshot(fx.player_ids[1])["station"].has("peek"))

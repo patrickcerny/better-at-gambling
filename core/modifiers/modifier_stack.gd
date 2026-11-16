@@ -15,6 +15,9 @@ var streak_min_stake: int = 0
 var streak_scale: Dictionary = {}
 
 var _mods: Dictionary[int, Array] = {}
+## Player → [{mod, left}] put aside while a minigame is on (`pause_all`); `left` is the time
+## that was left (INF = no time limit).
+var _paused: Dictionary[int, Array] = {}
 ## Player → luck points from the current losing streak.
 var _streak: Dictionary[int, float] = {}
 
@@ -109,7 +112,7 @@ func consume_on_loss(player: int, game_id: StringName) -> bool:
 ## Call once per round played at a game: decrements round-limited modifiers for that game.
 func consume_round(player: int, game_id: StringName) -> void:
 	for m: Modifier in get_mods(player):
-		if m.rounds_left > 0 and m.game_id == game_id:
+		if m.rounds_left > 0 and m.limited_to(game_id):
 			m.rounds_left -= 1
 			if m.rounds_left == 0:
 				_remove(player, m, &"consumed")
@@ -140,11 +143,50 @@ func expire_flag(flag: StringName) -> void:
 				_remove(player, m, &"expired")
 
 
-## Ends every modifier of every player (a minigame starts: no casino effect carries into it).
+## Ends every modifier of every player (the match is over); paused ones are dropped silently.
 func expire_all(reason: StringName = &"expired") -> void:
+	_paused.clear()
 	for player: int in _mods.keys():
 		for m: Modifier in get_mods(player):
 			_remove(player, m, reason)
+
+
+## A minigame starts: every modifier is put aside with the time it had left, so it does nothing
+## during the minigame and its clock stands still. No `modifier_removed` (nothing ran out).
+## Returns [{player, mod}] of what was paused.
+func pause_all(now: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for player: int in _mods.keys():
+		for m: Modifier in get_mods(player):
+			var left: float = m.expires_at - now if m.expires_at != INF else INF
+			if left <= 0.0:
+				continue  # ran out this very tick: `expire` ends it normally
+			if not _paused.has(player):
+				_paused[player] = []
+			_paused[player].append({"mod": m, "left": left})
+			_mods[player].erase(m)
+			out.append({"player": player, "mod": m})
+	return out
+
+
+## Back in the casino: the paused modifiers run on with the time they had left.
+## Returns [{player, mod}] of what was resumed.
+func resume_all(now: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for player: int in _paused.keys():
+		for e: Dictionary in _paused[player]:
+			var m: Modifier = e["mod"]
+			var left: float = float(e["left"])
+			m.expires_at = now + left if left != INF else INF
+			add(player, m)
+			out.append({"player": player, "mod": m})
+	_paused.clear()
+	return out
+
+
+## True while a player has effects put aside for a minigame.
+func has_paused(player: int) -> bool:
+	return not (_paused.get(player, []) as Array).is_empty()
 
 
 ## Hands the first modifier of `from` carrying `flag` over to `to` (Bad Luck Monkey). Returns it,

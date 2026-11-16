@@ -11,6 +11,10 @@ const STEP: float = 0.05
 var cfg: BalanceConfig = BalanceConfig.new()
 
 
+## The ring the drag was tuned on (the spawn ring until 0.9.85 moved the spawns in to 3.3).
+const TUNE_R: float = 4.4
+
+
 func _game(players: Array[int], seed_value: int = 7) -> RouletteSumoLogic:
 	var g := RouletteSumoLogic.new()
 	g.setup(players, SeededRng.new(seed_value), cfg, {}, {})
@@ -22,6 +26,8 @@ func _game(players: Array[int], seed_value: int = 7) -> RouletteSumoLogic:
 	g.ball_vel = Vector2.ZERO
 	g.ball_turn = 0.0
 	g.seg_left = 1000.0
+	g.grace_left = 0.0  # the start grace has its own test
+	g.ball_safe_until.clear()
 	return g
 
 
@@ -134,6 +140,7 @@ func _seconds_on(g: RouletteSumoLogic, p: int, walk: float, limit: float) -> flo
 func test_standing_still_gets_dragged_off_within_seconds() -> void:
 	var g: RouletteSumoLogic = _game([1, 2])
 	assert_almost_eq(RouletteSumoLogic.flat_radius(g.spawn_for(1)), WheelRoom.SPAWN_RADIUS, 0.01)
+	g.world.set_transform(1, _deck(TUNE_R), 0.0)
 	g.world.set_transform(2, _deck(1.5), 0.0)  # the other bean stays on so the game runs on
 	var t: float = _seconds_on(g, 1, 0.0, 10.0)
 	gut.p("standing still from the spawn at the start: off after %.2f s" % t)
@@ -143,7 +150,7 @@ func test_standing_still_gets_dragged_off_within_seconds() -> void:
 	h.world.set_transform(2, _deck(1.5), 0.0)
 	h.world.set_transform(1, _deck(1.5, 2.0), 0.0)
 	_run(h, RouletteSumoLogic.RAMP_SECONDS)
-	h.world.set_transform(1, _deck(WheelRoom.SPAWN_RADIUS, 0.5), 0.0)
+	h.world.set_transform(1, _deck(TUNE_R, 0.5), 0.0)
 	t = _seconds_on(h, 1, 0.0, 10.0)
 	gut.p("standing still from the spawn at full speed: off after %.2f s" % t)
 	assert_gt(t, 0.0)
@@ -154,17 +161,17 @@ func test_standing_still_gets_dragged_off_within_seconds() -> void:
 ## walk, past about 5.6 m only a sprint gets you back, and a bean walking in holds on.
 func test_walking_beans_have_to_work_to_stay_on() -> void:
 	var walk: float = cfg.walk_speed
-	var pull: float = RouletteSumoLogic.outward_speed(WheelRoom.SPAWN_RADIUS, RouletteSumoLogic.OMEGA_MAX)
+	var pull: float = RouletteSumoLogic.outward_speed(TUNE_R, RouletteSumoLogic.OMEGA_MAX)
 	assert_gt(pull, walk * 0.6, "the pull at the spawn ring is most of a walk (%.2f m/s)" % pull)
 	assert_lt(pull, walk, "but walking in still wins there")
 	assert_gt(RouletteSumoLogic.outward_speed(6.0, RouletteSumoLogic.OMEGA_MAX), walk, "near the rim walking isn't enough")
 	assert_lt(RouletteSumoLogic.outward_speed(6.0, RouletteSumoLogic.OMEGA_MAX), cfg.sprint_speed, "a sprint is")
-	assert_gt(RouletteSumoLogic.outward_speed(WheelRoom.SPAWN_RADIUS, RouletteSumoLogic.OMEGA_START), 0.5, "even at the start the pull is felt")
+	assert_gt(RouletteSumoLogic.outward_speed(TUNE_R, RouletteSumoLogic.OMEGA_START), 0.5, "even at the start the pull is felt")
 	var g: RouletteSumoLogic = _game([1, 2])
 	g.world.set_transform(2, _deck(1.5), 0.0)
 	g.world.set_transform(1, _deck(1.5, 2.0), 0.0)
 	_run(g, RouletteSumoLogic.RAMP_SECONDS)
-	g.world.set_transform(1, _deck(WheelRoom.SPAWN_RADIUS, 0.5), 0.0)
+	g.world.set_transform(1, _deck(TUNE_R, 0.5), 0.0)
 	assert_eq(_seconds_on(g, 1, walk, 10.0), -1.0, "a bean walking in at full speed stays on")
 	var h: RouletteSumoLogic = _game([1, 2])
 	h.world.set_transform(2, _deck(1.5), 0.0)
@@ -202,6 +209,7 @@ func test_ball_path_stays_on_the_deck_and_is_deterministic() -> void:
 		var g := RouletteSumoLogic.new()
 		g.setup([1, 2] as Array[int], SeededRng.new(42), cfg, {}, {})
 		g.world = WorldQuery.new()
+		g.grace_left = 0.0
 		var path: Array[Vector2] = []
 		var turns: int = 0
 		for i: int in 1200:  # 60 s
@@ -392,3 +400,34 @@ func test_public_state_carries_the_catch_up() -> void:
 		assert_true(st.has(k), "state has %s" % k)
 	assert_false(st.has("frozen"), "no bats, nothing frozen")
 	assert_eq(StringName(st["minigame"]), &"roulette_sumo")
+
+
+## Patrick 2026-11-16: "you sometimes spawn in the ball or at the edge and you directly get
+## disqualified". The start grace holds the wheel and the ball, nobody falls out during it, and
+## every spawn is clear of the ball and well inside the rim.
+func test_start_grace_and_safe_spawns() -> void:
+	for seed_value: int in [1, 2, 3, 7, 11, 42]:
+		var g := RouletteSumoLogic.new()
+		g.setup([1, 2, 3, 4, 5, 6, 7, 8], SeededRng.new(seed_value), cfg, {}, {})
+		g.world = WorldQuery.new()
+		var b := Vector2(g.ball_pos)
+		for p: int in g.players:
+			var at: Vector3 = g.spawn_for(p)
+			g.world.set_transform(p, at, 0.0)
+			assert_lt(RouletteSumoLogic.flat_radius(at), WheelRoom.RIM_RADIUS - 3.0, "spawn well inside the rim")
+			var c: Vector3 = WheelRoom.center()
+			assert_gt(Vector2(at.x - c.x, at.z - c.z).distance_to(b), RouletteSumoLogic.BALL_HIT + 1.0, "spawn clear of the ball")
+		var evs: Array[Dictionary] = _run(g, RouletteSumoLogic.START_GRACE - 0.1)
+		assert_eq(g.clock, 0.0, "the clock waits")
+		assert_eq(g.ball_pos, b, "the ball waits")
+		assert_eq(_of(evs, &"roulette_sumo_begin")[0].get("grace", 0.0), RouletteSumoLogic.START_GRACE)
+		assert_eq(_of(evs, &"roulette_sumo_spin").size(), 0)
+		# Even a bean standing past the rim during the grace isn't out yet.
+		g.world.set_transform(1, _deck(RouletteSumoLogic.FALL_RADIUS + 0.5), 0.0)
+		evs = _run(g, 0.05)
+		assert_eq(_of(evs, &"minigame_eliminated").size(), 0)
+		evs = _run(g, 0.2)
+		assert_eq(_of(evs, &"roulette_sumo_spin").size(), 1, "then the wheel spins")
+		assert_gt(g.clock, 0.0)
+		assert_eq(_of(evs, &"minigame_eliminated").size(), 1, "and the rules apply again")
+		assert_gt(g.ball_vel.length(), 1.0, "the ball sets off")

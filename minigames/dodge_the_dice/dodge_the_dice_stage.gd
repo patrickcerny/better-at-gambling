@@ -149,7 +149,7 @@ func on_event(ev: Dictionary) -> void:
 			Audio.play(&"countdown_beep", &"SFX", -4.0, 1.2)
 			_say("Roll 'em! Balls, coins and dice, coming down.", QuizHost.Pose.DRUMROLL)
 		&"dodge_the_dice_begin":
-			feed("First to the top wins", Palette.VIP_GOLD)
+			pass
 		&"dodge_the_dice_hit":
 			_on_hit(int(ev["player"]), StringName(ev.get("kind", &"")), float(ev.get("seconds", DodgeTheDiceLogic.KNOCK_SECONDS)))
 		&"dodge_the_dice_top":
@@ -164,10 +164,6 @@ func on_event(ev: Dictionary) -> void:
 					left.append(p)
 			if left.size() == 1:
 				_say("Last call, %s! Ten seconds to the top!" % player_name(left[0]), QuizHost.Pose.SURPRISED)
-		&"minigame_eliminated":
-			if StringName(ev.get("cause", &"")) == &"dropout":
-				for p: Variant in ev.get("players", []):
-					feed("%s left the game" % player_name(int(p)), Color(Palette.CREAM, 0.7))
 		&"dodge_the_dice_over":
 			done = true
 			winner = int(ev.get("winner", -1))
@@ -192,8 +188,6 @@ func _on_hit(pid: int, kind: StringName, seconds: float) -> void:
 		if kind == &"coin":
 			Audio.play_at(&"coin", a, -4.0, 0.7)
 		Vfx.floating_text(self, a.global_position + Vector3(0, 2.0, 0), word, Palette.CREAM, 100, 0.9, 1.0)
-	var what: String = {&"ball": "a roulette ball", &"coin": "a giant coin", &"dice": "a die"}.get(kind, "something")
-	feed("%s got hit by %s" % [player_name(pid), what], player_color(pid))
 	if pid == local_id:
 		banner("SLIDING BACK!", Palette.LOSS_RED, 1.0)
 		if scene != null:
@@ -225,7 +219,6 @@ func _on_top(ev: Dictionary) -> void:
 		if pid == local_id:
 			banner("YOU MADE IT!  #%d" % place, Palette.VIP_GOLD, 2.0)
 			Audio.play(&"big_win" if place == 1 else &"minor_win", &"SFX", -4.0)
-	feed("%s reached the top  (#%d)" % [" & ".join(names), place], Palette.VIP_GOLD)
 	if place == 1:
 		_say("%s is first to the top!" % " and ".join(names), QuizHost.Pose.HAPPY)
 		if local_id not in ev.get("players", []):
@@ -244,7 +237,6 @@ func _announce(ranking: Array, reason: StringName) -> void:
 		var w: int = top[0]
 		banner("YOU WIN!" if w == local_id else "%s WINS!" % player_name(w).to_upper(), Palette.VIP_GOLD, 3.0)
 		var how: String = "first to the top" if is_up(w) else "highest on the board"
-		feed("%s: %s" % [player_name(w), how], Palette.VIP_GOLD)
 		if is_up(w):
 			_say("%s climbed my board first. The winner!" % player_name(w), QuizHost.Pose.HAPPY, 4.0)
 		else:
@@ -349,11 +341,11 @@ func _incoming(at: Vector3) -> bool:
 func _refresh_status() -> void:
 	if status_label == null:
 		return
-	var lines: PackedStringArray = ["TO THE TOP"]
+	var rows: Array = []
 	var place: int = 1
 	for g: Array in finish_groups:
 		for p: int in g:
-			lines.append("#%d  %s" % [place, "YOU" if p == local_id else player_name(p)])
+			rows.append({"player": int(p), "rank": place, "score_text": "TOP", "status": &"done", "leader": place == 1})
 		place += g.size()
 	var rest: Array[int] = []
 	for p: int in roster:
@@ -361,10 +353,13 @@ func _refresh_status() -> void:
 			rest.append(p)
 	rest.sort_custom(func(a: int, b: int) -> bool: return height_of(a) > height_of(b))
 	for p: int in rest:
-		var tag: String = "DOWN" if down_left.has(p) else "%d%%" % roundi(height_of(p) * 100.0)
-		lines.append("%s  %s" % ["YOU" if p == local_id else player_name(p), tag])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 26)
+		var r: Dictionary = {"player": p, "rank": place, "score_text": "%d%%" % roundi(height_of(p) * 100.0)}
+		if down_left.has(p):
+			r["tag"] = "DOWN"
+			r["tag_color"] = Palette.LOSS_RED
+		rows.append(r)
+		place += 1
+	show_board("TO THE TOP", rows)
 
 
 # --- Hazards --------------------------------------------------------------------------------------

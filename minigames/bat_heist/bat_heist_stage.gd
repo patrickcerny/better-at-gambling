@@ -194,7 +194,6 @@ func on_event(ev: Dictionary) -> void:
 			var c: Dictionary = ev.get("coins", {})
 			for k: Variant in c:
 				_set_coins(int(k), int(c[k]))
-			feed("Everyone starts with %d coins" % BatHeistLogic.START_COINS, Palette.VIP_GOLD)
 		&"bat_heist_swing":
 			var who: int = int(ev["player"])
 			if who != local_id or _predicted_swing <= 0.0:
@@ -217,7 +216,6 @@ func on_event(ev: Dictionary) -> void:
 			_on_stole(int(ev["player"]), int(ev["target"]), ev.get("coins", {}))
 		&"minigame_eliminated":
 			for p: Variant in ev.get("players", []):
-				feed("%s left the game" % player_name(int(p)), Color(Palette.CREAM, 0.7))
 				_drop_player(int(p))
 		&"bat_heist_over":
 			done = true
@@ -234,7 +232,6 @@ func _on_hit(by: int, target: int, seconds: float, cause: StringName = &"bat") -
 	var ta: PlayerAvatar = avatar(target)
 	var ba: PlayerAvatar = avatar(by)
 	if cause == &"throw":
-		feed("%s  threw  %s" % [player_name(by), player_name(target)], player_color(by))
 		if target == local_id:
 			banner("THROWN! GET UP!", Palette.LOSS_RED, 1.0)
 		elif by == local_id:
@@ -247,7 +244,6 @@ func _on_hit(by: int, target: int, seconds: float, cause: StringName = &"bat") -
 		Vfx.floating_text(self, at + Vector3(0, 0.6, 0), "BONK!", Palette.VIP_GOLD, 120, 0.9, 1.0)
 		if ba != null:
 			ta.visuals.hit(ta.global_position - ba.global_position, 1.0)
-	feed("%s  bonked  %s" % [player_name(by), player_name(target)], player_color(by))
 	if target == local_id:
 		banner("BONKED! GET UP!", Palette.LOSS_RED, 1.0)
 		if scene != null:
@@ -364,16 +360,11 @@ func _refresh_status() -> void:
 		return
 	var order: Array[int] = alive_players()
 	order.sort_custom(func(a: int, b: int) -> bool: return coins[a] > coins[b] if coins[a] != coins[b] else a < b)
-	var lines: PackedStringArray = ["COINS"]
-	var rank: int = 0
-	for i: int in order.size():
-		if i == 0 or coins[order[i]] != coins[order[i - 1]]:
-			rank = i + 1
-		var p: int = order[i]
-		var who: String = "YOU" if p == local_id else player_name(p)
-		lines.append("%d. %s  %d" % [rank, who, coins[p]])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 26)
+	var rows: Array = []
+	for p: int in order:
+		rows.append({"player": p, "score": int(coins[p])})
+	MinigameScoreboard.rank_rows(rows)
+	show_board("COINS", rows)
 
 
 # --- Props: bats, coin badges, immunity ---------------------------------------------------------
