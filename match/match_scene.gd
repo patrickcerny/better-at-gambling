@@ -1148,7 +1148,7 @@ func _on_event(ev: Dictionary) -> void:
 		&"player_released", &"player_broke_free":
 			var t: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			var h: PlayerAvatar = avatars.get(int(ev["attacker"]), null)
-			if t != null:
+			if t != null and t.carrier == null:  # a bean a guard carries stays on the guard
 				t.release_held()
 				_report_position(int(ev["target"]))
 			if h != null:

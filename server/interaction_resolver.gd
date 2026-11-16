@@ -65,7 +65,7 @@ func grab(holder: int, target: int, now: float) -> Dictionary:
 	if held_by.has(holder):
 		return StationLogicBase.fail(&"held")
 	holding[holder] = target
-	held_by[target] = {"holder": holder, "since": now, "presses": 0}
+	held_by[target] = {"holder": holder, "since": now, "presses": 0, "down": rules.is_knocked_down(target, now)}
 	events.append(GameEvents.make(&"player_grabbed", {"attacker": holder, "target": target}))
 	return StationLogicBase.OK_RESULT
 
@@ -147,10 +147,7 @@ func report_knockout(target: int, attacker: int, now: float, cause: StringName) 
 	var money: int = economy.balance(target)
 	if not rules.knock_out(target, now, money, limits_multiplier):
 		return false
-	if held_by.has(target):
-		_end_hold(int(held_by[target]["holder"]), target)
-	if holding.has(target):
-		_end_hold(target, holding[target])
+	_drop_holds(target)
 	events.append(GameEvents.make(&"player_knocked_out", {"target": target, "attacker": attacker, "cause": cause}))
 	if attacker >= 0 and attacker != target:
 		_offence(attacker, target, now, &"knockout")
@@ -188,10 +185,7 @@ func recent_offences(now: float, window: float = 3.0) -> Array[Dictionary]:
 ## A guard caught the attacker: every hold ends, their offences are forgotten and they are safe
 ## from shoves for a moment. The MatchServer puts them in jail (`report_caught`).
 func report_caught(attacker: int, now: float) -> void:
-	if holding.has(attacker):
-		_end_hold(attacker, holding[attacker])
-	if held_by.has(attacker):
-		_end_hold(int(held_by[attacker]["holder"]), attacker)
+	_drop_holds(attacker)
 	offences = offences.filter(func(o: Dictionary) -> bool: return int(o["attacker"]) != attacker)
 	rules.protect(attacker, now + 4.0)
 
@@ -218,6 +212,11 @@ func tick(now: float) -> void:
 	offences = offences.filter(func(o: Dictionary) -> bool: return now - float(o["time"]) <= 10.0)
 	for target: int in held_by.keys():
 		var h: Dictionary = held_by[target]
+		if rules.is_knocked_down(int(h["holder"]), now) or (rules.is_knocked_down(target, now) and not bool(h.get("down", false))):
+			# Either one went flying (shoved into a wall, an item, a slip): the hands let go. A bean
+			# that was already down when grabbed (knocked out, to shake) stays in the hands.
+			_drop_holds(target)
+			continue
 		if now - float(h["since"]) >= cfg.grab_max_time:
 			var holder: int = h["holder"]
 			_end_hold(holder, target)
@@ -235,14 +234,28 @@ func _knocked_out(target: int, attacker: int, now: float, cause: StringName) -> 
 	var t: InteractionRules.Status = rules.status(target)
 	t.shake_cap_this_ko = rules.shake_cap(economy.balance(target), limits_multiplier)
 	t.shaken_this_ko = 0
-	if holding.has(target):
-		_end_hold(target, holding[target])
+	_drop_holds(target)
 	events.append(GameEvents.make(&"player_knocked_out", {"target": target, "attacker": attacker, "cause": cause}))
 	_offence(attacker, target, now, &"knockout")
 
 
 func _offence(attacker: int, victim: int, now: float, kind: StringName) -> void:
 	offences.append({"attacker": attacker, "victim": victim, "time": now, "kind": kind})
+
+
+## Ends every hold `player` is part of (holding someone or being held) and tells everyone
+## (`player_released`). A hold that ended without the event left the held bean dangling in front of
+## a flying (knocked out, jailed) holder on every screen: it never got its body back and the
+## holder could never grab again.
+func _drop_holds(player: int) -> void:
+	if holding.has(player):
+		var target: int = holding[player]
+		_end_hold(player, target)
+		events.append(GameEvents.make(&"player_released", {"attacker": player, "target": target}))
+	if held_by.has(player):
+		var holder: int = int(held_by[player]["holder"])
+		_end_hold(holder, player)
+		events.append(GameEvents.make(&"player_released", {"attacker": holder, "target": player}))
 
 
 func _end_hold(holder: int, target: int) -> void:
