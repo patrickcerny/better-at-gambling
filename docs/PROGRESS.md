@@ -93,6 +93,16 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.10.46 no false "ALL IN" after a bet goes down
+- Patrick: "sometimes it tells me I go all in but I have more money (mainly on blackjack)". Blackjack
+  takes the stake off the balance as soon as the bet is placed; that balance update re-clamped the
+  bet still held in the `BetPanel` to what was left and toasted "ALL IN: betting everything you have"
+  although only part of the money was bet (e.g. $200 of $300 -> "ALL IN $100"). It also shrank the
+  next round's bet to the leftover. Same for Hi-Lo and Hold'em (Hold'em feeds a third of the balance).
+- `BetPanel` now keeps the picked bet (`wanted`): a balance update only re-clamps it and moves the
+  ALL IN tag, it never toasts, and the bet grows back once the money is there. The toast comes only
+  when an all-in bet is actually placed (`confirm`, `chip_stake`, instant pulls). Tests in
+  `tests/ui/test_bet_panel.gd`.
 ### 2026-11-16 / 0.10.45 roulette: no more sitting in each other's lap
 - Patrick: "on roulette you can sit on eachother". The server already hands every player their own
   stool (`MatchServer._free_seat`, `tests/integration/test_station_seats.gd`), but all six roulette
