@@ -32,6 +32,9 @@ const MEDAL_RIMS: Array[Color] = [Color("#8C6418"), Color("#6C737C"), Color("#6D
 const SPOT_TINTS: Array[Color] = [Color("#FFE0A3"), Color("#E6EEFF"), Color("#FFD2B0")]
 ## Height of the name tag over a bean's feet.
 const TAG_Y: float = 2.3
+## The top band of a name plate that holds its colour stripe (border, gap and stripe, metres;
+## matches nameplate.gdshader): kept clear of the text.
+const NAMEPLATE_STRIPE_BAND: float = 0.11
 const NAMEPLATE_SHADER: Shader = preload("res://ui/results/nameplate.gdshader")
 ## Show timeline (seconds after the screen opens).
 const T_FLOOR: float = 0.3
@@ -295,9 +298,13 @@ func _name_tag(row: Dictionary, pid: int, rank: int) -> Label3D:
 	var plate := MeshInstance3D.new()
 	plate.name = "Plate"
 	var qm := QuadMesh.new()
-	var size := Vector2(text_px.x * tag.pixel_size + 0.34, text_px.y * tag.pixel_size + 0.16)
+	# The colour stripe runs along the plate's top edge: the plate grows upwards by the stripe's
+	# band (`NAMEPLATE_STRIPE_BAND`) so the name always sits below it, whatever the font metrics
+	# (Patrick 2026-11-16: the stripe ran through the names).
+	var size := Vector2(text_px.x * tag.pixel_size + 0.34, text_px.y * tag.pixel_size + 0.2 + NAMEPLATE_STRIPE_BAND)
 	qm.size = size
 	plate.mesh = qm
+	plate.position.y = NAMEPLATE_STRIPE_BAND * 0.5
 	plate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var m := ShaderMaterial.new()
 	m.shader = NAMEPLATE_SHADER
