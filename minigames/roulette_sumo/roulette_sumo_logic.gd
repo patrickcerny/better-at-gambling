@@ -27,6 +27,12 @@ extends WalkableLogicBase
 ##   doesn't turn or drag, the ball sits parked on the rim track, nobody can be hit or fall out.
 ##   `roulette_sumo_begin {grace}` tells the clients; the beans spawn on `WheelRoom.SPAWN_RADIUS`
 ##   (3.3), well clear of the ball's track, and the ball can't touch anyone for `BALL_GRACE` more.
+## - Safe start (0.10.48, Patrick: "you still spawn at the edge sometimes"): through the grace the
+##   server keeps everyone on their spot. Anyone it finds more than `START_LEASH` from their spawn
+##   (knocked about in the casino as the room opened, a late position, a push) goes straight back
+##   (`pending_moves` → `minigame_player_moved`), once more the moment the wheel starts, and pushes
+##   wait for the spin. For the first `BALL_CALM` s of play the ball only circles the rim track
+##   (it can't reach the spawn ring) and touches nobody.
 ## - Falls: a bean whose flat distance from the centre is past `FALL_RADIUS`, or who is more than
 ##   `FALL_DEPTH` below the deck, is out (`eliminate`, a short tumble, then the gallery).
 ##
@@ -85,6 +91,10 @@ const FALL_KNOCK: float = 1.2
 const SYNC_INTERVAL: float = 1.0
 ## Seconds after the go before the wheel turns and the ball rolls (see the header).
 const START_GRACE: float = 3.0
+## How far from their spawn a bean may stray during the grace before the server puts it back.
+const START_LEASH: float = 1.0
+## Game-clock seconds after the spin during which the ball circles the rim and hits nobody.
+const BALL_CALM: float = 2.5
 const END_HOLD: float = 3.5
 
 var state: State = State.PLAYING
@@ -126,7 +136,7 @@ func _on_room_setup(_context: Dictionary) -> void:
 	ball_turn = 0.0
 	seg_left = 0.0
 	for p: int in players:
-		ball_safe_until[p] = BALL_GRACE
+		ball_safe_until[p] = BALL_CALM
 
 
 ## The casino's shove (knockdowns, knockouts), grab and throw are off: the game's own little push
@@ -234,6 +244,7 @@ func tick(delta: float, _now: float) -> void:
 		return
 	if grace_left > 0.0:
 		grace_left -= delta
+		_leash_to_spawns()
 		if grace_left > 0.0:
 			return  # the wheel and the ball wait; nobody can fall out yet
 		events.append(GameEvents.make(&"roulette_sumo_spin", {}))
@@ -251,6 +262,18 @@ func tick(delta: float, _now: float) -> void:
 		_end_game(&"time")
 
 
+## The start grace: anyone off their spot (more than `START_LEASH`, or below the deck) goes back.
+func _leash_to_spawns() -> void:
+	var deck_y: float = WheelRoom.center().y + WheelRoom.WHEEL_TOP
+	for p: int in alive:
+		var at: Vector3 = server_position(p)
+		if at == Vector3.INF or pending_moves.has(p):
+			continue
+		var home: Vector3 = spawn_for(p)
+		if Vector2(at.x - home.x, at.z - home.z).length() > START_LEASH or at.y < deck_y - 0.5:
+			pending_moves[p] = home
+
+
 func _sync() -> void:
 	_sync_left = SYNC_INTERVAL
 	events.append(GameEvents.make(&"roulette_sumo_wheel", {"clock": snappedf(clock, 0.001), "angle": snappedf(wheel_angle(clock), 0.0001), "omega": snappedf(omega_at(clock), 0.0001)}))
@@ -263,10 +286,20 @@ func _tick_ball(delta: float) -> void:
 		seg_left = rng.range_float(SEG_MIN, SEG_MAX)
 		var speed: float = rng.range_float(BALL_MIN_SPEED, BALL_MAX_SPEED)
 		ball_turn = rng.range_float(-BALL_MAX_TURN, BALL_MAX_TURN)
+		if clock < BALL_CALM:
+			# The calm start: round the rim track at the slowest roll, turning just enough to follow it.
+			speed = BALL_MIN_SPEED
+			seg_left = BALL_CALM - clock + 0.01
+			if ball_pos.length() < 0.01:
+				ball_pos = Vector2(0, BALL_MAX_R)
+			ball_pos = ball_pos.normalized() * BALL_MAX_R
 		# A parked ball (the start) sets off along the rim track, one way or the other.
 		var tangent := Vector2(ball_pos.y, -ball_pos.x).normalized() * (1.0 if rng.unit() < 0.5 else -1.0)
 		var dir: Vector2 = ball_vel.normalized() if ball_vel.length() > 0.01 else (tangent if tangent.length() > 0.5 else Vector2.RIGHT)
 		ball_vel = dir * speed
+		if clock < BALL_CALM:
+			var side: float = signf(ball_pos.x * ball_vel.y - ball_pos.y * ball_vel.x)
+			ball_turn = (side if side != 0.0 else 1.0) * speed / BALL_MAX_R
 		events.append(GameEvents.make(&"roulette_sumo_ball", {"ball": ball_wire(), "clock": snappedf(clock, 0.001)}))
 	var res: Array[Vector2] = step_ball(ball_pos, ball_vel, ball_turn, delta)
 	ball_pos = res[0]
@@ -324,6 +357,8 @@ func _on_action(player: int, kind: StringName, hint: int, _now: float) -> Dictio
 		return StationLogicBase.fail(&"game_over")
 	if kind != &"push":
 		return StationLogicBase.fail(&"bad_value")
+	if grace_left > 0.0:
+		return StationLogicBase.fail(&"not_yet")  # pushes wait for the spin (the safe start)
 	if clock < float(last_push.get(player, -INF)) + PUSH_COOLDOWN:
 		return StationLogicBase.fail(&"cooldown")
 	last_push[player] = clock

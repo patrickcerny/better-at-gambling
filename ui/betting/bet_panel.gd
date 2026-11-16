@@ -6,8 +6,12 @@ extends PanelContainer
 ##
 ## All-in (BetClamp): with `set_balance` fed, a bet over what you have bets everything you have
 ## (still capped by the max; under the minimum it stays as asked and the server refuses it).
-## An "ALL IN" tag marks the bet and `went_all_in` fires once each time the bet becomes all-in
-## (the table shows a toast). Chips worth more than your balance are greyed out (Patrick: "Disable
+## An "ALL IN" tag marks the bet and `went_all_in` fires when an all-in bet is actually placed
+## (CONFIRM, a chip on the layout, an instant pull; the table shows a toast). A balance update alone
+## never toasts: the stake taken off when a bet goes down (blackjack) used to re-clamp the old bet
+## to what was left and say "ALL IN" although the player had bet only part of their money.
+## The bet the player picked is kept (`wanted`), so a smaller balance shrinks it only for as long
+## as the money is short and it grows back afterwards. Chips worth more than your balance are greyed out (Patrick: "Disable
 ## the button if I don't have this much money anymore"); picking one picks the dearest chip you
 ## can still pay, so a chip never bets an amount the table doesn't list.
 
@@ -23,6 +27,8 @@ var chips: Array[int] = [10, 25, 50, 100]
 var min_bet: int = 10
 var max_bet: int = 200
 var amount: int = 0
+## The bet the player picked (before the balance cut it down); `amount` is it clamped.
+var wanted: int = 0
 var selected_chip: int = 0
 var last_amount: int = 0
 ## What the player can bet (-1 = unknown: no all-in clamping).
@@ -108,8 +114,12 @@ func set_balance(b: int) -> void:
 		return
 	balance = b
 	selected_chip = affordable_index(selected_chip)
-	if amount > 0:
-		set_amount(amount)  # re-clamps, and re-checks the ALL IN tag
+	if wanted > 0:
+		# Re-clamps the picked bet to the new balance: the tag follows, but no toast (no bet placed).
+		amount = _clamped(wanted, max_bet)
+		_set_all_in(_is_all_in(wanted, max_bet))
+		_refresh()
+		amount_changed.emit(amount)
 	else:
 		_refresh()  # a chip already on the layout keeps its tag until the next chip or CLEAR
 
@@ -120,11 +130,14 @@ func chip_stake(room: int = -1) -> int:
 	var r: int = max_bet if room < 0 else room
 	var stake: int = _clamped(chip_value(), r)
 	_set_all_in(_is_all_in(chip_value(), r))
+	if all_in:
+		went_all_in.emit(balance)  # this chip goes down now, with everything you have
 	return stake
 
 
 func set_amount(a: int) -> void:
-	amount = _clamped(clampi(a, 0, max_bet), max_bet)
+	wanted = clampi(a, 0, max_bet)
+	amount = _clamped(wanted, max_bet)
 	_set_all_in(amount > 0 and _is_all_in(a, max_bet))
 	_refresh()
 	amount_changed.emit(amount)
@@ -145,14 +158,12 @@ func _is_all_in(requested: int, room: int) -> bool:
 	return bool(BetClamp.resolve(requested, balance, min_bet, room)["all_in"])
 
 
+## Shows or hides the ALL IN tag; the toast only comes when the bet is placed (`confirm`, `chip_stake`).
 func _set_all_in(v: bool) -> void:
-	var was: bool = all_in
 	all_in = v
 	if _all_in_tag != null:
 		_all_in_tag.visible = all_in
 		_all_in_tag.text = "ALL IN  $%d" % balance if all_in else "ALL IN"
-	if all_in and not was:
-		went_all_in.emit(balance)
 
 
 func select_chip(index: int) -> void:
@@ -169,6 +180,8 @@ func confirm() -> void:
 		set_amount(min_bet)
 	last_amount = amount
 	Audio.play(&"chips_in_pot", &"SFX", -4.0)
+	if all_in:
+		went_all_in.emit(balance)
 	confirmed.emit(amount)
 
 

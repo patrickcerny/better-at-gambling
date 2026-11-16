@@ -1,8 +1,8 @@
 extends GutTest
-## Split or Steal show: the schedule of pairs (2, 3, 4, 5, 7, 8 players; the house match for odd
-## counts), one pair at a time (ANNOUNCE → DECIDE → REVEAL), nothing announced before the first
-## tick (the first-round bug), watchers refused, payoffs (1/1, 3/0, 0/0), timeouts, leavers,
-## ranking (points, then fewer steals), snapshot / private state for late joiners.
+## Split or Steal tournament: everyone plays everyone (round robin for 2-8 players; tiny tables
+## repeat it), one duel at a time (ROUND → DECIDE → REVEAL), nothing announced before the first
+## tick (the first-round bug), watchers are refused, payoffs (1/1, 3/0, 0/0), timeouts, leavers, ranking (points, then
+## fewer steals), snapshot / private state for late joiners.
 
 const S: String = SplitOrStealLogic.SPLIT
 const T: String = SplitOrStealLogic.STEAL
@@ -14,10 +14,17 @@ var now: float = 0.0
 
 func _game(players: Array[int], params: Dictionary = {}) -> SplitOrStealLogic:
 	var g := SplitOrStealLogic.new()
-	var p: Dictionary = {"intro_time": 0.5, "announce_time": 0.5, "decide_time": 1.0, "reveal_time": 0.5, "outro_time": 0.5}
+	var p: Dictionary = {"intro_time": 0.5, "round_time": 0.5, "decide_time": 1.0, "reveal_time": 0.5, "outro_time": 0.5}
 	p.merge(params, true)
 	g.setup(players, SeededRng.new(5), cfg, p, {})
 	return g
+
+
+func _ids(n: int) -> Array[int]:
+	var out: Array[int] = []
+	for i: int in n:
+		out.append(i + 1)
+	return out
 
 
 func _run(g: SplitOrStealLogic, seconds: float) -> void:
@@ -34,13 +41,6 @@ func _to_decide(g: SplitOrStealLogic) -> void:
 		guard += 1
 
 
-func _to_next_reveal(g: SplitOrStealLogic) -> void:
-	var guard: int = 0
-	while g.state != SplitOrStealLogic.State.REVEAL and not g.finished and guard < 10000:
-		g.tick(0.05, now)
-		guard += 1
-
-
 func _pick(g: SplitOrStealLogic, p: int, c: String) -> Dictionary:
 	return g.submit(p, {"choice": c}, now)
 
@@ -49,181 +49,115 @@ func _of_type(events: Array[Dictionary], type: StringName) -> Array:
 	return events.filter(func(e: Dictionary) -> bool: return e["type"] == type)
 
 
-## Scored matches per player in a schedule (the house side doesn't count).
-func _scored(schedule: Array[Dictionary]) -> Dictionary:
+## How often each pair meets across the whole show, keyed "lo-hi".
+func _meetings(rounds: Array[Dictionary]) -> Dictionary:
 	var out: Dictionary = {}
-	for e: Dictionary in schedule:
-		for p: int in [int(e["a"]), int(e["b"])]:
-			if p != int(e["house"]):
-				out[p] = int(out.get(p, 0)) + 1
+	for r: Dictionary in rounds:
+		for d: Dictionary in r["duels"]:
+			var a: int = int(d["a"])
+			var b: int = int(d["b"])
+			var key: String = "%d-%d" % [mini(a, b), maxi(a, b)]
+			out[key] = int(out.get(key, 0)) + 1
 	return out
 
 
-# --- Schedule ---------------------------------------------------------------------------------
+# --- Schedule ----------------------------------------------------------------------------------
 
-func test_two_players_play_four_times() -> void:
-	var s: Array[Dictionary] = SplitOrStealLogic.build_schedule([1, 2], SeededRng.new(1))
-	assert_eq(s.size(), 4, "an iterated dilemma")
-	for e: Dictionary in s:
-		assert_eq(int(e["house"]), NOBODY)
-		assert_ne(int(e["a"]), int(e["b"]), "a real pair, never 'nobody'")
-	assert_eq(_scored(s), {1: 4, 2: 4})
-
-
-func test_three_players_round_robin() -> void:
-	var s: Array[Dictionary] = SplitOrStealLogic.build_schedule([1, 2, 3], SeededRng.new(2))
-	assert_eq(s.size(), 3)
-	assert_eq(_scored(s), {1: 2, 2: 2, 3: 2}, "everyone plays twice")
-	var keys: Dictionary = {}
-	for e: Dictionary in s:
-		keys["%d-%d" % [mini(e["a"], e["b"]), maxi(e["a"], e["b"])]] = true
-	assert_eq(keys.size(), 3, "every pair once")
-
-
-func test_four_players_two_different_opponents_each() -> void:
-	var s: Array[Dictionary] = SplitOrStealLogic.build_schedule([1, 2, 3, 4], SeededRng.new(3))
-	assert_eq(s.size(), 4)
-	assert_eq(_scored(s), {1: 2, 2: 2, 3: 2, 4: 2})
-	var keys: Dictionary = {}
-	for e: Dictionary in s:
-		keys["%d-%d" % [mini(e["a"], e["b"]), maxi(e["a"], e["b"])]] = true
-	assert_eq(keys.size(), 4, "no rematch")
+func test_everyone_meets_everyone_one_duel_at_a_time() -> void:
+	for n: int in range(2, 9):
+		var rounds: Array[Dictionary] = SplitOrStealLogic.build_rounds(_ids(n), SeededRng.new(n))
+		var cycles: int = SplitOrStealLogic.cycles_for(n)
+		var meet: Dictionary = _meetings(rounds)
+		assert_eq(meet.size(), n * (n - 1) / 2, "%d players: every pair meets" % n)
+		for k: String in meet:
+			assert_eq(int(meet[k]), cycles, "%d players: pair %s meets once per cycle" % [n, k])
+		assert_gte(rounds.size(), SplitOrStealLogic.MIN_ROUNDS, "%d players: long enough" % n)
+		assert_lte(rounds.size(), SplitOrStealLogic.MAX_ROUNDS, "%d players: within the cap" % n)
+		var prev: Array = []
+		for r: Dictionary in rounds:
+			assert_eq((r["duels"] as Array).size(), 1, "one duel on stage at a time")
+			var d: Dictionary = r["duels"][0]
+			assert_ne(int(d["a"]), int(d["b"]))
+			if n >= 5:  # with 4 the three disjoint pairs can't chain into one line
+				assert_false(int(d["a"]) in prev or int(d["b"]) in prev, "%d players: nobody twice in a row" % n)
+			prev = [int(d["a"]), int(d["b"])]
 
 
-func test_five_players_leftover_gets_a_house_match() -> void:
-	var s: Array[Dictionary] = SplitOrStealLogic.build_schedule([1, 2, 3, 4, 5], SeededRng.new(4))
-	assert_eq(s.size(), 3, "two pairs and the bonus match")
-	var last: Dictionary = s[2]
-	var house: int = int(last["house"])
-	assert_ne(house, NOBODY, "the bonus match has a stand-in")
-	assert_true(house == int(last["a"]) or house == int(last["b"]))
-	var scored: Dictionary = _scored(s)
-	assert_eq(scored.size(), 5, "everyone has a scored match")
-	for p: int in scored:
-		assert_eq(int(scored[p]), 1, "exactly one each")
-	for e: Dictionary in s.slice(0, 2):
-		assert_eq(int(e["house"]), NOBODY)
-
-
-func test_seven_and_eight_players_cap_at_four_pairs() -> void:
-	var s7: Array[Dictionary] = SplitOrStealLogic.build_schedule([1, 2, 3, 4, 5, 6, 7], SeededRng.new(5))
-	assert_eq(s7.size(), 4)
-	assert_ne(int(s7[3]["house"]), NOBODY)
-	assert_eq(_scored(s7).size(), 7)
-	var s8: Array[Dictionary] = SplitOrStealLogic.build_schedule([1, 2, 3, 4, 5, 6, 7, 8], SeededRng.new(6))
-	assert_eq(s8.size(), 4)
-	assert_eq(_scored(s8), {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1})
-
-
-func test_no_schedule_ever_exceeds_the_cap_or_has_nobody() -> void:
-	for n: int in range(2, SplitOrStealLogic.MAX_PLAYERS + 1):
-		var roster: Array[int] = []
-		for i: int in n:
-			roster.append(i + 1)
-		for seed_v: int in 5:
-			var s: Array[Dictionary] = SplitOrStealLogic.build_schedule(roster, SeededRng.new(seed_v))
-			assert_between(s.size(), 1, SplitOrStealLogic.MAX_PAIRS, "%d players" % n)
-			var scored: Dictionary = _scored(s)
-			assert_eq(scored.size(), n, "%d players: everyone plays" % n)
-			var k: int = SplitOrStealLogic.matches_per_player(n)
-			for p: int in scored:
-				assert_eq(int(scored[p]), k, "%d players: equal scored matches" % n)
-			for e: Dictionary in s:
-				assert_true(int(e["a"]) in roster and int(e["b"]) in roster, "never 'nobody' on a podium")
-	assert_eq(SplitOrStealLogic.build_schedule([1], null).size(), 0)
-	assert_eq(SplitOrStealLogic.build_schedule([], null).size(), 0)
+func test_duel_counts() -> void:
+	var expect: Dictionary = {2: 4, 3: 6, 4: 6, 5: 10, 6: 15, 7: 21, 8: 28}
+	for n: int in expect:
+		assert_eq(SplitOrStealLogic.build_rounds(_ids(n), null).size(), int(expect[n]), "%d players" % n)
+	assert_eq(SplitOrStealLogic.duels_per_player(8), 7)
+	assert_eq(SplitOrStealLogic.duels_per_player(2), 4)
+	assert_eq(SplitOrStealLogic.duels_per_player(3), 4)
 
 
 func test_game_cap_constants() -> void:
-	assert_almost_eq(SplitOrStealLogic.ROUND_CAP, 22.5, 0.001)
-	assert_almost_eq(SplitOrStealLogic.GAME_CAP, 98.0, 0.001)
-
-
-# --- The first-round bug -----------------------------------------------------------------------
-
-func test_nothing_is_announced_before_the_first_tick() -> void:
-	# Setup runs when `minigame_started` goes out; the clients build their stage behind the curtain
-	# after it, so a match announced here would be missed and the first round played "against
-	# nobody". The show starts on the first tick (after the briefing).
-	var g := _game([1, 2, 3, 4])
-	assert_eq(g.drain_events().size(), 0)
-	assert_eq(g.state, SplitOrStealLogic.State.WAITING)
-	assert_eq(g.current_pair(), [] as Array[int])
-	assert_eq(_pick(g, 1, S)["error"], &"not_your_turn")
-	g.tick(0.05, now)
-	var ev: Array[Dictionary] = g.drain_events()
-	assert_eq(ev.size(), 1)
-	assert_eq(ev[0]["type"], &"split_or_steal_started")
-	assert_eq((ev[0]["schedule"] as Array).size(), 4, "the schedule goes out with the start")
-	_run(g, 0.6)
-	var pairs: Array = _of_type(g.drain_events(), &"split_or_steal_pair")
-	assert_eq(pairs.size(), 1)
-	assert_eq(int(pairs[0]["index"]), 0)
-	assert_ne(int(pairs[0]["a"]), NOBODY)
-	assert_ne(int(pairs[0]["b"]), NOBODY)
-
-
-func test_private_state_carries_the_pair_for_a_stage_that_missed_events() -> void:
-	var g := _game([1, 2, 3])
-	_to_decide(g)
-	var pair: Array[int] = g.current_pair()
-	var priv: Dictionary = g.private_state(pair[0])
-	assert_eq(priv["pair"], pair)
-	assert_eq(int(priv["index"]), 0)
-	assert_eq(int(priv["state"]), SplitOrStealLogic.State.DECIDE)
-	assert_true(priv["in_pair"])
-	assert_true(priv["can_choose"])
-	var watcher: int = ([1, 2, 3] as Array[int]).filter(func(p: int) -> bool: return p not in pair)[0]
-	var wpriv: Dictionary = g.private_state(watcher)
-	assert_false(wpriv["in_pair"])
-	assert_false(wpriv["can_choose"])
-	assert_eq(wpriv["pair"], pair, "watchers see who is on stage too")
+	assert_eq(SplitOrStealLogic.ROUND_CAP, SplitOrStealLogic.ROUND_TIME + SplitOrStealLogic.DECIDE_TIME + SplitOrStealLogic.REVEAL_TIME)
+	assert_almost_eq(SplitOrStealLogic.GAME_CAP, 512.0, 0.01)
 
 
 # --- Flow --------------------------------------------------------------------------------------
 
-func test_pairs_play_one_at_a_time_in_schedule_order() -> void:
-	var g := _game([1, 2, 3, 4, 5, 6])
-	var order: Array = []
-	var guard: int = 0
-	while not g.finished and guard < 10000:
-		g.tick(0.05, now)
-		guard += 1
-		for e: Dictionary in g.drain_events():
-			if e["type"] == &"split_or_steal_pair":
-				order.append([int(e["a"]), int(e["b"])])
-				assert_eq(int(e["index"]), order.size() - 1, "sequential")
-	assert_eq(order.size(), 3)
-	for i: int in 3:
-		assert_eq(order[i], [int(g.schedule[i]["a"]), int(g.schedule[i]["b"])])
+func test_nothing_is_announced_before_the_first_tick() -> void:
+	var g := _game([1, 2, 3, 4])
+	assert_eq(g.drain_events().size(), 0, "the stage is not built yet")
+	assert_eq(g.get_public_state()["rounds"].size(), 3 * 2, "but the snapshot has the schedule")
+	g.tick(0.05, now)
+	var ev: Array[Dictionary] = g.drain_events()
+	assert_eq(_of_type(ev, &"split_or_steal_started").size(), 1)
+	assert_eq(_of_type(ev, &"split_or_steal_round").size(), 0, "the intro first")
 
 
-func test_announce_then_decide() -> void:
-	var g := _game([1, 2])
-	_run(g, 0.6)
-	assert_eq(g.state, SplitOrStealLogic.State.ANNOUNCE)
-	var pair: Array[int] = g.current_pair()
-	assert_eq(_pick(g, pair[0], S)["error"], &"not_decide_phase", "not while walking up")
+func test_one_duel_on_stage_at_a_time() -> void:
+	var g := _game(_ids(8))
 	_to_decide(g)
-	assert_true(_pick(g, pair[0], S)["ok"])
+	var rounds: Array = _of_type(g.drain_events(), &"split_or_steal_round")
+	assert_eq(rounds.size(), 1)
+	assert_eq((rounds[0]["duels"] as Array).size(), 1)
+	var pair: Array[int] = g.active_players()
+	assert_eq(pair.size(), 2)
+	for p: int in _ids(8):
+		if p in pair:
+			assert_true(_pick(g, p, S)["ok"])
+		else:
+			assert_eq(_pick(g, p, S)["error"], &"not_your_turn", "the audience watches")
+	g.tick(0.05, now)
+	var rev: Array = _of_type(g.drain_events(), &"split_or_steal_reveal")
+	assert_eq(rev.size(), 1)
+	assert_eq((rev[0]["results"] as Array).size(), 1)
+	assert_eq(g.points[pair[0]] + g.points[pair[1]], 2)
+
+
+func test_private_state_carries_the_duel_for_a_stage_that_missed_events() -> void:
+	var g := _game([1, 2, 3])
+	_to_decide(g)
+	var dueling: int = g.active_players()[0]
+	var watching: int = ([1, 2, 3].filter(func(p: int) -> bool: return p not in g.active_players()))[0]
+	var priv: Dictionary = g.private_state(dueling)
+	assert_eq(int(priv["index"]), 0)
+	assert_eq((priv["duels"] as Array).size(), 1)
+	assert_eq(int(priv["opponent"]), g.opponent_of(dueling))
+	assert_true(priv["can_choose"])
+	var off: Dictionary = g.private_state(watching)
+	assert_eq(int(off["opponent"]), NOBODY)
+	assert_false(off["can_choose"])
 
 
 func test_watchers_are_refused() -> void:
-	var g := _game([1, 2, 3, 4, 5])
+	var g := _game([1, 2, 3])
 	_to_decide(g)
-	var pair: Array[int] = g.current_pair()
-	for p: int in [1, 2, 3, 4, 5]:
-		if p not in pair:
-			assert_eq(_pick(g, p, S)["error"], &"not_your_turn")
-	assert_eq(_pick(g, 99, S)["error"], &"unknown_player")
+	var watching: int = ([1, 2, 3].filter(func(p: int) -> bool: return p not in g.active_players()))[0]
+	assert_eq(_pick(g, watching, T)["error"], &"not_your_turn")
 
 
 func test_rejections() -> void:
 	var g := _game([1, 2])
+	assert_eq(_pick(g, 1, S)["error"], &"not_decide_phase")
 	_to_decide(g)
+	assert_eq(_pick(g, 9, S)["error"], &"unknown_player")
 	assert_eq(_pick(g, 1, "MAYBE")["error"], &"invalid_choice")
-	assert_true(_pick(g, 1, "steal")["ok"], "lowercase accepted")
-	assert_eq(g.choices[1], T)
+	assert_true(_pick(g, 1, "steal")["ok"], "case-insensitive")
 	assert_eq(_pick(g, 1, S)["error"], &"already_chose")
 
 
@@ -235,18 +169,18 @@ func test_locked_event_hides_choice() -> void:
 	var locked: Array = _of_type(g.drain_events(), &"split_or_steal_locked")
 	assert_eq(locked.size(), 1)
 	assert_eq(int(locked[0]["player"]), 1)
-	assert_false(locked[0].has("choice"), "never what")
-	assert_eq(g.get_public_state()["locked"], [1])
-	assert_false(str(g.get_public_state()).contains(T), "the choice stays secret in the snapshot")
+	assert_false(locked[0].has("choice"))
+	assert_false(str(locked[0]).contains(T), "the pick stays secret")
 
 
 func test_reveal_comes_early_when_both_decided() -> void:
-	var g := _game([1, 2], {"decide_time": 10.0})
+	var g := _game([1, 2, 3, 4], {"decide_time": 30.0})
 	_to_decide(g)
-	_pick(g, 1, S)
+	var pair: Array[int] = g.active_players()
+	_pick(g, pair[0], S)
 	g.tick(0.05, now)
 	assert_eq(g.state, SplitOrStealLogic.State.DECIDE, "one still thinking")
-	_pick(g, 2, S)
+	_pick(g, pair[1], S)
 	g.tick(0.05, now)
 	assert_eq(g.state, SplitOrStealLogic.State.REVEAL)
 
@@ -254,19 +188,14 @@ func test_reveal_comes_early_when_both_decided() -> void:
 func test_timeout_counts_as_split() -> void:
 	var g := _game([1, 2])
 	_to_decide(g)
-	var pair: Array[int] = g.current_pair()
-	_pick(g, pair[0], T)
-	g.drain_events()
-	_to_next_reveal(g)
-	var rev: Array = _of_type(g.drain_events(), &"split_or_steal_reveal")
-	assert_eq(rev.size(), 1)
-	var r: Dictionary = rev[0]
-	assert_eq(r["choice_a"], T)
-	assert_eq(r["choice_b"], S)
-	assert_true(r["auto_b"])
-	assert_false(r["auto_a"])
-	assert_eq(int(r["points_a"]), 3)
-	assert_eq(g.points[pair[0]], 3)
+	_pick(g, 1, T)
+	_run(g, 1.1)
+	assert_eq(g.state, SplitOrStealLogic.State.REVEAL)
+	var r: Dictionary = g.rounds[0]["duels"][0]["result"]
+	var a_is_1: bool = int(r["a"]) == 1
+	assert_eq(str(r["choice_b" if a_is_1 else "choice_a"]), S)
+	assert_true(bool(r["auto_b" if a_is_1 else "auto_a"]))
+	assert_eq(g.points[1], 3)
 
 
 func test_payoff_matrix() -> void:
@@ -276,74 +205,42 @@ func test_payoff_matrix() -> void:
 	assert_eq(SplitOrStealLogic.payoff(T, T), [0, 0] as Array[int])
 
 
-func _play_match(g: SplitOrStealLogic, ca: String, cb: String) -> Dictionary:
+func _play_round(g: SplitOrStealLogic, pick: Callable) -> void:
 	_to_decide(g)
-	var pair: Array[int] = g.current_pair()
-	_pick(g, pair[0], ca)
-	_pick(g, pair[1], cb)
+	for p: int in g.active_players():
+		_pick(g, p, pick.call(p))
 	g.tick(0.05, now)
-	return g.schedule[g.pair_index]["result"]
 
 
 func test_scoring_both_split_steal_and_both_steal() -> void:
 	var g := _game([1, 2])
-	var r: Dictionary = _play_match(g, S, S)
-	assert_eq([int(r["points_a"]), int(r["points_b"])], [1, 1])
-	r = _play_match(g, T, S)
-	assert_eq([int(r["points_a"]), int(r["points_b"])], [3, 0])
-	r = _play_match(g, T, T)
-	assert_eq([int(r["points_a"]), int(r["points_b"])], [0, 0])
-	var a: int = int(r["a"])
-	var b: int = int(r["b"])
-	# The schedule may flip sides between matches: sum per player.
-	assert_eq(g.points[a] + g.points[b], 5)
-	assert_eq(g.steals[a] + g.steals[b], 3)
-
-
-func test_house_match_scores_only_the_leftover() -> void:
-	var g := _game([1, 2, 3, 4, 5])
-	for i: int in 2:
-		_play_match(g, S, S)
-	_to_decide(g)
-	assert_eq(g.pair_index, 2)
-	var e: Dictionary = g.schedule[2]
-	var house: int = int(e["house"])
-	var leftover: int = int(e["b"]) if int(e["a"]) == house else int(e["a"])
-	var house_before: int = g.points[house]
-	_pick(g, house, T)
-	_pick(g, leftover, S)
-	g.tick(0.05, now)
-	assert_eq(g.points[house], house_before, "the stand-in scores nothing")
-	assert_eq(g.steals[house], 0, "nor is the house steal counted")
-	assert_eq(g.points[leftover], 0)
-	var r: Dictionary = g.schedule[2]["result"]
-	assert_eq(int(r["house"]), house)
+	_play_round(g, func(_p: int) -> String: return S)
+	assert_eq([g.points[1], g.points[2]], [1, 1])
+	_play_round(g, func(p: int) -> String: return T if p == 1 else S)
+	assert_eq([g.points[1], g.points[2]], [4, 1])
+	_play_round(g, func(_p: int) -> String: return T)
+	assert_eq([g.points[1], g.points[2]], [4, 1])
+	assert_eq([g.steals[1], g.steals[2]], [2, 1])
 
 
 func test_full_show_finishes_with_ranking() -> void:
 	var g := _game([1, 2, 3, 4])
 	var guard: int = 0
-	while not g.finished and guard < 10000:
+	while not g.finished and guard < 100000:
 		if g.state == SplitOrStealLogic.State.DECIDE:
-			for p: int in g.current_pair():
+			for p: int in g.active_players():
 				if not g.choices.has(p):
 					_pick(g, p, T if p == 1 else S)
 		g.tick(0.05, now)
 		guard += 1
 	assert_true(g.finished)
-	var reveals: int = 0
-	var fin: Array = []
-	for e: Dictionary in g.drain_events():
-		if e["type"] == &"split_or_steal_reveal":
-			reveals += 1
-		elif e["type"] == &"split_or_steal_finished":
-			fin.append(e)
-	assert_eq(reveals, 4)
-	assert_eq(fin.size(), 1)
+	var ev: Array[Dictionary] = g.drain_events()
+	assert_eq(_of_type(ev, &"split_or_steal_reveal").size(), 6, "4 players: 6 rounds")
+	assert_eq(_of_type(ev, &"split_or_steal_finished").size(), 1)
 	var rows: Array[Dictionary] = g.ranking()
 	assert_eq(rows.size(), 4)
-	assert_eq(int(rows[0]["player"]), 1, "the stealer robbed two splitters: 6 points")
-	assert_eq(int(rows[0]["points"]), 6)
+	assert_eq(int(rows[0]["player"]), 1, "the stealer robbed every splitter")
+	assert_eq(int(rows[0]["points"]), 3 * 3, "once against each of the other three")
 	for row: Dictionary in rows:
 		assert_true(row.has("rank") and row.has("time"))
 
@@ -361,39 +258,34 @@ func test_outro_holds_before_finished() -> void:
 
 
 func test_show_stays_within_the_game_cap() -> void:
-	var g := SplitOrStealLogic.new()
-	g.setup([1, 2, 3, 4, 5, 6, 7, 8] as Array[int], SeededRng.new(1), cfg, {}, {})
-	var t: float = 0.0
-	while not g.finished and t < 200.0:
-		g.tick(0.05, now)
-		t += 0.05
-	assert_true(g.finished)
-	assert_lt(t, SplitOrStealLogic.GAME_CAP + 1.0, "nobody deciding: every match runs its full timer")
+	for n: int in [2, 3, 8]:
+		var g := SplitOrStealLogic.new()
+		g.setup(_ids(n), SeededRng.new(1), cfg, {}, {})
+		var t: float = 0.0
+		while not g.finished and t < 700.0:
+			g.tick(0.05, now)
+			t += 0.05
+		assert_true(g.finished)
+		assert_lt(t, SplitOrStealLogic.GAME_CAP + 0.2 * SplitOrStealLogic.MAX_ROUNDS, "%d players, nobody deciding: every round runs its full timer" % n)
+		if n == 8:
+			assert_gt(t, 120.0, "8 players: a real tournament, not a minute")
 
 
-func test_player_leaving_mid_match_does_not_block() -> void:
+func test_leaver_counts_as_split_and_scores_nothing() -> void:
 	var g := _game([1, 2, 3, 4], {"decide_time": 30.0})
 	_to_decide(g)
-	var pair: Array[int] = g.current_pair()
-	_pick(g, pair[0], S)
-	g.remove_player(pair[1])
-	g.tick(0.05, now)
-	assert_eq(g.state, SplitOrStealLogic.State.REVEAL, "the one left already decided")
-
-
-func test_leaver_gets_replaced_by_a_house_stand_in() -> void:
-	var g := _game([1, 2, 3, 4, 5, 6])
-	_play_match(g, S, S)
-	var next: Dictionary = g.schedule[1]
-	var gone: int = int(next["a"])
-	var stays: int = int(next["b"])
+	var gone: int = g.active_players()[0]
+	var opp: int = g.opponent_of(gone)
 	g.remove_player(gone)
+	for p: int in g.active_players():
+		_pick(g, p, T if p == opp else S)
+	g.tick(0.05, now)
+	assert_eq(g.state, SplitOrStealLogic.State.REVEAL, "nobody waits for the leaver")
+	assert_eq(g.points[opp], 3, "the opponent still plays their duel")
+	assert_false(gone in g.ranking().map(func(r: Dictionary) -> int: return int(r["player"])))
+	_run(g, 0.6)
 	_to_decide(g)
-	var e: Dictionary = g.schedule[1]
-	assert_true(stays in g.current_pair(), "the one still here gets their match")
-	assert_false(gone in g.current_pair())
-	assert_ne(int(e["house"]), NOBODY)
-	assert_ne(int(e["house"]), stays)
+	assert_eq(g.round_index, 1, "the show goes on")
 
 
 func test_two_players_one_leaves_ends_the_show() -> void:
@@ -433,25 +325,26 @@ func test_ranking_full_tie_shares_rank() -> void:
 # --- Snapshot / late join ----------------------------------------------------------------------
 
 func test_public_state_for_late_join() -> void:
-	var g := _game([1, 2, 3])
-	_play_match(g, T, S)
+	var g := _game([1, 2, 3, 4])
+	_play_round(g, func(_p: int) -> String: return T)
 	_to_decide(g)
-	var pair: Array[int] = g.current_pair()
-	_pick(g, pair[0], S)
+	var up: int = g.active_players()[0]
+	_pick(g, up, S)
 	var st: Dictionary = g.get_public_state()
 	assert_eq(st["minigame"], &"split_or_steal")
 	assert_eq(int(st["state"]), SplitOrStealLogic.State.DECIDE)
 	assert_eq(int(st["index"]), 1)
-	assert_eq(int(st["total"]), 3)
-	var sched: Array = st["schedule"]
-	assert_eq(sched.size(), 3)
-	assert_eq((sched[0]["result"] as Dictionary)["choice_a"], T, "revealed decisions are public")
-	assert_true((sched[1]["result"] as Dictionary).is_empty(), "the current one is not")
-	assert_eq(st["locked"], [pair[0]])
-	var total: int = 0
-	for p: Variant in st["points"]:
-		total += int(st["points"][p])
-	assert_eq(total, 3, "running totals")
+	assert_eq(int(st["total"]), 6)
+	var rounds: Array = st["rounds"]
+	for d: Variant in rounds[0]["duels"]:
+		assert_true(((d as Dictionary)["result"] as Dictionary).has("choice_a"), "revealed decisions are public")
+	for d: Variant in rounds[1]["duels"]:
+		assert_true(((d as Dictionary)["result"] as Dictionary).is_empty(), "the current ones are not")
+	assert_eq(st["locked"], [up])
+	var stole: int = 0
+	for p: Variant in st["steals"]:
+		stole += int(st["steals"][p])
+	assert_eq(stole, 2, "running totals: the first duel, both stole")
 	assert_gt(float(st["timer"]), 0.0)
 
 

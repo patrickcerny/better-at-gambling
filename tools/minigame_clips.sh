@@ -17,7 +17,7 @@ SECONDS_LONG="${CLIP_SECONDS:-6}"
 QUALITY="${CLIP_QUALITY:-5}"
 # Seconds of real play skipped before recording, so the clip lands on the interesting part.
 declare -A SKIP=(
-	[quiz]=6 [lonely_number]=0 [roulette_royale]=4 [split_or_steal]=6 [bust_or_bank]=3
+	[quiz]=6 [lonely_number]=0 [roulette_royale]=4 [split_or_steal]=7 [bust_or_bank]=3
 	[vote_race]=3 [find_the_lady]=0 [forehead_poker]=4 [spy]=5
 )
 if [ $# -gt 0 ]; then

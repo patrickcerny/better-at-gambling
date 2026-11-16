@@ -63,6 +63,8 @@ var pending_lobby: int = 0
 var last_error: String = ""
 
 var _available: bool = false
+## The look `submit_profile_bests` last uploaded this run.
+var _bests_look: PackedInt32Array = PackedInt32Array()
 ## The global leaderboards (`SteamLeaderboards`; a no-op without Steam).
 var boards: SteamLeaderboards = SteamLeaderboards.new()
 var _steam_id: int = 0
@@ -133,6 +135,7 @@ func _ready() -> void:
 	# The developers own every achievement (`DevMode.granted_achievements`), set once per start.
 	unlock_achievements(DevMode.granted_achievements(_steam_id))
 	sync_achievements()
+	submit_profile_bests()
 
 
 func _process(_delta: float) -> void:
@@ -205,12 +208,34 @@ func check_beat_the_dev(beaten: Array[int]) -> void:
 
 
 ## After a match: the local player's ranked row (`MatchServer.progress_rows`, already added to the
-## profile) goes on the global leaderboards (`LeaderboardRules.scores_for`). Nothing when developer
-## mode was used this run or the host didn't rank the match.
+## profile) goes on the global leaderboards (`LeaderboardRules.scores_for`). Nothing when the host
+## didn't rank the match. The developer mode doesn't block it any more (Patrick 2026-11-16: "why
+## am i not on the leaderboard"): its menu tools (Coins, levels, cosmetics) can't touch an online
+## match's money, and its in-match tools only work in Practice, which the host never ranks.
 func submit_match(row: Dictionary) -> void:
-	if not _available or DevMode.used:
+	if not _available:
 		return
-	boards.submit(LeaderboardRules.scores_for(row, ProfileManager.profile))
+	boards.submit(LeaderboardRules.scores_for(row, ProfileManager.profile), my_look())
+
+
+## The local player's bean colour and outfit as leaderboard details (`LeaderboardRules.skin_details`).
+func my_look() -> PackedInt32Array:
+	var p: PlayerProfile = ProfileManager.profile
+	return LeaderboardRules.skin_details(p.preferred_color if p.preferred_color >= 0 else 0, p.outfit_wire())
+
+
+## On start: the profile's ranked bests (`LeaderboardRules.profile_scores`) go up again. Steam
+## keeps the higher score, so this only fills in matches whose upload never happened (an earlier
+## run with the developer mode on, Steam offline when the match ended).
+## Also when the leaderboards open, so a new outfit shows there at once (once per look and run).
+func submit_profile_bests() -> void:
+	if not _available:
+		return
+	var look: PackedInt32Array = my_look()
+	if look == _bests_look:
+		return
+	_bests_look = look
+	boards.submit(LeaderboardRules.profile_scores(ProfileManager.profile), look)
 
 
 func _on_user_stats_received(_game_id: int = 0, result: int = 0, user_id: int = 0) -> void:

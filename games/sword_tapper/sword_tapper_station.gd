@@ -103,7 +103,7 @@ func _build_visuals() -> void:
 	hot_center = Vector3(0, 0, 0.3)
 	# The plinth's foot flares past its collider (to PLINTH_R + 0.075) and a wall's wainscot stands
 	# 0.06 m proud of its face: the layouts keep this much floor so a pedestal with its back to a
-	# wall stands clear of it (0.10.46, Patrick: "stuck in the wall ... the 3d model").
+	# wall stands clear of it (0.10.54, Patrick: "stuck in the wall ... the 3d model").
 	# Only backwards: side by side the two pedestals keep the layouts' gap from their colliders.
 	floor_extent = Rect2(-PLINTH_R, -FLOOR_BACK, PLINTH_R * 2.0, FLOOR_BACK + PLINTH_R)
 	GreyboxKit.cylinder(self, PLINTH_R, TOP_Y, Vector3(0, TOP_Y * 0.5, 0), MARBLE, "Plinth")

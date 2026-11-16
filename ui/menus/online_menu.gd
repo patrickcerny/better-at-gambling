@@ -3,8 +3,8 @@ extends Control
 ## PLAY ONLINE (Patrick 2026-11-16: "der play online button sollte uns jetzt in ein menu bringen mit
 ## bildern als buttons und die bild beschreiben was abgeht"): a full screen like the lobby lists,
 ## with four big picture cards (`PictureCard`): CREATE PUBLIC LOBBY, CREATE PRIVATE LOBBY, BROWSE
-## LOBBIES and FRIENDS' LOBBIES, each with an in-game picture (assets/ui/online/, rendered by
-## tools/online_pictures.sh) and a line on what happens, four in a row. Under them the status line and BACK. There is no name field: your
+## LOBBIES and FRIENDS' LOBBIES, each with a picture (assets/ui/online/, generated splash
+## arts, Patrick 2026-11-16: "es sollen eher so splasharts sein ... generiere sie") and a line on what happens, PUBLIC / PRIVATE big on top, BROWSE / FRIENDS smaller below. Under them the status line and BACK. There is no name field: your
 ## name in a lobby is your Steam name (Patrick: "Der Name in der Lobby ist auch nicht setzbar
 ## sondern einfach der Name aus Steam"). The main menu wires the cards up.
 
@@ -14,11 +14,16 @@ const PICTURES: String = "res://assets/ui/online/%s.webp"
 const GAP: int = 28
 const MARGIN_X: int = 64
 const MARGIN_Y: int = 44
-## A card is this much taller than wide (picture on top, caption band at the bottom).
-const CARD_ASPECT: float = 1.18
+## Card shapes (width / height): the big ones wide, the small ones a little less so.
+const BIG_ASPECT: float = 1.55
+const SMALL_ASPECT: float = 1.75
+const SMALL_SCALE: float = 0.68
 
 var title: Label
-var grid: GridContainer
+## PUBLIC / PRIVATE big on top, BROWSE / FRIENDS' smaller under them (Patrick 2026-11-16: "public
+## und private größer 2 oben und die anderen 2 unten kleiner").
+var top_row: HBoxContainer
+var bottom_row: HBoxContainer
 var public_card: PictureCard
 var private_card: PictureCard
 var browse_card: PictureCard
@@ -60,16 +65,16 @@ func _init() -> void:
 	center.name = "Cards"
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(center)
-	grid = GridContainer.new()
-	grid.name = "Grid"
-	grid.columns = 4
-	grid.add_theme_constant_override(&"h_separation", GAP)
-	grid.add_theme_constant_override(&"v_separation", GAP)
-	center.add_child(grid)
-	public_card = _card("CreatePublic", "Public Lobby", "Open a lobby anyone can find and join under Browse Lobbies.", "public")
-	private_card = _card("CreatePrivate", "Private Lobby", "Open a lobby only your friends and players you invite can join.", "private")
-	browse_card = _card("BrowseLobbies", "Browse Lobbies", "Find an open lobby of other players and jump in.", "browse")
-	friends_card = _card("FriendsLobbies", OnlineMenu.FRIENDS_TITLE, "Join a lobby one of your friends is already in.", "friends")
+	var rows := VBoxContainer.new()
+	rows.name = "Rows"
+	rows.add_theme_constant_override(&"separation", GAP)
+	center.add_child(rows)
+	top_row = _row(rows, "Big")
+	bottom_row = _row(rows, "Small")
+	public_card = _card(top_row, "CreatePublic", "Public Lobby", "Open a lobby anyone can find and join under Browse Lobbies.", "public")
+	private_card = _card(top_row, "CreatePrivate", "Private Lobby", "Open a lobby only your friends and players you invite can join.", "private")
+	browse_card = _card(bottom_row, "BrowseLobbies", "Browse Lobbies", "Find an open lobby of other players and jump in.", "browse")
+	friends_card = _card(bottom_row, "FriendsLobbies", OnlineMenu.FRIENDS_TITLE, "Join a lobby one of your friends is already in.", "friends")
 	var bar := HBoxContainer.new()
 	bar.name = "Bar"
 	bar.add_theme_constant_override(&"separation", 12)
@@ -114,30 +119,36 @@ func focus_first() -> void:
 	back_button.grab_focus()
 
 
-func _card(card_name: String, title_text: String, caption: String, picture: String) -> PictureCard:
+func _row(parent: Control, row_name: String) -> HBoxContainer:
+	var r := HBoxContainer.new()
+	r.name = row_name
+	r.alignment = BoxContainer.ALIGNMENT_CENTER
+	r.add_theme_constant_override(&"separation", GAP)
+	parent.add_child(r)
+	return r
+
+
+func _card(row: HBoxContainer, card_name: String, title_text: String, caption: String, picture: String) -> PictureCard:
 	var path: String = PICTURES % picture
 	var tex: Texture2D = load(path) as Texture2D if ResourceLoader.exists(path) else null
 	var c := PictureCard.new(card_name, title_text, caption, tex)
-	grid.add_child(c)
+	row.add_child(c)
 	return c
 
 
-## Four in a row (2×2 only on a very narrow window); the cards as big as the screen allows.
+## The two big cards fill the width (wide splash arts), the two small ones sit under them at about
+## two thirds of their size; both rows shrink together on a short screen.
 func _fit() -> void:
 	var w: float = size.x - 2.0 * MARGIN_X
-	var h: float = size.y - 2.0 * MARGIN_Y - 52.0 - 52.0 - 2.0 * 18.0 - 24.0  # title, bar, gaps, lift room
+	var h: float = size.y - 2.0 * MARGIN_Y - 60.0 - 52.0 - 2.0 * 18.0 - GAP - 24.0  # title, bar, gaps, lift room
 	if w <= 0.0 or h <= 0.0:
 		return
-	var cols: int = 4 if w >= 1000.0 else 2
-	grid.columns = cols
-	var rows: int = 4 / cols
-	var card_w: float = (w - GAP * (cols - 1)) / float(cols)
-	var card_h: float = card_w * CARD_ASPECT
-	var max_h: float = (h - GAP * (rows - 1)) / float(rows)
-	if card_h > max_h:
-		card_h = max_h
-		card_w = minf(card_w, card_h / CARD_ASPECT * 1.6)  # wide, short cards on a flat screen
-	card_w = minf(card_w, 460.0)
-	card_h = minf(card_h, 560.0)
-	for c: PictureCard in cards():
-		c.custom_minimum_size = Vector2(floorf(card_w), floorf(card_h))
+	var big_w: float = minf((w - GAP) / 2.0, 820.0)
+	var big_h: float = big_w / BIG_ASPECT
+	var small_w: float = big_w * SMALL_SCALE
+	var small_h: float = small_w / SMALL_ASPECT
+	var fit: float = minf(1.0, h / (big_h + small_h))
+	for c: PictureCard in [public_card, private_card]:
+		c.custom_minimum_size = Vector2(floorf(big_w * fit), floorf(big_h * fit))
+	for c: PictureCard in [browse_card, friends_card]:
+		c.custom_minimum_size = Vector2(floorf(small_w * fit), floorf(small_h * fit))

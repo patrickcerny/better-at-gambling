@@ -191,13 +191,14 @@ func _on_roulette(sid: StringName, d: Dictionary, out: Array[StringName]) -> voi
 
 ## Split or Steal: the local player stole while the other one split (the house seat doesn't count).
 static func _backstabbed(ev: Dictionary, local_id: int) -> bool:
-	var house: int = int(ev.get("house", -1))
-	if local_id == house:
-		return false
-	if int(ev.get("a", -1)) == local_id:
-		return String(ev.get("choice_a", "")) == "STEAL" and String(ev.get("choice_b", "")) == "SPLIT"
-	if int(ev.get("b", -1)) == local_id:
-		return String(ev.get("choice_b", "")) == "STEAL" and String(ev.get("choice_a", "")) == "SPLIT"
+	for r: Variant in ev.get("results", []):
+		if not (r is Dictionary):
+			continue
+		var d: Dictionary = r
+		if int(d.get("a", -1)) == local_id:
+			return String(d.get("choice_a", "")) == "STEAL" and String(d.get("choice_b", "")) == "SPLIT"
+		if int(d.get("b", -1)) == local_id:
+			return String(d.get("choice_b", "")) == "STEAL" and String(d.get("choice_a", "")) == "SPLIT"
 	return false
 
 
