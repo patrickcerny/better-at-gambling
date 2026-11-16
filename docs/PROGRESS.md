@@ -93,6 +93,26 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.61 Luck in percent, losing streak, luck plaque, item cards on the right
+- Patrick: the half-ring luck gauge "sieht mega kacke aus", put it right of the items; item info on
+  the right too; luck should not be just 1–3; a losing streak should raise luck a bit; drop the
+  "[I] more info" hint; monkey/bat previews were the wrong way round.
+- Luck is fractional points now (`ModifierStack.get_luck` → float, `LuckRng` float), shown as the
+  reroll chance in percent (1 point = 12 %, −36 % … +36 %). Item descriptions say percent.
+- Losing streak (`BalanceConfig.luck_streak_*`, `ModifierStack.note_result` from
+  `StationLogicBase._settle`): each lost bet of at least $25 adds +1.5 % up to +6 %, slots count it
+  at half; the next win clears it. Server only; private snapshot has `streak`. At +3 %/+15 % slots
+  paid 109 %, so it was cut. `tests/sim/test_rtp_streak.gd` (slots 1.006 → 1.034, plinko 1.007 →
+  1.018, roulette red unchanged, straight 1.005 → 1.027, blackjack 1.013 → 1.013); the base RTP sims
+  run without the streak (`SimHelpers.streak`).
+- HUD: luck plaque right of the slots (LUCK + word, percent, bar from the centre with the streak's
+  share striped gold, "LOSING STREAK +x%"), hidden at 0 but its place kept. NEW ITEM / picked item /
+  I cards sit right of it, bottom level with the slots. Item bar spans the screen width.
+- Previews: models are built facing -z, so `ItemThumbnails.YAW` turns them round (152°); the bat is
+  tilted barrel up (`TILT`). The held item's live model swings instead of turning a full circle.
+  Round results' turning cards use the same yaw.
+- Look-dev: `tools/dev/item_thumbs_shot.tscn` (every preview, `--turn`), `item_bar_shot.tscn --luck P --streak S`.
+
 ### 2026-11-16 / 0.9.60 Round results reworked
 Patrick: "round results look shitty. Also 3d models for items and rework". `RewardPanel` now uses the table overlays' look (`TableSkin`): a walnut panel in a brass frame, only as big as its rows (no more big empty box over the stage), the title between brass rules and a draining countdown bar. Each row: a gold/silver/bronze place medallion (`PlaceBadge`), the bean in its colour and outfit (`BeanPortraits`), the cash counting up (ease out, gold flash at the end), and the item as a card that flips from a burgundy back to the item's own 3D model turning live in it, framed and tagged in its rarity colour (legendary glows); long items lie across the card. Underdog bonus and House Comp stay on the row; Minigames Only shows no cards; eight rows go compact. Look-dev: `scripts/screenshot.sh res://tools/dev/reward_panel_shot.tscn name 90 [--players N] [--instant] [--no-items]`. Tests: `test_reward_panel_items`, `test_stage_after_minigame`, `test_regroup_scene`, `test_item_bar` green (no full suite, per Patrick's rule).
 

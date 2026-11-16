@@ -248,7 +248,8 @@ func _show_model(r: Dictionary, item: StringName) -> void:
 	add_child(vp)
 	var stand: Node3D = ItemThumbnails.build_stage(vp)
 	var model: Node3D = ItemModels.make(item, 1.0)
-	model.rotation_degrees = Vector3(0.0, -28.0, 0.0)
+	# Facing the camera (the models are built facing away from it) and upright.
+	model.rotation_degrees = Vector3(0.0, ItemThumbnails.preview_yaw(item), 180.0 if item in ItemThumbnails.UPSIDE_DOWN else 0.0)
 	# Long thin items (bat, bow, cue) lie across the card's corner, bigger, and turn about their
 	# own length; everything else stands and turns.
 	var tilt := Node3D.new()

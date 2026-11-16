@@ -14,6 +14,8 @@ const SIZE: int = 128
 ## barrel up across the square.
 const YAW: float = 180.0 - 28.0
 const TILT: Dictionary = {&"baseball_bat": Vector3(0, 0, 145)}
+## Models that stand on their head as built (the round results' turning cards flip them upright).
+const UPSIDE_DOWN: Array[StringName] = [&"baseball_bat"]
 ## Dev: extra turn for every item (tools/dev/item_thumbs_shot.gd --turn).
 static var extra_turn: float = 0.0
 
