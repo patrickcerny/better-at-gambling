@@ -7,6 +7,15 @@ extends Node
 ## frame). Headless: nothing renders, the textures stay blank.
 
 const SIZE: int = 128
+## The items are built facing forward (-z), the way the bean holds them out to the others, so the
+## preview turns them round to face the camera (Patrick: "monkey ist verkehr rum"), a little to the
+## side so they read as 3D. `TILT` sets single items upright (degrees, x/y/z, on top of the turn):
+## bat.glb has its barrel at -y, so it stood on its head (Patrick: "wrong way"); it now leans
+## barrel up across the square.
+const YAW: float = 180.0 - 28.0
+const TILT: Dictionary = {&"baseball_bat": Vector3(0, 0, 145)}
+## Dev: extra turn for every item (tools/dev/item_thumbs_shot.gd --turn).
+static var extra_turn: float = 0.0
 
 ## id -> ImageTexture, shared by every list that ever opens.
 static var _cache: Dictionary = {}
@@ -81,6 +90,16 @@ static func texture_for(id: StringName) -> ImageTexture:
 	return tex
 
 
+## The y turn of `id`'s preview, degrees (also the item bar's live model turns from there).
+static func preview_yaw(id: StringName) -> float:
+	return YAW + extra_turn
+
+
+## The whole preview rotation of `id`, degrees (turn plus `TILT`).
+static func preview_rotation(id: StringName) -> Vector3:
+	return Vector3(0.0, preview_yaw(id), 0.0) + (TILT.get(id, Vector3.ZERO) as Vector3)
+
+
 ## Whether every requested picture is done.
 static func idle() -> bool:
 	return _queue.is_empty()
@@ -102,7 +121,7 @@ func _process(_delta: float) -> void:
 	if _model != null:
 		_model.queue_free()
 	_model = ItemModels.make(_busy, 1.0)
-	_model.rotation_degrees = Vector3(0.0, -28.0, 0.0)
+	_model.rotation_degrees = preview_rotation(_busy)
 	_stand.add_child(_model)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_wait = 2  # rendered at the end of this frame; read it back next frame (plus one for safety)

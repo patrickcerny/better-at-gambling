@@ -382,8 +382,8 @@ func _build() -> void:
 	items.anchor_right = 0.5
 	items.anchor_top = 1.0
 	items.anchor_bottom = 1.0
-	items.offset_left = -380
-	items.offset_right = 380
+	items.offset_left = -960
+	items.offset_right = 960
 	items.offset_top = -600
 	items.offset_bottom = -20
 	add_child(items)

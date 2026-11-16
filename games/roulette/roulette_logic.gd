@@ -228,7 +228,7 @@ func _settle_bet(b: Dictionary) -> void:
 	var p: int = b["player"]
 	var stake: int = b["amount"]
 	var type: StringName = b["type"]
-	var lk: int = modifiers.get_luck(p, game_id)
+	var lk: float = modifiers.get_luck(p, game_id)
 	var details: Dictionary = {"type": type, "value": b["value"], "number": result}
 	var base_return: int = 0
 	if wins(type, int(b["value"]), result):

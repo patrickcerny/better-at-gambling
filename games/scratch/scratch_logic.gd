@@ -118,7 +118,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	tier = t
 	card_age = 0.0
 	serial += 1
-	var lk: int = modifiers.get_luck(p, game_id)
+	var lk: float = modifiers.get_luck(p, game_id)
 	var d: LuckRng.Draw = luck.draw(lk, func() -> Array[int]: return draw_card(rng, balance, t),
 		func(c: Array[int]) -> float: return card_multiplier(c, t, balance))
 	card = d.value

@@ -11,7 +11,7 @@ func before_each() -> void:
 	root.size = Vector2(1920, 1080)
 	add_child_autofree(root)
 	bar = ItemBar.new()
-	bar.size = Vector2(680, 400)
+	bar.size = Vector2(1920, 600)
 	root.add_child(bar)
 	await wait_process_frames(2)
 
@@ -20,7 +20,7 @@ func test_nothing_is_held_until_a_slot_is_picked() -> void:
 	bar.set_inventory([&"lucky_clover", &"black_cat"])
 	assert_eq(bar.selected, -1)
 	assert_eq(bar.selected_item(), &"")
-	assert_false(bar.info_hint.visible, "no key line with empty hands")
+	assert_false(bar.keys_label.visible, "no key line with empty hands")
 	assert_false(bar.selection_panel.visible)
 
 
@@ -36,12 +36,10 @@ func test_picking_flashes_name_description_and_how_to_use() -> void:
 	assert_string_contains(bar.selection_tag.text, "45 s")
 	assert_string_contains(bar.selection_use.text, "look at a player")
 	assert_true(bar.keys_label.visible, "use / put away keys over the slots")
-	assert_true(bar.info_hint.visible, "i for info next to the slots")
 	await wait_seconds(ItemBar.SELECTION_SECONDS + 0.3)
 	assert_false(bar.selection_panel.visible, "gone after a moment")
 	bar.set_held(-1)
 	assert_eq(bar.selected, -1)
-	assert_false(bar.info_hint.visible)
 	assert_false(bar.keys_label.visible)
 
 
@@ -117,8 +115,29 @@ func test_slots_do_not_overlap_the_flash() -> void:
 	bar.set_held(2)
 	await wait_process_frames(3)
 	var flash: Rect2 = bar.selection_panel.get_global_rect()
-	assert_true(flash.end.y <= bar.slots[0].get_global_rect().position.y + 1.0, "flash sits above the slots")
-	assert_true(flash.position.y >= bar.get_global_rect().position.y - 1.0, "inside the bar")
+	assert_true(flash.position.x >= bar.slots[2].get_global_rect().end.x, "the card sits right of the slots")
+	assert_almost_eq(flash.end.y, bar.slots[2].get_global_rect().end.y, 2.0, "bottom level with the slots")
+	bar.set_private({"luck": 2.0})
+	await wait_process_frames(2)
+	assert_true(bar.luck_panel.visible)
+	assert_true(bar.selection_panel.get_global_rect().position.x >= bar.luck_panel.get_global_rect().end.x, "and right of the luck plaque")
+	assert_true(bar.luck_panel.get_global_rect().position.x >= bar.slots[2].get_global_rect().end.x, "the plaque is right of the slots")
+
+
+func test_luck_plaque_shows_percent_and_streak() -> void:
+	bar.set_private({"luck": 0.0})
+	assert_false(bar.luck_panel.visible, "no luck, no plaque")
+	bar.set_private({"luck": 2.0})
+	assert_true(bar.luck_panel.visible)
+	assert_eq(bar.luck_value.text, "+24%")
+	assert_eq(bar.luck_label.text, "LUCKY")
+	assert_false(bar.luck_streak.visible)
+	bar.set_private({"luck": 0.75, "streak": 0.75})
+	assert_eq(bar.luck_value.text, "+9%")
+	assert_string_contains(bar.luck_streak.text, "+9%")
+	bar.set_private({"luck": -3.0})
+	assert_eq(bar.luck_value.text, "−36%")
+	assert_eq(bar.luck_label.text, "CURSED")
 
 
 func test_duel_screen_picks_and_shows_the_result() -> void:

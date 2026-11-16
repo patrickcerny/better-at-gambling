@@ -322,7 +322,7 @@ func _draw_seed() -> int:
 	for b: Dictionary in bets:  # one bet per player (one horse per race)
 		var p: int = int(b["player"])
 		var horse: int = int(b["horse"])
-		var lk: int = modifiers.get_luck(p, game_id)
+		var lk: float = modifiers.get_luck(p, game_id)
 		if lk == 0:
 			continue
 		var d: LuckRng.Draw = luck.draw(lk, func() -> int:

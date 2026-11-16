@@ -557,7 +557,10 @@ func private_state(player: int, now: float) -> Dictionary:
 		if not defs.has(m.id):
 			continue
 		effects.append({"item": m.id, "luck": m.luck, "game": m.game_id, "left": snappedf(m.expires_at - now, 0.1) if m.expires_at != INF else -1.0, "uses": m.rounds_left})
-	var out: Dictionary = {"luck": modifiers.get_luck(player), "effects": effects}
+	var out: Dictionary = {"luck": snappedf(modifiers.get_luck(player), 0.01), "effects": effects}
+	var streak: float = modifiers.streak_luck(player)
+	if streak > 0.0:
+		out["streak"] = snappedf(streak, 0.01)
 	if shop != null and shop.bought.has(player):
 		out["shop_bought"] = true
 	for d: Dictionary in duels.duels.values():

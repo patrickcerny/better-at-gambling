@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"beer"
 display_name = "Beer"
-description = "Luck +1 for 40 s, but you're tipsy: wobbly screen, inverted look, money hidden. Leaves an Empty Bottle."
+description = "Luck +12% for 40 s, but you're tipsy: wobbly screen, inverted look, money hidden. Leaves an Empty Bottle."
 rarity = 0
 target_mode = 0
 requires_proximity = false

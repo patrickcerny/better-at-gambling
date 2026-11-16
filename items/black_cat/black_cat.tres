@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"black_cat"
 display_name = "Black Cat"
-description = "Jinx any player: their luck −2 for 45 s."
+description = "Jinx any player: their luck −24% for 45 s."
 rarity = 0
 target_mode = 1
 requires_proximity = false

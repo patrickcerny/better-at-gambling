@@ -9,8 +9,9 @@ var id: StringName
 var source_player: int = -1
 ## Restrict to one game (&"" = all games).
 var game_id: StringName = &""
-## Added to the player's luck while active.
-var luck: int = 0
+## Added to the player's luck while active, in luck points (1 point = `luck_reroll_per_point`
+## reroll chance, 12 %).
+var luck: float = 0.0
 ## Multiplies winnings (profit) while active.
 var payout_multiplier: float = 1.0
 ## Consumed by the first win it applies to.

@@ -258,6 +258,7 @@ func _settle(player: int, stake: int, base_return: int, details: Dictionary = {}
 		details["refunded"] = true
 	if returned > 0:
 		economy.apply(player, returned, StringName("win_" + game_id) if returned > stake else StringName("return_" + game_id), station_id)
+	modifiers.note_result(player, stake, returned)  # the losing streak's luck
 	events.append(GameEvents.round_result(station_id, player, stake, returned, details))
 	if returned > stake:
 		_collar_cut(player, returned - stake)

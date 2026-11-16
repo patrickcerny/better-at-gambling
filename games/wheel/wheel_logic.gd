@@ -279,7 +279,7 @@ func _draw_segment() -> int:
 		if seen.has(p):
 			continue
 		seen[p] = true
-		var lk: int = modifiers.get_luck(p, game_id)
+		var lk: float = modifiers.get_luck(p, game_id)
 		if lk == 0:
 			continue
 		var d: LuckRng.Draw = luck.draw(lk, func() -> int:
