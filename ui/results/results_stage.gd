@@ -1,6 +1,6 @@
 class_name ResultsStage
 extends Node3D
-## The results screen (§2.11, art direction "podium results with ragdolls"; reworked in 0.9.82,
+## The results screen (§2.11, art direction "podium results with ragdolls"; reworked in 0.9.83,
 ## Patrick: "rework it to look nicer"). A short show on a casino stage (`PodiumSet`: round stage,
 ## art-deco sunburst, curtains, a marquee with chasing bulbs): everyone below the top three drops
 ## in beside the stage, then the lacquered podium steps ride up out of the stage and the beans fall
