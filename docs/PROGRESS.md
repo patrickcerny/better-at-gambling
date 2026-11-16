@@ -93,6 +93,14 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.56 Taskbar icon on Windows
+- Patrick: after 0.9.48 the window title showed the logo but the taskbar showed the generic app icon.
+  Cause: Godot 4.7.2's exe resource editing writes our icon group without its name, and the engine
+  registers the window class with `LoadIcon(..., "GODOT_ICON")`, so the class icon (taskbar) was empty.
+  `tools/windows/fix_exe_icon.py` (stdlib only) names the group GODOT_ICON again after the export; run
+  by release.yml and `scripts/export.sh windows`. Checked on the 0.9.54 release exe (only .rsrc tail,
+  header sizes and checksum change; PE checksum verified with pefile).
+
 ### 2026-11-16 / 0.9.54 Table UIs redesigned, roulette inside bets
 - Patrick: "KOMPLETTER redesign des UI's der games" and "Roulette UI ausbauen und besser betten kann auf
   mehrere zahlen". Every table overlay shares `TableSkin`: walnut panel in a brass frame with corner
