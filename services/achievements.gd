@@ -62,6 +62,8 @@ const DEFS: Dictionary[StringName, Array] = {
 	&"ACH_COUNTERFEIT": ["Counterfeiter", "Get caught paying with Fake Cash."],
 	&"ACH_YEET": ["Yeet", "Throw another player."],
 	&"ACH_LAST_PLACE": ["Participation Trophy", "Finish last in a minigame with 3 or more players."],
+	# Hidden in Steamworks: spin the main menu logo (`LogoSpin`) 1000 full turns, in total.
+	&"ACH_LOGO_SPINNER": ["You Spin Me Round", "Spin the logo on the main menu 1,000 times."],
 }
 
 ## Patrick 2026-11-15: "a Steam achievement (beat the Dev) where you have to win against me in a
@@ -70,6 +72,11 @@ const DEFS: Dictionary[StringName, Array] = {
 ## player to player. The rule is here; whether the others hold it is asked from Steam by
 ## `SteamSvc.check_beat_the_dev`.
 const BEAT_THE_DEV: StringName = &"ACH_BEAT_THE_DEV"
+
+## Patrick 2026-11-16: "Add a hidden achievement (spin the startlogo 1000 times)". Full turns of
+## the main menu logo, all sessions together (`PlayerProfile.logo_spins`, kept in profile.cfg).
+const LOGO_SPINNER: StringName = &"ACH_LOGO_SPINNER"
+const LOGO_SPINS: int = 1000
 
 
 ## A finished match's progress row (`Progression.breakdown` + minigames_won, money, players):
@@ -147,6 +154,15 @@ static func from_profile(p: PlayerProfile) -> Array[StringName]:
 		out.append(&"ACH_BIG_WIN")
 	if not p.owned.is_empty():
 		out.append(&"ACH_SHOPPING")
+	out.append_array(from_logo_spins(p.logo_spins))
+	return out
+
+
+## The logo spin achievement once `total` full turns of the main menu logo reach `LOGO_SPINS`.
+static func from_logo_spins(total: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	if total >= LOGO_SPINS:
+		out.append(LOGO_SPINNER)
 	return out
 
 

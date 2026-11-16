@@ -26,6 +26,8 @@ const CAMERA_DIST: float = 24.0
 ## Yaw/pitch in degrees applied on top of the sway (used for the preview angles).
 @export var yaw_deg: float = 0.0
 @export var pitch_deg: float = 0.0
+## Extra yaw in degrees from the player spinning it (`LogoSpin`, main menu), unbounded.
+var spin_deg: float = 0.0
 
 var camera: Camera3D
 var _pivot: Node3D
@@ -57,9 +59,8 @@ func _frame() -> void:
 
 
 func _process(delta: float) -> void:
-	if not sway:
-		return
-	_t += delta
+	if sway:
+		_t += delta
 	_apply_pose()
 
 
@@ -67,7 +68,7 @@ func _apply_pose() -> void:
 	var s: float = sin(_t * 0.6) if sway else 0.0
 	var c: float = sin(_t * 0.45 + 1.3) if sway else 0.0
 	# Gentle: it must still read as a flat coin sign.
-	_pivot.rotation = Vector3(deg_to_rad(pitch_deg + c * 1.5), deg_to_rad(yaw_deg + s * 5.0), deg_to_rad(s * -0.6))
+	_pivot.rotation = Vector3(deg_to_rad(pitch_deg + c * 1.5), deg_to_rad(yaw_deg + spin_deg + s * 5.0), deg_to_rad(s * -0.6))
 	_pivot.position.y = sin(_t * 0.9) * 0.06 if sway else 0.0
 
 

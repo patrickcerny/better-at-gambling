@@ -108,6 +108,15 @@ func add_wheel_prize(kind: StringName, amount: int) -> Dictionary:
 	return got
 
 
+## Adds `turns` full turns of the main menu logo (`Logo3DView`) and saves. Returns the new total.
+## No `changed`: nothing on screen shows it, and it fires several times a second while spinning.
+func add_logo_spins(turns: int) -> int:
+	if turns > 0:
+		profile.logo_spins = mini(profile.logo_spins + turns, PlayerProfile.MAX_STAT)
+		save()
+	return profile.logo_spins
+
+
 ## Remembers a Daily Spin at `when` (unix seconds) and saves.
 func mark_daily_spin(when: int) -> void:
 	profile.daily_last = maxi(when, 0)

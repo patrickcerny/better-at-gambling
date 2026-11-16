@@ -40,6 +40,7 @@ LABELS = {
     "ACH_COUNTERFEIT": ("FAKE", "$$$"),
     "ACH_YEET": ("", "YEET"),
     "ACH_LAST_PLACE": ("", "LAST"),
+    "ACH_LOGO_SPINNER": ("1000", "SPINS"),
 }
 
 ON = {
