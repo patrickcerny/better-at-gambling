@@ -93,6 +93,9 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.60 Round results reworked
+Patrick: "round results look shitty. Also 3d models for items and rework". `RewardPanel` now uses the table overlays' look (`TableSkin`): a walnut panel in a brass frame, only as big as its rows (no more big empty box over the stage), the title between brass rules and a draining countdown bar. Each row: a gold/silver/bronze place medallion (`PlaceBadge`), the bean in its colour and outfit (`BeanPortraits`), the cash counting up (ease out, gold flash at the end), and the item as a card that flips from a burgundy back to the item's own 3D model turning live in it, framed and tagged in its rarity colour (legendary glows); long items lie across the card. Underdog bonus and House Comp stay on the row; Minigames Only shows no cards; eight rows go compact. Look-dev: `scripts/screenshot.sh res://tools/dev/reward_panel_shot.tscn name 90 [--players N] [--instant] [--no-items]`. Tests: `test_reward_panel_items`, `test_stage_after_minigame`, `test_regroup_scene`, `test_item_bar` green (no full suite, per Patrick's rule).
+
 ### 2026-11-16 / 0.9.59 Daily Spin
 - Patrick: "Daily spin button auf der Startseite wo du Sachen gewinnen kannst (auch die gezahlte
   Währung und sehr unwahrscheinlich ein krasser animierter Skin). Mach da ein cooles Wheel."
