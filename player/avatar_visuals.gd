@@ -160,6 +160,8 @@ var outfit: Dictionary[StringName, StringName] = {}
 var _outfit_nodes: Dictionary[StringName, Node3D] = {}
 var _boot_l: Node3D = null
 var _cape_pivot: Node3D = null
+## Between the cape's hinge and its mesh: scaled out round the body's axis (`OutfitMeshes.cape_spread`).
+var _cape_spread_node: Node3D = null
 var _cape_swing: float = 0.0
 ## The worn cape's cloth (null when the toon shaders are off: the cape just swings then).
 var _cloth: CapeCloth = null
@@ -196,11 +198,23 @@ func set_outfit(o: Dictionary) -> void:
 		wear(kind, StringName(str(o.get(kind, o.get(String(kind), "")))))
 
 
+## Spreads the worn cape out round a bulky shirt or trousers (`OutfitMeshes.cape_spread`).
+func _update_cape_spread() -> void:
+	if _cape_spread_node == null or not is_instance_valid(_cape_spread_node):
+		return
+	var cape: StringName = outfit.get(CosmeticDef.KIND_CAPE, &"")
+	var pieces: Array[StringName] = [outfit.get(CosmeticDef.KIND_SHIRT, &""), outfit.get(CosmeticDef.KIND_PANTS, &"")]
+	var s: float = OutfitMeshes.cape_spread(cape, pieces) if cape != &"" else 1.0
+	_cape_spread_node.scale = Vector3(s, 1.0, s)
+
+
 ## Puts on one piece (`OutfitMeshes`): &"" or an unknown id takes that kind off.
 func wear(kind: StringName, id: StringName) -> void:
 	if not kind in CosmeticDef.OUTFIT_KINDS or outfit.get(kind, &"") == id:
 		return
 	_take_off(kind)
+	if kind == CosmeticDef.KIND_SHIRT or kind == CosmeticDef.KIND_PANTS:
+		_update_cape_spread.call_deferred()  # once the new piece is on
 	if id == &"" or not String(id).begins_with(String(kind) + "_"):
 		return
 	outfit[kind] = id
@@ -254,8 +268,14 @@ func wear(kind: StringName, id: StringName) -> void:
 			_cape_pivot.position = OutfitMeshes.cape_pivot()
 			body.add_child(_cape_pivot)
 			var mi: MeshInstance3D = _outfit_mesh(m, "CapeMesh")
-			mi.position = -_cape_pivot.position
-			_cape_pivot.add_child(mi)
+			# A bulky shirt or trousers (a barrel): the cape hangs wider, from the body's axis.
+			var spread_node := Node3D.new()
+			spread_node.name = "Spread"
+			spread_node.position = -_cape_pivot.position
+			_cape_pivot.add_child(spread_node)
+			spread_node.add_child(mi)
+			_cape_spread_node = spread_node
+			_update_cape_spread()
 			_outfit_nodes[kind] = _cape_pivot
 			var cloth_mat: ShaderMaterial = ToonMaterial.make_cloth(0.3)
 			if cloth_mat != null:
@@ -299,6 +319,7 @@ func _take_off(kind: StringName) -> void:
 				_legs[i].mesh = _foot_meshes[i]
 		CosmeticDef.KIND_CAPE:
 			_cape_pivot = null
+			_cape_spread_node = null
 			_cape_swing = 0.0
 			_cloth = null
 		CosmeticDef.KIND_SHIRT:
