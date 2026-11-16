@@ -45,6 +45,23 @@ func test_cosmetic_accounts_get_every_cosmetic_but_no_dev_mode() -> void:
 	assert_true(p.owns(&"hat_halo"), "level pass pieces too")
 
 
+func test_developers_own_everything_and_every_achievement() -> void:
+	for id: int in DevMode.STEAM_IDS:
+		assert_true(DevMode.owns_everything(id), "developers own every piece for good")
+	for id: int in DevMode.COSMETIC_IDS:
+		assert_true(DevMode.owns_everything(id))
+	assert_false(DevMode.owns_everything(0))
+	assert_false(DevMode.owns_everything(76561190000000002), "a friend's account: no")
+	var mine: Array[StringName] = DevMode.granted_achievements(DevMode.THE_DEV)
+	assert_eq(mine.size(), Achievements.DEFS.size(), "Patrick gets all of them")
+	assert_true(Achievements.BEAT_THE_DEV in mine)
+	for id: int in DevMode.STEAM_IDS:
+		if id != DevMode.THE_DEV:
+			assert_false(Achievements.BEAT_THE_DEV in DevMode.granted_achievements(id), "would spread Beat the Dev")
+	assert_eq(DevMode.granted_achievements(76561190000000002).size(), 0, "nobody else")
+	assert_eq(DevMode.granted_achievements(DevMode.COSMETIC_IDS[0]).size(), 0, "cosmetic accounts: no achievements")
+
+
 func test_developers_wear_the_developer_skin() -> void:
 	var p: PlayerProfile = ProfileManager.profile
 	DevMode.forced = 1
