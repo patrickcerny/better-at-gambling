@@ -93,6 +93,12 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.10.47 no more cash piles on the floor
+- Patrick: "remove this random cash from everywhere" (screenshot: banknotes + coins on the carpet).
+  It was the Plinko jackpot decor: two `money_pile` props beside the board that appeared once the
+  jackpot reached 3x / 6x its seed. Removed `PlinkoStation.set_jackpot` + its call in `MatchScene`
+  and the test. Jackpot money logic untouched (purely visual).
+
 ### 2026-11-16 / 0.10.46 no false "ALL IN" after a bet goes down
 - Patrick: "sometimes it tells me I go all in but I have more money (mainly on blackjack)". Blackjack
   takes the stake off the balance as soon as the bet is placed; that balance update re-clamped the

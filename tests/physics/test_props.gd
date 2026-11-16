@@ -30,18 +30,6 @@ func test_out_of_order_puts_cones_on_the_seats() -> void:
 	assert_false(st.out_of_order_cones.visible)
 
 
-func test_money_piles_grow_with_the_jackpot() -> void:
-	var st: PlinkoStation = await _station(PlinkoStation.new()) as PlinkoStation
-	st.set_jackpot(500, 500)
-	assert_false(st._money_piles[0].visible, "seed jackpot: no money")
-	st.set_jackpot(1600, 500)
-	assert_true(st._money_piles[0].visible)
-	assert_false(st._money_piles[1].visible)
-	st.set_jackpot(6000, 500)
-	assert_true(st._money_piles[1].visible)
-	assert_gt(st._money_piles[0].scale.x, 1.0)
-
-
 func test_the_bean_is_the_only_body_and_takes_its_colour() -> void:
 	var v := AvatarVisuals.new()
 	add_child_autofree(v)
