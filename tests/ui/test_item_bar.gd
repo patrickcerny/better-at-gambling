@@ -98,6 +98,58 @@ func test_info_card_still_opens_on_the_held_item() -> void:
 	assert_false(bar.selection_panel.visible, "the card replaces the flash")
 
 
+func test_used_item_takes_its_cards_with_it() -> void:
+	# Patrick: "The info of old items gets stuck on the screen".
+	bar.set_inventory([&"lucky_clover", &"black_cat"])
+	bar.set_held(0)
+	assert_true(bar.selection_panel.visible)
+	bar.set_inventory([&"black_cat"])  # the clover was used: the slots shift
+	assert_false(bar.selection_panel.visible, "no card for an item that is gone")
+	bar.set_held(0)
+	bar.toggle_info()
+	assert_true(bar.info_panel.visible)
+	bar.set_inventory([])
+	assert_false(bar.info_panel.visible, "the I card goes with its item")
+
+
+func test_info_card_follows_the_hand_on_scroll() -> void:
+	bar.set_inventory([&"lucky_clover", &"black_cat"])
+	bar.set_held(0)
+	bar.toggle_info()
+	bar.set_held(1)
+	assert_true(bar.info_panel.visible)
+	assert_eq(bar.info_name.text, "Black Cat", "the card shows the item now in the hand")
+	assert_false(bar.selection_panel.visible, "no second card on top")
+	bar.set_held(-1)
+	assert_false(bar.info_panel.visible, "put away: card gone")
+
+
+func test_new_item_card_dropped_when_the_item_is_gone() -> void:
+	bar.set_inventory([&"lucky_clover", &"mirror", &"black_cat"])
+	assert_eq(bar.pickup_item, &"lucky_clover")
+	bar.set_inventory([&"black_cat"])  # used / stolen before its card came up
+	assert_eq(bar.pickup_item, &"black_cat", "the gone ones are skipped")
+	assert_eq(bar.pickup_queue.size(), 0)
+	bar.set_inventory([])
+	assert_eq(bar.pickup_item, &"")
+	assert_false(bar.pickup_panel.visible)
+
+
+func test_hidden_hud_clears_the_cards() -> void:
+	bar.set_inventory([&"lucky_clover", &"mirror"])
+	bar.set_held(0)
+	bar.toggle_info()
+	root.visible = false  # a minigame / the rewards take the screen
+	assert_false(bar.info_panel.visible)
+	assert_false(bar.selection_panel.visible)
+	assert_false(bar.pickup_panel.visible)
+	assert_eq(bar.pickup_queue.size(), 0)
+	root.visible = true
+	await wait_process_frames(2)
+	assert_false(bar.info_panel.visible, "nothing old comes back after the minigame")
+	assert_false(bar.pickup_panel.visible)
+
+
 func test_two_button_choice_reports_the_button() -> void:
 	var got: Array[int] = []
 	bar.choice_made.connect(func(i: int) -> void: got.append(i))
