@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.75 Warning when the game is out of date
+### 2026-11-16 / 0.9.76 Warning when the game is out of date
 - Patrick: "warning if youre a version behind and you start the game". The main menu asks
   `VersionCheck` on every visit and shows a red UPDATE AVAILABLE card top right when behind.
   Started from the Steam install: Steam's own `getAppBuildId` (this install) vs `getBetaInfo`
