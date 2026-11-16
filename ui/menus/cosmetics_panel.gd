@@ -649,7 +649,7 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 	b.tooltip_text = title if d != null else "%s: a set of %d pieces for Gold Coins" % [title, pack.pieces.size()]
 	b.clip_contents = true
 	SettingsPanel.style_tab(b)
-	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
 		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
 		sb.set_corner_radius_all(18)
 		b.add_theme_stylebox_override(st, sb)
@@ -711,7 +711,7 @@ func _coin_tile(c: CoinPack) -> Button:
 	b.custom_minimum_size = TILE
 	b.tooltip_text = "%s Gold Coins" % Hud._thousands(c.gold)
 	SettingsPanel.style_tab(b)
-	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
 		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
 		sb.set_corner_radius_all(18)
 		b.add_theme_stylebox_override(st, sb)
