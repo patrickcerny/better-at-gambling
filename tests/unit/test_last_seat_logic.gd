@@ -1,8 +1,8 @@
 extends GutTest
 ## Last Seat at the Table (MINIGAME_IDEAS #5): musical chairs in the parlor. The music stops at a
 ## server-picked time (6..14 s from the seeded rng), one stool fewer than beans comes out, the
-## server decides every claim (action button in reach, or touching a stool), seated beans can't be
-## shoved and stay pinned, whoever is left standing at the end of the round (all stools taken or
+## server decides every claim (only the action button / click in reach, never by touching), seated
+## beans can't be shoved and stay pinned, whoever is left standing at the end of the round (all stools taken or
 ## the 10 s grace) is out together, the last bean seated wins.
 
 const STEP: float = 0.05
@@ -140,19 +140,17 @@ func test_claims_need_reach_and_the_first_claim_wins() -> void:
 	assert_eq(int(st["seated"][1]), 0)
 
 
-func test_touching_a_stool_sits_the_nearest_bean() -> void:
+func test_walking_onto_a_stool_does_not_sit_you_down() -> void:
 	var g: LastSeatLogic = _game([1, 2, 3])
 	_run(g, STEP)
 	_park(g)
 	_to_scramble(g)
-	_near(g, 2, 1, 0.5)
-	_near(g, 3, 1, LastSeatLogic.SIT_TOUCH - 0.02)
-	var evs: Array[Dictionary] = _run(g, STEP)
-	var sat: Array[Dictionary] = _of(evs, &"last_seat_sat")
-	assert_eq(sat.size(), 1)
-	assert_eq(int(sat[0]["player"]), 2, "the closer bean gets it")
-	assert_eq(sat[0]["how"], &"touch")
-	assert_false(g.is_seated(3))
+	_near(g, 2, 1, 0.0)
+	var evs: Array[Dictionary] = _run(g, 1.0)
+	assert_eq(_of(evs, &"last_seat_sat").size(), 0, "only E / the click sits a bean down")
+	assert_false(g.is_seated(2))
+	assert_true(_sit(g, 2)["ok"])
+	assert_true(g.is_seated(2))
 
 
 func test_seated_bean_cannot_be_shoved_off_and_stays_pinned() -> void:
@@ -276,8 +274,9 @@ func test_two_players_is_one_round_with_one_stool() -> void:
 	_to_scramble(g)
 	assert_eq(g.stools.size(), 1)
 	_near(g, 1, 0, 0.3)
+	assert_true(_sit(g, 1)["ok"], "pressed E next to it")
 	evs = _run(g, STEP)
-	assert_eq(_of(evs, &"last_seat_sat").size(), 1, "ran onto it")
+	assert_eq(_of(evs, &"last_seat_sat").size(), 1)
 	assert_eq(int(_of(evs, &"last_seat_winner")[0]["player"]), 1)
 	_run(g, LastSeatLogic.END_HOLD + STEP)
 	assert_true(g.is_finished())
