@@ -208,9 +208,28 @@ func _update_controls() -> void:
 	info_label.text = "%s %s   •   %s" % ["PLAY MONEY" if fun else "BALANCE", money(bal), "CARD %s" % money(shown_price) if shown_serial >= 0 else "Three in a line wins"]
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	super(delta)
 	if visible:
 		_update_controls()
+
+
+## Gamepad: the stick frames a card to buy, A buys it (A reveals the card while one is open).
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	out.assign(buy_buttons)
+	return out
+
+
+func _pad_selected(i: int) -> void:
+	_hover(i)
+
+
+func _pad_activate(i: int) -> bool:
+	if card_open():
+		return false  # A scratches it all off (bet_confirm)
+	buy(i)
+	return true
 
 
 func _on_all_revealed() -> void:

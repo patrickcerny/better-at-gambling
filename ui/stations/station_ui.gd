@@ -46,6 +46,18 @@ var countdown: CountdownBar
 ## The ribbon over the panel's top edge that shows a round's result ("WIN +$120").
 var result_ribbon: PanelContainer
 var result_ribbon_label: Label
+## Gamepad bet picker (`pad_targets`): which target the gold frame is on, the frame itself, and
+## the left stick's latch (one step per push; held, it repeats).
+var pad_index: int = 0
+var pad_frame: Panel
+var _pad_latched: bool = false
+var _pad_hold: float = 0.0
+## Stick push (0..1) that moves the picker one step, and where it lets go again.
+const PAD_PUSH: float = 0.6
+const PAD_RELEASE: float = 0.3
+## A held stick repeats a step after this long, then every `PAD_REPEAT`.
+const PAD_REPEAT_DELAY: float = 0.4
+const PAD_REPEAT: float = 0.16
 ## A round's results arrive one per bet: summed over a short window into one ribbon.
 var _ribbon_stake: int = 0
 var _ribbon_net: int = 0
@@ -179,6 +191,17 @@ func _ready() -> void:
 	var how: String = _rules_text()
 	if not how.is_empty():
 		_add_rules(how)
+	_build_pad_frame()
+	no_gui_focus(self)
+
+
+## Nothing at a table takes GUI focus: with a focusable button there, the engine hands it the
+## focus on the first d-pad press (which then never reaches the items) and A would press it
+## instead of betting. The mouse still clicks everything; pads use the keys and the picker.
+## Runs after the build and after every redraw (tables rebuild chips and bonus buttons).
+static func no_gui_focus(node: Node) -> void:
+	for c: Node in node.find_children("*", "BaseButton", true, false):
+		(c as BaseButton).focus_mode = Control.FOCUS_NONE
 
 
 ## Shows the overlay for a station.
@@ -199,6 +222,8 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 	_update_glyphs()
 	_refresh()
 	_after_refresh()
+	if InputGlyphs.gamepad and not pad_targets().is_empty() and _pad_current() < 0:
+		pad_select(clampi(pad_index, 0, pad_targets().size() - 1))
 
 
 ## How the game works, folded away under the key hint: one small "HOW IT WORKS" line that opens
@@ -235,6 +260,160 @@ func close() -> void:
 	visible = false
 
 
+# --- Gamepad picker ----------------------------------------------------------------------------
+# Tables you bet on by clicking a spot (craps, the wheel, the horses, baccarat, Plinko's risk,
+# the scratch-card counter) list those spots in `pad_targets`. On a gamepad the left stick (free
+# while seated) moves a gold frame between them and `_pad_selected` tells the table; A presses the
+# framed spot (`_pad_activate`, by default its button). The d-pad keeps using items.
+
+## Override: the spots a gamepad can pick, in reading order ([] = no picker at this table).
+func pad_targets() -> Array[Control]:
+	return []
+
+
+## True while the picker shows and takes the stick and A.
+func pad_active() -> bool:
+	return visible and InputGlyphs.gamepad and not pad_targets().is_empty()
+
+
+## Override: the target that is the table's current choice (Plinko's risk), -1 = none. The frame
+## sits on it whatever chose it (the mouse included).
+func _pad_current() -> int:
+	return -1
+
+
+## Override: the frame moved onto target `i` (remember it as the table's chosen spot).
+func _pad_selected(_i: int) -> void:
+	pass
+
+
+## Override: A on target `i`; true when it was used (the press goes no further). By default it
+## presses the target's button when that can be pressed.
+func _pad_activate(i: int) -> bool:
+	var t: Array[Control] = pad_targets()
+	if i < 0 or i >= t.size():
+		return false
+	var b: BaseButton = t[i] as BaseButton
+	if b == null or not b.is_visible_in_tree():
+		return false
+	if b.disabled:
+		Audio.play(&"buzzer", &"UI", -18.0, 1.4)
+		return true
+	b.pressed.emit()
+	return true
+
+
+## Moves the frame one step towards `dir` (screen space): onto the nearest target that way.
+func pad_move(dir: Vector2) -> void:
+	var t: Array[Control] = pad_targets()
+	if t.is_empty():
+		return
+	pad_index = clampi(pad_index, 0, t.size() - 1)
+	var from: Vector2 = t[pad_index].get_global_rect().get_center()
+	var best: int = -1
+	var best_score: float = INF
+	for i: int in t.size():
+		if i == pad_index or not t[i].is_visible_in_tree():
+			continue
+		var d: Vector2 = t[i].get_global_rect().get_center() - from
+		var along: float = d.dot(dir)
+		if along <= 1.0:
+			continue
+		var across: float = absf(d.cross(dir))
+		var score: float = along + across * 2.5
+		if score < best_score:
+			best_score = score
+			best = i
+	if best >= 0:
+		pad_select(best)
+
+
+## Puts the frame on target `i`.
+func pad_select(i: int) -> void:
+	var t: Array[Control] = pad_targets()
+	if t.is_empty():
+		return
+	i = clampi(i, 0, t.size() - 1)
+	if i != pad_index:
+		Audio.play(&"ui_hover", &"UI", -14.0)
+	pad_index = i
+	_pad_selected(i)
+	_place_pad_frame()
+
+
+func _build_pad_frame() -> void:
+	pad_frame = Panel.new()
+	pad_frame.name = "PadFrame"
+	pad_frame.top_level = true
+	pad_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad_frame.z_index = 4
+	var sb := StyleBoxFlat.new()
+	sb.draw_center = false
+	sb.border_color = Palette.VIP_GOLD
+	sb.set_border_width_all(4)
+	sb.set_corner_radius_all(10)
+	sb.shadow_color = Color(Palette.VIP_GOLD, 0.45)
+	sb.shadow_size = 12
+	pad_frame.add_theme_stylebox_override(&"panel", sb)
+	pad_frame.visible = false
+	add_child(pad_frame)
+
+
+func _place_pad_frame() -> void:
+	if pad_frame == null:
+		return
+	var t: Array[Control] = pad_targets()
+	var show: bool = pad_active() and pad_index < t.size() and t[pad_index].is_visible_in_tree()
+	pad_frame.visible = show
+	if show:
+		var r: Rect2 = t[pad_index].get_global_rect().grow(5.0)
+		pad_frame.global_position = r.position
+		pad_frame.size = r.size
+
+
+## The left stick, read straight from the pads (not through the move actions: WASD are table keys
+## while seated, S stands and D doubles at blackjack).
+static func left_stick() -> Vector2:
+	var best := Vector2.ZERO
+	for d: int in Input.get_connected_joypads():
+		var v := Vector2(Input.get_joy_axis(d, JOY_AXIS_LEFT_X), Input.get_joy_axis(d, JOY_AXIS_LEFT_Y))
+		if v.length() > best.length():
+			best = v
+	return best
+
+
+func _process(delta: float) -> void:
+	if not visible:
+		return
+	_pad_step(left_stick(), delta)
+	var cur: int = _pad_current()
+	if cur >= 0:
+		pad_index = cur
+	_place_pad_frame()
+
+
+## One frame of stick input for the picker: a push past `PAD_PUSH` steps once, holding repeats.
+func _pad_step(stick: Vector2, delta: float) -> void:
+	if not pad_active():
+		_pad_latched = false
+		return
+	if stick.length() < PAD_RELEASE:
+		_pad_latched = false
+		return
+	if stick.length() < PAD_PUSH:
+		return
+	var dir: Vector2 = Vector2(signf(stick.x), 0.0) if absf(stick.x) >= absf(stick.y) else Vector2(0.0, signf(stick.y))
+	if not _pad_latched:
+		_pad_latched = true
+		_pad_hold = -PAD_REPEAT_DELAY
+		pad_move(dir)
+		return
+	_pad_hold += delta
+	if _pad_hold >= PAD_REPEAT:
+		_pad_hold = 0.0
+		pad_move(dir)
+
+
 ## A clicked button keeps keyboard focus, and Space/Enter would then press it again instead of
 ## reaching the bet/action keys: let go of the focus once a click is done.
 func _input(event: InputEvent) -> void:
@@ -242,6 +421,10 @@ func _input(event: InputEvent) -> void:
 		var f: Control = get_viewport().gui_get_focus_owner()
 		if f != null and is_ancestor_of(f):
 			get_viewport().gui_release_focus.call_deferred()
+	# Gamepad picker: A presses the framed spot before the table's own A (bet / hit) sees it.
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed and (event as InputEventJoypadButton).button_index == JOY_BUTTON_A and pad_active():
+		if _pad_activate(clampi(pad_index, 0, pad_targets().size() - 1)):
+			get_viewport().set_input_as_handled()
 
 
 ## Redraws from the newest station state.
@@ -267,6 +450,7 @@ func _update_glyphs() -> void:
 ## The look that follows every redraw: the status band shows only with a status, and the
 ## countdown follows the public `timer` (`_countdown_seconds`).
 func _after_refresh() -> void:
+	no_gui_focus(panel)
 	status_band.visible = status_label.visible and status_label.text != ""
 	var left: float = _countdown_seconds()
 	countdown.feed(left, str(pub.get("state", "")))

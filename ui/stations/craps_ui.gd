@@ -129,12 +129,26 @@ func bet_on(type: StringName) -> bool:
 	return send(&"place_bet", {"bet": {"type": type, "amount": bet_panel.chip_stake(bet_room())}})
 
 
+## Gamepad: the stick frames a bet (it becomes the chosen one), A puts a chip on it.
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	for t: StringName in CrapsLogic.BET_TYPES:
+		out.append(bet_buttons[t])
+	return out
+
+
+func _pad_selected(i: int) -> void:
+	selected_bet = CrapsLogic.BET_TYPES[i]
+
+
 ## The shooter throws the dice.
 func shoot() -> bool:
 	return send(&"action", {"action": &"shoot"})
 
 
 func _hint_text() -> String:
+	if InputGlyphs.gamepad:
+		return InputGlyphs.fill("Left stick: pick a bet  [%s] put a chip on it  [{bet_chip_prev} / {bet_chip_next}] chip\n[{bet_repeat}] shoot  [{bet_clear}] clear  [{leave_station}] stand up" % InputGlyphs.pad_name("A"))
 	return "%s Stand up   ·   %s shoot when you have the dice" % [InputGlyphs.hint(&"leave_station"), InputGlyphs.hint(&"bet_repeat")]
 
 
@@ -280,7 +294,7 @@ func _bet_button(t: StringName) -> Button:
 	chip.content_margin_left = 5
 	chip.content_margin_right = 5
 	badge.add_theme_stylebox_override(&"normal", chip)
-	badge.add_theme_font_size_override(&"font_size", 13)
+	badge.add_theme_font_size_override(&"font_size", 14)
 	badge.anchor_left = 1.0
 	badge.anchor_right = 1.0
 	badge.offset_left = -52
@@ -293,7 +307,7 @@ func _bet_button(t: StringName) -> Button:
 	b.add_child(badge)
 	_badges[t] = badge
 	var dots := Label.new()
-	dots.add_theme_font_size_override(&"font_size", 12)
+	dots.add_theme_font_size_override(&"font_size", 14)
 	dots.position = Vector2(6, 2)
 	dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dots.visible = false

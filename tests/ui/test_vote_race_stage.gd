@@ -400,3 +400,40 @@ func test_players_out_of_the_race_sit_on_the_bench() -> void:
 	assert_eq(bench_root.name, "Bench")
 	assert_true((bench_root as Node3D).visible)
 	assert_eq(tr.lanes, [1, 2, 3, 4] as Array[int])
+
+
+# --- Gamepad -------------------------------------------------------------------------------------
+
+func _pad(button: JoyButton) -> void:
+	for down: bool in [true, false]:
+		var ev := InputEventJoypadButton.new()
+		ev.button_index = button
+		ev.pressed = down
+		get_tree().root.push_input(ev)
+
+
+func test_gamepad_dpad_and_a_vote() -> void:
+	InputGlyphs.set_gamepad(true)
+	await wait_process_frames(2)
+	var targets: Array[int] = stage.vote_targets()
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	assert_eq(focused, stage.cards[targets[0]], "the first racer you can vote for has the focus")
+	assert_false(focused == stage.cards[1], "never your own card")
+	_pad(JOY_BUTTON_DPAD_RIGHT)
+	assert_eq(get_viewport().gui_get_focus_owner(), stage.cards[targets[1]], "the d-pad moves along the cards")
+	_pad(JOY_BUTTON_A)
+	assert_eq(sent.size(), 1, "A votes")
+	assert_eq(logic.votes.get(1, -1), targets[1])
+	assert_string_contains(InputGlyphs.pad_text("D-pad + A"), "A")
+	InputGlyphs.set_gamepad(false)
+	await wait_process_frames(1)
+	assert_null(get_viewport().gui_get_focus_owner(), "keyboard and mouse: nothing sits focused")
+
+
+func test_status_names_the_pad_while_voting() -> void:
+	InputGlyphs.set_gamepad(true)
+	stage._refresh()
+	assert_string_contains(stage.status_label.text, "d-pad")
+	InputGlyphs.set_gamepad(false)
+	stage._refresh()
+	assert_string_contains(stage.status_label.text, "Click a card")

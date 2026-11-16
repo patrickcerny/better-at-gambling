@@ -202,9 +202,31 @@ func _rules_text() -> String:
 		+ "AA BONUS (your cards + the flop, paid even if you fold):  " + "  ·  ".join(bonus_lines))
 
 
+## Gamepad: while bets are open the stick picks the AA bonus (the frame is the chosen size);
+## A still deals.
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	if bonus_row != null and bonus_row.is_visible_in_tree():
+		out.assign(bonus_buttons)
+	return out
+
+
+func _pad_selected(i: int) -> void:
+	if i < bonus_sizes.size():
+		set_bonus(bonus_sizes[i])
+
+
+func _pad_current() -> int:
+	return bonus_sizes.find(bonus)
+
+
+func _pad_activate(_i: int) -> bool:
+	return false
+
+
 func _hint_text() -> String:
 	if InputGlyphs.gamepad:
-		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_confirm}] deal\n[{bj_hit}] call / river bet  [{bj_stand}] fold / check  [{leave_station}] stand up")
+		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  Left stick: AA bonus  [{bet_confirm}] deal\n[{bj_hit}] call / river bet  [{bj_stand}] fold / check  [{leave_station}] stand up")
 	return InputGlyphs.fill("[1-4] chip  [B] bonus  [{bet_confirm}] deal  [{bet_repeat}] repeat\n[C] call / river bet  [F] fold / check  [{leave_station}] stand up")
 
 

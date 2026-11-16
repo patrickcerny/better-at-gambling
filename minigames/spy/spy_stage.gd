@@ -133,6 +133,8 @@ func _build_ui() -> void:
 	set_bg = VoteRaceSet.new()
 	set_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(set_bg)
+	# Gamepad: in the vote the d-pad or left stick moves over the suspects, A votes.
+	root.add_child(PadFocus.make(_pad_cards, can_vote_now))
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -213,6 +215,7 @@ func _build_ui() -> void:
 	for st: String in ["normal", "focus", "read_only"]:
 		entry.add_theme_stylebox_override(st, eb)
 	entry.text_submitted.connect(func(_t: String) -> void: send_clue())
+	PadKeyboard.attach(entry)  # A on the field opens a keyboard (Steam's on a Deck)
 	entry.visible = false
 	row.add_child(entry)
 	say_button = _button("SAY IT  ⏎", Palette.FELT_GREEN)
@@ -220,6 +223,7 @@ func _build_ui() -> void:
 	say_button.visible = false
 	row.add_child(say_button)
 	vote_button = _button("CALL A VOTE  [V]", Palette.VIP_BURGUNDY)
+	vote_button.name = "CallVote"
 	vote_button.pressed.connect(call_vote)
 	row.add_child(vote_button)
 
@@ -280,9 +284,14 @@ func _button(text: String, color: Color) -> Button:
 				sb.bg_color = color.darkened(0.45)
 				sb.border_color = Color(Palette.WARM_GOLD, 0.35)
 			"focus":
+				# A gamepad's focus: a bright gold ring round the card (the mouse never focuses it).
 				sb.draw_center = false
-				sb.set_border_width_all(0)
-				sb.shadow_size = 0
+				sb.border_color = Palette.VIP_GOLD
+				sb.set_border_width_all(6)
+				sb.set_expand_margin_all(6)
+				sb.shadow_color = Color(Palette.VIP_GOLD, 0.5)
+				sb.shadow_size = 18
+				sb.shadow_offset = Vector2.ZERO
 		b.add_theme_stylebox_override(st, sb)
 	return b
 
@@ -344,6 +353,15 @@ func _size_cards() -> void:
 	for c: SpyCard in cards.values():
 		c.custom_minimum_size = Vector2(w, 0)
 	_update_spots.call_deferred()
+
+
+## The suspects' cards a gamepad can vote with (card order).
+func _pad_cards() -> Array:
+	var out: Array = []
+	for p: int in vote_targets():
+		if cards.has(p):
+			out.append(cards[p])
+	return out
 
 
 ## Who the local player can vote for, in card order (the number keys follow it).
@@ -539,10 +557,18 @@ func _update_strip() -> void:
 			entry.clear()
 			if entry.is_inside_tree():
 				entry.grab_focus()
-		elif entry.has_focus():
-			entry.release_focus()
+				if InputGlyphs.gamepad:
+					PadKeyboard.open_for(entry)  # your turn on a pad: the keyboard comes up by itself
+		else:
+			if entry.has_focus():
+				entry.release_focus()
+			if PadKeyboard.current != null and PadKeyboard.current.target == entry:
+				PadKeyboard.close_current()
+			SteamSvc.hide_text_keyboard()
 	vote_button.visible = not over and phase in ["clues", "open", "intro"] and me_in
 	vote_button.disabled = not can_call_now()
+	vote_button.text = "CALL A VOTE  [%s]" % (InputGlyphs.pad_name("Y") if InputGlyphs.gamepad else "V")
+	say_button.text = "SAY IT  [%s]" % (InputGlyphs.pad_name("Menu") if InputGlyphs.gamepad else "⏎")
 
 
 func _update_status() -> void:
@@ -558,7 +584,7 @@ func _update_status() -> void:
 		text = "You were caught - watch the rest play it out." if role == "spy" else "Watch the panel."
 	elif phase == "vote":
 		if can_vote_now():
-			text = "Click a card or press 1-%d: who is the spy?" % vote_targets().size()
+			text = ("Pick a card with the d-pad, %s votes: who is the spy?" % InputGlyphs.pad_name("A")) if InputGlyphs.gamepad else "Click a card or press 1-%d: who is the spy?" % vote_targets().size()
 		elif my_vote >= 0:
 			text = "You voted for %s - waiting for the others" % _name(my_vote)
 	elif phase in ["clues", "open"]:
@@ -641,6 +667,15 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
+		var b: JoyButton = (event as InputEventJoypadButton).button_index
+		if b == JOY_BUTTON_Y and can_call_now():
+			call_vote()
+			get_viewport().set_input_as_handled()
+		elif b == JOY_BUTTON_A and entry != null and entry.visible and PadKeyboard.current == null:
+			PadKeyboard.open_for(entry)  # the keyboard was closed with B: A brings it back
+			get_viewport().set_input_as_handled()
+		return
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return

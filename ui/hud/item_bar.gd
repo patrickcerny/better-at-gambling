@@ -842,7 +842,7 @@ func _build() -> void:
 	luck_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	mid.add_child(luck_value)
 	luck_streak = _label(&"SmallLabel", Palette.VIP_GOLD)
-	luck_streak.add_theme_font_size_override(&"font_size", 13)
+	luck_streak.add_theme_font_size_override(&"font_size", 14)
 	luck_streak.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	luck_streak.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	luck_streak.size_flags_horizontal = Control.SIZE_EXPAND_FILL

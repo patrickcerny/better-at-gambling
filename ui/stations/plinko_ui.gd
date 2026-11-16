@@ -148,6 +148,26 @@ func _relabel() -> void:
 	_update_drop()
 
 
+## Gamepad: the stick picks the risk (the frame is the chosen risk), A still drops.
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	for r: StringName in risk_buttons:
+		out.append(risk_buttons[r])
+	return out
+
+
+func _pad_selected(i: int) -> void:
+	_set_risk(risk_buttons.keys()[i])
+
+
+func _pad_current() -> int:
+	return risk_buttons.keys().find(risk)
+
+
+func _pad_activate(_i: int) -> bool:
+	return false  # A drops a chip (bet_confirm)
+
+
 func _hint_text() -> String:
 	var bet_keys: String = InputGlyphs.hint(&"bet_chip_next") if InputGlyphs.gamepad else "[1–4]"
 	return "%s Bet  %s Drop  %s Stand up" % [bet_keys, InputGlyphs.hint(&"bet_confirm"), InputGlyphs.hint(&"leave_station")]
@@ -180,6 +200,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	super(delta)
 	if _cooldown > 0.0:
 		_cooldown = maxf(_cooldown - delta, 0.0)
 		if visible:

@@ -635,9 +635,18 @@ func _choice_input(event: InputEvent) -> bool:
 	return false
 
 
-## In the duel, keys 1–3 pick (the d-pad comes through `on_slot`).
+## In the duel, keys 1–3 or the d-pad (left rock, up paper, right scissors) pick. The duel screen
+## puts the router in MENU mode, so the d-pad's item actions never reach `on_slot`: read them here.
 func _duel_input(event: InputEvent) -> bool:
-	if not duel_panel.is_open() or not (event is InputEventKey) or not (event as InputEventKey).pressed or (event as InputEventKey).echo:
+	if not duel_panel.is_open():
+		return false
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
+		for i: int in 3:
+			if event.is_action_pressed(StringName("item_%d" % (i + 1))):
+				duel_panel.choose(i)
+				return true
+		return false
+	if not (event is InputEventKey) or not (event as InputEventKey).pressed or (event as InputEventKey).echo:
 		return false
 	var k: Key = (event as InputEventKey).physical_keycode
 	if k < KEY_1 or k > KEY_3:
