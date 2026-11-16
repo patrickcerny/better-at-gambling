@@ -86,6 +86,21 @@ static func fill(text: String) -> String:
 	return out
 
 
+## `fill` for a given device instead of the last one used (the minigame rules card shows both).
+static func fill_for(text: String, pad: bool) -> String:
+	if not "{" in text:
+		return text
+	if _token == null:
+		_token = RegEx.create_from_string("\\{([a-z0-9_]+)\\}")
+	var out: String = text
+	for m: RegExMatch in _token.search_all(text):
+		var action: StringName = StringName(m.get_string(1))
+		if InputMap.has_action(action):
+			var l: PackedStringArray = labels(action, pad)
+			out = out.replace(m.get_string(0), l[0] if not l.is_empty() else "?")
+	return out
+
+
 ## Names of an action's bindings for one device (deduplicated, in InputMap order).
 static func labels(action: StringName, pad: bool) -> PackedStringArray:
 	var out: PackedStringArray = []
