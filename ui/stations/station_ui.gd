@@ -706,6 +706,8 @@ static func rejection_text(error: StringName) -> String:
 	match error:
 		&"insufficient_funds":
 			return "Not enough money"
+		&"invalid_amount":
+			return "Pick one of the table's bets"
 		&"betting_closed":
 			return "Bets are closed"
 		&"below_min":

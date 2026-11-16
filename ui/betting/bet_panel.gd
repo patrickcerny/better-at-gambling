@@ -6,8 +6,10 @@ extends PanelContainer
 ##
 ## All-in (BetClamp): with `set_balance` fed, a bet over what you have bets everything you have
 ## (still capped by the max; under the minimum it stays as asked and the server refuses it).
-## Chips worth more than your balance show the balance, an "ALL IN" tag marks the bet, and
-## `went_all_in` fires once each time the bet becomes all-in (the table shows a toast).
+## An "ALL IN" tag marks the bet and `went_all_in` fires once each time the bet becomes all-in
+## (the table shows a toast). Chips worth more than your balance are greyed out (Patrick: "Disable
+## the button if I don't have this much money anymore"); picking one picks the dearest chip you
+## can still pay, so a chip never bets an amount the table doesn't list.
 
 signal confirmed(amount: int)
 signal cleared
@@ -84,11 +86,28 @@ func chip_value() -> int:
 	return chips[clampi(selected_chip, 0, chips.size() - 1)]
 
 
-## Updates what the player has; an amount over it drops to it (all-in).
+## True when the player can pay chip `i` (always while the balance is unknown).
+func chip_affordable(i: int) -> bool:
+	return i >= 0 and i < chips.size() and (balance < 0 or chips[i] <= balance)
+
+
+## `i` itself when you can pay it, else the dearest cheaper chip you can pay; the smallest when
+## you can pay none, so the server says "not enough money".
+func affordable_index(i: int) -> int:
+	var idx: int = clampi(i, 0, chips.size() - 1)
+	for j: int in range(idx, -1, -1):
+		if chip_affordable(j):
+			return j
+	return 0
+
+
+## Updates what the player has; an amount over it drops to it (all-in), and a picked chip you
+## can't pay any more drops to the dearest one you can.
 func set_balance(b: int) -> void:
 	if b == balance:
 		return
 	balance = b
+	selected_chip = affordable_index(selected_chip)
 	if amount > 0:
 		set_amount(amount)  # re-clamps, and re-checks the ALL IN tag
 	else:
@@ -137,7 +156,7 @@ func _set_all_in(v: bool) -> void:
 
 
 func select_chip(index: int) -> void:
-	selected_chip = clampi(index, 0, chips.size() - 1)
+	selected_chip = affordable_index(index)
 	_refresh()
 	chip_changed.emit(chip_value())
 	Audio.play(&"ui_click", &"UI", -12.0)
@@ -214,11 +233,14 @@ func _refresh() -> void:
 	_limits_label.text = "MIN $%d   MAX $%d" % [min_bet, max_bet]
 	for i: int in _chip_buttons.size():
 		_chip_buttons[i].button_pressed = i == selected_chip
-		# A chip worth more than you have bets what you have.
+		# A chip worth more than you have is greyed out (it keeps its own value).
 		var c: int = chips[i] if i < chips.size() else 0
-		var shown: int = _clamped(c, max_bet)
-		_chip_buttons[i].text = "$%d" % shown
-		_chip_buttons[i].tooltip_text = "ALL IN: $%d is everything you have" % shown if shown < c else ""
+		var can_pay: bool = chip_affordable(i)
+		_chip_buttons[i].text = "$%d" % c
+		if _chip_buttons[i].disabled == can_pay:
+			_chip_buttons[i].disabled = not can_pay
+			_chip_buttons[i].queue_redraw()
+		_chip_buttons[i].tooltip_text = "" if can_pay else "Not enough money"
 	_confirm.disabled = amount < min_bet and amount != 0
 	_repeat.disabled = last_amount <= 0
 

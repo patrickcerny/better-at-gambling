@@ -234,3 +234,19 @@ func test_tables_name_their_pad_buttons() -> void:
 		var t: String = ui._hint_text()
 		assert_false("[1-4]" in t or "[1–4]" in t, "%s: no number keys on a pad: %s" % [ui.game_title, t])
 		assert_false("?" in t, "%s: every action has a pad button: %s" % [ui.game_title, t])
+
+
+## A size you can't pay can't be picked (Patrick: "Disable the button if I don't have this much
+## money anymore"): the drop always bets a listed size, never an amount the board refuses.
+func test_plinko_never_picks_a_size_over_the_balance() -> void:
+	var ui := CapPlinko.new()
+	await _open(ui, &"plinko_1", {"game": &"plinko", "players": [1], "drops": []})
+	ui._select(ui.sizes.size() - 1)
+	st.balances[1] = ui.sizes[1] + 3
+	ui.update_state(st.stations[&"plinko_1"], {})
+	assert_eq(ui.bet_index, 1, "the picked size drops to the dearest one you can pay")
+	assert_true(ui.plus_btn.disabled, "+ is greyed out")
+	ui._select(3)
+	assert_eq(ui.stake(), ui.sizes[1])
+	ui.drop()
+	assert_eq(int(ui.sent[0]["payload"]["bet"]["amount"]), ui.sizes[1], "a listed size goes out")

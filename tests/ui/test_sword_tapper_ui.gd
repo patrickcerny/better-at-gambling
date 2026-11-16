@@ -109,22 +109,16 @@ func test_greyed_while_pulling_and_under_the_minimum() -> void:
 	assert_string_contains(ui.status_label.text, "Not enough")
 
 
-func test_a_chip_over_the_balance_goes_all_in() -> void:
+func test_a_chip_over_the_balance_is_greyed_out() -> void:
 	st.balances[1] = 60
 	ui.update_state(_pub(false, {}, []), {})
+	assert_true(ui.bet_panel._chip_buttons[3].disabled, "the $100 chip is greyed out at $60")
 	ui.bet_panel.select_chip(3)
-	assert_eq(ui.stake(), 60, "pulls with everything you have")
-	assert_string_contains(ui.pull_btn.text, "PULL  $60")
-	assert_eq(ui.pull_btn.tooltip_text, StationUi.all_in_text(60))
-	assert_eq(ui.ring.prizes[0], "$300", "the ring prints the prizes for what goes in")
-	Net.stop()
-	watch_signals(ui)
-	ui.pull()
-	assert_true(ui.bet_panel.all_in)
-	assert_signal_emitted_with_parameters(ui, "notice", [StationUi.all_in_text(60)])
+	assert_eq(ui.stake(), 50, "pulls with the dearest chip you can pay")
+	assert_string_contains(ui.pull_btn.text, "PULL  $50")
+	assert_eq(ui.pull_btn.tooltip_text, "")
 	ui.bet_panel.select_chip(1)
 	assert_eq(ui.stake(), 25, "a chip you can pay is the chip")
-	assert_eq(ui.pull_btn.tooltip_text, "")
 
 
 func test_the_result_shows_after_the_reveal() -> void:
