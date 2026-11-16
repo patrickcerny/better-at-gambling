@@ -4,14 +4,14 @@ extends RefCounted
 ## (and anything else color coded) should be your skin color"): pedestal inlays, scoreboard and
 ## lobby rings, end-screen strips, money-graph lines, the dots on the station UIs, minigame props.
 ##
-## It is the bean's own colour (`Palette.bean_color`), or for an animated skin its dominant colour
-## (`ToonMaterial.skin_flat`). Everything comes from the shared match state (`bean_color` and the
-## outfit in every player's wire dictionary), so every client shows the same colours.
+## It is the bean colour the player picked (`Palette.bean_color`), also under an animated skin.
+## Everything comes from the shared match state (`bean_color` in every player's wire dictionary),
+## so every client shows the same colours.
 ##
 ## Bean colours never repeat (`Cosmetics.bean_color_for`), but some sit close together (Cream and
-## Champagne, the Gold skin and the Gold bean, Navy and Galaxy) and two players can wear the same
-## skin. `of_player` keeps such players apart: the lowest player id keeps their colour, a later one
-## that would be too close gets a lighter, darker or slightly turned shade of it.
+## Champagne, Orange and Gold). `of_player` keeps such players apart: the lowest player id keeps
+## their colour, a later one that would be too close gets a lighter, darker or slightly turned
+## shade of it.
 
 ## Below this distance (`distance`) two colours count as "the same" on a graph or a scoreboard.
 const MIN_DISTANCE: float = 0.17
@@ -21,13 +21,10 @@ static var _cache: Dictionary = {}
 
 
 ## A player's own colour from their wire dictionary (`PlayerState.to_wire`), not kept apart from
-## anyone else's: the skin's dominant colour, else the bean colour.
+## anyone else's: the bean colour they picked, also while they wear an animated skin (Patrick
+## 2026-11-16: with the dev skin the pedestals went near-black, "das ist garnicht das was ich
+## ausgewählt habe").
 static func own(p: Dictionary) -> Color:
-	var skin: StringName = Cosmetics.skin_of(p)
-	if skin != &"":
-		var flat: Color = ToonMaterial.skin_flat(skin)
-		if flat.a > 0.0:
-			return flat
 	return Palette.bean_color(p)
 
 
@@ -41,14 +38,14 @@ static func of_player(players: Dictionary, pid: int, fallback: int = -1) -> Colo
 
 
 ## Every player's colour (pid -> Color), told apart from each other. Cached until a player joins,
-## leaves or changes colour or skin.
+## leaves or changes colour.
 static func of_all(players: Dictionary) -> Dictionary:
 	var ids: Array = players.keys()
 	ids.sort()
 	var key_parts: PackedStringArray = []
 	for pid: Variant in ids:
 		var p: Dictionary = players[pid] if players[pid] is Dictionary else {}
-		key_parts.append("%s:%d:%s" % [str(pid), int(p.get("bean_color", p.get("color", 0))), str(p.get("outfit", ""))])
+		key_parts.append("%s:%d" % [str(pid), int(p.get("bean_color", p.get("color", 0)))])
 	var key: String = ",".join(key_parts)
 	if key == _cache_key:
 		return _cache
