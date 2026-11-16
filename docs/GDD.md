@@ -215,7 +215,7 @@ loading clamps every value (level always recomputed from XP, unknown items dropp
   A typical match (2nd, one minigame, +$600, 20 hands) is about 280 XP.
 - **Level curve**: level L → L+1 costs 100 + 35 × (L − 1) XP up to level 10 (2,160 XP in all,
   about 8 matches), then 450 + 50 × (L − 10), so levels 10 → 20 take about 24 more matches.
-  Level 99 is the cap.
+  Level 100 is the cap.
 - **Coins** (the gold coin; "chips" are the casino's): a tenth of the match's XP plus 50 per
   level gained. Earned only by playing, never bought, never spendable at the tables: the in-match
   $ is separate and starts fresh every match, and the UI says so wherever Coins show.
