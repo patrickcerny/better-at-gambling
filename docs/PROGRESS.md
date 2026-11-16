@@ -93,6 +93,21 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.66 Public lobbies of other players show up
+- Patrick: "Public lobbies are not found of other ppl". The Steam search filtered on our exact
+  version, so a lobby from a player whose Steam had not updated yet (or one on a GitHub build)
+  vanished silently. The search now asks for every version of the game (worldwide, public, free
+  seat); BROWSE LOBBIES puts joinable lobbies first and shows others greyed with "Version X (you
+  have Y): restart Steam". Friends' public lobbies the search misses are added from the friends
+  list (`SteamService.merge_friend_public`). Each search logs how many it found. Tests:
+  `test_steam_service.gd`, `test_main_menu.gd` green (no Steam in CI, so not tried with two accounts).
+### 2026-11-16 / 0.9.64 Daily Spin button
+- Patrick: "the wheel is always also a button on the bottom right, but very highlighted (like super
+  mega) when it's available", "the size of a 3x3 button and above the 3 buttons". `DailySpinButton`
+  (ui/common): a 224 px square above ?, T-shirt and gear (their width together), a little prize
+  wheel drawn in code. Spin free: it turns, pulses, rays and glow rings breathe, bulbs race, sparkles
+  circle it, the pointer ticks and a gold SPIN! plaque bounces. Otherwise it rests dimmed with the
+  countdown. DAILY SPIN stays in the menu list too. `test_main_menu.gd` green.
 ### 2026-11-16 / 0.9.62 Broke players are pointed to the Odd Jobs button
 - Patrick: "Indicator wenn man broke ist (weniger geld als 50) zum button". Under $50 (or under the
   House Comp line if the table limits put it higher; `OddJobsController.is_broke`) a gold beacon

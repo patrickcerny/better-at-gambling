@@ -111,7 +111,6 @@ func _build_visuals() -> void:
 	game_id = &"plinko"
 	seat_count = 2
 	interact_radius = 3.0
-	_rug(Vector2(5.0, 4.0), Palette.VIP_BURGUNDY.darkened(0.3))
 	var mid_y: float = FLOOR_Y + BOARD_H * 0.5
 	# Collision: cabinet, side rails, tray and the glass that keeps hands off the pegs.
 	GreyboxKit.box(self, Vector3(BOARD_W + 0.5, BOARD_H + 1.1, 0.2), Vector3(0, mid_y + 0.3, -0.25), Color("#2E2018"), "Backboard")

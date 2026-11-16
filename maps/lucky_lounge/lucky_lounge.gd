@@ -104,9 +104,8 @@ const DAIS_SIZE: Vector2 = Vector2(1.2, 1.0)
 const STAIR_STEPS: int = 3
 const STAIR_LEN: float = 1.35
 const STAIR_W: float = 0.86
-## Floor layers (y): carpet 0.01, area rugs 0.02, station rugs 0.03. Keep 1 cm apart.
+## Floor layers (y): carpet 0.01, area rugs 0.02. Keep 1 cm apart.
 const AREA_RUG_Y: float = 0.02
-const STATION_RUG_Y: float = 0.03
 ## The ready pedestals (0.8.15, Patrick: "Podeste"; reworked 0.9.57): marble daises along the
 ## south wall of the start room, one per player colour, nearest the door first, each with a
 ## marble stair up to its top; 2.5 m apart (1.2 m free between two), the back 0.3 m off the wall.

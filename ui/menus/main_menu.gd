@@ -65,6 +65,8 @@ var dev_panel: DevPanel
 ## spin is free and counts down otherwise.
 var daily_entry: Button
 var daily_spin: DailySpinPanel
+## The big wheel button above the corner buttons (Patrick 2026-11-16), always there.
+var daily_button: DailySpinButton
 var _daily_tick: float = 0.0
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
@@ -226,11 +228,25 @@ func _build_daily() -> void:
 		_refresh_daily()
 		if daily_entry.is_visible_in_tree():
 			daily_entry.grab_focus())
-	daily_entry.pressed.connect(func() -> void:
+	var open_daily := func() -> void:
 		_settings.close()
 		cosmetics.close()
 		level_pass.close()
-		daily_spin.open())
+		daily_spin.open()
+	daily_entry.pressed.connect(open_daily)
+	# The big wheel above the three corner buttons, as wide as they are together.
+	daily_button = DailySpinButton.new()
+	daily_button.name = "DailySpinButton"
+	daily_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	daily_button.offset_right = -32.0
+	daily_button.offset_left = -32.0 - DailySpinButton.SIZE
+	daily_button.offset_bottom = -48.0 - GearButton.SIZE
+	daily_button.offset_top = -48.0 - GearButton.SIZE - DailySpinButton.SIZE
+	daily_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	daily_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(daily_button)
+	move_child(daily_button, daily_spin.get_index())  # under the wheel panel
+	daily_button.pressed.connect(open_daily)
 	_refresh_daily()
 
 
@@ -239,6 +255,8 @@ func _refresh_daily() -> void:
 	if daily_entry == null:
 		return
 	var w: int = DailySpinPanel.wait_s()
+	if daily_button != null:
+		daily_button.set_state(w <= 0, DailyWheel.wait_text(w))
 	if w <= 0:
 		daily_entry.text = "DAILY SPIN  ★"
 		daily_entry.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
@@ -784,10 +802,21 @@ static func sort_public_lobbies(lobbies: Array[Dictionary], friend_lobbies_: Dic
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var fa: int = (friend_lobbies_.get(int(a["lobby"]), []) as Array).size()
 		var fb: int = (friend_lobbies_.get(int(b["lobby"]), []) as Array).size()
+		var va: bool = str(a.get("build", Protocol.BUILD_ID)) == Protocol.BUILD_ID
+		var vb: bool = str(b.get("build", Protocol.BUILD_ID)) == Protocol.BUILD_ID
+		if va != vb:
+			return va  # lobbies we can join first
 		if fa != fb:
 			return fa > fb
 		return int(a["members"]) > int(b["members"]))
 	return out
+
+
+## Why a public lobby of another version can't be joined, and what to do about it.
+static func version_text(build: String) -> String:
+	if build == "":
+		return "Version unknown, refresh in a moment"
+	return "Version %s (you have %s): restart Steam so both run the newest version" % [build, Protocol.BUILD_ID]
 
 
 ## One row per public lobby: its name, your friends in it, players and JOIN; full ones are left
@@ -806,7 +835,11 @@ func _fill_browse(lobbies: Array[Dictionary]) -> void:
 		var lid: int = int(l["lobby"])
 		var friends: Array = _friend_lobby_ids.get(lid, [])
 		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if not friends.is_empty() else ""
-		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), true, l.get("info", {})))
+		var build: String = str(l.get("build", Protocol.BUILD_ID))
+		var same: bool = build == Protocol.BUILD_ID
+		if not same:
+			sub = version_text(build)
+		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), same, l.get("info", {})))
 	if had_focus:
 		_browse_refresh.grab_focus()
 
