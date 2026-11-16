@@ -2827,13 +2827,13 @@ func _spawn_pile(id: int, amount: int, pos: Vector3, source: int = -1) -> void:
 	piles[id] = p
 	var from: PlayerAvatar = avatars.get(source, null)
 	if from != null:
-		# Shaken out of someone: the coins burst out and can't be grabbed mid-air.
+		# Shaken out of someone: the chips arc out and can't be grabbed mid-air.
 		p.settles_at = _clock + CoinPile.SETTLE_SECONDS
 		var origin: Vector3 = from.ragdoll.body_position() if from.ragdoll != null and is_instance_valid(from.ragdoll) else from.global_position + Vector3(0.0, 0.9, 0.0)
-		p.create_coins(origin)
+		p.spawn_chips(origin)
 	else:
-		# Late join sync: coins already on floor
-		p.create_coins(p.position)
+		# Late join sync: the chips are hovering already
+		p.spawn_chips(p.position)
 	Audio.play_at(&"coin", p, -8.0)
 
 
