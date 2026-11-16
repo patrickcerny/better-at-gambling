@@ -93,6 +93,25 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.57 ready pedestals reworked
+- Patrick: "das klipped und passt nicht. reworke die podeste komplett". The column pedestals with
+  their side rails clipped (rails through the steps, the abacus over the stair, the colour ring
+  under the drum) and stood tight against the wall. Now each pedestal is one piece: a deep brown
+  marble footing, a 1.2 x 1.0 m white marble dais 0.8 m high (dark base moulding, colour inlays in
+  gold frames on both sides and either side of the stair, a gold fillet, a polished overhanging cap)
+  and a three-step stair 0.86 m wide that runs straight into it, no rails. 2.5 m apart (1.2 m free),
+  back 0.3 m off the wall, x ±3.2 / 5.7 / 8.2 / 10.7, z 14.85; start-room spawns moved to z 11.4–11.9.
+  The two mirrors on the pedestal wall are gone. Walking up stays one invisible wedge.
+  `test_lobby_pedestals.gd` green. `test_start_room_and_jail.gd`'s jail path test already fails on
+  main before this change (path ends on the floor at (1.3, 1.25, −3.6)), unrelated.
+### 2026-11-16 / 0.9.56 Taskbar icon on Windows
+- Patrick: after 0.9.48 the window title showed the logo but the taskbar showed the generic app icon.
+  Cause: Godot 4.7.2's exe resource editing writes our icon group without its name, and the engine
+  registers the window class with `LoadIcon(..., "GODOT_ICON")`, so the class icon (taskbar) was empty.
+  `tools/windows/fix_exe_icon.py` (stdlib only) names the group GODOT_ICON again after the export; run
+  by release.yml and `scripts/export.sh windows`. Checked on the 0.9.54 release exe (only .rsrc tail,
+  header sizes and checksum change; PE checksum verified with pefile).
+
 ### 2026-11-16 / 0.9.54 Table UIs redesigned, roulette inside bets
 - Patrick: "KOMPLETTER redesign des UI's der games" and "Roulette UI ausbauen und besser betten kann auf
   mehrere zahlen". Every table overlay shares `TableSkin`: walnut panel in a brass frame with corner

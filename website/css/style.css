@@ -281,6 +281,10 @@ body.is-ready .hero__title .line > span { transform: none; }
 .footer__links { display: flex; gap: 26px; }
 .footer__links a { text-transform: uppercase; letter-spacing: .2em; font-size: 15px; text-decoration: none; color: var(--cream-dim); }
 .footer__links a:hover { color: var(--gold); }
+.footer__lang { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; color: rgba(242,230,201,.35); }
+.footer__lang button { background: none; border: 1px solid rgba(242,230,201,.18); border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; letter-spacing: .18em; text-transform: uppercase; color: var(--cream-dim); cursor: pointer; }
+.footer__lang button:hover { color: var(--gold); border-color: var(--gold); }
+.footer__lang button[aria-pressed="true"] { color: #0f0e0e; background: var(--gold); border-color: var(--gold); }
 .footer__legal { grid-column: 1 / -1; color: rgba(242,230,201,.45); font-size: 15px; margin: 20px 0 0; }
 @media (max-width: 640px) { .footer { grid-template-columns: 1fr; } }
 

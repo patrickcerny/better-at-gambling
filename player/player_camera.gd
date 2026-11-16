@@ -27,6 +27,9 @@ const EMOTE_LOOK_HEIGHT: float = 0.95
 const EMOTE_SEATED_HEIGHT: float = 1.85
 const EMOTE_SEATED_LOOK_HEIGHT: float = 0.9
 const EMOTE_BLEND_SECONDS: float = 0.3
+## How far the knocked-out camera keeps from walls, ceiling and floor (its near plane must not
+## reach through them).
+const CAMERA_RADIUS: float = 0.25
 
 var mode: Mode = Mode.FIRST
 var camera: Camera3D
@@ -56,6 +59,7 @@ var emote_blend: float = 0.0
 var _anchor_blend: float = 0.0
 ## Where the camera would be without the emote view (first, third or seated), last frame.
 var _base_xf: Transform3D = Transform3D.IDENTITY
+var _sweep_shape: SphereShape3D = null
 
 
 func _ready() -> void:
@@ -195,10 +199,19 @@ func _update_base(speed: float, on_floor: bool, ragdolled: bool, delta: float) -
 		camera.global_transform = camera.global_transform.interpolate_with(target, _anchor_blend)
 		return
 	if ragdolled and follow != null:
-		var eye: Vector3 = follow.global_position + Vector3(0, 1.0, 0)
-		var offset: Vector3 = up_rot * Vector3(0, 0.5, THIRD_DISTANCE)
-		camera.global_position = camera.global_position.lerp(eye + offset, 8.0 * delta)
-		camera.look_at(eye, Vector3.UP)
+		# Knocked out: orbit the torso, but never through the room. Every step is swept against
+		# the level (walls, ceiling, floor, props), so a ragdoll by a wall or under a low ceiling
+		# can't put the camera behind it and show the void (Patrick: "kann die kamera aus dem
+		# raum rausglitchen"). The eased position is swept again, since easing from the last
+		# spot could cut a corner through a wall too.
+		var pivot: Vector3 = follow.global_position
+		var eye: Vector3 = _sweep(pivot, pivot + Vector3(0, 1.0, 0), CAMERA_RADIUS)
+		var want: Vector3 = _sweep(eye, eye + up_rot * Vector3(0, 0.5, THIRD_DISTANCE), CAMERA_RADIUS)
+		var pos: Vector3 = camera.global_position.lerp(want, minf(8.0 * delta, 1.0))
+		pos = _sweep(eye, pos, CAMERA_RADIUS)
+		camera.global_position = pos
+		if pos.distance_squared_to(eye) > 0.0025:
+			camera.look_at(eye, Vector3.UP)
 		return
 	if third:
 		# Straight behind the avatar (Patrick: "it should be directly in front"), not over a
@@ -214,6 +227,26 @@ func _update_base(speed: float, on_floor: bool, ragdolled: bool, delta: float) -
 	var bob: Vector3 = Vector3(0, sin(_bob_time * 1.6) * 0.03, 0) if head_bob and on_floor and speed > 0.5 else Vector3.ZERO
 	camera.global_position = global_position + Vector3(0, EYE_HEIGHT, 0) + bob
 	camera.global_rotation = Vector3(pitch, yaw, 0.0)
+
+
+## The farthest point from `from` towards `to` a sphere of `radius` reaches without touching the
+## level (collision layer 1; beans and ragdolls are on other layers). Starting inside the level
+## stays at `from`.
+func _sweep(from: Vector3, to: Vector3, radius: float) -> Vector3:
+	if not is_inside_tree() or from.is_equal_approx(to):
+		return to
+	if _sweep_shape == null:
+		_sweep_shape = SphereShape3D.new()
+	_sweep_shape.radius = radius
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = _sweep_shape
+	q.transform = Transform3D(Basis.IDENTITY, from)
+	q.motion = to - from
+	q.collision_mask = 1
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var r: PackedFloat32Array = space.cast_motion(q)
+	var t: float = r[0] if r.size() > 0 else 1.0
+	return from + (to - from) * t
 
 
 func _apply_fov() -> void:

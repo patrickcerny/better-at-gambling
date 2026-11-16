@@ -74,6 +74,8 @@ jobs:
           tools/godot/godot --headless --path . --export-release "Windows" "$PWD/build/windows/BetterAtGambling.exe"
           tools/godot/godot --headless --path . --export-release "Linux" "$PWD/build/linux/BetterAtGambling.x86_64"
           test -s build/windows/BetterAtGambling.exe && test -s build/linux/BetterAtGambling.x86_64
+          # Godot 4.7.2 leaves the exe's icon group unnamed, so the taskbar showed the generic icon.
+          python3 tools/windows/fix_exe_icon.py build/windows/BetterAtGambling.exe
           # GodotSteam (host mode over Steam): its library and the Steam API sit next to the exe.
           test -s build/windows/steam_api64.dll && test -s build/linux/libsteam_api.so
           build/linux/BetterAtGambling.x86_64 --headless -- --smoke-test --frames 60

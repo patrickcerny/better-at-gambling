@@ -173,12 +173,12 @@
 } }
 </script>
 </head>
-<body class="is-loading">
+<body class="is-loading home">
 
 <!-- Loader: a spinning chip -->
 <div class="loader" id="loader" aria-hidden="true">
   <div class="loader__chip"><span>$</span></div>
-  <p class="loader__label">Shuffling the deck <b id="loaderPct">0%</b></p>
+  <p class="loader__label" data-i18n="ld.label">Shuffling the deck <b id="loaderPct">0%</b></p>
 </div>
 
 <canvas id="stage" aria-hidden="true"></canvas>
@@ -191,13 +191,13 @@
     <span class="nav__suit">♠</span><span>Better <small>at</small> Gambling</span>
   </a>
   <nav class="nav__links" aria-label="Sections">
-    <a href="#tables">Tables</a>
-    <a href="#friends">Shove</a>
-    <a href="#minigames">Minigames</a>
-    <a href="#items">Items</a>
+    <a href="#tables" data-i18n="nav.tables">Tables</a>
+    <a href="#friends" data-i18n="nav.shove">Shove</a>
+    <a href="#minigames" data-i18n="nav.mini">Minigames</a>
+    <a href="#items" data-i18n="nav.items">Items</a>
     <a href="#trailer">Trailer</a>
   </nav>
-  <a class="btn btn--chip btn--small" href="https://store.steampowered.com/app/5623410/Better_at_Gambling/" target="_blank" rel="noopener">Wishlist</a>
+  <a class="btn btn--chip btn--small" href="https://store.steampowered.com/app/5623410/Better_at_Gambling/" target="_blank" rel="noopener" data-i18n="nav.wish">Wishlist</a>
 </header>
 
 <main id="top">
@@ -205,54 +205,54 @@
   <!-- 1. HERO -->
   <section class="hero" data-cam="0">
     <div class="hero__inner">
-      <p class="eyebrow reveal">The Lucky Lounge · est. tonight</p>
+      <p class="eyebrow reveal" data-i18n="hero.eyebrow">The Lucky Lounge · est. tonight</p>
       <h1 class="hero__title">
-        <span class="line"><span>Red carpet.</span></span>
-        <span class="line"><span>Gold trim.</span></span>
-        <span class="line line--red"><span>Zero dignity.</span></span>
+        <span class="line"><span data-i18n="hero.t1">Red carpet.</span></span>
+        <span class="line"><span data-i18n="hero.t2">Gold trim.</span></span>
+        <span class="line line--red"><span data-i18n="hero.t3">Zero dignity.</span></span>
       </h1>
-      <p class="hero__lede reveal">A chaotic casino party game for 2–8 friends. Win at the tables, shove the leader off their stool and be the richest bean at closing time.</p>
+      <p class="hero__lede reveal" data-i18n="hero.lede">A chaotic casino party game for 2–8 friends. Win at the tables, shove the leader off their stool and be the richest bean at closing time.</p>
       <div class="hero__cta reveal">
         <a class="cta-steam" href="https://store.steampowered.com/app/5623410/Better_at_Gambling/" target="_blank" rel="noopener">
           <span class="cta-steam__chip" aria-hidden="true">★</span>
-          <span class="cta-steam__text"><small>Coming soon</small><b>Wishlist on Steam</b></span>
+          <span class="cta-steam__text"><small data-i18n="cta.soon">Coming soon</small><b data-i18n="cta.wish">Wishlist on Steam</b></span>
           <span class="cta-steam__arrow" aria-hidden="true">→</span>
         </a>
-        <a class="btn btn--ghost" href="#trailer">▶ Watch the trailer</a>
+        <a class="btn btn--ghost" href="#trailer" data-i18n="hero.trailer">▶ Watch the trailer</a>
       </div>
     </div>
-    <div class="hero__scroll" aria-hidden="true"><span>Scroll to enter</span><i></i></div>
+    <div class="hero__scroll" aria-hidden="true"><span data-i18n="hero.scroll">Scroll to enter</span><i></i></div>
   </section>
 
   <!-- stats ticker -->
   <div class="ticker" aria-label="Game at a glance">
     <div class="ticker__track">
-      <span><b>2–8</b> players online</span><span>♦</span>
-      <span><b>11</b> casino games</span><span>♣</span>
-      <span><b>16</b> minigames</span><span>♥</span>
-      <span><b>33</b> items</span><span>♠</span>
-      <span><b>$1,000</b> to start</span><span>♦</span>
-      <span><b>75</b> outfit pieces</span><span>♣</span>
-      <span><b>2–8</b> players online</span><span>♦</span>
-      <span><b>11</b> casino games</span><span>♣</span>
-      <span><b>16</b> minigames</span><span>♥</span>
-      <span><b>33</b> items</span><span>♠</span>
-      <span><b>$1,000</b> to start</span><span>♦</span>
-      <span><b>75</b> outfit pieces</span><span>♣</span>
+      <span data-i18n="tk.players"><b>2–8</b> players online</span><span>♦</span>
+      <span data-i18n="tk.casino"><b>11</b> casino games</span><span>♣</span>
+      <span data-i18n="tk.mini"><b>16</b> minigames</span><span>♥</span>
+      <span data-i18n="tk.items"><b>33</b> items</span><span>♠</span>
+      <span data-i18n="tk.start"><b>$1,000</b> to start</span><span>♦</span>
+      <span data-i18n="tk.outfit"><b>75</b> outfit pieces</span><span>♣</span>
+      <span data-i18n="tk.players"><b>2–8</b> players online</span><span>♦</span>
+      <span data-i18n="tk.casino"><b>11</b> casino games</span><span>♣</span>
+      <span data-i18n="tk.mini"><b>16</b> minigames</span><span>♥</span>
+      <span data-i18n="tk.items"><b>33</b> items</span><span>♠</span>
+      <span data-i18n="tk.start"><b>$1,000</b> to start</span><span>♦</span>
+      <span data-i18n="tk.outfit"><b>75</b> outfit pieces</span><span>♣</span>
     </div>
   </div>
 
   <!-- 2. TABLES -->
   <section class="chapter chapter--left" id="tables" data-cam="1">
     <div class="panel reveal">
-      <p class="eyebrow"><span class="num">01</span> Play the tables</p>
-      <h2>The house always wins.<br><em>Your friends don't have to.</em></h2>
-      <p>Walk the casino floor in first person and sit down wherever you like. Everybody gambles at the same time, so you always know who is winning. And where they are sitting.</p>
+      <p class="eyebrow" data-i18n="t.eyebrow"><span class="num">01</span> Play the tables</p>
+      <h2 data-i18n="t.h2">The house always wins.<br><em>Your friends don't have to.</em></h2>
+      <p data-i18n="t.p">Walk the casino floor in first person and sit down wherever you like. Everybody gambles at the same time, so you always know who is winning. And where they are sitting.</p>
       <ul class="ticks">
-        <li><b>Eleven casino games</b> with proper rules: Blackjack, Roulette, Craps, Casino Hold'em, Hi-Lo, Slots, Peg Drop, the Big Wheel, Scratch Cards, the Bean Derby and Sword Tapper</li>
-        <li><b>A progressive Jackpot</b> that grows all night and lands on one lucky bean</li>
-        <li><b>Hot Tables</b> pay extra, so everyone runs for the same few stools</li>
-        <li><b>Luck is a real stat.</b> A clover pushes it up, a black cat drags it down</li>
+        <li data-i18n="t.l1"><b>Eleven casino games</b> with proper rules: Blackjack, Roulette, Craps, Casino Hold'em, Hi-Lo, Slots, Peg Drop, the Big Wheel, Scratch Cards, the Bean Derby and Sword Tapper</li>
+        <li data-i18n="t.l2"><b>A progressive Jackpot</b> that grows all night and lands on one lucky bean</li>
+        <li data-i18n="t.l3"><b>Hot Tables</b> pay extra, so everyone runs for the same few stools</li>
+        <li data-i18n="t.l4"><b>Luck is a real stat.</b> A clover pushes it up, a black cat drags it down</li>
       </ul>
     </div>
   </section>
@@ -260,21 +260,21 @@
   <!-- 3. FRIENDS -->
   <section class="chapter chapter--right" id="friends" data-cam="2">
     <div class="panel reveal">
-      <p class="eyebrow"><span class="num">02</span> Or play your friends</p>
-      <h2>Why beat the odds<br><em>when you can beat the leader?</em></h2>
+      <p class="eyebrow" data-i18n="f.eyebrow"><span class="num">02</span> Or play your friends</p>
+      <h2 data-i18n="f.h2">Why beat the odds<br><em>when you can beat the leader?</em></h2>
       <ul class="ticks">
-        <li>Shove, grab and throw anyone who is doing better than you</li>
-        <li>Knock a rival out cold and shake the chips out of their pockets</li>
-        <li>Scoop up the spilled chips before they wake up</li>
-        <li>Security is watching. Get caught and you are carried off to jail, and the fine grows every time</li>
-        <li>Do not hit the dealer. Really.</li>
+        <li data-i18n="f.l1">Shove, grab and throw anyone who is doing better than you</li>
+        <li data-i18n="f.l2">Knock a rival out cold and shake the chips out of their pockets</li>
+        <li data-i18n="f.l3">Scoop up the spilled chips before they wake up</li>
+        <li data-i18n="f.l4">Security is watching. Get caught and you are carried off to jail, and the fine grows every time</li>
+        <li data-i18n="f.l5">Do not hit the dealer. Really.</li>
       </ul>
       <figure class="clip">
         <video src="assets/clips/03_shove_and_jail.mp4" muted loop playsinline preload="none" data-lazy>
           <source src="assets/clips/03_shove_and_jail.webm" type="video/webm">
           <source src="assets/clips/03_shove_and_jail.mp4" type="video/mp4">
         </video>
-        <figcaption>In-game footage</figcaption>
+        <figcaption data-i18n="f.cap">In-game footage</figcaption>
       </figure>
     </div>
   </section>
@@ -282,9 +282,9 @@
   <!-- 4. MINIGAMES -->
   <section class="chapter chapter--left" id="minigames" data-cam="3">
     <div class="panel reveal">
-      <p class="eyebrow"><span class="num">03</span> 16 minigames, hosted by a cat</p>
-      <h2>Every few minutes<br><em>Lucky closes the tables.</em></h2>
-      <p>Lucky, the house cat, herds everyone into a minigame. Place well and you walk back onto the floor with cash and an item.</p>
+      <p class="eyebrow" data-i18n="m.eyebrow"><span class="num">03</span> 16 minigames, hosted by a cat</p>
+      <h2 data-i18n="m.h2">Every few minutes<br><em>Lucky closes the tables.</em></h2>
+      <p data-i18n="m.p">Lucky, the house cat, herds everyone into a minigame. Place well and you walk back onto the floor with cash and an item.</p>
     </div>
   </section>
 
@@ -296,15 +296,15 @@
       </article>
       <article class="game-card tilt" data-cat="Brawl">
         <img src="assets/img/02_roulette_sumo.webp" alt="Roulette Sumo minigame" loading="lazy">
-        <div><span class="tag tag--red">Brawl</span><h3>Bat Heist, Roulette Sumo, Pass the Bomb, Last Seat at the Table, Grab Your Hand</h3></div>
+        <div><span class="tag tag--red" data-i18n="g.brawl">Brawl</span><h3>Bat Heist, Roulette Sumo, Pass the Bomb, Last Seat at the Table, Grab Your Hand</h3></div>
       </article>
       <article class="game-card tilt" data-cat="Climb">
         <img src="assets/img/05_jackpot_climb.webp" alt="Jackpot Climb minigame" loading="lazy">
-        <div><span class="tag tag--green">Climb</span><h3>Jackpot Climb, Dodge the Dice</h3></div>
+        <div><span class="tag tag--green" data-i18n="g.climb">Climb</span><h3>Jackpot Climb, Dodge the Dice</h3></div>
       </article>
       <article class="game-card tilt" data-cat="Think">
         <img src="assets/img/find_the_lady.webp" alt="Find the Lady minigame" loading="lazy">
-        <div><span class="tag tag--gold">Think, briefly</span><h3>Casino Quiz, Find the Lady, Roulette Royale, Bust or Bank</h3></div>
+        <div><span class="tag tag--gold" data-i18n="g.think">Think, briefly</span><h3>Casino Quiz, Find the Lady, Roulette Royale, Bust or Bank</h3></div>
       </article>
     </div>
   </section>
@@ -312,9 +312,9 @@
   <!-- 5. LAST CALL -->
   <section class="lastcall" id="lastcall" data-cam="4">
     <div class="lastcall__inner reveal">
-      <p class="eyebrow eyebrow--red">The final 60 seconds</p>
+      <p class="eyebrow eyebrow--red" data-i18n="lc.eyebrow">The final 60 seconds</p>
       <h2 class="lastcall__title">Last&nbsp;Call</h2>
-      <p class="lastcall__mult"><span>×1.5</span> payouts. Nobody behaves.</p>
+      <p class="lastcall__mult" data-i18n="lc.mult"><span>×1.5</span> payouts. Nobody behaves.</p>
       <div class="timer" aria-hidden="true"><span id="lcTimer">00:60</span></div>
     </div>
   </section>
@@ -322,26 +322,26 @@
   <!-- 6. ITEMS -->
   <section class="items" id="items">
     <div class="items__head reveal">
-      <p class="eyebrow"><span class="num">04</span> The pocket arsenal</p>
-      <h2>33 items that<br><em>end friendships.</em></h2>
+      <p class="eyebrow" data-i18n="i.eyebrow"><span class="num">04</span> The pocket arsenal</p>
+      <h2 data-i18n="i.h2">33 items that<br><em>end friendships.</em></h2>
     </div>
-    <p class="items__hint" aria-hidden="true">Swipe <i>→</i></p>
+    <p class="items__hint" aria-hidden="true" data-i18n="i.hint">Swipe <i>→</i></p>
     <div class="items__rail" id="itemsRail">
-      <article class="item-card"><span class="item-card__glyph">◐</span><h3>Banana Peel</h3><p>They slip, their chips spill, you were never there.</p></article>
-      <article class="item-card item-card--red"><span class="item-card__glyph">☹</span><h3>Bad Luck Monkey</h3><p>Luck −3 for whoever carries it. Pass it on with a shove.</p></article>
-      <article class="item-card item-card--green"><span class="item-card__glyph">▭</span><h3>Credit Card</h3><p>$300 now, $360 back in 90 seconds. Or everything you have.</p></article>
-      <article class="item-card item-card--dark"><span class="item-card__glyph">◎</span><h3>Russian Roulette</h3><p>Every pull adds 20% to your money. Until the one that doesn't.</p></article>
-      <article class="item-card"><span class="item-card__glyph">✋&#xFE0E;</span><h3>Pickpocket</h3><p>A friendly pat on the back. A lighter wallet.</p></article>
-      <article class="item-card item-card--red"><span class="item-card__glyph">⚾&#xFE0E;</span><h3>Baseball Bat</h3><p>The fastest way to win an argument about chips.</p></article>
-      <article class="item-card item-card--green"><span class="item-card__glyph">$</span><h3>Bribe the Guard</h3><p>For 30 seconds security looks the other way. Make them count.</p></article>
-      <article class="item-card"><span class="item-card__glyph">♣</span><h3>Lucky Clover</h3><p>Luck goes up. The gauge on your screen says so.</p></article>
-      <article class="item-card item-card--dark"><span class="item-card__glyph">↺</span><h3>Robin Hood</h3><p>Take 8% from the leader and split it with everyone else. Including you.</p></article>
-      <article class="item-card item-card--red"><span class="item-card__glyph">⚿</span><h3>Get Out of Jail Free</h3><p>Exactly what it says. Worth every chip.</p></article>
-      <article class="item-card item-card--gold"><span class="item-card__glyph">+23</span><h3>And 23 more</h3><p>Each one worse for your friendships than the last.</p></article>
+      <article class="item-card"><span class="item-card__glyph">◐</span><h3>Banana Peel</h3><p data-i18n="i.1">They slip, their chips spill, you were never there.</p></article>
+      <article class="item-card item-card--red"><span class="item-card__glyph">☹</span><h3>Bad Luck Monkey</h3><p data-i18n="i.2">Luck −3 for whoever carries it. Pass it on with a shove.</p></article>
+      <article class="item-card item-card--green"><span class="item-card__glyph">▭</span><h3>Credit Card</h3><p data-i18n="i.3">$300 now, $360 back in 90 seconds. Or everything you have.</p></article>
+      <article class="item-card item-card--dark"><span class="item-card__glyph">◎</span><h3>Russian Roulette</h3><p data-i18n="i.4">Every pull adds 20% to your money. Until the one that doesn't.</p></article>
+      <article class="item-card"><span class="item-card__glyph">✋&#xFE0E;</span><h3>Pickpocket</h3><p data-i18n="i.5">A friendly pat on the back. A lighter wallet.</p></article>
+      <article class="item-card item-card--red"><span class="item-card__glyph">⚾&#xFE0E;</span><h3>Baseball Bat</h3><p data-i18n="i.6">The fastest way to win an argument about chips.</p></article>
+      <article class="item-card item-card--green"><span class="item-card__glyph">$</span><h3>Bribe the Guard</h3><p data-i18n="i.7">For 30 seconds security looks the other way. Make them count.</p></article>
+      <article class="item-card"><span class="item-card__glyph">♣</span><h3>Lucky Clover</h3><p data-i18n="i.8">Luck goes up. The gauge on your screen says so.</p></article>
+      <article class="item-card item-card--dark"><span class="item-card__glyph">↺</span><h3>Robin Hood</h3><p data-i18n="i.9">Take 8% from the leader and split it with everyone else. Including you.</p></article>
+      <article class="item-card item-card--red"><span class="item-card__glyph">⚿</span><h3>Get Out of Jail Free</h3><p data-i18n="i.10">Exactly what it says. Worth every chip.</p></article>
+      <article class="item-card item-card--gold"><span class="item-card__glyph">+23</span><h3>And 23 more</h3><p data-i18n="i.11">Each one worse for your friendships than the last.</p></article>
     </div>
     <div class="items__cta"><a class="cta-steam" href="https://store.steampowered.com/app/5623410/Better_at_Gambling/" target="_blank" rel="noopener">
           <span class="cta-steam__chip" aria-hidden="true">★</span>
-          <span class="cta-steam__text"><small>Coming soon</small><b>Wishlist on Steam</b></span>
+          <span class="cta-steam__text"><small data-i18n="cta.soon">Coming soon</small><b data-i18n="cta.wish">Wishlist on Steam</b></span>
           <span class="cta-steam__arrow" aria-hidden="true">→</span>
         </a></div>
   </section>
@@ -350,50 +350,50 @@
   <section class="trailer" id="trailer">
     <div class="trailer__frame reveal">
       <video id="trailerVideo" src="assets/video/trailer_720p.mp4" poster="assets/img/trailer_poster.jpg" controls playsinline preload="none"></video>
-      <button class="trailer__play" id="trailerPlay" type="button" aria-label="Play the trailer"><span>▶</span><b>Watch the trailer</b></button>
+      <button class="trailer__play" id="trailerPlay" type="button" aria-label="Play the trailer"><span>▶</span><b data-i18n="tr.play">Watch the trailer</b></button>
     </div>
   </section>
 
   <!-- 8. CLIPS -->
   <section class="reel" aria-label="Gameplay clips">
     <div class="reel__head reveal">
-      <p class="eyebrow"><span class="num">05</span> Loud by design</p>
-      <h2>Proximity voice.<br><em>Ten emotes. No shame.</em></h2>
-      <p>Hear the next table celebrate, and the bean sneaking up behind you. Beans move their mouths when you talk.</p>
+      <p class="eyebrow" data-i18n="r.eyebrow"><span class="num">05</span> Loud by design</p>
+      <h2 data-i18n="r.h2">Proximity voice.<br><em>Ten emotes. No shame.</em></h2>
+      <p data-i18n="r.p">Hear the next table celebrate, and the bean sneaking up behind you. Beans move their mouths when you talk.</p>
     </div>
     <div class="reel__grid">
-      <figure class="clip tilt"><video muted loop playsinline preload="none" data-lazy><source src="assets/clips/01_hall_chaos.webm" type="video/webm"><source src="assets/clips/01_hall_chaos.mp4" type="video/mp4"></video><figcaption>The casino floor</figcaption></figure>
-      <figure class="clip tilt"><video muted loop playsinline preload="none" data-lazy><source src="assets/clips/02_tables.webm" type="video/webm"><source src="assets/clips/02_tables.mp4" type="video/mp4"></video><figcaption>Eleven tables, one wallet</figcaption></figure>
-      <figure class="clip tilt"><video muted loop playsinline preload="none" data-lazy><source src="assets/clips/04_minigames.webm" type="video/webm"><source src="assets/clips/04_minigames.mp4" type="video/mp4"></video><figcaption>Minigames</figcaption></figure>
-      <figure class="clip tilt"><video muted loop playsinline preload="none" data-lazy><source src="assets/clips/05_emotes.webm" type="video/webm"><source src="assets/clips/05_emotes.mp4" type="video/mp4"></video><figcaption>Emotes, including the 6-7</figcaption></figure>
+      <figure class="clip tilt"><video muted loop playsinline preload="none" data-lazy><source src="assets/clips/01_hall_chaos.webm" type="video/webm"><source src="assets/clips/01_hall_chaos.mp4" type="video/mp4"></video><figcaption data-i18n="r.c1">The casino floor</figcaption></figure>
+      <figure class="clip tilt"><video muted loop playsinline preload="none" data-lazy><source src="assets/clips/02_tables.webm" type="video/webm"><source src="assets/clips/02_tables.mp4" type="video/mp4"></video><figcaption data-i18n="r.c2">Eleven tables, one wallet</figcaption></figure>
+      <figure class="clip tilt"><video muted loop playsinline preload="none" data-lazy><source src="assets/clips/04_minigames.webm" type="video/webm"><source src="assets/clips/04_minigames.mp4" type="video/mp4"></video><figcaption data-i18n="nav.mini">Minigames</figcaption></figure>
+      <figure class="clip tilt"><video muted loop playsinline preload="none" data-lazy><source src="assets/clips/05_emotes.webm" type="video/webm"><source src="assets/clips/05_emotes.mp4" type="video/mp4"></video><figcaption data-i18n="r.c4">Emotes, including the 6-7</figcaption></figure>
     </div>
   </section>
 
   <!-- 9. RULES -->
   <section class="rules" aria-label="Features">
     <div class="rules__head reveal">
-      <p class="eyebrow"><span class="num">06</span> Your casino, your rules</p>
-      <h2>Half an hour.<br><em>Or until someone cries.</em></h2>
+      <p class="eyebrow" data-i18n="ru.eyebrow"><span class="num">06</span> Your casino, your rules</p>
+      <h2 data-i18n="ru.h2">Half an hour.<br><em>Or until someone cries.</em></h2>
     </div>
     <div class="rules__grid">
-      <div class="rule reveal"><b>2–8</b><h3>Players online</h3><p>Invite through Steam, share a five-letter room code or open a public lobby.</p></div>
-      <div class="rule reveal"><b>1–10</b><h3>Minigames per night</h3><p>With 1 to 6 minutes of gambling in between. You set the length.</p></div>
-      <div class="rule reveal"><b>∞</b><h3>Floors</h3><p>The tables are rearranged every round while everyone is locked in the lobby.</p></div>
-      <div class="rule reveal"><b>0</b><h3>Maths required</h3><p>Minigames Only mode for when nobody wants to count cards.</p></div>
-      <div class="rule reveal"><b>75</b><h3>Outfit pieces</h3><p>Hats, shirts, trousers, capes and boots. Most unlock with Coins you earn by playing, a few are optional Steam extras. Purely cosmetic, no loot boxes.</p></div>
-      <div class="rule reveal"><b>1</b><h3>Tutorial</h3><p>Practice the tables alone before you embarrass yourself in public.</p></div>
+      <div class="rule reveal"><b>2–8</b><h3 data-i18n="ru.1h">Players online</h3><p data-i18n="ru.1p">Invite through Steam, share a five-letter room code or open a public lobby.</p></div>
+      <div class="rule reveal"><b>1–10</b><h3 data-i18n="ru.2h">Minigames per night</h3><p data-i18n="ru.2p">With 1 to 6 minutes of gambling in between. You set the length.</p></div>
+      <div class="rule reveal"><b>∞</b><h3 data-i18n="ru.3h">Floors</h3><p data-i18n="ru.3p">The tables are rearranged every round while everyone is locked in the lobby.</p></div>
+      <div class="rule reveal"><b>0</b><h3 data-i18n="ru.4h">Maths required</h3><p data-i18n="ru.4p">Minigames Only mode for when nobody wants to count cards.</p></div>
+      <div class="rule reveal"><b>75</b><h3 data-i18n="ru.5h">Outfit pieces</h3><p data-i18n="ru.5p">Hats, shirts, trousers, capes and boots. Most unlock with Coins you earn by playing, a few are optional Steam extras. Purely cosmetic, no loot boxes.</p></div>
+      <div class="rule reveal"><b>1</b><h3>Tutorial</h3><p data-i18n="ru.6p">Practice the tables alone before you embarrass yourself in public.</p></div>
     </div>
   </section>
 
   <!-- 10. PODIUM / FINAL CTA -->
   <section class="finale" id="play" data-cam="5">
     <div class="finale__inner reveal">
-      <p class="eyebrow">Closing time</p>
-      <h2 class="finale__title">Be the richest bean<br>in the room.</h2>
+      <p class="eyebrow" data-i18n="fin.eyebrow">Closing time</p>
+      <h2 class="finale__title" data-i18n="fin.h2">Be the richest bean<br>in the room.</h2>
       <div class="hero__cta">
         <a class="cta-steam cta-steam--xl" href="https://store.steampowered.com/app/5623410/Better_at_Gambling/" target="_blank" rel="noopener">
           <span class="cta-steam__chip" aria-hidden="true">★</span>
-          <span class="cta-steam__text"><small>Coming soon</small><b>Wishlist on Steam</b></span>
+          <span class="cta-steam__text"><small data-i18n="cta.soon">Coming soon</small><b data-i18n="cta.wish">Wishlist on Steam</b></span>
           <span class="cta-steam__arrow" aria-hidden="true">→</span>
         </a>
       </div>
@@ -402,31 +402,31 @@
 
   <section class="faq" id="faq" aria-labelledby="faqTitle">
     <div class="faq__inner">
-      <p class="eyebrow">Questions at the cashier</p>
+      <p class="eyebrow" data-i18n="faq.eyebrow">Questions at the cashier</p>
       <h2 id="faqTitle">FAQ</h2>
-      <details class="faq__item"><summary><h3>What is Better at Gambling?</h3></summary><p>Better at Gambling is an online casino party game for 2 to 8 friends. Everyone starts with $1,000 in play chips. You win money at eleven casino games such as blackjack, roulette and slots, in 16 minigames, or by shoving the leader and shaking the chips out of their pockets. The richest bean at closing time wins.</p></details>
-      <details class="faq__item"><summary><h3>Is there real money gambling?</h3></summary><p>No. You only ever gamble with fictional chips. No real money can be wagered or won, chips and Coins cannot be bought, and nothing can be cashed out.</p></details>
-      <details class="faq__item"><summary><h3>Are there microtransactions?</h3></summary><p>Yes, optional cosmetics. Single outfit pieces for your bean cost 0.50 to 1 € through Steam, and 10 outfit packs bundle a full look for less than the pieces one by one. Most of the 75 outfit pieces can also be unlocked with Coins you earn by playing, ten pieces are paid only, and all bean colours are earned in game. Purchases are purely cosmetic: they never help you win, and there are no loot boxes.</p></details>
-      <details class="faq__item"><summary><h3>How many players can play?</h3></summary><p>2 to 8 players online. You invite friends through Steam. A practice mode and a tutorial let you learn the tables alone.</p></details>
-      <details class="faq__item"><summary><h3>Which platforms is it on?</h3></summary><p>Better at Gambling is coming to Steam for Windows PC. Builds for macOS and Linux are in testing.</p></details>
-      <details class="faq__item"><summary><h3>When does Better at Gambling come out?</h3></summary><p>The game is coming soon to Steam. Add it to your Steam wishlist to get a message on release day.</p></details>
-      <details class="faq__item"><summary><h3>Does it have voice chat?</h3></summary><p>Yes. Proximity voice chat is built in, so you hear the players near you, and the beans move their mouths when you talk. A microphone is optional.</p></details>
-      <details class="faq__item"><summary><h3>How long is a round?</h3></summary><p>You set it: 1 to 10 minigames with 1 to 6 minutes of gambling in between. A standard night takes about half an hour.</p></details>
+      <details class="faq__item"><summary><h3 data-i18n="faq.q1">What is Better at Gambling?</h3></summary><p data-i18n="faq.a1">Better at Gambling is an online casino party game for 2 to 8 friends. Everyone starts with $1,000 in play chips. You win money at eleven casino games such as blackjack, roulette and slots, in 16 minigames, or by shoving the leader and shaking the chips out of their pockets. The richest bean at closing time wins.</p></details>
+      <details class="faq__item"><summary><h3 data-i18n="faq.q2">Is there real money gambling?</h3></summary><p data-i18n="faq.a2">No. You only ever gamble with fictional chips. No real money can be wagered or won, chips and Coins cannot be bought, and nothing can be cashed out.</p></details>
+      <details class="faq__item"><summary><h3 data-i18n="faq.q3">Are there microtransactions?</h3></summary><p data-i18n="faq.a3">Yes, optional cosmetics. Single outfit pieces for your bean cost 0.50 to 1 € through Steam, and 10 outfit packs bundle a full look for less than the pieces one by one. Most of the 75 outfit pieces can also be unlocked with Coins you earn by playing, ten pieces are paid only, and all bean colours are earned in game. Purchases are purely cosmetic: they never help you win, and there are no loot boxes.</p></details>
+      <details class="faq__item"><summary><h3 data-i18n="faq.q4">How many players can play?</h3></summary><p data-i18n="faq.a4">2 to 8 players online. You invite friends through Steam. A practice mode and a tutorial let you learn the tables alone.</p></details>
+      <details class="faq__item"><summary><h3 data-i18n="faq.q5">Which platforms is it on?</h3></summary><p data-i18n="faq.a5">Better at Gambling is coming to Steam for Windows PC. Builds for macOS and Linux are in testing.</p></details>
+      <details class="faq__item"><summary><h3 data-i18n="faq.q6">When does Better at Gambling come out?</h3></summary><p data-i18n="faq.a6">The game is coming soon to Steam. Add it to your Steam wishlist to get a message on release day.</p></details>
+      <details class="faq__item"><summary><h3 data-i18n="faq.q7">Does it have voice chat?</h3></summary><p data-i18n="faq.a7">Yes. Proximity voice chat is built in, so you hear the players near you, and the beans move their mouths when you talk. A microphone is optional.</p></details>
+      <details class="faq__item"><summary><h3 data-i18n="faq.q8">How long is a round?</h3></summary><p data-i18n="faq.a8">You set it: 1 to 10 minigames with 1 to 6 minutes of gambling in between. A standard night takes about half an hour.</p></details>
     </div>
   </section>
 
   <section class="fineprint">
     <div class="fineprint__card reveal">
-      <span class="fineprint__seal">PLAY<br>MONEY<br>ONLY</span>
+      <span class="fineprint__seal" data-i18n="fp.seal">PLAY<br>MONEY<br>ONLY</span>
       <div>
-        <h3>The only thing you can lose here is face.</h3>
-        <p>Better at Gambling is played with fictional chips. There is no real-money gambling and nothing to cash out. The only things for sale are optional cosmetic outfits for your bean, and none of them help you win.</p>
+        <h3 data-i18n="fp.h3">The only thing you can lose here is face.</h3>
+        <p data-i18n="fp.p">Better at Gambling is played with fictional chips. There is no real-money gambling and nothing to cash out. The only things for sale are optional cosmetic outfits for your bean, and none of them help you win.</p>
       </div>
     </div>
   </section>
 </main>
 
-<a class="float-cta" id="floatCta" href="https://store.steampowered.com/app/5623410/Better_at_Gambling/" target="_blank" rel="noopener"><span aria-hidden="true">★</span> Wishlist on Steam</a>
+<a class="float-cta" id="floatCta" href="https://store.steampowered.com/app/5623410/Better_at_Gambling/" target="_blank" rel="noopener" data-i18n="cta.float"><span aria-hidden="true">★</span> Wishlist on Steam</a>
 
 <footer class="footer">
   <div class="footer__brand">Better <small>at</small> Gambling</div>
@@ -434,13 +434,17 @@
     <a href="https://store.steampowered.com/app/5623410/Better_at_Gambling/" target="_blank" rel="noopener">Steam</a>
     <a href="#trailer">Trailer</a>
     <a href="#faq">FAQ</a>
-    <a href="impressum.html">Impressum</a>
-    <a href="datenschutz.html">Datenschutz</a>
+    <a href="impressum.html" data-i18n="ft.imp">Imprint</a>
+    <a href="datenschutz.html" data-i18n="ft.priv">Privacy Policy</a>
   </div>
-  <p class="footer__legal">© 2026 <a href="https://cerny.app/">Patrick Cerny</a>. Made with Godot Engine. Fictional chips only; no real money can be wagered or won. Steam and the Steam logo are trademarks of Valve Corporation.</p>
+  <div class="footer__lang" role="group" aria-label="Language / Sprache">
+    <button type="button" data-setlang="en" lang="en">English</button><span aria-hidden="true">·</span><button type="button" data-setlang="de" lang="de">Deutsch</button>
+  </div>
+  <p class="footer__legal" data-i18n="ft.legal">© 2026 <a href="https://cerny.app/">Patrick Cerny</a>. Made with Godot Engine. Fictional chips only; no real money can be wagered or won. Steam and the Steam logo are trademarks of Valve Corporation.</p>
 </footer>
 
 <noscript><style>.loader{display:none}body.is-loading{overflow:auto}</style></noscript>
+<script src="js/i18n.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
