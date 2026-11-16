@@ -31,6 +31,8 @@ var over: bool = false
 var overlay: Control = null
 var clock_label: Label = null
 var status_label: Label = null
+## The shared scoreboard top left (`show_board`); built on first use.
+var score_board: MinigameScoreboard = null
 var prompt_label: Label = null
 var _banner: Label = null
 var _clock_panel: PanelContainer = null
@@ -339,6 +341,22 @@ func banner(text: String, color: Color = Palette.VIP_GOLD, seconds: float = 2.0)
 	t.tween_property(_banner, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_interval(seconds)
 	t.tween_property(_banner, "modulate:a", 0.0, 0.35)
+
+
+## Shows the standings in the shared minigame scoreboard, top left (rows: MinigameScoreboard).
+## Replaces the old plain text list in `status_label`, which is cleared.
+func show_board(title: String, rows: Array, subtitle: String = "") -> void:
+	if overlay == null:
+		return
+	if score_board == null:
+		score_board = MinigameScoreboard.new(title, subtitle).bind(state, local_id)
+		score_board.position = Vector2(18, 16)
+		score_board.custom_minimum_size = Vector2(360, 0)
+		overlay.add_child(score_board)
+	score_board.set_title(title, subtitle)
+	score_board.set_rows(rows)
+	if status_label != null:
+		status_label.text = ""
 
 
 func label(text: String, size_px: int, color: Color) -> Label:

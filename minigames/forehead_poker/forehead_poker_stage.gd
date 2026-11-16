@@ -117,8 +117,7 @@ var sub_label: Label
 var action_box: HBoxContainer
 var stay_button: Button
 var fold_button: Button
-var board: VBoxContainer
-var board_rows: Dictionary[int, Dictionary] = {}
+var board: MinigameScoreboard
 var overlay: Control
 var own_panel: PanelContainer
 var own_card: TextureRect
@@ -468,22 +467,14 @@ func _build_ui() -> void:
 	pcol.add_child(phase_label)
 
 	# Scoreboard, top right (a tick by everyone who decided).
-	var board_panel := PanelContainer.new()
-	board_panel.anchor_left = 1.0
-	board_panel.anchor_right = 1.0
-	board_panel.offset_left = -320.0
-	board_panel.offset_right = -28.0
-	board_panel.offset_top = 22.0
-	board_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	board_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	board_panel.add_theme_stylebox_override(&"panel", _panel_style(Color(Palette.CASINO_BLACK, 0.82), Palette.WARM_GOLD, 14))
-	root.add_child(board_panel)
-	board = VBoxContainer.new()
-	board.add_theme_constant_override(&"separation", 2)
-	board_panel.add_child(board)
-	board.add_child(_label("POINTS", BOLD_FONT, 24, Palette.WARM_GOLD, HORIZONTAL_ALIGNMENT_LEFT))
-	for p: int in players_list:
-		_add_board_row(p)
+	board = MinigameScoreboard.new("POINTS").bind(state, local_id)
+	board.anchor_left = 1.0
+	board.anchor_right = 1.0
+	board.offset_left = -400.0
+	board.offset_right = -24.0
+	board.offset_top = 20.0
+	board.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	root.add_child(board)
 
 	# Your own card, top centre: a back with a "?" and a warning.
 	own_panel = PanelContainer.new()
@@ -637,33 +628,6 @@ func _action_button(key: String, text: String, color: Color) -> Button:
 	return b
 
 
-func _add_board_row(p: int) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override(&"separation", 10)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	board.add_child(row)
-	var dot := ColorRect.new()
-	dot.color = _color(p)
-	dot.custom_minimum_size = Vector2(14, 14)
-	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(dot)
-	var nm := _label(("YOU" if p == local_id else _name(p)).left(12), BOLD_FONT, 26, Palette.VIP_GOLD if p == local_id else Palette.CREAM, HORIZONTAL_ALIGNMENT_LEFT)
-	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	nm.custom_minimum_size = Vector2(110, 0)
-	row.add_child(nm)
-	var tick := TickMark.new(22.0)
-	tick.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	tick.visible = false
-	row.add_child(tick)
-	var mark := _label("", BOLD_FONT, 24, Palette.MONEY_GREEN, HORIZONTAL_ALIGNMENT_RIGHT)
-	mark.custom_minimum_size = Vector2(54, 0)
-	row.add_child(mark)
-	var pts := _label("0", BLACK_FONT, 28, Palette.CREAM, HORIZONTAL_ALIGNMENT_RIGHT)
-	pts.custom_minimum_size = Vector2(50, 0)
-	row.add_child(pts)
-	board_rows[p] = {"row": row, "name": nm, "tick": tick, "mark": mark, "points": pts}
-
-
 func _add_head_tick(p: int) -> void:
 	if head_ticks.has(p) or p == local_id:
 		return
@@ -799,6 +763,8 @@ func _refresh_own_card() -> void:
 
 
 func _refresh_board() -> void:
+	if board == null:
+		return
 	var order: Array[int] = players_list.duplicate()
 	order.sort_custom(func(a: int, b: int) -> bool:
 		if int(totals.get(a, 0)) != int(totals.get(b, 0)):
@@ -808,27 +774,26 @@ func _refresh_board() -> void:
 	for row: Variant in ranking:
 		place[int((row as Dictionary).get("player", -1))] = int((row as Dictionary).get("rank", 0))
 	var choices: Dictionary = showdown.get("choices", {})
-	for i: int in order.size():
-		var p: int = order[i]
-		if not board_rows.has(p):
-			_add_board_row(p)
-		var r: Dictionary = board_rows[p]
-		board.move_child(r["row"] as Control, i + 1)
-		(r["points"] as Label).text = str(int(totals.get(p, 0)))
-		(r["tick"] as Control).visible = phase == "decide" and decided.has(p)
-		var mark: Label = r["mark"]
-		mark.text = ""
-		if over and place.has(p):
-			mark.text = "#%d" % place[p]
-			mark.add_theme_color_override(&"font_color", Palette.VIP_GOLD if place[p] == 1 else Palette.CREAM)
+	var rows: Array = []
+	for p: int in order:
+		var r: Dictionary = {"player": p, "score": int(totals.get(p, 0))}
+		if phase == "decide":
+			r["status"] = &"done" if decided.has(p) else &"waiting"
 		elif phase == "showdown" and gains.has(p):
 			var g: int = int(gains[p])
 			if String(choices.get(p, choices.get(str(p), ForeheadPokerLogic.FOLD))) == ForeheadPokerLogic.FOLD:
-				mark.text = "fold"
-				mark.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.6))
+				r["tag"] = "fold"
+				r["tag_color"] = Palette.CREAM.darkened(0.3)
 			else:
-				mark.text = "%+d" % g
-				mark.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if g > 0 else Palette.LOSS_RED)
+				r["tag"] = "%+d" % g
+				r["tag_color"] = Palette.MONEY_GREEN if g > 0 else Palette.LOSS_RED
+		rows.append(r)
+	MinigameScoreboard.rank_rows(rows)
+	if over:
+		for r: Dictionary in rows:
+			if place.has(r["player"]):
+				r["rank"] = place[r["player"]]
+	board.set_rows(rows)
 	for p: int in players_list:
 		_add_head_tick(p)
 
@@ -1081,9 +1046,6 @@ func on_private(priv: Dictionary) -> void:
 func apply_state(st: Dictionary) -> void:
 	if st.has("players"):
 		_set_players(st["players"])
-		for p: int in players_list:
-			if not board_rows.has(p):
-				_add_board_row(p)
 		_ensure_cards()
 	for k: Variant in (st.get("totals", {}) as Dictionary):
 		totals[int(k)] = int(st["totals"][k])

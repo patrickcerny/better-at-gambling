@@ -272,9 +272,20 @@ func _relabel() -> void:
 	stop_btn.text = "STOP  [%s]" % InputGlyphs.keys(&"bet_confirm")
 
 
+func _hint_text() -> String:
+	if InputGlyphs.gamepad:
+		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] pick a bet and spin  [{bet_confirm}] spin / stop  [{leave_station}] stand up")
+	return super()
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if is_visible_in_tree() and event.is_action_pressed(&"bet_confirm") and stop_btn.visible:
+	if not is_visible_in_tree() or not event.is_action_pressed(&"bet_confirm"):
+		return
+	if stop_btn.visible:
 		stop_btn.pressed.emit()
+		get_viewport().set_input_as_handled()
+	elif bet_panel.is_visible_in_tree() and event is InputEventJoypadButton:
+		bet_panel.select_chip(bet_panel.selected_chip)  # A spins at the chip picked last (LB / RB pick and spin)
 		get_viewport().set_input_as_handled()
 
 

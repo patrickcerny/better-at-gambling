@@ -12,7 +12,7 @@ const ROWS: Dictionary = {
 		["1 – 4 / Click", "A / B / X / Y", "Lock in an answer (fast = more points)"],
 	],
 	&"lonely_number": [
-		["Click", "", "Pick a number on the board"],
+		["Click", "D-pad + A", "Pick a number on the board"],
 		["0 – 9 + Enter", "", "Or type it in"],
 	],
 	&"roulette_royale": [
@@ -29,7 +29,7 @@ const ROWS: Dictionary = {
 		["{bj_stand}", "{bj_stand}", "STAND: lock your hand"],
 	],
 	&"vote_race": [
-		["1 – 9 / Click", "", "Vote for another racer"],
+		["1 – 9 / Click", "D-pad + A", "Vote for another racer"],
 	],
 	&"find_the_lady": [
 		["1 – 4 / Click", "D-pad + A", "Pick the Queen's card"],
@@ -40,9 +40,9 @@ const ROWS: Dictionary = {
 		["Mouse", "Right stick", "Look round the table"],
 	],
 	&"spy": [
-		["Type + Enter", "", "Say your clue word on your turn"],
-		["V", "", "Call a vote"],
-		["1 – 9 / Click", "", "Vote someone out"],
+		["Type + Enter", "A: keyboard", "Say your clue word on your turn"],
+		["V", "Y", "Call a vote"],
+		["1 – 9 / Click", "D-pad + A", "Vote someone out"],
 	],
 	&"pass_the_bomb": [
 		MOVE, JUMP,
@@ -61,7 +61,7 @@ const ROWS: Dictionary = {
 	&"grab_your_hand": [
 		MOVE,
 		["Walk over", "Walk over", "Pick up a card (5 max)"],
-		["1 – 5 / Wheel", "", "Choose a card in your hand"],
+		["1 – 5 / Wheel", "D-pad ◀ ▶", "Choose a card in your hand"],
 		["{interact}", "{interact}", "Drop the chosen card"],
 		["{shove}", "{shove}", "Shove: they drop a card"],
 	],
@@ -88,7 +88,7 @@ static func rows(id: StringName) -> Array[Dictionary]:
 		var r: Array = row
 		out.append({
 			"key": InputGlyphs.fill_for(str(r[0]), false),
-			"pad": InputGlyphs.fill_for(str(r[1]), true),
+			"pad": InputGlyphs.pad_text(InputGlyphs.fill_for(str(r[1]), true)),
 			"what": str(r[2]),
 		})
 	return out

@@ -93,6 +93,45 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.82 Every game, minigame and menu on a gamepad and the Steam Deck
+- Patrick: "gehe ALLE games und minigames und controls für den controller und fürs steamdeck durch
+  ob das geht. Wenn ja, implementiere es und teste alles."
+- Menus: Godot's `ui_accept` / `ui_cancel` have no pad buttons, so A pressed nothing and B closed
+  nothing in any menu (main menu, shop, wardrobe, level pass, Daily Spin, lobby, settings, pause,
+  results, confirm dialogs). Now A = ui_accept, B = ui_cancel (tools/gen_input_map.gd). Ping got LT.
+  The wardrobe's featured offers, outfit slots and the Gold "+" take focus (they were mouse only).
+- Tables: nothing at a table takes GUI focus any more (`StationUi.no_gui_focus`; BetPanel chips
+  grabbed it, so the d-pad moved between chips instead of using items and A pressed a chip). New
+  picker: the left stick (free while seated) moves a gold frame over the bet spots, A puts a chip
+  on the framed one: craps, wheel, horse race, baccarat (tie and pairs were keyboard only). Plinko's
+  risk and Hold'em's AA bonus (keyboard only before) are picked the same way, A still drops / deals.
+  Scratch cards: stick + A buys (the first card couldn't be bought on a pad). Roulette: the stick
+  moves a pointer over the layout like a mouse (every split/corner/street), A bets, Y rebets.
+  Slots: A spins at the last chip. Pad hints on every table (no "[1-4]" on a pad).
+- Minigames: Lonely Number (d-pad grid + A), Vote Race and Spy votes (d-pad + A over the cards,
+  `PadFocus`), Spy: Y calls a vote, the clue opens a keyboard on your turn (Steam's floating
+  keyboard on a Deck / Big Picture via `SteamSvc.show_text_keyboard`, else the in-game
+  `PadKeyboard`: A types, X deletes, Y space, Menu = DONE, B closes). Grab Your Hand: d-pad left /
+  right picks the card. Rock Paper Scissors duel: the d-pad never reached it (router in MENU mode),
+  now left/up/right = rock/paper/scissors. Main menu name field: A opens the keyboard.
+- Steam Deck: detected (`SteamDeck=1`, the DMI board name, `isSteamRunningOnSteamDeck`); button
+  names L1/R1/L2/R2 there (PlayStation and Nintendo pads get their own names too, `InputGlyphs.style`),
+  fullscreen by default so the game fills the 1280x800 screen. Smallest UI text raised to 14 px
+  (≥ 9 px on the Deck screen).
+- Tests: tests/ui/test_gamepad_menus.gd, tests/ui/test_gamepad_tables.gd, pad tests in
+  test_lonely_number_stage / test_vote_race_stage / test_spy_stage, test_bet_panel updated.
+
+
+### 2026-11-16 / 0.9.77 Warning when the game is out of date
+- Patrick: "warning if youre a version behind and you start the game". The main menu asks
+  `VersionCheck` on every visit and shows a red UPDATE AVAILABLE card top right when behind.
+  Started from the Steam install: Steam's own `getAppBuildId` (this install) vs `getBetaInfo`
+  (the live build of the picked branch, else the default branch), so it follows what is LIVE on
+  Steam, not GitHub (which runs ahead). Other copies (GitHub zips): the latest GitHub release tag,
+  once per session. Steam copies without Steam running say nothing. Lobby version errors (join,
+  Browse Lobbies) now say whose game is out of date. Tests: `test_version_check.gd`,
+  `test_steam_service.gd`, `test_main_menu.gd`, lint green. Not tried against real Steam yet
+  (needs a live build newer than the installed one).
 ### 2026-11-16 / 0.9.67 Your chips wear your skin
 - Patrick: "the chips you have mirror the skin you use". A player's chip stacks on every table
   (bets, splits, the minigame card tables) and their Plinko chip now wear their animated skin:

@@ -12,7 +12,7 @@ static func make() -> GoldPlusButton:
 	var b := GoldPlusButton.new()
 	b.custom_minimum_size = Vector2(SIZE, SIZE)
 	b.toggle_mode = true
-	b.focus_mode = Control.FOCUS_NONE
+	b.focus_mode = Control.FOCUS_ALL  # a gamepad can open the Gold page from here too
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	b.flat = true
 	var empty := StyleBoxEmpty.new()
@@ -22,12 +22,14 @@ static func make() -> GoldPlusButton:
 	b.mouse_exited.connect(b.queue_redraw)
 	b.toggled.connect(func(_on: bool) -> void: b.queue_redraw())
 	b.button_down.connect(b.queue_redraw)
+	b.focus_entered.connect(b.queue_redraw)
+	b.focus_exited.connect(b.queue_redraw)
 	b.button_up.connect(b.queue_redraw)
 	return b
 
 
 func _draw() -> void:
-	var hover: bool = is_hovered()
+	var hover: bool = is_hovered() or has_focus()
 	var down: bool = button_pressed or get_draw_mode() == DRAW_PRESSED
 	var r: float = minf(size.x, size.y) * 0.5 * (1.04 if hover and not down else 1.0)
 	var c: Vector2 = size * 0.5 + (Vector2(0, r * 0.06) if down else Vector2.ZERO)
@@ -52,6 +54,8 @@ func _draw() -> void:
 	var o := Vector2(0, r * 0.05)
 	_cross(c + o, arm + w * 0.25, w + maxf(r * 0.1, 1.5), ink)
 	_cross(c, arm, w, Palette.CREAM if not down else Palette.CREAM.darkened(0.08))
+	if has_focus():
+		draw_arc(c, r + 3.0, 0.0, TAU, 40, Palette.VIP_GOLD, 3.0, true)  # gamepad focus
 
 
 ## A "+" of half-length `arm` and thickness `w` with round ends.

@@ -142,12 +142,21 @@ static func check_lobby(info: Dictionary, my_steam_id: int) -> String:
 	if str(info.get("game", "")) != SteamSvc.LOBBY_GAME:
 		return "That Steam lobby is not a Better at Gambling lobby."
 	if str(info.get("build", "")) != Protocol.BUILD_ID:
-		return "The host is on version %s, you are on %s. Both need the same version." % [str(info.get("build", "?")), Protocol.BUILD_ID]
+		return version_mismatch_text(str(info.get("build", "")))
 	if int(info.get("owner", 0)) == 0:
 		return "The lobby has no host any more."
 	if int(info.get("owner", 0)) == my_steam_id:
 		return "That is your own lobby."
 	return ""
+
+
+## Why another version's lobby can't be joined, and who has to update: a newer host means this
+## game is out of date (restart Steam), an older one means the host's is.
+static func version_mismatch_text(host_build: String) -> String:
+	var shown: String = host_build if host_build != "" else "?"
+	if host_build != "" and VersionCheck.compare_versions(host_build, Protocol.BUILD_ID) > 0:
+		return "Your game is out of date: the host has version %s, you have %s. Quit and restart Steam to update, then join again. Both need the same version." % [shown, Protocol.BUILD_ID]
+	return "The host's game is out of date: they have version %s, you have %s. They need to quit and restart Steam to update. Both need the same version." % [shown, Protocol.BUILD_ID]
 
 
 ## Starts the party's room server process (loopback only) and waits until it listens. Returns its

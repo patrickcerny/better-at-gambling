@@ -22,7 +22,7 @@ extends WalkableLogicBase
 ##   at full speed (before: 22 s and 3 s). At full speed the outward pull at r 4.4 is 4.3 m/s
 ##   against a 5.5 m/s walk, so a bean has to keep walking inward to stay on, and past r 5.6 only a
 ##   sprint gets it back.
-## - Start grace (0.9.72, Patrick: "you sometimes spawn in the ball or at the edge and you directly
+## - Start grace (0.9.85, Patrick: "you sometimes spawn in the ball or at the edge and you directly
 ##   get disqualified"): for `START_GRACE` s after the go the game clock stands still: the wheel
 ##   doesn't turn or drag, the ball sits parked on the rim track, nobody can be hit or fall out.
 ##   `roulette_sumo_begin {grace}` tells the clients; the beans spawn on `WheelRoom.SPAWN_RADIUS`

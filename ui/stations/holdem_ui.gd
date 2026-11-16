@@ -5,7 +5,10 @@ extends StationUi
 ## down; once the flop is out the two big buttons FOLD or CALL (twice the ante) on your own clock;
 ## once the turn is out the same two buttons CHECK or put down the RIVER BET (one more ante).
 ## Your hand is named live ("Pair of Kings"), the dealer's at the showdown, then the result line.
-## The paytables are folded away under HOW IT WORKS.
+## The AA BONUS explains itself before the deal: one rule line and its paytable (with what the
+## picked size would win) under the size buttons; right after the flop the result line says which
+## hand hit and what it paid (or that it missed), and the ribbon reads "AA BONUS  WIN …".
+## The full rules are folded away under HOW IT WORKS.
 ## Keys: [1-4] chip, [B] bonus, [Space] deal, [R] repeat; [C] or [H] call / river bet, [F] or [S]
 ## fold / check (gamepad: A call / bet, X fold / check). Key names follow the device in use (InputGlyphs).
 
@@ -21,11 +24,20 @@ var call_btn: Button
 var fold_btn: Button
 var bet_panel: BetPanel
 var bonus_row: HBoxContainer
+## The rule line and the paytable under the AA BONUS sizes (shown with them, before the deal).
+var bonus_rule: Label
+var bonus_table: GridContainer
 var bonus_buttons: Array[Button] = []
 ## The AA Bonus sizes on offer (0 = off), and the one picked.
 var bonus_sizes: Array[int] = [0]
 var bonus: int = 0
 var others_label: Label
+
+
+## The AA Bonus in one sentence, right under its title.
+const BONUS_RULE: String = "Wins if your 2 cards + the 3 flop cards make a Pair of Aces or better. Paid right after the flop, even if you fold. Anything less loses the bonus."
+## The paytable's rows, best first; the last row stands for Pair of Aces up to a Straight.
+const BONUS_ROWS: Array[int] = [HoldemHand.Rank.ROYAL_FLUSH, HoldemHand.Rank.STRAIGHT_FLUSH, HoldemHand.Rank.FOUR_OF_A_KIND, HoldemHand.Rank.FULL_HOUSE, HoldemHand.Rank.FLUSH, HoldemHand.Rank.STRAIGHT]
 
 
 func _init() -> void:
@@ -89,13 +101,24 @@ func _build() -> void:
 	call_btn = _action("Call", call_it)
 	TableSkin.style_button(fold_btn, &"red", 26)
 	TableSkin.style_button(call_btn, &"gold", 26)
-	var bonus_title := _line("AA BONUS  ·  pays on your first five cards", 17, Palette.WARM_GOLD)
+	var bonus_title := _line("AA BONUS  ·  optional side bet", 19, Palette.WARM_GOLD)
 	bonus_title.name = "BonusTitle"
+	bonus_rule = _line(BONUS_RULE, 15, Palette.CREAM)
+	bonus_rule.name = "BonusRule"
+	bonus_rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bonus_rule.custom_minimum_size = Vector2(120, 0)
 	bonus_row = HBoxContainer.new()
 	bonus_row.name = "Bonus"
 	bonus_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	bonus_row.add_theme_constant_override(&"separation", 8)
 	body.add_child(bonus_row)
+	bonus_table = GridContainer.new()
+	bonus_table.name = "BonusTable"
+	bonus_table.columns = 3
+	bonus_table.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	bonus_table.add_theme_constant_override(&"h_separation", 18)
+	bonus_table.add_theme_constant_override(&"v_separation", 0)
+	body.add_child(bonus_table)
 	bet_panel = BetPanel.new()
 	bet_panel.chip_size = Vector2(72, 48)
 	bet_panel.chip_gap = 8
@@ -144,6 +167,12 @@ func set_bonus(amount: int) -> void:
 	_refresh()
 
 
+## One AA Bonus size along, stopping at the ends (the gamepad picks it with StationUi's stick picker).
+func step_bonus(dir: int) -> void:
+	var i: int = clampi(bonus_sizes.find(bonus) + dir, 0, bonus_sizes.size() - 1)
+	set_bonus(bonus_sizes[i])
+
+
 ## The next AA Bonus size along (OFF → … → the largest → OFF).
 func cycle_bonus() -> void:
 	var i: int = bonus_sizes.find(bonus)
@@ -153,6 +182,39 @@ func cycle_bonus() -> void:
 func _show_bonus() -> void:
 	for i: int in bonus_buttons.size():
 		bonus_buttons[i].set_pressed_no_signal(bonus_sizes[i] == bonus)
+	_fill_bonus_table()
+
+
+## The paytable rows: hand, odds and what the picked size wins (dimmed while the bonus is OFF).
+func _fill_bonus_table() -> void:
+	if bonus_table == null:
+		return
+	for c: Node in bonus_table.get_children():
+		bonus_table.remove_child(c)
+		c.queue_free()
+	var cfg: BalanceConfig = Registry.balance
+	var ink: Color = Palette.CREAM if bonus > 0 else Color(Palette.CREAM, 0.6)
+	for cat: int in BONUS_ROWS:
+		var pay: int = cfg.holdem_bonus_pays[cat]
+		_table_cell(bonus_row_name(cat), ink, HORIZONTAL_ALIGNMENT_LEFT)
+		_table_cell("%d:1" % pay, Palette.WARM_GOLD if bonus > 0 else Color(Palette.WARM_GOLD, 0.6), HORIZONTAL_ALIGNMENT_RIGHT)
+		_table_cell(("wins %s" % money(bonus * pay)) if bonus > 0 else "", Palette.VIP_GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+
+
+## The paytable's name for a row ("Pair of Aces – Straight" for the bottom one).
+static func bonus_row_name(cat: int) -> String:
+	if cat <= HoldemHand.Rank.STRAIGHT:
+		return "Pair of Aces – Straight"
+	return HoldemHand.category_name(cat)
+
+
+func _table_cell(text: String, color: Color, align: HorizontalAlignment) -> void:
+	var l := Label.new()
+	l.text = text
+	l.horizontal_alignment = align
+	l.add_theme_font_size_override(&"font_size", 15)
+	l.add_theme_color_override(&"font_color", color)
+	bonus_table.add_child(l)
 
 
 ## Puts the ante (and the AA Bonus picked) down; the server deals when the window closes.
@@ -199,12 +261,34 @@ func _rules_text() -> String:
 		+ "FOLD and lose the ante, or CALL for twice the ante. Then the turn: CHECK, or put down the RIVER BET (one more ante). Then the river; the best five of your two cards and the five on the board play against the dealer's.\n"
 		+ "The dealer needs a pair of 4s or better. If not, your ante pays by the table and the call (and river bet) come back. If so: beat the dealer and the ante pays by the table, the call and river bet 1:1; a tie gives everything back; lose and it is all lost. Out of time = fold (at the river: check).\n"
 		+ "ANTE:  " + "  ·  ".join(ante) + "\n"
-		+ "AA BONUS (your cards + the flop, paid even if you fold):  " + "  ·  ".join(bonus_lines))
+		+ "AA BONUS (optional side bet on your 2 cards + the 3 flop cards, Pair of Aces or better wins, paid even if you fold):  " + "  ·  ".join(bonus_lines))
+
+
+## Gamepad: while bets are open the stick picks the AA bonus (the frame is the chosen size);
+## A still deals.
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	if bonus_row != null and bonus_row.is_visible_in_tree():
+		out.assign(bonus_buttons)
+	return out
+
+
+func _pad_selected(i: int) -> void:
+	if i < bonus_sizes.size():
+		set_bonus(bonus_sizes[i])
+
+
+func _pad_current() -> int:
+	return bonus_sizes.find(bonus)
+
+
+func _pad_activate(_i: int) -> bool:
+	return false
 
 
 func _hint_text() -> String:
 	if InputGlyphs.gamepad:
-		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_confirm}] deal\n[{bj_hit}] call / river bet  [{bj_stand}] fold / check  [{leave_station}] stand up")
+		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  [Left stick] AA bonus  [{bet_confirm}] deal\n[{bj_hit}] call / river bet  [{bj_stand}] fold / check  [{leave_station}] stand up")
 	return InputGlyphs.fill("[1-4] chip  [B] bonus  [{bet_confirm}] deal  [{bet_repeat}] repeat\n[C] call / river bet  [F] fold / check  [{leave_station}] stand up")
 
 
@@ -270,6 +354,8 @@ func _refresh() -> void:
 	var betting: bool = (st == HoldemLogic.State.IDLE or st == HoldemLogic.State.BETTING) and mine.is_empty()
 	bet_panel.visible = betting
 	bonus_row.visible = betting
+	bonus_rule.visible = betting
+	bonus_table.visible = betting
 	(body.get_node(^"BonusTitle") as Control).visible = betting
 	# All-in keeps the call covered: the most the ante can be is a third of what's left after the bonus.
 	if state != null:
@@ -294,6 +380,31 @@ func _refresh_buttons() -> void:
 	call_btn.disabled = ante * 2 > my_balance()
 
 
+## The AA Bonus after the flop, in plain words: "AA BONUS WINS  ·  Flush 20:1  ·  +$600" or
+## "AA BONUS lost  ·  no Pair of Aces or better on the flop  ·  −$30". The hand is the hole cards
+## and the first three board cards (what the server settled it on).
+static func bonus_result_text(stake: int, returned: int, hole: Array, board: Array) -> String:
+	var hand: String = ""
+	if hole.size() == 2 and board.size() >= 3:
+		var five: Array[int] = []
+		for c: Variant in hole + board.slice(0, 3):
+			five.append(int(c))
+		var score: int = HoldemHand.evaluate(five)
+		var pay: int = HoldemLogic.bonus_pay(score, Registry.balance)
+		hand = HoldemHand.describe(score) + ("  %d:1" % pay if pay > 0 else "")
+	if returned > stake:
+		return "AA BONUS WINS  ·  %s+%s" % [(hand + "  ·  ") if hand != "" else "", money(returned - stake)]
+	if returned == stake:
+		return "AA BONUS back  ·  %s" % money(stake)
+	return "AA BONUS lost  ·  no Pair of Aces or better on the flop  ·  −%s" % money(stake)
+
+
+## The ribbon after the flop is the bonus's own.
+func _ribbon_tag(ev: Dictionary) -> String:
+	var details: Dictionary = ev.get("details", {})
+	return "AA BONUS" if StringName(details.get("type", &"")) == HoldemLogic.BONUS else ""
+
+
 ## "DEALER  ?? ??", then "DEALER  4♣ 4♦  ·  Pair of Fours" or "… does not qualify".
 func _dealer_text() -> String:
 	var dealer: Array = pub.get("dealer", [])
@@ -301,7 +412,11 @@ func _dealer_text() -> String:
 	if dealer.is_empty() and down == 0:
 		return ""
 	if dealer.is_empty():
-		return "DEALER  " + "  ".join(PackedStringArray(["??", "??"]).slice(0, down))
+		var out_down: String = "DEALER  " + "  ".join(PackedStringArray(["??", "??"]).slice(0, down))
+		var peek: Array = priv.get("peek", [])
+		if not peek.is_empty():  # Sunglasses: only your own private state has them
+			out_down += "  ·  SUNGLASSES: %s" % "  ".join(_labels(peek))
+		return out_down
 	var out: String = "DEALER  %s  ·  %s" % ["  ".join(_labels(dealer)), String(pub.get("dealer_hand", ""))]
 	if not bool(pub.get("qualifies", true)):
 		out += "  ·  does not qualify"
@@ -316,7 +431,7 @@ func _result_text(mine: Dictionary) -> String:
 	var b: int = int(mine.get("bonus", 0))
 	var b_ret: int = int(mine.get("bonus_returned", -1))
 	if b > 0 and b_ret >= 0:
-		lines.append(("AA BONUS  +%s" % money(b_ret - b)) if b_ret > 0 else "AA BONUS lost")
+		lines.append(bonus_result_text(b, b_ret, mine.get("hole", []), pub.get("board", [])))
 	var ante: int = int(mine.get("ante", 0))
 	var call: int = int(mine.get("call", 0)) + int(mine.get("river", 0))
 	var net: int = int(mine.get("returned", 0)) - ante - call

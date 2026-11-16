@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Records the looping preview clip each minigame's rules card plays (MinigameBriefing):
 # assets/minigames/clips/<id>.ogv, an Ogg Theora video (Godot plays it natively), 960x540 at
-# 30 fps, 6 s. Patrick 2026-11-16: "Dont use GIFs use videos gifs are bad quality" (until 0.9.71
+# 30 fps, 6 s. Patrick 2026-11-16: "Dont use GIFs use videos gifs are bad quality" (until 0.9.84
 # these were 384x216 10 fps sprite sheets). Frames come from tools/dev/minigame_clip.tscn (real
 # logic + bot seats for table games, the dev shot with walking beans for walkable ones, or the
 # game's own scripted tools/dev/<id>_clip.tscn). Needs Xvfb and ffmpeg with libtheora.

@@ -48,6 +48,59 @@ func _near(a: int, b: int, d: float = 2.0) -> void:
 	world.set_transform(b, world.get_position(a) + Vector3(d, 0, 0), 0.0)
 
 
+# --- Minigame start ----------------------------------------------------------------------------
+
+func test_minigame_pauses_item_effects_and_they_run_on_after() -> void:
+	# Patrick 2026-11-16: effects running when a minigame starts do nothing in the minigame
+	# (Energy Drink speed, Beer blur) and the game remembers them for afterwards.
+	_give(1, [&"energy_drink", &"lucky_clover", &"beer"])
+	assert_true(_use(1)["ok"])  # Energy Drink, 30 s
+	now += cfg.item_cooldown
+	assert_true(_use(1)["ok"])  # Lucky Clover, 45 s
+	now += cfg.item_cooldown
+	assert_true(_use(1)["ok"])  # Beer, 40 s
+	var clover_left: float = 45.0 - cfg.item_cooldown
+	now += 5.0
+	sys.events.clear()
+	sys.end_segment(true, now)
+	assert_eq(mods.get_mods(1).size(), 0, "nothing works in the minigame")
+	assert_eq(mods.get_luck(1), 0)
+	assert_false(mods.has_flag(1, &"speed"))
+	var ended: Array[Dictionary] = _events(&"effect_ended")
+	assert_eq(ended.size(), 3, "clients drop the tags, speed and blur")
+	assert_eq(StringName(ended[0]["reason"]), &"paused")
+	assert_eq(players[1].inventory.size(), 0, "a paused Beer leaves no bottle yet")
+	now += 300.0  # a long minigame: the clocks stand still
+	mods.expire(now)
+	sys.end_segment(true, now)  # nothing running: nothing changes
+	sys.events.clear()
+	sys.resume_effects(now)
+	assert_eq(_events(&"effect_resumed").size(), 3)
+	assert_eq(mods.get_luck(1), 3.0, "the clover (+2) and the beer (+1) are back")
+	assert_true(mods.has_flag(1, &"speed"), "and the drink")
+	var ids: Callable = func() -> Array: return mods.get_mods(1).map(func(m: Modifier) -> StringName: return m.id)
+	mods.expire(now + clover_left - 5.0 - 0.1)
+	assert_true(ids.call().has(&"lucky_clover"), "with the time it had left")
+	mods.expire(now + clover_left - 5.0)
+	assert_false(ids.call().has(&"lucky_clover"))
+	mods.expire(now + 60.0)
+	assert_eq(players[1].inventory, [&"empty_bottle"] as Array[StringName], "the beer still leaves its bottle")
+
+
+func test_match_end_ends_every_effect() -> void:
+	_give(1, [&"lucky_clover"])
+	assert_true(_use(1)["ok"])
+	sys.end_segment(true, now)
+	sys.end_segment(false, now)
+	sys.resume_effects(now)
+	assert_eq(mods.get_mods(1).size(), 0, "paused effects don't come back after the match")
+	_give(1, [&"lucky_clover"])
+	now += cfg.item_cooldown
+	assert_true(_use(1)["ok"])
+	sys.end_segment()
+	assert_eq(mods.get_luck(1), 0)
+
+
 # --- Self items --------------------------------------------------------------------------------
 
 func test_lucky_clover_adds_luck_and_expires() -> void:

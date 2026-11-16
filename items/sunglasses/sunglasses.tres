@@ -7,13 +7,13 @@
 script = ExtResource("1")
 id = &"sunglasses"
 display_name = "Sunglasses"
-description = "Blackjack: peek at the dealer's hole card for your next hand."
+description = "See the dealer's face-down cards for one hand: at Blackjack the hole card, at Hold'em the dealer's two once the turn is out. They show half see-through, and only for you."
 rarity = 1
 target_mode = 0
 requires_proximity = false
 range_m = 0.0
 is_negative = false
 duration = 0.0
-params = {"game": "blackjack", "rounds": 1, "flags": ["peek_dealer"], "segment_end": true}
+params = {"game": ["blackjack", "holdem"], "rounds": 1, "flags": ["peek_dealer"], "segment_end": true}
 effect_script = ExtResource("2")
 in_loot = true

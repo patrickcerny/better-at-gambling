@@ -2,7 +2,7 @@ class_name MinigamePreview
 extends Control
 ## A minigame's looping preview clip on its rules card: plays the video
 ## assets/minigames/clips/<id>.ogv (Ogg Theora, 960x540 at 30 fps, tools/minigame_clips.sh; until
-## 0.9.71 a low-res sprite sheet, Patrick: "Dont use GIFs use videos gifs are bad quality"), or
+## 0.9.84 a low-res sprite sheet, Patrick: "Dont use GIFs use videos gifs are bad quality"), or
 ## shows the still picture assets/minigames/<id>.webp when there's no clip.
 
 const CLIP_PATH: String = "res://assets/minigames/clips/%s.ogv"

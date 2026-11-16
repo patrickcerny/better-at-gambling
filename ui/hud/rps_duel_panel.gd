@@ -1,6 +1,6 @@
 class_name RpsDuelPanel
 extends CanvasLayer
-## Rock Paper Scissors duel screen (0.8.19, redrawn in 0.9.72 in the table look): both players
+## Rock Paper Scissors duel screen (0.8.19, redrawn in 0.9.85 in the table look): both players
 ## are pulled straight into it (no accept step). A walnut-and-brass panel with who you play and
 ## for how much, three cards with drawn hands (keys 1–3, the d-pad or a click pick; the badge on
 ## each card follows the device), a ring that runs down the seconds and a felt status band. The

@@ -73,7 +73,7 @@ func test_standing_still_flings_you_off_within_seconds() -> void:
 	# The wheel started when the room opened (no rules card): its clock is the time on the deck.
 	gut.p("a bean standing still on the real wheel went over after %.2f s of wheel time" % st.clock)
 	assert_lt(t, 6.0, "went over")
-	assert_lt(st.clock, 5.0, "dragged off within a few seconds (from the 3.3 m spawn ring since 0.9.72)")
+	assert_lt(st.clock, 5.0, "dragged off within a few seconds (from the 3.3 m spawn ring since 0.9.85)")
 	assert_gt(st.clock, 1.5, "but not at once")
 	assert_eq(st.get_node_or_null(^"SumoBat"), null)
 	for a: PlayerAvatar in scene.avatars.values():

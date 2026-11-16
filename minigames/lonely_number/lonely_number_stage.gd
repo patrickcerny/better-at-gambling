@@ -16,7 +16,7 @@ var buttons: Array[Button] = []
 var reveal_box: VBoxContainer
 var reveal_title: Label
 var reveal_rows: VBoxContainer
-var score_rows: VBoxContainer
+var scoreboard: MinigameScoreboard
 
 var players: Array[int] = []
 var round: int = 0
@@ -101,6 +101,8 @@ func _build_ui() -> void:
 	status_label = _label("", 24, Palette.CREAM)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	left.add_child(status_label)
+	# Gamepad: the d-pad or left stick walks the grid, A locks the number in.
+	root.add_child(PadFocus.make(func() -> Array: return buttons, _can_pick))
 
 	# Right: scoreboard and last round's reveal.
 	var right := VBoxContainer.new()
@@ -108,9 +110,8 @@ func _build_ui() -> void:
 	right.add_theme_constant_override(&"separation", 10)
 	cols.add_child(right)
 
-	right.add_child(_label("SCORE  (wins / total)", 26, Palette.VIP_GOLD))
-	score_rows = VBoxContainer.new()
-	right.add_child(score_rows)
+	scoreboard = MinigameScoreboard.new("SCORE", "round wins  ·  sum of lonely picks breaks ties").bind(state, local_id)
+	right.add_child(scoreboard)
 
 	reveal_box = VBoxContainer.new()
 	reveal_box.add_theme_constant_override(&"separation", 6)
@@ -256,42 +257,33 @@ func _refresh() -> void:
 	elif picking and my_pick > 0:
 		status_label.text = "You picked %d - waiting for others (%d/%d)" % [my_pick, picked.size(), players.size()]
 	elif picking:
-		status_label.text = ("Typed: %s  (Enter to lock in)" % _typed) if _typed != "" else "Pick a number! (%d/%d picked)" % [picked.size(), players.size()]
+		var how: String = (" - %s to lock in" % InputGlyphs.pad_name("A")) if InputGlyphs.gamepad else ""
+		status_label.text = ("Typed: %s  (Enter to lock in)" % _typed) if _typed != "" else "Pick a number!%s (%d/%d picked)" % [how, picked.size(), players.size()]
 	else:
 		status_label.text = "Next round coming up..." if round < ROUNDS else "Tallying..."
 	_refresh_scores()
 
 
 func _refresh_scores() -> void:
-	for c: Node in score_rows.get_children():
-		c.queue_free()
-	var rows: Array[Dictionary] = []
+	var rows: Array = []
 	if not ranking.is_empty():
 		for r: Variant in ranking:
-			rows.append(r)
+			var d: Dictionary = r
+			rows.append({"player": int(d["player"]), "score": int(d.get("points", 0)), "rank": int(d.get("rank", 1)),
+				"detail": "%d total" % int(d.get("total", 0))})
 	else:
 		for p: int in players:
-			rows.append({"player": p, "points": int(wins.get(p, 0)), "total": int(totals.get(p, 0))})
+			var row: Dictionary = {"player": p, "score": int(wins.get(p, 0)), "total": int(totals.get(p, 0)),
+				"detail": "%d total" % int(totals.get(p, 0))}
+			if picking:
+				row["status"] = &"done" if p in picked else &"waiting"
+			rows.append(row)
 		rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-			if a["points"] != b["points"]:
-				return a["points"] > b["points"]
+			if a["score"] != b["score"]:
+				return a["score"] > b["score"]
 			return a["total"] > b["total"])
-	for i: int in rows.size():
-		var r: Dictionary = rows[i]
-		var pid: int = int(r["player"])
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override(&"separation", 10)
-		if r.has("rank"):
-			h.add_child(_label("#%d" % int(r["rank"]), 24, Palette.VIP_GOLD if int(r["rank"]) == 1 else Palette.CREAM))
-		h.add_child(_dot(_player_color(pid), 16))
-		var name_lbl := _label(state.player_name(pid) if state != null else "Player %d" % pid, 24, Palette.VIP_GOLD if pid == local_id else Palette.CREAM)
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.clip_text = true
-		h.add_child(name_lbl)
-		if picking and pid in picked:
-			h.add_child(_label("picked", 18, Palette.MONEY_GREEN))
-		h.add_child(_label("%d / %d" % [int(r.get("points", 0)), int(r.get("total", 0))], 24, Palette.CREAM))
-		score_rows.add_child(h)
+		MinigameScoreboard.rank_rows(rows, "score", "total")
+	scoreboard.set_rows(rows)
 
 
 func _show_reveal(res: Dictionary) -> void:

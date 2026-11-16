@@ -1,6 +1,6 @@
 extends Node
 ## Dev: records the short looping preview clip a minigame's rules card plays
-## (tools/minigame_clips.sh → assets/minigames/clips/<id>.ogv, a Theora video since 0.9.72).
+## (tools/minigame_clips.sh → assets/minigames/clips/<id>.ogv, a Theora video since 0.9.85).
 ## Table games run their real logic in real time with every seat played by a simple bot that
 ## submits random legal intents; walkable games use their dev shot (tools/dev/<id>_shot.tscn) with
 ## the beans walking about and the camera drifting, unless the game has its own scripted clip

@@ -341,11 +341,11 @@ func _incoming(at: Vector3) -> bool:
 func _refresh_status() -> void:
 	if status_label == null:
 		return
-	var lines: PackedStringArray = ["TO THE TOP"]
+	var rows: Array = []
 	var place: int = 1
 	for g: Array in finish_groups:
 		for p: int in g:
-			lines.append("#%d  %s" % [place, "YOU" if p == local_id else player_name(p)])
+			rows.append({"player": int(p), "rank": place, "score_text": "TOP", "status": &"done", "leader": place == 1})
 		place += g.size()
 	var rest: Array[int] = []
 	for p: int in roster:
@@ -353,10 +353,13 @@ func _refresh_status() -> void:
 			rest.append(p)
 	rest.sort_custom(func(a: int, b: int) -> bool: return height_of(a) > height_of(b))
 	for p: int in rest:
-		var tag: String = "DOWN" if down_left.has(p) else "%d%%" % roundi(height_of(p) * 100.0)
-		lines.append("%s  %s" % ["YOU" if p == local_id else player_name(p), tag])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 26)
+		var r: Dictionary = {"player": p, "rank": place, "score_text": "%d%%" % roundi(height_of(p) * 100.0)}
+		if down_left.has(p):
+			r["tag"] = "DOWN"
+			r["tag_color"] = Palette.LOSS_RED
+		rows.append(r)
+		place += 1
+	show_board("TO THE TOP", rows)
 
 
 # --- Hazards --------------------------------------------------------------------------------------

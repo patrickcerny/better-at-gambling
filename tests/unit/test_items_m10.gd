@@ -199,5 +199,5 @@ func test_sunglasses_used_standing_still_peek_at_the_next_hand() -> void:
 	if bj.dealer_revealed:
 		pass_test("dealer natural: the hole card is public anyway")
 		return
-	assert_eq(int(bj.get_private_state(1).get("hole_card", -1)), bj.dealer[1], "peeks the hole card")
-	assert_false(bj.get_private_state(2).has("hole_card"), "nobody else does")
+	assert_eq(bj.get_private_state(1).get("peek", []), [bj.dealer[1]], "peeks the hole card")
+	assert_false(bj.get_private_state(2).has("peek"), "nobody else does")

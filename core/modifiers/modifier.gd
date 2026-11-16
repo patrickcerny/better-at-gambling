@@ -9,6 +9,8 @@ var id: StringName
 var source_player: int = -1
 ## Restrict to one game (&"" = all games).
 var game_id: StringName = &""
+## Or to a few games (Sunglasses: the card tables with a face-down dealer card); [] = use `game_id`.
+var games: Array[StringName] = []
 ## Added to the player's luck while active, in luck points (1 point = `luck_reroll_per_point`
 ## reroll chance, 12 %).
 var luck: float = 0.0
@@ -28,4 +30,11 @@ var flags: Dictionary = {}
 
 ## True if this modifier applies to `p_game_id`.
 func applies_to(p_game_id: StringName) -> bool:
+	if not games.is_empty():
+		return p_game_id in games
 	return game_id == &"" or game_id == p_game_id
+
+
+## True if this modifier is limited to `p_game_id` (one of its games), so a round there uses it up.
+func limited_to(p_game_id: StringName) -> bool:
+	return p_game_id in games if not games.is_empty() else game_id == p_game_id

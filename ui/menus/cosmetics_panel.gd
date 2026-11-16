@@ -27,7 +27,7 @@ signal outfit_worn(kind: StringName, id: StringName)
 const COLUMNS: int = 4
 const TILE: Vector2 = Vector2(196, 236)
 const KIND_TITLES: Dictionary = {
-	CosmeticDef.KIND_COLOR: "COLOURS", CosmeticDef.KIND_SKIN: "SKINS", CosmeticDef.KIND_HAT: "HATS",
+	CosmeticDef.KIND_COLOR: "SKINS", CosmeticDef.KIND_SKIN: "SKINS", CosmeticDef.KIND_HAT: "HATS",
 	CosmeticDef.KIND_SHIRT: "SHIRTS", CosmeticDef.KIND_PANTS: "TROUSERS", CosmeticDef.KIND_CAPE: "CAPES",
 	CosmeticDef.KIND_BOOTS: "BOOTS", CosmeticDef.KIND_EYES: "EYES", CosmeticDef.KIND_MOUTH: "MOUTHS",
 	CosmeticDef.KIND_BEARD: "BEARDS", KIND_PACK: "PACKS", KIND_COINS: "GOLD",
@@ -38,7 +38,7 @@ const KIND_PACK: StringName = &"pack"
 const KIND_COINS: StringName = &"coins"
 ## The piece each tab's icon shows.
 const TAB_ICONS: Dictionary = {
-	CosmeticDef.KIND_COLOR: &"color_gold", CosmeticDef.KIND_SKIN: &"skin_rainbow", CosmeticDef.KIND_HAT: &"hat_top",
+	CosmeticDef.KIND_COLOR: &"skin_rainbow", CosmeticDef.KIND_SKIN: &"skin_rainbow", CosmeticDef.KIND_HAT: &"hat_top",
 	CosmeticDef.KIND_SHIRT: &"shirt_tux", CosmeticDef.KIND_PANTS: &"pants_jeans", CosmeticDef.KIND_CAPE: &"cape_hero",
 	CosmeticDef.KIND_BOOTS: &"boots_sneakers", CosmeticDef.KIND_EYES: &"eyes_star", CosmeticDef.KIND_MOUTH: &"mouth_tongue",
 	CosmeticDef.KIND_BEARD: &"beard_full", KIND_PACK: &"pack_royal",
@@ -303,13 +303,19 @@ func _ready() -> void:
 	tabs.add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
 	right.add_child(tabs)
 	for kind: StringName in CosmeticDef.KINDS:
+		if kind == CosmeticDef.KIND_SKIN:
+			continue  # on the colours' page: plain and animated skins are one tab (Patrick 2026-11-16)
 		var items: Array[CosmeticDef] = shop.of_kind(kind)
+		if kind == CosmeticDef.KIND_COLOR:
+			items = items + shop.of_kind(CosmeticDef.KIND_SKIN)
 		if items.is_empty():
 			continue  # a kind shows up once the shop stocks it
 		var grid: GridContainer = _grid_tab(str(KIND_TITLES.get(kind, String(kind).to_upper())))
 		for d: CosmeticDef in items:
 			grid.add_child(_tile(d))
 		tab_row.add_child(_tab_button(kind, tabs.get_tab_count() - 1))
+		if kind == CosmeticDef.KIND_COLOR:
+			tab_buttons[CosmeticDef.KIND_SKIN] = tab_buttons[kind]
 	if not shop.packs.is_empty():
 		var pgrid: GridContainer = _grid_tab(str(KIND_TITLES[KIND_PACK]))
 		for k: CosmeticPack in shop.packs:
@@ -370,7 +376,7 @@ func _featured_card(id: StringName) -> Button:
 	b.custom_minimum_size = Vector2(0, 118)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.clip_contents = true
-	b.focus_mode = Control.FOCUS_NONE
+	b.focus_mode = Control.FOCUS_ALL  # a gamepad reaches the featured offers too
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	b.tooltip_text = (d.display_name if d != null else pack.display_name)
 	var normal := _box(Color("#3A2318"), Color(Palette.COIN_GOLD, 0.75), 2, 18, 10)
@@ -378,7 +384,9 @@ func _featured_card(id: StringName) -> Button:
 	b.add_theme_stylebox_override(&"normal", normal)
 	b.add_theme_stylebox_override(&"hover", hover)
 	b.add_theme_stylebox_override(&"pressed", hover)
-	b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+	var ring := _box(Color(0, 0, 0, 0), Palette.VIP_GOLD, 4, 18, 10)
+	ring.draw_center = false
+	b.add_theme_stylebox_override(&"focus", ring)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override(&"separation", 10)
@@ -450,19 +458,25 @@ func _build_wardrobe() -> PanelContainer:
 	grid.add_theme_constant_override(&"v_separation", 8)
 	col.add_child(grid)
 	for kind: StringName in CosmeticDef.KINDS:
-		if shop.of_kind(kind).is_empty():
-			continue
+		if shop.of_kind(kind).is_empty() or kind == CosmeticDef.KIND_SKIN:
+			continue  # one SKIN slot: the animated skin if one is on, else the colour
 		var b := Button.new()
 		b.name = "Slot_" + String(kind)
 		b.custom_minimum_size = Vector2(72, 72)
 		b.expand_icon = true
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.focus_mode = Control.FOCUS_NONE
+		b.focus_mode = Control.FOCUS_ALL  # the outfit slots, on a gamepad too
 		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		b.theme_type_variation = &"SmallLabel"
+		b.add_theme_font_size_override(&"font_size", 15)
+		b.add_theme_color_override(&"font_color", Color(MUTED, 0.6))
+		b.add_theme_color_override(&"font_hover_color", MUTED)
 		b.add_theme_stylebox_override(&"normal", _box(Color("#2A1D14"), Color("#5A4128"), 2, 14, 6))
 		b.add_theme_stylebox_override(&"hover", _box(Color("#36261A"), Palette.WARM_GOLD, 2, 14, 6))
 		b.add_theme_stylebox_override(&"pressed", _box(Color("#36261A"), Palette.WARM_GOLD, 2, 14, 6))
-		b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+		var slot_ring := _box(Color(0, 0, 0, 0), Palette.VIP_GOLD, 3, 14, 6)
+		slot_ring.draw_center = false
+		b.add_theme_stylebox_override(&"focus", slot_ring)
 		b.pressed.connect(func() -> void:
 			show_kind(kind)
 			var worn: StringName = worn_in(ProfileManager.profile, kind)
@@ -476,6 +490,9 @@ func _build_wardrobe() -> PanelContainer:
 ## The id worn in slot `kind` (the colour for KIND_COLOR), &"" when nothing is.
 func worn_in(p: PlayerProfile, kind: StringName) -> StringName:
 	if kind == CosmeticDef.KIND_COLOR:
+		var skin: StringName = p.outfit.get(CosmeticDef.KIND_SKIN, &"")
+		if skin != &"":
+			return skin  # an animated skin covers the colour
 		var c: CosmeticDef = shop.color_item(p.preferred_color if p.preferred_color >= 0 else 0)
 		return c.id if c != null else &""
 	return p.outfit.get(kind, &"")
@@ -498,12 +515,16 @@ func _refresh_places(p: PlayerProfile) -> void:
 		var title: String = str(KIND_TITLES.get(kind, kind)).capitalize()
 		if worn != &"":
 			b.icon = CosmeticThumbnails.texture_for(worn)
+			b.text = ""
 			b.modulate = Color.WHITE
 			var d: CosmeticDef = shop.find(worn)
 			b.tooltip_text = "%s: %s" % [title, d.display_name if d != null else String(worn)]
 		else:
-			b.icon = CosmeticThumbnails.texture_for(TAB_ICONS.get(kind, &""))
-			b.modulate = Color(1, 1, 1, 0.3)
+			# Nothing worn there: an empty slot with its name, not a faded picture (that read as
+			# a greyed-out piece, Patrick 2026-11-16).
+			b.icon = null
+			b.text = title.to_upper()
+			b.modulate = Color.WHITE
 			b.tooltip_text = "%s: nothing" % title
 	var owned: int = 0
 	var total: int = 0
@@ -597,7 +618,7 @@ func show_kind(kind: StringName) -> void:
 		return
 	tabs.current_tab = int(b.get_meta(&"tab"))
 	for k: StringName in tab_buttons:
-		tab_buttons[k].set_pressed_no_signal(k == kind)
+		tab_buttons[k].set_pressed_no_signal(tab_buttons[k] == b)
 	if coins_button != null:
 		coins_button.set_pressed_no_signal(kind == KIND_COINS)
 	# The pictures on this page first (backwards, so the first tile ends up at the front).
@@ -608,6 +629,10 @@ func show_kind(kind: StringName) -> void:
 	elif kind != KIND_COINS:
 		for d: CosmeticDef in CosmeticShop.default().of_kind(kind):
 			ids.append(d.id)
+		if kind == CosmeticDef.KIND_COLOR or kind == CosmeticDef.KIND_SKIN:
+			var other: StringName = CosmeticDef.KIND_SKIN if kind == CosmeticDef.KIND_COLOR else CosmeticDef.KIND_COLOR
+			for d: CosmeticDef in CosmeticShop.default().of_kind(other):
+				ids.append(d.id)
 	ids.reverse()
 	for id: StringName in ids:
 		CosmeticThumbnails.texture_for(id, true)
@@ -659,6 +684,11 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 10)
 		b.add_child(badge)
+	var lock := LockIcon.make(24.0)
+	lock.name = "Lock"
+	lock.visible = false
+	lock.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, 10)
+	b.add_child(lock)
 	var pr: Array = _price_widget(22.0, &"SmallLabel")
 	var row: HBoxContainer = pr[0]
 	row.name = "PriceRow"
@@ -747,6 +777,8 @@ func select(id: StringName) -> void:
 	selected = id
 	if d != null:
 		trying[d.kind] = id
+		if d.kind == CosmeticDef.KIND_COLOR:
+			trying.erase(CosmeticDef.KIND_SKIN)  # a plain colour shows without the animated skin
 	status_label.text = ""
 	if preview != null:
 		preview.face(d != null and d.kind == CosmeticDef.KIND_CAPE)
@@ -938,10 +970,16 @@ func press_action() -> void:
 				status_label.text = "Can't buy that right now."
 		_refresh()
 		return
-	if d.kind == CosmeticDef.KIND_COLOR and p.preferred_color != d.color_index:
-		ProfileManager.set_preferred_color(d.color_index)
+	if d.kind == CosmeticDef.KIND_COLOR and not _wearing(p, d):
+		# One skins page: a plain colour takes an animated skin off (else nothing would change).
+		var skin: StringName = p.outfit.get(CosmeticDef.KIND_SKIN, &"")
+		if skin != &"":
+			ProfileManager.take_off(CosmeticDef.KIND_SKIN)
+			outfit_worn.emit(CosmeticDef.KIND_SKIN, &"")
+		if p.preferred_color != d.color_index:
+			ProfileManager.set_preferred_color(d.color_index)
+			color_worn.emit(d.color_index)
 		status_label.text = "Your bean wears %s from now on." % d.display_name
-		color_worn.emit(d.color_index)
 	elif d.kind in CosmeticDef.OUTFIT_KINDS:
 		if p.is_worn(d.id):
 			ProfileManager.take_off(d.kind)
@@ -956,7 +994,7 @@ func press_action() -> void:
 ## Whether item `d` is what the bean wears now (its colour or one of its outfit pieces).
 static func _wearing(p: PlayerProfile, d: CosmeticDef) -> bool:
 	if d.kind == CosmeticDef.KIND_COLOR:
-		return p.preferred_color == d.color_index
+		return p.preferred_color == d.color_index and p.outfit.get(CosmeticDef.KIND_SKIN, &"") == &""
 	return p.is_worn(d.id)
 
 
@@ -1010,11 +1048,12 @@ func _refresh() -> void:
 		var badge: Node = b.get_node_or_null("Level")
 		if badge != null:
 			(badge as Control).visible = d != null and not p.owns(id)
-		# Out of reach for now (level not reached and no Coins price, or too few Coins): greyed out.
+		# Out of reach for now (level not reached and no Coins price, or too few Coins): a lock in
+		# the corner, the picture stays bright (a dimmed bean read as a broken one).
 		var locked: bool = d != null and not p.owns(id) and not _can_get_now(p, d)
-		var pic: Control = b.find_child("Picture", true, false) as Control
-		if pic != null:
-			pic.modulate = Color(0.45, 0.45, 0.45, 0.8) if locked else Color.WHITE
+		var lock: Control = b.get_node_or_null("Lock") as Control
+		if lock != null:
+			lock.visible = locked
 		if badge != null:
 			(badge as Label).add_theme_color_override(&"font_color", MUTED if locked else Palette.VIP_GOLD)
 		var coin_pack: CoinPack = shop.find_coin_pack(id)
@@ -1112,6 +1151,8 @@ func _dress_preview(p: PlayerProfile) -> void:
 			color = d.color_index
 		elif d.kind in CosmeticDef.OUTFIT_KINDS:
 			dress[d.kind] = d.id
+	if trying.has(CosmeticDef.KIND_COLOR) and not trying.has(CosmeticDef.KIND_SKIN):
+		dress.erase(CosmeticDef.KIND_SKIN)
 	preview.set_bean_color(Palette.player_color(color))
 	if preview.outfit != dress:
 		preview.set_outfit(dress)

@@ -360,16 +360,11 @@ func _refresh_status() -> void:
 		return
 	var order: Array[int] = alive_players()
 	order.sort_custom(func(a: int, b: int) -> bool: return coins[a] > coins[b] if coins[a] != coins[b] else a < b)
-	var lines: PackedStringArray = ["COINS"]
-	var rank: int = 0
-	for i: int in order.size():
-		if i == 0 or coins[order[i]] != coins[order[i - 1]]:
-			rank = i + 1
-		var p: int = order[i]
-		var who: String = "YOU" if p == local_id else player_name(p)
-		lines.append("%d. %s  %d" % [rank, who, coins[p]])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 26)
+	var rows: Array = []
+	for p: int in order:
+		rows.append({"player": p, "score": int(coins[p])})
+	MinigameScoreboard.rank_rows(rows)
+	show_board("COINS", rows)
 
 
 # --- Props: bats, coin badges, immunity ---------------------------------------------------------

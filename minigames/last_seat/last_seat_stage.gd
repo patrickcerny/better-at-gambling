@@ -504,13 +504,26 @@ func _refresh_hud() -> void:
 	if status_label == null:
 		return
 	var free: int = stool_spots.size() - seated.size() if scramble else stool_count
-	var lines: PackedStringArray = ["ROUND %d  ·  %d STOOL%s" % [maxi(round_no, 1), maxi(free, 0), "" if free == 1 else "S"]]
+	var rows: Array = []
+	var gone: Array = []
 	for p: int in roster:
-		var who: String = "YOU" if p == local_id else player_name(p)
-		var tag: String = "OUT" if p in out else ("SEATED" if seated.has(p) else ("WINNER" if p == winner else "standing"))
-		lines.append("%s  %s" % [who, tag])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 26)
+		var r: Dictionary = {"player": p, "leader": p == winner}
+		if p in out:
+			r["status"] = &"out"
+			gone.append(r)
+			continue
+		if p == winner:
+			r["tag"] = "WINNER"
+			r["tag_color"] = Palette.VIP_GOLD
+		elif seated.has(p):
+			r["status"] = &"done"
+		elif scramble:
+			r["status"] = &"waiting"
+		rows.append(r)
+	rows.append_array(gone)
+	for r: Dictionary in rows:
+		r["rank"] = 0  # who is still in has no order
+	show_board("ROUND %d" % maxi(round_no, 1), rows, "%d stool%s left" % [maxi(free, 0), "" if free == 1 else "s"])
 
 
 # --- Lucky ----------------------------------------------------------------------------------------

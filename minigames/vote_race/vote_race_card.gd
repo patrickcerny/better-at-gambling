@@ -219,9 +219,14 @@ func _restyle() -> void:
 			"pressed":
 				sb.bg_color = Palette.CREAM.darkened(0.08)
 			"focus":
+				# A gamepad's focus: a bright gold ring round the card (the mouse never focuses it).
 				sb.draw_center = false
-				sb.set_border_width_all(0)
-				sb.shadow_size = 0
+				sb.border_color = Palette.VIP_GOLD
+				sb.set_border_width_all(6)
+				sb.set_expand_margin_all(6)
+				sb.shadow_color = Color(Palette.VIP_GOLD, 0.5)
+				sb.shadow_size = 18
+				sb.shadow_offset = Vector2.ZERO
 		add_theme_stylebox_override(st, sb)
 
 

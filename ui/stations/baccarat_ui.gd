@@ -120,9 +120,17 @@ func _rules_text() -> String:
 		+ "PLAYER pays 1:1. BANKER pays 1:1 less %d%% commission. A tie gives Player and Banker bets back. TIE pays %d:1, P PAIR and B PAIR %d:1." % [int(round(cfg.baccarat_banker_commission * 100.0)), cfg.baccarat_tie_pays, cfg.baccarat_pair_pays])
 
 
+## Gamepad: the stick frames a bet (Player, Banker, Tie, the pairs), A puts a chip on it.
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	for b: Button in buttons.values():
+		out.append(b)
+	return out
+
+
 func _hint_text() -> String:
 	if InputGlyphs.gamepad:
-		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  [{bj_hit}] banker  [{bj_stand}] player\n[{bet_clear}] clear  [{leave_station}] stand up")
+		return InputGlyphs.fill("Left stick: pick a bet  [%s] put a chip on it  [{bet_chip_prev} / {bet_chip_next}] chip\n[{bet_clear}] clear  [{leave_station}] stand up" % InputGlyphs.pad_name("A"))
 	return InputGlyphs.fill("[1-4] chip  [P] player  [B] banker  [T] tie  [{bet_clear}] clear\n[{leave_station}] stand up")
 
 
@@ -130,9 +138,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or int(pub.get("state", 0)) != BaccaratLogic.State.BETTING:
 		return
 	var key: Key = (event as InputEventKey).physical_keycode if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo else KEY_NONE
-	if key == KEY_P or event.is_action_pressed(&"bj_stand"):
+	# On a pad the stick and A bet (the picker); X stays "clear" like at every other table.
+	if key == KEY_P:
 		bet(BaccaratLogic.PLAYER)
-	elif key == KEY_B or event.is_action_pressed(&"bj_hit"):
+	elif key == KEY_B:
 		bet(BaccaratLogic.BANKER)
 	elif key == KEY_T:
 		bet(BaccaratLogic.TIE)
@@ -338,7 +347,7 @@ func _bet_button(type: StringName, text: String, color: Color, parent: Control, 
 	_badges[type] = badge
 	var dots := Label.new()
 	dots.name = "Dots"
-	dots.add_theme_font_size_override(&"font_size", 12)
+	dots.add_theme_font_size_override(&"font_size", 14)
 	dots.position = Vector2(6, 2)
 	dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dots.visible = false

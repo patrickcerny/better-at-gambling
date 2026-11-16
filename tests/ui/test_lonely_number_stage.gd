@@ -104,3 +104,32 @@ func test_spectator_cannot_pick() -> void:
 	s._on_pick(5)
 	assert_eq(s.my_pick, -1)
 	assert_eq(s.status_label.text, "Spectating")
+
+
+func _pad(button: JoyButton) -> void:
+	for down: bool in [true, false]:
+		var ev := InputEventJoypadButton.new()
+		ev.button_index = button
+		ev.pressed = down
+		get_tree().root.push_input(ev)
+
+
+func test_gamepad_walks_the_grid_and_a_picks() -> void:
+	InputGlyphs.set_gamepad(true)
+	await wait_process_frames(2)
+	assert_eq(get_viewport().gui_get_focus_owner(), stage.buttons[0], "1 has the focus")
+	_pad(JOY_BUTTON_DPAD_RIGHT)
+	_pad(JOY_BUTTON_DPAD_DOWN)
+	assert_eq(get_viewport().gui_get_focus_owner(), stage.buttons[6], "right then down: 7")
+	_pad(JOY_BUTTON_A)
+	assert_eq(stage.my_pick, 7, "A locks it in")
+	assert_string_contains(stage.status_label.text, "You picked 7")
+	InputGlyphs.set_gamepad(false)
+
+
+func test_keyboard_never_leaves_a_number_focused() -> void:
+	InputGlyphs.set_gamepad(false)
+	await wait_process_frames(2)
+	assert_null(get_viewport().gui_get_focus_owner())
+	for b: Button in stage.buttons:
+		assert_eq(b.focus_mode, Control.FOCUS_NONE)

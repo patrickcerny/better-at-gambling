@@ -178,8 +178,7 @@ func test_reveal_shows_who_picked_which_card() -> void:
 	assert_string_starts_with(stage.prompt_label.text, "YOU FOUND HER!")
 	assert_gt(stage.totals[1], 500)
 	assert_eq(stage.totals[3], 0)
-	var mark: Label = stage.board_rows[3]["mark"]
-	assert_eq(mark.text, "-")
+	assert_eq(stage.board.card_for(3).tag(), "-")
 
 
 func test_fourth_card_and_the_end() -> void:

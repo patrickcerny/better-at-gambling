@@ -11,7 +11,7 @@ const STEP: float = 0.05
 var cfg: BalanceConfig = BalanceConfig.new()
 
 
-## The ring the drag was tuned on (the spawn ring until 0.9.72 moved the spawns in to 3.3).
+## The ring the drag was tuned on (the spawn ring until 0.9.85 moved the spawns in to 3.3).
 const TUNE_R: float = 4.4
 
 
