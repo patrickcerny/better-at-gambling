@@ -49,3 +49,28 @@ func test_player_colour_and_rim() -> void:
 	var house: ChipStack = ChipStack.make(30)
 	add_child_autofree(house)
 	assert_eq(house.color, ChipStack.tier_color(30), "house chips keep the size colours")
+
+
+func test_chips_wear_the_owners_skin() -> void:
+	var red: Color = Palette.CASINO_RED
+	var s: ChipStack = ChipStack.make(30, red, 10, &"skin_gold")
+	add_child_autofree(s)
+	assert_eq(s.skin, &"skin_gold")
+	var mats: Array = ChipStack.skin_materials_for(&"skin_gold", red)
+	assert_eq((s.get_child(0) as MeshInstance3D).material_override, mats[0], "the chips wear the skin")
+	assert_eq((s.get_child(1) as MeshInstance3D).material_override, mats[1], "every other chip a shade darker")
+	assert_ne(mats[0], mats[1])
+	assert_eq((mats[2] as StandardMaterial3D).albedo_color, red, "the rim keeps the owner's colour")
+	assert_same(ChipStack.skin_materials_for(&"skin_gold", red)[0], mats[0], "one material per skin and colour")
+	var copy: ChipStack = ChipStack.make(30, red, 10, &"not_a_skin")
+	add_child_autofree(copy)
+	assert_eq(copy.skin, &"", "unknown skins fall back to the colour")
+	assert_eq((copy.get_child(0) as MeshInstance3D).material_override, ChipStack.materials_for(red)[0])
+
+
+func test_skin_of_reads_the_wire_outfit() -> void:
+	var outfit: Array = []
+	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
+		outfit.append("skin_gold" if kind == CosmeticDef.KIND_SKIN else "")
+	assert_eq(Cosmetics.skin_of({"outfit": outfit}), &"skin_gold")
+	assert_eq(Cosmetics.skin_of({}), &"")

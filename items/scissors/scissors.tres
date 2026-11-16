@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"scissors"
 display_name = "Scissors"
-description = "Blackjack: snip off the last card you drew (once, not after doubling)."
+description = "Blackjack: snip off the last card you drew (once, not after doubling). Bust? You get a few seconds to cut the busting card away and play on."
 rarity = 1
 target_mode = 0
 requires_proximity = false

@@ -163,7 +163,7 @@ func _process(delta: float) -> void:
 	_pulse = lerpf(_pulse, 1.25 if talking else 1.0, minf(1.0, 12.0 * delta))
 	var hand: Node3D = ItemModels.hand_node(h.visuals)
 	var k: float = 1.0
-	if h.cam != null and h.cam.camera != null and h.cam.mode == PlayerCamera.Mode.FIRST and not h.visuals.visible:
+	if h.cam != null and h.cam.camera != null and h.cam.first_person() and not h.visuals.visible:
 		megaphone_model.global_transform = h.cam.camera.global_transform * view_grip()
 		k = VIEW_SCALE
 	elif hand != null:

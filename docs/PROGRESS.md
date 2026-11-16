@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.67 Every game, minigame and menu on a gamepad and the Steam Deck
+### 2026-11-16 / 0.9.75 Every game, minigame and menu on a gamepad and the Steam Deck
 - Patrick: "gehe ALLE games und minigames und controls für den controller und fürs steamdeck durch
   ob das geht. Wenn ja, implementiere es und teste alles."
 - Menus: Godot's `ui_accept` / `ui_cancel` have no pad buttons, so A pressed nothing and B closed
@@ -120,6 +120,18 @@
   (≥ 9 px on the Deck screen).
 - Tests: tests/ui/test_gamepad_menus.gd, tests/ui/test_gamepad_tables.gd, pad tests in
   test_lonely_number_stage / test_vote_race_stage / test_spy_stage, test_bet_panel updated.
+
+### 2026-11-16 / 0.9.67 Your chips wear your skin
+- Patrick: "the chips you have mirror the skin you use". A player's chip stacks on every table
+  (bets, splits, the minigame card tables) and their Plinko chip now wear their animated skin:
+  the bean shader (`bean_skin.gdshader`, new `chip` mode) lays the skin's pattern over each chip,
+  animated like on the bean; every other chip in a stack is a shade darker so the count still
+  reads, and the top rim keeps the player's bean colour so two players in the same skin can still
+  tell their chips apart. Without a skin the chips now use the bean colour (they used the slot
+  colour before, so they did not match the bean). Effects off / server: the skin's flat colour.
+  Skins already sync with the outfit, so everyone sees the same chips. Look-dev:
+  `scripts/screenshot.sh res://tools/dev/table_fx_shot.tscn chips 40 --view chips --skins`.
+  Tests: tests/unit/test_chip_stack.gd (skin chips, fallback, `Cosmetics.skin_of`).
 
 ### 2026-11-16 / 0.9.66 Public lobbies of other players show up
 - Patrick: "Public lobbies are not found of other ppl". The Steam search filtered on our exact

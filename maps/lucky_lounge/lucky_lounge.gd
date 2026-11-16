@@ -1264,7 +1264,10 @@ func _build_waiting_door() -> void:
 	for side: float in [-1.0, 1.0]:
 		var hinge := Node3D.new()
 		hinge.name = "WaitLeaf%s" % ("L" if side < 0.0 else "R")
-		hinge.position = Vector3(side * WAIT_DOOR_HALF, 0.0, hz + 0.17)
+		# Hinged just inside the waiting room, past the wall and its wainscot and rail: open, a
+		# leaf lies flat against the room's front wall instead of inside it (0.9.65; at hz + 0.17
+		# both open leaves were buried in the wall with only their handles poking out).
+		hinge.position = Vector3(side * WAIT_DOOR_HALF, 0.0, hz + 0.42)
 		add_child(hinge)
 		_waiting_leaves.append(hinge)
 		var w: float = WAIT_DOOR_HALF - 0.02
@@ -1282,6 +1285,7 @@ func _build_waiting_door() -> void:
 		plate.outline_size = 8
 		plate.position = Vector3(-side * w * 0.5, 1.65, -0.075)
 		plate.rotation.y = PI  # read from the start room (−z)
+		plate.double_sided = false  # never seen mirrored through the leaf from behind
 		hinge.add_child(plate)
 	var z: float = hz - 0.28
 	for x: float in [-1.0, 1.0]:
@@ -1306,6 +1310,11 @@ func set_waiting_room_open(open: bool) -> void:
 			_waiting_tween.tween_property(_waiting_leaves[i], ^"rotation:y", angle, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		else:
 			_waiting_leaves[i].rotation.y = angle
+		# The name plates only while shut: open, the leaves lie in the room and would read
+		# "ROOM  WAITING".
+		for c: Node in _waiting_leaves[i].get_children():
+			if c is Label3D:
+				(c as Label3D).visible = not open
 
 
 func _build_stations() -> void:

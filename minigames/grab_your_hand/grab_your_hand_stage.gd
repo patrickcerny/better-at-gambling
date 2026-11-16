@@ -411,7 +411,7 @@ func _update_fans() -> void:
 
 func _first_person() -> bool:
 	var me: PlayerAvatar = local_avatar()
-	return me != null and me.cam != null and me.cam.mode == PlayerCamera.Mode.FIRST
+	return me != null and me.cam != null and me.cam.first_person()
 
 
 func _update_clock() -> void:

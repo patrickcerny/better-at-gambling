@@ -62,6 +62,8 @@ const PAD_REPEAT: float = 0.16
 var _ribbon_stake: int = 0
 var _ribbon_net: int = 0
 var _ribbon_pending: bool = false
+## The ribbon's name for the results gathered (`_ribbon_tag`), "" = the plain one.
+var _ribbon_label: String = ""
 
 
 func _ready() -> void:
@@ -496,6 +498,9 @@ func _on_table_event(ev: Dictionary) -> void:
 		return
 	_ribbon_stake += int(ev.get("stake", 0))
 	_ribbon_net += int(ev.get("net", 0))
+	var tag: String = _ribbon_tag(ev)
+	if tag != "":
+		_ribbon_label = tag
 	if not _ribbon_pending:
 		_ribbon_pending = true
 		get_tree().create_timer(0.35).timeout.connect(_flush_ribbon)
@@ -505,15 +510,23 @@ func _flush_ribbon() -> void:
 	_ribbon_pending = false
 	var net: int = _ribbon_net
 	var stake: int = _ribbon_stake
+	var label: String = _ribbon_label
 	_ribbon_net = 0
 	_ribbon_stake = 0
+	_ribbon_label = ""
 	if stake <= 0 and net == 0:
 		return
-	show_result(net)
+	show_result(net, label)
 
 
-## Shows the ribbon for a result of `net` (won > 0, lost < 0, push 0) for a few seconds.
-func show_result(net: int) -> void:
+## Override: a name for the ribbon of this result ("AA BONUS"), "" = the plain WIN / LOST.
+func _ribbon_tag(_ev: Dictionary) -> String:
+	return ""
+
+
+## Shows the ribbon for a result of `net` (won > 0, lost < 0, push 0) for a few seconds, named
+## `label` when given ("AA BONUS  WIN  +$600").
+func show_result(net: int, label: String = "") -> void:
 	var face: Color
 	var ink: Color = Palette.CREAM
 	if net > 0:
@@ -527,6 +540,8 @@ func show_result(net: int) -> void:
 	else:
 		result_ribbon_label.text = "PUSH  ·  BET BACK"
 		face = TableSkin.WALNUT_LIGHT
+	if label != "":
+		result_ribbon_label.text = label + "  " + result_ribbon_label.text
 	result_ribbon_label.add_theme_color_override(&"font_color", ink)
 	result_ribbon_label.add_theme_constant_override(&"outline_size", 0 if net > 0 else 6)
 	var sb: StyleBoxFlat = TableSkin.band_box(face, Palette.VIP_GOLD if net > 0 else Color(Palette.CREAM, 0.6), 10)
