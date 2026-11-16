@@ -93,6 +93,22 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.49 Item bar with the item models, NEW ITEM card, fuller explanations
+- Patrick: "Items erklären wichtiger" and "Item inventory bar sollte nicht namen der items zeigen
+  sondern die 3d models und onscroll oder equip der name". The three slots (`ItemBar`) are squares
+  with the item's model (`ItemThumbnails`, still pictures); the held slot is bigger, its model turns
+  live in a small SubViewport (`ItemThumbnails.build_stage`, shared photo booth) and its name shows
+  under it. No names otherwise.
+- New items: a "NEW ITEM" card (picture, rarity, FOR YOU / ON OTHERS / TRAP, duration, the whole
+  description, how to take it out and how to use it), one after another, 6 s each while the bar is
+  on screen; it waits while you sit or another card is up, and taking the item out skips it.
+- Picking a slot: the card shows the whole description (not just the first sentence), the tag
+  line and how to use it (aim, reach, key) for 3.5 s. The I card has the picture and the same lines.
+- Look-dev: `scripts/screenshot.sh res://tools/dev/item_bar_shot.tscn name 60 [--hold N] [--info] [--quiet] [--items a,b,c]`.
+- Tests: `tests/ui/test_item_bar.gd` (models in slots, held name, NEW ITEM queue, copies count),
+  `tests/physics/test_items_scene.gd` updated. Ran: those two, reward panel items, pause menu, shop
+  panel, HUD toasts, items/duels/shop, check_scripts (no full suite, Patrick's rule).
+
 ### 2026-11-16 / 0.9.48 Own game icon instead of the Godot icon
 - Patrick: the game (also started through Steam) showed the Godot icon in the taskbar. The project now
   has its own icon: `assets/icons/icon.png` (512 px, runtime window/taskbar icon via
