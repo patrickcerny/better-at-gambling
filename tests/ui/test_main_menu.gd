@@ -230,6 +230,8 @@ func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	ProfileManager.profile.daily_last = 0
 	menu._refresh_daily()
 	assert_eq(menu.daily_entry.text, "DAILY SPIN  ★", "a free spin shines")
+	assert_true(menu.daily_button.spin_ready, "the big wheel button shines too")
+	assert_eq(menu.daily_button.size.x, DailySpinButton.SIZE, "as wide as the three corner buttons")
 	menu.daily_entry.pressed.emit()
 	assert_true(menu.daily_spin.visible)
 	assert_false(menu.daily_spin.spin_button.disabled)
@@ -239,4 +241,6 @@ func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	menu.daily_spin.close()
 	menu._refresh_daily()
 	assert_string_starts_with(menu.daily_entry.text, "DAILY SPIN  ·  ")
+	assert_false(menu.daily_button.spin_ready, "and rests with the countdown")
+	assert_ne(menu.daily_button.wait_text, "")
 	ProfileManager.reload()

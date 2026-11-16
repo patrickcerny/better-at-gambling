@@ -65,6 +65,8 @@ var dev_panel: DevPanel
 ## spin is free and counts down otherwise.
 var daily_entry: Button
 var daily_spin: DailySpinPanel
+## The big wheel button above the corner buttons (Patrick 2026-11-16), always there.
+var daily_button: DailySpinButton
 var _daily_tick: float = 0.0
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
@@ -226,11 +228,25 @@ func _build_daily() -> void:
 		_refresh_daily()
 		if daily_entry.is_visible_in_tree():
 			daily_entry.grab_focus())
-	daily_entry.pressed.connect(func() -> void:
+	var open_daily := func() -> void:
 		_settings.close()
 		cosmetics.close()
 		level_pass.close()
-		daily_spin.open())
+		daily_spin.open()
+	daily_entry.pressed.connect(open_daily)
+	# The big wheel above the three corner buttons, as wide as they are together.
+	daily_button = DailySpinButton.new()
+	daily_button.name = "DailySpinButton"
+	daily_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	daily_button.offset_right = -32.0
+	daily_button.offset_left = -32.0 - DailySpinButton.SIZE
+	daily_button.offset_bottom = -48.0 - GearButton.SIZE
+	daily_button.offset_top = -48.0 - GearButton.SIZE - DailySpinButton.SIZE
+	daily_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	daily_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(daily_button)
+	move_child(daily_button, daily_spin.get_index())  # under the wheel panel
+	daily_button.pressed.connect(open_daily)
 	_refresh_daily()
 
 
@@ -239,6 +255,8 @@ func _refresh_daily() -> void:
 	if daily_entry == null:
 		return
 	var w: int = DailySpinPanel.wait_s()
+	if daily_button != null:
+		daily_button.set_state(w <= 0, DailyWheel.wait_text(w))
 	if w <= 0:
 		daily_entry.text = "DAILY SPIN  ★"
 		daily_entry.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
