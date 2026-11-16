@@ -82,12 +82,22 @@ def check(na, A, nb, B):
     vis = pts[~inside_body(pts)] if len(pts) < 20000 else pts
     return len(vis), (vis.mean(0) if len(vis) else None)
 
+SPREADS = d.get('spreads', {})
+def spread(cape, other, T):
+    s = SPREADS.get(cape + '|' + other)
+    if not s: return T, cape
+    T = T.copy(); T[..., 0] *= s; T[..., 2] *= s
+    return T, cape + '@' + other
+
 res = []
 names = sorted(pieces)
 for x, y in itertools.combinations(names, 2):
     kx, A = pieces[x]; ky, B = pieces[y]
     if kx == ky: continue
-    n, c = check(x, A, y, B)
+    xa, ya = x, y
+    if kx == 'cape': A, xa = spread(x, y, A)
+    if ky == 'cape': B, ya = spread(y, x, B)
+    n, c = check(xa, A, ya, B)
     if n: res.append((n, x, y, None if c is None else c.round(2).tolist()))
 for x in names:
     kx, A = pieces[x]
