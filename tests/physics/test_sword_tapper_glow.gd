@@ -1,5 +1,5 @@
 extends GutTest
-## The Sword Tapper spotlight only on a win (0.10.16, Patrick: "entferne den glow. der kommt nur
+## The Sword Tapper spotlight only on a win (0.10.19, Patrick: "entferne den glow. der kommt nur
 ## wenn du gewinnst (slow glow fade in)"): idle and stuck pedestals stand dark; a freed sword fades
 ## the light, shaft and dust in slowly, holds them through the reveal and fades them out again.
 
