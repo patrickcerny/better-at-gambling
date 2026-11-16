@@ -1,20 +1,20 @@
 class_name RouletteWheelFx
 extends Node3D
-## Spins Patrick's roulette wheel (Rolley.fbx, `RouletteStation.WHEEL_MODEL`) and its ball. Lives
-## inside the wheel model, so positions are in the model's native units (4 m across). The rotor
-## carries a number ring (Patrick's `roulette_table_1.png`, European order like
-## `RouletteLogic.WHEEL_ORDER`). The ball circles the track while the server spins and drops into
+## Spins our roulette wheel (`RouletteStation.WHEEL_MODEL`, built by `PropRecipes._roulette_wheel`)
+## and its ball. Lives inside the wheel model, so positions are in the model's native units (4 m
+## across). The rotor carries a number ring (`roulette_ring.png` from tools/models/make_textures.py,
+## European order like `RouletteLogic.WHEEL_ORDER`, the zero included). The ball circles the track while the server spins and drops into
 ## the winning pocket when `roulette_result` arrives.
 
 ## Model parts that turn with the rotor.
-const ROTOR_PARTS: Array[String] = ["Handle", "Cloner_1", "Cloner_2", "Cloner_2_2", "Cloner_3", "Tube_3", "Cylinder_2_2"]
-const RING_TEXTURE: String = "res://assets/casino/roulette_table_1.png"
+const ROTOR_PARTS: Array[String] = ["Rotor"]
+const RING_TEXTURE: String = "res://assets/models/own/textures/roulette_ring.png"
 const POCKETS: int = 37
 ## Native radii / heights: ball track, pockets, number ring.
 const TRACK_R: float = 1.7
 const TRACK_Y: float = 0.29
-const POCKET_R: float = 0.74
-const POCKET_Y: float = -0.05
+const POCKET_R: float = 0.68
+const POCKET_Y: float = 0.045
 const RING_R: float = 0.84
 const RING_Y: float = -0.03
 const BALL_R: float = 0.075
@@ -50,7 +50,7 @@ func _ready() -> void:
 	name = "WheelFx"
 	var model: Node = get_parent()
 	for n: String in ROTOR_PARTS:
-		var part: Node3D = model.get_node_or_null(NodePath(n)) as Node3D
+		var part: Node3D = model.find_child(n, true, false) as Node3D
 		if part != null:
 			_rotor_nodes.append(part)
 			_rotor_base.append(part.rotation.y)
@@ -90,24 +90,6 @@ func _build_ring() -> void:
 	ring.position.y = RING_Y
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ring)
-	# The texture leaves a gap for the green zero.
-	var zero := MeshInstance3D.new()
-	zero.name = "Zero"
-	var zm := BoxMesh.new()
-	zm.size = Vector3(RING_R * 0.15, 0.004, RING_R * 0.2)
-	zero.mesh = zm
-	zero.material_override = GreyboxKit.material(Palette.FELT_GREEN.lightened(0.15))
-	zero.position = Vector3(0, -0.002, -RING_R * 0.9)
-	ring.add_child(zero)
-	var zl := Label3D.new()
-	zl.text = "0"
-	zl.font = Vfx.font()
-	zl.font_size = 64
-	zl.pixel_size = 0.0016
-	zl.modulate = Palette.CREAM
-	zl.rotation = Vector3(-PI * 0.5, 0, 0)
-	zl.position = Vector3(0, 0.004, -RING_R * 0.9)
-	ring.add_child(zl)
 
 
 ## Starts a spin that the server resolves after about `seconds`.

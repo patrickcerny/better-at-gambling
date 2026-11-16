@@ -28,13 +28,13 @@ func _build_visuals() -> void:
 	add_child(camera_anchor)
 
 
-const WHEEL_MODEL: String = "res://assets/casino/roulette_table.fbx"
+const WHEEL_MODEL: String = "res://assets/models/own/roulette_wheel.glb"
 ## Centre of the wheel along the table (the body ends at x −2.5, so the 0.8 m radius stays on it).
 const WHEEL_X: float = -1.5
 
 
-## Patrick's roulette wheel (native 4 m across with its own floor plane, camera and lights,
-## which are dropped), scaled to 1.6 m and resting on the table at `pos`.
+## Our roulette wheel (`PropRecipes._roulette_wheel`, native 4 m across), scaled to 1.6 m and
+## resting on the table at `pos`.
 func _add_wheel_model(pos: Vector3) -> void:
 	var ps: PackedScene = load(WHEEL_MODEL) as PackedScene
 	if ps == null:

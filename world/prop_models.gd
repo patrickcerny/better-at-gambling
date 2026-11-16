@@ -1,31 +1,31 @@
 class_name PropModels
 extends RefCounted
-## Patrick's poly.pizza props (credited in CREDITS.md). `make` returns a model centred on x/z,
+## The game's props: our own models built in code (`tools/models/prop_recipes.gd`, written to
+## `assets/models/own/` by `tools/models/build_models.gd`). `make` returns a model centred on x/z,
 ## resting on y = 0 and scaled to the size the caller asks for, so callers never deal with each
 ## file's own units and pivot.
 
 const PATHS: Dictionary = {
-	&"poker_chip": "res://assets/polypizza/poker_chip.glb",
-	&"money_pile": "res://assets/polypizza/money_pile.glb",
-	&"seat": "res://assets/polypizza/seat.glb",
-	&"rug": "res://assets/polypizza/rug_blackjack.glb",
-	&"couch": "res://assets/polypizza/couch.glb",
-	&"plant_1": "res://assets/polypizza/flowers_01.glb",
-	&"plant_2": "res://assets/polypizza/flowers_02.glb",
-	&"plant_3": "res://assets/polypizza/flowers_03.glb",
-	&"cone": "res://assets/polypizza/cone.glb",
-	&"beer": "res://assets/polypizza/beer_empty.glb",
-	# Lounge decor (CC0, see CREDITS.md): Quaternius Ultimate House Interior and Poly Haven.
-	&"column": "res://assets/models/quaternius_interior/Column_Round3.fbx",
-	&"pedestal": "res://assets/models/quaternius_interior/Column_Round1.fbx",
-	&"window_arch": "res://assets/models/quaternius_interior/Window_Round1.fbx",
-	&"window_large": "res://assets/models/quaternius_interior/Window_Large1.fbx",
-	&"door_double": "res://assets/models/quaternius_interior/Door_Double.fbx",
-	&"curtains": "res://assets/models/quaternius_interior/Curtains_Double.fbx",
-	&"mirror": "res://assets/models/polyhaven/ornate_mirror_01/ornate_mirror_01_1k.gltf",
-	&"picture": "res://assets/models/polyhaven/fancy_picture_frame_01/fancy_picture_frame_01_1k.gltf",
-	&"bust": "res://assets/models/polyhaven/marble_bust_01/marble_bust_01_1k.gltf",
-	&"horse": "res://assets/models/polyhaven/horse_statue_01/horse_statue_01_1k.gltf",
+	&"poker_chip": "res://assets/models/own/poker_chip.glb",
+	&"money_pile": "res://assets/models/own/money_pile.glb",
+	&"seat": "res://assets/models/own/bar_stool.glb",
+	&"couch": "res://assets/models/own/couch.glb",
+	&"plant_1": "res://assets/models/own/plant_palm.glb",
+	&"plant_2": "res://assets/models/own/plant_bush.glb",
+	&"plant_3": "res://assets/models/own/plant_spiky.glb",
+	&"cone": "res://assets/models/own/cone.glb",
+	&"beer": "res://assets/models/own/beer_mug_empty.glb",
+	# Lounge decor; LoungeDecor recolours them by material name ("Marble", "White", "Glass",
+	# "Fabric", "Wood", "Gold").
+	&"column": "res://assets/models/own/column.glb",
+	&"pedestal": "res://assets/models/own/pedestal.glb",
+	&"window_arch": "res://assets/models/own/window_arch.glb",
+	&"door_double": "res://assets/models/own/door_double.glb",
+	&"curtains": "res://assets/models/own/curtains.glb",
+	&"mirror": "res://assets/models/own/mirror.glb",
+	&"picture": "res://assets/models/own/picture.glb",
+	&"bust": "res://assets/models/own/bust.glb",
+	&"horse": "res://assets/models/own/horse.glb",
 }
 ## Item → prop of this table that stands for it (ItemModels reads it; items with a model file
 ## of their own are listed in ItemModels.MODELS).

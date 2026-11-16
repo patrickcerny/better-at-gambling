@@ -8,7 +8,7 @@ No build step: plain ES modules, three.js r170 and Lenis are vendored in `vendor
 - `js/main.js`: renderer, scroll camera, stations, chip rain, confetti, UI.
 - `js/bean.js`: the bean rebuilt after `player/avatar_visuals.gd`.
 - `js/props.js`: chips, roulette, cards, Big Wheel, Peg Drop, marquee signs, podium, columns.
-- `assets/`: logo glb (`assets/models/logo/logo_3d.glb`), Poly Haven statue and bust (CC0), card
+- `assets/`: logo glb (`assets/models/logo/logo_3d.glb`), our own horse statue and bust (copies of the game's `assets/models/own/horse.glb` and `bust.glb`), card
   faces, Barlow Condensed (OFL), screenshots and clips from the Steam kit, a 720p trailer.
 
 `.gdignore` keeps Godot from importing this folder, and the release workflow ignores `website/**`.

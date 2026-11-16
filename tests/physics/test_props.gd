@@ -1,5 +1,5 @@
 extends GutTest
-## Patrick's poly.pizza props on the stations: stools under every seat, cones while out of order,
+## Our own props on the stations: stools under every seat, cones while out of order,
 ## money piles beside Plinko once the jackpot is big, and the bean taking a new colour.
 
 

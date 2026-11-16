@@ -441,7 +441,7 @@ async function start() {
     const pl = new THREE.PointLight(0xffd9a0, 26, 14, 1.5); pl.position.set(X, 6, 3); scene.add(pl);
   }
 
-  // decor: Poly Haven statue + bust (CC0), scaled to a real size from their bounding boxes
+  // decor: our own horse statue + bust (from the game), scaled to a real size from their bounding boxes
   const fitHeight = (obj, h) => {
     const box = new THREE.Box3().setFromObject(obj); const size = box.getSize(new THREE.Vector3());
     obj.scale.multiplyScalar(h / size.y);
@@ -459,7 +459,7 @@ async function start() {
     g.add(body, cap, foot); return g;
   };
   const gl = new GLTFLoader(manager);
-  gl.load('assets/models/horse_statue_01/horse_statue_01_1k.gltf', (g) => {
+  gl.load('assets/models/horse.glb', (g) => {
     g.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const horse = fitHeight(g.scene, 1.7);
     for (const [x, ry] of [[8.2, 0.6], [STATIONS[5] - 6.5, -0.5]]) {
@@ -467,7 +467,7 @@ async function start() {
       const h = horse.clone(); h.position.set(x, 0.98, -4.2); h.rotation.y = ry; scene.add(h);
     }
   });
-  gl.load('assets/models/marble_bust_01/marble_bust_01_1k.gltf', (g) => {
+  gl.load('assets/models/bust.glb', (g) => {
     g.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const bust = fitHeight(g.scene, 0.95);
     for (const [x, ry] of [[STATIONS[2] + 4.4, -0.5], [STATIONS[3] - 4.5, 0.5]]) {

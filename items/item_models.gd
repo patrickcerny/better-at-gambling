@@ -3,16 +3,16 @@ extends RefCounted
 ## The 3D model of each item: what the bean holds in its hand, what pops up when someone uses an
 ## item and what flies at a target. Wiring a real model is one line in `MODELS` (item → model file)
 ## plus, if it needs it, one line in `SIZES` (longest side in metres) and `GRIPS` (how it sits in
-## the hand). Items with no line get `DEFAULT_MODEL` (Patrick's coin placeholder). Props that
+## the hand). Items with no line get `DEFAULT_MODEL` (the gold coin placeholder). Props that
 ## PropModels already knows (PropModels.ITEM_PROPS) are used from there.
 ## `make` returns a model centred on its own origin, so the hand holds it by the middle unless a
 ## grip moves it.
 
-const DEFAULT_MODEL: String = "res://assets/polypizza/coin_placeholder.glb"
+const DEFAULT_MODEL: String = "res://assets/models/own/coin.glb"
 const MODELS: Dictionary = {
-	&"baseball_bat": "res://assets/polypizza/bat.glb",
-	&"russian_roulette": "res://assets/polypizza/revolver.glb",
-	&"beer": "res://assets/polypizza/beer_full.glb",
+	&"baseball_bat": "res://assets/models/own/bat.glb",
+	&"russian_roulette": "res://assets/models/own/revolver.glb",
+	&"beer": "res://assets/models/own/beer_mug_full.glb",
 }
 ## The idle motion of model-file items (hand-built ones animate in `ItemArt`):
 ## [ItemIdle.Kind, amount, speed, axis].
@@ -212,27 +212,6 @@ static func attach_to_hand(visuals: Node3D, model: Node3D) -> Node3D:
 		return visuals
 	hand.add_child(model)
 	return hand
-
-
-## Gift Shop kiosk prop (Patrick's ATM), standing on y = 0, `height` metres tall.
-const SHOP_KIOSK_MODEL: String = "res://assets/polypizza/atm_shop.fbx"
-
-
-static func make_kiosk(height: float = 1.9) -> Node3D:
-	var holder := Node3D.new()
-	holder.name = "ShopKiosk"
-	var ps: PackedScene = load(SHOP_KIOSK_MODEL) as PackedScene if ResourceLoader.exists(SHOP_KIOSK_MODEL) else null
-	if ps == null:
-		return holder
-	var model: Node3D = ps.instantiate()
-	if not _bounds.has(SHOP_KIOSK_MODEL):
-		_bounds[SHOP_KIOSK_MODEL] = _measure(model)
-	var b: AABB = _bounds[SHOP_KIOSK_MODEL]
-	var s: float = height / maxf(b.size.y, 0.0001)
-	model.scale = model.scale * s
-	model.position = Vector3(-b.get_center().x, -b.position.y, -b.get_center().z) * s
-	holder.add_child(model)
-	return holder
 
 
 ## First person: the held item at the bottom right of the view (a child of the camera), a bit

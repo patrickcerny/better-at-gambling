@@ -558,7 +558,7 @@ func _chandelier_near(p: Vector3, r: float) -> bool:
 # --- Columns, VIP lounge ----------------------------------------------------------------------
 
 func _pillars() -> void:
-	# Classical round columns (Quaternius) replace the plain cylinders; the collision cylinder
+	# Our classical fluted columns replace the plain cylinders; the collision cylinder
 	# underneath stays. Pedestal to the rail, column, head block to the ceiling (PEDESTAL_TOP).
 	for solid: Node3D in _solids("Pillar"):
 		(solid.get_node(^"Mesh") as Node3D).visible = false
@@ -691,7 +691,7 @@ func _windows() -> void:
 		var curtains: Node3D = PropModels.make(&"curtains", 0.0, h * 0.58 + 0.9)
 		curtains.position = c + n * 0.32 - Vector3(0, h * 0.5 + 0.2, 0)
 		curtains.rotation.y = atan2(n.x, n.z)
-		_recolor(curtains, {"Couch_Blue": curtain_red, "LightMetal": _gold_mat})
+		_recolor(curtains, {"Fabric": curtain_red, "Gold": _gold_mat})
 		add_child(curtains)
 		_window_sets.append([win, curtains])
 
@@ -783,7 +783,7 @@ func _art() -> void:
 		add_child(pic)
 
 
-## Replaces a prop's materials by their source name (Quaternius models use flat named colours).
+## Replaces a prop's materials by their source name (our models use named palette materials).
 func _recolor(prop: Node3D, by_name: Dictionary) -> void:
 	for n: Node in prop.find_children("*", "MeshInstance3D", true, false):
 		var mi: MeshInstance3D = n
