@@ -65,7 +65,6 @@ var results_panel: ResultsStage = null
 var pause_menu: PauseMenu = null
 ## Developer mode's in-match tools (Practice, Patrick only), built on first use.
 var dev_panel: DevMatchPanel = null
-var _shown_jackpot: int = -1
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
 ## The rules screen over the stage until everyone is ready (or 30 s pass).
@@ -745,11 +744,6 @@ func _process(delta: float) -> void:
 	_point_at_hot_table()
 	if crown != null:
 		crown.track(view.state.balances, avatars)
-	if view.state.jackpot != _shown_jackpot:
-		_shown_jackpot = view.state.jackpot
-		for node: StationBase in map.stations.values():
-			if node is PlinkoStation:
-				(node as PlinkoStation).set_jackpot(_shown_jackpot, cfg.jackpot_seed)
 	if stage != null:
 		stage.on_private(Net.request_private_snapshot())
 	_update_look_lock()
