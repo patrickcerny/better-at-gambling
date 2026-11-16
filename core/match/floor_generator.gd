@@ -240,14 +240,45 @@ func _build_pit() -> bool:
 	# Every table game once, then the extra copies.
 	var once: Array[StringName] = tables.duplicate()
 	_shuffle(once)
+	var seated: bool = true
 	for g: StringName in once:
 		if not _seat_table(rows, g):
+			seated = false
+			break
+	if not seated:
+		# The rows the dice chose left no room for one of them: search for rows that take every
+		# table game (draws that worked before keep their floor; this only rescues the failed ones).
+		for row: Row in rows:
+			row.tables.clear()
+		if not _seat_search(rows, once, 0):
 			return false  # a draw that can't put every table game in the pit is no draw
 	for g: StringName in _extra_tables(tables):
 		_seat_table(rows, g)
 	for row: Row in rows:
 		_lay_row(row)
 	return true
+
+
+## Backtracking: seats `games[i:]` in rows they fit (with what each row holds already). False when
+## no assignment takes them all.
+func _seat_search(rows: Array[Row], games: Array[StringName], i: int) -> bool:
+	if i >= games.size():
+		return true
+	var g: StringName = games[i]
+	for row: Row in rows:
+		var w: Rect2 = turned(size_of(g), row.yaw)
+		var z: float = _row_z(row, w)
+		if (row.yaw == 180.0 and z + w.position.y < site.pit_north - 0.0001) or (row.yaw == 0.0 and z + w.end.y > site.pit_south + 0.0001):
+			continue
+		var with: Array[StringName] = row.tables.duplicate()
+		with.append(g)
+		if _orders(with, row).is_empty():
+			continue
+		row.tables.append(g)
+		if _seat_search(rows, games, i + 1):
+			return true
+		row.tables.pop_back()
+	return false
 
 
 ## Extra copies of the table games: the config's list for the canonical draw; a few by weight
