@@ -537,7 +537,7 @@ func _doors() -> void:
 
 func _art() -> void:
 	# Paintings in the mouldings along the game floor. (The entrance hall's two mirrors left the
-	# pedestal wall in 0.9.56: they hung between the name plates and crowded the pedestals.)
+	# pedestal wall in 0.9.57: they hung between the name plates and crowded the pedestals.)
 	for spec: Array in [
 		[Vector3(-21.75, 3.5, -7.5), Vector3(1, 0, 0)], [Vector3(-21.75, 3.6, 9.8), Vector3(1, 0, 0)],
 		[Vector3(21.75, 3.5, 11.0), Vector3(-1, 0, 0)], [Vector3(29.0, 3.5, LuckyLounge.ANNEX_Z1 - 0.25), Vector3(0, 0, -1)],

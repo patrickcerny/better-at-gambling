@@ -107,7 +107,7 @@ const STAIR_W: float = 0.86
 ## Floor layers (y): carpet 0.01, area rugs 0.02, station rugs 0.03. Keep 1 cm apart.
 const AREA_RUG_Y: float = 0.02
 const STATION_RUG_Y: float = 0.03
-## The ready pedestals (0.8.15, Patrick: "Podeste"; reworked 0.9.56): marble daises along the
+## The ready pedestals (0.8.15, Patrick: "Podeste"; reworked 0.9.57): marble daises along the
 ## south wall of the start room, one per player colour, nearest the door first, each with a
 ## marble stair up to its top; 2.5 m apart (1.2 m free between two), the back 0.3 m off the wall.
 ## The revolving door gap runs x −2..2.
@@ -730,7 +730,7 @@ func _mesh_box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> Me
 	return mi
 
 
-## A ready pedestal (0.9.56, Patrick: "reworke die podeste komplett"): one marble piece on a dark
+## A ready pedestal (0.9.57, Patrick: "reworke die podeste komplett"): one marble piece on a dark
 ## marble footing, a square dais 0.8 m high (base moulding, a body with an inlay panel in the
 ## player's colour on each side and either side of the stair, a gold fillet and an overhanging cap)
 ## with a three-step stair in front that runs straight into it. Nothing overlaps or pokes through:
