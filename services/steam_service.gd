@@ -583,8 +583,11 @@ func create_lobby(party_name: String, max_members: int, public: bool = false) ->
 	return true
 
 
-## Asks Steam for the public lobbies of this game and version, worldwide, with a free seat;
-## `public_lobbies_received` follows. Returns false without Steam or while a request is running.
+## Asks Steam for the public lobbies of this game, worldwide, with a free seat;
+## `public_lobbies_received` follows. Every version is asked for (Patrick 2026-11-16: "Public
+## lobbies are not found of other ppl"): Steam updates players at different times, and a lobby of
+## another version used to vanish without a word; BROWSE LOBBIES now shows it with the version
+## needed instead. Returns false without Steam or while a request is running.
 func request_public_lobbies() -> bool:
 	if not _available:
 		return false
@@ -594,7 +597,6 @@ func request_public_lobbies() -> bool:
 	browsing = true
 	_browse_started = now
 	steam.call("addRequestLobbyListStringFilter", "game", LOBBY_GAME, LOBBY_COMPARISON_EQUAL)
-	steam.call("addRequestLobbyListStringFilter", "build", Protocol.BUILD_ID, LOBBY_COMPARISON_EQUAL)
 	steam.call("addRequestLobbyListStringFilter", "public", "1", LOBBY_COMPARISON_EQUAL)
 	steam.call("addRequestLobbyListFilterSlotsAvailable", 1)
 	steam.call("addRequestLobbyListDistanceFilter", LOBBY_DISTANCE_FILTER_WORLDWIDE)
@@ -681,7 +683,7 @@ func friend_lobbies() -> Array[Dictionary]:
 		elif kind != LOBBY_GAME:
 			continue
 		seen.append({"name": str(steam.call("getFriendPersonaName", fid)), "lobby": lid, "party": lobby_data(lid, "name"),
-			"build": lobby_data(lid, "build"), "members": int(steam.call("getNumLobbyMembers", lid)), "max": int(steam.call("getLobbyMemberLimit", lid)),
+			"build": lobby_data(lid, "build"), "public": lobby_data(lid, "public") == "1", "members": int(steam.call("getNumLobbyMembers", lid)), "max": int(steam.call("getLobbyMemberLimit", lid)),
 			"info": LobbyInfo.parse(lobby_data(lid, LobbyInfo.KEY))})
 	return group_friend_lobbies(seen)
 
@@ -698,7 +700,7 @@ static func group_friend_lobbies(seen: Array[Dictionary]) -> Array[Dictionary]:
 			e["members"] = maxi(int(e["members"]), int(f.get("members", 0)))
 			continue
 		at[lid] = out.size()
-		out.append({"lobby": lid, "party": str(f.get("party", "")), "build": str(f.get("build", "")), "friends": [str(f["name"])],
+		out.append({"lobby": lid, "party": str(f.get("party", "")), "build": str(f.get("build", "")), "public": bool(f.get("public", false)), "friends": [str(f["name"])],
 			"members": int(f.get("members", 0)), "max": int(f.get("max", 0)), "info": f.get("info", {})})
 	for e: Dictionary in out:
 		e["members"] = maxi(int(e["members"]), (e["friends"] as Array).size())  # Steam may not know yet
@@ -757,15 +759,35 @@ func _on_lobby_match_list(lobbies: Array = []) -> void:
 		var lid: int = int(v)
 		if lid == 0 or lid == lobby_id:
 			continue
-		var e: Dictionary = public_lobby_entry(lid, lobby_data(lid, "name"), int(steam.call("getNumLobbyMembers", lid)), int(steam.call("getLobbyMemberLimit", lid)))
-		e["info"] = LobbyInfo.parse(lobby_data(lid, LobbyInfo.KEY))
+		var e: Dictionary = public_lobby_entry(lid, lobby_data(lid, "name"), int(steam.call("getNumLobbyMembers", lid)), int(steam.call("getLobbyMemberLimit", lid)),
+			LobbyInfo.parse(lobby_data(lid, LobbyInfo.KEY)), lobby_data(lid, "build"))
 		out.append(e)
-	public_lobbies_received.emit(out)
+	Log.info(&"steam", "public lobby search: %d found (%d other versions)" % [out.size(), out.filter(func(e: Dictionary) -> bool: return str(e["build"]) != Protocol.BUILD_ID).size()])
+	public_lobbies_received.emit(merge_friend_public(out, friend_lobbies()))
 
 
-## One row of BROWSE LOBBIES (`info`: the host's `LobbyInfo`, {} from an older host).
-static func public_lobby_entry(lid: int, party: String, members: int, max_members: int, info: Dictionary = {}) -> Dictionary:
-	return {"lobby": lid, "name": party if party.strip_edges() != "" else "Lobby", "members": members, "max": max_members if max_members > 0 else Protocol.MAX_PLAYERS, "info": info}
+## One row of BROWSE LOBBIES (`info`: the host's `LobbyInfo`, {} from an older host; `build`: the
+## host's version, "" when Steam has not sent it yet).
+static func public_lobby_entry(lid: int, party: String, members: int, max_members: int, info: Dictionary = {}, build: String = Protocol.BUILD_ID) -> Dictionary:
+	return {"lobby": lid, "name": party if party.strip_edges() != "" else "Lobby", "members": members, "max": max_members if max_members > 0 else Protocol.MAX_PLAYERS, "info": info, "build": build}
+
+
+## Public lobbies of friends the search missed are added too (a friend's public lobby must always
+## be in BROWSE LOBBIES, whatever Steam's search returns), each lobby once.
+static func merge_friend_public(found: Array[Dictionary], friends: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = found.duplicate()
+	var ids: Dictionary[int, bool] = {}
+	for e: Dictionary in found:
+		ids[int(e["lobby"])] = true
+	for f: Dictionary in friends:
+		var lid: int = int(f["lobby"])
+		if ids.has(lid) or not bool(f.get("public", false)):
+			continue
+		if int(f.get("max", 0)) > 0 and int(f.get("members", 0)) >= int(f["max"]):
+			continue  # full: Steam's search leaves those out as well
+		ids[lid] = true
+		out.append(public_lobby_entry(lid, str(f.get("party", "")), int(f.get("members", 0)), int(f.get("max", 0)), f.get("info", {}), str(f.get("build", ""))))
+	return out
 
 
 func _on_lobby_chat_update(id: int, _changed: int, _making_change: int, _state: int) -> void:
