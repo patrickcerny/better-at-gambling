@@ -93,7 +93,8 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 				k.cylinder(at + Vector3(0, 0.178, 0), 0.075, 0.06, 0.02, OutfitMeshes.GOLD.lightened(0.25), 14)
 			k.prism(PackedVector2Array([Vector2(-0.07, -0.05), Vector2(0.07, -0.05), Vector2(0.0, 0.08)]), 0.04, Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), Vector3(0.12, 0.25, -0.17)), OutfitMeshes.WHITE)
 		&"hat_blast":
-			# Hair blown up by the bomb: a frizzy charred mop, embers glowing in it, a puff of smoke.
+			# Hair blown up by the bomb: a frizzy charred mop, embers glowing in it; smoke puffs and
+			# sparks keep rising out of it and fade (`spinners`).
 			var n: int = 46
 			for i: int in n:
 				var h: float = OutfitMeshes._hash(i, 1, 41)
@@ -105,9 +106,6 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 					continue  # keep the forehead clear
 				var s: float = lerpf(0.07, 0.11, h)
 				k.sphere(p, Vector3(s, s * 0.9, s), INK.darkened(0.35 * h) if h > 0.12 else OutfitMeshes._glow(OutfitMeshes.ORANGE, 0.55), 8, 4)
-			for i: int in 3:
-				var p := Vector3(-0.12 + float(i) * 0.13, 0.42 + 0.07 * float(i % 2), 0.05)
-				k.sphere(p, Vector3.ONE * (0.07 + 0.02 * float(i % 2)), Color("#8A8580"), 10, 5)
 		&"hat_consolation_crown":
 			# Last place still gets a crown: a gold one, a bit crooked, a red velvet cap inside and a
 			# big blue participation rosette pinned to the front.
@@ -248,9 +246,53 @@ static func _hat_mover(k: OutfitMeshKit, at: Vector3, axis_local: Vector3, speed
 	return {"mesh": k.commit(), "origin": hat * at, "axis": (hat.basis * axis_local).normalized(), "speed": speed, "path": path, "period": period}
 
 
+## Where greedy eyes look, in turn (x sideways, y up), each glance held a moment: ahead, one way,
+## the other, down at the money, up, and back.
+const GREEDY_LOOKS: Array[Vector2] = [Vector2(0, 0), Vector2(0, 0), Vector2(0.32, 0.04), Vector2(0.32, 0.04), Vector2(0.32, 0.04),
+	Vector2(-0.32, 0.04), Vector2(-0.32, 0.04), Vector2(-0.32, 0.04), Vector2(0.08, -0.3), Vector2(0.08, -0.3), Vector2(0.08, -0.3),
+	Vector2(-0.22, 0.22), Vector2(-0.22, 0.22), Vector2(0, 0)]
+
+
 static func spinners(id: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	match id:
+		&"eyes_bulging":
+			# The pupils dart round the bulging eyeballs (body space, like `eyes`).
+			var r: float = AvatarVisuals.EYE_RADIUS
+			for side: float in [-1.0, 1.0]:
+				var e: Vector3 = OutfitMeshes._eye_center(side)
+				var c := Vector3(e.x * 1.12, e.y + 0.01, e.z - r * 0.55)
+				var k := OutfitMeshKit.new()
+				k.sphere(Vector3.ZERO, Vector3(r * 0.55, r * 0.55, r * 0.2), OutfitMeshes.BLACK, 12, 6)
+				k.sphere(Vector3(0, 0, -r * 0.1), Vector3(r * 0.32, r * 0.32, r * 0.1), OutfitMeshes._glow(OutfitMeshes.GOLD, 0.4), 10, 5)
+				k.sphere(Vector3(r * 0.25, r * 0.26, -r * 0.15), Vector3.ONE * r * 0.1, OutfitMeshes.WHITE, 6, 3)
+				var origin: Vector3 = c + Vector3(0, -0.01, -r * 1.15)
+				var path := PackedVector3Array()
+				for look: Vector2 in GREEDY_LOOKS:
+					var dir := Vector3(look.x, look.y - 0.01 / (r * 1.15), -1.0).normalized()
+					path.append(c + dir * r * 1.15 - origin)
+				out.append({"mesh": k.commit(), "origin": origin, "axis": Vector3.UP, "speed": 0.0, "path": path, "period": 5.2})
+		&"hat_blast":
+			# Smoke puffs rise out of the singed hair, swell and fade; sparks fly up with them.
+			for i: int in 3:
+				var k := OutfitMeshKit.new()
+				k.sphere(Vector3.ZERO, Vector3.ONE * 0.08, Color("#8A8580"), 10, 5)
+				k.sphere(Vector3(0.05, 0.03, 0.02), Vector3.ONE * 0.055, Color("#9C978F"), 8, 4)
+				var x: float = -0.12 + float(i) * 0.12
+				var path := PackedVector3Array([Vector3.ZERO, Vector3(x * 0.3, 0.12, 0.0), Vector3(x * 0.6, 0.26, 0.02), Vector3(x * 0.8, 0.36, 0.03)])
+				var sp: Dictionary = _hat_mover(k, Vector3(x, 0.36, 0.04), Vector3.UP, 0.8 - 0.5 * float(i), path, 2.4)
+				sp["scales"] = PackedFloat32Array([0.3, 1.0, 1.15, 0.0])
+				sp["phase"] = float(i) / 3.0
+				out.append(sp)
+			for i: int in 4:
+				var k := OutfitMeshKit.new()
+				k.sphere(Vector3.ZERO, Vector3.ONE * 0.022, OutfitMeshes._glow(OutfitMeshes.ORANGE, 0.9), 6, 3)
+				var a: float = TAU * float(i) / 4.0 + 0.4
+				var path := PackedVector3Array([Vector3.ZERO, Vector3(sin(a) * 0.06, 0.1, cos(a) * 0.06), Vector3(sin(a) * 0.14, 0.17, cos(a) * 0.14)])
+				var sp: Dictionary = _hat_mover(k, Vector3(sin(a) * 0.12, 0.3, cos(a) * 0.1), Vector3.UP, 0.0, path, 1.3)
+				sp["scales"] = PackedFloat32Array([1.0, 0.8, 0.0])
+				sp["phase"] = float(i) / 4.0
+				out.append(sp)
 		&"hat_star":
 			var k := OutfitMeshKit.new()
 			k.prism(OutfitMeshKit.star_poly(5, 0.16, 0.07), 0.06, Transform3D.IDENTITY, OutfitMeshes.GOLD)
@@ -655,14 +697,11 @@ static func eyes(k: OutfitMeshKit, id: StringName) -> void:
 			for a: float in [0.6, -0.6]:
 				k.prism(OutfitMeshKit.rect_poly(0.06, 0.016), 0.006, place.rotated_local(Vector3.BACK, a), Color("#E3B48C"))
 		&"eyes_bulging":
-			# Greedy goggle eyes popping out, gold glints in the pupils.
+			# Greedy goggle eyes popping out, gold glints in the pupils, darting about after money.
 			for side: float in [-1.0, 1.0]:
 				var e: Vector3 = OutfitMeshes._eye_center(side)
 				var c := Vector3(e.x * 1.12, e.y + 0.01, e.z - r * 0.55)
-				k.sphere(c, Vector3.ONE * r * 1.25, OutfitMeshes.WHITE, 16, 10)
-				k.sphere(c + Vector3(0, -0.01, -r * 1.15), Vector3(r * 0.55, r * 0.55, r * 0.2), OutfitMeshes.BLACK, 12, 6)
-				k.sphere(c + Vector3(0, -0.01, -r * 1.25), Vector3(r * 0.32, r * 0.32, r * 0.1), OutfitMeshes._glow(OutfitMeshes.GOLD, 0.4), 10, 5)
-				k.sphere(c + Vector3(r * 0.25, r * 0.25, -r * 1.3), Vector3.ONE * r * 0.1, OutfitMeshes.WHITE, 6, 3)
+				k.sphere(c, Vector3.ONE * r * 1.25, OutfitMeshes.WHITE, 16, 10)  # the pupils move: `spinners`
 		&"eyes_loupe":
 			# A jeweller's loupe screwed into the right eye.
 			var e: Vector3 = OutfitMeshes._eye_center(-1.0)
