@@ -116,9 +116,16 @@ func _ready() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)
+	# Right gutter so values (70 %, 400 %) never touch the scrollbar.
+	var gutter := MarginContainer.new()
+	gutter.name = "ScrollGutter"
+	gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gutter.add_theme_constant_override(&"margin_right", 32)
+	gutter.add_theme_constant_override(&"margin_left", 4)
+	scroll.add_child(gutter)
 	var holder := VBoxContainer.new()
 	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(holder)
+	gutter.add_child(holder)
 	for t: String in TABS:
 		var page := VBoxContainer.new()
 		page.name = t.capitalize()

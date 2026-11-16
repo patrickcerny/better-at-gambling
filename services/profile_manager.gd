@@ -20,6 +20,10 @@ var persist: bool = true
 var steam_owned: Array[StringName] = []
 ## Developer mode's "every cosmetic" (`DevMode.set_unlock_all`), kept across `reload`, never saved.
 var dev_unlock_all: bool = false
+## Developer mode's "play as a normal player": the developer accounts' own-everything and the Steam
+## inventory are ignored until the game closes, so the shop, COLLECT and unlocks can be tested
+## (Patrick 2026-11-16: "The dev mode should also be able to remove skins etc"). Never saved.
+var dev_as_player: bool = false
 
 
 func _ready() -> void:
@@ -41,7 +45,7 @@ func reload() -> void:
 	var err: Error = profile.load_from(path) if persist else ERR_FILE_NOT_FOUND
 	if err != OK and err != ERR_FILE_NOT_FOUND:
 		Log.warn(&"profile", "could not load %s (error %d), starting fresh" % [path, err])
-	profile.steam_owned = steam_owned.duplicate()
+	profile.steam_owned = _visible_steam_owned()
 	profile.dev_all = dev_unlock_all
 	changed.emit()
 
@@ -63,8 +67,40 @@ func set_steam_owned(ids: Array[StringName]) -> void:
 	if ids == steam_owned:
 		return
 	steam_owned = ids.duplicate()
-	profile.steam_owned = steam_owned.duplicate()
+	profile.steam_owned = _visible_steam_owned()
 	changed.emit()
+
+
+## Developer mode: own only what this profile really has, Steam inventory hidden (on), or back to
+## normal (off). Takes off pieces that were only lent and saves.
+func set_dev_as_player(on: bool) -> void:
+	if on == dev_as_player:
+		return
+	dev_as_player = on
+	if on and dev_unlock_all:
+		dev_unlock_all = false
+		profile.dev_all = false
+	profile.steam_owned = _visible_steam_owned()
+	profile.sanitize()
+	save()
+	changed.emit()
+
+
+## Developer mode: a fresh profile (level 1, no Coins, nothing bought or collected, no stats),
+## saved. The Steam inventory and the dev switches stay as they are.
+func dev_reset_profile() -> void:
+	profile = PlayerProfile.new()
+	profile.steam_owned = _visible_steam_owned()
+	profile.dev_all = dev_unlock_all
+	save()
+	changed.emit()
+
+
+func _visible_steam_owned() -> Array[StringName]:
+	var out: Array[StringName] = []
+	if not dev_as_player:
+		out = steam_owned.duplicate()
+	return out
 
 
 func save() -> void:

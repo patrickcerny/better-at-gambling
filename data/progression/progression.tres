@@ -17,6 +17,6 @@ early_step = 35
 soft_cap_level = 10
 late_base = 450
 late_step = 50
-max_level = 99
+max_level = 100
 coins_per_xp = 0.1
 level_up_coins = 50

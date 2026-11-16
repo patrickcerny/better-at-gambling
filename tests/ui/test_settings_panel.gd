@@ -387,7 +387,15 @@ func test_controls_are_grouped_into_sections() -> void:
 
 func test_the_controls_tab_scrolls() -> void:
 	var page: VBoxContainer = panel.pages[SettingsPanel.TABS.find("CONTROLS")]
-	assert_true(page.get_parent().get_parent() is ScrollContainer, "a long tab scrolls")
+	assert_true(page.get_parent().get_parent().get_parent() is ScrollContainer, "a long tab scrolls")
+
+
+## Patrick: "more space on the side for the scroller its too packed".
+func test_the_pages_keep_a_gutter_from_the_scrollbar() -> void:
+	for page: VBoxContainer in panel.pages:
+		var gutter: Node = page.get_parent().get_parent()
+		assert_true(gutter is MarginContainer, "every tab sits inside the gutter")
+		assert_gte((gutter as MarginContainer).get_theme_constant(&"margin_right"), 24, "values keep clear of the scrollbar")
 
 
 ## Patrick: "Add More frame limits".

@@ -81,7 +81,12 @@ static func mesh(id: StringName) -> ArrayMesh:
 		k.xf = Transform3D(Basis(Vector3.RIGHT, HAT_TILT), HAT_BASE)
 		_hat(k, id)
 		if k.is_empty():
+			if PLATED.has(id):
+				k.xf = k.xf.translated_local(Vector3(0, PLATED[id][0], 0))
 			AchievementMeshes.hat(k, id)
+			if PLATED.has(id) and PLATED[id][1] > 0.0:
+				k.xf = Transform3D(Basis(Vector3.RIGHT, HAT_TILT), HAT_BASE)
+				_serving_plate(k, PLATED[id][1], PLATED[id][2])
 	elif s.begins_with("shirt_"):
 		_shirt(k, id)
 		if k.is_empty():
@@ -105,7 +110,10 @@ static func mesh(id: StringName) -> ArrayMesh:
 		if k.is_empty():
 			AchievementMeshes.eyes(k, id)
 	elif s.begins_with("mouth_"):
-		AchievementMeshes.mouth(k, id)  # mouth pieces that are objects (the shader draws the rest)
+		if id == Cigarette.ID:
+			Cigarette.build(k, Cigarette.pivot(), true)  # the still model; worn, it's a `Cigarette` node
+		else:
+			AchievementMeshes.mouth(k, id)  # mouth pieces that are objects (the shader draws the rest)
 	var m: ArrayMesh = null if k.is_empty() else k.commit()
 	if m != null and id == &"eyes_shades":
 		# A second, see-through surface: the tinted lenses (the eyes show through them).
@@ -133,16 +141,25 @@ static func lens_material() -> Material:
 	return _lens_material
 
 
+const SHADE_WIDE: float = 0.96
+
+
+## Centre of one of the shades' rims: out far enough that the two rims (and lenses) meet at the
+## nose without crossing, a little in front of the eyes.
+static func _shade_center(side: float) -> Vector3:
+	var e: Vector3 = _eye_center(side)
+	return Vector3(side * 0.156, e.y - 0.01, e.z - AvatarVisuals.EYE_RADIUS - 0.018)
+
+
 ## The shades' two lenses: ovals just inside the gold rims (nothing pokes out under the frame).
 static func _shade_lenses(k: OutfitMeshKit) -> void:
 	var r: float = AvatarVisuals.EYE_RADIUS
 	for side: float in [-1.0, 1.0]:
-		var e: Vector3 = _eye_center(side)
-		var p := Vector3(e.x * 1.1, e.y - 0.01, e.z - r - 0.016)
+		var p := _shade_center(side)
 		var oval := PackedVector2Array()
 		for i: int in 28:
 			var a: float = TAU * float(i) / 28.0
-			oval.append(Vector2(cos(a) * r * 1.1 * 1.05, sin(a) * r * 1.1 * 0.92))
+			oval.append(Vector2(cos(a) * r * 1.1 * SHADE_WIDE, sin(a) * r * 1.1 * 0.92))
 		k.prism(oval, 0.004, _facing(Vector3(0, 0, -1), p), Color.WHITE)
 
 
@@ -209,9 +226,36 @@ static func spinners(id: StringName) -> Array[Dictionary]:
 					var back: float = ang - 0.16 * float(j + 1)
 					k.sphere(Basis(Vector3.UP, back) * Vector3(0, 0, 0.47), Vector3.ONE * (0.016 - float(j) * 0.004), _glow(CREAM, 0.6), 6, 3)
 			out.append(_hat_spinner(k, Vector3(0, 0.3, 0), 1.3))
-	out.append_array(AchievementMeshes.spinners(id))
+	for sp: Dictionary in AchievementMeshes.spinners(id):
+		if PLATED.has(id):  # lifted onto its plate with the hat
+			sp["origin"] = sp["origin"] + Basis(Vector3.RIGHT, HAT_TILT) * Vector3(0, PLATED[id][0], 0)
+		out.append(sp)
 	_spin_cache[id] = out
 	return out
+
+
+## Hats with a flat base that would sit on the round top of the head on a single point: they stand
+## on a little serving plate instead. [lift onto the plate, plate radius (0: no plate, only the
+## lift), plate depth scale (1 round, less an oval platter)].
+const PLATED: Dictionary = {
+	&"hat_card_house": [0.06, 0.27, 0.62],
+	&"hat_full_house": [0.08, 0.27, 0.9],
+	&"hat_plinko": [0.096, 0.36, 0.38],
+	&"hat_tray": [-0.02, 0.0, 1.0],  # the tray is its own plate: only set down onto the head
+}
+## Top of a serving plate, in hat space (the head's crown is at about y 0.2).
+const PLATE_TOP: float = 0.258
+
+
+## A porcelain cake stand on the crown: a small foot on the head, a short stem, the plate with a
+## gold rim. Its top is at `PLATE_TOP`.
+static func _serving_plate(k: OutfitMeshKit, radius: float, depth: float) -> void:
+	var oval := Basis.from_scale(Vector3(1.0, 1.0, depth))
+	k.cylinder(Vector3(0, 0.198, 0), 0.075, 0.09, 0.02, WHITE.darkened(0.04), 18)
+	k.torus(Vector3(0, 0.206, 0), 0.07, 0.09, GOLD, 18)
+	k.cylinder(Vector3(0, 0.226, 0), 0.03, 0.045, 0.04, WHITE, 12)
+	k.cylinder(Vector3(0, PLATE_TOP - 0.011, 0), radius, radius * 0.72, 0.022, WHITE, 28, oval)
+	k.torus(Vector3(0, PLATE_TOP - 0.002, 0), radius - 0.018, radius + 0.008, GOLD, 28, oval)
 
 
 static func _hat_spinner(k: OutfitMeshKit, at: Vector3, speed: float) -> Dictionary:
@@ -1343,6 +1387,43 @@ static var _cape_bottoms: Dictionary = {}
 
 
 ## Where cape `id`'s cloth point (u across, v down) rests, in body space (`CapeCloth`).
+static var _spread_cache: Dictionary = {}
+
+
+## How much wider than normal cape `cape_id` has to hang (scaled out from the body's axis, x and
+## z) so that none of `pieces` (the worn shirt and trousers) pokes through it from behind: 1.0 for
+## everything that hugs the bean, more for a barrel (Patrick 2026-11-16: "the barrel eg. clips").
+## Read from the pieces' meshes; 1.0 without mesh data (headless).
+static func cape_spread(cape_id: StringName, pieces: Array[StringName]) -> float:
+	var key: String = "%s|%s" % [cape_id, ",".join(PackedStringArray(pieces))]
+	if _spread_cache.has(key):
+		return _spread_cache[key]
+	var spread: float = 1.0
+	var y_top: float = (CAPE_TOP_T - 0.5) * AvatarVisuals.BODY_HEIGHT
+	var bottom: float = cape_rest(cape_id, 0.5, 1.0).y
+	for id: StringName in pieces:
+		var m: ArrayMesh = mesh(id) if id != &"" else null
+		if m == null:
+			continue
+		for si: int in m.get_surface_count():
+			var arrays: Array = m.surface_get_arrays(si)
+			if arrays.is_empty() or arrays[Mesh.ARRAY_VERTEX] == null:
+				continue
+			for p: Vector3 in (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+				if p.y > y_top or p.y < bottom or p.z <= 0.05:
+					continue  # only what is behind the bean, under the cape
+				var v: float = clampf((y_top - p.y) / maxf(y_top - bottom, 0.01), 0.0, 1.0)
+				var c: Vector3 = cape_rest(cape_id, 0.5, v)
+				var edge: Vector3 = cape_rest(cape_id, 0.0, v)
+				if absf(p.x) > absf(edge.x) * 0.85 or c.z <= 0.05:
+					continue  # out at the sides, past the cape's edge
+				# The cape's sheet at this height, spread out to clear the piece by 2.5 cm.
+				spread = maxf(spread, (p.z + 0.025) / c.z)
+	spread = minf(spread, 1.6)
+	_spread_cache[key] = spread
+	return spread
+
+
 static func cape_rest(id: StringName, u: float, v: float) -> Vector3:
 	if not _cape_bottoms.has(id):
 		mesh(id)
@@ -1750,8 +1831,9 @@ static func _glasses(k: OutfitMeshKit, id: StringName) -> void:
 			var c := Color("#5A3A24")
 			for side: float in [-1.0, 1.0]:
 				var e: Vector3 = _eye_center(side)
-				var p := Vector3(e.x * 1.08, e.y, e.z - r - 0.012)
-				k.torus(p, r * 1.0, r * 1.16, c, 22, face)
+				# Centred out far enough that the two round rims just meet at the nose, not cross.
+				var p := Vector3(side * 0.15, e.y, e.z - r - 0.012)
+				k.torus(p, r * 1.0, r * 1.12, c, 22, face)
 				k.cylinder(Vector3(side * (absf(p.x) + r * 1.1), e.y + 0.02, p.z + 0.08), 0.01, 0.01, 0.17, c, 6, Basis(Vector3.RIGHT, PI * 0.5) * Basis(Vector3.BACK, side * 0.4))
 			var bridge_y: float = _eye_center(1.0).y + 0.045
 			k.cylinder(Vector3(0, bridge_y, _eye_center(1.0).z - r - 0.02), 0.011, 0.011, 0.07, c, 6, Basis(Vector3.BACK, PI * 0.5))
@@ -1771,11 +1853,12 @@ static func _glasses(k: OutfitMeshKit, id: StringName) -> void:
 			# The tinted lenses are their own see-through surface (`shade_lenses`), inside the rims.
 			for side: float in [-1.0, 1.0]:
 				var e: Vector3 = _eye_center(side)
-				var p := Vector3(e.x * 1.1, e.y - 0.01, e.z - r - 0.016)
-				k.torus(p, r * 1.1, r * 1.2, GOLD, 22, face * Basis.from_scale(Vector3(1.05, 1.0, 0.92)))
+				var p := _shade_center(side)
+				k.torus(p, r * 1.1, r * 1.2, GOLD, 22, face * Basis.from_scale(Vector3(SHADE_WIDE, 1.0, 0.92)))
 				k.cylinder(Vector3(side * (absf(p.x) + r * 1.2), e.y + 0.02, p.z + 0.08), 0.008, 0.008, 0.17, GOLD, 6, Basis(Vector3.RIGHT, PI * 0.5) * Basis(Vector3.BACK, side * 0.4))
-			var top_y: float = _eye_center(1.0).y + r * 0.95
-			k.cylinder(Vector3(0, top_y, _eye_center(1.0).z - r - 0.02), 0.008, 0.008, 0.12, GOLD, 6, Basis(Vector3.BACK, PI * 0.5))
+			# A short bridge where the two rims meet over the nose.
+			var c: Vector3 = _shade_center(1.0)
+			k.cylinder(Vector3(0, c.y + 0.035, c.z), 0.008, 0.008, 0.045, GOLD, 6, Basis(Vector3.BACK, PI * 0.5))
 
 
 static var _pupil_cache: Dictionary = {}
