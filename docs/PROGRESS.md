@@ -93,6 +93,12 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.10.22 Click the wheel to spin
+- Patrick: "be able to click the wheel to spin it". A click on the Daily Spin wheel (rim included) spins
+  it like SPIN while a spin is free; the hand cursor shows when it can.
+- Checked Patrick's rule "no money or level locked skins": the mystery piece only draws red-Coin shop
+  pieces (no Gold, no level pass, no skins); the only skin is the wheel-only Fortune. A test locks it in.
+
 ### 2026-11-16 / 0.10.2 Daily Spin only as the big button
 - Patrick: the DAILY SPIN entry in the main menu list goes; only the big wheel button above the corner
   buttons stays (it opens the wheel, shines when a spin is free, counts down otherwise).

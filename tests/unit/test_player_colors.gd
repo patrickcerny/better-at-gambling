@@ -1,5 +1,5 @@
 extends GutTest
-## PlayerColors: everything colour-coded per player uses their bean or skin colour, kept apart.
+## PlayerColors: everything colour-coded per player uses the bean colour they picked, kept apart.
 
 const SKIN_SLOT: int = 5  # CosmeticDef.OUTFIT_KINDS: hat, shirt, pants, cape, boots, skin, ...
 
@@ -19,9 +19,10 @@ func test_own_colour_is_the_bean_colour_not_the_slot_colour() -> void:
 	assert_eq(PlayerColors.own(p), Palette.player_color(11), "bean colour wins over slot colour")
 
 
-func test_own_colour_of_an_animated_skin_is_its_dominant_colour() -> void:
-	var p: Dictionary = {"color": 0, "bean_color": 1, "outfit": _outfit_with_skin("skin_lava")}
-	assert_eq(PlayerColors.own(p), ToonMaterial.skin_flat(&"skin_lava"))
+func test_an_animated_skin_keeps_the_picked_bean_colour() -> void:
+	# The dev skin's flat colour is near-black: the pedestals looked empty (Patrick 2026-11-16).
+	var p: Dictionary = {"color": 0, "bean_color": 6, "outfit": _outfit_with_skin("skin_the_house")}
+	assert_eq(PlayerColors.own(p), Palette.player_color(6), "the colour the player picked")
 
 
 func test_players_far_apart_keep_their_own_colours() -> void:
@@ -31,11 +32,10 @@ func test_players_far_apart_keep_their_own_colours() -> void:
 
 
 func test_close_colours_are_told_apart() -> void:
-	# Cream and Champagne beans, and two players in the same skin.
+	# Cream and Champagne beans, Yellow and Gold, Orange.
 	var players: Dictionary = {
 		1: {"color": 0, "bean_color": 7}, 2: {"color": 1, "bean_color": 23},
-		3: {"color": 2, "bean_color": 2, "outfit": _outfit_with_skin("skin_gold")},
-		4: {"color": 3, "bean_color": 3, "outfit": _outfit_with_skin("skin_gold")},
+		3: {"color": 2, "bean_color": 3}, 4: {"color": 3, "bean_color": 15}, 5: {"color": 4, "bean_color": 0},
 	}
 	var all: Dictionary = PlayerColors.of_all(players)
 	assert_eq(all[1], Palette.player_color(7), "the first player keeps theirs")

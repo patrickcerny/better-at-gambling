@@ -56,8 +56,8 @@ var cosmetics: CosmeticsPanel
 var profile_badge: ProfileBadge
 var level_pass: LevelPassPanel
 var how_to_play: HowToPlayPanel
-## DEV MODE under TUTORIAL and the panel it opens: only for Patrick's Steam account (`DevMode`);
-## for everyone else neither exists.
+## The small dev button (bottom right, `DevButton`) and the Dev Dashboard it opens: only for
+## Patrick's Steam account (`DevMode`); for everyone else neither exists.
 var dev_entry: Button
 var dev_panel: DevPanel
 ## The prize wheel the big Daily Spin button opens (`DailySpinPanel`).
@@ -373,29 +373,33 @@ func _build_lists() -> void:
 	SteamSvc.public_lobbies_received.connect(_on_public_lobbies)
 
 
-## Developer mode (Patrick only): DEV MODE under TUTORIAL and its panel.
+## Developer mode (Patrick only): the small "</>" corner button above the trophy, left of the
+## Daily Spin wheel (Patrick 2026-11-16), and the Dev Dashboard it opens.
 func _build_dev() -> void:
-	dev_entry = Button.new()
-	dev_entry.name = "DevMode"
-	dev_entry.text = "DEV MODE"
-	dev_entry.custom_minimum_size = _tutorial.custom_minimum_size
-	dev_entry.alignment = _tutorial.alignment
-	dev_entry.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
-	_main_box.add_child(dev_entry)
-	_main_box.move_child(dev_entry, _tutorial.get_index() + 1)
 	dev_panel = DevPanel.new()
-	dev_panel.visible = false
-	_column.add_child(dev_panel)
+	add_child(dev_panel)
+	dev_entry = DevButton.new()
+	dev_entry.name = "DevMode"
+	dev_entry.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	# Right-aligned with the trophy, its bottom level with the wheel's.
+	dev_entry.offset_right = -80.0 - 3.0 * GearButton.SIZE
+	dev_entry.offset_left = dev_entry.offset_right - DevButton.SMALL
+	dev_entry.offset_bottom = -48.0 - GearButton.SIZE
+	dev_entry.offset_top = dev_entry.offset_bottom - DevButton.SMALL
+	dev_entry.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	dev_entry.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(dev_entry)
+	move_child(dev_entry, trophy_button.get_index())  # with the corner buttons, under every panel
 	dev_entry.pressed.connect(func() -> void:
 		if _busy:
 			return
 		_settings.close()
 		cosmetics.close()
-		_hide_boxes()
+		level_pass.close()
 		dev_panel.open())
 	dev_panel.closed.connect(func() -> void:
-		_show_main()
-		dev_entry.grab_focus())
+		if dev_entry.is_visible_in_tree():
+			dev_entry.grab_focus())
 	dev_panel.practice_requested.connect(start_dev_practice)
 
 
@@ -437,7 +441,7 @@ func _hide_boxes() -> void:
 	_set_corner_visible(true)
 	how_to_play.visible = false
 	if dev_panel != null:
-		dev_panel.visible = false
+		dev_panel.close()
 
 
 func _show_online() -> void:
@@ -483,7 +487,7 @@ func _back_to_online(opener: Button) -> void:
 
 ## The profile line and the corner buttons step aside while a full-screen lobby list is open.
 func _set_corner_visible(on: bool) -> void:
-	for c: Control in [profile_badge, _settings_button, cosmetics_button, help_button, trophy_button, daily_button]:
+	for c: Control in [profile_badge, _settings_button, cosmetics_button, help_button, trophy_button, daily_button, dev_entry]:
 		if c != null:
 			c.visible = on
 
