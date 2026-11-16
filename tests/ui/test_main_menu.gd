@@ -310,7 +310,8 @@ func test_trophy_opens_leaderboards_and_stats() -> void:
 	await wait_process_frames(2)
 	assert_true(panel.stats_page.visible)
 	assert_false(panel.boards_page.visible)
-	assert_gt(panel.stats_grid.get_child_count(), 20)
+	assert_eq(panel.stats_grid.get_child_count(), LeaderboardPanel.STAT_GROUPS.size(), "the stats in cards")
+	assert_eq(panel.stat_values.size(), LeaderboardPanel.stat_lines(ProfileManager.profile).size(), "every line in a card")
 	panel.close()
 	assert_false(panel.visible)
 
