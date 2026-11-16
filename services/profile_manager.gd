@@ -135,6 +135,35 @@ func spin_local(now: int, r: float = randf()) -> Dictionary:
 	return {"index": i, "coins": got["coins"], "piece": got["piece"], "gold": 0}
 
 
+## Collects a reward from the shop's COLLECT tab (`PlayerProfile.collect`) and saves.
+func collect(id: StringName) -> bool:
+	if not profile.collect(id):
+		return false
+	save()
+	changed.emit()
+	return true
+
+
+## Collects everything the COLLECT tab holds. Returns what was collected.
+func collect_all() -> Array[StringName]:
+	var got: Array[StringName] = []
+	for id: StringName in profile.collectable():
+		if profile.collect(id):
+			got.append(id)
+	if not got.is_empty():
+		save()
+		changed.emit()
+	return got
+
+
+## Achievements Steam says this player holds (`SteamSvc.sync_achievements`): their rewards wait in
+## the COLLECT tab.
+func note_achieved(ids: Array[StringName]) -> void:
+	if profile.note_achieved(ids):
+		save()
+		changed.emit()
+
+
 ## Buys a cosmetic (see `PlayerProfile.buy`); &"" on success.
 func buy(id: StringName) -> StringName:
 	var err: StringName = profile.buy(id)

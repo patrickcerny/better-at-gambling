@@ -30,10 +30,13 @@ const KIND_TITLES: Dictionary = {
 	CosmeticDef.KIND_COLOR: "SKINS", CosmeticDef.KIND_SKIN: "SKINS", CosmeticDef.KIND_HAT: "HATS",
 	CosmeticDef.KIND_SHIRT: "SHIRTS", CosmeticDef.KIND_PANTS: "TROUSERS", CosmeticDef.KIND_CAPE: "CAPES",
 	CosmeticDef.KIND_BOOTS: "BOOTS", CosmeticDef.KIND_EYES: "EYES", CosmeticDef.KIND_MOUTH: "MOUTHS",
-	CosmeticDef.KIND_BEARD: "BEARDS", KIND_PACK: "PACKS", KIND_COINS: "GOLD",
+	CosmeticDef.KIND_BEARD: "BEARDS", KIND_PACK: "PACKS", KIND_COINS: "GOLD", KIND_COLLECT: "COLLECT",
 }
 ## The packs tab's key (not a `CosmeticDef` kind).
 const KIND_PACK: StringName = &"pack"
+## The COLLECT page's key: achievement rewards, level-pass pieces and Daily Spin wins to collect
+## (Patrick 2026-11-16: "There should be a collect stuff (from wheel achievements etc) in the shop").
+const KIND_COLLECT: StringName = &"collect"
 ## The coins page's key (opened by the + next to the wallet; no tab icon).
 const KIND_COINS: StringName = &"coins"
 ## The piece each tab's icon shows.
@@ -41,7 +44,7 @@ const TAB_ICONS: Dictionary = {
 	CosmeticDef.KIND_COLOR: &"skin_rainbow", CosmeticDef.KIND_SKIN: &"skin_rainbow", CosmeticDef.KIND_HAT: &"hat_top",
 	CosmeticDef.KIND_SHIRT: &"shirt_tux", CosmeticDef.KIND_PANTS: &"pants_jeans", CosmeticDef.KIND_CAPE: &"cape_hero",
 	CosmeticDef.KIND_BOOTS: &"boots_sneakers", CosmeticDef.KIND_EYES: &"eyes_star", CosmeticDef.KIND_MOUTH: &"mouth_tongue",
-	CosmeticDef.KIND_BEARD: &"beard_full", KIND_PACK: &"pack_royal",
+	CosmeticDef.KIND_BEARD: &"beard_full", KIND_PACK: &"pack_royal", KIND_COLLECT: &"hat_trophy",
 }
 const MUTED := Color("#B9A98C")
 
@@ -106,6 +109,12 @@ var wardrobe: PanelContainer
 ## Kind -> its slot in the WEARING column.
 var slots: Dictionary[StringName, Button] = {}
 var stage: PanelContainer
+## The COLLECT page: its tiles (id -> tile), the grid, COLLECT ALL, the empty note, the tab's dot.
+var collect_tiles: Dictionary[StringName, Button] = {}
+var collect_grid: GridContainer
+var collect_all_button: Button
+var collect_note: Label
+var collect_dot: NotifyDot
 ## How many featured cards the shop shows.
 const FEATURED: int = 3
 
@@ -321,6 +330,7 @@ func _ready() -> void:
 		tab_row.add_child(_tab_button(kind, tabs.get_tab_count() - 1))
 		if kind == CosmeticDef.KIND_COLOR:
 			tab_buttons[CosmeticDef.KIND_SKIN] = tab_buttons[kind]
+	_build_collect_page(tab_row)
 	if not shop.packs.is_empty():
 		var pgrid: GridContainer = _grid_tab(str(KIND_TITLES[KIND_PACK]))
 		for k: CosmeticPack in shop.packs:
@@ -784,6 +794,9 @@ func select(id: StringName) -> void:
 		trying[d.kind] = id
 		_one_look(d)
 	status_label.text = ""
+	if d != null and d.achievement != &"" and not ProfileManager.profile.owns(id) and not ProfileManager.profile.can_collect(id):
+		var ach: Array = achievement_text(d.achievement)
+		status_label.text = "Achievement reward: unlock \"%s\" (%s) to get it." % [ach[0], ach[1]]
 	if preview != null:
 		preview.face(d != null and d.kind == CosmeticDef.KIND_CAPE)
 		preview.focus(d.kind if d != null else &"")
@@ -1043,6 +1056,11 @@ func press_action() -> void:
 	if d == null:
 		return
 	var p: PlayerProfile = ProfileManager.profile
+	if p.can_collect(d.id) and not p.owns(d.id):
+		collect(d.id)
+		return
+	if p.can_collect(d.id):
+		ProfileManager.collect(d.id)  # owned already (level pass, Daily Spin): wearing it collects it
 	if not p.owns(d.id) and d.premium():
 		_buy_with_gold(d.display_name, d.steam_item, d.gold)
 		return
@@ -1109,6 +1127,9 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 		label.text = "FREE" if d.is_free() else ("DEVELOPER" if d.dev_only else ("JACKPOT" if d.wheel_only else "OWNED"))
 	elif d.premium():
 		label.text = Hud._thousands(d.gold)
+	elif d.achievement != &"":
+		label.text = "COLLECT" if p.can_collect(d.id) else "ACHIEVEMENT"
+		coin.visible = false
 	elif d.wheel_only:
 		label.text = "DAILY SPIN"
 		coin.visible = false
@@ -1150,7 +1171,7 @@ func _refresh() -> void:
 			(badge as Control).visible = d != null and not p.owns(id)
 		# Out of reach for now (level not reached and no Coins price, or too few Coins): a lock in
 		# the corner, the picture stays bright (a dimmed bean read as a broken one).
-		var locked: bool = d != null and not p.owns(id) and not _can_get_now(p, d)
+		var locked: bool = d != null and not p.owns(id) and not _can_get_now(p, d) and not p.can_collect(id)
 		var lock: Control = b.get_node_or_null("Lock") as Control
 		if lock != null:
 			lock.visible = locked
@@ -1169,6 +1190,7 @@ func _refresh() -> void:
 			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
 		else:
 			_show_pack_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, shop.find_pack(id))
+	_refresh_collect(p)
 	_refresh_look(p)
 	_refresh_places(p)
 	var pack: CosmeticPack = shop.find_pack(selected)
@@ -1206,6 +1228,8 @@ func _refresh() -> void:
 		item_kind.text = "ANIMATED SKIN"
 	if sel.level > 0 and not p.owns(sel.id):
 		item_kind.text += " · FREE AT LEVEL %d" % sel.level
+	if sel.achievement != &"":
+		item_kind.text += " · ACHIEVEMENT: %s" % str(achievement_text(sel.achievement)[0]).to_upper()
 	price_row.visible = true
 	_show_price(price_label, price_coin, p, sel)
 	if inventory and p.owns(sel.id):
@@ -1214,7 +1238,12 @@ func _refresh() -> void:
 	action_button.disabled = false
 	action_button.visible = true
 	steam_button.visible = false
-	if not p.owns(sel.id) and sel.premium():
+	if not p.owns(sel.id) and p.can_collect(sel.id):
+		action_button.text = "COLLECT"
+	elif not p.owns(sel.id) and sel.achievement != &"":
+		action_button.text = "ACHIEVEMENT REWARD"
+		action_button.disabled = true
+	elif not p.owns(sel.id) and sel.premium():
 		if not SteamSvc.is_available():
 			action_button.text = "GOLD NEEDS STEAM"
 			action_button.disabled = true
@@ -1283,7 +1312,7 @@ func _refresh_look(p: PlayerProfile) -> void:
 	if to_buy > 0:
 		look_label.text += " · %s COINS TOGETHER" % Hud._thousands(total)
 	if unbuyable > 0:
-		look_label.text += " · %d NEED GOLD OR A LEVEL" % unbuyable
+		look_label.text += " · %d NOT FOR COINS" % unbuyable
 	look_button.visible = true
 	if to_buy > 0:
 		look_button.text = "BUY ALL · %s" % Hud._thousands(total)
@@ -1345,6 +1374,154 @@ func _show_steam_button(on: bool, def: int, cents: int, verb: String) -> void:
 	steam_button.tooltip_text = "" if SteamSvc.is_available() else "Needs Steam running"
 
 
+## The COLLECT page and its icon tab (with the red dot): COLLECT ALL over a grid of what waits.
+func _build_collect_page(tab_row: Container) -> void:
+	var page := VBoxContainer.new()
+	page.name = KIND_TITLES[KIND_COLLECT]
+	page.add_theme_constant_override(&"separation", 12)
+	tabs.add_child(page)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override(&"separation", 14)
+	page.add_child(head)
+	collect_note = Label.new()
+	collect_note.name = "Note"
+	collect_note.theme_type_variation = &"SmallLabel"
+	collect_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	collect_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	collect_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	head.add_child(collect_note)
+	collect_all_button = Button.new()
+	collect_all_button.name = "CollectAll"
+	collect_all_button.text = "COLLECT ALL"
+	collect_all_button.custom_minimum_size = Vector2(220, 48)
+	collect_all_button.pressed.connect(collect_all)
+	head.add_child(collect_all_button)
+	var scroll := ScrollContainer.new()
+	scroll.name = "Scroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_child(scroll)
+	collect_grid = GridContainer.new()
+	collect_grid.name = "Grid"
+	collect_grid.columns = COLUMNS
+	collect_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	collect_grid.add_theme_constant_override(&"h_separation", 14)
+	collect_grid.add_theme_constant_override(&"v_separation", 14)
+	scroll.add_child(collect_grid)
+	var tab: Button = _tab_button(KIND_COLLECT, tabs.get_tab_count() - 1)
+	tab.tooltip_text = "Collect: achievement rewards, level-pass pieces and Daily Spin wins"
+	tab_row.add_child(tab)
+	tab_row.move_child(tab, 0)  # first: that's where the red dot leads
+	collect_dot = NotifyDot.attach(tab)
+
+
+## [name, description] of achievement `id` (`Achievements.DEFS`); one not in this build is hidden.
+static func achievement_text(id: StringName) -> Array:
+	var def: Variant = Achievements.DEFS.get(id, null)
+	if def is Array and (def as Array).size() >= 2:
+		return [str(def[0]), str(def[1])]
+	return ["???", "a hidden achievement"]
+
+
+## Where a reward in the COLLECT tab comes from.
+static func collect_source(d: CosmeticDef) -> String:
+	if d.achievement != &"":
+		return str(achievement_text(d.achievement)[0]).to_upper()
+	if d.level > 0:
+		return "LEVEL %d" % d.level
+	return "DAILY SPIN"
+
+
+## A COLLECT tile: the piece's picture, its name, where it comes from; a click collects it.
+func _collect_tile(d: CosmeticDef) -> Button:
+	var b := Button.new()
+	b.name = String(d.id)
+	b.custom_minimum_size = TILE
+	var from: String = ("achievement \"%s\"" % achievement_text(d.achievement)[0]) if d.achievement != &"" else collect_source(d).capitalize()
+	b.tooltip_text = "%s (%s): click to collect" % [d.display_name, from]
+	b.clip_contents = true
+	SettingsPanel.style_tab(b)
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
+		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
+		sb.set_corner_radius_all(18)
+		b.add_theme_stylebox_override(st, sb)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override(&"separation", 2)
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 10)
+	b.add_child(box)
+	var pic := TextureRect.new()
+	pic.name = "Picture"
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.texture = CosmeticThumbnails.texture_for(d.id)
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(pic)
+	for line: Array in [[d.display_name.to_upper(), &"", Palette.CREAM], [collect_source(d), &"SmallLabel", MUTED], ["COLLECT", &"SmallLabel", Palette.VIP_GOLD]]:
+		var l := Label.new()
+		l.text = str(line[0])
+		l.theme_type_variation = line[1]
+		l.add_theme_color_override(&"font_color", line[2])
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		l.clip_text = true
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(l)
+	b.pressed.connect(collect.bind(d.id))
+	return b
+
+
+## Rebuilds the COLLECT grid when what waits has changed; sets the dot and COLLECT ALL.
+func _refresh_collect(p: PlayerProfile) -> void:
+	if collect_grid == null:
+		return
+	var ids: Array[StringName] = p.collectable()
+	collect_dot.count = ids.size()
+	collect_all_button.visible = ids.size() > 1
+	collect_note.text = ("Rewards waiting for you: achievements, level-pass pieces and Daily Spin wins. Click one to collect it." if not ids.is_empty()
+		else "Nothing to collect right now. Every achievement unlocks a piece you can't buy: they land here, with new level-pass pieces and Daily Spin wins.")
+	if Array(ids) == collect_tiles.keys():
+		return
+	var focus: Control = collect_grid.get_viewport().gui_get_focus_owner() if collect_grid.is_inside_tree() else null
+	var had_focus: bool = focus != null and collect_grid.is_ancestor_of(focus)
+	for t: Node in collect_grid.get_children():
+		collect_grid.remove_child(t)
+		t.queue_free()
+	collect_tiles.clear()
+	for id: StringName in ids:
+		var t: Button = _collect_tile(shop.find(id))
+		collect_grid.add_child(t)
+		collect_tiles[id] = t
+	_fit_columns.call_deferred()
+	if had_focus:
+		if not ids.is_empty():
+			collect_tiles[ids[0]].grab_focus.call_deferred()
+		else:
+			tab_buttons[KIND_COLLECT].grab_focus.call_deferred()
+
+
+## Collects `id` from the COLLECT tab and tries it on.
+func collect(id: StringName) -> void:
+	var d: CosmeticDef = shop.find(id)
+	if d == null or not ProfileManager.collect(id):
+		return
+	Audio.play(&"cash_register", &"UI", -6.0)
+	select(id)
+	status_label.text = "Collected %s! It's in your cosmetics now: WEAR puts it on." % d.display_name
+
+
+## Collects everything the COLLECT tab holds.
+func collect_all() -> void:
+	var got: Array[StringName] = ProfileManager.collect_all()
+	if got.is_empty():
+		return
+	Audio.play(&"cash_register", &"UI", -6.0)
+	select(got[got.size() - 1])
+	status_label.text = "Collected %d rewards! They're in your cosmetics now." % got.size()
+
+
 ## As many tile columns as fit.
 func _fit_columns() -> void:
 	if tabs == null:
@@ -1352,7 +1529,7 @@ func _fit_columns() -> void:
 	var w: float = tabs.size.x - 24.0
 	var cols: int = clampi(int(floor((w + 14.0) / (TILE.x + 14.0))), 2, 8)
 	for scroll: Node in tabs.get_children():
-		var grid: GridContainer = scroll.get_node_or_null("Grid") as GridContainer
+		var grid: GridContainer = scroll.find_child("Grid", true, false) as GridContainer
 		if grid != null:
 			grid.columns = cols
 			# The tiles share the whole width (no empty strip to the right).
@@ -1414,6 +1591,8 @@ func open(as_inventory: bool = false) -> void:
 	visible = true
 	var sel: CosmeticDef = shop.find(selected)
 	show_kind(sel.kind if sel != null else (KIND_PACK if shop.find_pack(selected) != null else CosmeticDef.KIND_COLOR))
+	if not p.collectable().is_empty():
+		show_kind(KIND_COLLECT)  # rewards are waiting: the red dot brought the player here
 	_fit_columns.call_deferred()
 	if tiles.has(selected):
 		tiles[selected].grab_focus()

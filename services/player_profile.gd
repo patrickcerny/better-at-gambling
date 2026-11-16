@@ -48,6 +48,14 @@ var lifetime: Dictionary[StringName, int] = {}
 var applied: Array[String] = []
 ## The last Daily Spin (unix seconds, Steam's clock when Steam runs; 0 = never), `DailyWheel`.
 var daily_last: int = 0
+## Achievements this player holds (from Steam, `SteamSvc.sync_achievements`), so their rewards can
+## be collected (Patrick 2026-11-16: "Each achievement should also unlock something").
+var achieved: Array[StringName] = []
+## Rewards collected in the shop's COLLECT tab: achievement pieces (only owned once collected) and
+## level-pass pieces (owned from their level on; collecting just takes them out of the tab).
+var collected: Array[StringName] = []
+## Daily Spin pieces won but not looked at in the COLLECT tab yet (owned already).
+var unseen: Array[StringName] = []
 
 var config: ProgressionConfig
 var shop: CosmeticShop
@@ -82,7 +90,51 @@ func owns(id: StringName) -> bool:
 	var d: CosmeticDef = shop.find(id)
 	if d != null and d.dev_only:
 		return DevMode.dev_skins()
-	return d != null and (dev_all or DevMode.all_cosmetics() or d.is_free() or (d.level > 0 and level >= d.level) or id in owned or id in steam_owned)
+	return d != null and (dev_all or DevMode.all_cosmetics() or d.is_free() or (d.level > 0 and level >= d.level) or id in owned or id in steam_owned or (d.achievement != &"" and id in collected))
+
+
+## What waits in the shop's COLLECT tab (Patrick 2026-11-16: "There should be a collect stuff (from
+## wheel achievements etc) in the shop"), in shop order: achievement rewards whose achievement this
+## player holds (also ones earned before rewards existed), level-pass pieces reached and Daily Spin
+## pieces won. The menu's shop buttons show how many.
+func collectable() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for d: CosmeticDef in shop.items:
+		if can_collect(d.id):
+			out.append(d.id)
+	return out
+
+
+func can_collect(id: StringName) -> bool:
+	var d: CosmeticDef = shop.find(id)
+	if d == null or id in collected:
+		return false
+	if d.achievement != &"":
+		return d.achievement in achieved
+	if d.level > 0 and level >= d.level and not id in owned and not id in steam_owned:
+		return true
+	return id in unseen
+
+
+## Collects `id` from the COLLECT tab. Returns whether it was there.
+func collect(id: StringName) -> bool:
+	if not can_collect(id):
+		return false
+	var d: CosmeticDef = shop.find(id)
+	unseen.erase(id)
+	if d.achievement != &"" or d.level > 0:
+		collected.append(id)
+	return true
+
+
+## Adds achievements this player holds. Returns whether any was new.
+func note_achieved(ids: Array[StringName]) -> bool:
+	var fresh: bool = false
+	for id: StringName in ids:
+		if id != &"" and not id in achieved:
+			achieved.append(id)
+			fresh = true
+	return fresh
 
 
 ## Whether every piece of pack `pack` is owned.
@@ -138,6 +190,7 @@ func add_wheel_prize(kind: StringName, amount: int, piece: StringName = &"") -> 
 		var d: CosmeticDef = shop.find(piece)
 		if d != null and d.coin_buyable() and not owns(piece):
 			owned.append(piece)
+			unseen.append(piece)
 			return {"coins": 0, "piece": piece}
 		return {"coins": add_coins(DailyWheel.PIECE_FALLBACK_COINS), "piece": &""}
 	return {"coins": 0, "piece": &""}
@@ -277,6 +330,9 @@ func to_config(cfg: ConfigFile) -> void:
 	for key: StringName in LIFETIME_KEYS:
 		cfg.set_value("lifetime", String(key), int(lifetime.get(key, 0)))
 	cfg.set_value("daily", "last_spin", daily_last)
+	cfg.set_value("rewards", "achieved", _strings(achieved))
+	cfg.set_value("rewards", "collected", _strings(collected))
+	cfg.set_value("rewards", "unseen", _strings(unseen))
 
 
 ## Reads a profile back and makes it sane (see `sanitize`).
@@ -302,6 +358,17 @@ func from_config(cfg: ConfigFile) -> void:
 	lifetime.clear()
 	for key: StringName in LIFETIME_KEYS:
 		lifetime[key] = _int(cfg.get_value("lifetime", String(key), 0))
+	achieved = _names(cfg.get_value("rewards", "achieved", PackedStringArray()))
+	unseen = _names(cfg.get_value("rewards", "unseen", PackedStringArray()))
+	if cfg.has_section_key("rewards", "collected"):
+		collected = _names(cfg.get_value("rewards", "collected", PackedStringArray()))
+	else:
+		# A profile from before the COLLECT tab: the level pieces it already has stay out of the tab.
+		collected.clear()
+		var lv: int = config.level_for_xp(clampi(xp, 0, config.max_xp()))
+		for d: CosmeticDef in shop.items:
+			if d.level > 0 and d.level <= lv:
+				collected.append(d.id)
 	applied.clear()
 	var ap: Variant = cfg.get_value("stats", "applied", PackedStringArray())
 	if ap is PackedStringArray or ap is Array:
@@ -337,6 +404,22 @@ func sanitize() -> void:
 	online_wins = clampi(online_wins, 0, wins)
 	biggest_win = maxi(biggest_win, 0)
 	daily_last = maxi(daily_last, 0)
+	var got: Array[StringName] = []
+	for id: StringName in collected:
+		var d: CosmeticDef = shop.find(id)
+		if d != null and (d.achievement != &"" or d.level > 0) and not id in got:
+			got.append(id)
+	collected = got
+	var news: Array[StringName] = []
+	for id: StringName in unseen:
+		if id in owned and not id in news:
+			news.append(id)
+	unseen = news
+	var held: Array[StringName] = []
+	for id: StringName in achieved:
+		if not id in held:
+			held.append(id)
+	achieved = held
 	var life: Dictionary[StringName, int] = {}
 	for key: StringName in LIFETIME_KEYS:
 		life[key] = clampi(int(lifetime.get(key, 0)), 0, MAX_STAT)
@@ -360,6 +443,21 @@ func load_from(path: String) -> Error:
 	if err == OK:
 		from_config(cfg)
 	return err
+
+
+static func _strings(ids: Array[StringName]) -> PackedStringArray:
+	var out: PackedStringArray = []
+	for id: StringName in ids:
+		out.append(String(id))
+	return out
+
+
+static func _names(v: Variant) -> Array[StringName]:
+	var out: Array[StringName] = []
+	if v is PackedStringArray or v is Array:
+		for id: Variant in v:
+			out.append(StringName(str(id)))
+	return out
 
 
 static func _int(v: Variant) -> int:

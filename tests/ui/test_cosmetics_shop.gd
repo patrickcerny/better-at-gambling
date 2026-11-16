@@ -251,3 +251,29 @@ func test_too_few_gold_coins_opens_the_gold_tab() -> void:
 	assert_eq(panel.tabs.current_tab, int(panel.tab_buttons[CosmeticsPanel.KIND_COINS].get_meta(&"tab")), "on the GOLD tab")
 	assert_true(panel.steam_button.visible, "ready to buy with Steam")
 	panel.close()
+
+
+## Achievement rewards (Patrick 2026-11-16): locked in the shop with the achievement named, then
+## waiting in COLLECT (with the red dot) once the achievement is held; collecting owns it.
+func test_achievement_rewards_are_collected() -> void:
+	var panel: CosmeticsPanel = _shop()
+	panel.open()
+	panel.select(&"hat_card_house")
+	assert_eq(panel.action_button.text, "ACHIEVEMENT REWARD")
+	assert_true(panel.action_button.disabled, "can't be bought")
+	assert_string_contains(panel.status_label.text, "Five Card Trick")
+	assert_eq((panel.tiles[&"hat_card_house"].find_child("Price", true, false) as Label).text, "ACHIEVEMENT")
+	assert_eq(panel.collect_tiles.size(), 0)
+	assert_false(panel.collect_dot.visible)
+	ProfileManager.note_achieved([&"ACH_BJ_FIVE_CARDS", &"ACH_JACKPOT"])
+	assert_eq(panel.collect_tiles.size(), 2, "both wait in COLLECT")
+	assert_eq(panel.collect_dot.count, 2)
+	assert_eq(panel.action_button.text, "COLLECT")
+	panel.collect_tiles[&"hat_card_house"].pressed.emit()
+	assert_true(ProfileManager.profile.owns(&"hat_card_house"))
+	assert_eq(panel.collect_tiles.size(), 1)
+	assert_eq(panel.action_button.text, "WEAR", "collected: it can be worn")
+	panel.collect_all_button.pressed.emit()
+	assert_true(ProfileManager.profile.owns(&"hat_beacon"))
+	assert_eq(panel.collect_tiles.size(), 0)
+	assert_false(panel.collect_dot.visible)

@@ -374,11 +374,11 @@ static func shirt(k: OutfitMeshKit, id: StringName) -> void:
 				var lv: float = fposmod(u - v, 1.0)
 				if lu < 0.06 or lv < 0.06:
 					return OutfitMeshes.BLACK
-				return [OutfitMeshes.BURGUNDY, OutfitMeshes.GOLD, OutfitMeshes.CREAM][posmod(i + j * 2, 3)])
-			for i: int in 24:
-				var a: float = TAU * float(i) / 24.0
+				return [OutfitMeshes.BURGUNDY, OutfitMeshes.GOLD, OutfitMeshes.CREAM][posmod(i + j * 2, 3)], 0.0, 40, 24)
+			for i: int in 20:
+				var a: float = TAU * float(i) / 20.0
 				var p: Vector3 = OutfitMeshKit.body_point(OutfitMeshes._shirt_top().call(a) - 0.008, a, inf + 0.012)
-				k.sphere(p, Vector3(0.04, 0.024, 0.04), OutfitMeshes.WHITE.darkened(0.06 * float(i % 2)), 8, 4, Basis(Vector3.UP, a))
+				k.sphere(p, Vector3(0.046, 0.024, 0.046), OutfitMeshes.WHITE.darkened(0.06 * float(i % 2)), 7, 4, Basis(Vector3.UP, a))
 		&"shirt_gold_chain":
 			# The high roller's black silk shirt, open to the chest, a heavy gold chain.
 			k.band(b, top, inf, func(t: float, a: float) -> Color:

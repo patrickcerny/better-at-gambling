@@ -54,6 +54,8 @@ var cosmetics_button: TShirtButton
 var cosmetics: CosmeticsPanel
 ## Level, XP bar and Coins in the top-left corner.
 var profile_badge: ProfileBadge
+## The red dots on the T-shirt and the COSMETICS entry: rewards waiting in the COLLECT tab.
+var _shop_dots: Array[NotifyDot] = []
 var level_pass: LevelPassPanel
 var how_to_play: HowToPlayPanel
 ## The small dev button (bottom right, `DevButton`) and the Dev Dashboard it opens: only for
@@ -157,6 +159,10 @@ func _ready() -> void:
 		cosmetics_opener[0] = _cosmetics_entry
 		_settings.close()
 		cosmetics.open())
+	# Rewards waiting in the shop's COLLECT tab: a red dot with the count on both shop buttons.
+	_shop_dots = [NotifyDot.attach(cosmetics_button), NotifyDot.attach(_cosmetics_entry, true)]
+	ProfileManager.changed.connect(_count_shop_dots)
+	_count_shop_dots()
 	profile_badge = ProfileBadge.new()
 	profile_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	profile_badge.offset_left = 32.0
@@ -557,6 +563,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _online_box.visible:
 		get_viewport().set_input_as_handled()
 		_show_main()
+
+
+func _count_shop_dots() -> void:
+	var n: int = ProfileManager.profile.collectable().size()
+	for dot: NotifyDot in _shop_dots:
+		dot.count = n
 
 
 ## The sub-menus are tall: the big logo steps aside while one is open.

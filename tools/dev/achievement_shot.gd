@@ -5,7 +5,7 @@ extends Node3D
 ## [--yaw 25] [--back] [--walk]. Colours and skins work too (the bean wears them).
 
 ## Achievements still on other branches.
-const PENDING: Dictionary = {&"ACH_BJ_SUITED_TRIPS": "Suited Trips", &"ACH_HOLDEM_ROYAL_FLUSH": "Royal Flush", &"ACH_LOGO_SPIN": "Logo 1000x (hidden)"}
+const PENDING: Dictionary = {&"ACH_BJ_SUITED_TRIPS": "Suited Trips", &"ACH_HOLDEM_ROYAL_FLUSH": "Royal Flush", &"ACH_LOGO_SPINNER": "Logo 1000x (hidden)"}
 
 var _beans: Array[AvatarVisuals] = []
 var _walk: bool = false
