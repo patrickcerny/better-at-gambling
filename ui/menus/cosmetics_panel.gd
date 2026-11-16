@@ -59,6 +59,9 @@ var title_label: Label
 var switch_button: Button
 ## Item id -> its tile (a toggle Button).
 var tiles: Dictionary[StringName, Button] = {}
+## The NONE tile first on every page but the colours' (Patrick 2026-11-16: "else you ALWAYS have
+## to wear something"): takes off what the bean wears in that slot. By kind.
+var none_tiles: Dictionary[StringName, Button] = {}
 ## The item the preview and the action button are about.
 var selected: StringName = &""
 ## What the preview tries on, one per slot (kind -> id): picks stack across the tabs, so a hat, a
@@ -325,6 +328,8 @@ func _ready() -> void:
 		if items.is_empty():
 			continue  # a kind shows up once the shop stocks it
 		var grid: GridContainer = _grid_tab(str(KIND_TITLES.get(kind, String(kind).to_upper())))
+		if kind != CosmeticDef.KIND_COLOR:
+			grid.add_child(_none_tile(kind))
 		for d: CosmeticDef in items:
 			grid.add_child(_tile(d))
 		tab_row.add_child(_tab_button(kind, tabs.get_tab_count() - 1))
@@ -719,6 +724,68 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 
 
 ## A gold pack's tile: a pile of Gold Coins, how many, and the Steam price.
+## The NONE tile of `kind`'s page: a crossed-out circle; picking it takes the slot's piece off.
+func _none_tile(kind: StringName) -> Button:
+	var b := Button.new()
+	b.name = "None_" + String(kind)
+	b.toggle_mode = true
+	b.custom_minimum_size = TILE
+	b.tooltip_text = "Wear nothing here"
+	SettingsPanel.style_tab(b)
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
+		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
+		sb.set_corner_radius_all(18)
+		b.add_theme_stylebox_override(st, sb)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override(&"separation", 2)
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 10)
+	b.add_child(box)
+	var pic := Control.new()
+	pic.name = "Picture"
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pic.draw.connect(func() -> void:
+		var c: Vector2 = pic.size * 0.5
+		var rad: float = minf(pic.size.x, pic.size.y) * 0.3
+		pic.draw_arc(c, rad, 0.0, TAU, 48, MUTED, 7.0, true)
+		var d: Vector2 = Vector2(rad, -rad) * 0.7071
+		pic.draw_line(c - d, c + d, MUTED, 7.0, true))
+	box.add_child(pic)
+	var label := Label.new()
+	label.name = "Name"
+	label.text = "NONE"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(label)
+	var worn := Label.new()  # same height as a price row, so the grid lines up
+	worn.name = "Price"
+	worn.theme_type_variation = &"SmallLabel"
+	worn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	worn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(worn)
+	b.pressed.connect(wear_none.bind(kind))
+	none_tiles[kind] = b
+	return b
+
+
+## NONE: the slot's try-on goes, and what the bean wears there comes off.
+func wear_none(kind: StringName) -> void:
+	var d: CosmeticDef = shop.find(selected)
+	if d != null and d.kind == kind:
+		selected = &""
+	trying.erase(kind)
+	var p: PlayerProfile = ProfileManager.profile
+	var worn: CosmeticDef = shop.find(p.outfit.get(kind, &""))
+	if worn != null:
+		ProfileManager.take_off(kind)
+		outfit_worn.emit(kind, &"")
+		status_label.text = "Took off %s." % worn.display_name if kind == CosmeticDef.KIND_SKIN else "Took off the %s." % worn.display_name
+	else:
+		status_label.text = ""
+	_refresh()
+
+
 func _coin_tile(c: CoinPack) -> Button:
 	var b := Button.new()
 	b.name = String(c.id)
@@ -1190,6 +1257,10 @@ func _refresh() -> void:
 			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
 		else:
 			_show_pack_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, shop.find_pack(id))
+	for kind: StringName in none_tiles:
+		var bare: bool = p.outfit.get(kind, &"") == &"" and not trying.has(kind)
+		none_tiles[kind].set_pressed_no_signal(bare)
+		(none_tiles[kind].find_child("Price", true, false) as Label).text = "WEARING" if bare else ""
 	_refresh_collect(p)
 	_refresh_look(p)
 	_refresh_places(p)
