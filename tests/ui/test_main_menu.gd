@@ -155,7 +155,7 @@ func test_browse_list_rows() -> void:
 	assert_eq(sorted.map(func(l: Dictionary) -> int: return int(l["lobby"])), [3, 2, 1], "friends first, then fullest, each once")
 	menu.call(&"_fill_friends", SteamSvc.group_friend_lobbies([{"name": "Anna", "lobby": 5, "party": "", "build": Protocol.BUILD_ID}, {"name": "Ben", "lobby": 5, "party": "", "build": Protocol.BUILD_ID}] as Array[Dictionary]))
 	var friends_list: Node = menu.find_child("JoinFriend", true, false)
-	assert_eq(friends_list.find_children("Lobby*", "HBoxContainer", true, false).size(), 1, "two friends, one lobby row")
+	assert_eq(friends_list.find_children("Lobby*", "PanelContainer", true, false).size(), 1, "two friends, one lobby card")
 	assert_true("Friends: Anna and Ben" in _label_texts(friends_list))
 	menu.call(&"_fill_browse", [] as Array[Dictionary])
 	assert_eq(list.get_child_count(), 1, "just the 'no lobbies' line")
@@ -210,3 +210,17 @@ func test_tutorial_pages_and_done() -> void:
 	assert_true((menu.get_node("Center/Column/VBox") as Control).visible)
 	assert_true((menu.get_node("Center/Column/Logo") as Control).visible)
 	assert_true((menu.get_node("Center/Column/VBox/Tutorial") as Button).has_focus(), "focus back on TUTORIAL")
+
+
+func test_browse_cards_show_settings_and_beans() -> void:
+	var info: Dictionary = LobbyInfo.parse(JSON.stringify({"mode": "casino", "mg": 5, "gm": 3, "items": true, "picked": 16, "all": 16,
+		"beans": [{"n": "Patrick", "c": 1, "o": ["hat_top"], "l": true}, {"n": "Anna", "c": 4, "o": []}]}))
+	menu.call(&"_fill_browse", [SteamSvc.public_lobby_entry(7, "Patrick's lobby", 2, 8, info)] as Array[Dictionary])
+	var list: Node = menu.find_child("LobbyList", true, false)
+	var texts: PackedStringArray = _label_texts(list)
+	assert_true("Casino · 5 minigames · 3 min gambling · items on" in texts, "the lobby's settings")
+	assert_true("★ Patrick" in texts, "the leader's bean")
+	assert_true("Anna" in texts)
+	var beans: Node = list.find_child("Beans", true, false)
+	assert_not_null(beans)
+	assert_eq(beans.get_child_count(), 2, "one bean per player")

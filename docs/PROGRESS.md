@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.50 Baccarat
+### 2026-11-16 / 0.9.52 Baccarat
 - Patrick: "Adde Baccarat". New table game `baccarat` (Punto Banco, 8-deck shoe, standard tableau):
   PLAYER 1:1, BANKER 1:1 less 5%, TIE 9:1, P PAIR / B PAIR 11:1, Player and Banker push on a tie.
   Shared round like roulette (betting window, the cards turn one by one, then the pay); quiet favour
@@ -105,6 +105,25 @@
   `BaccaratUi` docks in the right column (hands, five bet buttons with pays, chips, road).
 - Full floor: the pit can't hold a tenth table, so `full_extras` is now two blackjacks (roulette_2 is
   off the canonical floor; random floors still draw extras by weight). Protocol 17.
+### 2026-11-16 / 0.9.50 Lobby panel redesign, lobby cards with beans, no kick rejoin block
+- Patrick: "auch das UI ist veraltet … Wenn man jemanden kickt soll er nicht einen throttle haben" and
+  "Die browse lobbies ist was grad eingestellt ist und kleine anzeige von allen beans … mit namen".
+- Kick: the 60 s rejoin block is gone (`MatchServer._kicked`/`kick_blocked_for`, `RoomHost` kick_cooldown
+  check, `Protocol.KICK_REJOIN_SECONDS`); a kicked player can join again on their own right away.
+- "(away)" ghosts: players who left stayed in the lobby list forever. In the lobby, anyone disconnected
+  for `MatchServer.LOBBY_AWAY_DROP_SECONDS` (60 s, Patrick 0.9.51) is removed (also those who left during the last match,
+  once Play Again returns to the lobby); a quick reconnect keeps the slot.
+- `LobbyPanel` redesign: fully opaque panel (pedestal names no longer show through), header with lobby
+  kind and player count, status band (countdown or hint + "x / y READY"), player rows with a bean
+  portrait in its outfit, LEADER/YOU tags, READY pills, KICK aligned; MATCH SETTINGS card with one row
+  per setting; footer LEAVE LOBBY | COSMETICS, INVITE FRIENDS, CLOSE.
+- `BeanPortraits` (ui/common): one offscreen viewport renders cached bean pictures (head or full bean).
+- BROWSE LOBBIES / JOIN A FRIEND: one card per lobby with the host's settings ("Casino · 5 minigames ·
+  3 min gambling · items on") and a line-up of the beans inside in their outfits with names (★ leader),
+  "IN A MATCH" when playing. The host's game writes `LobbyInfo` JSON to the Steam lobby data key `info`
+  (`SteamSvc.publish_lobby_info`, from match_scene when it owns the lobby); browsers parse it untrusted.
+- Tests: test_lobby_info (new), test_room_lobby (ghost drop), test_lobby_kick, test_host_mode,
+  test_main_menu (cards), test_minigame_selector; lint ok. Gallery: `--panel lobby`, `--panel browser`.
 
 ### 2026-11-16 / 0.9.49 Item bar with the item models, NEW ITEM card, fuller explanations
 - Patrick: "Items erklären wichtiger" and "Item inventory bar sollte nicht namen der items zeigen
