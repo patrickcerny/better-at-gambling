@@ -1,6 +1,6 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|players|players_lobby|shop|rewards|settings|audio|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining|dev|dev_match|confirm`
+## `--panel lobby|players|players_lobby|shop|rewards|settings|audio|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining|dev|dev_corner|dev_match|confirm`
 ## (tutorial: `--page N` picks the page, `--minigame <id>` opens that game's page)
 ## over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
@@ -79,6 +79,9 @@ func _ready() -> void:
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
 			(menu.find_child("DevMode", true, false) as Button).pressed.emit()
+		"dev_corner":
+			DevMode.forced = 1
+			add_child((load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate())
 		"dev_match":
 			var p := DevMatchPanel.new()
 			add_child(p)
