@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.52 Baccarat
+### 2026-11-16 / 0.9.53 Baccarat
 - Patrick: "Adde Baccarat". New table game `baccarat` (Punto Banco, 8-deck shoe, standard tableau):
   PLAYER 1:1, BANKER 1:1 less 5%, TIE 9:1, P PAIR / B PAIR 11:1, Player and Banker push on a tie.
   Shared round like roulette (betting window, the cards turn one by one, then the pay); quiet favour
@@ -105,6 +105,8 @@
   `BaccaratUi` docks in the right column (hands, five bet buttons with pays, chips, road).
 - Full floor: the pit can't hold a tenth table, so `full_extras` is now two blackjacks (roulette_2 is
   off the canonical floor; random floors still draw extras by weight). Protocol 17.
+- Floor generator: with seven table games a random pit draw could leave one out (seed 48); such a
+  draw now searches rows that take them all instead of failing.
 ### 2026-11-16 / 0.9.50 Lobby panel redesign, lobby cards with beans, no kick rejoin block
 - Patrick: "auch das UI ist veraltet … Wenn man jemanden kickt soll er nicht einen throttle haben" and
   "Die browse lobbies ist was grad eingestellt ist und kleine anzeige von allen beans … mit namen".
