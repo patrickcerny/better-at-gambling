@@ -7,13 +7,13 @@
 script = ExtResource("1")
 id = &"out_of_order"
 display_name = "Out of Order Sign"
-description = "Hang it on the nearest table or machine (4 m): nobody can sit or bet there for 30 s."
+description = "Hang it on the nearest table or machine (4 m): the game there stops, every bet on it is refunded, and it stays closed until the next minigame."
 rarity = 1
 target_mode = 0
 requires_proximity = false
 range_m = 0.0
 is_negative = false
-duration = 30.0
+duration = 0.0
 params = {"range": 4.0}
 effect_script = ExtResource("2")
 in_loot = true

@@ -14,7 +14,7 @@ func after_each() -> void:
 	fx.server.free()
 
 
-func test_out_of_order_blocks_the_nearest_table_then_expires() -> void:
+func test_out_of_order_blocks_the_nearest_table_until_reopened() -> void:
 	var p: int = fx.player_ids[0]
 	var q: int = fx.player_ids[1]
 	var sid: StringName = &"roulette_1"
@@ -29,8 +29,11 @@ func test_out_of_order_blocks_the_nearest_table_then_expires() -> void:
 	assert_true(r["ok"], str(r))
 	assert_true(fx.server.stations.public_states()[sid].has("out_of_order"))
 	assert_eq(fx.intent(q, &"sit", {"station": sid})["error"], &"out_of_order")
-	fx.run(Registry.items[&"out_of_order"].duration + 0.5)
-	assert_false(fx.server.stations.out_of_order.has(sid))
+	# 0.9.71: closed until the next minigame, not for a fixed time.
+	assert_eq(float(fx.server.stations.public_states()[sid]["out_of_order"]), -1.0)
+	fx.run(60.0)
+	assert_true(fx.server.stations.out_of_order.has(sid), "still closed a minute later")
+	fx.server.stations.reopen_all()  # what the next minigame does
 	assert_true(fx.intent(q, &"sit", {"station": sid})["ok"])
 
 

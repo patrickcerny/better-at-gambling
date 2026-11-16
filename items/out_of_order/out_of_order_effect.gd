@@ -1,8 +1,9 @@
 class_name OutOfOrderEffect
 extends ItemEffect
-## Out of Order sign (Patrick's "game disabler"): hang it on the nearest table or machine (within
-## `range` m) and nobody can sit down or bet there for `def.duration` s. Rounds already running
-## finish normally.
+## Out of Order sign (Patrick's "game disabler"): hang it on the nearest open table or machine
+## (within `range` m). The game there stops, every open bet is refunded, the players there stand
+## up, and nobody can sit or bet there until the next minigame (Patrick 0.9.71). A `duration` > 0
+## in the definition closes it for that many seconds instead.
 
 
 func can_activate(ctx: ItemContext) -> StringName:
@@ -13,5 +14,6 @@ func can_activate(ctx: ItemContext) -> StringName:
 
 func activate(ctx: ItemContext) -> Dictionary:
 	var sid: StringName = ctx.system.find_station.call(ctx.user, float(ctx.param("range", 4.0)))
-	ctx.system.close_station.call(sid, ctx.def.duration)
-	return {"station": sid, "seconds": ctx.def.duration}
+	var seconds: float = ctx.def.duration if ctx.def.duration > 0.0 else INF
+	ctx.system.close_station.call(sid, seconds)
+	return {"station": sid, "seconds": seconds if is_finite(seconds) else -1.0}

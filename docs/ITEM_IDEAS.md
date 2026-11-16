@@ -38,8 +38,9 @@ knockouts and falls keep the plain respawn.
   tier / the stake (5, 10 or 15% of the poorer player's money, minimum $10). A challenged player
   answers with **Y / N** (6 s, silence declines), then both pick with **1 / 2 / 3** (6 s, no pick =
   random). One tie replays, a second tie calls it off. Bots accept 70% of challenges.
-- **Out of Order:** hangs on the nearest table or machine within 4 m for 30 s; nobody can sit or
-  bet there, rounds already running finish. A red sign and the prompt show the countdown.
+- **Out of Order:** hangs on the nearest open table or machine within 4 m; the game there stops at
+  once, every open bet is refunded (no win, no loss), the players there stand up, and nobody can
+  sit or bet there until the next minigame (0.9.71). A red sign and cones show it.
 - **Gift Shop:** a kiosk on the east wall, open in the casino. Four offers per
   segment (two common, one rare, one rare or legendary), the same for everyone, $150 / $400 / $900
   × table limits; one buy per player per segment. Restocks when each casino segment starts.

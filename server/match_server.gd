@@ -231,7 +231,7 @@ func _build_match_systems(seed_value: int) -> void:
 	odd_jobs = OddJobs.new(economy)
 	items.jackpot = jackpot
 	items.find_station = _nearest_station
-	items.close_station = func(sid: StringName, seconds: float) -> void: stations.out_of_order[sid] = seconds
+	items.close_station = _close_station
 	items.clear_jail = clear_catch_count  # Jail system (v0.8.3)
 	waiter = WaiterLogic.new(state.players, rules, world, SeededRng.new(seed_value ^ 0x3A11E5))
 	megaphone = MegaphoneLogic.new(state.players, rules, world)
@@ -903,9 +903,21 @@ func _on_phase_changed(from: Phase.Id, to: Phase.Id) -> void:
 		_start_regroup()
 
 
+## An Out of Order sign goes up on `sid` (item): the game there stops, every open bet is refunded
+## (StationManager.close_station) and everyone seated there is stood up. Closed until the next
+## minigame when `seconds` is INF.
+func _close_station(sid: StringName, seconds: float) -> void:
+	stations.close_station(sid, seconds)
+	_flush()  # refunds + table_reset go out before the players stand
+	for id: int in state.players:
+		if stations.station_of(id) == sid:
+			stand_up(id, &"out_of_order")
+
+
 ## A minigame starts (Patrick's notes #9, #21): every open bet is refunded first (blackjack would
-## auto-stand a hand on leave), then everyone seated is stood up.
+## auto-stand a hand on leave), then everyone seated is stood up. Out of Order signs come down.
 func _refund_and_stand_everyone() -> void:
+	stations.reopen_all()
 	stations.refund_all()
 	_flush()
 	for id: int in state.players:
@@ -1817,7 +1829,7 @@ func _nearest_station(player: int, range_m: float) -> StringName:
 	var best_d: float = range_m
 	for sid: Variant in map_def.station_positions:
 		var d: float = (Vector3(map_def.station_positions[sid]) - pos).length()
-		if d <= best_d and stations.logics.has(StringName(sid)):
+		if d <= best_d and stations.logics.has(StringName(sid)) and not stations.is_out_of_order(StringName(sid)):
 			best_d = d
 			best = StringName(sid)
 	return best
