@@ -140,6 +140,13 @@ func expire_flag(flag: StringName) -> void:
 				_remove(player, m, &"expired")
 
 
+## Ends every modifier of every player (a minigame starts: no casino effect carries into it).
+func expire_all(reason: StringName = &"expired") -> void:
+	for player: int in _mods.keys():
+		for m: Modifier in get_mods(player):
+			_remove(player, m, reason)
+
+
 ## Hands the first modifier of `from` carrying `flag` over to `to` (Bad Luck Monkey). Returns it,
 ## or null if `from` had none.
 func move_flag(from: int, to: int, flag: StringName) -> Modifier:

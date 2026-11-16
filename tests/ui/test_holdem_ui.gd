@@ -74,6 +74,63 @@ func test_ante_and_the_aa_bonus_before_a_hand() -> void:
 	_assert_right_column("betting")
 
 
+func test_the_aa_bonus_explains_itself() -> void:
+	var cfg: BalanceConfig = Registry.balance
+	assert_true(ui.bonus_rule.visible, "a rule line before the deal")
+	assert_string_contains(ui.bonus_rule.text, "Pair of Aces or better")
+	assert_string_contains(ui.bonus_rule.text, "even if you fold")
+	assert_true(ui.bonus_table.visible, "and its paytable")
+	assert_eq(ui.bonus_table.get_child_count(), HoldemUi.BONUS_ROWS.size() * 3)
+	var texts: PackedStringArray = []
+	for c: Node in ui.bonus_table.get_children():
+		texts.append((c as Label).text)
+	var all: String = " | ".join(texts)
+	assert_string_contains(all, "Royal Flush | %d:1" % cfg.holdem_bonus_pays[HoldemHand.Rank.ROYAL_FLUSH])
+	assert_string_contains(all, "Pair of Aces – Straight | %d:1" % cfg.holdem_bonus_pays[HoldemHand.Rank.STRAIGHT])
+	assert_false(all.contains("wins"), "no amounts while OFF")
+	ui.set_bonus(ui.bonus_sizes[1])
+	texts.clear()
+	for c: Node in ui.bonus_table.get_children():
+		if not c.is_queued_for_deletion():
+			texts.append((c as Label).text)
+	assert_has(texts, "wins %s" % HoldemUi.money(ui.bonus * cfg.holdem_bonus_pays[HoldemHand.Rank.FLUSH]), "what the picked size wins")
+	await wait_process_frames(2)
+	_assert_right_column("bonus paytable")
+
+
+func test_the_left_stick_picks_the_aa_bonus() -> void:
+	InputGlyphs.set_gamepad(true)
+	var push := func(v: float) -> void:
+		var ev := InputEventJoypadMotion.new()
+		ev.axis = JOY_AXIS_LEFT_X
+		ev.axis_value = v
+		ui._unhandled_input(ev)
+	push.call(1.0)
+	assert_eq(ui.bonus, ui.bonus_sizes[1], "right: the next size")
+	push.call(0.9)
+	assert_eq(ui.bonus, ui.bonus_sizes[1], "held: one step per push")
+	push.call(0.0)
+	push.call(1.0)
+	assert_eq(ui.bonus, ui.bonus_sizes[2])
+	push.call(0.0)
+	push.call(-1.0)
+	assert_eq(ui.bonus, ui.bonus_sizes[1], "left: back one")
+	ui.update_state(_pub(HoldemLogic.State.IDLE, {}), {})
+	assert_string_contains(ui.hint.text, "Left stick] AA bonus")
+	InputGlyphs.set_gamepad(false)
+
+
+func test_the_bonus_result_in_plain_words() -> void:
+	var flop: Array = [Card.make(5, 2), Card.make(9, 2), Card.make(4, 2)]
+	assert_eq(HoldemUi.bonus_result_text(10, 0, [Card.make(13), Card.make(13, 1)], flop), "AA BONUS lost  ·  no Pair of Aces or better on the flop  ·  −$10", "kings are not enough")
+	var won: String = HoldemUi.bonus_result_text(10, 210, [Card.make(2, 2), Card.make(7, 2)], flop + [Card.make(1)])
+	assert_string_contains(won, "AA BONUS WINS")
+	assert_string_contains(won, "Flush, Nine High  %d:1" % Registry.balance.holdem_bonus_pays[HoldemHand.Rank.FLUSH], "only the flop counts, not the turn")
+	assert_string_contains(won, "+$200")
+	assert_eq(ui._ribbon_tag({"details": {"type": HoldemLogic.BONUS}}), "AA BONUS")
+	assert_eq(ui._ribbon_tag({"details": {"type": HoldemLogic.ANTE}}), "")
+
+
 func test_all_in_keeps_the_call_covered() -> void:
 	st.balances[1] = 70
 	ui.set_bonus(ui.bonus_sizes[1])
@@ -102,7 +159,9 @@ func test_fold_or_call_after_the_flop() -> void:
 	assert_string_contains(ui.cards_label.text, "A♥")
 	assert_string_contains(ui.cards_label.text, "9♥", "and the flop")
 	assert_eq(ui.dealer_label.text, "DEALER  ??  ??", "the dealer's two face down")
-	assert_string_contains(ui.result_label.text, "AA BONUS  +$70", "the bonus settled with the flop")
+	assert_string_contains(ui.result_label.text, "AA BONUS WINS", "the bonus settled with the flop")
+	assert_string_contains(ui.result_label.text, "Three Aces  7:1", "names the hand that hit and its odds")
+	assert_string_contains(ui.result_label.text, "+$70")
 	assert_string_contains(ui.others_label.text, "Bert: called")
 	_assert_right_column("deciding")
 	st.balances[1] = 30
@@ -157,6 +216,7 @@ func test_folded_and_the_showdown() -> void:
 	var lost: Dictionary = {1: {"ante": 20, "call": 40, "bonus": 10, "bonus_returned": 0, "hole": [Card.make(2), Card.make(3, 1)], "decision": &"call", "hand": "Pair of Twos", "outcome": &"lose", "returned": 0}}
 	ui.update_state(_pub(HoldemLogic.State.PAYOUT, lost, {"board": board, "dealer": [Card.make(13), Card.make(13, 1)], "dealer_hand": "Three of a Kind, Kings", "qualifies": true}), {})
 	assert_string_contains(ui.result_label.text, "AA BONUS lost")
+	assert_string_contains(ui.result_label.text, "no Pair of Aces or better")
 	assert_string_contains(ui.result_label.text, "Dealer wins  ·  −$60")
 	_assert_right_column("showdown")
 

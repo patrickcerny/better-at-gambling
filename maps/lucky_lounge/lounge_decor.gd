@@ -50,6 +50,21 @@ const SIGN_SCALE: float = 0.29
 const PILLAR_CLEAR: float = 0.9
 ## Half the width of the entrance hall's red runner (brass edges just outside it).
 const RUNNER_HALF: float = 1.6
+## Every column (0.9.65, Patrick: the capital ran through the crown moulding and the chair rail
+## through the base) stands on a marble pedestal as tall as the wainscot, so the wainscot and the
+## rail die into the pedestal's sides, and carries a mahogany head block from under the crown
+## moulding to the ceiling, so the crown, the coffer beams and their gold frames run into the
+## block instead of through the capital.
+const PEDESTAL_HALF: float = 0.6
+const PEDESTAL_TOP: float = 1.14
+const HEAD_HALF: float = 0.65
+const HEAD_BOTTOM: float = LuckyLounge.WALL_H - 0.42
+## Doorway reveals get a mahogany lining this thick (0.9.65: the walls' end faces were bare
+## wallpaper, from the doorway they read as a red column standing in the opening).
+const LINING_T: float = 0.04
+## Outer edge of the waiting room door's gold casing (x): the wainscot runs either side stop here,
+## on both faces of the wall.
+const WAIT_CASING_OUT: float = LuckyLounge.WAIT_DOOR_HALF + 0.16
 
 var map: LuckyLounge
 ## Batches filled while building, turned into MultiMeshes at the end: key → [mesh, material, transforms].
@@ -284,6 +299,7 @@ func _walls() -> void:
 	var ax1: float = LuckyLounge.ANNEX_X1 - 0.25
 	var az0: float = LuckyLounge.ANNEX_Z0 + 0.25
 	var az1: float = LuckyLounge.ANNEX_Z1 - 0.25
+	var wd: float = WAIT_CASING_OUT
 	var runs: Array = [
 		[Vector3(-hx, 0, -hz), Vector3(-door - 0.2, 0, -hz), Vector3(0, 0, 1)],
 		[Vector3(door + 0.2, 0, -hz), Vector3(hx, 0, -hz), Vector3(0, 0, 1)],
@@ -297,8 +313,9 @@ func _walls() -> void:
 		[Vector3(ax1, 0, az0), Vector3(ax1, 0, az1), Vector3(-1, 0, 0)],
 		[Vector3(ax0, 0, az0), Vector3(ax0, 0, -hz - 0.5), Vector3(1, 0, 0)],
 		[Vector3(ax0, 0, az1), Vector3(ax1, 0, az1), Vector3(0, 0, -1)],
-		[Vector3(-hx, 0, hz), Vector3(-2.3, 0, hz), Vector3(0, 0, -1)],
-		[Vector3(2.3, 0, hz), Vector3(hx, 0, hz), Vector3(0, 0, -1)],
+		# The start room's south wall, either side of the waiting room door (up to its casing).
+		[Vector3(-hx, 0, hz), Vector3(-wd, 0, hz), Vector3(0, 0, -1)],
+		[Vector3(wd, 0, hz), Vector3(hx, 0, hz), Vector3(0, 0, -1)],
 		# The start-room wall, casino face and start-room face.
 		[Vector3(-hx, 0, lz - lt), Vector3(-ld, 0, lz - lt), Vector3(0, 0, -1)],
 		[Vector3(ld, 0, lz - lt), Vector3(hx, 0, lz - lt), Vector3(0, 0, -1)],
@@ -321,8 +338,17 @@ func _walls() -> void:
 		var mid: Vector3 = (a + b) * 0.5
 		var basis := Basis.looking_at(-n, Vector3.UP)  # local x runs along the wall, +z into the room
 		# Mahogany wainscot to 1.05 m, brass chair rail, gold crown moulding under the ceiling.
-		_box_b(Vector3(length, 1.05, 0.06), mid + n * 0.03 + Vector3(0, 0.525, 0), basis, _wood_mat, "wood")
-		_box_b(Vector3(length, 0.09, 0.1), mid + n * 0.06 + Vector3(0, 1.08, 0), basis, _brass_mat, "brass")
+		# A column standing in the wall breaks the wainscot and the rail: they stop at its
+		# pedestal's sides (the crown runs on into its head block).
+		var cuts: Array[Vector2] = []
+		for pillar: Vector3 in LuckyLounge.PILLARS:
+			var off: Vector3 = pillar - a
+			if absf(off.dot(n)) < PEDESTAL_HALF:
+				cuts.append(Vector2(off.dot(dir) - PEDESTAL_HALF, off.dot(dir) + PEDESTAL_HALF))
+		for seg: Vector2 in _subtract(0.0, length, cuts):
+			var seg_mid: Vector3 = a + dir * (seg.x + seg.y) * 0.5
+			_box_b(Vector3(seg.y - seg.x, 1.05, 0.06), seg_mid + n * 0.03 + Vector3(0, 0.525, 0), basis, _wood_mat, "wood")
+			_box_b(Vector3(seg.y - seg.x, 0.09, 0.1), seg_mid + n * 0.06 + Vector3(0, 1.08, 0), basis, _brass_mat, "brass")
 		_box_b(Vector3(length, 0.22, 0.14), mid + n * 0.07 + Vector3(0, LuckyLounge.WALL_H - 0.2, 0), basis, _gold_mat, "gold")
 		# Gold mouldings frame the wallpaper between the rail and the ceiling, except where a
 		# window, door or doorway sits. A column standing in the wall (the doorway pair) cuts the
@@ -347,16 +373,43 @@ func _walls() -> void:
 				continue
 			_box_b(Vector3(step - 0.7, 3.9, 0.04), c + n * 0.02 + Vector3(0, 3.6, 0), basis, _gold_mat, "gold")
 			_box_b(Vector3(step - 0.86, 3.74, 0.05), c + n * 0.035 + Vector3(0, 3.6, 0), basis, _velvet_mat, "velvet")
-	# The crown moulding carries on over both doorways, on both faces.
-	for spec: Array in [[-hz, door], [-hz - 0.5, door], [lz - lt, ld], [lz + lt, ld]]:
+	# The crown moulding carries on over the doorways, on both faces: the VIP door, the lobby doors
+	# and the start room's face over the waiting room door. Each piece spans exactly the gap the
+	# runs leave (over the VIP door it was 0.2 m short at each end).
+	for spec: Array in [[-hz, door + 0.2, 1.0], [-hz - 0.5, door + 0.2, -1.0], [lz - lt, ld, -1.0], [lz + lt, ld, 1.0], [hz, wd, -1.0]]:
 		var z: float = spec[0]
-		var n_z: float = 1.0 if (z == -hz or z == lz + lt) else -1.0
+		var n_z: float = spec[2]
 		_box(Vector3(float(spec[1]) * 2.0, 0.22, 0.14), Vector3(0, LuckyLounge.WALL_H - 0.2, z + n_z * 0.07), _gold_mat, "gold")
+	_reveals()
 	# And over the Race Hall archway, on both faces.
 	var arch_len: float = LuckyLounge.ARCH_Z1 - LuckyLounge.ARCH_Z0 + 0.4
 	var arch_mid: float = (LuckyLounge.ARCH_Z0 + LuckyLounge.ARCH_Z1) * 0.5
 	for x: float in [hx - 0.07, hx + 0.5 + 0.07]:
 		_box(Vector3(0.14, 0.22, arch_len), Vector3(x, LuckyLounge.WALL_H - 0.2, arch_mid), _gold_mat, "gold")
+
+
+## Mahogany linings on the reveals of the doorways that go through a wall (both jambs and the
+## soffit), so a doorway reads as a door frame between its gold casings: the VIP door, the lobby
+## doors, the waiting room door and the Race Hall archway.
+func _reveals() -> void:
+	var hz: float = LuckyLounge.SIZE_Z * 0.5
+	var t: float = 0.5
+	_reveal(Vector3(0, 0, -hz), Vector3.RIGHT, LuckyLounge.VIP_DOOR_HALF, LuckyLounge.VIP_DOOR_H, t)
+	_reveal(Vector3(0, 0, LuckyLounge.LOBBY_DOORS_Z), Vector3.RIGHT, LuckyLounge.LOBBY_DOOR_HALF, LuckyLounge.LOBBY_DOOR_H, LuckyLounge.LOBBY_WALL_T)
+	_reveal(Vector3(0, 0, hz), Vector3.RIGHT, LuckyLounge.WAIT_DOOR_HALF, LuckyLounge.WAIT_DOOR_H, t)
+	var arch_mid: float = (LuckyLounge.ARCH_Z0 + LuckyLounge.ARCH_Z1) * 0.5
+	_reveal(Vector3(LuckyLounge.SIZE_X * 0.5, 0, arch_mid), Vector3.BACK, (LuckyLounge.ARCH_Z1 - LuckyLounge.ARCH_Z0) * 0.5, LuckyLounge.ARCH_H, t)
+
+
+## One doorway's lining: `c` is the opening's floor centre in the middle of the wall, `along` the
+## wall's direction, `thick` the wall's thickness. The lining stands 6 mm proud of each face (under
+## the casings) so no face of it lies in a wall face.
+func _reveal(c: Vector3, along: Vector3, half: float, h: float, thick: float) -> void:
+	var basis := Basis(along, Vector3.UP, along.cross(Vector3.UP))
+	var depth: float = thick + 0.012
+	for side: float in [-1.0, 1.0]:
+		_box_b(Vector3(LINING_T, h, depth), c + along * side * (half - LINING_T * 0.5) + Vector3(0, h * 0.5, 0), basis, _wood_mat, "wood")
+	_box_b(Vector3((half - LINING_T) * 2.0, LINING_T, depth), c + Vector3(0, h - LINING_T * 0.5, 0), basis, _wood_mat, "wood")
 
 
 func _near_opening(p: Vector3, radius: float) -> bool:
@@ -390,7 +443,9 @@ func _ceiling() -> void:
 	var lobby_z0: float = LuckyLounge.LOBBY_DOORS_Z - LuckyLounge.LOBBY_WALL_T * 0.5
 	var lobby_z1: float = LuckyLounge.LOBBY_DOORS_Z + LuckyLounge.LOBBY_WALL_T * 0.5
 	# Casino floor.
-	_coffers(Rect2(-hx, -hz, hx * 2.0, lobby_z0 + hz), _sym_lines(4.3, hx), [-13.55, -9.55, -5.55, -1.55, 2.45, 6.45])
+	# The cross beam at z = −1 runs right over the two free-standing columns, their head blocks
+	# carry it (at −1.55 it cut through the edge of their capitals).
+	_coffers(Rect2(-hx, -hz, hx * 2.0, lobby_z0 + hz), _sym_lines(4.3, hx), [-13.0, -9.0, -5.0, -1.0, 3.0])
 	# Start room (its own spacing: the ready pedestals' spotlights stay clear of the beams).
 	_coffers(Rect2(-hx, lobby_z1, hx * 2.0, hz - lobby_z1), _sym_lines(4.6, hx), [13.3])
 	# VIP lounge.
@@ -430,7 +485,7 @@ func _coffers(area: Rect2, xs: Array[float], zs: Array[float]) -> void:
 	var z1: float = area.end.y
 	var cx: float = (x0 + x1) * 0.5
 	var cz: float = (z0 + z1) * 0.5
-	var beam_mat: StandardMaterial3D = _tex("wooden_panels", 2.1, Color(0.5, 0.36, 0.3), 0.4, 0.55)
+	var beam_mat: StandardMaterial3D = _beam_mat()
 	for x: float in xs:
 		_box(Vector3(BEAM_W, BEAM_D, z1 - z0), Vector3(x, top - BEAM_D * 0.5, cz), beam_mat, "beam")
 		for side: float in [-1.0, 1.0]:
@@ -479,12 +534,12 @@ func _coffers(area: Rect2, xs: Array[float], zs: Array[float]) -> void:
 			if w < 0.8 or d < 0.8:
 				continue
 			var mid := Vector3((a.x + b.x) * 0.5, top - 0.02, (a.y + b.y) * 0.5)
-			# Gold frame inside the coffer.
-			_box(Vector3(w, 0.04, 0.06), mid + Vector3(0, 0, -d * 0.5), _gold_mat, "gold")
-			_box(Vector3(w, 0.04, 0.06), mid + Vector3(0, 0, d * 0.5), _gold_mat, "gold")
-			_box(Vector3(0.06, 0.04, d), mid + Vector3(-w * 0.5, 0, 0), _gold_mat, "gold")
-			_box(Vector3(0.06, 0.04, d), mid + Vector3(w * 0.5, 0, 0), _gold_mat, "gold")
-			if not _chandelier_near(mid, 1.4) and minf(w, d) > 1.4:
+			# Gold frame inside the coffer (cut where a column's head block reaches into it).
+			_ceiling_strip(Vector3(w, 0.04, 0.06), mid + Vector3(0, 0, -d * 0.5))
+			_ceiling_strip(Vector3(w, 0.04, 0.06), mid + Vector3(0, 0, d * 0.5))
+			_ceiling_strip(Vector3(0.06, 0.04, d), mid + Vector3(-w * 0.5, 0, 0))
+			_ceiling_strip(Vector3(0.06, 0.04, d), mid + Vector3(w * 0.5, 0, 0))
+			if not _chandelier_near(mid, 1.4) and not _under_head(mid, 0.35) and minf(w, d) > 1.4:
 				_add(&"rosette", rosette, _gold_mat, Transform3D(Basis(), mid + Vector3(0, -0.01, 0)))
 	for p: Vector3 in CHANDELIERS:
 		if p.x < x0 or p.x > x1 or p.z < z0 or p.z > z1:
@@ -503,21 +558,81 @@ func _chandelier_near(p: Vector3, r: float) -> bool:
 # --- Columns, VIP lounge ----------------------------------------------------------------------
 
 func _pillars() -> void:
-	# Classical round columns (Quaternius) on black marble plinths replace the plain cylinders;
-	# the collision cylinder underneath stays.
+	# Classical round columns (Quaternius) replace the plain cylinders; the collision cylinder
+	# underneath stays. Pedestal to the rail, column, head block to the ceiling (PEDESTAL_TOP).
 	for solid: Node3D in _solids("Pillar"):
 		(solid.get_node(^"Mesh") as Node3D).visible = false
 		var base: Node3D = solid.get_node_or_null(^"Base")
 		if base != null:
 			base.visible = false
-		var col: Node3D = PropModels.make(&"column", LuckyLounge.WALL_H - 0.5)
+		var col: Node3D = PropModels.make(&"column", HEAD_BOTTOM - PEDESTAL_TOP)
 		col.scale = Vector3(0.75, 1.0, 0.75)
-		col.position.y = -LuckyLounge.WALL_H * 0.5 + 0.5
+		col.position.y = -LuckyLounge.WALL_H * 0.5 + PEDESTAL_TOP
 		_recolor(col, {"Marble": GreyboxKit.material(Palette.CREAM.darkened(0.12), 0.0, 0.55)})
 		solid.add_child(col)
 		var foot: Vector3 = solid.position - Vector3(0, LuckyLounge.WALL_H * 0.5, 0)
-		_box(Vector3(1.5, 0.5, 1.5), foot + Vector3(0, 0.25, 0), _marble_mat, "marble")
-		_box(Vector3(1.6, 0.06, 1.6), foot + Vector3(0, 0.53, 0), _brass_mat, "brass")
+		var ped: float = PEDESTAL_TOP - 0.1
+		_box(Vector3(PEDESTAL_HALF * 2.0, ped, PEDESTAL_HALF * 2.0), foot + Vector3(0, ped * 0.5, 0), _marble_mat, "marble")
+		_box(Vector3(PEDESTAL_HALF * 2.0 + 0.08, 0.1, PEDESTAL_HALF * 2.0 + 0.08), foot + Vector3(0, ped + 0.05, 0), _brass_mat, "brass")
+		var head: float = LuckyLounge.WALL_H - HEAD_BOTTOM
+		_box(Vector3(HEAD_HALF * 2.0, head, HEAD_HALF * 2.0), foot + Vector3(0, HEAD_BOTTOM + head * 0.5, 0), _beam_mat(), "beam")
+		_box(Vector3(HEAD_HALF * 2.0 + 0.08, 0.06, HEAD_HALF * 2.0 + 0.08), foot + Vector3(0, HEAD_BOTTOM + 0.03, 0), _gold_mat, "gold")
+
+
+## The mahogany of the ceiling beams and the column head blocks.
+func _beam_mat() -> StandardMaterial3D:
+	return _tex("wooden_panels", 2.1, Color(0.5, 0.36, 0.3), 0.4, 0.55)
+
+
+## [lo, hi] minus every interval in `cuts` (x = from, y = to): the pieces left that are longer
+## than 2 cm.
+static func _subtract(lo: float, hi: float, cuts: Array[Vector2]) -> Array[Vector2]:
+	var out: Array[Vector2] = [Vector2(lo, hi)]
+	for cut: Vector2 in cuts:
+		var next: Array[Vector2] = []
+		for seg: Vector2 in out:
+			if cut.y <= seg.x or cut.x >= seg.y:
+				next.append(seg)
+				continue
+			if cut.x > seg.x:
+				next.append(Vector2(seg.x, cut.x))
+			if cut.y < seg.y:
+				next.append(Vector2(cut.y, seg.y))
+		out = next
+	var long: Array[Vector2] = []
+	for seg: Vector2 in out:
+		if seg.y - seg.x > 0.02:
+			long.append(seg)
+	return long
+
+
+## A gold strip under the ceiling (an axis-aligned box along x or z), cut where a column's head
+## block stands, so it dies into the block instead of running through it.
+func _ceiling_strip(size: Vector3, pos: Vector3) -> void:
+	var along_x: bool = size.x >= size.z
+	var length: float = size.x if along_x else size.z
+	var start: float = (pos.x if along_x else pos.z) - length * 0.5
+	var half_across: float = (size.z if along_x else size.x) * 0.5
+	var reach: float = HEAD_HALF + 0.04
+	var cuts: Array[Vector2] = []
+	for p: Vector3 in LuckyLounge.PILLARS:
+		if absf((p.z if along_x else p.x) - (pos.z if along_x else pos.x)) < reach + half_across:
+			var c: float = p.x if along_x else p.z
+			cuts.append(Vector2(c - reach, c + reach))
+	for seg: Vector2 in _subtract(start, start + length, cuts):
+		var mid: float = (seg.x + seg.y) * 0.5
+		if along_x:
+			_box(Vector3(seg.y - seg.x, size.y, size.z), Vector3(mid, pos.y, pos.z), _gold_mat, "gold")
+		else:
+			_box(Vector3(size.x, size.y, seg.y - seg.x), Vector3(pos.x, pos.y, mid), _gold_mat, "gold")
+
+
+## Whether `p` (x/z) is under a column's head block, grown by `margin`.
+static func _under_head(p: Vector3, margin: float) -> bool:
+	for c: Vector3 in LuckyLounge.PILLARS:
+		if absf(c.x - p.x) < HEAD_HALF + margin and absf(c.z - p.z) < HEAD_HALF + margin:
+			return true
+	return false
 
 
 func _vip_lounge() -> void:
@@ -821,7 +936,13 @@ func _waiting_room() -> void:
 	var h: float = LuckyLounge.WAIT_H
 	_retexture("WaitFloor", _tex("herringbone_parquet", 1.6, Color(0.72, 0.56, 0.44), 0.45, 0.5))
 	_retexture_solid("WaitWall", _tex("damask_wallpaper", 2.0, Color(0.95, 0.9, 0.9), 0.0, 0.85))
-	var door: float = LuckyLounge.WAIT_DOOR_HALF + 0.1
+	var door: float = WAIT_CASING_OUT
+	# The door's gold casing on this face too (the map builds the start-room one), the same
+	# size, so the runs either side stop at it and the reveal doesn't end in bare wallpaper.
+	var dh: float = LuckyLounge.WAIT_DOOR_H
+	for sx: float in [-1.0, 1.0]:
+		_box(Vector3(0.16, dh + 0.08, 0.06), Vector3(sx * (LuckyLounge.WAIT_DOOR_HALF + 0.08), (dh + 0.08) * 0.5, z0 + 0.03), _gold_mat, "gold")
+	_box(Vector3(LuckyLounge.WAIT_DOOR_HALF * 2.0 + 0.32, 0.12, 0.07), Vector3(0, dh + 0.04, z0 + 0.035), _gold_mat, "gold")
 	var runs: Array = [
 		[Vector3(-x, 0, z0), Vector3(-x, 0, z1), Vector3(1, 0, 0)],
 		[Vector3(x, 0, z0), Vector3(x, 0, z1), Vector3(-1, 0, 0)],

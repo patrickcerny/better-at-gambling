@@ -4,7 +4,7 @@ extends Control
 ## Patrick: "The practise mode should only be the game"; minigames only stays a lobby mode),
 ## Tutorial (how to play), Shop (the cosmetics shop, `CosmeticsPanel`), Quit, the profile line in the
 ## top-left corner (level, XP bar, Coins: `ProfileBadge`) and small buttons in the bottom-right
-## corner: "?" (the tutorial again), the T-shirt (your cosmetics inventory: only what you own, Patrick 2026-11-15) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
+## corner: the trophy (global leaderboards and your lifetime stats, Patrick 2026-11-16), "?" (the tutorial again), the T-shirt (your cosmetics inventory: only what you own, Patrick 2026-11-15) and the gear (settings). The first PRACTICE or PLAY ONLINE shows
 ## the tutorial first (Patrick: "The Tutorial pops up when you click practise or play for the first
 ## time") and then carries on to what the player chose; `tutorial/seen` in user://settings.cfg
 ## remembers it.
@@ -70,6 +70,9 @@ var daily_button: DailySpinButton
 var _daily_tick: float = 0.0
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
+## The trophy left of the "?": global leaderboards and your lifetime stats (`LeaderboardPanel`).
+var trophy_button: TrophyButton
+var leaderboards: LeaderboardPanel
 ## What the tutorial opened on the first PRACTICE / PLAY ONLINE carries on to when it closes.
 var _after_tutorial: Callable = Callable()
 ## Who gets the focus back when the tutorial closes to the main entries.
@@ -190,6 +193,7 @@ func _ready() -> void:
 		cosmetics.close()
 		_after_tutorial = Callable()
 		_show_tutorial(help_button))
+	_build_leaderboards()
 	_build_daily()
 	how_to_play = HowToPlayPanel.new()
 	how_to_play.name = "HowToPlay"
@@ -213,6 +217,32 @@ func _ready() -> void:
 	if SteamSvc.pending_lobby != 0:
 		_on_steam_join_requested.call_deferred(SteamSvc.pending_lobby)
 	Log.info(&"menu", "main menu ready")
+
+
+## The trophy left of the "?" and the leaderboards / stats panel it opens.
+func _build_leaderboards() -> void:
+	trophy_button = TrophyButton.new()
+	trophy_button.name = "TrophyButton"
+	trophy_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	trophy_button.offset_left = -80.0 - 4.0 * GearButton.SIZE
+	trophy_button.offset_top = -32.0 - GearButton.SIZE
+	trophy_button.offset_right = -80.0 - 3.0 * GearButton.SIZE
+	trophy_button.offset_bottom = -32.0
+	trophy_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	trophy_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(trophy_button)
+	leaderboards = LeaderboardPanel.new()
+	add_child(leaderboards)
+	leaderboards.closed.connect(func() -> void:
+		if trophy_button.is_visible_in_tree():
+			trophy_button.grab_focus())
+	trophy_button.pressed.connect(func() -> void:
+		if _busy:
+			return
+		_settings.close()
+		cosmetics.close()
+		level_pass.close()
+		leaderboards.open())
 
 
 func _build_daily() -> void:
@@ -801,10 +831,21 @@ static func sort_public_lobbies(lobbies: Array[Dictionary], friend_lobbies_: Dic
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var fa: int = (friend_lobbies_.get(int(a["lobby"]), []) as Array).size()
 		var fb: int = (friend_lobbies_.get(int(b["lobby"]), []) as Array).size()
+		var va: bool = str(a.get("build", Protocol.BUILD_ID)) == Protocol.BUILD_ID
+		var vb: bool = str(b.get("build", Protocol.BUILD_ID)) == Protocol.BUILD_ID
+		if va != vb:
+			return va  # lobbies we can join first
 		if fa != fb:
 			return fa > fb
 		return int(a["members"]) > int(b["members"]))
 	return out
+
+
+## Why a public lobby of another version can't be joined, and what to do about it.
+static func version_text(build: String) -> String:
+	if build == "":
+		return "Version unknown, refresh in a moment"
+	return "Version %s (you have %s): restart Steam so both run the newest version" % [build, Protocol.BUILD_ID]
 
 
 ## One row per public lobby: its name, your friends in it, players and JOIN; full ones are left
@@ -823,7 +864,11 @@ func _fill_browse(lobbies: Array[Dictionary]) -> void:
 		var lid: int = int(l["lobby"])
 		var friends: Array = _friend_lobby_ids.get(lid, [])
 		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if not friends.is_empty() else ""
-		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), true, l.get("info", {})))
+		var build: String = str(l.get("build", Protocol.BUILD_ID))
+		var same: bool = build == Protocol.BUILD_ID
+		if not same:
+			sub = version_text(build)
+		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), same, l.get("info", {})))
 	if had_focus:
 		_browse_refresh.grab_focus()
 
