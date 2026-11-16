@@ -3,12 +3,19 @@ extends Node
 ## Client side of the Odd Jobs cabinet (no window): walk up, look at the big red button and click
 ## (left mouse or E); each click is one `odd_jobs_press`, sent at once: no cap, as fast as you can click. The bar is shared by everyone in the
 ## casino and the click that fills it wins the $50 (server/odd_jobs.gd); the cabinet shows the bar,
-## "N clicks to $50" at your own share and who won. While you are broke (below the House Comp line,
-## the smallest table minimum) the cabinet's lamps pulse and the button is outlined, with a
-## one-time hint. Never decides anything: the server counts, fills and pays.
+## "N clicks to $50" at your own share and who won. While you are broke (under $50, or under the
+## House Comp line when the table limits put that higher) the cabinet's lamps pulse, the button is
+## outlined, a gold beacon floats over the cabinet (seen through walls), a gold arrow on the screen
+## edge points the way while the cabinet is off screen, and a one-time hint says what to do
+## (Patrick: "Indicator wenn man broke ist (weniger geld als 50) zum button"). All of it goes
+## away at the cabinet and once you have $50 again. Never decides anything: the server counts,
+## fills and pays.
 
 const ENOUGH_TEXT: String = "You've got enough. Go gamble!"
-const HINT_TEXT: String = "Broke? Smash the big red button at the Odd Jobs cabinet by the Gift Shop: $50 a bar."
+const HINT_TEXT: String = "Broke? Follow the gold arrow to the Odd Jobs button by the Gift Shop and smash it: $50 a bar."
+## Under this balance the player counts as broke and is pointed to the button (Patrick: "weniger
+## geld als 50").
+const BROKE_BELOW: int = 50
 
 var scene: MatchScene
 ## True while the local player looks at the button from the stand spot.
@@ -47,6 +54,11 @@ static func broke_line(cfg: BalanceConfig, segment: int) -> int:
 	return int(floor(cfg.comp_threshold * cfg.limits_multiplier(segment)))
 
 
+## True when `money` counts as broke: under $50, or under the House Comp line if that is higher.
+static func is_broke(money_now: int, line: int) -> bool:
+	return money_now < maxi(BROKE_BELOW, line)
+
+
 func _casino_open() -> bool:
 	var ph: Phase.Id = scene.view.state.phase
 	return (ph == Phase.Id.CASINO or ph == Phase.Id.PRE_MINIGAME) and not scene._minigames_only()
@@ -67,16 +79,32 @@ func is_aiming() -> bool:
 func _process(_delta: float) -> void:
 	var cab: OddJobsCabinet = cabinet()
 	if cab == null or scene.local == null:
+		scene.hud.set_odd_jobs_pointer(false)
 		return
 	aimed = is_aiming()
 	cab.set_aimed(aimed)
-	var now_broke: bool = _casino_open() and money() < broke_line(scene.cfg, scene.view.state.segment_index)
+	var now_broke: bool = _casino_open() and is_broke(money(), broke_line(scene.cfg, scene.view.state.segment_index))
 	if now_broke != broke:
 		broke = now_broke
 		cab.set_glow(broke)
 		if broke:
 			scene._hint(&"odd_jobs", HINT_TEXT, 1.0)
+	_point_the_way(cab)
 	cab.set_counts(fill, OddJobs.presses_needed(money()))
+
+
+## True while the way to the button is shown: broke, standing (not seated at a table or knocked
+## out), not at the cabinet already and no results screen up.
+func guiding() -> bool:
+	return broke and scene.local.is_standing() and not scene._near_odd_jobs() and scene.results_panel == null
+
+
+## The beacon over the cabinet and, while the cabinet is off screen, the arrow on the screen edge.
+func _point_the_way(cab: OddJobsCabinet) -> void:
+	var on: bool = guiding()
+	cab.set_beacon(on)
+	var at: Dictionary = scene.edge_pointer(cab.beacon_position()) if on else {}
+	scene.hud.set_odd_jobs_pointer(not at.is_empty(), at.get("pos", Vector2.ZERO), at.get("angle", 0.0))
 
 
 ## A click (left mouse or E): presses the button when the player looks at it. False = not aimed,

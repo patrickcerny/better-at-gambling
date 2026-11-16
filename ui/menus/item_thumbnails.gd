@@ -7,6 +7,17 @@ extends Node
 ## frame). Headless: nothing renders, the textures stay blank.
 
 const SIZE: int = 128
+## The items are built facing forward (-z), the way the bean holds them out to the others, so the
+## preview turns them round to face the camera (Patrick: "monkey ist verkehr rum"), a little to the
+## side so they read as 3D. `TILT` sets single items upright (degrees, x/y/z, on top of the turn):
+## bat.glb has its barrel at -y, so it stood on its head (Patrick: "wrong way"); it now leans
+## barrel up across the square.
+const YAW: float = 180.0 - 28.0
+const TILT: Dictionary = {&"baseball_bat": Vector3(0, 0, 145)}
+## Models that stand on their head as built (the round results' turning cards flip them upright).
+const UPSIDE_DOWN: Array[StringName] = [&"baseball_bat"]
+## Dev: extra turn for every item (tools/dev/item_thumbs_shot.gd --turn).
+static var extra_turn: float = 0.0
 
 ## id -> ImageTexture, shared by every list that ever opens.
 static var _cache: Dictionary = {}
@@ -27,21 +38,28 @@ func _ready() -> void:
 		return
 	_viewport = SubViewport.new()
 	_viewport.size = Vector2i(SIZE, SIZE)
-	_viewport.transparent_bg = true
-	_viewport.own_world_3d = true
-	_viewport.msaa_3d = Viewport.MSAA_4X
 	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(_viewport)
+	_stand = build_stage(_viewport)
+
+
+## Sets up `vp` as a little photo booth for one item (transparent background, its own world, the
+## warm key and fill light, the camera a little above): returns the stand to put the model on.
+## Shared with the item bar's live model of the held item (`ItemBar`).
+static func build_stage(vp: SubViewport) -> Node3D:
+	vp.transparent_bg = true
+	vp.own_world_3d = true
+	vp.msaa_3d = Viewport.MSAA_4X
 	var root := Node3D.new()
-	_viewport.add_child(root)
-	_stand = Node3D.new()
-	root.add_child(_stand)
+	vp.add_child(root)
+	var stand := Node3D.new()
+	root.add_child(stand)
 	var cam := Camera3D.new()
 	cam.current = true
 	cam.fov = 30.0
 	cam.position = Vector3(0.0, 0.35, 2.3)
 	root.add_child(cam)
-	cam.look_at(Vector3.ZERO, Vector3.UP)
+	cam.basis = Basis.looking_at(-cam.position, Vector3.UP)
 	var key := DirectionalLight3D.new()
 	key.light_color = Color(1.0, 0.94, 0.84)
 	key.light_energy = 1.2
@@ -60,6 +78,7 @@ func _ready() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	root.add_child(we)
+	return stand
 
 
 ## The picture of item `id` (blank until rendered).
@@ -71,6 +90,16 @@ static func texture_for(id: StringName) -> ImageTexture:
 	_cache[id] = tex
 	_queue.append(id)
 	return tex
+
+
+## The y turn of `id`'s preview, degrees (also the item bar's live model turns from there).
+static func preview_yaw(id: StringName) -> float:
+	return YAW + extra_turn
+
+
+## The whole preview rotation of `id`, degrees (turn plus `TILT`).
+static func preview_rotation(id: StringName) -> Vector3:
+	return Vector3(0.0, preview_yaw(id), 0.0) + (TILT.get(id, Vector3.ZERO) as Vector3)
 
 
 ## Whether every requested picture is done.
@@ -94,7 +123,7 @@ func _process(_delta: float) -> void:
 	if _model != null:
 		_model.queue_free()
 	_model = ItemModels.make(_busy, 1.0)
-	_model.rotation_degrees = Vector3(0.0, -28.0, 0.0)
+	_model.rotation_degrees = preview_rotation(_busy)
 	_stand.add_child(_model)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_wait = 2  # rendered at the end of this frame; read it back next frame (plus one for safety)

@@ -12,9 +12,12 @@ config_version=5
 
 config/name="Better at Gambling"
 config/description="Online casino party game with fictional chips."
-config/version="0.9.44"
+config/version="0.9.64"
 run/main_scene="res://ui/menus/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://assets/icons/icon.png"
+config/macos_native_icon="res://assets/icons/icon.icns"
+config/windows_native_icon="res://assets/icons/icon.ico"
 
 [audio]
 

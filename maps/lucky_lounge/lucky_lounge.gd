@@ -36,9 +36,9 @@ const GAMES_PATH: String = "res://data/registry/games.tres"
 ## `full_floor_plan`) plus the fixed stations.
 static var _full_plan: Dictionary = {}
 static var STATIONS: Dictionary = _full_floor_stations()
-const SPAWNS: Array[Vector3] = [  # start-room spots: in front of the pedestal stairs (z ≥ 12.95)
-	Vector3(-6, 0, 12.3), Vector3(-4, 0, 11.8), Vector3(-2, 0, 12.3), Vector3(2, 0, 12.3),
-	Vector3(4, 0, 11.8), Vector3(6, 0, 12.3), Vector3(-8, 0, 12.3), Vector3(8, 0, 12.3),
+const SPAWNS: Array[Vector3] = [  # start-room spots: in front of the pedestal stairs (z ≥ 12.85)
+	Vector3(-6, 0, 11.9), Vector3(-4, 0, 11.4), Vector3(-2, 0, 11.9), Vector3(2, 0, 11.9),
+	Vector3(4, 0, 11.4), Vector3(6, 0, 11.9), Vector3(-8, 0, 11.9), Vector3(8, 0, 11.9),
 ]
 ## The guards' rounds, along the aisles every floor keeps open (docs/FLOOR_PLAN.md): the west
 ## and the east half of the floor, each round its pit block and along the walls.
@@ -83,25 +83,36 @@ const SHOP_POS: Vector3 = Vector3(19.6, 0, 0.9)
 ## north side: its centre, and where players stand to use it.
 const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -2.6)
 const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -2.6)
-## The lobby settings tablet on its brass stand (0.9.4, Patrick: "settings tablet into the lobby
-## room"), west of the middle of the start room by the host's spot: walk up and press E for the
-## lobby settings. Where it stands, which way its screen faces (yaw), and how close you must be.
-const SETTINGS_TABLET_POS: Vector3 = Vector3(-10.6, 0, 9.9)
-const SETTINGS_TABLET_YAW: float = -PI * 0.6
-const SETTINGS_TABLET_RANGE: float = 1.8
+## The lobby settings board (0.9.46, Patrick: "mach lieber da eine große tafel an der wand"):
+## a big framed board on the start room's north wall, west of the lobby doors, that shows the
+## lobby's settings to everyone, live. Only the host opens the settings there (walk up, press E).
+## Where its middle hangs (x, wall face z), its size, and the spot in front of it you use it from.
+const SETTINGS_BOARD_X: float = -11.0
+const SETTINGS_BOARD_SIZE: Vector2 = Vector2(4.2, 2.7)
+const SETTINGS_BOARD_Y: float = 2.75
+const SETTINGS_BOARD_SPOT: Vector3 = Vector3(-11.0, 0, 9.5)
+const SETTINGS_BOARD_RANGE: float = 2.0
+## Rows on the board: [left label, right value] each.
+const SETTINGS_BOARD_ROWS: int = 5
 ## Radius around a ready pedestal's centre that counts as standing on it, and how high its top is
 ## (you have to be up on it, not beside it).
 const PAD_RADIUS: float = 0.75
 const PEDESTAL_TOP: float = 0.8
-## Floor layers (y): carpet 0.01, area rugs 0.02, station rugs 0.03. Keep 1 cm apart.
+## Each pedestal's dais (body width x depth, without moulding and cap) and the stair in front of
+## it: how many steps below the top, how long (floor to dais) and how wide.
+const DAIS_SIZE: Vector2 = Vector2(1.2, 1.0)
+const STAIR_STEPS: int = 3
+const STAIR_LEN: float = 1.35
+const STAIR_W: float = 0.86
+## Floor layers (y): carpet 0.01, area rugs 0.02. Keep 1 cm apart.
 const AREA_RUG_Y: float = 0.02
-const STATION_RUG_Y: float = 0.03
-## The ready pedestals (0.8.15, Patrick: "Podeste"): Greek marble column pedestals along the
+## The ready pedestals (0.8.15, Patrick: "Podeste"; reworked 0.9.57): marble daises along the
 ## south wall of the start room, one per player colour, nearest the door first, each with a
-## marble stair up to its top. The revolving door gap runs x −2..2.
+## marble stair up to its top; 2.5 m apart (1.2 m free between two), the back 0.3 m off the wall.
+## The revolving door gap runs x −2..2.
 const PEDESTALS: Array[Vector3] = [
-	Vector3(-3.0, 0, 15.1), Vector3(3.0, 0, 15.1), Vector3(-5.2, 0, 15.1), Vector3(5.2, 0, 15.1),
-	Vector3(-7.4, 0, 15.1), Vector3(7.4, 0, 15.1), Vector3(-9.6, 0, 15.1), Vector3(9.6, 0, 15.1),
+	Vector3(-3.2, 0, 14.85), Vector3(3.2, 0, 14.85), Vector3(-5.7, 0, 14.85), Vector3(5.7, 0, 14.85),
+	Vector3(-8.2, 0, 14.85), Vector3(8.2, 0, 14.85), Vector3(-10.7, 0, 14.85), Vector3(10.7, 0, 14.85),
 ]
 ## The glow from above a ready pedestal: warm gold spotlight, how bright, how long it fades.
 const PEDESTAL_GLOW: Color = Color(1.0, 0.8, 0.45)
@@ -115,6 +126,8 @@ const PEDESTAL_PLATE_Y: float = 3.5
 const PEDESTAL_NAME_SIZE: int = 44
 const MARBLE: Color = Color("#E6DFD2")
 const MARBLE_DARK: Color = Color("#B9AE9C")
+## The pedestals' footing and base moulding: deep brown marble so the white dais stands on it.
+const MARBLE_DEEP: Color = Color("#4E3A2C")
 ## The wall between the start room and the casino (centre line) and its doorway: the lobby
 ## doors fill x −LOBBY_DOOR_HALF..LOBBY_DOOR_HALF, LOBBY_DOOR_H high.
 const LOBBY_DOORS_Z: float = 8.4
@@ -235,6 +248,10 @@ var _glow_level: Array[float] = []
 var _glow_tweens: Array[Tween] = []
 ## Bobbing arrow over the local player's own pedestal (built on first use, client only).
 var pedestal_marker: Node3D
+## The lobby settings board's labels: title, [left, right] per row, and the footer.
+var settings_board_title: Label3D
+var settings_board_rows: Array = []
+var settings_board_footer: Label3D
 var _marker_base_y: float = 0.0
 var _marker_time: float = 0.0
 var vip_gate_area: Area3D
@@ -552,50 +569,94 @@ func _build_lobby() -> void:
 	for x: float in [-16.5, 18.0]:
 		var couch: Node3D = GreyboxKit.box(self, Vector3(2.4, 0.9, 1.0), Vector3(x, 0.45, SIZE_Z * 0.5 - 0.8), Color("#24304A"), "Couch")
 		PropModels.dress(couch, &"couch", 0.45, 0.0, 2.5).rotation.y = PI
-	_build_settings_tablet()
+	_build_settings_board()
 	_build_lobby_doors()
 
 
-## The lobby settings tablet: a brass pedestal stand with a tilted black tablet on top, its screen
-## lit with the lobby's colours and a "LOBBY SETTINGS / press E" title. The pole is solid.
-func _build_settings_tablet() -> void:
+## The lobby settings board on the start room's north wall, facing the room (+z): a gold frame
+## around a dark green felt panel, "LOBBY SETTINGS" at the top, one row per setting (name left,
+## value right in gold) and a footer naming the host. `set_settings_board` writes the rows.
+func _build_settings_board() -> void:
 	var root := Node3D.new()
-	root.name = "SettingsTablet"
-	root.position = SETTINGS_TABLET_POS
-	root.rotation.y = SETTINGS_TABLET_YAW
+	root.name = "SettingsBoard"
+	root.position = Vector3(SETTINGS_BOARD_X, SETTINGS_BOARD_Y, LOBBY_DOORS_Z + LOBBY_WALL_T * 0.5)
 	add_child(root)
-	GreyboxKit.cylinder(root, 0.26, 0.05, Vector3(0, 0.025, 0), Palette.WARM_GOLD, "TabletFoot", false, 0.85)
-	GreyboxKit.cylinder(root, 0.045, 1.0, Vector3(0, 0.5, 0), Palette.WARM_GOLD, "TabletPole", true, 0.85)
-	var head := Node3D.new()
-	head.name = "Head"
-	head.position = Vector3(0, 1.2, -0.1)
-	head.rotation.x = deg_to_rad(35.0)  # screen tilted up towards whoever stands in front (−z)
-	root.add_child(head)
-	_mesh_box(head, Vector3(0.12, 0.12, 0.08), Vector3(0, -0.12, 0.06), GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)).name = "Bracket"
-	_mesh_box(head, Vector3(0.66, 0.46, 0.04), Vector3.ZERO, GreyboxKit.material(Palette.CASINO_BLACK, 0.3, 0.4)).name = "Bezel"
-	var screen_mat := StandardMaterial3D.new()
-	screen_mat.albedo_color = Palette.FELT_GREEN.darkened(0.45)
-	screen_mat.emission_enabled = true
-	screen_mat.emission = Palette.FELT_GREEN.darkened(0.2)
-	screen_mat.emission_energy_multiplier = 0.6
-	_mesh_box(head, Vector3(0.58, 0.38, 0.01), Vector3(0, 0, -0.021), screen_mat).name = "Screen"
-	_mesh_box(head, Vector3(0.68, 0.03, 0.05), Vector3(0, -0.245, 0), GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)).name = "Lip"
-	for spec: Array in [["LOBBY SETTINGS", 30, 0.08, Palette.VIP_GOLD], ["press E", 22, -0.07, Palette.CREAM]]:
-		var l := Label3D.new()
-		l.text = spec[0]
-		l.font_size = spec[1]
-		l.pixel_size = 0.0035
-		l.modulate = spec[3]
-		l.outline_modulate = Palette.CASINO_BLACK
-		l.outline_size = 6
-		l.position = Vector3(0, spec[2], -0.03)
-		l.rotation.y = PI  # read from the screen side (−z)
-		head.add_child(l)
+	var size: Vector2 = SETTINGS_BOARD_SIZE
+	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
+	_mesh_box(root, Vector3(size.x + 0.16, size.y + 0.16, 0.05), Vector3(0, 0, 0.025), gold).name = "Frame"
+	_mesh_box(root, Vector3(size.x + 0.04, size.y + 0.04, 0.02), Vector3(0, 0, 0.06), GreyboxKit.material(Palette.CASINO_BLACK, 0.2, 0.5)).name = "Bezel"
+	var felt := StandardMaterial3D.new()
+	felt.albedo_color = Palette.FELT_GREEN.darkened(0.5)
+	felt.roughness = 0.95
+	felt.emission_enabled = true
+	felt.emission = Palette.FELT_GREEN.darkened(0.55)
+	felt.emission_energy_multiplier = 0.5
+	_mesh_box(root, Vector3(size.x - 0.04, size.y - 0.04, 0.01), Vector3(0, 0, 0.075), felt).name = "Felt"
+	var front: float = 0.085
+	var top: float = size.y * 0.5
+	# Gold corner studs and a crest on top of the frame.
+	for cx: float in [-1.0, 1.0]:
+		for cy: float in [-1.0, 1.0]:
+			_mesh_box(root, Vector3(0.12, 0.12, 0.03), Vector3(cx * (size.x * 0.5 + 0.02), cy * (top + 0.02), 0.065), gold).name = "Stud"
+	settings_board_title = _board_label(root, "LOBBY SETTINGS", 80, Vector3(0, top - 0.3, front), Palette.VIP_GOLD, HORIZONTAL_ALIGNMENT_CENTER, 0.0055)
+	_mesh_box(root, Vector3(size.x - 0.5, 0.02, 0.005), Vector3(0, top - 0.56, front), gold).name = "Rule"
+	var row_h: float = 0.32
+	var x_in: float = size.x * 0.5 - 0.26
+	settings_board_rows.clear()
+	for r: int in SETTINGS_BOARD_ROWS:
+		var y: float = top - 0.8 - r * row_h
+		var left: Label3D = _board_label(root, "", 48, Vector3(-x_in, y, front), Palette.CREAM.darkened(0.08), HORIZONTAL_ALIGNMENT_LEFT, 0.005)
+		var right: Label3D = _board_label(root, "", 48, Vector3(x_in, y, front), Palette.VIP_GOLD, HORIZONTAL_ALIGNMENT_RIGHT, 0.005)
+		settings_board_rows.append([left, right])
+	_mesh_box(root, Vector3(size.x - 0.5, 0.014, 0.005), Vector3(0, -top + 0.34, front), gold).name = "FootRule"
+	settings_board_footer = _board_label(root, "", 36, Vector3(0, -top + 0.19, front), Palette.CREAM.darkened(0.25), HORIZONTAL_ALIGNMENT_CENTER, 0.0045)
+	# A brass picture light over the board, its warm strip lit.
+	var strip := StandardMaterial3D.new()
+	strip.albedo_color = Palette.CREAM
+	strip.emission_enabled = true
+	strip.emission = Color(1.0, 0.8, 0.5)
+	strip.emission_energy_multiplier = 1.4
+	var lamp_y: float = top + 0.24
+	_mesh_box(root, Vector3(2.2, 0.08, 0.12), Vector3(0, lamp_y, 0.3), gold).name = "PictureLight"
+	_mesh_box(root, Vector3(2.1, 0.02, 0.08), Vector3(0, lamp_y - 0.05, 0.3), strip).name = "PictureLightStrip"
+	for ax: float in [-0.75, 0.75]:
+		_mesh_box(root, Vector3(0.04, 0.04, 0.26), Vector3(ax, lamp_y, 0.13), gold).name = "PictureLightArm"
+		_mesh_box(root, Vector3(0.12, 0.16, 0.03), Vector3(ax, lamp_y, 0.015), gold).name = "PictureLightMount"
 
 
-## True when `pos` (feet) is close enough to the settings tablet to use it.
-static func near_settings_tablet(pos: Vector3) -> bool:
-	return Vector2(pos.x - SETTINGS_TABLET_POS.x, pos.z - SETTINGS_TABLET_POS.z).length() < SETTINGS_TABLET_RANGE
+func _board_label(parent: Node3D, text: String, font_size: int, pos: Vector3, color: Color, align: HorizontalAlignment, px: float) -> Label3D:
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = font_size
+	l.pixel_size = px
+	l.modulate = color
+	l.outline_modulate = Palette.CASINO_BLACK
+	l.outline_size = 8
+	l.horizontal_alignment = align
+	l.double_sided = false
+	l.position = pos
+	parent.add_child(l)
+	return l
+
+
+## Writes the board: `rows` is [[label, value], ...] (up to `SETTINGS_BOARD_ROWS`), `footer` the
+## line at the bottom. Labels only change when the text does.
+func set_settings_board(rows: Array, footer: String) -> void:
+	for r: int in settings_board_rows.size():
+		var pair: Array = rows[r] if r < rows.size() else ["", ""]
+		var left: Label3D = settings_board_rows[r][0]
+		var right: Label3D = settings_board_rows[r][1]
+		if left.text != str(pair[0]):
+			left.text = str(pair[0])
+		if right.text != str(pair[1]):
+			right.text = str(pair[1])
+	if settings_board_footer != null and settings_board_footer.text != footer:
+		settings_board_footer.text = footer
+
+
+## True when `pos` (feet) is close enough to the settings board to use it.
+static func near_settings_board(pos: Vector3) -> bool:
+	return Vector2(pos.x - SETTINGS_BOARD_SPOT.x, pos.z - SETTINGS_BOARD_SPOT.z).length() < SETTINGS_BOARD_RANGE
 
 
 func _build_lobby_doors() -> void:
@@ -668,9 +729,12 @@ func _mesh_box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> Me
 	return mi
 
 
-## A Greek marble column pedestal (plinth, fluted drum with a band in the player's colour,
-## echinus and abacus, 0.8 m high) with a four-step marble stair in front of it. The stair's
-## collision is one smooth wedge (no step lips to catch on); the column is a plain block.
+## A ready pedestal (0.9.57, Patrick: "reworke die podeste komplett"): one marble piece on a dark
+## marble footing, a square dais 0.8 m high (base moulding, a body with an inlay panel in the
+## player's colour on each side and either side of the stair, a gold fillet and an overhanging cap)
+## with a three-step stair in front that runs straight into it. Nothing overlaps or pokes through:
+## every part sits on the one below, the stair is narrower than the dais and has no rails. You walk
+## up on one smooth invisible wedge (no step lips); the dais is a plain block.
 func _build_pedestal(i: int, pos: Vector3) -> void:
 	var root := Node3D.new()
 	root.name = "Pedestal%d" % i
@@ -679,40 +743,66 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	add_child(root)
 	var marble: StandardMaterial3D = GreyboxKit.material(MARBLE, 0.0, 0.45)
 	var marble_dark: StandardMaterial3D = GreyboxKit.material(MARBLE_DARK, 0.0, 0.5)
-	# The block you stand on (collision only; the column's looks are the visuals below).
+	var polished: StandardMaterial3D = GreyboxKit.material(MARBLE.lightened(0.06), 0.0, 0.3)
+	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
+	var colour: StandardMaterial3D = GreyboxKit.material(Palette.player_color(i), 0.1, 0.45)
+	var deep: StandardMaterial3D = GreyboxKit.material(MARBLE_DEEP, 0.0, 0.35)
+	var hw: float = DAIS_SIZE.x * 0.5  # body half width
+	var hd: float = DAIS_SIZE.y * 0.5  # body half depth
+	var front: float = -hd  # the body's front face
+	var foot: float = front - STAIR_LEN  # the stair's lowest riser
+	# The block you stand on (collision only) and the walking wedge up the stair.
 	var body := StaticBody3D.new()
 	body.name = "Block"
 	body.add_to_group(&"navsource")
 	var bs := BoxShape3D.new()
-	bs.size = Vector3(0.9, PEDESTAL_TOP, 0.9)
+	bs.size = Vector3(DAIS_SIZE.x + 0.1, PEDESTAL_TOP, DAIS_SIZE.y + 0.1)
 	var cs := CollisionShape3D.new()
 	cs.shape = bs
 	cs.position.y = PEDESTAL_TOP * 0.5
 	body.add_child(cs)
 	root.add_child(body)
-	# Plinth, drum with 16 flutes, colour band, echinus and abacus.
-	(GreyboxKit.box(root, Vector3(1.0, 0.16, 1.0), Vector3(0, 0.08, 0), MARBLE, "Plinth", false).get_node("Mesh") as MeshInstance3D).material_override = marble
-	GreyboxKit.cylinder(root, 0.40, 0.03, Vector3(0, 0.175, 0), Palette.player_color(i), "Band", false)
-	(GreyboxKit.cylinder(root, 0.36, 0.5, Vector3(0, 0.44, 0), MARBLE, "Drum", false).get_node("Mesh") as MeshInstance3D).material_override = marble
-	for f: int in 16:
-		var a: float = TAU * f / 16.0
-		var flute: Node3D = GreyboxKit.box(root, Vector3(0.05, 0.46, 0.04), Vector3(cos(a) * 0.36, 0.44, sin(a) * 0.36), MARBLE_DARK, "Flute%d" % f, false)
-		flute.rotation.y = -a
-		(flute.get_node("Mesh") as MeshInstance3D).material_override = marble_dark
-	(GreyboxKit.cylinder(root, 0.44, 0.05, Vector3(0, 0.715, 0), MARBLE_DARK, "Echinus", false).get_node("Mesh") as MeshInstance3D).material_override = marble_dark
-	GreyboxKit.box(root, Vector3(0.94, 0.012, 0.94), Vector3(0, 0.745, 0), Palette.WARM_GOLD, "Trim", false)
-	var top: Node3D = GreyboxKit.box(root, Vector3(0.9, 0.06, 0.9), Vector3(0, PEDESTAL_TOP - 0.03, 0), MARBLE, "Abacus", false)
-	var top_mesh: MeshInstance3D = top.get_node("Mesh") as MeshInstance3D
-	top_mesh.material_override = marble
-	# Stair up from the room side (−z): a smooth wedge to walk on, dressed as four marble steps.
-	var stair_len: float = 1.7
-	GreyboxKit.ramp(root, Vector3(0, 0, -0.45 - stair_len), Vector3(0, PEDESTAL_TOP, -0.45), 0.9, MARBLE, "Stair")
-	for k: int in 4:
-		var rise: float = PEDESTAL_TOP / 4.0
-		var run: float = stair_len / 4.0
-		# Step k climbs from the room side: lowest tread farthest from the column.
-		var step: Node3D = GreyboxKit.box(root, Vector3(0.96, rise, run), Vector3(0, rise * (k + 0.5), -0.45 - stair_len + run * (k + 0.5)), MARBLE if k % 2 == 0 else MARBLE_DARK, "Step%d" % k, false)
-		(step.get_node("Mesh") as MeshInstance3D).material_override = marble if k % 2 == 0 else marble_dark
+	var ramp: Node3D = GreyboxKit.ramp(root, Vector3(0, 0, foot - 0.03), Vector3(0, PEDESTAL_TOP, front - 0.05), STAIR_W, MARBLE, "Stair")
+	(ramp.get_node("Mesh") as MeshInstance3D).visible = false
+	# Footing: one dark slab under the dais and the stair, a gold line along its front edge.
+	var base_h: float = 0.05
+	var fz0: float = foot - 0.1
+	var fz1: float = hd + 0.08
+	_mesh_box(root, Vector3(DAIS_SIZE.x + 0.2, base_h, fz1 - fz0), Vector3(0, base_h * 0.5, (fz0 + fz1) * 0.5), deep).name = "Footing"
+	_mesh_box(root, Vector3(DAIS_SIZE.x + 0.21, 0.012, 0.012), Vector3(0, base_h - 0.006, fz0 - 0.001), gold).name = "FootingEdge"
+	# The dais: base moulding, body, gold fillet, overhanging cap (the top you stand on).
+	var mould_h: float = 0.09
+	_mesh_box(root, Vector3(DAIS_SIZE.x + 0.08, mould_h, DAIS_SIZE.y + 0.08), Vector3(0, base_h + mould_h * 0.5, 0), deep).name = "Moulding"
+	var cap_h: float = 0.07
+	var body_y0: float = base_h + mould_h
+	var body_y1: float = PEDESTAL_TOP - cap_h
+	_mesh_box(root, Vector3(DAIS_SIZE.x, body_y1 - body_y0, DAIS_SIZE.y), Vector3(0, (body_y0 + body_y1) * 0.5, 0), marble).name = "Body"
+	_mesh_box(root, Vector3(DAIS_SIZE.x + 0.03, 0.02, DAIS_SIZE.y + 0.03), Vector3(0, body_y1 - 0.01, 0), gold).name = "Fillet"
+	var top_mesh: MeshInstance3D = _mesh_box(root, Vector3(DAIS_SIZE.x + 0.1, cap_h, DAIS_SIZE.y + 0.1), Vector3(0, PEDESTAL_TOP - cap_h * 0.5, 0), polished)
+	top_mesh.name = "Cap"
+	# Colour inlays in gold frames: one on each side face, one either side of the stair in front.
+	var mid_y: float = (body_y0 + body_y1) * 0.5 - 0.01
+	var inlay_h: float = (body_y1 - body_y0) - 0.16
+	for sx: float in [-1.0, 1.0]:
+		_mesh_box(root, Vector3(0.012, inlay_h + 0.04, DAIS_SIZE.y - 0.2), Vector3(sx * (hw + 0.006), mid_y, 0), gold).name = "InlayFrame"
+		_mesh_box(root, Vector3(0.012, inlay_h, DAIS_SIZE.y - 0.24), Vector3(sx * (hw + 0.012), mid_y, 0), colour).name = "Inlay"
+		var cx: float = sx * (STAIR_W * 0.5 + (hw - STAIR_W * 0.5) * 0.5)
+		var iw: float = hw - STAIR_W * 0.5 - 0.06
+		_mesh_box(root, Vector3(iw + 0.04, inlay_h + 0.04, 0.012), Vector3(cx, mid_y, front - 0.006), gold).name = "InlayFrame"
+		_mesh_box(root, Vector3(iw, inlay_h, 0.012), Vector3(cx, mid_y, front - 0.012), colour).name = "Inlay"
+	# The stair: solid risers from the footing up, polished treads with a gold nosing.
+	var rise: float = PEDESTAL_TOP / (STAIR_STEPS + 1)
+	var run: float = STAIR_LEN / STAIR_STEPS
+	var tread_t: float = 0.04
+	var over: float = 0.025
+	for k: int in STAIR_STEPS:
+		var top: float = rise * (k + 1)
+		var z0: float = foot + run * k
+		var z1: float = z0 + run if k < STAIR_STEPS - 1 else front
+		var bh: float = top - tread_t - base_h
+		_mesh_box(root, Vector3(STAIR_W, bh, z1 - z0), Vector3(0, base_h + bh * 0.5, (z0 + z1) * 0.5), marble_dark).name = "Step%d" % k
+		_mesh_box(root, Vector3(STAIR_W + 0.02, tread_t, z1 - z0 + over), Vector3(0, top - tread_t * 0.5, (z0 - over + z1) * 0.5), polished).name = "Tread%d" % k
+		_mesh_box(root, Vector3(STAIR_W + 0.024, 0.014, 0.014), Vector3(0, top - tread_t * 0.5, z0 - over - 0.004), gold).name = "Nosing%d" % k
 	pedestal_labels.append(_build_name_plate(root, i))
 	pedestal_tops.append(top_mesh)
 	_build_glow(root)
@@ -722,7 +812,7 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	_set_glow(0.0, i)
 
 
-## The brass name plate on a slim post behind the column (between it and the wall), facing the
+## The brass name plate on a slim post behind the pedestal (between it and the wall), facing the
 ## room; high enough to read over the head of whoever stands on the pedestal.
 func _build_name_plate(root: Node3D, i: int) -> Label3D:
 	var brass: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
@@ -1505,6 +1595,8 @@ func _make_station(kind: StringName) -> StationBase:
 			return SwordTapperStation.new()
 		&"holdem":
 			return HoldemStation.new()
+		&"baccarat":
+			return BaccaratStation.new()
 	# A newer game can bring its own station scene (`GameDefinition.station_scene`).
 	var def: GameDefinition = Registry.games.get(kind, null)
 	if def != null and def.station_scene != null:

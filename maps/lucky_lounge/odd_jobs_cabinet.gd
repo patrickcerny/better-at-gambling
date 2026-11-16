@@ -3,7 +3,8 @@ extends Node3D
 ## The Odd Jobs cabinet's live parts (built by LuckyLounge at `ODD_JOBS_CABINET`, front to the room,
 ## −x): the big red arcade button you click in the world, the shared bar lit on the riser above it,
 ## the clicks/notes text, and the warm lamp strip + marquee bulbs that pulse while the local player
-## is broke. Pure presentation: OddJobsController feeds it the server's numbers.
+## is broke, plus a gold beacon (arrow and "ODD JOBS +$50") floating over it that shows through
+## walls so a broke player finds the button from anywhere. Pure presentation: OddJobsController feeds it the server's numbers.
 
 ## Button cap centre (local) and its radius.
 const BUTTON_POS: Vector3 = Vector3(-0.08, 1.17, 0.0)
@@ -18,6 +19,9 @@ const DIP: float = 0.05
 const BAR_X: float = 0.145
 const BAR_Y: float = 1.57
 const BAR_LEN: float = 0.68
+## The beacon's height over the floor (local), and how far it bobs.
+const BEACON_Y: float = 3.0
+const BEACON_BOB: float = 0.12
 const OUTLINE_SHADER: Shader = preload("res://client/aim_outline.gdshader")
 
 var button: Node3D
@@ -25,6 +29,8 @@ var bar_fill: MeshInstance3D
 var count_label: Label3D
 var note_label: Label3D
 var lamp_light: OmniLight3D
+## Floats over the cabinet while a broke player is guided here (see `set_beacon`).
+var beacon: Node3D
 ## True while the cabinet glows for a broke local player.
 var glowing: bool = false
 var aimed: bool = false
@@ -119,8 +125,59 @@ func _build() -> void:
 	lamp_light.position = Vector3(-0.7, 1.2, 0)
 	lamp_light.visible = false
 	add_child(lamp_light)
+	_build_beacon()
 	_apply_fill()
 	set_counts(0.0, OddJobs.MIN_PRESSES)
+
+
+## A gold down arrow with "ODD JOBS +$50" over it, unshaded and drawn on top of everything so it
+## reads through the casino's walls and crowd. Hidden until `set_beacon(true)`.
+func _build_beacon() -> void:
+	beacon = Node3D.new()
+	beacon.name = "OddJobsBeacon"
+	beacon.position = Vector3(BUTTON_POS.x, BEACON_Y, 0)
+	beacon.visible = false
+	add_child(beacon)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Palette.VIP_GOLD
+	mat.no_depth_test = true
+	mat.render_priority = 2
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.2
+	cone.bottom_radius = 0.0
+	cone.height = 0.36
+	cone.radial_segments = 4  # a low-poly diamond tip
+	var arrow := MeshInstance3D.new()
+	arrow.name = "Arrow"
+	arrow.mesh = cone
+	arrow.material_override = mat
+	arrow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	beacon.add_child(arrow)
+	var tag := Label3D.new()
+	tag.name = "Tag"
+	tag.text = "ODD JOBS +$%d" % OddJobs.PAYOUT
+	tag.font_size = 64
+	tag.pixel_size = 0.005
+	tag.modulate = Palette.VIP_GOLD
+	tag.outline_modulate = Palette.CASINO_BLACK
+	tag.outline_size = 14
+	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	tag.no_depth_test = true
+	tag.render_priority = 3
+	tag.outline_render_priority = 2
+	tag.position = Vector3(0, 0.42, 0)
+	beacon.add_child(tag)
+
+
+## Shows or hides the beacon over the cabinet.
+func set_beacon(on: bool) -> void:
+	beacon.visible = on
+
+
+## The beacon's world position (what the screen-edge arrow points at).
+func beacon_position() -> Vector3:
+	return global_transform * Vector3(BUTTON_POS.x, BEACON_Y, 0)
 
 
 func _label(n: String, pos: Vector3, size: int, color: Color) -> Label3D:
@@ -215,6 +272,9 @@ func _process(delta: float) -> void:
 		_lamp_mat.emission_energy_multiplier = 0.8 + 1.6 * pulse
 		lamp_light.light_energy = 0.4 + 0.5 * pulse
 		_outline.set_shader_parameter(&"width", 0.012 + 0.012 * pulse)
+	if beacon.visible:
+		beacon.position.y = BEACON_Y + BEACON_BOB * sin(_time * 3.0)
+		beacon.rotation.y = _time * 1.5
 	if _note_until > 0.0 and _time >= _note_until:
 		_note_until = 0.0
 		note_label.text = ""

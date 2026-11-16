@@ -88,14 +88,17 @@ var _logic_scripts: Dictionary = {}
 var _server_owned: Dictionary[int, bool] = {}
 ## Real seconds since the server started (lobby ordering, network clock).
 var _uptime: float = 0.0
+## Disconnected players → server uptime they dropped at. In the lobby, anyone away for
+## `LOBBY_AWAY_DROP_SECONDS` is removed, so a lobby never fills up with "(away)" ghosts of friends
+## who left (Patrick 2026-11-15). A quick reconnect within that time keeps their slot.
+var _away_since: Dictionary[int, float] = {}
+const LOBBY_AWAY_DROP_SECONDS: float = 60.0
 ## Simulated seconds ever stepped (never reset, unlike `match_time`).
 var _stepped: float = 0.0
 var _leader: int = -1
 ## player → casino segment in which they got the House Comp (once per segment).
 var _comped: Dictionary[int, int] = {}
 var _logic_rng: SeededRng
-## Kicked uids → server uptime until which they may not come back (Protocol.KICK_REJOIN_SECONDS).
-var _kicked: Dictionary[String, float] = {}
 ## Who the current/last minigame started with (late joiners are not in it; the snapshot tells
 ## them to sit it out). Kept through its rewards.
 var _minigame_roster: Array[int] = []
@@ -200,7 +203,7 @@ func _build_match_systems(seed_value: int) -> void:
 	state.match_seed = seed_value
 	rng = SeededRng.new(seed_value)
 	luck_rng = LuckRng.new(rng, balance.luck_reroll_per_point, balance.luck_clamp)
-	modifiers = ModifierStack.new(balance.luck_clamp)
+	modifiers = ModifierStack.new(balance.luck_clamp).use_streak(balance)
 	jackpot = ProgressiveJackpot.new(balance.jackpot_feed_rate, balance.jackpot_seed)
 	rules = InteractionRules.new(balance)
 	pickups = PickupSystem.new(economy)
@@ -502,6 +505,7 @@ func player_disconnected(player: int) -> void:
 		return
 	state.players[player].connected = false
 	state.players[player].ready = false
+	_away_since[player] = _uptime
 	rules.status(player).away = true  # untouchable while away (§2.12)
 	lobby.set_connected(player, false, _uptime)
 	if fun_room != null and fun_room.stations.is_seated(player):
@@ -521,6 +525,7 @@ func remove_player(player: int) -> void:
 	if stations.is_seated(player):
 		stand_up(player)
 	state.players.erase(player)
+	_away_since.erase(player)
 	economy.remove_player(player)
 	if fun_room != null:
 		fun_room.remove_player(player)
@@ -536,12 +541,11 @@ func remove_player(player: int) -> void:
 
 ## The party leader kicks `target` (Patrick: "Give the party lead the right to kick players"):
 ## `player_kicked {player, by}` goes out, the room drops their connection with the reason
-## (`kick_handler`), and they can't rejoin for `Protocol.KICK_REJOIN_SECONDS`. In the lobby they
-## are removed outright; in a running match they stay as "away" like any disconnected player.
+## (`kick_handler`). They may come straight back on their own (Patrick 2026-11-15: no rejoin
+## block, a kick just drops them). In the lobby they are removed outright; in a running match they stay as "away" like any disconnected player.
 func kick(target: int, by: int) -> void:
 	if not state.players.has(target):
 		return
-	_kicked[state.players[target].uid] = _uptime + Protocol.KICK_REJOIN_SECONDS
 	Log.info(&"server", "player %d kicked by the party leader (player %d)" % [target, by])
 	_emit(GameEvents.make(&"player_kicked", {"player": target, "by": by}))
 	if kick_handler.is_valid():
@@ -552,22 +556,12 @@ func kick(target: int, by: int) -> void:
 		player_disconnected(target)
 
 
-## Seconds before a kicked identity may join this party again (0 = welcome).
-func kick_blocked_for(uid: String) -> float:
-	if not _kicked.has(uid):
-		return 0.0
-	var left: float = _kicked[uid] - _uptime
-	if left <= 0.0:
-		_kicked.erase(uid)
-		return 0.0
-	return left
-
-
 ## The same identity came back.
 func player_reconnected(player: int) -> void:
 	if not state.players.has(player):
 		return
 	state.players[player].connected = true
+	_away_since.erase(player)
 	# Someone who joined meanwhile may wear our bean colour now: two beans never share one.
 	var ps: PlayerState = state.players[player]
 	var worn: Array[int] = _worn_bean_colors(player)
@@ -774,6 +768,19 @@ func dev_minigame_now(id: StringName = &"") -> bool:
 	return true
 
 
+## The leader's START NEXT MINIGAME: the casino clock jumps to the next minigame's 10 s warning
+## (everyone gets it as usual). False when the casino isn't open, no minigame is left, or the
+## warning is already running.
+func minigame_now() -> bool:
+	if phases.phase != Phase.Id.CASINO or phases.minigames_done >= schedule.minigames:
+		return false
+	var at: float = schedule.minigame_times()[phases.minigames_done] - PhaseMachine.PRE_MINIGAME_SECONDS
+	if phases.casino_time >= at:
+		return false
+	phases.casino_time = at
+	return true
+
+
 ## Runs the simulation until the match is over or `max_seconds` elapsed (tests/sims).
 func run_to_end(max_seconds: float = 36000.0) -> void:
 	var elapsed: float = 0.0
@@ -824,6 +831,7 @@ func _step(delta: float) -> void:
 
 
 func _tick_lobby(delta: float) -> void:
+	_drop_lobby_ghosts()
 	_keep_out_of_casino()
 	_tick_fun_room(delta)
 	match lobby.tick(delta):
@@ -833,6 +841,17 @@ func _tick_lobby(delta: float) -> void:
 			_emit(GameEvents.make(&"lobby_countdown_cancelled", {}))
 		&"start":
 			start_match()
+
+
+## Removes lobby members who have been disconnected for `LOBBY_AWAY_DROP_SECONDS` (also those
+## who left during the last match, once Play Again brings the room back to the lobby).
+func _drop_lobby_ghosts() -> void:
+	for id: int in _away_since.keys():
+		if not state.players.has(id) or state.players[id].connected:
+			_away_since.erase(id)
+		elif _uptime - _away_since[id] >= LOBBY_AWAY_DROP_SECONDS:
+			Log.info(&"server", "player %d left the lobby (away %.0f s)" % [id, _uptime - _away_since[id]])
+			remove_player(id)
 
 
 ## Server time in seconds (real time since start; the network clock).
@@ -1122,6 +1141,7 @@ func return_to_lobby() -> void:
 	if not room_mode or phases.phase != Phase.Id.RESULTS:
 		return
 	running = false
+	lobby.forced = false
 	economy = Economy.new()
 	for id: int in state.players:
 		economy.add_player(id, balance.start_money)
@@ -1393,6 +1413,24 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if not (typeof(t) in [TYPE_INT, TYPE_FLOAT]) or int(t) == player or not state.players.has(int(t)):
 				return StationLogicBase.fail(&"bad_target")
 			kick(int(t), player)
+			return StationLogicBase.OK_RESULT
+		&"force_start":
+			if not room_mode:
+				return StationLogicBase.fail(&"not_room")
+			if player != lobby.leader():
+				return StationLogicBase.fail(&"not_leader")
+			lobby.forced = true
+			Log.info(&"server", "player %d force-starts the match" % player)
+			return StationLogicBase.OK_RESULT
+		&"minigame_now":
+			if not room_mode:
+				return StationLogicBase.fail(&"not_room")
+			if player != lobby.leader():
+				return StationLogicBase.fail(&"not_leader")
+			if not minigame_now():
+				return StationLogicBase.fail(&"no_minigame")
+			Log.info(&"server", "player %d starts the next minigame now" % player)
+			_emit(GameEvents.make(&"minigame_forced", {"by": player}))
 			return StationLogicBase.OK_RESULT
 		&"set_ready":
 			lobby.set_panel_ready(player, bool(intent["ready"]))

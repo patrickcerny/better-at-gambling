@@ -194,3 +194,13 @@ func test_late_join_mid_talk() -> void:
 	assert_true(late.cards[1].visible)
 	assert_eq(late.cards[1].card, logic.cards[1])
 	assert_eq(late.cards[2].card, TableCard3D.FACE_DOWN, "the late joiner's own card stays hidden too")
+
+
+func test_gamepad_a_stays_b_folds() -> void:
+	_to(ForeheadPokerLogic.Step.DECIDE)
+	var ev := InputEventJoypadButton.new()
+	ev.button_index = JOY_BUTTON_A
+	ev.pressed = true
+	stage._unhandled_input(ev)
+	assert_eq(sent.size(), 1)
+	assert_eq(sent[0]["action"], "stay")

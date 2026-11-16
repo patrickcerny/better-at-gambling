@@ -958,6 +958,8 @@ func press_action() -> void:
 			&"not_enough_coins":
 				status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (d.price - p.coins)
 				Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
+			&"level" when d.wheel_only:
+				status_label.text = "Only the Daily Spin has it."
 			&"level":
 				status_label.text = "Reach level %d to unlock it (you're level %d)." % [d.level, p.level]
 			_:
@@ -1000,9 +1002,12 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	if wearing:
 		label.text = "WEARING"
 	elif p.owns(d.id):
-		label.text = "FREE" if d.is_free() else ("DEVELOPER" if d.dev_only else "OWNED")
+		label.text = "FREE" if d.is_free() else ("DEVELOPER" if d.dev_only else ("JACKPOT" if d.wheel_only else "OWNED"))
 	elif d.premium():
 		label.text = Hud._thousands(d.gold)
+	elif d.wheel_only:
+		label.text = "DAILY SPIN"
+		coin.visible = false
 	elif not d.coin_buyable():
 		label.text = "LEVEL %d" % d.level
 		coin.visible = false
@@ -1110,6 +1115,9 @@ func _refresh() -> void:
 			action_button.disabled = true
 		else:
 			action_button.text = "BUY FOR %s GOLD" % Hud._thousands(sel.gold)
+	elif not p.owns(sel.id) and sel.wheel_only:
+		action_button.text = "ONLY ON THE DAILY SPIN"
+		action_button.disabled = true
 	elif not p.owns(sel.id) and not sel.coin_buyable():
 		action_button.text = "LEVEL PASS · LEVEL %d" % sel.level  # only levelling up unlocks it
 		action_button.disabled = true

@@ -4,10 +4,16 @@ extends RefCounted
 
 const BANKROLL: int = 1_000_000_000
 
+## True: the tables run with the losing-streak luck on (as in a real match); false (default) gives
+## the base return the RTP bands are about.
+static var streak: bool = false
+
 
 static func fixture(seed_value: int, luck: int, game_id: StringName) -> TableFixture:
 	var fx := TableFixture.new(seed_value, [1], BANKROLL)
 	fx.economy.record_history = false
+	if streak:
+		fx.modifiers.use_streak(fx.balance)
 	if luck != 0:
 		fx.give_luck(1, luck, game_id)
 	return fx

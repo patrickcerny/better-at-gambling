@@ -171,6 +171,8 @@ func _adjust(a: int) -> void:
 	set_amount(a)
 	if amount != before:
 		Audio.play(&"chips_in_pot", &"SFX", -9.0, 1.08 if amount > before else 0.9)
+		if _amount_label != null:
+			TableSkin.flash(_amount_label)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -222,6 +224,10 @@ func _refresh() -> void:
 
 
 func _build() -> void:
+	if not has_theme_stylebox_override(&"panel"):
+		var felt: StyleBoxFlat = TableSkin.felt_box(12, 10)
+		felt.bg_color = Color(TableSkin.FELT_DEEP, 0.75)
+		add_theme_stylebox_override(&"panel", felt)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override(&"separation", 8)
 	add_child(v)
@@ -229,6 +235,7 @@ func _build() -> void:
 	_limits_label.theme_type_variation = &"SmallLabel"
 	_limits_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_limits_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	_limits_label.add_theme_font_size_override(&"font_size", 16)
 	v.add_child(_limits_label)
 	_all_in_tag = Label.new()
 	_all_in_tag.name = "AllInTag"
@@ -250,17 +257,23 @@ func _build() -> void:
 	v.add_child(_stepper)
 	_minus = Button.new()
 	_minus.text = "−"
-	_minus.custom_minimum_size = Vector2(56, 48)
+	_minus.custom_minimum_size = Vector2(52, 44)
+	TableSkin.style_button(_minus, &"ghost", 26)
 	_minus.pressed.connect(func() -> void: _adjust(amount - chip_value()))
 	_stepper.add_child(_minus)
 	_amount_label = Label.new()
 	_amount_label.theme_type_variation = &"MoneyLabel"
 	_amount_label.custom_minimum_size = Vector2(160, 0)
 	_amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_amount_label.add_theme_font_size_override(&"font_size", 42)
+	_amount_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	_amount_label.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.5))
+	_amount_label.add_theme_constant_override(&"outline_size", 5)
 	_stepper.add_child(_amount_label)
 	_plus = Button.new()
 	_plus.text = "+"
-	_plus.custom_minimum_size = Vector2(56, 48)
+	_plus.custom_minimum_size = Vector2(52, 44)
+	TableSkin.style_button(_plus, &"ghost", 26)
 	_plus.pressed.connect(func() -> void: _adjust(amount + chip_value()))
 	_stepper.add_child(_plus)
 	var actions := HBoxContainer.new()
@@ -269,15 +282,18 @@ func _build() -> void:
 	v.add_child(actions)
 	_clear = Button.new()
 	_clear.text = "CLEAR"
+	TableSkin.style_button(_clear, &"ghost", 20)
 	_clear.pressed.connect(clear)
 	actions.add_child(_clear)
 	_repeat = Button.new()
 	_repeat.text = "REPEAT"
+	TableSkin.style_button(_repeat, &"ghost", 20)
 	_repeat.pressed.connect(repeat_last)
 	actions.add_child(_repeat)
 	_confirm = Button.new()
 	_confirm.text = "BET"
-	_confirm.custom_minimum_size = Vector2(140, 52)
+	_confirm.custom_minimum_size = Vector2(150, 52)
+	TableSkin.style_button(_confirm, &"gold", 26)
 	_confirm.pressed.connect(func() -> void:
 		if amount == 0:
 			set_amount(chip_value())
@@ -295,11 +311,12 @@ func _instant_layout() -> void:
 
 func _make_chip_buttons() -> void:
 	for i: int in chips.size():
-		var b := Button.new()
-		b.theme_type_variation = &"ChipButton"
+		var b := ChipToken.new()
+		b.step = i
 		b.toggle_mode = not instant
 		b.text = "$%d" % chips[i]
-		b.custom_minimum_size = chip_size
+		var side: float = clampf(minf(chip_size.x, chip_size.y) + 8.0, 44.0, 72.0)
+		b.custom_minimum_size = Vector2(side, side)
 		b.focus_mode = Control.FOCUS_ALL
 		var idx: int = i
 		b.pressed.connect(func() -> void: select_chip(idx))

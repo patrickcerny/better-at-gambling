@@ -76,7 +76,6 @@ func _build_visuals() -> void:
 	seat_count = SEAT_XS.size()
 	interact_radius = 3.2
 	hot_center = Vector3(0, 0, 0.6)
-	_rug(Vector2(11.4, 6.6), Palette.FELT_GREEN.darkened(0.55))
 	var wood := Color("#3A2A1E")
 	GreyboxKit.box(self, Vector3(TABLE_L, TABLE_TOP - 0.04, TABLE_D), Vector3(0, (TABLE_TOP - 0.04) * 0.5, 0), wood, "Body")
 	GreyboxKit.box(self, Vector3(TABLE_L, 0.04, TABLE_D), Vector3(0, TABLE_TOP - 0.02, 0), Color("#1E1917"), "Top", false)

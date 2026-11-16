@@ -65,16 +65,14 @@ func test_non_leaders_cannot_kick_and_nobody_kicks_themselves() -> void:
 	assert_eq(_of(&"intent_rejected").back()["intent"], &"kick_player")
 
 
-func test_a_kicked_player_cannot_rejoin_for_60_seconds() -> void:
+func test_a_kicked_player_may_come_straight_back() -> void:
 	var host: int = server.add_player("dev:host", "Host")
 	var bob: int = server.add_player("dev:bob", "Bob")
 	_kick(host, bob)
-	assert_almost_eq(server.kick_blocked_for("dev:bob"), Protocol.KICK_REJOIN_SECONDS, 0.1)
-	assert_eq(server.kick_blocked_for("dev:host"), 0.0, "only the kicked identity")
-	server.advance(30.0)
-	assert_almost_eq(server.kick_blocked_for("dev:bob"), 30.0, 0.1, "still blocked")
-	server.advance(30.5)
-	assert_eq(server.kick_blocked_for("dev:bob"), 0.0, "welcome back after a minute")
+	assert_false(server.state.players.has(bob))
+	assert_false(server.has_method("kick_blocked_for"), "no rejoin block (Patrick 2026-11-15)")
+	var again: int = server.add_player("dev:bob", "Bob")
+	assert_true(server.state.players.has(again), "back in the lobby right away")
 
 
 func test_kicking_in_a_running_match_leaves_them_away() -> void:
@@ -89,7 +87,6 @@ func test_kicking_in_a_running_match_leaves_them_away() -> void:
 	assert_true(server.state.players.has(bob), "a running match keeps their standing")
 	assert_false(server.state.players[bob].connected, "away, like a disconnect")
 	assert_eq(server.economy.balance(bob), money)
-	assert_gt(server.kick_blocked_for("dev:bob"), 59.0)
 
 
 func test_practice_has_no_kicking() -> void:

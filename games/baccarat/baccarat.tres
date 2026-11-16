@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GameDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/defs/game_definition.gd" id="1"]
+[ext_resource type="Script" path="res://games/baccarat/baccarat_logic.gd" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"baccarat"
+display_name = "Baccarat"
+rules_text = "Punto Banco: bet on the PLAYER hand, the BANKER hand or a TIE before the cards come out. Each hand counts the last digit of its cards (aces 1, tens and pictures 0); the closer to 9 wins. The dealer draws third cards by the fixed rules. Player pays 1:1, Banker 1:1 less 5% commission, Tie 9:1, and either Pair (the hand's first two cards) 11:1."
+logic_script = ExtResource("2")
+rug_color = Color(0.133, 0.196, 0.29, 1)
+floor_footprint = &"table"

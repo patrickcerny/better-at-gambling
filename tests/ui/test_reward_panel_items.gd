@@ -23,7 +23,7 @@ func _panel(settings: Dictionary) -> RewardPanel:
 func _card_boxes(p: RewardPanel) -> Array:
 	var out: Array = []
 	for r: Dictionary in p._rows:
-		out.append((r["card"] as Label).get_parent().get_parent())
+		out.append(r["card_box"])
 	return out
 
 

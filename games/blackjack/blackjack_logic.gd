@@ -328,7 +328,7 @@ func _deal() -> void:
 
 ## Deals one card to one of the player's hands; luck rerolls judge it against that hand.
 func _deal_card(p: int, cards: Array[int]) -> void:
-	var lk: int = modifiers.get_luck(p, game_id)
+	var lk: float = modifiers.get_luck(p, game_id)
 	var d: LuckRng.Draw = luck.draw(lk, shoe.draw, func(c: int) -> float:
 		var trial: Array[int] = cards.duplicate()
 		trial.append(c)

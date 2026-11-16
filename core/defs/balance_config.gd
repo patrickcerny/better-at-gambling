@@ -21,6 +21,16 @@ extends Resource
 @export_group("Luck")
 @export var luck_reroll_per_point: float = 0.12
 @export var luck_clamp: int = 3
+## Losing streak (0.9.57, Patrick: "wenn man oft hintereinander verliert dein luck immer bisschen
+## steigt"): each lost bet of at least `luck_streak_min_stake` adds this many luck points (0.125 =
+## +1.5 % reroll chance), up to `luck_streak_cap` (0.5 = +6 %); the next win clears it. Kept small:
+## at +3 % a step slots paid 109 % (tests/sim/test_rtp_streak.gd).
+@export var luck_streak_step: float = 0.125
+@export var luck_streak_cap: float = 0.5
+@export var luck_streak_min_stake: int = 25
+## Games where a reroll is worth a lot (slots keeps the better of two whole spins) count the streak
+## luck at this share (slots 0.5: 105 % → 103 %).
+@export var luck_streak_scale: Dictionary = {&"slots": 0.5}
 
 @export_group("Blackjack")
 @export var bj_decks: int = 6
@@ -119,8 +129,10 @@ extends Resource
 @export var hilo_max_pay: float = 25.0
 ## The streak ladder: right calls in one hand before it cashes out on its own, and the most a pot
 ## can grow to (times the ante).
-@export var hilo_max_rungs: int = 6
+@export var hilo_max_rungs: int = 10
 @export var hilo_pot_cap: float = 50.0
+## Free skips per hand: a card the player doesn't like is replaced by a fresh one (Patrick, 0.9.52).
+@export var hilo_skips: int = 2
 ## The single deck is reshuffled before an ante once fewer cards than this are left.
 @export var hilo_reshuffle_at: int = 15
 ## Seconds to make a call (then the table calls for you) and how long a result stays up.
@@ -155,8 +167,40 @@ extends Resource
 @export var holdem_betting_window: float = 8.0
 ## Each player's clock to FOLD or CALL once the flop is out; out of time = fold (the real rule).
 @export var holdem_action_time: float = 15.0
+## Each called hand's clock to put down the RIVER BET (one more ante) or CHECK once the turn is out;
+## out of time = check.
+@export var holdem_river_time: float = 10.0
 ## Seconds the showdown stays up before the next hand.
 @export var holdem_result_time: float = 4.0
+
+@export_group("Baccarat")
+## Punto Banco from an eight-deck shoe. Minimum per bet and maximum total per round (× limits).
+@export var baccarat_min_bet: int = 10
+@export var baccarat_max_total: int = 300
+## Seconds the table takes bets before the cards come out (the table only cycles while someone sits).
+@export var baccarat_betting_time: float = 12.0
+## Seconds between two cards turning over (P, B, P, B, then the third cards), and after the last
+## card until the bets pay.
+@export var baccarat_card_time: float = 0.8
+@export var baccarat_settle_time: float = 0.9
+## Seconds the result stays up before the next round opens.
+@export var baccarat_result_time: float = 4.0
+## Printed pays (profit per $1): Banker 1:1 less the commission, Tie 9:1, either Pair 11:1;
+## Player pays 1:1. Player and Banker bets push on a tie.
+@export var baccarat_banker_commission: float = 0.05
+@export var baccarat_tie_pays: int = 9
+@export var baccarat_pair_pays: int = 11
+## The quiet favour (0.9.6 rule: every table pays the player a little more than it costs, but
+## doesn't show it): extra fraction of the total return (stake + winnings) on a winning bet,
+## rounded stochastically. The printed pays return 98.76% (Player), 98.94% (Banker), 95.16% (Tie)
+## and 89.64% (Pairs) of the stake in eight decks; these make each about 101.1%
+## (exact, `tests/sim/test_rtp_baccarat.gd`).
+@export var baccarat_player_favour: float = 0.0262
+@export var baccarat_banker_favour: float = 0.0241
+@export var baccarat_tie_favour: float = 0.0624
+@export var baccarat_pair_favour: float = 0.1279
+@export var baccarat_decks: int = 8
+@export var baccarat_penetration: float = 0.85
 
 @export_group("Slots")
 @export var slots_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])

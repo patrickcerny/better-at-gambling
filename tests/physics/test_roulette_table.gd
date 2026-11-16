@@ -31,28 +31,9 @@ func _screen(type: StringName, value: int) -> Vector2:
 	return p
 
 
-## Centre of the panel's button for a spot.
+## Centre of the panel's spot for a bet (the drawn layout's chip point).
 func _panel(ui: RouletteUi, type: StringName, value: int) -> Vector2:
-	var columns: int = 0
-	for b: Button in ui._buttons:
-		var t: StringName = b.get_meta(&"type")
-		if t != type:
-			continue
-		var hit: bool = false
-		match type:
-			&"straight":
-				hit = int(b.text) == value
-			&"dozen":
-				hit = b.text.begins_with(["1st", "2nd", "3rd"][value - 1])
-			&"column":
-				columns += 1
-				hit = columns == value
-			_:
-				hit = true
-		if hit:
-			return b.get_global_rect().get_center()
-	assert_true(false, "no panel button for %s %d" % [type, value])
-	return Vector2.ZERO
+	return ui.board.spot_global(type, value)
 
 
 ## +1 / -1: which way the triangle a → b → c turns (a mirror image turns the other way).

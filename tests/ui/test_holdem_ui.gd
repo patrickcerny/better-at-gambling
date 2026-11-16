@@ -110,6 +110,30 @@ func test_fold_or_call_after_the_flop() -> void:
 	assert_true(ui.call_btn.disabled, "the call must be covered")
 
 
+func test_the_river_bet_or_check() -> void:
+	var board: Array = _flop()
+	board.append(Card.make(13, 3))
+	var hands: Dictionary = {
+		1: {"ante": 20, "hole": [Card.make(1), Card.make(1, 1)], "decision": &"call", "call": 40, "river": 0, "river_decision": &"", "hand": "Pair of Aces", "clock": 7.5},
+		2: {"ante": 10, "hole": [Card.make(12), Card.make(5, 2)], "decision": &"call", "call": 20, "river": 10, "river_decision": &"river", "hand": "Queen High"},
+	}
+	ui.update_state(_pub(HoldemLogic.State.RIVER, hands, {"board": board, "dealer_down": 2}), {})
+	assert_true(ui.actions.visible, "your river decision")
+	assert_true(ui.wants_camera_lock())
+	assert_string_contains(ui.call_btn.text, "RIVER BET")
+	assert_string_contains(ui.call_btn.text, "$20", "one ante")
+	assert_string_contains(ui.fold_btn.text, "CHECK")
+	assert_string_contains(ui.status_label.text, "8 s")
+	assert_string_contains(ui.cards_label.text, "K♣", "the turn")
+	assert_eq(ui.dealer_label.text, "DEALER  ??  ??")
+	assert_string_contains(ui.others_label.text, "Bert: bet the river")
+	assert_string_contains(ui.rules_label.text, "RIVER BET")
+	hands[1]["river_decision"] = &"check"
+	ui.update_state(_pub(HoldemLogic.State.RIVER, hands, {"board": board, "dealer_down": 2}), {})
+	assert_false(ui.actions.visible, "checked")
+	assert_string_contains(ui.status_label.text, "Waiting for the river")
+
+
 func test_folded_and_the_showdown() -> void:
 	var folded: Dictionary = {1: {"ante": 20, "hole": [Card.make(2), Card.make(7, 1)], "decision": &"fold", "hand": "Ace High", "outcome": &"fold", "returned": 0}}
 	ui.update_state(_pub(HoldemLogic.State.DECIDING, folded, {"board": _flop(), "dealer_down": 2}), {})

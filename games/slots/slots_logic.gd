@@ -76,7 +76,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	stake_covered = last_covered
 	if jackpot != null:
 		jackpot.feed(amount)
-	var lk: int = modifiers.get_luck(p, game_id)
+	var lk: float = modifiers.get_luck(p, game_id)
 	var d: LuckRng.Draw = luck.draw(lk, _random_line, func(l: Array[int]) -> float: return float(payout_multiplier(l, balance)))
 	line = d.value
 	spinning = true

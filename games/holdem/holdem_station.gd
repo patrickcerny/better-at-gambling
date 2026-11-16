@@ -58,7 +58,6 @@ func _build_visuals() -> void:
 	seat_count = SEAT_XS.size()
 	interact_radius = 2.8
 	hot_center = Vector3(0, 0, 0.3)
-	_rug(Vector2(5.8, 4.4), Palette.FELT_GREEN.darkened(0.55))
 	# Collision: one box the size of the oval; the table you see is built from parts below.
 	var body: Node3D = GreyboxKit.box(self, Vector3(2.0 * (HALF_L + RAIL_OUTER), TABLE_TOP, 2.0 * RAIL_OUTER), Vector3(0, TABLE_TOP * 0.5, 0), WOOD_COLOR, "Body")
 	(body.get_node(^"Mesh") as Node3D).visible = false
@@ -136,7 +135,9 @@ static func hand_of(hands: Dictionary, pid: int) -> Dictionary:
 func show_round(pub: Dictionary) -> void:
 	var seat_ids: Array = pub.get("seats", [])
 	var hands: Dictionary = pub.get("hands", {})
-	var deciding: bool = int(pub.get("state", 0)) == HoldemLogic.State.DECIDING
+	var st: int = int(pub.get("state", 0))
+	var deciding: bool = st == HoldemLogic.State.DECIDING
+	var river: bool = st == HoldemLogic.State.RIVER
 	var by_seat: Dictionary = {}
 	var outlined: Array[int] = []
 	for i: int in seat_count:
@@ -146,6 +147,8 @@ func show_round(pub: Dictionary) -> void:
 		if not h.is_empty() and not folded:
 			by_seat[i] = h.get("hole", [])
 			if deciding and StringName(h.get("decision", &"")) == &"":
+				outlined.append(i)
+			elif river and StringName(h.get("decision", &"")) == HoldemLogic.CALL and StringName(h.get("river_decision", &"")) == &"":
 				outlined.append(i)
 		_show_hand_label(i, h)
 	by_seat[BOARD_KEY] = pub.get("board", [])

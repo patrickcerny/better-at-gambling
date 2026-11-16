@@ -17,6 +17,8 @@ signal leave_requested
 signal quit_requested
 ## DEV (only shown when `dev_available`): the match scene opens its dev tools.
 signal dev_requested
+## START NEXT MINIGAME (lobby leader, online, in the casino): the match scene asks the server.
+signal minigame_now_requested
 
 ## In-game settings panel bottom, from the screen centre (1080-high canvas: ends 230 px above the
 ## bottom edge, above the HUD's item bar).
@@ -32,6 +34,9 @@ var help_button: HelpButton
 var how_to_play: HowToPlayPanel
 ## The dev tools entry (hidden unless `set_dev_available(true)`).
 var dev_button: Button
+## Lobby leader only: skips the rest of the gambling time (Patrick 2026-11-16: "Lobby can force
+## start minigame"); everyone gets the usual 10 s warning, then the minigame.
+var minigame_button: Button
 
 
 func _ready() -> void:
@@ -63,6 +68,12 @@ func _ready() -> void:
 	v.add_child(title)
 	resume_button = _button(v, "RESUME", resume)
 	resume_button.theme_type_variation = &"ActionButton"
+	minigame_button = _button(v, "START NEXT MINIGAME", func() -> void:
+		minigame_now_requested.emit()
+		resume())
+	minigame_button.name = "MinigameNow"
+	minigame_button.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	minigame_button.visible = false
 	leave_button = _button(v, "LEAVE TO MENU", ask_leave)
 	quit_button = _button(v, "QUIT GAME", ask_quit)
 	dev_button = _button(v, "DEV TOOLS", func() -> void:
@@ -70,7 +81,7 @@ func _ready() -> void:
 		dev_requested.emit())
 	dev_button.name = "DevButton"
 	dev_button.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
-	dev_button.visible = false
+	dev_button.visible = bool(get_meta(&"dev_available", false))
 	var bottom := HBoxContainer.new()
 	bottom.name = "Bottom"
 	bottom.alignment = BoxContainer.ALIGNMENT_END
@@ -108,8 +119,17 @@ func open() -> void:
 	resume_button.grab_focus()
 
 
+## Shows START NEXT MINIGAME (the match scene decides: leader, online, casino open).
+func set_minigame_now_available(on: bool) -> void:
+	if minigame_button != null:
+		minigame_button.visible = on
+
+
 ## Patrick only (`DevMode`, Practice): shows the DEV TOOLS entry.
 func set_dev_available(on: bool) -> void:
+	if dev_button == null:  # before _ready: kept for it
+		set_meta(&"dev_available", on)
+		return
 	dev_button.visible = on
 
 

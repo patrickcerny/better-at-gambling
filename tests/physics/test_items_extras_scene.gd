@@ -143,13 +143,12 @@ func test_roulette_chip_badge_sits_on_its_own_spot() -> void:
 	var res: Dictionary = Net.send_intent(Intents.make(&"place_bet", {"station": sid, "bet": {"type": &"straight", "value": 17, "amount": 10}}))
 	assert_true(res["ok"], str(res))
 	await wait_seconds(1.0)
-	var badge: Label = ui._badges["straight:17"]
-	assert_true(badge.visible)
-	var spot: Button = badge.get_parent() as Button
-	assert_eq(spot.text, "17")
-	var centre: Vector2 = badge.get_global_rect().get_center()
-	assert_true(centre.x > spot.get_global_rect().position.x and centre.x < spot.get_global_rect().end.x, "badge centred over 17, not the neighbour")
-	assert_lt(badge.get_global_rect().size.x, spot.get_global_rect().size.x + 1.0, "badge no wider than its spot")
+	# Your chip is drawn on 17's own spot of the layout, not on a neighbour.
+	assert_eq(ui.board.bets.size(), 1)
+	var at: Vector2 = ui.board.spot_point(&"straight", 17)
+	assert_true(ui.board.number_rect(17).has_point(at), "chip centred on 17")
+	assert_false(ui.board.number_rect(18).has_point(at))
+	assert_eq(ui.board.spot_at(at), [&"straight", 17], "and a click there bets 17")
 	# The overlay stays clear of the item bar.
 	assert_true(ui.panel.get_global_rect().end.y <= scene.hud.items.slots[0].get_global_rect().position.y + 1.0, "station panel above the item slots")
 

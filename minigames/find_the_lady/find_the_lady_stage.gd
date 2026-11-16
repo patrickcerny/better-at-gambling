@@ -787,6 +787,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				pick(s)
 				get_viewport().set_input_as_handled()
 		return
+	var pad := event as InputEventJoypadButton
+	if pad != null:
+		if pad.pressed and can_act():
+			_on_pad(pad.button_index)
+		return
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo or not can_act():
 		return
@@ -797,6 +802,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		n = key.keycode - KEY_KP_1
 	if n >= 0 and n < card_count:
 		pick(n)
+		get_viewport().set_input_as_handled()
+
+
+## Gamepad: D-pad left / right moves the highlight along the cards, A picks the highlighted one.
+func _on_pad(button: JoyButton) -> void:
+	if button == JOY_BUTTON_DPAD_LEFT or button == JOY_BUTTON_DPAD_RIGHT:
+		var step: int = -1 if button == JOY_BUTTON_DPAD_LEFT else 1
+		hover_slot = posmod(hover_slot + step, card_count) if hover_slot >= 0 else (0 if step > 0 else card_count - 1)
+		_refresh_cards()
+		get_viewport().set_input_as_handled()
+	elif button == JOY_BUTTON_A:
+		pick(hover_slot if hover_slot >= 0 else 0)
 		get_viewport().set_input_as_handled()
 
 

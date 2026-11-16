@@ -2,13 +2,17 @@ class_name HoldemUi
 extends StationUi
 ## Casino Hold'em overlay: a column down the right third of the screen (the seat camera frames the
 ## felt on the left). Pick the ANTE with the chips and the AA BONUS (off or a chip), DEAL puts them
-## down; once the flop is out the two big buttons FOLD or CALL (twice the ante) on your own clock.
+## down; once the flop is out the two big buttons FOLD or CALL (twice the ante) on your own clock;
+## once the turn is out the same two buttons CHECK or put down the RIVER BET (one more ante).
 ## Your hand is named live ("Pair of Kings"), the dealer's at the showdown, then the result line.
 ## The paytables are folded away under HOW IT WORKS.
-## Keys: [1-4] chip, [B] bonus, [Space] deal, [R] repeat; [C] or [H] call, [F] or [S] fold (gamepad:
-## A call, X fold). Key names follow the device in use (InputGlyphs).
+## Keys: [1-4] chip, [B] bonus, [Space] deal, [R] repeat; [C] or [H] call / river bet, [F] or [S]
+## fold / check (gamepad: A call / bet, X fold / check). Key names follow the device in use (InputGlyphs).
 
 var cards_label: Label
+## The board and your two hole cards, drawn.
+var board_row: CardRow
+var hole_row: CardRow
 var hand_label: Label
 var dealer_label: Label
 var result_label: Label
@@ -40,7 +44,14 @@ func wants_camera_lock() -> bool:
 			return true
 		HoldemLogic.State.DECIDING:
 			return not mine.is_empty() and StringName(mine.get("decision", &"")) == &""
+		HoldemLogic.State.RIVER:
+			return river_open(mine)
 	return false
+
+
+## True while this hand (called, river not decided yet) can bet the river or check.
+static func river_open(h: Dictionary) -> bool:
+	return StringName(h.get("decision", &"")) == HoldemLogic.CALL and StringName(h.get("river_decision", &"")) == &""
 
 
 ## The local player's hand in the newest state (empty when they have none).
@@ -53,8 +64,16 @@ func _build() -> void:
 	status_label.custom_minimum_size = Vector2(120, 0)
 	dealer_label = _line("", 22, Palette.WARM_GOLD)
 	dealer_label.name = "Dealer"
+	board_row = CardRow.new(70.0)
+	board_row.name = "BoardRow"
+	board_row.add_theme_constant_override(&"separation", 4)
+	body.add_child(board_row)
+	hole_row = CardRow.new(84.0)
+	hole_row.name = "HoleRow"
+	body.add_child(hole_row)
 	cards_label = _line("", 26, Palette.CREAM)
 	cards_label.name = "Cards"
+	cards_label.visible = false  # the drawn cards above show them; the text stays for the record
 	hand_label = _line("", 34, Palette.VIP_GOLD)
 	hand_label.name = "Hand"
 	result_label = _line("", 22, Palette.CREAM)
@@ -68,6 +87,8 @@ func _build() -> void:
 	body.add_child(actions)
 	fold_btn = _action("Fold", fold)
 	call_btn = _action("Call", call_it)
+	TableSkin.style_button(fold_btn, &"red", 26)
+	TableSkin.style_button(call_btn, &"gold", 26)
 	var bonus_title := _line("AA BONUS  ·  pays on your first five cards", 17, Palette.WARM_GOLD)
 	bonus_title.name = "BonusTitle"
 	bonus_row = HBoxContainer.new()
@@ -142,12 +163,26 @@ func deal(ante: int) -> bool:
 	return send(&"place_bet", {"bet": bet})
 
 
+## CALL while the flop is out, the RIVER BET once the turn is out.
 func call_it() -> bool:
+	if int(pub.get("state", 0)) == HoldemLogic.State.RIVER:
+		return river_bet()
 	return send(&"action", {"action": HoldemLogic.CALL})
 
 
+## FOLD while the flop is out, CHECK once the turn is out.
 func fold() -> bool:
+	if int(pub.get("state", 0)) == HoldemLogic.State.RIVER:
+		return river_check()
 	return send(&"action", {"action": HoldemLogic.FOLD})
+
+
+func river_bet() -> bool:
+	return send(&"action", {"action": HoldemLogic.RIVER_BET})
+
+
+func river_check() -> bool:
+	return send(&"action", {"action": HoldemLogic.CHECK})
 
 
 func _rules_text() -> String:
@@ -161,16 +196,16 @@ func _rules_text() -> String:
 		bonus_lines.append("%s %d:1" % [HoldemHand.category_name(cat), cfg.holdem_bonus_pays[cat]])
 	bonus_lines.append("Pair of Aces to Straight %d:1" % cfg.holdem_bonus_pays[HoldemHand.Rank.STRAIGHT])
 	return ("Texas Hold'em against the dealer. Put down an ANTE (and the AA BONUS if you like): you get two cards, the dealer two face down, and three cards go on the board. "
-		+ "FOLD and lose the ante, or CALL for twice the ante. Then the turn and the river; the best five of your two cards and the five on the board play against the dealer's.\n"
-		+ "The dealer needs a pair of 4s or better. If not, your ante pays by the table and the call comes back. If so: beat the dealer and the ante pays by the table and the call 1:1; a tie gives both back; lose and both are lost. Out of time = fold.\n"
+		+ "FOLD and lose the ante, or CALL for twice the ante. Then the turn: CHECK, or put down the RIVER BET (one more ante). Then the river; the best five of your two cards and the five on the board play against the dealer's.\n"
+		+ "The dealer needs a pair of 4s or better. If not, your ante pays by the table and the call (and river bet) come back. If so: beat the dealer and the ante pays by the table, the call and river bet 1:1; a tie gives everything back; lose and it is all lost. Out of time = fold (at the river: check).\n"
 		+ "ANTE:  " + "  ·  ".join(ante) + "\n"
 		+ "AA BONUS (your cards + the flop, paid even if you fold):  " + "  ·  ".join(bonus_lines))
 
 
 func _hint_text() -> String:
 	if InputGlyphs.gamepad:
-		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_confirm}] deal\n[{bj_hit}] call  [{bj_stand}] fold  [{leave_station}] stand up")
-	return InputGlyphs.fill("[1-4] chip  [B] bonus  [{bet_confirm}] deal  [{bet_repeat}] repeat\n[C] call  [F] fold  [{leave_station}] stand up")
+		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_confirm}] deal\n[{bj_hit}] call / river bet  [{bj_stand}] fold / check  [{leave_station}] stand up")
+	return InputGlyphs.fill("[1-4] chip  [B] bonus  [{bet_confirm}] deal  [{bet_repeat}] repeat\n[C] call / river bet  [F] fold / check  [{leave_station}] stand up")
 
 
 func _relabel() -> void:
@@ -198,6 +233,7 @@ func _refresh() -> void:
 	var mine: Dictionary = my_hand()
 	var decision: StringName = StringName(mine.get("decision", &""))
 	var deciding: bool = st == HoldemLogic.State.DECIDING and not mine.is_empty() and decision == &""
+	var river: bool = st == HoldemLogic.State.RIVER and river_open(mine)
 	match st:
 		HoldemLogic.State.IDLE:
 			status_label.text = "Ante up to deal a hand"
@@ -208,6 +244,11 @@ func _refresh() -> void:
 				status_label.text = "Fold or call?  (%d s)" % int(ceil(float(mine.get("clock", timer))))
 			else:
 				status_label.text = "Waiting for the table…"
+		HoldemLogic.State.RIVER:
+			if river:
+				status_label.text = "River bet or check?  (%d s)" % int(ceil(float(mine.get("clock", timer))))
+			else:
+				status_label.text = "Waiting for the river…"
 		HoldemLogic.State.PAYOUT:
 			status_label.text = "Showdown"
 	var hole: Array = mine.get("hole", [])
@@ -218,9 +259,13 @@ func _refresh() -> void:
 	else:
 		cards_label.text = "%s   |   %s" % ["  ".join(_labels(hole)), "  ".join(_labels(board))]
 		hand_label.text = "FOLDED" if decision == HoldemLogic.FOLD else String(mine.get("hand", ""))
+	board_row.visible = not board.is_empty()
+	board_row.show_cards(board)
+	hole_row.visible = not hole.is_empty()
+	hole_row.show_cards(hole, decision == HoldemLogic.FOLD)
 	dealer_label.text = _dealer_text()
 	result_label.text = _result_text(mine)
-	actions.visible = deciding
+	actions.visible = deciding or river
 	_refresh_buttons()
 	var betting: bool = (st == HoldemLogic.State.IDLE or st == HoldemLogic.State.BETTING) and mine.is_empty()
 	bet_panel.visible = betting
@@ -237,8 +282,15 @@ func _refresh_buttons() -> void:
 		return
 	var mine: Dictionary = my_hand()
 	var ante: int = int(mine.get("ante", 0))
-	call_btn.text = "CALL  %s\n%s" % [InputGlyphs.hint(&"bj_hit") if InputGlyphs.gamepad else "[C]", money(ante * 2)]
-	fold_btn.text = "FOLD  %s\nlose %s" % [InputGlyphs.hint(&"bj_stand") if InputGlyphs.gamepad else "[F]", money(ante)]
+	var hit: String = InputGlyphs.hint(&"bj_hit") if InputGlyphs.gamepad else "[C]"
+	var stand: String = InputGlyphs.hint(&"bj_stand") if InputGlyphs.gamepad else "[F]"
+	if int(pub.get("state", 0)) == HoldemLogic.State.RIVER:
+		call_btn.text = "RIVER BET  %s\n%s" % [hit, money(ante)]
+		fold_btn.text = "CHECK  %s\nno more" % stand
+		call_btn.disabled = ante > my_balance()
+		return
+	call_btn.text = "CALL  %s\n%s" % [hit, money(ante * 2)]
+	fold_btn.text = "FOLD  %s\nlose %s" % [stand, money(ante)]
 	call_btn.disabled = ante * 2 > my_balance()
 
 
@@ -266,17 +318,17 @@ func _result_text(mine: Dictionary) -> String:
 	if b > 0 and b_ret >= 0:
 		lines.append(("AA BONUS  +%s" % money(b_ret - b)) if b_ret > 0 else "AA BONUS lost")
 	var ante: int = int(mine.get("ante", 0))
-	var call: int = int(mine.get("call", 0))
+	var call: int = int(mine.get("call", 0)) + int(mine.get("river", 0))
 	var net: int = int(mine.get("returned", 0)) - ante - call
 	match StringName(mine.get("outcome", &"")):
 		&"fold":
 			lines.append("Folded: the ante (%s) is lost" % money(ante))
 		&"no_qualify":
-			lines.append("Dealer doesn't qualify: ante pays, call back  ·  +%s" % money(net))
+			lines.append("Dealer doesn't qualify: ante pays, call%s back  ·  +%s" % [" and river bet" if int(mine.get("river", 0)) > 0 else "", money(net)])
 		&"win":
 			lines.append("YOU WIN  ·  +%s" % money(net))
 		&"push":
-			lines.append("Tie: both bets back")
+			lines.append("Tie: all bets back")
 		&"lose":
 			lines.append("Dealer wins  ·  −%s" % money(-net))
 	return "\n".join(lines)
@@ -296,7 +348,8 @@ func _others_text() -> String:
 			lines.append("%s: watching" % who)
 			continue
 		var d: StringName = StringName(h.get("decision", &""))
-		var what: String = "folded" if d == HoldemLogic.FOLD else ("called" if d == HoldemLogic.CALL else ("deciding" if not (h.get("hole", []) as Array).is_empty() else "ante $%d" % int(h.get("ante", 0))))
+		var rd: StringName = StringName(h.get("river_decision", &""))
+		var what: String = "folded" if d == HoldemLogic.FOLD else (("bet the river" if rd == HoldemLogic.RIVER_BET else ("checked" if rd == HoldemLogic.CHECK else "called")) if d == HoldemLogic.CALL else ("deciding" if not (h.get("hole", []) as Array).is_empty() else "ante $%d" % int(h.get("ante", 0))))
 		lines.append("%s: %s%s" % [who, what, ("  ·  " + String(h["hand"])) if h.has("hand") and d != HoldemLogic.FOLD else ""])
 	return "\n".join(lines)
 

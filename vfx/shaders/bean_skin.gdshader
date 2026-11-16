@@ -1,7 +1,7 @@
 // Animated bean skins (CosmeticDef KIND_SKIN, ToonMaterial.make_skin): a moving pattern over the
 // whole bean, in the beans' toon light (soft 3-band ramp + warm rim). Warm casino colours, no neon
 // (docs/ART_DIRECTION.md). `mode`: 0 gold rush, 1 rainbow, 2 molten lava, 3 starry night,
-// 4 lucky felt, 5 candy swirl, 6 deep sea, 7 marble, 8 the house (developers only). Client only.
+// 4 lucky felt, 5 candy swirl, 6 deep sea, 7 marble, 8 the house (developers only), 9 fortune (Daily Spin only). Client only.
 shader_type spatial;
 render_mode cull_back;
 
@@ -141,6 +141,65 @@ void fragment() {
 		vec3 cell = floor(p * 26.0);
 		float em = step(0.96, hash3(cell)) * pow(max(sin(t * 3.0 + hash3(cell + 2.7) * 40.0), 0.0), 6.0);
 		e += vec3(1.0, 0.55, 0.2) * em * smoothstep(0.5, 0.1, length(fract(p * 26.0) - 0.5));
+	} else if (mode == 9) {
+		// Fortune (only from the Daily Spin): a little burgundy, cream and felt prize wheel on the
+		// belly and the back (it spins up, coasts and stops every 6 s, then the gold flashes), warm
+		// marquee bulbs chasing round its rim, gold coins turning as they drift up the dark lacquer.
+		// Body space: y -0.7..0.7, radius 0.46, the mouth at y 0.02.
+		float cyc = mod(t, 6.0);
+		float spin = 1.0 - pow(1.0 - clamp(cyc / 4.2, 0.0, 1.0), 3.0);
+		float stop_flash = smoothstep(4.2, 4.35, cyc) * smoothstep(6.0, 4.8, cyc);
+		vec2 w = vec2(p.x, p.y + 0.33);
+		float r = length(w);
+		float face = smoothstep(0.0, 0.12, abs(p.z));  // the sides stay lacquer
+		float wa = atan(w.x, w.y) + floor(t / 6.0) * 2.3 + spin * 11.0;
+		float sf = fract(wa / 6.2832) * 12.0;
+		float slice = floor(sf);
+		vec3 burg = vec3(0.41, 0.12, 0.17);
+		vec3 cream = vec3(0.95, 0.9, 0.79);
+		vec3 felt = vec3(0.15, 0.37, 0.29);
+		vec3 gold = vec3(0.96, 0.78, 0.36);
+		vec3 sc = mod(slice, 3.0) < 0.5 ? burg : (mod(slice, 3.0) < 1.5 ? cream : felt);
+		float on_wheel = smoothstep(0.255, 0.245, r) * face;
+		c = mix(vec3(0.05, 0.03, 0.03), vec3(0.24, 0.06, 0.09), smoothstep(0.3, 0.8, fbm(p * 2.4 + vec3(0.0, -t * 0.1, 0.0))));
+		c = mix(c, sc, on_wheel);
+		float div = smoothstep(0.42, 0.48, abs(fract(sf) - 0.5)) * on_wheel;
+		float rim = smoothstep(0.035, 0.012, abs(r - 0.275)) * face;
+		float hub = smoothstep(0.055, 0.04, r) * face;
+		c = mix(c, gold, max(max(div, rim), hub));
+		e += gold * (div * 0.3 + rim * 0.45 + hub * 0.4) * (0.6 + stop_flash * 1.4);
+		// The winning slice under the pointer (straight up) glows once the wheel stops.
+		float top = smoothstep(0.45, 0.0, abs(atan(w.x, w.y))) * on_wheel;
+		e += mix(sc, gold, 0.4) * top * stop_flash * 0.7;
+		// Pointer: a small gold wedge above the rim.
+		float ptr = smoothstep(0.012, 0.0, abs(w.x) - (0.33 - w.y) * 0.5) * step(0.27, w.y) * step(w.y, 0.33) * face;
+		c = mix(c, gold, ptr);
+		e += gold * ptr * 0.6;
+		// Marquee bulbs round the rim, chasing (faster while the wheel turns, all on at the stop).
+		float ba = atan(w.x, w.y) / 6.2832 + 0.5;
+		float bi = floor(ba * 16.0);
+		vec2 bq = vec2((fract(ba * 16.0) - 0.5) * 6.2832 * 0.31 / 16.0, r - 0.31);
+		float bulb = smoothstep(0.022, 0.012, length(bq)) * face;
+		float chase = step(0.66, fract((bi - t * mix(2.5, 14.0, 1.0 - spin)) / 3.0));
+		float lit = max(chase, stop_flash * step(0.5, fract(t * 6.0)));
+		vec3 warm = vec3(1.0, 0.82, 0.5);
+		c = mix(c, mix(vec3(0.4, 0.28, 0.14), warm, lit), bulb);
+		e += warm * bulb * (0.15 + 1.5 * lit);
+		// Gold coins drifting up the lacquer, turning (a disc squashed sideways).
+		vec2 cq = vec2(ang / 6.2832 * 12.0, p.y * 4.0 - t * 0.7);
+		vec2 cid = floor(cq);
+		cq.y += hash3(vec3(cid.x, 0.0, 3.0)) * 10.0;
+		cid = floor(cq);
+		vec2 lc = fract(cq) - 0.5;
+		float hc = hash3(vec3(cid, 5.1));
+		float squash = abs(sin(t * 2.5 + hc * 20.0)) * 0.8 + 0.2;
+		float away = 1.0 - max(smoothstep(0.36, 0.3, r) * face, 0.0);
+		float coin = step(0.8, hc) * smoothstep(0.24, 0.17, length(vec2(lc.x / squash, lc.y))) * away;
+		c = mix(c, gold * (0.75 + 0.25 * squash), coin);
+		e += gold * coin * 0.45;
+		// Jackpot sheen: gold light sweeping over the whole bean when the wheel stops.
+		float sheen = smoothstep(0.1, 0.0, abs(p.y - p.x * 0.5 - mix(-1.0, 1.0, clamp((cyc - 4.2) / 0.9, 0.0, 1.0))));
+		e += vec3(1.0, 0.85, 0.5) * sheen * stop_flash * 0.9;
 	} else {
 		// Marble: slowly drifting veins with gold flecks.
 		float v = sin(p.y * 5.0 + fbm(p * 2.5 + vec3(t * 0.03)) * 6.0);

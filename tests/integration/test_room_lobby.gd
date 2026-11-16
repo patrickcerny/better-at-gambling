@@ -162,3 +162,45 @@ func test_validator_rules() -> void:
 		if _intent(b, &"emote", {"id": &"wave"})["error"] == &"rate_limited":
 			limited += 1
 	assert_eq(limited, 10, "more than 20 intents per second are dropped")
+
+
+## Patrick 2026-11-15: friends who left stayed in the lobby list as "(away)" forever.
+func test_players_away_from_the_lobby_are_dropped_after_a_while() -> void:
+	var a: int = server.add_player("dev:a", "A")
+	var b: int = server.add_player("dev:b", "B")
+	var c: int = server.add_player("dev:c", "C")
+	server.player_disconnected(b)
+	server.player_disconnected(c)
+	_tick(5.0)
+	server.player_reconnected(c)
+	assert_true(server.state.players.has(b), "a short drop keeps the slot")
+	_tick(MatchServer.LOBBY_AWAY_DROP_SECONDS)
+	assert_false(server.state.players.has(b), "gone for good after a while")
+	assert_eq(int(_of(&"player_removed").back()["player"]), b)
+	assert_true(server.state.players.has(a))
+	assert_true(server.state.players.has(c), "came back in time: stays")
+	assert_eq(server.player_by_uid("dev:b"), -1, "B joins as a new player next time")
+
+
+## Patrick 2026-11-16: "Lobby can force start minigame".
+func test_leader_force_starts_the_match_and_the_next_minigame() -> void:
+	var a: int = server.add_player("dev:a", "A")
+	var b: int = server.add_player("dev:b", "B")
+	assert_eq(_intent(b, &"force_start")["error"], &"not_leader")
+	assert_eq(_intent(a, &"minigame_now")["error"], &"wrong_phase", "no minigame to start in the lobby")
+	assert_true(_intent(a, &"force_start")["ok"])
+	_tick(0.1)
+	assert_eq(_of(&"lobby_countdown").size(), 1, "the doors count down although nobody is ready")
+	_tick(LobbyController.COUNTDOWN_SECONDS + 0.5)
+	assert_eq(_of(&"match_started").size(), 1)
+	assert_false(server.lobby.forced, "used up")
+	_tick(4.0)
+	assert_eq(server.phases.phase, Phase.Id.CASINO)
+	assert_eq(_intent(b, &"minigame_now")["error"], &"not_leader")
+	assert_true(_intent(a, &"minigame_now")["ok"])
+	assert_eq(_of(&"minigame_forced").size(), 1)
+	assert_eq(_intent(a, &"minigame_now")["error"], &"no_minigame", "the warning is already running")
+	_tick(0.2)
+	assert_eq(_of(&"minigame_warning").size(), 1, "everyone gets the usual warning")
+	_tick(PhaseMachine.PRE_MINIGAME_SECONDS + 1.0)
+	assert_ne(server.phases.phase, Phase.Id.CASINO, "the minigame is on")

@@ -68,7 +68,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 		jackpot.feed(amount)
 	var mults: PackedFloat32Array = balance.plinko_multipliers(risk)
 	var weights: PackedInt32Array = balance.plinko_weights(risk)
-	var lk: int = modifiers.get_luck(p, game_id)
+	var lk: float = modifiers.get_luck(p, game_id)
 	var d: LuckRng.Draw = luck.draw(lk, func() -> int: return rng.weighted_index(Array(weights)), func(s: int) -> float: return mults[s])
 	var drop: Dictionary = {"drop_id": _next_drop_id, "player": p, "stake": amount, "risk": risk, "slot": int(d.value), "time_left": balance.plinko_flight_time, "covered": last_covered}
 	_next_drop_id += 1

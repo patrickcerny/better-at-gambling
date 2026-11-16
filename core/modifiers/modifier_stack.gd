@@ -6,12 +6,46 @@ extends RefCounted
 signal modifier_removed(player: int, mod: Modifier, reason: StringName)
 
 var luck_clamp: int = 3
+## Losing-streak luck (see BalanceConfig.luck_streak_*): points per counted loss, the cap, and the
+## smallest stake that counts. Step 0 turns the streak off.
+var streak_step: float = 0.0
+var streak_cap: float = 0.0
+var streak_min_stake: int = 0
+## Game → share of the streak luck that counts there (BalanceConfig.luck_streak_scale).
+var streak_scale: Dictionary = {}
 
 var _mods: Dictionary[int, Array] = {}
+## Player → luck points from the current losing streak.
+var _streak: Dictionary[int, float] = {}
 
 
 func _init(p_luck_clamp: int = 3) -> void:
 	luck_clamp = p_luck_clamp
+
+
+## Turns the losing-streak luck on with the balance's numbers.
+func use_streak(balance: BalanceConfig) -> ModifierStack:
+	streak_step = balance.luck_streak_step
+	streak_cap = balance.luck_streak_cap
+	streak_min_stake = balance.luck_streak_min_stake
+	streak_scale = balance.luck_streak_scale
+	return self
+
+
+## A bet was settled: a loss of at least `streak_min_stake` grows the streak luck, a win clears it,
+## a push leaves it.
+func note_result(player: int, stake: int, returned: int) -> void:
+	if streak_step <= 0.0:
+		return
+	if returned > stake:
+		_streak.erase(player)
+	elif returned < stake and stake >= streak_min_stake:
+		_streak[player] = minf(float(_streak.get(player, 0.0)) + streak_step, streak_cap)
+
+
+## Luck points from the losing streak (0 = none).
+func streak_luck(player: int) -> float:
+	return float(_streak.get(player, 0.0))
 
 
 ## Adds a modifier to a player.
@@ -29,13 +63,14 @@ func get_mods(player: int) -> Array[Modifier]:
 	return out
 
 
-## Clamped luck sum for a player at a game (general + game-specific).
-func get_luck(player: int, game_id: StringName = &"") -> int:
-	var sum: int = 0
+## Clamped luck for a player at a game, in luck points (general + game-specific items + the
+## losing streak). Fractional since 0.9.57 (the streak adds quarter points).
+func get_luck(player: int, game_id: StringName = &"") -> float:
+	var sum: float = streak_luck(player) * float(streak_scale.get(game_id, 1.0))
 	for m: Modifier in _mods.get(player, []):
 		if m.applies_to(game_id):
 			sum += m.luck
-	return clampi(sum, -luck_clamp, luck_clamp)
+	return clampf(sum, -luck_clamp, luck_clamp)
 
 
 ## Product of payout multipliers for a player at a game.

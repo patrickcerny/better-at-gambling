@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"loaded_reels"
 display_name = "Loaded Reels"
-description = "Slots luck +3 for your next 8 spins."
+description = "Slots luck +36% for your next 8 spins."
 rarity = 0
 target_mode = 0
 requires_proximity = false

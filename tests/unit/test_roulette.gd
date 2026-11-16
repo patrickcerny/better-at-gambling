@@ -56,7 +56,7 @@ func test_limits() -> void:
 	assert_eq(rl.place_bet(1, {"type": &"black", "amount": 101})["error"], &"above_max")
 	assert_true(rl.place_bet(1, {"type": &"black", "amount": 100})["ok"])
 	assert_eq(rl.place_bet(1, {"type": &"straight", "value": 37, "amount": 10})["error"], &"invalid_bet_value")
-	assert_eq(rl.place_bet(1, {"type": &"corner", "amount": 10})["error"], &"invalid_bet_type")
+	assert_eq(rl.place_bet(1, {"type": &"basket", "amount": 10})["error"], &"invalid_bet_type")
 	assert_eq(rl.place_bet(2, {"type": &"red", "amount": 10})["error"], &"not_seated")
 
 
@@ -153,3 +153,52 @@ func test_lucky_neighbor_and_jinx() -> void:
 	r2.tick(4.0)
 	r2.tick(RouletteLogic.LAND_TIME)
 	assert_eq(fx2.economy.balance(1), 900 + 190)
+
+
+func test_split_street_corner_line_cover_and_pay() -> void:
+	# Valid values and the numbers they cover.
+	assert_eq(RouletteLogic.covered(&"split", 1720), [17, 20])
+	assert_eq(RouletteLogic.covered(&"split", 1), [0, 1])
+	assert_eq(RouletteLogic.covered(&"street", 4), [4, 5, 6])
+	assert_eq(RouletteLogic.covered(&"corner", 25), [25, 26, 28, 29])
+	assert_eq(RouletteLogic.covered(&"corner", 0), [0, 1, 2, 3])
+	assert_eq(RouletteLogic.covered(&"line", 31), [31, 32, 33, 34, 35, 36])
+	for bad: Array in [[&"split", 304], [&"split", 1819], [&"split", 0], [&"street", 5], [&"corner", 3], [&"corner", 33], [&"line", 34]]:
+		assert_false(RouletteLogic.is_valid_value(bad[0], bad[1]), str(bad))
+	assert_eq(RouletteLogic.split_value(20, 17), 1720)
+	assert_eq(RouletteLogic.split_value(3, 4), -1, "3 and 4 don't touch on the layout")
+	assert_true(RouletteLogic.wins(&"split", 1, 0), "the zero split wins on zero")
+	assert_true(RouletteLogic.wins(&"corner", 0, 0))
+	assert_false(RouletteLogic.wins(&"street", 1, 0))
+	assert_eq(RouletteLogic.bet_name(&"split", 1720), "SPLIT 17-20")
+	assert_eq(RouletteLogic.bet_name(&"line", 1), "LINE 1-6")
+	# Payout ratios as on a real single-zero table.
+	assert_eq(int(RouletteLogic.RATIOS[&"split"]), 17)
+	assert_eq(int(RouletteLogic.RATIOS[&"street"]), 11)
+	assert_eq(int(RouletteLogic.RATIOS[&"corner"]), 8)
+	assert_eq(int(RouletteLogic.RATIOS[&"line"]), 5)
+	assert_true(rl.place_bet(1, {"type": &"corner", "value": 25, "amount": 10})["ok"])
+	assert_eq(rl.place_bet(1, {"type": &"corner", "value": 27, "amount": 10})["error"], &"invalid_bet_value")
+
+
+func test_every_layout_spot_is_a_valid_bet() -> void:
+	var board := RouletteBoard.new()
+	board.size = board.custom_minimum_size
+	add_child_autofree(board)
+	var seen: Dictionary = {}
+	var y: float = 0.0
+	while y < board.size.y:
+		var x: float = 0.0
+		while x < board.size.x:
+			var hit: Array = board.spot_at(Vector2(x, y))
+			if hit[0] != &"":
+				assert_true(RouletteLogic.RATIOS.has(hit[0]), str(hit))
+				assert_true(RouletteLogic.is_valid_value(hit[0], hit[1]), str(hit))
+				seen[hit[0]] = true
+			x += 2.0
+		y += 2.0
+	for t: StringName in RouletteLogic.RATIOS:
+		assert_true(seen.has(t), "%s reachable on the layout" % t)
+	# A chip drawn for a bet sits where a click makes that bet.
+	for b: Array in [[&"straight", 17], [&"split", 1720], [&"split", 1718], [&"corner", 25], [&"street", 4], [&"line", 10], [&"dozen", 2], [&"column", 3], [&"red", 0], [&"corner", 0], [&"split", 2]]:
+		assert_eq(board.spot_at(board.spot_point(b[0], b[1])), b, str(b))

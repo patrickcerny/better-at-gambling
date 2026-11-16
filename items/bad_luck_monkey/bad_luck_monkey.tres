@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"bad_luck_monkey"
 display_name = "Bad Luck Monkey"
-description = "Give a player a monkey on their back: luck −3 for 25 s. They can pass it on with a shove."
+description = "Give a player a monkey on their back: luck −36% for 25 s. They can pass it on with a shove."
 rarity = 2
 target_mode = 1
 requires_proximity = false

@@ -93,6 +93,204 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.64 Daily Spin button
+- Patrick: "the wheel is always also a button on the bottom right, but very highlighted (like super
+  mega) when it's available", "the size of a 3x3 button and above the 3 buttons". `DailySpinButton`
+  (ui/common): a 224 px square above ?, T-shirt and gear (their width together), a little prize
+  wheel drawn in code. Spin free: it turns, pulses, rays and glow rings breathe, bulbs race, sparkles
+  circle it, the pointer ticks and a gold SPIN! plaque bounces. Otherwise it rests dimmed with the
+  countdown. DAILY SPIN stays in the menu list too. `test_main_menu.gd` green.
+### 2026-11-16 / 0.9.62 Broke players are pointed to the Odd Jobs button
+- Patrick: "Indicator wenn man broke ist (weniger geld als 50) zum button". Under $50 (or under the
+  House Comp line if the table limits put it higher; `OddJobsController.is_broke`) a gold beacon
+  (spinning arrow + "ODD JOBS +$50", drawn through walls) floats over the cabinet, and while the
+  cabinet is off screen a gold arrow with an "ODD JOBS +$50" tag sits on the screen edge
+  (`hud.set_odd_jobs_pointer`, same edge maths as the Hot Table arrow, now `MatchScene.edge_pointer`).
+  Both hide at the cabinet, while seated or knocked out, on the results screen and at $50. The cabinet
+  glow and the one-time hint now also start under $50. Test: `test_under_50_points_the_way_to_the_button`
+  in tests/physics/test_odd_jobs_cabinet.gd.
+
+### 2026-11-16 / 0.9.61 Luck in percent, losing streak, luck plaque, item cards on the right
+- Patrick: the half-ring luck gauge "sieht mega kacke aus", put it right of the items; item info on
+  the right too; luck should not be just 1–3; a losing streak should raise luck a bit; drop the
+  "[I] more info" hint; monkey/bat previews were the wrong way round.
+- Luck is fractional points now (`ModifierStack.get_luck` → float, `LuckRng` float), shown as the
+  reroll chance in percent (1 point = 12 %, −36 % … +36 %). Item descriptions say percent.
+- Losing streak (`BalanceConfig.luck_streak_*`, `ModifierStack.note_result` from
+  `StationLogicBase._settle`): each lost bet of at least $25 adds +1.5 % up to +6 %, slots count it
+  at half; the next win clears it. Server only; private snapshot has `streak`. At +3 %/+15 % slots
+  paid 109 %, so it was cut. `tests/sim/test_rtp_streak.gd` (slots 1.006 → 1.034, plinko 1.007 →
+  1.018, roulette red unchanged, straight 1.005 → 1.027, blackjack 1.013 → 1.013); the base RTP sims
+  run without the streak (`SimHelpers.streak`).
+- HUD: luck plaque right of the slots (LUCK + word, percent, bar from the centre with the streak's
+  share striped gold, "LOSING STREAK +x%"), hidden at 0 but its place kept. NEW ITEM / picked item /
+  I cards sit right of it, bottom level with the slots. Item bar spans the screen width.
+- Previews: models are built facing -z, so `ItemThumbnails.YAW` turns them round (152°); the bat is
+  tilted barrel up (`TILT`). The held item's live model swings instead of turning a full circle.
+  Round results' turning cards use the same yaw.
+- Look-dev: `tools/dev/item_thumbs_shot.tscn` (every preview, `--turn`), `item_bar_shot.tscn --luck P --streak S`.
+
+### 2026-11-16 / 0.9.60 Round results reworked
+Patrick: "round results look shitty. Also 3d models for items and rework". `RewardPanel` now uses the table overlays' look (`TableSkin`): a walnut panel in a brass frame, only as big as its rows (no more big empty box over the stage), the title between brass rules and a draining countdown bar. Each row: a gold/silver/bronze place medallion (`PlaceBadge`), the bean in its colour and outfit (`BeanPortraits`), the cash counting up (ease out, gold flash at the end), and the item as a card that flips from a burgundy back to the item's own 3D model turning live in it, framed and tagged in its rarity colour (legendary glows); long items lie across the card. Underdog bonus and House Comp stay on the row; Minigames Only shows no cards; eight rows go compact. Look-dev: `scripts/screenshot.sh res://tools/dev/reward_panel_shot.tscn name 90 [--players N] [--instant] [--no-items]`. Tests: `test_reward_panel_items`, `test_stage_after_minigame`, `test_regroup_scene`, `test_item_bar` green (no full suite, per Patrick's rule).
+
+### 2026-11-16 / 0.9.59 Daily Spin
+- Patrick: "Daily spin button auf der Startseite wo du Sachen gewinnen kannst (auch die gezahlte
+  Währung und sehr unwahrscheinlich ein krasser animierter Skin). Mach da ein cooles Wheel."
+  DAILY SPIN under SHOP (gold star when free, else the countdown) opens `DailySpinPanel`: a prize
+  wheel drawn in code (`DailyWheelView`: burgundy/cream/felt slices, gold pegs, a ticking pointer,
+  chasing marquee bulbs, confetti and coins on a win), the jackpot on a turning bean, the odds.
+  Prizes (`DailyWheel`): 100-2,500 red Coins, a mystery piece, 5-50 Gold, and at 0.3 % the new
+  Fortune skin (`skin_fortune`, bean_skin mode 9: a prize wheel spinning on the belly with chasing
+  bulbs, gold coins drifting up; `CosmeticDef.wheel_only`, Steam item 208).
+- Security: with Steam the spin is `triggerItemDrop` on playtime generator 3200 (one drop per 20 h
+  per account, weights in its bundle); prizes are tokens the game redeems (consume for Coins and
+  pieces, exchange for Gold bundles 3311-3314). Timer on Steam server time. Without Steam or before
+  the itemdefs are uploaded: a local spin, Coins and pieces only. docs/STEAM_INVENTORY.md "Daily Spin".
+  itemdefs.json regenerated (162), NOT uploaded (needs Patrick's go). Dev panel: DAILY SPIN AGAIN.
+- Tests: new `test_daily_wheel.gd`; `test_steam_store`, `test_outfits`, `test_player_profile`,
+  `test_bean_colors`, `test_cosmetics_shop`, `test_main_menu`, `test_confirm_and_dev_ui`,
+  `test_dev_mode` green.
+### 2026-11-16 / 0.9.58 Leader force start: START NOW in the lobby, START NEXT MINIGAME in the casino
+- Patrick: "Lobby can force start minigame". New intents `force_start` (lobby) and `minigame_now`
+  (casino), leader only, online rooms only.
+- START NOW (lobby panel footer, leader): `LobbyController.forced` makes the doors' countdown run even
+  if not everyone is ready; reset when the match starts or Play Again returns to the lobby.
+- START NEXT MINIGAME (pause menu, leader, casino open, not minigames-only): `MatchServer.minigame_now`
+  jumps the casino clock to the next minigame's 10 s warning; `minigame_forced {by}` puts
+  "X starts the next minigame now!" in the feed. Refused (`no_minigame`) once the warning runs.
+- PauseMenu.set_dev_available no longer crashes before _ready (test_pause_in_minigame was red on main).
+- Tests: test_room_lobby, test_lobby_panel_host, test_pause_menu, test_pause_in_minigame; lint ok.
+
+### 2026-11-16 / 0.9.57 ready pedestals reworked
+- Patrick: "das klipped und passt nicht. reworke die podeste komplett". The column pedestals with
+  their side rails clipped (rails through the steps, the abacus over the stair, the colour ring
+  under the drum) and stood tight against the wall. Now each pedestal is one piece: a deep brown
+  marble footing, a 1.2 x 1.0 m white marble dais 0.8 m high (dark base moulding, colour inlays in
+  gold frames on both sides and either side of the stair, a gold fillet, a polished overhanging cap)
+  and a three-step stair 0.86 m wide that runs straight into it, no rails. 2.5 m apart (1.2 m free),
+  back 0.3 m off the wall, x ±3.2 / 5.7 / 8.2 / 10.7, z 14.85; start-room spawns moved to z 11.4–11.9.
+  The two mirrors on the pedestal wall are gone. Walking up stays one invisible wedge.
+  `test_lobby_pedestals.gd` green. `test_start_room_and_jail.gd`'s jail path test already fails on
+  main before this change (path ends on the floor at (1.3, 1.25, −3.6)), unrelated.
+### 2026-11-16 / 0.9.56 Taskbar icon on Windows
+- Patrick: after 0.9.48 the window title showed the logo but the taskbar showed the generic app icon.
+  Cause: Godot 4.7.2's exe resource editing writes our icon group without its name, and the engine
+  registers the window class with `LoadIcon(..., "GODOT_ICON")`, so the class icon (taskbar) was empty.
+  `tools/windows/fix_exe_icon.py` (stdlib only) names the group GODOT_ICON again after the export; run
+  by release.yml and `scripts/export.sh windows`. Checked on the 0.9.54 release exe (only .rsrc tail,
+  header sizes and checksum change; PE checksum verified with pefile).
+
+### 2026-11-16 / 0.9.54 Table UIs redesigned, roulette inside bets
+- Patrick: "KOMPLETTER redesign des UI's der games" and "Roulette UI ausbauen und besser betten kann auf
+  mehrere zahlen". Every table overlay shares `TableSkin`: walnut panel in a brass frame with corner
+  studs, engraved title between brass rules (`DecoRule`), felt status band, draining `CountdownBar`,
+  drawn casino chips (`ChipToken` in `BetPanel`), brass plaque buttons (gold / felt / red / ghost),
+  a WIN / LOST / PUSH ribbon summed per round from `round_result`. Blackjack, Hi-Lo and Hold'em show
+  drawn cards (`CardRow` over the minigames' `CardFace`).
+- Roulette: `RouletteBoard` draws the layout and takes every real bet by mouse position: straight 35:1,
+  split 17:1 (value lo*100+hi, zero splits), street 11:1, corner 8:1 (0 = first four), six line 5:1,
+  dozens, columns, even money. Hover lights the covered numbers with name and payout; last numbers
+  strip; REBET. `RouletteLogic.covered/split_value/bet_name`, 3D chip spots on the lines/corners.
+- Tests: unit test_roulette (new inside bets, every layout point is a valid bet, chip point = click
+  point), tests/ui green except the pre-existing pause-menu `set_dev_available` Nil error (also on main).
+### 2026-11-16 / 0.9.53 Baccarat
+- Patrick: "Adde Baccarat". New table game `baccarat` (Punto Banco, 8-deck shoe, standard tableau):
+  PLAYER 1:1, BANKER 1:1 less 5%, TIE 9:1, P PAIR / B PAIR 11:1, Player and Banker push on a tie.
+  Shared round like roulette (betting window, the cards turn one by one, then the pay); quiet favour
+  per bet type makes each ~101.1% (`tests/sim/test_rtp_baccarat.gd`). Luck moves the pay only
+  (lucky: a one-point loss can come back; jinxed: a win pays 80%).
+- `BaccaratStation`: long table with round corners in deep blue felt, five seats each with its own
+  gold-lined betting panel (PLAYER/BANKER discs in front, P PAIR/TIE/B PAIR behind), the two hands in
+  frames with floating totals, winner outlined, a LAST ROUNDS scoreboard, shoe and chip rack.
+  `BaccaratUi` docks in the right column (hands, five bet buttons with pays, chips, road).
+- Full floor: the pit can't hold a tenth table, so `full_extras` is now two blackjacks (roulette_2 is
+  off the canonical floor; random floors still draw extras by weight). Protocol 17.
+- Floor generator: with seven table games a random pit draw could leave one out (seed 48); such a
+  draw now searches rows that take them all instead of failing.
+### 2026-11-16 / 0.9.50 Lobby panel redesign, lobby cards with beans, no kick rejoin block
+- Patrick: "auch das UI ist veraltet … Wenn man jemanden kickt soll er nicht einen throttle haben" and
+  "Die browse lobbies ist was grad eingestellt ist und kleine anzeige von allen beans … mit namen".
+- Kick: the 60 s rejoin block is gone (`MatchServer._kicked`/`kick_blocked_for`, `RoomHost` kick_cooldown
+  check, `Protocol.KICK_REJOIN_SECONDS`); a kicked player can join again on their own right away.
+- "(away)" ghosts: players who left stayed in the lobby list forever. In the lobby, anyone disconnected
+  for `MatchServer.LOBBY_AWAY_DROP_SECONDS` (60 s, Patrick 0.9.51) is removed (also those who left during the last match,
+  once Play Again returns to the lobby); a quick reconnect keeps the slot.
+- `LobbyPanel` redesign: fully opaque panel (pedestal names no longer show through), header with lobby
+  kind and player count, status band (countdown or hint + "x / y READY"), player rows with a bean
+  portrait in its outfit, LEADER/YOU tags, READY pills, KICK aligned; MATCH SETTINGS card with one row
+  per setting; footer LEAVE LOBBY | COSMETICS, INVITE FRIENDS, CLOSE.
+- `BeanPortraits` (ui/common): one offscreen viewport renders cached bean pictures (head or full bean).
+- BROWSE LOBBIES / JOIN A FRIEND: one card per lobby with the host's settings ("Casino · 5 minigames ·
+  3 min gambling · items on") and a line-up of the beans inside in their outfits with names (★ leader),
+  "IN A MATCH" when playing. The host's game writes `LobbyInfo` JSON to the Steam lobby data key `info`
+  (`SteamSvc.publish_lobby_info`, from match_scene when it owns the lobby); browsers parse it untrusted.
+- Tests: test_lobby_info (new), test_room_lobby (ghost drop), test_lobby_kick, test_host_mode,
+  test_main_menu (cards), test_minigame_selector; lint ok. Gallery: `--panel lobby`, `--panel browser`.
+
+### 2026-11-16 / 0.9.49 Item bar with the item models, NEW ITEM card, fuller explanations
+- Patrick: "Items erklären wichtiger" and "Item inventory bar sollte nicht namen der items zeigen
+  sondern die 3d models und onscroll oder equip der name". The three slots (`ItemBar`) are squares
+  with the item's model (`ItemThumbnails`, still pictures); the held slot is bigger, its model turns
+  live in a small SubViewport (`ItemThumbnails.build_stage`, shared photo booth) and its name shows
+  under it. No names otherwise.
+- New items: a "NEW ITEM" card (picture, rarity, FOR YOU / ON OTHERS / TRAP, duration, the whole
+  description, how to take it out and how to use it), one after another, 6 s each while the bar is
+  on screen; it waits while you sit or another card is up, and taking the item out skips it.
+- Picking a slot: the card shows the whole description (not just the first sentence), the tag
+  line and how to use it (aim, reach, key) for 3.5 s. The I card has the picture and the same lines.
+- Look-dev: `scripts/screenshot.sh res://tools/dev/item_bar_shot.tscn name 60 [--hold N] [--info] [--quiet] [--items a,b,c]`.
+- Tests: `tests/ui/test_item_bar.gd` (models in slots, held name, NEW ITEM queue, copies count),
+  `tests/physics/test_items_scene.gd` updated. Ran: those two, reward panel items, pause menu, shop
+  panel, HUD toasts, items/duels/shop, check_scripts (no full suite, Patrick's rule).
+
+### 2026-11-16 / 0.9.48 Own game icon instead of the Godot icon
+- Patrick: the game (also started through Steam) showed the Godot icon in the taskbar. The project now
+  has its own icon: `assets/icons/icon.png` (512 px, runtime window/taskbar icon via
+  `application/config/icon`), `icon.ico` (16 to 256 px, `config/windows_native_icon` and the Windows
+  preset's `application/icon`) and `icon.icns` (`config/macos_native_icon` and the macOS preset). Same
+  coin logo as the Steam icons (`better-at-gambling/steam/icons/` in the project files).
+- Windows preset: `application/modify_resources=true`, so the export writes the icon, product name and
+  file description into the .exe (Godot 4.7 does this natively, no rcedit needed).
+
+### 2026-11-16 / 0.9.47 Minigame rules card: preview clip + controls
+- Patrick: "Controls und gifs bei den minigames". The rules card before every minigame
+  (MinigameBriefing) is wider: a looping 5 s preview clip on the left (MinigamePreview plays the
+  sprite sheet assets/minigames/clips/<id>.webp, 50 frames 384x216 at 10 fps), how to play and a
+  controls table on the right (MinigameControls: keyboard and gamepad keycaps per action, filled from
+  the InputMap, the column of the device used last is lit, a dash where a device can't do it).
+  Player ready states are pills; the READY hint follows the device.
+- Clips: `tools/minigame_clips.sh [id ...]` runs tools/dev/minigame_clip.tscn under Xvfb with
+  `--fixed-fps 30`. Table games run their real logic in real time with every seat played by a bot that
+  sends random legal intents (per-game skip in the script); walkable games use their dev shot with the
+  beans walking one lap and the camera drifting so the loop joins. Imported lossy (compress/mode=1),
+  ~7.6 MB of source for all 16.
+- Gamepad gaps closed: Forehead Poker A = STAY / B = FOLD, Find the Lady D-pad moves the highlight and
+  A picks. Still mouse/keyboard only: Lonely Number, Vote Race, Spy, Grab Your Hand's card select
+  (shown as a dash on the card).
+- Known, not from this change: tests/ui/test_pause_in_minigame.gd fails 2/3 on main too
+  (PauseMenu.set_dev_available touches a null node, pause_menu.gd:113).
+### 2026-11-16 / 0.9.46 pedestal stairs and the lobby settings board
+- Patrick: "mach die stairs noch besser". The pedestal stairs were four thin slabs hanging in the
+  air over a visible wedge. Now `_build_stair`: four solid steps standing on the floor and running
+  into the column, polished treads that overhang their risers with a gold nosing and a shadow line,
+  dark marble cheek walls along the slope with a gold cap rail, newel posts with gold balls at the
+  foot. Walking is still the one invisible wedge (no lips), 0.9 m wide; 1.1 m gap between stairs.
+- Patrick: "mach lieber da eine große tafel an der wand ... settings LESBAR (nur host kann ui öffnen
+  und verändern)". The brass tablet stand is gone; a 4.2 x 2.7 m framed felt board hangs on the start
+  room's north wall west of the lobby doors (`SETTINGS_BOARD_*`) with a picture light, showing mode,
+  minigames, gambling minutes, items and the minigame pick live for everyone, and the host in the
+  footer. E in front of it opens the lobby settings for the host only; anyone else gets a toast.
+  Tests: `test_start_room_and_jail.gd` (board follows the settings, non-host cannot open).
+### 2026-11-15 / 0.9.45 Casino Hold'em river bet
+- Patrick: "Poker river bet". Before, the turn and the river came out together straight after the
+  CALL, with no betting in between. Now the turn comes out on its own (state `RIVER`, appended to
+  `HoldemLogic.State` so the older numbers stay), and every called hand puts down a RIVER BET (one
+  ante) or CHECKs on its own clock (`BalanceConfig.holdem_river_time` 10 s; out of time, standing up
+  or the match end = check). The river bet pays 1:1 like the call, comes back when the dealer does
+  not qualify or ties. Turn, river and the dealer's two are still drawn together (house rule and
+  luck unchanged, judged on ante + call); river and dealer stay in `hidden` on the server until the
+  showdown. Chips go on the CALL spot and settle with the hand. Same two buttons in the overlay
+  (C = river bet, F = check). Protocol 16. The RTP sim checks the river, so its numbers are unchanged.
 ### 2026-11-15 / 0.9.43 end screen with the stats stays up for 10 s
 - Patrick: "Es hat auch den endscreen mit den stats einfach direct geskipped lass den verpflichtend paar
   sekunden bleiben bis man leaven kann". Cause: PLAY AGAIN had the focus from the first frame, so a

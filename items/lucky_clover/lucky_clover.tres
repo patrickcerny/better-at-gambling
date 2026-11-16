@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"lucky_clover"
 display_name = "Lucky Clover"
-description = "Luck +2 for 45 s."
+description = "Luck +24% for 45 s."
 rarity = 0
 target_mode = 0
 requires_proximity = false

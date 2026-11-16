@@ -7,7 +7,6 @@ extends StationBase
 func _build_visuals() -> void:
 	game_id = &"blackjack"
 	seat_count = 4
-	_round_rug(4.8)
 	# Collision stays a simple cylinder; Patrick's half-moon table model is what you see.
 	var rim: Node3D = GreyboxKit.cylinder(self, 1.7, 0.9, Vector3(0, 0.45, 0), Color("#3A2A1E"), "Rim")
 	(rim.get_node(^"Mesh") as Node3D).visible = false
