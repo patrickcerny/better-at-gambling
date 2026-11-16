@@ -93,6 +93,15 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.10.45 roulette: no more sitting in each other's lap
+- Patrick: "on roulette you can sit on eachother". The server already hands every player their own
+  stool (`MatchServer._free_seat`, `tests/integration/test_station_seats.gd`), but all six roulette
+  seats shared one camera anchor 0.4 m behind stool 1, at head height: whoever sat anywhere at the
+  table looked out of stool 1's bean. Each stool now has its own view (`RouletteStation.SEAT_EYE_*`,
+  `SEAT_AIM_X`): over and behind its own stool, high enough to clear the neighbours, the far row
+  turned towards the wheel so it stays left of the docked panel.
+- Checked every other table: `tests/physics/test_seat_cameras_clear.gd` fails if any seat's view
+  starts inside another seat's bean (only roulette did). Dev shot: `tools/dev/roulette_shot.tscn`.
 ### 2026-11-16 / 0.10.44 thrown-around beans no longer stuck in someone's hands
 - Patrick: "The throw around and the ragdoll not updating bug is still there". When the bean holding
   someone went flying (knocked out, caught by a guard, knocked down), `InteractionResolver` ended
