@@ -71,6 +71,8 @@ var price_row: HBoxContainer
 var price_label: Label
 var price_coin: CoinIcon
 var action_button: Button
+## The open "Buy ...? Can't be refunded" question, if any.
+var confirm_dialog: ConfirmDialog
 ## Pays real money through Steam (a piece or a pack).
 var steam_button: Button
 var status_label: Label
@@ -649,7 +651,7 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 	b.tooltip_text = title if d != null else "%s: a set of %d pieces for Gold Coins" % [title, pack.pieces.size()]
 	b.clip_contents = true
 	SettingsPanel.style_tab(b)
-	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
 		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
 		sb.set_corner_radius_all(18)
 		b.add_theme_stylebox_override(st, sb)
@@ -711,7 +713,7 @@ func _coin_tile(c: CoinPack) -> Button:
 	b.custom_minimum_size = TILE
 	b.tooltip_text = "%s Gold Coins" % Hud._thousands(c.gold)
 	SettingsPanel.style_tab(b)
-	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
 		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
 		sb.set_corner_radius_all(18)
 		b.add_theme_stylebox_override(st, sb)
@@ -849,11 +851,15 @@ func press_look() -> void:
 			status_label.text = "Not enough Coins for the whole look: %s more to go." % Hud._thousands(look_price() - p.coins)
 			_refresh()
 			return
+		var lines: PackedStringArray = []
 		for d: CosmeticDef in to_buy:
-			ProfileManager.buy(d.id)
-		status_label.text = "Bought %d pieces! WEAR ALL puts the look on." % to_buy.size()
-		Audio.play(&"cash_register", &"UI", -6.0)
-		_refresh()
+			lines.append("%s · %s · %s Coins" % [d.display_name, _kind_name(d), Hud._thousands(d.price)])
+		_confirm_buy("BUY THE WHOLE LOOK?", "\n".join(lines) + "\n\n%d pieces for %s Coins together." % [to_buy.size(), Hud._thousands(look_price())], func() -> void:
+			for d: CosmeticDef in to_buy:
+				ProfileManager.buy(d.id)
+			status_label.text = "Bought %d pieces! WEAR ALL puts the look on." % to_buy.size()
+			Audio.play(&"cash_register", &"UI", -6.0)
+			_refresh(), look_button)
 		return
 	var n: int = 0
 	for d: CosmeticDef in look_pieces():
@@ -910,16 +916,58 @@ func _on_purchase_finished(ok: bool) -> void:
 
 
 ## A premium piece or a set paid in Gold Coins: Steam exchanges them (the answer: `_on_gold_spent`).
-func _buy_with_gold(title: String, def: int, cost: int) -> void:
+## Too few Gold Coins: off to the GOLD tab to get more. Enough: asks first (no refunds).
+func _buy_with_gold(title: String, def: int, cost: int, contents: String = "") -> void:
 	if not SteamSvc.is_available():
 		status_label.text = "Gold Coins need Steam running."
 	elif SteamSvc.gold < cost:
-		status_label.text = "Not enough Gold Coins: %s more to go (+ next to them)." % Hud._thousands(cost - SteamSvc.gold)
-	elif SteamSvc.buy_with_gold(def, cost):
-		status_label.text = "Buying %s..." % title
+		open_gold_shop(cost - SteamSvc.gold)
+		return
 	else:
-		status_label.text = "Can't buy that right now, try again in a moment."
+		_confirm_buy("BUY %s?" % title.to_upper(), contents + "%s Gold Coins." % Hud._thousands(cost), func() -> void:
+			if SteamSvc.buy_with_gold(def, cost):
+				status_label.text = "Buying %s..." % title
+			else:
+				status_label.text = "Can't buy that right now, try again in a moment."
+			_refresh())
+		return
 	_refresh()
+
+
+## "Hat", "Skin" ...: what a piece is, for the purchase lists.
+func _kind_name(d: CosmeticDef) -> String:
+	return str(KIND_TITLES.get(d.kind, "")).trim_suffix("S").replace("TROUSER", "TROUSERS").capitalize()
+
+
+## "MORE GOLD NEEDED · BUY MORE": the GOLD tab, with the smallest pack that covers `missing` picked.
+func open_gold_shop(missing: int) -> void:
+	var pick: CoinPack = null
+	for c: CoinPack in shop.coin_packs:
+		if c.gold >= missing and (pick == null or c.gold < pick.gold):
+			pick = c
+	if pick == null and not shop.coin_packs.is_empty():
+		pick = shop.coin_packs[-1]
+	show_kind(KIND_COINS)
+	if pick != null:
+		select(pick.id)
+		if tiles.has(pick.id):
+			tiles[pick.id].grab_focus()
+	status_label.text = "%s more Gold Coins needed: pick a pack, Steam handles the payment." % Hud._thousands(missing)
+
+
+## Every cosmetic purchase asks first and says it can't be refunded (Patrick: "for both buys both
+## currencies dialog about non refundability of the bought skin"). `on_yes` buys.
+func _confirm_buy(title: String, price_text: String, on_yes: Callable, from: Control = null) -> void:
+	if confirm_dialog != null and is_instance_valid(confirm_dialog) and confirm_dialog.visible:
+		return
+	# CANCEL hands the focus back here: to the button, never to a tile (that would pick it).
+	var back: Control = from if from != null else action_button
+	if back.is_visible_in_tree():
+		back.grab_focus()
+	var host: Node = get_parent() if get_parent() != null else self
+	confirm_dialog = ConfirmDialog.ask(host, title, "%s\nCosmetics can't be refunded once bought." % price_text, "BUY", on_yes)
+	for c: StringName in [&"font_color", &"font_hover_color", &"font_focus_color"]:
+		confirm_dialog.yes_button.add_theme_color_override(c, Palette.COIN_GOLD)
 
 
 func _on_gold_spent(ok: bool) -> void:
@@ -931,11 +979,38 @@ func _on_gold_spent(ok: bool) -> void:
 	_refresh()
 
 
-## BUY when not owned (refused with a message when the Coins don't reach), else WEAR / TAKE OFF.
+## Buys `d` with red Coins, or says why not.
+func _buy_with_coins(d: CosmeticDef) -> void:
+	var p: PlayerProfile = ProfileManager.profile
+	match ProfileManager.buy(d.id):
+		&"":
+			status_label.text = "Bought %s! Wear it whenever you like." % d.display_name
+			Audio.play(&"cash_register", &"UI", -6.0)
+		&"owned":
+			pass
+		&"not_enough_coins":
+			status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (d.price - p.coins)
+			Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
+		&"level" when d.wheel_only:
+			status_label.text = "Only the Daily Spin has it."
+		&"level":
+			status_label.text = "Reach level %d to unlock it (you're level %d)." % [d.level, p.level]
+		_:
+			status_label.text = "Can't buy that right now."
+	_refresh()
+
+
+## BUY when not owned (asks first, as no purchase can be refunded; refused with a message when the
+## Coins don't reach; too few Gold Coins opens the GOLD tab), else WEAR / TAKE OFF.
 func press_action() -> void:
 	var pack: CosmeticPack = shop.find_pack(selected)
 	if pack != null and not ProfileManager.profile.owns_pack(pack):
-		_buy_with_gold(pack.display_name, pack.steam_item, pack.gold)
+		var names: PackedStringArray = []
+		for id: StringName in pack.pieces:
+			var piece: CosmeticDef = shop.find(id)
+			if piece != null:
+				names.append("%s · %s" % [piece.display_name, _kind_name(piece)])
+		_buy_with_gold(pack.display_name, pack.steam_item, pack.gold, "\n".join(names) + "\n\n")
 		return
 	if pack != null:
 		if ProfileManager.profile.owns_pack(pack):
@@ -953,22 +1028,11 @@ func press_action() -> void:
 	if not p.owns(d.id) and d.premium():
 		_buy_with_gold(d.display_name, d.steam_item, d.gold)
 		return
+	if not p.owns(d.id) and d.coin_buyable() and p.coins >= d.price:
+		_confirm_buy("BUY %s?" % d.display_name.to_upper(), "%s Coins." % Hud._thousands(d.price), func() -> void: _buy_with_coins(d))
+		return
 	if not p.owns(d.id):
-		var err: StringName = ProfileManager.buy(d.id)
-		match err:
-			&"":
-				status_label.text = "Bought %s! Wear it whenever you like." % d.display_name
-				Audio.play(&"cash_register", &"UI", -6.0)
-			&"not_enough_coins":
-				status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (d.price - p.coins)
-				Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
-			&"level" when d.wheel_only:
-				status_label.text = "Only the Daily Spin has it."
-			&"level":
-				status_label.text = "Reach level %d to unlock it (you're level %d)." % [d.level, p.level]
-			_:
-				status_label.text = "Can't buy that right now."
-		_refresh()
+		_buy_with_coins(d)  # refused: says why
 		return
 	if d.kind == CosmeticDef.KIND_COLOR and not _wearing(p, d):
 		# One skins page: a plain colour takes an animated skin off (else nothing would change).
@@ -1115,8 +1179,7 @@ func _refresh() -> void:
 			action_button.text = "GOLD NEEDS STEAM"
 			action_button.disabled = true
 		elif SteamSvc.gold < sel.gold:
-			action_button.text = "%s MORE GOLD NEEDED" % Hud._thousands(sel.gold - SteamSvc.gold)
-			action_button.disabled = true
+			action_button.text = "%s MORE GOLD NEEDED · BUY MORE" % Hud._thousands(sel.gold - SteamSvc.gold)
 		else:
 			action_button.text = "BUY FOR %s GOLD" % Hud._thousands(sel.gold)
 	elif not p.owns(sel.id) and sel.wheel_only:
@@ -1226,8 +1289,7 @@ func _refresh_pack(p: PlayerProfile, pack: CosmeticPack) -> void:
 		action_button.text = "GOLD NEEDS STEAM"
 		action_button.disabled = true
 	elif SteamSvc.gold < pack.gold:
-		action_button.text = "%s MORE GOLD NEEDED" % Hud._thousands(pack.gold - SteamSvc.gold)
-		action_button.disabled = true
+		action_button.text = "%s MORE GOLD NEEDED · BUY MORE" % Hud._thousands(pack.gold - SteamSvc.gold)
 	else:
 		action_button.text = "BUY FOR %s GOLD" % Hud._thousands(pack.gold)
 
