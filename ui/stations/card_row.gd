@@ -3,6 +3,11 @@ extends HBoxContainer
 ## A fanned row of drawn playing cards (`CardFace`) for the card tables' overlays. Redraws only
 ## when the cards change; a new card deals in. -1 shows a card face down (the dealer's hole card).
 
+## A peeked face-down card (Sunglasses) is kept in `_shown` as PEEKED + card.
+const PEEKED: int = 100
+## How see-through a peeked card is drawn.
+const PEEK_ALPHA: float = 0.5
+
 var card_height: float = 76.0
 var _shown: Array = []
 ## Gold underline under the row (the hand you are playing).
@@ -20,11 +25,18 @@ func _init(p_height: float = 76.0) -> void:
 	custom_minimum_size = Vector2(0, p_height)
 
 
-## Shows `cards` (card ints; -1 = face down); `dim` greys them (bust, folded).
-func show_cards(cards: Array, dim: bool = false) -> void:
+## Shows `cards` (card ints; -1 = face down); `dim` greys them (bust, folded). `peek` (Sunglasses)
+## fills the face-down cards in order: their faces show half see-through.
+func show_cards(cards: Array, dim: bool = false, peek: Array = []) -> void:
 	var ints: Array = []
+	var down: int = 0
 	for c: Variant in cards:
-		ints.append(int(c))
+		if int(c) < 0 and down < peek.size():
+			ints.append(PEEKED + int(peek[down]))
+		else:
+			ints.append(int(c))
+		if int(c) < 0:
+			down += 1
 	if ints != _shown:
 		var old: Array = _shown
 		var keep: int = 0
@@ -35,7 +47,11 @@ func show_cards(cards: Array, dim: bool = false) -> void:
 			remove_child(kids[i])
 			kids[i].queue_free()
 		for i: int in range(keep, ints.size()):
-			var f: CardFace = CardFace.make(int(ints[i]), card_height)
+			var c: int = int(ints[i])
+			var f: CardFace = CardFace.make(c - PEEKED if c >= PEEKED else c, card_height)
+			if c >= PEEKED:
+				f.name = "Peek%d" % i
+				f.modulate.a = PEEK_ALPHA
 			add_child(f)
 			f.deal_in(0.08 * (i - keep))
 		_shown = ints

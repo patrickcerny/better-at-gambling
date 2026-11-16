@@ -301,7 +301,11 @@ func _dealer_text() -> String:
 	if dealer.is_empty() and down == 0:
 		return ""
 	if dealer.is_empty():
-		return "DEALER  " + "  ".join(PackedStringArray(["??", "??"]).slice(0, down))
+		var out_down: String = "DEALER  " + "  ".join(PackedStringArray(["??", "??"]).slice(0, down))
+		var peek: Array = priv.get("peek", [])
+		if not peek.is_empty():  # Sunglasses: only your own private state has them
+			out_down += "  ·  SUNGLASSES: %s" % "  ".join(_labels(peek))
+		return out_down
 	var out: String = "DEALER  %s  ·  %s" % ["  ".join(_labels(dealer)), String(pub.get("dealer_hand", ""))]
 	if not bool(pub.get("qualifies", true)):
 		out += "  ·  does not qualify"

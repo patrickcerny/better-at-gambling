@@ -75,8 +75,13 @@ func test_sunglasses_peek_for_one_blackjack_hand() -> void:
 	_give(1, [&"sunglasses"])
 	assert_true(_use(1)["ok"])
 	assert_true(mods.has_flag(1, &"peek_dealer", &"blackjack"))
+	assert_true(mods.has_flag(1, &"peek_dealer", &"holdem"), "Hold'em too")
+	assert_false(mods.has_flag(1, &"peek_dealer", &"roulette"))
+	mods.consume_round(1, &"roulette")
+	assert_true(mods.has_flag(1, &"peek_dealer", &"blackjack"), "another game doesn't use it up")
 	mods.consume_round(1, &"blackjack")
 	assert_false(mods.has_flag(1, &"peek_dealer", &"blackjack"))
+	assert_false(mods.has_flag(1, &"peek_dealer", &"holdem"), "one hand, either table")
 
 
 func test_monkey_jinxes_and_passes_on_with_a_shove() -> void:

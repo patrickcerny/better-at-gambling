@@ -287,7 +287,7 @@ func get_public_state() -> Dictionary:
 func get_private_state(p: int) -> Dictionary:
 	var out: Dictionary = {}
 	if not dealer_revealed and dealer.size() >= 2 and modifiers.has_flag(p, &"peek_dealer", game_id):
-		out["hole_card"] = dealer[1]
+		out["peek"] = [dealer[1]]  # Sunglasses: only this player's private state carries it
 	if modifiers.has_flag(p, &"scissors", game_id):
 		out["scissors"] = true
 	return out

@@ -462,6 +462,26 @@ func test_the_turn_comes_then_the_river_bet() -> void:
 	assert_true(t.has_stake(1))
 
 
+func test_sunglasses_peek_at_the_dealers_two_on_the_river_only_for_the_wearer() -> void:
+	var m := Modifier.new()
+	m.id = &"sunglasses"
+	m.games = [&"blackjack", &"holdem"]
+	m.rounds_left = 1
+	m.flags = {&"peek_dealer": true}
+	fx.modifiers.add(1, m)
+	_deal_one("AS AD 9C 5H 2S KD 7C 4C 4D")
+	assert_false(t.get_private_state(1).has("peek"), "the dealer's cards aren't drawn before the turn")
+	t.player_action(1, &"call")
+	assert_eq(t.state, HoldemLogic.State.RIVER)
+	assert_eq(t.get_private_state(1).get("peek", []), _h("4C 4D"), "the wearer sees the dealer's two")
+	assert_false(t.get_private_state(2).has("peek"), "nobody else does")
+	assert_false(t.get_public_state().has("peek"))
+	t.player_action(1, &"check")
+	for i: int in 40:
+		t.tick(0.5)
+	assert_false(fx.modifiers.has_flag(1, &"peek_dealer", &"holdem"), "used up by the hand")
+
+
 func test_a_river_bet_pays_one_to_one_when_the_hand_wins() -> void:
 	_deal_one("AS AD 9C 5H 2S KD 7C 4C 4D")
 	t.player_action(1, &"call")

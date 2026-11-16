@@ -166,7 +166,7 @@ func test_hole_card_hidden_unless_peek() -> void:
 	m.game_id = &"blackjack"
 	m.flags = {&"peek_dealer": true}
 	fx.modifiers.add(1, m)
-	assert_eq(bj.get_private_state(1)["hole_card"], bj.dealer[1])
+	assert_eq(bj.get_private_state(1)["peek"], [bj.dealer[1]])
 
 
 func test_shoe_reshuffles_between_rounds_at_penetration() -> void:

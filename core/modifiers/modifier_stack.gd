@@ -109,7 +109,7 @@ func consume_on_loss(player: int, game_id: StringName) -> bool:
 ## Call once per round played at a game: decrements round-limited modifiers for that game.
 func consume_round(player: int, game_id: StringName) -> void:
 	for m: Modifier in get_mods(player):
-		if m.rounds_left > 0 and m.game_id == game_id:
+		if m.rounds_left > 0 and m.limited_to(game_id):
 			m.rounds_left -= 1
 			if m.rounds_left == 0:
 				_remove(player, m, &"consumed")

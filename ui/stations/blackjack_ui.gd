@@ -185,8 +185,8 @@ func _refresh() -> void:
 	if st == BlackjackLogic.State.ACTING and dealer.size() == 1:
 		dealer_txt += "  ??"
 	dealer_label.text = "DEALER  %s" % (dealer_txt if not dealer.is_empty() else "—")
-	if priv.has("hole_card"):
-		dealer_label.text += "   (peek: %s)" % Card.label(int(priv["hole_card"]))
+	if not (priv.get("peek", []) as Array).is_empty():
+		dealer_label.text += "   (peek: %s)" % Card.label(int(priv["peek"][0]))
 	var split: bool = mine.has("split")
 	var active: int = int(mine.get("active", 0))
 	var active_hand: Dictionary = (mine["split"] as Dictionary) if split and active == 1 else mine
@@ -237,7 +237,7 @@ func _refresh_cards(st: int, dealer: Array, mine: Dictionary, split: bool, activ
 	if st == BlackjackLogic.State.ACTING and dealer.size() == 1:
 		shown.append(-1)
 	dealer_box.visible = not dealer.is_empty()
-	dealer_cards.show_cards(shown)
+	dealer_cards.show_cards(shown, false, priv.get("peek", []))
 	dealer_total.text = str(HandEval.total(_ints(dealer))) if not dealer.is_empty() else ""
 	var cards: Array = mine.get("cards", [])
 	hands_box.visible = not cards.is_empty()

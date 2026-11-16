@@ -8,7 +8,7 @@ extends Node3D
 ## the floor and an outline while you hold the item ("No one in reach" otherwise). Pickpocket's
 ## greed and the duel stake are a two-button choice on the item bar before the use goes out.
 ## Also runs the Rock Paper Scissors duel screen, the "inventory full" choice (keys 1–4), the item
-## info card (I), the Sunglasses x-ray on the dealer's hole card and feeds the ItemBar from the
+## info card (I), the Sunglasses peek at the dealer's face-down cards and feeds the ItemBar from the
 ## private snapshot. Never decides anything: the server validates every use.
 
 const PRIVATE_POLL: float = 0.2
@@ -48,7 +48,7 @@ var _clock: float = 0.0
 var _discard_open: bool = false
 var _outlined: Array[GeometryInstance3D] = []
 var _outline_mat: ShaderMaterial
-## Blackjack table whose hole card is x-rayed for us (Sunglasses), &"" = none.
+## Card table whose face-down dealer cards we see through (Sunglasses), &"" = none.
 var _xray_station: StringName = &""
 ## The arm pose we put on our own bean for the held item (Vector3.INF = none of ours).
 var _arm_pose: Vector3 = Vector3.INF
@@ -508,21 +508,30 @@ func _update_aim(bar: ItemBar) -> void:
 		bar.show_target("%s: no one in reach" % def.display_name)
 
 
-## Sunglasses: while the server shows us the dealer's hole card, the face-down card is x-rayed.
+## Sunglasses: while the server shows us the dealer's face-down cards (Blackjack's hole card,
+## Hold'em's two), they lie half see-through on our felt. Nobody else gets the cards.
 func _update_xray(station_priv: Dictionary) -> void:
 	var sid: StringName = StringName(scene.view.state.players.get(scene.local_id, {}).get("station", ""))
-	var hole: int = int(station_priv.get("hole_card", -1))
-	if _xray_station != &"" and (_xray_station != sid or hole < 0):
-		var old: BlackjackStation = scene.map.stations.get(_xray_station, null) as BlackjackStation if scene.map != null else null
+	var peek: Array = station_priv.get("peek", [])
+	if _xray_station != &"" and (_xray_station != sid or peek.is_empty()):
+		var old: TableCards = _table_cards(_xray_station)
 		if old != null:
-			old.cards.set_xray(-1)
+			old.set_peek([])
 		_xray_station = &""
-	if hole < 0 or sid == &"" or scene.map == null:
+	if peek.is_empty() or sid == &"":
 		return
-	var st: BlackjackStation = scene.map.stations.get(sid, null) as BlackjackStation
-	if st != null:
-		st.cards.set_xray(hole)
+	var cards: TableCards = _table_cards(sid)
+	if cards != null:
+		cards.set_peek(peek)
 		_xray_station = sid
+
+
+## The felt cards of a card table (Blackjack, Hold'em …), null for anything else.
+func _table_cards(sid: StringName) -> TableCards:
+	if scene.map == null:
+		return null
+	var st: Node = scene.map.stations.get(sid, null)
+	return st.get(&"cards") as TableCards if st != null else null
 
 
 ## The held item's model: in the bean's hand, or at the bottom of the view in first person

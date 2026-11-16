@@ -383,6 +383,15 @@ func get_public_state() -> Dictionary:
 	return out
 
 
+## Sunglasses: the dealer's two face-down cards once they exist (drawn with the turn), for this
+## player only.
+func get_private_state(p: int) -> Dictionary:
+	var out: Dictionary = {}
+	if state == State.RIVER and hidden.size() == 3 and modifiers.has_flag(p, &"peek_dealer", game_id):
+		out["peek"] = hidden.slice(1, 3)
+	return out
+
+
 # --- Play ---------------------------------------------------------------------------------------
 
 
