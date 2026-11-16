@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.75 Every game, minigame and menu on a gamepad and the Steam Deck
+### 2026-11-16 / 0.9.80 Every game, minigame and menu on a gamepad and the Steam Deck
 - Patrick: "gehe ALLE games und minigames und controls für den controller und fürs steamdeck durch
   ob das geht. Wenn ja, implementiere es und teste alles."
 - Menus: Godot's `ui_accept` / `ui_cancel` have no pad buttons, so A pressed nothing and B closed
@@ -121,6 +121,17 @@
 - Tests: tests/ui/test_gamepad_menus.gd, tests/ui/test_gamepad_tables.gd, pad tests in
   test_lonely_number_stage / test_vote_race_stage / test_spy_stage, test_bet_panel updated.
 
+
+### 2026-11-16 / 0.9.77 Warning when the game is out of date
+- Patrick: "warning if youre a version behind and you start the game". The main menu asks
+  `VersionCheck` on every visit and shows a red UPDATE AVAILABLE card top right when behind.
+  Started from the Steam install: Steam's own `getAppBuildId` (this install) vs `getBetaInfo`
+  (the live build of the picked branch, else the default branch), so it follows what is LIVE on
+  Steam, not GitHub (which runs ahead). Other copies (GitHub zips): the latest GitHub release tag,
+  once per session. Steam copies without Steam running say nothing. Lobby version errors (join,
+  Browse Lobbies) now say whose game is out of date. Tests: `test_version_check.gd`,
+  `test_steam_service.gd`, `test_main_menu.gd`, lint green. Not tried against real Steam yet
+  (needs a live build newer than the installed one).
 ### 2026-11-16 / 0.9.67 Your chips wear your skin
 - Patrick: "the chips you have mirror the skin you use". A player's chip stacks on every table
   (bets, splits, the minigame card tables) and their Plinko chip now wear their animated skin:

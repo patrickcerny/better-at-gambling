@@ -109,6 +109,10 @@ var inventory: Array = []
 var luck: float = 0.0
 var seated: bool = false
 var _selection_left: float = 0.0
+## The items the selection card and the I card are about (&"" = none): a card whose item left the
+## hand (used, stolen, swapped) goes away instead of staying on screen.
+var _selection_item: StringName = &""
+var _info_item: StringName = &""
 
 
 func _ready() -> void:
@@ -126,12 +130,36 @@ func _ready() -> void:
 	set_inventory([])
 
 
+func _notification(what: int) -> void:
+	# The HUD went away (minigame, rewards, results, a menu): no old card waits behind it.
+	if what == NOTIFICATION_VISIBILITY_CHANGED and is_inside_tree() and not is_visible_in_tree():
+		clear_cards()
+
+
+## Hides every item card (selection, I card, NEW ITEM) and forgets the waiting NEW ITEM cards.
+func clear_cards() -> void:
+	if selection_panel == null:
+		return
+	_hide_selection()
+	hide_info()
+	pickup_queue.clear()
+	pickup_item = &""
+	_pickup_left = 0.0
+	pickup_panel.visible = false
+
+
+func _hide_selection() -> void:
+	selection_panel.visible = false
+	_selection_item = &""
+	_selection_left = 0.0
+
+
 func _process(delta: float) -> void:
 	_place_side()
 	if _selection_left > 0.0:
 		_selection_left -= delta
 		if _selection_left <= 0.0:
-			selection_panel.visible = false
+			_hide_selection()
 	if _live_model != null:
 		# Swings to either side instead of a full turn, so the front stays towards you.
 		_live_t += delta
@@ -187,29 +215,51 @@ func set_inventory(inv: Array) -> void:
 		slots[i].self_modulate.a = 1.0 if has else 0.55
 	_set_live(held_id)
 	_refresh_keys()
+	_drop_gone_pickups()
 	for id: StringName in fresh:
 		announce(id)
 	var item: StringName = selected_item()
 	keys_label.visible = item != &""
 	keys_label.text = hint_text()
-	if item == &"":
-		selection_panel.visible = false
-	if info_panel.visible:
-		if item == &"":
-			info_panel.visible = false
-		else:
-			_fill_info(item)
+	# A card about an item that isn't in the hand any more (used, stolen, the slots shifted) goes.
+	if item == &"" or item != _selection_item:
+		_hide_selection()
+	if info_panel.visible and item != _info_item:
+		hide_info()
+
+
+## NEW ITEM cards for items that already left the inventory (used, stolen, thrown away) are
+## dropped, the one on screen too.
+func _drop_gone_pickups() -> void:
+	var left: Array = inventory.duplicate()
+	if pickup_item != &"":
+		var i: int = left.find(pickup_item)
+		if i >= 0:
+			left.remove_at(i)
+	var kept: Array[StringName] = []
+	for id: StringName in pickup_queue:
+		var i: int = left.find(id)
+		if i >= 0:
+			left.remove_at(i)
+			kept.append(id)
+	pickup_queue = kept
+	if pickup_item != &"" and not inventory.has(pickup_item):
+		_next_pickup()
 
 
 ## Puts slot `slot` in your hand (-1 = hands empty) and flashes its name and description.
 func set_held(slot: int) -> void:
 	var changed: bool = slot != selected
+	var info_open: bool = info_panel.visible
 	selected = slot if slot >= 0 and slot < SLOTS else -1
 	set_inventory(inventory)
 	if changed and selected_item() != &"":
 		if selected_item() == pickup_item:
 			dismiss_pickup()  # the flash says the same
-		flash_selection()
+		if info_open:
+			_open_info(selected_item())  # the I card follows the hand to the next item
+		else:
+			flash_selection()
 
 
 ## The item shown in slot `i` (&"" = empty).
@@ -364,7 +414,7 @@ func selected_item() -> StringName:
 func flash_selection() -> void:
 	var item: StringName = selected_item()
 	if item == &"":
-		selection_panel.visible = false
+		_hide_selection()
 		return
 	var col: Color = _rarity_color(item)
 	selection_name.text = RewardPanel.item_name(item)
@@ -375,6 +425,7 @@ func flash_selection() -> void:
 	selection_use.visible = selection_use.text != ""
 	selection_panel.add_theme_stylebox_override(&"panel", _card_style(col))
 	selection_panel.visible = not info_panel.visible
+	_selection_item = item
 	_selection_left = SELECTION_SECONDS
 
 
@@ -390,18 +441,24 @@ static func short_description(item: StringName) -> String:
 ## I toggles the info card for the held item; nothing happens with empty hands.
 func toggle_info() -> void:
 	if info_panel.visible:
-		info_panel.visible = false
+		hide_info()
 		return
 	var item: StringName = selected_item()
 	if item == &"":
 		return
+	_open_info(item)
+
+
+func _open_info(item: StringName) -> void:
 	_fill_info(item)
+	_info_item = item
 	info_panel.visible = true
-	selection_panel.visible = false
+	_hide_selection()
 
 
 func hide_info() -> void:
 	info_panel.visible = false
+	_info_item = &""
 
 
 ## The key line next to the slots while you hold something.
@@ -456,7 +513,7 @@ func set_seated(v: bool) -> void:
 		_refresh_keys()
 		keys_label.text = hint_text()
 		if seated:
-			selection_panel.visible = false
+			_hide_selection()
 
 
 ## Fraction of the item cooldown still to run (0 = ready).
