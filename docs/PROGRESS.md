@@ -93,6 +93,16 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.10.42 thrown-around beans no longer stuck in someone's hands
+- Patrick: "The throw around and the ragdoll not updating bug is still there". When the bean holding
+  someone went flying (knocked out, caught by a guard, knocked down), `InteractionResolver` ended
+  the hold silently: the held bean kept dangling in front of the flying holder on every screen, the
+  host kept it server-owned (frozen for everyone else) and the holder could never grab again. Every
+  hold end now emits `player_released` (`_drop_holds`), and `tick` drops a hold whose holder (or a
+  target that was standing when grabbed) gets knocked down. `player_released` leaves a bean a guard
+  carries alone. Puppet ragdolls on clients applied the streamed (world) torso rotation as local
+  rotation under the bean's yaw: lying beans showed turned the wrong way; now world space.
+  Tests: tests/physics/test_holder_knocked_out.gd, test_ragdoll_puppet_pose.gd.
 ### 2026-11-16 / 0.10.22 Click the wheel to spin
 - Patrick: "be able to click the wheel to spin it". A click on the Daily Spin wheel (rim included) spins
   it like SPIN while a spin is free; the hand cursor shows when it can.
