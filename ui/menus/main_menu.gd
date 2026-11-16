@@ -801,10 +801,21 @@ static func sort_public_lobbies(lobbies: Array[Dictionary], friend_lobbies_: Dic
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var fa: int = (friend_lobbies_.get(int(a["lobby"]), []) as Array).size()
 		var fb: int = (friend_lobbies_.get(int(b["lobby"]), []) as Array).size()
+		var va: bool = str(a.get("build", Protocol.BUILD_ID)) == Protocol.BUILD_ID
+		var vb: bool = str(b.get("build", Protocol.BUILD_ID)) == Protocol.BUILD_ID
+		if va != vb:
+			return va  # lobbies we can join first
 		if fa != fb:
 			return fa > fb
 		return int(a["members"]) > int(b["members"]))
 	return out
+
+
+## Why a public lobby of another version can't be joined, and what to do about it.
+static func version_text(build: String) -> String:
+	if build == "":
+		return "Version unknown, refresh in a moment"
+	return "Version %s (you have %s): restart Steam so both run the newest version" % [build, Protocol.BUILD_ID]
 
 
 ## One row per public lobby: its name, your friends in it, players and JOIN; full ones are left
@@ -823,7 +834,11 @@ func _fill_browse(lobbies: Array[Dictionary]) -> void:
 		var lid: int = int(l["lobby"])
 		var friends: Array = _friend_lobby_ids.get(lid, [])
 		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if not friends.is_empty() else ""
-		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), true, l.get("info", {})))
+		var build: String = str(l.get("build", Protocol.BUILD_ID))
+		var same: bool = build == Protocol.BUILD_ID
+		if not same:
+			sub = version_text(build)
+		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), same, l.get("info", {})))
 	if had_focus:
 		_browse_refresh.grab_focus()
 
