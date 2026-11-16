@@ -15,14 +15,12 @@ extends WalkableLogicBase
 ## The last bean seated wins (a 2-player game is one round with one stool). Ranking = elimination
 ## order (`elimination_ranking`).
 ##
-## Claiming a seat is the server's call, from its own positions:
-## - the action button: `minigame_action {kind: "sit", target?}` (target = stool index hint) claims
-##   the free stool within `SIT_REACH` of the bean (the hint first, with lag slack, else the
-##   nearest). Refused while the music plays (`music_playing`), when already seated, or when every
-##   stool in reach is taken (`taken`) or none is near (`no_stool`);
-## - touching: a standing bean whose centre comes within `SIT_TOUCH` of a free stool sits down
-##   by itself (checked every tick, nearest first). Running onto a stool is how most seats are won;
-##   E is the "I'm right next to it" shortcut.
+## Claiming a seat is the server's call, from its own positions, and only ever on purpose: E, the
+## click (LMB) or the gamepad's X / RT send `minigame_action {kind: "sit", target?}` (target = stool
+## index hint), which claims the free stool within `SIT_REACH` of the bean (the hint first, with lag
+## slack, else the nearest). Refused while the music plays (`music_playing`), when already seated,
+## or when every stool in reach is taken (`taken`) or none is near (`no_stool`). Walking into a
+## stool never sits you down (Patrick 2026-11-16: "you need to click a chair or press E").
 ## A seated bean is pinned: `clamp_position` returns the seat (the server snaps any move back), the
 ## stage poses the bean on the stool. First claim wins: a taken stool is never handed over.
 
@@ -36,9 +34,8 @@ const GRACE: float = 10.0
 const RESULT_HOLD: float = 3.0
 ## Seconds the winner stays on the last stool before the ranking.
 const END_HOLD: float = 3.5
-## Action-button claim reach (bean centre to stool centre, flat), and the touch auto-claim.
+## Action-button claim reach (bean centre to stool centre, flat).
 const SIT_REACH: float = 1.5
-const SIT_TOUCH: float = 0.6
 ## A seated bean's reported position may wander this far from the seat before it is snapped back.
 const PIN_SLACK: float = 0.4
 
@@ -90,7 +87,6 @@ func tick(delta: float, _now: float) -> void:
 				_stop_music()
 		State.SCRAMBLE:
 			grace_left -= delta
-			_touch_claims()
 			if _all_taken() or grace_left <= 0.0:
 				_end_round()
 		State.RESULT:
@@ -149,26 +145,6 @@ func _stop_music() -> void:
 	stool_count = maxi(alive.size() - 1, 1)  # somebody may have left during the music
 	stools = ParlorRoom.stool_ring(stool_count, rng.unit() * TAU)
 	events.append(GameEvents.make(&"last_seat_stop", {"round": round_no, "stools": _stools_wire(), "grace": GRACE}))
-
-
-## Standing beans touching a free stool sit down, nearest first.
-func _touch_claims() -> void:
-	if world == null:
-		return
-	var hits: Array = []
-	for p: int in alive:
-		if seat_of.has(p) or not world.positions.has(p):
-			continue
-		for i: int in stools.size():
-			if sitter.has(i):
-				continue
-			var d: float = _flat(world.get_position(p), stools[i])
-			if d <= SIT_TOUCH:
-				hits.append([d, p, i])
-	hits.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
-	for h: Array in hits:
-		if not seat_of.has(int(h[1])) and not sitter.has(int(h[2])):
-			_claim(int(h[1]), int(h[2]), &"touch")
 
 
 func _all_taken() -> bool:
