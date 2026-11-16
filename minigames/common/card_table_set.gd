@@ -108,7 +108,7 @@ func set_chips(pid: int, amount: int) -> void:
 	var pos: Vector3 = old.position if old != null else Vector3.ZERO
 	if old != null:
 		old.queue_free()
-	var stack := ChipStack.make(maxi(amount, 25), _color(pid))
+	var stack := ChipStack.make(maxi(amount, 25), _chip_color(pid), 0, _skin(pid))
 	stack.position = pos
 	add_child(stack)
 	seat["chips"] = stack
@@ -126,6 +126,20 @@ func _color(pid: int) -> Color:
 	if state != null and state.players.has(pid):
 		idx = int(state.players[pid].get("color", pid))
 	return Palette.player_color(idx)
+
+
+## A player's chips: their bean colour and animated skin (like their chips on the casino tables).
+func _chip_color(pid: int) -> Color:
+	if state != null and state.players.has(pid):
+		var p: Dictionary = state.players[pid]
+		return Palette.player_color(int(p.get("bean_color", p.get("color", pid))))
+	return _color(pid)
+
+
+func _skin(pid: int) -> StringName:
+	if state == null or not state.players.has(pid):
+		return &""
+	return Cosmetics.skin_of(state.players[pid])
 
 
 func _name(pid: int) -> String:
@@ -304,7 +318,7 @@ func _build_seat(pid: int, i: int, n: int) -> void:
 	seat.add_child(tag)
 	# Their chip stack on the rail in front of them.
 	var rail_pt: Vector3 = Vector3(pos.x * 0.72, TABLE_TOP + 0.05, pos.z * 0.68)
-	var chips := ChipStack.make(25, _color(pid))
+	var chips := ChipStack.make(25, _chip_color(pid), 0, _skin(pid))
 	chips.position = rail_pt
 	add_child(chips)
 	seats[pid] = {"root": seat, "bean": bean, "puppet": puppet, "tag": tag, "chips": chips}

@@ -28,6 +28,8 @@ var stations: Dictionary = {}
 var avatar_of: Callable
 ## (pid: int) -> Color: the player's colour for their chips (unset = size-tier colours).
 var color_of: Callable
+## pid -> StringName: the animated skin the player wears (&"" = none), their chips wear it too.
+var skin_of: Callable
 ## (sid: StringName) -> int: the table minimum at the current limits, one chip each (unset = size scale).
 var min_bet_of: Callable
 var local_id: int = -1
@@ -192,7 +194,8 @@ func _on_bet(ev: Dictionary) -> void:
 		for b: Dictionary in list:  # stacking on the same spot again: nudge it over
 			if b["type"] == type and int(b["value"]) == value:
 				target += Vector3(ChipStack.CHIP_RADIUS * 1.6, 0, 0)
-	var stack: ChipStack = ChipStack.make(int(ev["amount"]), color, unit)
+	var skin: StringName = StringName(skin_of.call(pid)) if skin_of.is_valid() else &""
+	var stack: ChipStack = ChipStack.make(int(ev["amount"]), color, unit, skin)
 	st.add_child(stack)
 	stack.position = start
 	stack.slide_to(st.to_global(target), 0.4, 0.12)
@@ -214,7 +217,7 @@ func _on_bj_split(ev: Dictionary) -> void:
 	var first: ChipStack = list[0]["stack"]
 	var seat: int = _seat_index(st, pid)
 	first.slide_to(st.to_global(st.hand_bet_spot(seat, 0)), 0.3, 0.05)
-	var stack: ChipStack = ChipStack.make(first.amount, first.color, first.unit)
+	var stack: ChipStack = ChipStack.make(first.amount, first.color, first.unit, first.skin)
 	st.add_child(stack)
 	stack.position = _seat_edge(st, seat)
 	stack.slide_to(st.to_global(st.hand_bet_spot(seat, 1)), 0.4, 0.12)

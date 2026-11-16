@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.67 Warning when the game is out of date
+### 2026-11-16 / 0.9.75 Warning when the game is out of date
 - Patrick: "warning if youre a version behind and you start the game". The main menu asks
   `VersionCheck` on every visit and shows a red UPDATE AVAILABLE card top right when behind.
   Started from the Steam install: Steam's own `getAppBuildId` (this install) vs `getBetaInfo`
@@ -103,6 +103,18 @@
   Browse Lobbies) now say whose game is out of date. Tests: `test_version_check.gd`,
   `test_steam_service.gd`, `test_main_menu.gd`, lint green. Not tried against real Steam yet
   (needs a live build newer than the installed one).
+### 2026-11-16 / 0.9.67 Your chips wear your skin
+- Patrick: "the chips you have mirror the skin you use". A player's chip stacks on every table
+  (bets, splits, the minigame card tables) and their Plinko chip now wear their animated skin:
+  the bean shader (`bean_skin.gdshader`, new `chip` mode) lays the skin's pattern over each chip,
+  animated like on the bean; every other chip in a stack is a shade darker so the count still
+  reads, and the top rim keeps the player's bean colour so two players in the same skin can still
+  tell their chips apart. Without a skin the chips now use the bean colour (they used the slot
+  colour before, so they did not match the bean). Effects off / server: the skin's flat colour.
+  Skins already sync with the outfit, so everyone sees the same chips. Look-dev:
+  `scripts/screenshot.sh res://tools/dev/table_fx_shot.tscn chips 40 --view chips --skins`.
+  Tests: tests/unit/test_chip_stack.gd (skin chips, fallback, `Cosmetics.skin_of`).
+
 ### 2026-11-16 / 0.9.66 Public lobbies of other players show up
 - Patrick: "Public lobbies are not found of other ppl". The Steam search filtered on our exact
   version, so a lobby from a player whose Steam had not updated yet (or one on a GitHub build)

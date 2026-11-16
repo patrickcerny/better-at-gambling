@@ -71,6 +71,36 @@ static func make_skin(id: StringName) -> Material:
 	return s
 
 
+## Animated skin `id` on a casino chip (`ChipStack`, `PlinkoChip`): the bean pattern laid over the
+## chip's face (`face_radius` in mesh units; `upright` when the face looks along local Z), `shade`
+## darkens it (alternate chips in a stack). The skin's flat colour when effects are off, null for
+## unknown ids.
+static func make_chip_skin(id: StringName, face_radius: float, upright: bool = false, shade: float = 1.0) -> Material:
+	var mode: int = SKIN_MODES.get(id, -1)
+	if mode < 0:
+		return null
+	if not enabled or not Vfx.enabled():
+		var m := StandardMaterial3D.new()
+		m.albedo_color = SKIN_FLAT[mode].darkened(1.0 - shade)
+		m.roughness = 0.6
+		return m
+	var s := ShaderMaterial.new()
+	s.shader = SKIN_SHADER
+	s.set_shader_parameter(&"mode", mode)
+	s.set_shader_parameter(&"chip", true)
+	s.set_shader_parameter(&"chip_face", face_radius)
+	s.set_shader_parameter(&"chip_upright", upright)
+	s.set_shader_parameter(&"shade", shade)
+	s.set_shader_parameter(&"rim_strength", 0.25)
+	return s
+
+
+## The flat colour standing in for skin `id` (`SKIN_FLAT`), transparent for unknown ids.
+static func skin_flat(id: StringName) -> Color:
+	var mode: int = SKIN_MODES.get(id, -1)
+	return SKIN_FLAT[mode] if mode >= 0 else Color(0, 0, 0, 0)
+
+
 ## A cape's own material: `make_vertex_colored` plus the cloth deformation (`CapeCloth`). Null
 ## when the toon shaders are off (the cape then just swings).
 static func make_cloth(rim: float = 0.3) -> ShaderMaterial:
