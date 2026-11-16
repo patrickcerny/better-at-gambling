@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.10.42 thrown-around beans no longer stuck in someone's hands
+### 2026-11-16 / 0.10.44 thrown-around beans no longer stuck in someone's hands
 - Patrick: "The throw around and the ragdoll not updating bug is still there". When the bean holding
   someone went flying (knocked out, caught by a guard, knocked down), `InteractionResolver` ended
   the hold silently: the held bean kept dangling in front of the flying holder on every screen, the

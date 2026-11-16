@@ -58,6 +58,9 @@ var audio_enabled: bool = true
 var positional: bool = true
 ## Current loudness from the distance to the listener (1 at full volume).
 var gain: float = 1.0
+## This speaker's own volume from the listener's settings (0..`VoiceChannel.MAX_PLAYER_VOLUME`),
+## on top of the distance; set by `VoiceChannel` every frame.
+var player_volume: float = 1.0
 ## Rate of what is pushed to the generator (0 until it starts: then `AudioServer.get_mix_rate()`;
 ## tests set it beforehand).
 var output_rate: float = 0.0
@@ -357,4 +360,5 @@ func _update_gain() -> void:
 		if cam != null:
 			gain = VoiceProximity.gain_at(global_position.distance_to(cam.global_position))
 	if player != null:
-		player.volume_db = linear_to_db(gain) if gain > 0.001 else -80.0
+		var g: float = gain * player_volume
+		player.volume_db = linear_to_db(g) if g > 0.001 else -80.0

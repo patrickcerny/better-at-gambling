@@ -50,6 +50,16 @@ func test_entries_in_order_without_a_settings_entry() -> void:
 	assert_eq(names, PackedStringArray(["PLAY ONLINE", "PRACTICE", "TUTORIAL", "SHOP", "QUIT"]))
 
 
+func test_every_entry_has_its_logo() -> void:
+	# Patrick 2026-11-16: "its only text right now make it better with logos to distinguish".
+	var seen: Array[Texture2D] = []
+	for b: Node in menu.get_node("Center/Column/VBox").get_children():
+		var t: Texture2D = (b as Button).icon
+		assert_not_null(t, "%s has a logo" % (b as Button).text)
+		assert_false(t in seen, "%s has its own logo" % (b as Button).text)
+		seen.append(t)
+
+
 func test_logo_and_entries_are_centred() -> void:
 	var w: float = menu.get_viewport_rect().size.x
 	var h: float = menu.get_viewport_rect().size.y
