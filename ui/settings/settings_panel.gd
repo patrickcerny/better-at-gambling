@@ -335,6 +335,10 @@ static func style_tab(b: Button) -> void:
 	b.add_theme_stylebox_override(&"hover", hover)
 	b.add_theme_stylebox_override(&"pressed", lit)
 	b.add_theme_stylebox_override(&"hover_pressed", lit)
+	# The focus ring has the same rounded corners: the theme's square-ish ring stuck out behind them.
+	var ring := _tab_box(Color(0, 0, 0, 0), Palette.VIP_GOLD, 3)
+	ring.draw_center = false
+	b.add_theme_stylebox_override(&"focus", ring)
 	b.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.6))
 	b.add_theme_color_override(&"font_hover_color", Palette.CREAM)
 	b.add_theme_color_override(&"font_pressed_color", Palette.VIP_GOLD)
