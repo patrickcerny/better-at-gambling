@@ -1,7 +1,8 @@
 extends GutTest
-## Practice has no minigames (Patrick 2026-11-16: "No minigames in the practise mode"): the casino
-## never closes; where a minigame would start the round turns over (new limits, fresh Gift Shop
-## stock, Out of Order signs down) and the match ends after the same casino time as usual.
+## Practice has no minigames and no timer (Patrick 2026-11-16: "No minigames in the practise mode",
+## "Practise mode hat keinen Timer. Aber random hot tables schon"): an endless casino. Every
+## gambling stretch the round turns over quietly (new limits, fresh Gift Shop stock, Out of Order
+## signs down); Hot Tables keep coming; no Last Call and no results.
 
 var server: MatchServer
 var events: Array[Dictionary] = []
@@ -39,17 +40,20 @@ func _advance(seconds: float) -> void:
 		t += MatchServer.TICK
 
 
-func test_practice_runs_casino_to_results_without_any_minigame() -> void:
+func test_practice_is_an_endless_casino_without_minigames_but_with_hot_tables() -> void:
 	_configure({"no_minigames": true})
 	assert_true(bool(server.lobby.settings["no_minigames"]), "clients see it in the lobby settings")
-	_advance(200.0)
-	assert_eq(_phases(), [&"intro", &"casino", &"results"], "no warning, minigame, rewards or regroup")
+	_advance(300.0)  # far past the 80 s a match with 3 minigames would last
+	assert_eq(_phases(), [&"intro", &"casino"], "no warning, minigame, rewards, regroup or results")
+	assert_eq(server.phases.phase, Phase.Id.CASINO, "still open")
 	assert_eq(_of(&"minigame_warning").size(), 0)
 	assert_eq(_of(&"minigame_started").size(), 0)
-	assert_eq(_of(&"rewards_started").size(), 0)
-	assert_eq(_of(&"round_turned").size(), 3, "a new round where each minigame would have started")
-	assert_eq(_of(&"match_ended").size(), 1)
-	assert_almost_eq(server.phases.casino_time, 80.0, 0.01, "same casino time as a match with minigames")
+	assert_eq(_of(&"last_call").size(), 0, "no Last Call")
+	assert_eq(_of(&"match_ended").size(), 0, "no end")
+	assert_gt(_of(&"round_turned").size(), 3, "the rounds keep turning past the scheduled minigames")
+	assert_gt(_of(&"hot_table").size(), 0, "random Hot Tables still come")
+	assert_eq(server.phases.time_left(), INF)
+	assert_lt(float(server.get_snapshot()["time_left"]), 0.0, "-1 on the wire: the HUD hides the clock")
 
 
 func test_round_turn_restocks_the_shop_raises_limits_and_takes_signs_down() -> void:

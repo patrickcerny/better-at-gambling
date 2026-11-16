@@ -212,6 +212,8 @@ func _process(delta: float) -> void:
 	_flash_money()
 	var t: int = int(ceil(maxf(state.time_left, 0.0)))
 	timer_label.text = "%02d:%02d" % [t / 60, t % 60]
+	# Practice is endless (Patrick 2026-11-16: "Practise mode hat keinen Timer"): no match clock.
+	timer_label.visible = not (bool(state.lobby_settings.get("no_minigames", false)) or state.time_left < 0.0)
 	rank_label.text = "%s / %d" % [_ordinal(state.rank_of(local_id)), maxi(state.balances.size(), 1)]
 	rank_label.visible = state.balances.size() > 1  # alone (practice): no "1st / 1"
 	jackpot_label.text = "JACKPOT $%s" % _thousands(state.jackpot)
