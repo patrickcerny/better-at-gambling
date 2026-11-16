@@ -38,9 +38,6 @@ var jackpot_tags: Array[Label3D] = []
 var risk_sign: Label3D
 var _bucket_mats: Array[StandardMaterial3D] = []
 var _buckets: Array[MeshInstance3D] = []
-## Money piles beside the board, shown once the jackpot has grown (Patrick: "next to plinko when
-## jackpot big"). Left pile from 3x the seed, right one from 6x; both grow up to 10x.
-var _money_piles: Array[Node3D] = []
 var _flash_mesh: SphereMesh
 var _flash_mat: StandardMaterial3D
 
@@ -329,23 +326,6 @@ func flash_slot(s: int, mult: float = -1.0) -> void:
 	var lt: Tween = l.create_tween()
 	lt.tween_property(l, "scale", Vector3.ONE * 1.35, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	lt.tween_property(l, "scale", Vector3.ONE, 0.35)
-
-
-## Grows the money piles with the jackpot (`seed` = the jackpot's starting value).
-func set_jackpot(amount: int, seed: int) -> void:
-	if _money_piles.is_empty():
-		for side: float in [-1.0, 1.0]:
-			var pile: Node3D = PropModels.make(&"money_pile", 0.0, 1.0)
-			pile.position = Vector3(side * (BOARD_W * 0.5 + 0.8), 0.0, 0.5)
-			pile.rotation.y = side * 0.4
-			pile.visible = false
-			add_child(pile)
-			_money_piles.append(pile)
-	var ratio: float = float(amount) / float(maxi(seed, 1))
-	for i: int in _money_piles.size():
-		var from: float = 3.0 if i == 0 else 6.0
-		_money_piles[i].visible = ratio >= from
-		_money_piles[i].scale = Vector3.ONE * lerpf(0.8, 1.6, clampf((ratio - from) / (10.0 - from), 0.0, 1.0))
 
 
 func _marquee_bulbs() -> void:
