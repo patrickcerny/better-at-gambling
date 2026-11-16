@@ -74,9 +74,12 @@ func test_items_locked_in_the_minigame_countdown() -> void:
 	var a: int = fx.player_ids[0]
 	_start()
 	_give(a, [&"energy_drink", &"lucky_clover"])
+	var guard: int = 0
+	while fx.server.phases.next_minigame_in() > 15.0 and guard < 400:
+		fx.run(0.5)
+		guard += 1
 	assert_true(fx.intent(a, &"use_item", {"slot": 0})["ok"], "the casino: used")
 	assert_true(fx.server.modifiers.has_flag(a, &"speed"))
-	var guard: int = 0
 	while fx.server.phases.phase != Phase.Id.PRE_MINIGAME and guard < 400:
 		fx.run(0.5)
 		guard += 1
@@ -90,8 +93,15 @@ func test_items_locked_in_the_minigame_countdown() -> void:
 		guard += 1
 	assert_eq(fx.server.phases.phase, Phase.Id.MINIGAME)
 	assert_false(fx.server.modifiers.has_flag(a, &"speed"), "no Energy Drink in the minigame")
+	assert_false(fx.server.get_snapshot()["effects"].has(a), "no WIRED tag either")
 	assert_eq(fx.intent(a, &"use_item", {"slot": 0})["error"], &"wrong_phase")
 	assert_eq(fx.server.state.players[a].inventory, [&"lucky_clover"] as Array[StringName], "kept for the next casino round")
+	while fx.server.phases.phase != Phase.Id.CASINO and guard < 4000:
+		fx.run(0.5)
+		guard += 1
+	assert_eq(fx.server.phases.phase, Phase.Id.CASINO)
+	assert_true(fx.server.modifiers.has_flag(a, &"speed"), "the drink runs on after the minigame")
+	assert_eq(fx.of_type(&"effect_resumed").filter(func(e: Dictionary) -> bool: return int(e["player"]) == a).size(), 1)
 
 
 func test_items_off_refuses_use() -> void:
