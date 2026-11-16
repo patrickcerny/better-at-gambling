@@ -1009,10 +1009,10 @@ func _kind_name(d: CosmeticDef) -> String:
 
 
 ## "MORE GOLD NEEDED · BUY MORE": the GOLD tab, with the smallest pack that covers `missing` picked.
-func open_gold_shop(missing: int) -> void:
+func open_gold_shop(missing: int = 0) -> void:
 	var pick: CoinPack = null
 	for c: CoinPack in shop.coin_packs:
-		if c.gold >= missing and (pick == null or c.gold < pick.gold):
+		if c.gold >= maxi(missing, 1) and (pick == null or c.gold < pick.gold):
 			pick = c
 	if pick == null and not shop.coin_packs.is_empty():
 		pick = shop.coin_packs[-1]
@@ -1021,7 +1021,8 @@ func open_gold_shop(missing: int) -> void:
 		select(pick.id)
 		if tiles.has(pick.id):
 			tiles[pick.id].grab_focus()
-	status_label.text = "%s more Gold Coins needed: pick a pack, Steam handles the payment." % Hud._thousands(missing)
+	if missing > 0:
+		status_label.text = "%s more Gold Coins needed: pick a pack, Steam handles the payment." % Hud._thousands(missing)
 
 
 ## Every cosmetic purchase asks first and says it can't be refunded (Patrick: "for both buys both

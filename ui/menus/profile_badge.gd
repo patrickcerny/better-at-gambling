@@ -2,14 +2,21 @@ class_name ProfileBadge
 extends PanelContainer
 ## The profile line on the main menu (docs/GDD.md "Progression"): LEVEL n, the XP bar to the next
 ## level with "x / y XP", and the Coins balance with its coin. Follows `ProfileManager.changed`.
-## Clicking it opens the level pass (`pressed`, `LevelPassPanel`).
+## Clicking it opens the level pass (`pressed`, `LevelPassPanel`). Next to the Coins the Gold Coins
+## with the shop's gold + (Patrick: "at level indicator show gold money and plus icon as in shop,
+## directly brings you into the shop and allows you to buy the packs"): a click there is
+## `gold_pressed`, which opens the shop on its GOLD page.
 
 signal pressed
+## The Gold Coins or their + were clicked: the shop's GOLD page.
+signal gold_pressed
 
 var level_label: Label
 var xp_bar: ProgressBar
 var xp_label: Label
 var coins_label: Label
+var gold_label: Label
+var gold_button: GoldPlusButton
 
 
 func _ready() -> void:
@@ -61,7 +68,36 @@ func _ready() -> void:
 	coins_label.add_theme_color_override(&"font_color", Palette.COIN_RED)
 	coins_label.tooltip_text = "Coins: earned by playing, spent on cosmetics. Never on the tables."
 	coins.add_child(coins_label)
+	var gold := HBoxContainer.new()
+	gold.name = "GoldRow"
+	gold.add_theme_constant_override(&"separation", 6)
+	gold.mouse_filter = Control.MOUSE_FILTER_STOP
+	gold.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	gold.tooltip_text = "Gold Coins: bought with real money, for premium pieces and sets. Click to buy more."
+	gold.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and (e as InputEventMouseButton).pressed and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+			accept_event()
+			gold_pressed.emit())
+	h.add_child(gold)
+	var gicon := CoinIcon.make(30.0, true)
+	gicon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gicon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gold.add_child(gicon)
+	gold_label = Label.new()
+	gold_label.name = "Gold"
+	gold_label.add_theme_color_override(&"font_color", Palette.COIN_GOLD)
+	gold_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gold.add_child(gold_label)
+	gold_button = GoldPlusButton.make()
+	gold_button.name = "BuyGold"
+	gold_button.toggle_mode = false
+	gold_button.custom_minimum_size = Vector2(30, 30)
+	gold_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_button.tooltip_text = "Buy Gold Coins"
+	gold_button.pressed.connect(func() -> void: gold_pressed.emit())
+	gold.add_child(gold_button)
 	ProfileManager.changed.connect(refresh)
+	SteamSvc.store_changed.connect(refresh)
 	refresh()
 
 
@@ -74,3 +110,4 @@ func refresh() -> void:
 	var need: int = p.xp_needed()
 	xp_label.text = "%d / %d XP" % [p.xp_into_level(), need] if need > 0 else "MAX LEVEL"
 	coins_label.text = "%d" % p.coins
+	gold_label.text = Hud._thousands(SteamSvc.gold)

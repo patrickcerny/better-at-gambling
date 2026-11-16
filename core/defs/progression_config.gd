@@ -32,7 +32,7 @@ const PATH: String = "res://data/progression/progression.tres"
 @export var soft_cap_level: int = 10
 @export var late_base: int = 450
 @export var late_step: int = 50
-@export var max_level: int = 99
+@export var max_level: int = 100
 
 @export_group("Coins")
 ## Coins per XP earned in a match (rounded down), and for every level gained (the level pass:
