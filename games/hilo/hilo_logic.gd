@@ -4,7 +4,7 @@ extends StationLogicBase
 ## plays their own hand at their own pace from one shared single deck (aces high, 2 lowest).
 ##
 ## A hand: ante → the dealer turns a card face up → the player calls HIGHER or LOWER. Standard
-## online Hi-Lo rules (Patrick, 0.9.41): a tie is a push (the pot stays, the same-value card is the
+## online Hi-Lo rules (Patrick, 0.9.52): a tie is a push (the pot stays, the same-value card is the
 ## new card up and the call opens again), and up to `hilo_skips` times per hand the player can SKIP
 ## a card they don't like (a fresh card is turned up for free).
 ## Each call shows its true chance (counted from the cards still in the deck, ties left out since

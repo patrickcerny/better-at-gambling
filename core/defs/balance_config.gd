@@ -121,7 +121,7 @@ extends Resource
 ## can grow to (times the ante).
 @export var hilo_max_rungs: int = 10
 @export var hilo_pot_cap: float = 50.0
-## Free skips per hand: a card the player doesn't like is replaced by a fresh one (Patrick, 0.9.41).
+## Free skips per hand: a card the player doesn't like is replaced by a fresh one (Patrick, 0.9.52).
 @export var hilo_skips: int = 2
 ## The single deck is reshuffled before an ante once fewer cards than this are left.
 @export var hilo_reshuffle_at: int = 15
