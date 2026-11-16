@@ -363,14 +363,31 @@ func observe(ev: Dictionary, now: float) -> void:
 				events.append(GameEvents.make(&"grease_spill", {"player": target, "attacker": ev.get("attacker", -1), "amount": extra, "piles": piles}))
 
 
-## The casino segment ended (a minigame starts, or the match is over): every item effect runs
-## out, not just the segment-long ones (Hot Hands, Loaded Reels). Nothing used in the casino
-## carries into the minigame (an Energy Drink racing, a Beer's blur) or is left over after it.
-## Items are locked during the countdown before (MatchServer), so an item is used with its full
-## effect in the casino or stays in the inventory.
-func end_segment() -> void:
-	modifiers.expire_all(&"expired")
+## The casino segment ended. `into_minigame`: every running item effect is paused with the time
+## it had left (Patrick 2026-11-16: the game remembers them) and does nothing in the minigame (no
+## Energy Drink racing, no Beer blur); `resume_effects` brings them back in the next casino round.
+## Otherwise (the match is over) every effect runs out. Items are locked during the countdown
+## before a minigame (MatchServer), so an item is either used with its effect or stays in the bar.
+func end_segment(into_minigame: bool = false, now: float = -1.0) -> void:
+	if now >= 0.0:
+		_now = now
+	if into_minigame:
+		for e: Dictionary in modifiers.pause_all(_now):
+			var m: Modifier = e["mod"]
+			if defs.has(m.id):
+				events.append(GameEvents.make(&"effect_ended", {"player": e["player"], "item": m.id, "reason": &"paused"}))
+	else:
+		modifiers.expire_all(&"expired")
 	duels.cancel_all()
+
+
+## Back in the casino after a minigame: paused effects run on with the time they had left.
+func resume_effects(now: float) -> void:
+	_now = now
+	for e: Dictionary in modifiers.resume_all(now):
+		var m: Modifier = e["mod"]
+		if defs.has(m.id):
+			events.append(GameEvents.make(&"effect_resumed", {"player": e["player"], "item": m.id, "seconds": snappedf(m.expires_at - now, 0.1) if m.expires_at != INF else -1.0}))
 
 
 ## Discard deadlines always; banana peels only while the casino is open.

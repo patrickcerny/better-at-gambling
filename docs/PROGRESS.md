@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.80 Every game, minigame and menu on a gamepad and the Steam Deck
+### 2026-11-16 / 0.9.82 Every game, minigame and menu on a gamepad and the Steam Deck
 - Patrick: "gehe ALLE games und minigames und controls für den controller und fürs steamdeck durch
   ob das geht. Wenn ja, implementiere es und teste alles."
 - Menus: Godot's `ui_accept` / `ui_cancel` have no pad buttons, so A pressed nothing and B closed

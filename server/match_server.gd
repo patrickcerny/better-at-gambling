@@ -873,11 +873,12 @@ func _on_phase_note(note: StringName) -> void:
 		&"minigame_due":
 			_emit(GameEvents.make(&"minigame_warning", {"seconds": PhaseMachine.PRE_MINIGAME_SECONDS}))
 		&"segment_ended":
-			if phases.phase == Phase.Id.MINIGAME:
+			var into_minigame: bool = phases.phase == Phase.Id.MINIGAME
+			if into_minigame:
 				_refund_and_stand_everyone()
 			else:
 				stations.auto_resolve_all()  # end of the match: open rounds play out
-			items.end_segment()
+			items.end_segment(into_minigame, match_time)
 			_emit(GameEvents.make(&"segment_ended", {"segment": phases.segment_index()}))
 		&"minigame_started":
 			_start_minigame()
@@ -898,6 +899,7 @@ func _on_phase_changed(from: Phase.Id, to: Phase.Id) -> void:
 		if from == Phase.Id.REGROUP:
 			for id: int in state.players:
 				rules.protect(id, match_time)
+			items.resume_effects(match_time)  # effects paused for the minigame run on
 	_emit(GameEvents.make(&"phase_changed", {"phase": to, "from": from, "phase_name": Phase.name_of(to), "casino_time": snappedf(phases.casino_time, 0.001), "segment": phases.segment_index()}))
 	if to == Phase.Id.REGROUP:
 		_start_regroup()
@@ -1397,8 +1399,7 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if not bool(settings.get("items_enabled", true)):
 				return StationLogicBase.fail(&"items_off")
 			if phases.phase == Phase.Id.PRE_MINIGAME:
-				# The minigame countdown: the item stays in the inventory (its effect would end
-				# with the segment a few seconds later anyway).
+				# The minigame countdown: the item stays in the inventory for the next round.
 				return StationLogicBase.fail(&"minigame_soon")
 			var opts: Dictionary = {}
 			if intent.has("option"):

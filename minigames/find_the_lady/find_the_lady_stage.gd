@@ -66,8 +66,7 @@ var timer_bar: ProgressBar
 var timer_label: Label
 var prompt_label: Label
 var sub_label: Label
-var board: VBoxContainer
-var board_rows: Dictionary[int, Dictionary] = {}
+var board: MinigameScoreboard
 var chip_layer: Control
 ## [{chip: Control, slot: int, index: int}] name chips sitting on the cards after a reveal.
 var chips: Array[Dictionary] = []
@@ -336,22 +335,14 @@ func _build_ui() -> void:
 	pcol.add_child(phase_label)
 
 	# Scoreboard, top right.
-	var board_panel := PanelContainer.new()
-	board_panel.anchor_left = 1.0
-	board_panel.anchor_right = 1.0
-	board_panel.offset_left = -330.0
-	board_panel.offset_right = -28.0
-	board_panel.offset_top = 22.0
-	board_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	board_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	board_panel.add_theme_stylebox_override(&"panel", _panel_style(Color(Palette.CASINO_BLACK, 0.82), Palette.WARM_GOLD, 14))
-	root.add_child(board_panel)
-	board = VBoxContainer.new()
-	board.add_theme_constant_override(&"separation", 2)
-	board_panel.add_child(board)
-	board.add_child(_label("POINTS", BOLD_FONT, 24, Palette.WARM_GOLD, HORIZONTAL_ALIGNMENT_LEFT))
-	for p: int in players_list:
-		_add_board_row(p)
+	board = MinigameScoreboard.new("POINTS").bind(state, local_id)
+	board.anchor_left = 1.0
+	board.anchor_right = 1.0
+	board.offset_left = -400.0
+	board.offset_right = -24.0
+	board.offset_top = 20.0
+	board.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	root.add_child(board)
 
 	# Bottom centre: the prompt, a line under it and the pick timer.
 	var bottom := VBoxContainer.new()
@@ -423,29 +414,6 @@ func _build_ui() -> void:
 		hint.visible = false
 		chip_layer.add_child(hint)
 		key_hints.append(hint)
-
-
-func _add_board_row(p: int) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override(&"separation", 10)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	board.add_child(row)
-	var dot := ColorRect.new()
-	dot.color = _color(p)
-	dot.custom_minimum_size = Vector2(14, 14)
-	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(dot)
-	var nm := _label(("YOU" if p == local_id else _name(p)).left(12), BOLD_FONT, 26, Palette.VIP_GOLD if p == local_id else Palette.CREAM, HORIZONTAL_ALIGNMENT_LEFT)
-	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	nm.custom_minimum_size = Vector2(120, 0)
-	row.add_child(nm)
-	var mark := _label("", BOLD_FONT, 22, Palette.MONEY_GREEN)
-	mark.custom_minimum_size = Vector2(66, 0)
-	row.add_child(mark)
-	var pts := _label("0", BLACK_FONT, 28, Palette.CREAM, HORIZONTAL_ALIGNMENT_RIGHT)
-	pts.custom_minimum_size = Vector2(66, 0)
-	row.add_child(pts)
-	board_rows[p] = {"row": row, "name": nm, "mark": mark, "points": pts}
 
 
 func _label(text: String, font: Font, size_px: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER) -> Label:
@@ -548,6 +516,8 @@ func _refresh() -> void:
 
 
 func _refresh_board() -> void:
+	if board == null:
+		return
 	var order: Array[int] = players_list.duplicate()
 	order.sort_custom(func(a: int, b: int) -> bool:
 		if int(totals.get(a, 0)) != int(totals.get(b, 0)):
@@ -556,25 +526,22 @@ func _refresh_board() -> void:
 	var place: Dictionary = {}
 	for row: Variant in ranking:
 		place[int((row as Dictionary).get("player", -1))] = int((row as Dictionary).get("rank", 0))
-	for i: int in order.size():
-		var p: int = order[i]
-		if not board_rows.has(p):
-			_add_board_row(p)
-		var r: Dictionary = board_rows[p]
-		board.move_child(r["row"] as Control, i + 1)
-		(r["points"] as Label).text = str(int(totals.get(p, 0)))
-		var mark: Label = r["mark"]
-		mark.text = ""
-		if over and place.has(p):
-			mark.text = "#%d" % place[p]
-			mark.add_theme_color_override(&"font_color", Palette.VIP_GOLD if place[p] == 1 else Palette.CREAM)
-		elif phase == "pick" and picked_players.has(p):
-			mark.text = "PICKED"
-			mark.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.75))
+	var rows: Array = []
+	for p: int in order:
+		var r: Dictionary = {"player": p, "score": int(totals.get(p, 0))}
+		if phase == "pick":
+			r["status"] = &"done" if picked_players.has(p) else &"waiting"
 		elif phase == "reveal" and gains.has(p):
 			var g: int = int(gains[p])
-			mark.text = "+%d" % g if g > 0 else "-"
-			mark.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if g > 0 else Color(Palette.LOSS_RED, 0.85))
+			r["tag"] = "+%d" % g if g > 0 else "-"
+			r["tag_color"] = Palette.MONEY_GREEN if g > 0 else Palette.LOSS_RED
+		rows.append(r)
+	MinigameScoreboard.rank_rows(rows)
+	if over:
+		for r: Dictionary in rows:
+			if place.has(r["player"]):
+				r["rank"] = place[r["player"]]
+	board.set_rows(rows)
 
 
 ## Glow and lift: your pick (gold, raised), the hovered card, the Queen at the show and reveal.
@@ -872,9 +839,6 @@ func on_private(priv: Dictionary) -> void:
 func apply_state(st: Dictionary) -> void:
 	if st.has("players"):
 		_set_players(st["players"])
-		for p: int in players_list:
-			if not board_rows.has(p):
-				_add_board_row(p)
 	for k: Variant in (st.get("totals", {}) as Dictionary):
 		totals[int(k)] = int(st["totals"][k])
 	rounds = int(st.get("rounds", rounds))

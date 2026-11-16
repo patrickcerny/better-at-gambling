@@ -141,9 +141,9 @@ func test_ticks_show_who_decided_but_not_what() -> void:
 	logic.submit(3, {"action": "stay"}, 0.0)
 	_pump()
 	assert_true(stage.decided.has(3))
-	assert_true((stage.board_rows[3]["tick"] as Control).visible)
-	assert_false((stage.board_rows[2]["tick"] as Control).visible)
-	assert_eq((stage.board_rows[3]["mark"] as Label).text, "", "no choice shown")
+	assert_eq(stage.board.card_for(3).status(), MinigameScoreboard.Status.DONE)
+	assert_eq(stage.board.card_for(2).status(), MinigameScoreboard.Status.WAITING)
+	assert_eq(stage.board.card_for(3).tag(), "", "no choice shown")
 
 
 func test_showdown_reveal() -> void:
@@ -169,8 +169,8 @@ func test_showdown_reveal() -> void:
 	assert_eq(stage.prompt_label.text, "YOU TAKE THE POT!  +2")
 	assert_eq(stage.result_chips.size(), 4)
 	assert_eq(stage.pops.size(), 4, "+N / -1 / 0 over every bean")
-	assert_eq((stage.board_rows[3]["mark"] as Label).text, "fold")
-	assert_eq((stage.board_rows[2]["mark"] as Label).text, "-1")
+	assert_eq(stage.board.card_for(3).tag(), "fold")
+	assert_eq(stage.board.card_for(2).tag(), "-1")
 
 
 func test_two_players_and_the_end() -> void:

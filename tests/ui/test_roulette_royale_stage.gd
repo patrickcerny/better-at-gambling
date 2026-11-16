@@ -38,7 +38,7 @@ func test_builds_with_exactly_one_camera() -> void:
 	assert_eq(_cameras(), 1, "one stage camera; the wheel model's own camera is dropped")
 	assert_not_null(stage.camera)
 	assert_eq(stage.buttons.size(), 3)
-	assert_eq(stage.board.get_child_count(), 3, "a hearts row per bean from the start event")
+	assert_eq(stage.board.order().size(), 3, "a hearts row per bean from the start event")
 	assert_true(stage.buttons[0].disabled, "no picks during the intro")
 
 
@@ -153,7 +153,7 @@ func test_catch_up_from_snapshot_after_results_and_finish() -> void:
 		t += 0.05
 	_begin(logic.get_public_state())
 	assert_false(stage.picking)
-	assert_eq(stage.board.get_child_count(), 3)
+	assert_eq(stage.board.order().size(), 3)
 	while not logic.is_finished() and t < 120.0:
 		logic.tick(0.05, t)
 		t += 0.05
