@@ -1242,8 +1242,6 @@ func _on_event(ev: Dictionary) -> void:
 				map.set_lobby_open(false)
 			if phase == Phase.Id.INTRO:
 				hud.toast("WELCOME TO THE LUCKY LOUNGE", 3.0)
-			elif phase == Phase.Id.CASINO and int(ev.get("from", -1)) == Phase.Id.INTRO:
-				hud.toast("Gamble. Shove. Don't get caught.", 3.0)
 			elif phase == Phase.Id.CASINO and int(ev.get("from", -1)) == Phase.Id.REGROUP:
 				_back_to_casino()
 			elif phase == Phase.Id.PRE_MINIGAME:
