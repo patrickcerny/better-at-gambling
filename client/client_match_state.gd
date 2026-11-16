@@ -279,6 +279,8 @@ func _apply(ev: Dictionary) -> void:
 		&"lobby_countdown_cancelled":
 			countdown = -1.0
 			lobby_changed.emit()
+		&"minigame_forced":
+			_feed("%s starts the next minigame now!" % player_name(int(ev["by"])), &"info")
 		&"player_left", &"player_rejoined":
 			if players.has(int(ev["player"])):
 				players[int(ev["player"])]["connected"] = ev["type"] == &"player_rejoined"

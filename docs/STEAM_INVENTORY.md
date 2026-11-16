@@ -34,3 +34,26 @@ never uploaded to Steam.
 2. Steamworks, App 5623410: Community → Inventory Service → enable it.
 3. Same page → Item Definitions → upload `tools/steam/itemdefs.json`, then publish.
 4. Store page content: declare in-game purchases.
+
+## Daily Spin (Patrick 2026-11-16)
+
+DAILY SPIN on the main menu opens a prize wheel (`DailySpinPanel`, `DailyWheelView`, data in
+`core/defs/daily_wheel.gd`): one free spin every 20 hours. Nothing is paid for a spin, so it is
+not a loot box. Prizes: red Coins (100 to 2,500), a mystery piece (a normal piece you don't own
+yet), Gold Coins (5 / 10 / 25 / 50) and, at 0.3 %, the Fortune skin (`skin_fortune`, Steam item
+208, `CosmeticDef.wheel_only`: never sold, only from the wheel).
+
+- With Steam, Steam decides the spin: SPIN calls `triggerItemDrop(3200)`. 3200 is a
+  `playtimegenerator` with `drop_window` 1200 minutes and `drop_max_per_window` 1, so Steam grants at
+  most one prize per account per 20 hours whatever the client does, and picks it by the weights in
+  its bundle. Prizes arrive as tokens: 3201-3207 (Coins, mystery piece) are consumed by the game and
+  paid into profile.cfg; 3211-3214 (Gold) are exchanged for the bundles 3311-3314 (5/10/25/50 Gold
+  Coins, `exchange` "3211x1" etc.), so Gold can only come out of a won token; the skin (208) is
+  granted directly. Tokens left over (the game closed mid-payout) are paid on the next inventory read.
+- Timer: the profile keeps the last spin (`[daily] last_spin`), measured in Steam's server time when
+  Steam runs, so turning the PC clock does nothing. Without Steam (or until the item definitions are
+  uploaded) the spin is local: Coins and mystery pieces only, the Gold and jackpot slices dimmed, and
+  the PC clock counts (turning it forward to spin early locks the wheel once it is set back).
+- Upload: the new definitions are in `tools/steam/itemdefs.json` (162 definitions). Not on Steam yet:
+  needs Patrick's go. After uploading, check in the Steamworks item definition editor that 3200 shows
+  as a playtime generator with the drop window.

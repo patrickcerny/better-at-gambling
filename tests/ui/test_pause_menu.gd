@@ -113,3 +113,14 @@ func test_leave_and_quit_ask_first() -> void:
 	ConfirmDialog.open_in(menu).yes_button.pressed.emit()
 	assert_signal_emitted(menu, "quit_requested")
 	assert_signal_not_emitted(menu, "resumed")
+
+
+func test_start_next_minigame_only_when_offered() -> void:
+	assert_false(menu.minigame_button.visible, "hidden unless the match scene offers it (leader, casino)")
+	menu.set_minigame_now_available(true)
+	menu.open()
+	assert_true(menu.minigame_button.visible)
+	watch_signals(menu)
+	menu.minigame_button.pressed.emit()
+	assert_signal_emitted(menu, "minigame_now_requested")
+	assert_signal_emitted(menu, "resumed", "back to play for the warning")

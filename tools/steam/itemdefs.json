@@ -1195,6 +1195,15 @@
       "exchange": "3100x100"
     },
     {
+      "itemdefid": 208,
+      "type": "item",
+      "name": "Fortune",
+      "description": "Skin for your bean in Better at Gambling, only won on the Daily Spin.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
       "itemdefid": 1000,
       "type": "bundle",
       "bundle": "100x1;113x1;126x1;153x1",
@@ -1366,6 +1375,163 @@
       "exchange": "3100x175",
       "name": "Golfer",
       "description": "The whole Golfer outfit (4 pieces) for Gold Coins.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3200,
+      "type": "playtimegenerator",
+      "bundle": "3201x220;3211x90;3203x160;3207x100;3205x55;3213x20;3202x180;208x3;3204x110;3212x45;3206x15;3214x2",
+      "name": "Daily Spin",
+      "description": "One free spin of the prize wheel in Better at Gambling every day.",
+      "drop_interval": 1,
+      "use_drop_window": true,
+      "drop_window": 1200,
+      "drop_max_per_window": 1,
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3201,
+      "type": "item",
+      "name": "Daily Spin: 100 Coins",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3211,
+      "type": "item",
+      "name": "Daily Spin: 5 Gold",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3311,
+      "type": "bundle",
+      "bundle": "3100x5",
+      "exchange": "3211x1",
+      "name": "5 Gold Coins (Daily Spin)",
+      "description": "5 Gold Coins won on the Daily Spin.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3203,
+      "type": "item",
+      "name": "Daily Spin: 250 Coins",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3207,
+      "type": "item",
+      "name": "Daily Spin: Mystery Piece",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3205,
+      "type": "item",
+      "name": "Daily Spin: 1,000 Coins",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3213,
+      "type": "item",
+      "name": "Daily Spin: 25 Gold",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3313,
+      "type": "bundle",
+      "bundle": "3100x25",
+      "exchange": "3213x1",
+      "name": "25 Gold Coins (Daily Spin)",
+      "description": "25 Gold Coins won on the Daily Spin.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3202,
+      "type": "item",
+      "name": "Daily Spin: 150 Coins",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3204,
+      "type": "item",
+      "name": "Daily Spin: 500 Coins",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3212,
+      "type": "item",
+      "name": "Daily Spin: 10 Gold",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3312,
+      "type": "bundle",
+      "bundle": "3100x10",
+      "exchange": "3212x1",
+      "name": "10 Gold Coins (Daily Spin)",
+      "description": "10 Gold Coins won on the Daily Spin.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3206,
+      "type": "item",
+      "name": "Daily Spin: 2,500 Coins",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3214,
+      "type": "item",
+      "name": "Daily Spin: 50 Gold",
+      "description": "A Daily Spin prize; the game pays it out on its own.",
+      "store_hidden": true,
+      "tradable": false,
+      "marketable": false
+    },
+    {
+      "itemdefid": 3314,
+      "type": "bundle",
+      "bundle": "3100x50",
+      "exchange": "3214x1",
+      "name": "50 Gold Coins (Daily Spin)",
+      "description": "50 Gold Coins won on the Daily Spin.",
       "store_hidden": true,
       "tradable": false,
       "marketable": false
