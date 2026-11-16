@@ -2741,6 +2741,7 @@ func _add_table_fx() -> void:
 	add_child(table_fx)
 	table_fx.setup(map.stations, func(pid: int) -> PlayerAvatar: return avatars.get(pid, null), local_id, juice, world_root, _chip_color,
 		func(sid: StringName) -> int: return _min_bet(map.stations[sid]) if map.stations.has(sid) else 0)
+	table_fx.skin_of = _chip_skin
 	var lc := LastCallLighting.new()
 	last_call_lighting = lc
 	lc.name = "LastCallLighting"
@@ -2750,7 +2751,14 @@ func _add_table_fx() -> void:
 
 ## A player's colour, for their chips on the tables and their Plinko chip.
 func _chip_color(pid: int) -> Color:
-	return Palette.player_color(int(view.state.players.get(pid, {}).get("color", pid - 1)))
+	var p: Dictionary = view.state.players.get(pid, {})
+	return Palette.player_color(int(p.get("bean_color", p.get("color", pid - 1))))
+
+
+## The animated skin a player wears (&"" = none): their chips on the tables and their Plinko chip
+## wear the same pattern (`ChipStack.skin`).
+func _chip_skin(pid: int) -> StringName:
+	return Cosmetics.skin_of(view.state.players.get(pid, {}))
 
 
 func _on_station_state(sid: StringName) -> void:
@@ -2801,7 +2809,7 @@ func _drop_plinko_chip(sid: StringName, pid: int, slot: int, drop_id: int, secon
 	if _plinko_seen.size() > 256:
 		_plinko_seen.erase(_plinko_seen.keys()[0])  # oldest first; long since landed
 	_plinko_seen[key] = true
-	st.drop_chip(slot, drop_id, _chip_color(pid), seconds, risk)
+	st.drop_chip(slot, drop_id, _chip_color(pid), seconds, risk, _chip_skin(pid))
 
 
 func _spawn_pile(id: int, amount: int, pos: Vector3, source: int = -1) -> void:

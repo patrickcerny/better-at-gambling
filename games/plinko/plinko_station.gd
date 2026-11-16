@@ -258,14 +258,16 @@ func set_risk(p_risk: StringName) -> void:
 
 
 ## Drops a visual chip that lands in `p_slot`, touching down `seconds` from now; `p_risk` is the
-## row it was bet on (its multiplier pops over the slot on landing). Client only.
-func drop_chip(p_slot: int, drop_id: int, color: Color, seconds: float, p_risk: StringName = &"") -> PlinkoChip:
+## row it was bet on (its multiplier pops over the slot on landing); `skin` the dropper's animated
+## skin (the chip wears it, `PlinkoChip.skin`). Client only.
+func drop_chip(p_slot: int, drop_id: int, color: Color, seconds: float, p_risk: StringName = &"", skin: StringName = &"") -> PlinkoChip:
 	if not Vfx.enabled():
 		return null
 	var rng := SeededRng.new(drop_id * 7919 + p_slot)
 	var path: Array[float] = PlinkoSteering.path_to_slot(ROWS, SLOTS, p_slot, rng)
 	var chip := PlinkoChip.new()
 	chip.color = color
+	chip.skin = skin
 	chip.board = self
 	var mults: PackedFloat32Array = Registry.balance.plinko_multipliers(p_risk if p_risk != &"" else risk)
 	chip.mult = mults[clampi(p_slot, 0, mults.size() - 1)]
