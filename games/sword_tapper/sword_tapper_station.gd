@@ -3,8 +3,10 @@ extends StationBase
 ## Sword Tapper pedestal: a round marble plinth with a brass rim, a burgundy velvet disc on top with
 ## 17 brass-set gem lamps round a grey stone, and a gold-hilted sword stuck in the stone. Each lamp
 ## has its prize printed on the velvet beside it (for the stake of the pull); warm white when idle,
-## gold when the sword lights it, the big ruby at the top of the ring red. A soft warm spotlight
-## shaft falls on it from above with a few slow dust motes. The player stands in front of it (+z).
+## gold when the sword lights it, the big ruby at the top of the ring red. The player stands in
+## front of it (+z). A soft warm spotlight shaft with a few slow dust motes falls on it from above
+## only while a winning pull plays (0.10.10, Patrick: "entferne den glow. der kommt nur wenn du
+## gewinnst (slow glow fade in)"): it fades in slowly as the sword comes free and out after it sinks back.
 ##
 ## Presentation only (client-side; a headless server builds the solid plinth and nothing else). On
 ## `sword_pull` (`play_pull`) the sword heaves; it either wobbles and stays (grind, thud, a dust
@@ -50,6 +52,12 @@ const RETURN_TIME: float = 0.45
 const COLUMN_H: float = 9.0
 const COLUMN_R: float = 0.55
 const COLUMN_TIME: float = 3.6
+## The win spotlight: seconds it takes to fade in (from the sword coming free) and to fade out
+## (from the sword sinking back), and its full strengths.
+const GLOW_IN: float = 1.6
+const GLOW_OUT: float = 1.8
+const SPOT_ENERGY: float = 0.7
+const SHAFT_ALPHA: float = 0.022
 ## Gem colours: idle (warm white), lit (gold), and the ruby's own red.
 const GEM_IDLE: Color = Color("#F4E7C8")
 const GEM_LIT: Color = Color("#FFC94A")
@@ -67,6 +75,11 @@ var mult_label: Label3D
 var column: MeshInstance3D
 var column_light: OmniLight3D
 var dust: CPUParticles3D
+var spot_light: SpotLight3D
+var shaft: MeshInstance3D
+var _shaft_mat: StandardMaterial3D
+## 0..1 strength of the win spotlight right now.
+var glow: float = 0.0
 ## The stake the ring's prizes are printed for.
 var shown_stake: int = 0
 ## The pull on show ({free, gems, mult}, empty = none), its serial and the seconds since its tap.
@@ -175,7 +188,7 @@ func show_state(pub: Dictionary) -> void:
 		var p: Dictionary = (last.get("pull", {}) as Dictionary).duplicate()
 		p["serial"] = int(last.get("serial", -1))
 		p["stake"] = int(last.get("stake", 0))
-		play_pull(p, false, _reveal + RETURN_AFTER + RETURN_TIME)
+		play_pull(p, false, _settled_at())
 
 
 ## The golden light column over the pedestal (a big pull), seen across the floor.
@@ -220,12 +233,27 @@ func _tick(delta: float) -> void:
 		if _column_left <= 0.0:
 			column.visible = false
 			column_light.visible = false
-	if shown_pull.is_empty() or t > _reveal + RETURN_AFTER + RETURN_TIME + 0.1:
+	if shown_pull.is_empty() or t > _settled_at() + 0.1:
 		return
 	var before: float = t
 	t += delta
 	_cues(before, t)
 	_apply()
+
+
+## The clock at which a pull is over: the sword back in the stone and the win glow gone.
+func _settled_at() -> float:
+	return _reveal + RETURN_AFTER + maxf(RETURN_TIME, GLOW_OUT)
+
+
+## Strength of the win spotlight at the clock `at` (0 unless the sword came free): a slow ease in
+## from the moment it rips free, full through the reveal, a slow ease out once it sinks back.
+func glow_at(at: float) -> float:
+	if shown_pull.is_empty() or not bool(shown_pull.get("free", false)):
+		return 0.0
+	var fade_in: float = clampf((at - HEAVE) / GLOW_IN, 0.0, 1.0)
+	var fade_out: float = clampf((at - _reveal - RETURN_AFTER) / GLOW_OUT, 0.0, 1.0)
+	return smoothstep(0.0, 1.0, fade_in) * (1.0 - smoothstep(0.0, 1.0, fade_out))
 
 
 ## One-off sounds and puffs for the moments the clock passed (never when snapping to a state).
@@ -273,6 +301,7 @@ func _apply() -> void:
 			tilt = sin(t * 38.0) * 0.06 * w
 	sword.position.y = STONE_TOP + lift
 	sword.rotation.z = tilt
+	_set_glow(glow_at(t))
 	lit = lit_at(t)
 	for i: int in gems.size():
 		_light_gem(i, i in lit)
@@ -282,6 +311,20 @@ func _apply() -> void:
 		mult_label.text = "×%d" % m
 		var s: float = clampf((t - SLAM_AT) / 0.18, 0.0, 1.0)
 		mult_label.scale = Vector3.ONE * lerpf(2.4, 1.0, s * s)
+
+
+## Shows the win spotlight (light, shaft and dust) at strength `level` (0 hides it all).
+func _set_glow(level: float) -> void:
+	glow = level
+	if spot_light == null:
+		return
+	var on: bool = level > 0.001
+	spot_light.visible = on
+	shaft.visible = on
+	dust.emitting = on
+	dust.visible = on
+	spot_light.light_energy = SPOT_ENERGY * level
+	_shaft_mat.albedo_color.a = SHAFT_ALPHA * level
 
 
 func _light_gem(i: int, on: bool) -> void:
@@ -423,19 +466,20 @@ func _build_ring(brass: Material) -> void:
 		_light_gem(i, false)
 
 
-## The soft warm spotlight from above (a faint shaft of light and a few slow dust motes in it).
+## The soft warm win spotlight from above (a faint shaft of light and a few slow dust motes in it),
+## hidden until a winning pull fades it in (`_set_glow`).
 func _build_light() -> void:
-	var spot := SpotLight3D.new()
-	spot.name = "Spot"
-	spot.light_color = Color(1.0, 0.84, 0.58)
-	spot.light_energy = 0.7
-	spot.spot_range = 5.0
-	spot.spot_angle = 17.0
-	spot.spot_attenuation = 0.8
-	spot.position = Vector3(0, 3.6, 0.15)
-	spot.rotation.x = -PI * 0.5
-	add_child(spot)
-	var shaft := MeshInstance3D.new()
+	spot_light = SpotLight3D.new()
+	spot_light.name = "Spot"
+	spot_light.light_color = Color(1.0, 0.84, 0.58)
+	spot_light.light_energy = 0.0
+	spot_light.spot_range = 5.0
+	spot_light.spot_angle = 17.0
+	spot_light.spot_attenuation = 0.8
+	spot_light.position = Vector3(0, 3.6, 0.15)
+	spot_light.rotation.x = -PI * 0.5
+	add_child(spot_light)
+	shaft = MeshInstance3D.new()
 	shaft.name = "Shaft"
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.12
@@ -446,7 +490,8 @@ func _build_light() -> void:
 	cm.cap_top = false
 	cm.cap_bottom = false
 	shaft.mesh = cm
-	shaft.material_override = _glow(Color(1.0, 0.86, 0.6, 0.022))
+	_shaft_mat = _glow(Color(1.0, 0.86, 0.6, 0.0))
+	shaft.material_override = _shaft_mat
 	shaft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	shaft.position = Vector3(0, TOP_Y + 1.38, 0.0)
 	add_child(shaft)
@@ -473,6 +518,7 @@ func _build_light() -> void:
 	ramp.set_color(ramp.get_point_count() - 1, Color(1.0, 0.9, 0.7, 0.0))
 	dust.color_ramp = ramp
 	add_child(dust)
+	_set_glow(0.0)
 
 
 ## The big-pull column (hidden until `big_win_column`).
