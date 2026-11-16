@@ -392,17 +392,22 @@ func _refresh_status() -> void:
 	if status_label == null:
 		return
 	var on: Array[int] = alive_players()
-	var lines: PackedStringArray = ["ON THE WHEEL  %d/%d" % [on.size(), roster.size()]]
+	var rows: Array = []
+	var gone: Array = []
 	for p: int in roster:
-		var who: String = "YOU" if p == local_id else player_name(p)
-		var tag: String = "on"
+		var r: Dictionary = {"player": p, "leader": p == winner}
+		if p == winner:
+			r["tag"] = "WINNER"
+			r["tag_color"] = Palette.VIP_GOLD
 		if p in out:
-			tag = "OUT"
-		elif p == winner:
-			tag = "WINNER"
-		lines.append("%s  %s" % [who, tag])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 26)
+			r["status"] = &"out"
+			gone.append(r)
+		else:
+			rows.append(r)
+	rows.append_array(gone)
+	for r: Dictionary in rows:
+		r["rank"] = 0  # who is still in has no order
+	show_board("ON THE WHEEL  %d / %d" % [on.size(), roster.size()], rows)
 
 
 # --- The ball -------------------------------------------------------------------------------------

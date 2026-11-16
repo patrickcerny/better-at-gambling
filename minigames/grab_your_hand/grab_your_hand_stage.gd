@@ -435,15 +435,25 @@ func _refresh_hud() -> void:
 	_refresh_bar()
 	if status_label == null:
 		return
-	var lines: PackedStringArray = ["HANDS"]
+	var order: Array[int] = []
 	for p: int in roster:
-		if p in gone:
-			continue
-		var who: String = "YOU" if p == local_id else player_name(p)
+		if p not in gone:
+			order.append(p)
+	var tuples: Dictionary = {}
+	for p: int in order:
+		tuples[p] = PokerHand.evaluate(hands.get(p, []))
+	order.sort_custom(func(a: int, b: int) -> bool:
+		var c: int = PokerHand.compare(tuples[a], tuples[b])
+		return c > 0 if c != 0 else a < b)
+	var rows: Array = []
+	for i: int in order.size():
+		var p: int = order[i]
 		var n: int = (hands.get(p, []) as Array).size()
-		lines.append("%s  %s  (%d)" % [who, hand_names.get(p, "NO CARDS"), n])
-	status_label.text = "\n".join(lines)
-	status_label.add_theme_font_size_override(&"font_size", 24)
+		rows.append({"player": p, "score_text": str(hand_names.get(p, "NO CARDS")) if n > 0 else "—",
+			"detail": "%d card%s" % [n, "" if n == 1 else "s"],
+			"leader": i == 0 and n > 0 and (order.size() == 1 or PokerHand.compare(tuples[p], tuples[order[1]]) > 0)})
+	MinigameScoreboard.rank_rows(rows, "score_text")
+	show_board("HANDS", rows)
 
 
 # --- Our hand bar -------------------------------------------------------------------------------
