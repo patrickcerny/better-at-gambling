@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.65 Public lobbies of other players show up
+### 2026-11-16 / 0.9.66 Public lobbies of other players show up
 - Patrick: "Public lobbies are not found of other ppl". The Steam search filtered on our exact
   version, so a lobby from a player whose Steam had not updated yet (or one on a GitHub build)
   vanished silently. The search now asks for every version of the game (worldwide, public, free
