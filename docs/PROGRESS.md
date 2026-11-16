@@ -93,6 +93,15 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.46 Own game icon instead of the Godot icon
+- Patrick: the game (also started through Steam) showed the Godot icon in the taskbar. The project now
+  has its own icon: `assets/icons/icon.png` (512 px, runtime window/taskbar icon via
+  `application/config/icon`), `icon.ico` (16 to 256 px, `config/windows_native_icon` and the Windows
+  preset's `application/icon`) and `icon.icns` (`config/macos_native_icon` and the macOS preset). Same
+  coin logo as the Steam icons (`better-at-gambling/steam/icons/` in the project files).
+- Windows preset: `application/modify_resources=true`, so the export writes the icon, product name and
+  file description into the .exe (Godot 4.7 does this natively, no rcedit needed).
+
 ### 2026-11-15 / 0.9.45 Casino Hold'em river bet
 - Patrick: "Poker river bet". Before, the turn and the river came out together straight after the
   CALL, with no betting in between. Now the turn comes out on its own (state `RIVER`, appended to
