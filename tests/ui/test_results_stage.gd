@@ -197,6 +197,7 @@ func test_online_a_pad_player_always_has_a_button_focused() -> void:
 	var st: ClientMatchState = _state(3)
 	st.leader = 2
 	stage = ResultsStage.new()
+	stage.lock_seconds = 0.0
 	add_child_autofree(stage)
 	stage.setup(st, 1, true)
 	await wait_process_frames(2)
@@ -206,3 +207,27 @@ func test_online_a_pad_player_always_has_a_button_focused() -> void:
 	await wait_process_frames(2)
 	assert_true(stage.play_button.visible)
 	assert_true(stage.get_viewport().gui_get_focus_owner() != null, "still focused")
+
+
+## Patrick, 0.9.43: the end screen got skipped straight away. Play again / Leave stay greyed out
+## with a countdown for `results_min_time`, then the focus lands on a button.
+func test_buttons_are_locked_for_the_first_seconds() -> void:
+	var st: ClientMatchState = _state(3)
+	st.leader = 1
+	stage = ResultsStage.new()
+	add_child_autofree(stage)
+	stage.setup(st, 1, true)
+	assert_almost_eq(stage.lock_seconds, Registry.balance.results_min_time, 0.001)
+	assert_gt(Registry.balance.results_min_time, 5.0, "long enough to see the podium and the awards")
+	assert_true(stage.play_button.disabled)
+	assert_true(stage.leave_button.disabled)
+	assert_false(stage.is_unlocked())
+	assert_string_contains(stage.leave_button.text, "(%d)" % ceili(Registry.balance.results_min_time))
+	stage._process(Registry.balance.results_min_time * 0.5)
+	assert_true(stage.leave_button.disabled, "still locked halfway")
+	stage._process(Registry.balance.results_min_time)
+	assert_true(stage.is_unlocked())
+	assert_false(stage.play_button.disabled)
+	assert_false(stage.leave_button.disabled)
+	assert_eq(stage.leave_button.text, "LEAVE LOBBY")
+	assert_eq(stage.get_viewport().gui_get_focus_owner(), stage.play_button, "the leader lands on Play again")

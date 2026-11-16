@@ -257,10 +257,12 @@ func _on_result(ev: Dictionary) -> void:
 	if stack != null:
 		_after(delay, func() -> void: _settle_chips(st, pid, stack, net, stake))
 	if st is HoldemStation and StringName(details.get("type", &"")) == HoldemLogic.ANTE:
-		# Ante and call settle as one hand: the call's chips go where the ante's go.
+		# Ante, call and river bet settle as one hand: their chips go where the ante's go.
 		var call_stack: ChipStack = _take_stack(sid, pid, {"type": HoldemLogic.CALL_BET, "value": 0}, true)
-		if call_stack != null:
-			_after(delay, func() -> void: _settle_chips(st, pid, call_stack, 0 if net >= 0 else -1, stake))
+		while call_stack != null:
+			var cs: ChipStack = call_stack
+			_after(delay, func() -> void: _settle_chips(st, pid, cs, 0 if net >= 0 else -1, stake))
+			call_stack = _take_stack(sid, pid, {"type": HoldemLogic.CALL_BET, "value": 0}, true)
 	# Several results for one player at once (roulette bets) show as one total.
 	var key: String = _key(sid, pid)
 	if _pending.has(key):

@@ -1,17 +1,27 @@
 class_name MinigameBriefing
 extends CanvasLayer
-## The rules screen before every minigame (0.8.13): the minigame's name, how to play, who is
-## ready and a countdown. Everyone clicks READY (or presses Space / Enter / the interact button);
+## The rules screen before every minigame (0.8.13): the minigame's name, a looping preview clip
+## of it being played (MinigamePreview), how to play, its controls for keyboard and gamepad
+## (MinigameControls; the device you're using is lit), who is ready and a countdown. Everyone clicks READY (or presses Space / Enter / the interact button);
 ## the server starts the minigame when all players are ready or when the briefing time runs out.
 ## Sits above the stage UI and swallows keys so the stage can't act before the start.
 
-const WIDTH: float = 760.0
+const WIDTH: float = 1220.0
+## The preview clip's size on the card (16:9).
+const PREVIEW: Vector2 = Vector2(512, 288)
+const COLUMN: float = 600.0
 
 var rules_label: Label
 var title_label: Label
 var countdown_label: Label
 var ready_button: Button
-var players_box: VBoxContainer
+var players_box: HFlowContainer
+var preview: MinigamePreview
+var controls_grid: GridContainer
+## Keycap chips per device, dimmed when that device isn't the one in use.
+var key_chips: Array[Control] = []
+var pad_chips: Array[Control] = []
+var _glyph_epoch: int = -1
 ## player → their row label.
 var rows: Dictionary = {}
 var state: ClientMatchState
@@ -43,7 +53,7 @@ func open(start: Dictionary, p_state: ClientMatchState, p_local_id: int) -> void
 	var def: MinigameDefinition = Registry.minigames.get(StringName(start.get("minigame", "")), null)
 	var title: String = str(start.get("name", def.display_name if def != null else "Minigame"))
 	var rules: String = str(start.get("rules", def.rules_text if def != null else ""))
-	_build(title, rules)
+	_build(title, rules, StringName(start.get("minigame", "")))
 	_refresh()
 
 
@@ -62,6 +72,8 @@ func _process(delta: float) -> void:
 	if left > 0.0:
 		left = maxf(left - delta, 0.0)
 		countdown_label.text = "Starts in %d s" % ceili(left) if left > 0.0 else "Starting…"
+	if _glyph_epoch != InputGlyphs.epoch:
+		_light_device()
 
 
 func _input(event: InputEvent) -> void:
@@ -92,23 +104,28 @@ func press_ready() -> void:
 func _refresh() -> void:
 	for p: int in players:
 		if not rows.has(p):
+			var chip := PanelContainer.new()
+			players_box.add_child(chip)
 			var l := Label.new()
-			l.theme_type_variation = &"HeadingLabel"
-			players_box.add_child(l)
+			l.add_theme_font_size_override(&"font_size", 22)
+			chip.add_child(l)
 			rows[p] = l
 		var is_ready: bool = ready_ids.has(p)
 		var l: Label = rows[p]
 		l.text = "%s  %s" % ["✓" if is_ready else "…", state.player_name(p) if state != null else str(p)]
 		l.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if is_ready else Palette.CREAM)
+		var chip: PanelContainer = l.get_parent() as PanelContainer
+		if chip != null:
+			chip.add_theme_stylebox_override(&"panel", _pill(Palette.MONEY_GREEN if is_ready else Color(Palette.CREAM, 0.25)))
 	if sent or ready_ids.has(local_id):
 		ready_button.text = "WAITING FOR THE OTHERS…" if ready_ids.size() < players.size() else "STARTING…"
 		ready_button.disabled = true
 	countdown_label.text = "Starts in %d s" % ceili(left) if left > 0.0 else "Starting…"
 
 
-func _build(title: String, rules: String) -> void:
+func _build(title: String, rules: String, id: StringName) -> void:
 	var dim := ColorRect.new()
-	dim.color = Color(Palette.CASINO_BLACK, 0.78)
+	dim.color = Color(Palette.CASINO_BLACK, 0.82)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(dim)
@@ -118,11 +135,13 @@ func _build(title: String, rules: String) -> void:
 	add_child(center)
 	var panel := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.WARM_CHARCOAL, 0.96)
+	sb.bg_color = Color(Palette.WARM_CHARCOAL, 0.97)
 	sb.border_color = Palette.WARM_GOLD
 	sb.set_border_width_all(4)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(28)
+	sb.set_corner_radius_all(16)
+	sb.set_content_margin_all(30)
+	sb.shadow_color = Color(0, 0, 0, 0.5)
+	sb.shadow_size = 24
 	panel.add_theme_stylebox_override(&"panel", sb)
 	panel.custom_minimum_size = Vector2(WIDTH, 0)
 	center.add_child(panel)
@@ -140,31 +159,154 @@ func _build(title: String, rules: String) -> void:
 	title_label.text = title
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title_label)
+	# Preview clip on the left, how to play and the controls on the right.
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override(&"separation", 30)
+	col.add_child(body)
+	var frame := PanelContainer.new()
+	var fsb := StyleBoxFlat.new()
+	fsb.bg_color = Palette.CASINO_BLACK
+	fsb.border_color = Palette.VIP_GOLD
+	fsb.set_border_width_all(3)
+	fsb.set_corner_radius_all(10)
+	fsb.set_content_margin_all(3)
+	frame.add_theme_stylebox_override(&"panel", fsb)
+	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	body.add_child(frame)
+	preview = MinigamePreview.new()
+	preview.custom_minimum_size = PREVIEW
+	frame.add_child(preview)
+	if not preview.set_game(id):
+		frame.visible = false
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override(&"separation", 10)
+	right.custom_minimum_size = Vector2(COLUMN if frame.visible else WIDTH - 60, 0)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(right)
+	right.add_child(_heading("HOW TO PLAY"))
 	rules_label = Label.new()
 	rules_label.text = rules
 	rules_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rules_label.custom_minimum_size = Vector2(WIDTH - 56, 0)
-	rules_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rules_label.add_theme_font_size_override(&"font_size", 24)
+	rules_label.custom_minimum_size = Vector2(right.custom_minimum_size.x, 0)
+	rules_label.add_theme_font_size_override(&"font_size", 21 if rules.length() < 330 else 18)
 	rules_label.add_theme_color_override(&"font_color", Palette.CREAM)
-	col.add_child(rules_label)
-	var sep := HSeparator.new()
-	col.add_child(sep)
-	players_box = VBoxContainer.new()
-	players_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	players_box.add_theme_constant_override(&"separation", 4)
+	right.add_child(rules_label)
+	_build_controls(right, id)
+	col.add_child(HSeparator.new())
+	players_box = HFlowContainer.new()
+	players_box.alignment = FlowContainer.ALIGNMENT_CENTER
+	players_box.add_theme_constant_override(&"h_separation", 10)
+	players_box.add_theme_constant_override(&"v_separation", 8)
 	col.add_child(players_box)
+	var foot := HBoxContainer.new()
+	foot.alignment = BoxContainer.ALIGNMENT_CENTER
+	foot.add_theme_constant_override(&"separation", 28)
+	col.add_child(foot)
 	countdown_label = Label.new()
 	countdown_label.theme_type_variation = &"HeadingLabel"
-	countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	countdown_label.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
-	col.add_child(countdown_label)
+	foot.add_child(countdown_label)
 	ready_button = Button.new()
 	ready_button.theme_type_variation = &"ActionButton"
 	ready_button.text = "READY  (Space / Enter)"
-	ready_button.custom_minimum_size = Vector2(360, 72)
-	ready_button.add_theme_font_size_override(&"font_size", 30)
-	ready_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ready_button.custom_minimum_size = Vector2(380, 68)
+	ready_button.add_theme_font_size_override(&"font_size", 28)
 	ready_button.focus_mode = Control.FOCUS_NONE
 	ready_button.pressed.connect(press_ready)
-	col.add_child(ready_button)
+	foot.add_child(ready_button)
+	_light_device()
+
+
+## The controls table: a header row (KEYBOARD, GAMEPAD), then a keycap per device and what it does.
+func _build_controls(parent: Control, id: StringName) -> void:
+	var rows_data: Array[Dictionary] = MinigameControls.rows(id)
+	if rows_data.is_empty():
+		return
+	var head := _heading("CONTROLS")
+	head.custom_minimum_size.y = 34
+	parent.add_child(head)
+	controls_grid = GridContainer.new()
+	controls_grid.columns = 3
+	controls_grid.add_theme_constant_override(&"h_separation", 12)
+	controls_grid.add_theme_constant_override(&"v_separation", 6)
+	parent.add_child(controls_grid)
+	for t: String in ["KEYBOARD", "GAMEPAD", ""]:
+		var h := Label.new()
+		h.text = t
+		h.theme_type_variation = &"SmallLabel"
+		h.add_theme_font_size_override(&"font_size", 14)
+		h.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.55))
+		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		controls_grid.add_child(h)
+	for r: Dictionary in rows_data:
+		var k: Control = _keycap(str(r["key"]))
+		var g: Control = _keycap(str(r["pad"]))
+		key_chips.append(k)
+		pad_chips.append(g)
+		controls_grid.add_child(k)
+		controls_grid.add_child(g)
+		var what := Label.new()
+		what.text = str(r["what"])
+		what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		what.add_theme_font_size_override(&"font_size", 19)
+		what.add_theme_color_override(&"font_color", Palette.CREAM)
+		controls_grid.add_child(what)
+
+
+## Lights the column of the device you used last and dims the other.
+func _light_device() -> void:
+	_glyph_epoch = InputGlyphs.epoch
+	for c: Control in key_chips:
+		c.modulate.a = 0.4 if InputGlyphs.gamepad else 1.0
+	for c: Control in pad_chips:
+		c.modulate.a = 1.0 if InputGlyphs.gamepad else 0.4
+	if ready_button != null and not ready_button.disabled:
+		ready_button.text = "READY  (%s)" % ("A" if InputGlyphs.gamepad else "Space / Enter")
+
+
+## A key / button name on a little keycap ("" → a dash: that device can't do it).
+func _keycap(text: String) -> Control:
+	var chip := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	var none: bool = text == "" or text == "?"
+	sb.bg_color = Color(Palette.CASINO_BLACK, 0.9) if not none else Color(0, 0, 0, 0)
+	sb.border_color = Palette.WARM_GOLD if not none else Color(0, 0, 0, 0)
+	sb.set_border_width_all(2)
+	sb.border_width_bottom = 4
+	sb.set_corner_radius_all(7)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 2
+	sb.content_margin_bottom = 2
+	chip.add_theme_stylebox_override(&"panel", sb)
+	chip.custom_minimum_size = Vector2(150, 0)
+	var l := Label.new()
+	l.text = text if not none else "—"
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override(&"font_size", 18)
+	l.add_theme_color_override(&"font_color", Palette.VIP_GOLD if not none else Color(Palette.CREAM, 0.35))
+	chip.add_child(l)
+	return chip
+
+
+func _heading(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.theme_type_variation = &"SmallLabel"
+	l.add_theme_font_size_override(&"font_size", 16)
+	l.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	return l
+
+
+func _pill(border: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(Palette.CASINO_BLACK, 0.7)
+	sb.border_color = border
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(18)
+	sb.content_margin_left = 14
+	sb.content_margin_right = 14
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	return sb

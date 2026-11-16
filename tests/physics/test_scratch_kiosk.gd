@@ -61,8 +61,8 @@ func test_kiosk_stands_where_the_map_says_without_overlaps() -> void:
 	for other: AABB in _solids(scene.map, st, false):
 		for a: AABB in mine:
 			assert_false(a.grow(-0.02).intersects(other), "kiosk part %s overlaps a collider at %s" % [a, other])
-	var tablet: Vector3 = LuckyLounge.SETTINGS_TABLET_POS
-	assert_gt(Vector2(tablet.x - st.global_position.x, tablet.z - st.global_position.z).length(), LuckyLounge.SETTINGS_TABLET_RANGE + st.interact_radius, "the tablet's E and the kiosk's E never compete")
+	var tablet: Vector3 = LuckyLounge.SETTINGS_BOARD_SPOT
+	assert_gt(Vector2(tablet.x - st.global_position.x, tablet.z - st.global_position.z).length(), LuckyLounge.SETTINGS_BOARD_RANGE + st.interact_radius, "the settings board's E and the kiosk's E never compete")
 	for sid: StringName in scene.map.stations:
 		if sid != SID:
 			var o: StationBase = scene.map.stations[sid]
