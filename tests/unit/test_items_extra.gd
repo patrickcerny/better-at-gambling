@@ -283,6 +283,92 @@ func test_scissors_cut_the_last_card() -> void:
 	assert_false(fx.modifiers.has_flag(1, &"scissors"), "used up")
 
 
+func _scissors(fx: TableFixture) -> void:
+	var m := Modifier.new()
+	m.id = &"scissors"
+	m.game_id = &"blackjack"
+	m.flags[&"scissors"] = true
+	fx.modifiers.add(1, m)
+
+
+## Player 10 + 6 against dealer 9 + 10, the hit (`bust`) and what follows from the shoe.
+func _busting_table(fx: TableFixture, rest: Array[int]) -> BlackjackLogic:
+	var bj: BlackjackLogic = fx.make(BlackjackLogic.new(), &"bj") as BlackjackLogic
+	bj.join(1)
+	var top: Array[int] = [Card.make(10), Card.make(9), Card.make(6), Card.make(10)]
+	top.append_array(rest)
+	bj.shoe.stack_top(top)
+	bj.place_bet(1, {"amount": 50})
+	bj.tick(30.0)
+	return bj
+
+
+func test_scissors_save_a_busted_hand() -> void:
+	var fx := TableFixture.new(2, [1], 1000)
+	var bj: BlackjackLogic = _busting_table(fx, [Card.make(10), Card.make(3)] as Array[int])
+	_scissors(fx)
+	bj.tick(4.0)  # some of the decision clock is used up
+	assert_true(bj.player_action(1, &"hit")["ok"])  # 10 + 6 + 10 = 26
+	assert_eq(bj.state, BlackjackLogic.State.ACTING, "the bust waits for the scissors")
+	assert_false(bj.hands[1]["done"])
+	assert_true(bj.get_public_state()["hands"][1].get("rescue", false), "synced to the table")
+	assert_eq(bj.player_action(1, &"hit")["error"], &"busted", "only cut or take the bust")
+	assert_eq(bj.player_action(1, &"double")["error"], &"busted")
+	assert_true(bj.player_action(1, &"cut")["ok"])
+	assert_eq(HandEval.total(bj.hands[1]["cards"]), 16, "the busting 10 is gone")
+	assert_false(bj.hands[1].has("rescue"))
+	assert_almost_eq(float(bj.hands[1]["clock"]), fx.balance.bj_action_time - 4.0, 0.01, "the clock that was left")
+	assert_true(bj.player_action(1, &"hit")["ok"], "play goes on")  # 16 + 3 = 19
+	assert_eq(HandEval.total(bj.hands[1]["cards"]), 19)
+	assert_false(fx.modifiers.has_flag(1, &"scissors"), "used up")
+
+
+func test_scissors_window_runs_out_into_a_bust() -> void:
+	var fx := TableFixture.new(2, [1], 1000)
+	var bj: BlackjackLogic = _busting_table(fx, [Card.make(10)] as Array[int])
+	_scissors(fx)
+	bj.player_action(1, &"hit")
+	bj.tick(fx.balance.bj_scissors_window + 0.1)
+	assert_ne(bj.state, BlackjackLogic.State.ACTING, "no cut in time: bust")
+	assert_eq(fx.economy.balance(1), 950)
+
+
+func test_scissors_take_the_bust() -> void:
+	var fx := TableFixture.new(2, [1], 1000)
+	var bj: BlackjackLogic = _busting_table(fx, [Card.make(10)] as Array[int])
+	_scissors(fx)
+	bj.player_action(1, &"hit")
+	assert_true(bj.player_action(1, &"stand")["ok"])
+	assert_ne(bj.state, BlackjackLogic.State.ACTING)
+	assert_eq(fx.economy.balance(1), 950)
+
+
+func test_bust_without_scissors_ends_at_once() -> void:
+	var fx := TableFixture.new(2, [1], 1000)
+	var bj: BlackjackLogic = _busting_table(fx, [Card.make(10)] as Array[int])
+	bj.player_action(1, &"hit")
+	assert_ne(bj.state, BlackjackLogic.State.ACTING)
+
+
+func test_scissors_rescue_a_split_hand() -> void:
+	var fx := TableFixture.new(2, [1], 2000)
+	var bj: BlackjackLogic = fx.make(BlackjackLogic.new(), &"bj") as BlackjackLogic
+	bj.join(1)
+	# Player 8 8, dealer 9 10; split: hand 1 gets a 7 (15), hits a 10 (bust); hand 2 later gets a 2.
+	bj.shoe.stack_top([Card.make(8), Card.make(9), Card.make(8), Card.make(10), Card.make(7), Card.make(10), Card.make(2)] as Array[int])
+	bj.place_bet(1, {"amount": 50})
+	bj.tick(30.0)
+	_scissors(fx)
+	assert_true(bj.player_action(1, &"split")["ok"])
+	assert_true(bj.player_action(1, &"hit")["ok"])
+	assert_eq(int(bj.hands[1]["active"]), 0, "still on the busted first hand")
+	assert_true(bj.hands[1].has("rescue"))
+	bj.tick(fx.balance.bj_scissors_window + 0.1)
+	assert_eq(int(bj.hands[1]["active"]), 1, "window over: on to the second hand")
+	assert_false(bj.hands[1]["done"])
+	assert_eq((bj.hands[1]["split"]["cards"] as Array).size(), 2)
+
+
 func test_energy_drink_speeds_up_a_table_you_have_alone() -> void:
 	var fx := TableFixture.new(2, [1, 2], 1000)
 	var r: RouletteLogic = fx.make(RouletteLogic.new(), &"r") as RouletteLogic
