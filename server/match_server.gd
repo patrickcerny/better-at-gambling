@@ -59,6 +59,9 @@ var stats: Dictionary[int, Dictionary] = {}
 var money_history: MoneyHistory = MoneyHistory.new()
 ## Results screen: seconds until an online room goes back to its lobby on its own.
 var results_return_in: float = -1.0
+## Seconds left before the leader's Play again (`return_to_lobby`) is taken: the results screen
+## is shown to everyone for `results_min_time` first.
+var results_lock_in: float = 0.0
 ## The last finished match's XP/Coins rows, player → `Progression.breakdown` (in `match_ended`
 ## and the results snapshot), and its id: clients add their row to their profile once per id.
 var progress: Dictionary = {}
@@ -237,6 +240,7 @@ func _build_match_systems(seed_value: int) -> void:
 	rewards = RewardDirector.new()
 	_comped.clear()
 	results_return_in = -1.0
+	results_lock_in = 0.0
 	money_history = MoneyHistory.new()
 	for id: int in state.players:
 		_reset_stats(id)
@@ -726,10 +730,12 @@ func advance(real_delta: float) -> void:
 	if not running:
 		if room_mode and phases.phase == Phase.Id.LOBBY:
 			_tick_lobby(real_delta)
-		elif room_mode and phases.phase == Phase.Id.RESULTS and results_return_in > 0.0:
-			results_return_in -= real_delta
-			if results_return_in <= 0.0:
-				return_to_lobby()
+		elif room_mode and phases.phase == Phase.Id.RESULTS:
+			results_lock_in = maxf(results_lock_in - real_delta, 0.0)
+			if results_return_in > 0.0:
+				results_return_in -= real_delta
+				if results_return_in <= 0.0:
+					return_to_lobby()
 		return
 	_accumulator += real_delta * timescale
 	var steps: int = 0
@@ -926,6 +932,7 @@ func _finish_match() -> void:
 	var standings: Array[Dictionary] = get_standings()
 	if room_mode:
 		results_return_in = balance.results_return_time
+	results_lock_in = balance.results_min_time
 	_matches_finished += 1
 	match_id = "%d-%d" % [_instance_token, _matches_finished]
 	progress = progress_rows(standings)
@@ -1373,6 +1380,8 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 				return StationLogicBase.fail(&"not_leader")
 			if not room_mode:
 				return StationLogicBase.fail(&"not_room")
+			if results_lock_in > 0.0:
+				return StationLogicBase.fail(&"too_early")
 			return_to_lobby()
 			return StationLogicBase.OK_RESULT
 		&"kick_player":

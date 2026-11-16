@@ -64,5 +64,6 @@ func _results() -> void:
 	var stage := ResultsStage.new()
 	stage.progress_summary = summary
 	add_child(stage)
+	stage.lock_seconds = 0.0
 	stage.setup(st, 1, true)
 	stage.finish_show()
