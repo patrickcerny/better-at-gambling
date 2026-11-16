@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"split_or_steal"
 display_name = "Split or Steal"
-rules_text = "Everyone plays everyone! Every round all duels run at the same time: talk, plead, promise, then secretly lock in SPLIT or STEAL against your opponent within 12 s (keys 1 / 2, pad A / B). Both SPLIT: 1 point each. STEAL vs SPLIT: stealer 3, splitter 0. Both STEAL: 0. No pick counts as SPLIT. With an odd count one player sits each round out (everyone once). 2-4 players meet every opponent more than once. Most points wins; ties go to whoever stole least."
+rules_text = "Everyone plays everyone, one duel at a time: the pair on stage talks, pleads, promises, then secretly locks in SPLIT or STEAL within 12 s (keys 1 / 2, pad A / B) while everyone else watches. Both SPLIT: 1 point each. STEAL vs SPLIT: stealer 3, splitter 0. Both STEAL: 0. No pick counts as SPLIT. Every pair meets once (2-3 players meet more often). Most points wins; ties go to whoever stole least."
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2
