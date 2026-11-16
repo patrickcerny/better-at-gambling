@@ -11,4 +11,5 @@ case "${1:-}" in
 esac
 mkdir -p "$ROOT/$(dirname "$OUT")"
 "$GODOT" --headless --path "$ROOT" --export-release "$PRESET" "$ROOT/$OUT"
+[[ "$PRESET" == "Windows" ]] && python3 "$ROOT/tools/windows/fix_exe_icon.py" "$ROOT/$OUT"
 ls -la "$ROOT/$OUT"
