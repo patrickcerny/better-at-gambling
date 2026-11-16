@@ -55,7 +55,7 @@ const ROWS: Dictionary = {
 	],
 	&"last_seat": [
 		MOVE,
-		["{interact}", "{interact}", "Sit on a stool when the music stops"],
+		["{interact} / {grab}", "{interact} / {grab}", "Sit on the stool next to you when the music stops"],
 		["{shove}", "{shove}", "Shove"],
 	],
 	&"grab_your_hand": [

@@ -20,8 +20,9 @@ const COIN_DEALS: int = 2
 ## Gold offers a day (a premium piece or a set).
 const GOLD_DEALS: int = 1
 ## Whether Steamworks has the discounted exchange recipes (tools/steam/itemdefs.json uploaded):
-## until then a Gold offer is featured at its normal price, as a lower one would be refused.
-const GOLD_LIVE: bool = false
+## without them a Gold offer is featured at its normal price, as a lower one would be refused.
+## Uploaded 2026-11-16 ~21:55 UTC on Patrick's go ("Modified 43/43").
+const GOLD_LIVE: bool = true
 
 ## Tests: the day to use instead of today (-1 = the clock).
 static var fixed_day: int = -1
