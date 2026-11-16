@@ -1,8 +1,8 @@
 extends GutTest
 ## Split or Steal through the real match server and intent schema: nothing of the show goes out
 ## with `minigame_started` (the stage is built behind the curtain after it: the first-round bug),
-## the show begins after the briefing, picks go through `split_or_steal_pick`, whoever sits a round
-## out is refused, the snapshot carries the schedule and the ranking reaches the minigame ranking.
+## the show begins after the briefing, picks go through `split_or_steal_pick`, the audience
+## is refused, the snapshot carries the schedule and the ranking reaches the minigame ranking.
 
 var fx: ServerFixture
 
@@ -45,7 +45,10 @@ func test_round_by_round_through_the_intent_schema() -> void:
 	var duel: Dictionary = (rounds[0]["duels"] as Array)[0]
 	var a: int = int(duel["a"])
 	var b: int = int(duel["b"])
-	var sitting: int = int((rounds[0]["bye"] as Array)[0])
+	var sitting: int = -1
+	for p: int in fx.player_ids:
+		if p != a and p != b:
+			sitting = p
 	assert_eq(fx.intent(sitting, &"split_or_steal_pick", {"choice": "STEAL"})["error"], &"not_your_turn")
 	var mg: Dictionary = fx.server.get_snapshot()["minigame"]
 	assert_eq(int(mg["index"]), 0)
@@ -64,10 +67,11 @@ func test_round_by_round_through_the_intent_schema() -> void:
 
 func test_show_finishes_and_ranks() -> void:
 	_start(0.0, 4)
-	for i: int in 3:  # one advance runs at most 2000 ticks: the show is longer than that
-		fx.run((SplitOrStealLogic.GAME_CAP + 2.0) / 3.0)
+	var chunks: int = ceili((SplitOrStealLogic.GAME_CAP + 2.0) / 90.0)
+	for i: int in chunks:  # one advance runs at most 2000 ticks: the show is longer than that
+		fx.run((SplitOrStealLogic.GAME_CAP + 2.0) / chunks)
 	assert_ne(fx.server.phases.phase, Phase.Id.MINIGAME, "the show is over")
 	var fin: Array[Dictionary] = fx.of_type(&"minigame_finished")
 	assert_eq(fin.size(), 1)
 	assert_eq((fin[0]["ranking"] as Array).size(), 4)
-	assert_eq(fx.of_type(&"split_or_steal_reveal").size(), 6, "4 players: 6 rounds, every pair twice")
+	assert_eq(fx.of_type(&"split_or_steal_reveal").size(), 6, "4 players: 6 duels, every pair once")

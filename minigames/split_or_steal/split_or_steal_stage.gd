@@ -1,20 +1,20 @@
 class_name SplitOrStealStage
 extends MinigameStage
 ## Client presentation of the Split or Steal tournament (§2.9): a 3D game-show set like the
-## quiz's. A burgundy curtain backdrop, two podiums front and centre, Lucky the host between them
-## at a lectern, spotlights, and two audience rows at the sides (the local player's seat ringed in
-## gold). Everyone plays everyone: every ROUND all duels run at the same time. The podiums show
-## OUR duel (us on the left, our opponent on the right; when we sit a round out, the round's first
-## duel), everyone else watches from the seats. ROUND (the duels are announced, the two beans hop
-## up) → DECIDE (SPLIT / STEAL, keys 1 / 2 or pad A / B; "LOCKED IN" cards show who decided,
-## never what) → REVEAL (every duel of the round flips at once, the beans cheer or sulk).
+## quiz's. A burgundy curtain backdrop, two podiums front and centre for the pair on stage (their
+## beans, names and colours on the podium fronts, a choice card over each head), Lucky the host
+## between them at a lectern, spotlights on the pair, and everyone else in two audience rows at the
+## sides (the local player's seat ringed in gold). Everyone plays everyone, ONE DUEL AT A TIME:
+## ROUND (the pair hops up to the podiums) → DECIDE (SPLIT / STEAL, keys 1 / 2 or pad A / B, only
+## for the two on stage; "LOCKED IN" cards show who decided, never what) → REVEAL (both cards flip
+## with the payout, the beans cheer or sulk, the host reacts).
 ##
-## 2D overlay (1920×1080 base): round counter, phase and timer at the top; THIS ROUND top left
-## (every duel of the round: who decided, then both picks and the points); standings top right;
-## the host's speech bubble; the big SPLIT / STEAL buttons at the bottom for whoever has a duel,
-## "You sit this round out" for the one left over with an odd count. Everything comes from events,
-## the public snapshot and our private state, which also carries the round being played so a
-## stage built after the first events (behind the curtain) still catches up.
+## 2D overlay (1920×1080 base): duel counter, phase and timer at the top; THE DUELS top left (the
+## last results, the duel on stage, what's next and when we're up); standings top right; the
+## host's speech bubble; the big SPLIT / STEAL buttons at the bottom for the pair, "Waiting for
+## X vs Y" for the audience. Everything comes from events, the public snapshot and our private
+## state, which also carries the duel on stage so a stage built after the first events (behind the
+## curtain) still catches up. (A "round" in the data is one duel on stage.)
 
 const SPLIT: String = SplitOrStealLogic.SPLIT
 const STEAL: String = SplitOrStealLogic.STEAL
@@ -132,7 +132,7 @@ func on_event(ev: Dictionary) -> void:
 			duels_each = int(ev.get("duels_each", duels_each))
 			phase = Step.INTRO
 			_set_phase_text("SPLIT OR STEAL", Palette.VIP_GOLD)
-			_show_result("Everyone vs everyone  ·  %d round%s" % [total, "" if total == 1 else "s"], Palette.CREAM)
+			_show_result("Everyone vs everyone  ·  %d duel%s, one at a time" % [total, "" if total == 1 else "s"], Palette.CREAM)
 			_host_say("Tonight everyone faces everyone: %d duel%s each!" % [duels_each, "" if duels_each == 1 else "s"], QuizHost.Pose.HAPPY)
 			_refresh_all()
 		&"split_or_steal_round":
@@ -361,17 +361,14 @@ func _enter_round(remaining: float, live: bool) -> void:
 	for side: int in mini(2, pair.size()):
 		_set_card(side, "LOCKED IN" if locked.has(pair[side]) else "?", Palette.WARM_GOLD if locked.has(pair[side]) else Palette.WARM_CHARCOAL,
 			Palette.CASINO_BLACK if locked.has(pair[side]) else Palette.CREAM.darkened(0.2))
-	_set_phase_text("ROUND %d" % (round_index + 1), Palette.VIP_GOLD)
+	_set_phase_text("DUEL %d" % (round_index + 1), Palette.VIP_GOLD)
 	var opp: int = opponent()
 	if opp != NOBODY:
 		_show_result("You  vs  %s" % state.player_name(opp), Palette.CREAM)
-		_host_say("Round %d! %s, you face %s." % [round_index + 1, state.player_name(local_id), state.player_name(opp)], QuizHost.Pose.SURPRISED)
-	else:
-		_show_result("%d duel%s at once" % [duels.size(), "" if duels.size() == 1 else "s"], Palette.CREAM)
-		if local_id in bye:
-			_host_say("Round %d! You sit this one out. Enjoy the show." % (round_index + 1), QuizHost.Pose.HAPPY)
-		else:
-			_host_say("Round %d! %d duels at once!" % [round_index + 1, duels.size()], QuizHost.Pose.HAPPY)
+		_host_say("You're up, %s! Facing %s." % [state.player_name(local_id), state.player_name(opp)], QuizHost.Pose.SURPRISED)
+	elif pair.size() == 2:
+		_show_result("%s  vs  %s" % [state.player_name(pair[0]), state.player_name(pair[1])], Palette.CREAM)
+		_host_say("Up next: %s and %s!" % [state.player_name(pair[0]), state.player_name(pair[1])], QuizHost.Pose.HAPPY)
 	if live:
 		Audio.play(&"whoosh", &"UI", -6.0)
 	_refresh_all()
@@ -496,16 +493,30 @@ func _show_reveal(idx: int, results: Variant, live: bool) -> void:
 		if bool(mine.get("auto_a" if me_a else "auto_b", false)):
 			line += "   (* too slow: counted as SPLIT)"
 	else:
-		line = "%d steal%s  ·  %d duel%s both split" % [n_steal, "" if n_steal == 1 else "s", n_split, "" if n_split == 1 else "s"]
-		color = Palette.VIP_GOLD if n_steal > 0 else Palette.MONEY_GREEN
+		var shown_r: Dictionary = res[0]
+		var ca: String = str(shown_r["choice_a"])
+		var cb: String = str(shown_r["choice_b"])
+		var na: String = state.player_name(int(shown_r["a"])).to_upper()
+		var nb: String = state.player_name(int(shown_r["b"])).to_upper()
+		if ca == SPLIT and cb == SPLIT:
+			line = "BOTH SPLIT!  +%d each" % SplitOrStealLogic.POINTS_BOTH_SPLIT
+			color = Palette.MONEY_GREEN
+		elif ca == STEAL and cb == STEAL:
+			line = "BOTH STEAL!  Nobody gets a thing"
+			color = Palette.LOSS_RED
+		else:
+			line = "%s STEALS FROM %s!" % [na if ca == STEAL else nb, nb if ca == STEAL else na]
+			color = Palette.VIP_GOLD
+		if bool(shown_r.get("auto_a", false)) or bool(shown_r.get("auto_b", false)):
+			line += "   (* too slow: counted as SPLIT)"
 	_show_result(line, color)
 	_pop(result_label, 1.0, 0.7)
 	if n_steal == 0:
-		_host_say("Nobody stole! How wholesome.", QuizHost.Pose.HAPPY)
+		_host_say("How wholesome. Trust wins!", QuizHost.Pose.HAPPY)
 	elif n_split == 0 and n_steal >= res.size() * 2:
-		_host_say("Thieves everywhere! Empty pockets all round.", QuizHost.Pose.DISAPPOINTED)
+		_host_say("Two thieves, empty pockets.", QuizHost.Pose.DISAPPOINTED)
 	else:
-		_host_say("%d steal%s this round! Who saw that coming?" % [n_steal, "" if n_steal == 1 else "s"], QuizHost.Pose.SURPRISED)
+		_host_say("Ooh! Nobody saw that coming.", QuizHost.Pose.SURPRISED)
 	if live:
 		Audio.play(&"card_flip", &"UI", -4.0)
 		if my_gain > 0:
@@ -701,7 +712,7 @@ func _refresh_header() -> void:
 	if header_label == null:
 		return
 	if round_index >= 0 and total > 0 and phase != Step.OUTRO:
-		header_label.text = "ROUND %d / %d" % [mini(round_index + 1, total), total]
+		header_label.text = "DUEL %d / %d" % [mini(round_index + 1, total), total]
 	else:
 		header_label.text = "EVERYONE VS EVERYONE" if phase != Step.OUTRO else "THAT'S A WRAP"
 
@@ -739,50 +750,61 @@ func _refresh_buttons() -> void:
 		var n: int = 0
 		for p: int in all:
 			n += int(locked.has(p))
-		text = "You sit this round out" if local_id in bye else "Watching"
-		if phase == Step.DECIDE:
-			text += "  ·  %d / %d decided" % [n, all.size()]
+		if pair.size() == 2:
+			text = "Waiting for %s vs %s" % [state.player_name(pair[0]), state.player_name(pair[1])]
+			if phase == Step.DECIDE:
+				text += "  ·  %d / %d decided" % [n, all.size()]
 	elif phase == Step.ROUND:
 		text = "You face %s  ·  SPLIT or STEAL opens in a moment" % them
 	elif my_choice != "":
-		text = "You locked in %s vs %s. %s" % [my_choice, them, "Waiting for the others..." if locked.has(opp) else "Waiting for %s..." % them]
+		text = "You locked in %s. %s" % [my_choice, "Here comes the reveal!" if locked.has(opp) else "Waiting for %s..." % them]
 	else:
 		text = "vs %s  ·  1 / A = SPLIT  ·  2 / B = STEAL" % them + ("   ·   %s has locked in!" % them if locked.has(opp) else "")
 	status_label.text = text
 	status_panel.visible = text != ""
 
 
-## THIS ROUND: every duel of the round, who decided, then the picks and points.
+## THE DUELS: the last results, the duel on stage (who decided), what's next, and when we're up.
 func _refresh_round() -> void:
 	if round_box == null:
 		return
 	for c: Node in round_box.get_children():
 		round_box.remove_child(c)
 		c.queue_free()
-	if round_index < 0 or phase == Step.OUTRO or duels.is_empty():
+	if round_index < 0 or phase == Step.OUTRO or rounds.is_empty():
 		round_title.text = "EVERYONE VS EVERYONE"
 		var twice: bool = duels_each > players.size() - 1
 		var line: String = "Every pair meets %s." % ("twice" if twice else "once")
 		if total > 0:
-			line = "%d rounds  ·  every pair meets %s." % [total, "twice" if twice else "once"]
+			line = "%d duels, one at a time  ·  every pair meets %s." % [total, "twice" if twice else "once"]
 		if phase == Step.OUTRO:
 			line = "%d duels played." % _duels_played()
-		round_box.add_child(_label(line, 20, MUTED))
+		var l: Label = _label(line, 20, MUTED)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(340, 0)
+		round_box.add_child(l)
 		return
-	round_title.text = "ROUND %d / %d" % [round_index + 1, maxi(total, round_index + 1)]
-	for d: Variant in duels:
+	round_title.text = "DUEL %d / %d" % [round_index + 1, maxi(total, round_index + 1)]
+	var first: int = maxi(0, round_index - 2)
+	var last: int = mini(rounds.size() - 1, round_index + 4)
+	for i: int in range(first, last + 1):
+		var dl: Array = rounds[i]["duels"]
+		if dl.is_empty():
+			continue
+		var d: Dictionary = dl[0]
 		var a: int = int(d["a"])
 		var b: int = int(d["b"])
-		var ours: bool = local_id == a or local_id == b
+		var current: bool = i == round_index
 		var row := PanelContainer.new()
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Palette.WARM_GOLD.darkened(0.55) if ours else Color(0, 0, 0, 0.0)
+		sb.bg_color = Palette.WARM_GOLD.darkened(0.55) if current else Color(0, 0, 0, 0.0)
 		sb.set_corner_radius_all(8)
 		sb.content_margin_left = 8
 		sb.content_margin_right = 8
 		sb.content_margin_top = 3
 		sb.content_margin_bottom = 3
 		row.add_theme_stylebox_override(&"panel", sb)
+		row.modulate = Color(1, 1, 1, 0.6) if i > round_index else Color.WHITE
 		round_box.add_child(row)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override(&"separation", 0)
@@ -790,6 +812,7 @@ func _refresh_round() -> void:
 		var h := HBoxContainer.new()
 		h.add_theme_constant_override(&"separation", 6)
 		v.add_child(h)
+		h.add_child(_label(str(i + 1), 20, Palette.VIP_GOLD if current else MUTED, 30))
 		for pid: int in [a, b]:
 			if pid == b:
 				h.add_child(_label("vs", 18, MUTED))
@@ -798,6 +821,7 @@ func _refresh_round() -> void:
 		var r: Dictionary = d["result"]
 		var sub := HBoxContainer.new()
 		sub.add_theme_constant_override(&"separation", 8)
+		sub.add_child(_label("", 16, MUTED, 30))
 		if r.has("choice_a"):
 			sub.add_child(_tag(str(r["choice_a"]), _choice_color(str(r["choice_a"]))))
 			sub.add_child(_label(_gain_text(r, "a"), 18, Palette.CREAM.darkened(0.1)))
@@ -805,16 +829,26 @@ func _refresh_round() -> void:
 			sub.add_child(_tag(str(r["choice_b"]), _choice_color(str(r["choice_b"]))))
 			sub.add_child(_label(_gain_text(r, "b"), 18, Palette.CREAM.darkened(0.1)))
 			v.add_child(sub)
-		elif phase == Step.DECIDE:
+		elif current and phase == Step.DECIDE:
 			for pid: int in [a, b]:
 				var gone: bool = pid not in state.players
-				sub.add_child(_label("left" if gone else ("decided" if locked.has(pid) else "thinking..."), 16, Palette.VIP_GOLD if locked.has(pid) else MUTED, 150))
+				sub.add_child(_label("left" if gone else ("decided" if locked.has(pid) else "thinking..."), 16, Palette.VIP_GOLD if locked.has(pid) else MUTED, 130))
 			v.add_child(sub)
-	if not bye.is_empty():
-		var names: Array[String] = []
-		for p: int in bye:
-			names.append("You" if p == local_id else _short(state.player_name(p)))
-		round_box.add_child(_label("Sitting out: %s" % ", ".join(names), 18, MUTED))
+	if last < rounds.size() - 1:
+		round_box.add_child(_label("+ %d more" % (rounds.size() - 1 - last), 16, MUTED))
+	var next: int = _next_duel_of(local_id)
+	if next >= 0 and next != round_index:
+		var opp: int = opponent_in(rounds[next]["duels"], local_id)
+		var k: int = next - round_index
+		round_box.add_child(_label("You're up %s: vs %s" % ["next" if k == 1 else "in %d duels" % k, _short(state.player_name(opp))], 18, Palette.VIP_GOLD))
+
+
+## The index of the next duel (from the one on stage on) `pid` plays in, -1 if none is left.
+func _next_duel_of(pid: int) -> int:
+	for i: int in range(maxi(round_index, 0), rounds.size()):
+		if opponent_in(rounds[i]["duels"], pid) != NOBODY:
+			return i
+	return -1
 
 
 func _duels_played() -> int:
@@ -846,16 +880,11 @@ func _refresh_standings() -> void:
 	for pid: int in order:
 		var r: Dictionary = {"player": pid, "score": _pts(pid), "steals": _stl(pid),
 			"detail": "%d steal%s" % [_stl(pid), "" if _stl(pid) == 1 else "s"]}
-		if phase in [Step.ROUND, Step.DECIDE, Step.REVEAL]:
-			if pid in bye:
-				r["tag"] = "SITS OUT"
-				r["tag_color"] = MUTED
-			elif pid in dueling:
-				var opp: int = opponent_in(duels, pid)
-				r["tag"] = "VS %s" % _short(state.player_name(opp)).to_upper()
-				r["tag_color"] = Palette.WARM_GOLD
-				if phase == Step.DECIDE:
-					r["status"] = &"done" if locked.has(pid) else &"waiting"
+		if pid in dueling and phase in [Step.ROUND, Step.DECIDE, Step.REVEAL]:
+			r["tag"] = "ON STAGE"
+			r["tag_color"] = Palette.WARM_GOLD
+			if phase == Step.DECIDE:
+				r["status"] = &"done" if locked.has(pid) else &"waiting"
 		rows.append(r)
 	MinigameScoreboard.rank_rows(rows, "score", "steals")
 	standings.set_rows(rows)
@@ -1310,7 +1339,7 @@ func _build_ui() -> void:
 	legend.add_theme_constant_override(&"outline_size", 6)
 	bottom.add_child(legend)
 
-	# Top left: this round's duels. Top right: standings.
+	# Top left: the duels. Top right: standings.
 	var left := _side_panel(root, "EVERYONE VS EVERYONE", true)
 	round_title = left.get_child(0) as Label
 	round_box = VBoxContainer.new()

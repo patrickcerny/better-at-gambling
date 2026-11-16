@@ -1,23 +1,23 @@
 class_name SplitOrStealLogic
 extends MinigameLogicBase
-## "Split or Steal": a game-show tournament where EVERYONE plays EVERYONE (Patrick 2026-11-16:
-## "needs to be N to N like everyone against everyone"). The show runs in ROUNDS; in every round
-## all duels of that round play AT THE SAME TIME: ROUND (the duels are announced) → DECIDE (each
-## player secretly locks in SPLIT or STEAL against their opponent; voice is global, so bluff, beg,
-## promise) → REVEAL (every duel of the round flips up at once, points paid).
+## "Split or Steal": a game-show tournament where EVERYONE plays EVERYONE, ONE DUEL AT A TIME
+## (Patrick 2026-11-16: "N to N like everyone against everyone", "die Duelle sind nacheinander, es
+## ist ok wenns länger geht"). Every pair meets once; each duel is its own short show while
+## everyone else watches: ROUND (the pair walks up to the podiums) → DECIDE (both secretly lock in
+## SPLIT or STEAL; voice is global, so bluff, beg, promise) → REVEAL (both cards flip, points paid).
+## (`rounds` holds one entry per duel; a "round" here is one duel on stage.)
 ##
 ## Points per duel: both SPLIT = 1 each; STEAL vs SPLIT = 3 for the stealer, 0 for the splitter;
 ## both STEAL = 0 each. Nobody picking in time counts as SPLIT.
 ## Ranking: total points, then fewer steals (the nicest player wins ties).
 ##
-## Schedule (`build_rounds`): a full round robin by the circle method, so every pair meets exactly
-## once per cycle. Even counts play n − 1 rounds with everyone in a duel; odd counts play n rounds
-## and each round one player sits out (everyone exactly once). Small tables repeat the whole cycle
-## until the show has at least `MIN_ROUNDS` rounds (2 players: 4 duels against each other; 3 and 4
-## players: every pairing twice), so no show is over in a minute. 8 players = 7 rounds, 28 duels.
+## Schedule (`build_rounds`): a full round robin (circle method), the duels ordered so nobody plays
+## twice in a row where avoidable. Tiny tables repeat the whole cycle until the show has at least
+## `MIN_ROUNDS` duels (2 players: 4 duels against each other; 3 players: every pair twice).
+## 4 players = 6 duels, 8 players = 28 duels.
 ##
 ## A player who leaves keeps their seat in the schedule: their open duels count as SPLIT for them
-## (like a timeout) and only the opponent scores.
+## (like a timeout) and only the opponent scores; a duel with both players gone is skipped.
 
 enum State { WAITING, INTRO, ROUND, DECIDE, REVEAL, OUTRO, DONE }
 
@@ -32,18 +32,18 @@ const POINTS_BOTH_STEAL: int = 0
 const NOBODY: int = -1
 ## Most players the schedule is built for (the lobby's maximum).
 const MAX_PLAYERS: int = 8
-## Small tables repeat the round robin until the show has at least this many rounds.
+## Tiny tables repeat the round robin until the show has at least this many duels.
 const MIN_ROUNDS: int = 4
-## Most rounds in one show (7 or 8 players: 7 rounds).
-const MAX_ROUNDS: int = 7
+## Most duels in one show (8 players: 28).
+const MAX_ROUNDS: int = MAX_PLAYERS * (MAX_PLAYERS - 1) / 2
 const INTRO_TIME: float = 4.0
 const ROUND_TIME: float = 2.0
 const DECIDE_TIME: float = 12.0
-const REVEAL_TIME: float = 5.0
+const REVEAL_TIME: float = 4.0
 const OUTRO_TIME: float = 4.0
-## Longest one round can take (announce + decide + reveal).
+## Longest one duel can take (announce + decide + reveal).
 const ROUND_CAP: float = ROUND_TIME + DECIDE_TIME + REVEAL_TIME
-## Longest the whole show can take: 4 + 7 × 19 + 4 = 141 s.
+## Longest the whole show can take: 4 + 28 × 18 + 4 = 512 s (both locking in early ends a duel sooner).
 const GAME_CAP: float = INTRO_TIME + MAX_ROUNDS * ROUND_CAP + OUTRO_TIME
 
 var intro_time: float = INTRO_TIME
@@ -86,7 +86,7 @@ func _on_setup(_context: Dictionary) -> void:
 		splits[p] = 0
 	rounds = build_rounds(players, rng)
 	duels_each = duels_per_player(players.size())
-	_game_cap = intro_time + rounds.size() * (round_time + decide_time + reveal_time) + outro_time + 2.0
+	_game_cap = intro_time + rounds.size() * (round_time + decide_time + reveal_time) + outro_time + 2.0 + rounds.size() * 0.5  # ticks overshoot each phase a little
 	# Nothing is announced yet: the stage on the clients is built behind the curtain, after the
 	# `minigame_started` event, and must not miss the first round. The show starts on the first
 	# tick (after the briefing); the snapshot carries the schedule meanwhile.
@@ -96,7 +96,7 @@ func _on_setup(_context: Dictionary) -> void:
 static func cycles_for(n: int) -> int:
 	if n < 2:
 		return 0
-	var per_cycle: int = n if n % 2 == 1 else n - 1
+	var per_cycle: int = n * (n - 1) / 2
 	return ceili(float(MIN_ROUNDS) / float(per_cycle))
 
 
@@ -105,9 +105,9 @@ static func duels_per_player(n: int) -> int:
 	return (n - 1) * cycles_for(n) if n >= 2 else 0
 
 
-## Every pair meets once per cycle (see the class comment); the order of the players (who meets
-## whom when) is shuffled with `p_rng` when given. Repeated cycles swap sides, so the second
-## meeting of a pair isn't a copy of the first.
+## One entry per duel, in show order: {duels: [{a, b, result}], bye: []}. Every pair meets once
+## per cycle; the seating (who meets whom when) is shuffled with `p_rng` when given. Repeated
+## cycles swap sides, so the second meeting of a pair isn't a copy of the first.
 static func build_rounds(p_roster: Array[int], p_rng: SeededRng) -> Array[Dictionary]:
 	var seats: Array = p_roster.duplicate()
 	if seats.size() > MAX_PLAYERS:
@@ -118,39 +118,100 @@ static func build_rounds(p_roster: Array[int], p_rng: SeededRng) -> Array[Dictio
 	var out: Array[Dictionary] = []
 	if n < 2:
 		return out
-	var cycle: Array = _circle_rounds(seats)
+	var pairs: Array = []
 	for c: int in cycles_for(n):
-		for r: Dictionary in cycle:
-			var duels: Array = []
-			for d: Array in r["pairs"]:
-				var a: int = d[0] if c % 2 == 0 else d[1]
-				var b: int = d[1] if c % 2 == 0 else d[0]
-				duels.append({"a": a, "b": b, "result": {}})
-			out.append({"duels": duels, "bye": (r["bye"] as Array).duplicate()})
+		for r: Array in _circle_rounds(seats):
+			for d: Array in r:
+				pairs.append([d[0], d[1]] if c % 2 == 0 else [d[1], d[0]])
+	for d: Array in _spread(pairs):
+		out.append({"duels": [{"a": int(d[0]), "b": int(d[1]), "result": {}}], "bye": []})
 	return out
 
 
-## Round robin by the circle method (a bye seat for odd counts): every round is {pairs: [[a, b]],
-## bye: [the player paired with the bye seat, if any]}.
-static func _circle_rounds(p_roster: Array) -> Array[Dictionary]:
+## Round robin by the circle method (a bye seat for odd counts, its pairs dropped): every round is
+## an Array of [a, b].
+static func _circle_rounds(p_roster: Array) -> Array:
 	var seats: Array = p_roster.duplicate()
 	if seats.size() % 2 == 1:
 		seats.append(NOBODY)
 	var n: int = seats.size()
-	var out: Array[Dictionary] = []
+	var out: Array = []
 	for r: int in n - 1:
 		var pairs: Array = []
-		var bye: Array = []
 		for i: int in n >> 1:
 			var a: int = seats[i]
 			var b: int = seats[n - 1 - i]
-			if a == NOBODY or b == NOBODY:
-				bye.append(b if a == NOBODY else a)
-			else:
+			if a != NOBODY and b != NOBODY:
 				pairs.append([a, b] if r % 2 == 0 or i > 0 else [b, a])  # the fixed seat alternates sides
-		out.append({"pairs": pairs, "bye": bye})
+		out.append(pairs)
 		var last: Variant = seats.pop_back()
 		seats.insert(1, last)
+	return out
+
+
+## Reorders duels so nobody plays twice in a row when that is possible (4+ players), preferring
+## whoever has waited longest so nobody sits idle for ages. A depth-first search with that greedy
+## order finds a clean sequence almost at once; the greedy order alone is the fallback.
+static func _spread(pairs: Array) -> Array:
+	var out: Array = []
+	var budget: Array[int] = [20000]
+	if _spread_dfs(pairs.duplicate(), out, {}, budget):
+		return out
+	return _spread_greedy(pairs)
+
+
+static func _ranked(left: Array, prev: Array, last_played: Dictionary) -> Array:
+	var idx: Array = range(left.size())
+	idx.sort_custom(func(i: int, j: int) -> bool:
+		return _wait_score(left[i], prev, last_played) < _wait_score(left[j], prev, last_played))
+	return idx
+
+
+static func _wait_score(p: Array, prev: Array, last_played: Dictionary) -> int:
+	var clash: bool = p[0] in prev or p[1] in prev
+	return (1 << 20 if clash else 0) + int(last_played.get(p[0], -1)) + int(last_played.get(p[1], -1))
+
+
+static func _spread_dfs(left: Array, out: Array, last_played: Dictionary, budget: Array[int]) -> bool:
+	if left.is_empty():
+		return true
+	budget[0] -= 1
+	if budget[0] < 0:
+		return false
+	var prev: Array = out.back() if not out.is_empty() else []
+	for i: int in _ranked(left, prev, last_played):
+		var p: Array = left[i]
+		if p[0] in prev or p[1] in prev:
+			continue
+		var before: Array = [last_played.get(p[0], null), last_played.get(p[1], null)]
+		last_played[p[0]] = out.size()
+		last_played[p[1]] = out.size()
+		out.append(p)
+		left.remove_at(i)
+		if _spread_dfs(left, out, last_played, budget):
+			return true
+		left.insert(i, p)
+		out.pop_back()
+		for k: int in 2:
+			if before[k] == null:
+				last_played.erase(p[k])
+			else:
+				last_played[p[k]] = before[k]
+	return false
+
+
+static func _spread_greedy(pairs: Array) -> Array:
+	var left: Array = pairs.duplicate()
+	var out: Array = []
+	var last_played: Dictionary = {}
+	while not left.is_empty():
+		var prev: Array = out.back() if not out.is_empty() else []
+		var pick: int = _ranked(left, prev, last_played)[0]
+		var chosen: Array = left[pick]
+		last_played[chosen[0]] = out.size()
+		last_played[chosen[1]] = out.size()
+		out.append(chosen)
+		left.remove_at(pick)
 	return out
 
 
