@@ -2419,6 +2419,7 @@ func _on_pause() -> void:
 			pause_menu.leave_requested.connect(_leave_to_menu)
 			pause_menu.quit_requested.connect(_quit_game)
 			pause_menu.dev_requested.connect(_open_dev_tools)
+			pause_menu.minigame_now_requested.connect(func() -> void: Net.send_intent(Intents.make(&"minigame_now", {})))
 			pause_menu.set_dev_available(dev_tools_available())
 			pause_layer = CanvasLayer.new()
 			pause_layer.name = "PauseLayer"
@@ -2426,6 +2427,8 @@ func _on_pause() -> void:
 			add_child(pause_layer)
 			pause_layer.add_child(pause_menu)
 		router.set_mode(InputRouter.Mode.MENU)
+		var st: ClientMatchState = view.state
+		pause_menu.set_minigame_now_available(st.room_mode and local_id == st.leader and st.phase == Phase.Id.CASINO and not MatchMode.is_minigames_only(st.lobby_settings))
 		pause_menu.open()
 
 
