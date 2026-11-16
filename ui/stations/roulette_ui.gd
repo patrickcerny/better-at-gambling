@@ -96,7 +96,7 @@ func _build() -> void:
 func _on_open() -> void:
 	board.local_id = local_id
 	board.color_of = func(pid: int) -> Color:
-		return Palette.player_color(int(state.players.get(pid, {}).get("color", 0))) if state != null else Palette.CREAM
+		return PlayerColors.of_player(state.players, pid) if state != null else Palette.CREAM
 	var lo: int = scaled(Registry.balance.roulette_min_bet)
 	var hi: int = scaled(Registry.balance.roulette_max_total)
 	bet_panel.setup([lo, lo * 2 + lo / 2, lo * 5, lo * 10], lo, hi, "")

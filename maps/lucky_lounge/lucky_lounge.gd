@@ -118,6 +118,8 @@ const PEDESTALS: Array[Vector3] = [
 const PEDESTAL_GLOW: Color = Color(1.0, 0.8, 0.45)
 const PEDESTAL_LIGHT_ENERGY: float = 6.0
 const PEDESTAL_GLOW_FADE: float = 0.3
+## The inlays of a pedestal nobody has: dark polished marble, no player colour.
+const PEDESTAL_EMPTY: Color = Color("#3A2A22")
 ## A pedestal's name plate when nobody has its colour.
 const PEDESTAL_FREE: String = "FREE"
 ## How high the name plate's centre sits (on its post behind the column): above the name tag of a
@@ -242,6 +244,9 @@ var pedestal_labels: Array[Label3D] = []
 var pedestal_tops: Array[MeshInstance3D] = []
 var pedestal_lights: Array[SpotLight3D] = []
 var pedestal_glows: Array[Node3D] = []
+## Per pedestal: the material of its colour inlays, in its player's colour (`PlayerColors`, their
+## bean or skin colour) or `PEDESTAL_EMPTY` while nobody has it.
+var pedestal_inlays: Array[StandardMaterial3D] = []
 var _pedestal_state: Array = []
 ## 0..1 per pedestal: how far its glow has faded in, and the fade under way.
 var _glow_level: Array[float] = []
@@ -364,18 +369,22 @@ func ready_pad(color_index: int) -> Vector3:
 
 
 ## Writes the player's name on the pedestal's brass plate ("" = nobody has this colour: the plate
-## reads FREE) and fades the glow from above in while they are ready, out when they are not.
-func set_pedestal(color_index: int, player_name: String, ready: bool) -> void:
+## reads FREE), colours its inlays and name in the player's `color` (their bean or skin colour,
+## `PlayerColors`; transparent = the slot colour) and fades the glow from above in while they are
+## ready, out when they are not.
+func set_pedestal(color_index: int, player_name: String, ready: bool, color: Color = Color(0, 0, 0, 0)) -> void:
 	if color_index < 0 or color_index >= pedestal_labels.size():
 		return
-	var state: Array = [player_name, ready]
+	var mark: Color = PEDESTAL_EMPTY if player_name == "" else (color if color.a > 0.0 else Palette.player_color(color_index))
+	var state: Array = [player_name, ready, mark]
 	if _pedestal_state[color_index] == state:
 		return
 	_pedestal_state[color_index] = state
+	pedestal_inlays[color_index].albedo_color = mark
 	var label: Label3D = pedestal_labels[color_index]
 	label.text = player_name.to_upper() if player_name != "" else PEDESTAL_FREE
 	label.font_size = PEDESTAL_NAME_SIZE if label.text.length() <= 8 else maxi(20, PEDESTAL_NAME_SIZE * 8 / label.text.length())  # long names fit the plate
-	label.modulate = Palette.player_color(color_index).lightened(0.35) if player_name != "" else Palette.CREAM.darkened(0.35)
+	label.modulate = mark.lightened(0.35) if player_name != "" else Palette.CREAM.darkened(0.35)
 	var to: float = 1.0 if ready and player_name != "" else 0.0
 	var tw: Tween = _glow_tweens[color_index]
 	if tw != null and tw.is_valid():
@@ -401,9 +410,10 @@ func _set_glow(level: float, i: int) -> void:
 		mat.albedo_color.a = float(mi.get_meta(&"alpha")) * level
 
 
-## Shows (or hides) the arrow that points the local player to their own pedestal, in their colour.
-## Hidden again once they are ready. One marker: it follows whichever colour is passed.
-func set_pedestal_marker(color_index: int, shown: bool) -> void:
+## Shows (or hides) the arrow that points the local player to their own pedestal, in their `color`
+## (transparent = the slot colour). Hidden again once they are ready. One marker: it follows
+## whichever pedestal is passed.
+func set_pedestal_marker(color_index: int, shown: bool, color: Color = Color(0, 0, 0, 0)) -> void:
 	if not shown or color_index < 0 or color_index >= PEDESTALS.size():
 		if pedestal_marker != null:
 			pedestal_marker.visible = false
@@ -431,7 +441,8 @@ func set_pedestal_marker(color_index: int, shown: bool) -> void:
 		shaft.mesh = bar
 		shaft.position.y = 0.55
 		pedestal_marker.add_child(shaft)
-	var color: Color = Palette.player_color(color_index)
+	if color.a <= 0.0:
+		color = Palette.player_color(color_index)
 	var mat := StandardMaterial3D.new()  # own material: the kit caches one per colour
 	mat.albedo_color = color
 	mat.roughness = 0.5
@@ -745,7 +756,11 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	var marble_dark: StandardMaterial3D = GreyboxKit.material(MARBLE_DARK, 0.0, 0.5)
 	var polished: StandardMaterial3D = GreyboxKit.material(MARBLE.lightened(0.06), 0.0, 0.3)
 	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
-	var colour: StandardMaterial3D = GreyboxKit.material(Palette.player_color(i), 0.1, 0.45)
+	var colour := StandardMaterial3D.new()  # own material (the kit caches one per colour): set_pedestal recolours it
+	colour.albedo_color = PEDESTAL_EMPTY
+	colour.metallic = 0.1
+	colour.roughness = 0.45
+	pedestal_inlays.append(colour)
 	var deep: StandardMaterial3D = GreyboxKit.material(MARBLE_DEEP, 0.0, 0.35)
 	var hw: float = DAIS_SIZE.x * 0.5  # body half width
 	var hd: float = DAIS_SIZE.y * 0.5  # body half depth
@@ -806,7 +821,7 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	pedestal_labels.append(_build_name_plate(root, i))
 	pedestal_tops.append(top_mesh)
 	_build_glow(root)
-	_pedestal_state.append(["", false])
+	_pedestal_state.append(["", false, PEDESTAL_EMPTY])
 	_glow_level.append(0.0)
 	_glow_tweens.append(null)
 	_set_glow(0.0, i)

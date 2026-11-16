@@ -801,7 +801,7 @@ static func _int_keys(d: Variant) -> Dictionary:
 func _player_color(pid: int) -> Color:
 	if pid == NOBODY:
 		return Palette.WARM_CHARCOAL
-	return Palette.player_color(int(state.players.get(pid, {}).get("color", pid - 1)))
+	return PlayerColors.of_player(state.players, pid)
 
 
 # --- Building: the set ------------------------------------------------------------------------

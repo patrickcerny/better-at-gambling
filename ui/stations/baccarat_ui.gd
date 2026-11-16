@@ -204,7 +204,7 @@ func _show_chips() -> void:
 		dots.visible = others.has(t)
 		if dots.visible:
 			dots.text = "●".repeat(mini((others[t] as Array).size(), 4))
-			dots.add_theme_color_override(&"font_color", Palette.player_color(int(state.players.get(int(others[t][0]), {}).get("color", 0))) if state != null else Palette.CREAM)
+			dots.add_theme_color_override(&"font_color", PlayerColors.of_player(state.players, int(others[t][0])) if state != null else Palette.CREAM)
 	if total > 0:
 		my_bets.text = "YOUR BETS %s  ·  %s" % [money(total), "  ·  ".join(parts)]
 	elif int(pub.get("state", 0)) == BaccaratLogic.State.BETTING:

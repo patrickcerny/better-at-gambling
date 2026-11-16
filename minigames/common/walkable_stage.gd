@@ -243,10 +243,12 @@ func _is_dedicated() -> bool:
 
 
 func player_color(pid: int) -> Color:
+	if state != null and state.players.has(pid):
+		return PlayerColors.of_player(state.players, pid)
 	var a: PlayerAvatar = avatar(pid)
 	if a != null:
 		return a.color
-	return Palette.player_color(int(state.players.get(pid, {}).get("color", pid)) if state != null else pid)
+	return Palette.player_color(pid)
 
 
 func player_name(pid: int) -> String:

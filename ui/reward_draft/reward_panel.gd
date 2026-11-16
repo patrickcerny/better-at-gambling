@@ -289,7 +289,7 @@ func _build_row(row: Dictionary, compact: bool = false) -> Dictionary:
 	pframe.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var psb := StyleBoxFlat.new()
 	psb.bg_color = Color("#3A2A22")
-	psb.border_color = Palette.player_color(int(p.get("color", 0)))
+	psb.border_color = PlayerColors.of_player(state.players, pid) if state != null else Palette.player_color(bean)
 	psb.set_border_width_all(3)
 	psb.set_corner_radius_all(12)
 	psb.anti_aliasing = true

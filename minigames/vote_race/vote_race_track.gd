@@ -334,6 +334,7 @@ func _make_bean(p: int, d: Dictionary) -> void:
 	root.name = "Racer%d" % p
 	add_child(root)
 	var color: Color = d.get("bean", d.get("color", Palette.CREAM))
+	var mark: Color = d.get("color", color)  # the player's colour (`PlayerColors`): tag and vote trails
 	var bean := AvatarVisuals.new()
 	bean.scale = Vector3.ONE * BEAN_SCALE
 	bean.rotation.y = PI + 0.55  # face the audience, turned towards the cashier
@@ -372,13 +373,13 @@ func _make_bean(p: int, d: Dictionary) -> void:
 	tag.pixel_size = 0.0055
 	tag.outline_size = 10
 	tag.outline_modulate = Palette.CASINO_BLACK
-	tag.modulate = Palette.VIP_GOLD if p == local_id else color.lightened(0.25)
+	tag.modulate = Palette.VIP_GOLD if p == local_id else mark.lightened(0.25)
 	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	tag.no_depth_test = true
 	tag.render_priority = 2
 	tag.position = Vector3(0, 1.38, 0)
 	root.add_child(tag)
-	beans[p] = {"root": root, "bean": bean, "puppet": puppet, "tag": tag, "step": -1, "lane": -1, "color": color}
+	beans[p] = {"root": root, "bean": bean, "puppet": puppet, "tag": tag, "step": -1, "lane": -1, "color": mark}
 
 
 # --- The set -----------------------------------------------------------------------------------

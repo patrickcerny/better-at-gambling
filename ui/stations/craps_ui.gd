@@ -203,7 +203,7 @@ func _refresh() -> void:
 		_dots[t].visible = others.has(t)
 		if others.has(t):
 			_dots[t].text = "●".repeat(mini((others[t] as Array).size(), 5))
-			_dots[t].add_theme_color_override(&"font_color", Palette.player_color(int(state.players.get(int(others[t][0]), {}).get("color", 0))) if state != null else Palette.CREAM)
+			_dots[t].add_theme_color_override(&"font_color", PlayerColors.of_player(state.players, int(others[t][0])) if state != null else Palette.CREAM)
 	var parts: PackedStringArray = []
 	var total: int = 0
 	for t: StringName in CrapsLogic.BET_TYPES:

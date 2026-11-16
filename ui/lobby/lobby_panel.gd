@@ -469,7 +469,7 @@ func _refresh() -> void:
 		kick.text = "SURE?" if _kick_armed == pid and _now() < _kick_armed_until else "KICK"
 		kick.tooltip_text = "Kick %s from the lobby (they can join again)" % str(p.get("name", "?"))
 		var bean: int = int(p.get("bean_color", p.get("color", 0)))
-		_tint_row(r, Palette.player_color(bean))
+		_tint_row(r, PlayerColors.of_player(state.players, pid))
 		portrait.texture = BeanPortraits.texture_for(bean, p.get("outfit", []))
 		var label: Label = r["name"]
 		label.text = str(p.get("name", "?"))

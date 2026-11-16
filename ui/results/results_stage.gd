@@ -209,7 +209,7 @@ func _rank_of(pid: int) -> int:
 
 
 func _color_of(pid: int) -> Color:
-	return Palette.player_color(int(state.players.get(pid, {}).get("color", pid - 1)))
+	return PlayerColors.of_player(state.players, pid)
 
 
 func _build_set() -> void:

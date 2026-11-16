@@ -144,7 +144,7 @@ func _refresh() -> void:
 		_dots[i].visible = others.has(i)
 		if others.has(i):
 			_dots[i].text = "●".repeat(mini((others[i] as Array).size(), 5))
-			_dots[i].add_theme_color_override(&"font_color", Palette.player_color(int(state.players.get(int(others[i][0]), {}).get("color", 0))) if state != null else Palette.CREAM)
+			_dots[i].add_theme_color_override(&"font_color", PlayerColors.of_player(state.players, int(others[i][0])) if state != null else Palette.CREAM)
 	if backed >= 0:
 		var horse_name: String = String(names[backed]) if backed < names.size() else ""
 		my_bets.text = "YOUR BET $%d on %d %s" % [int(mine[backed]), backed + 1, horse_name]

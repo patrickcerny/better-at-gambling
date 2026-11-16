@@ -885,16 +885,18 @@ func _refresh_pedestals() -> void:
 	if map == null or view == null:
 		return
 	var by_color: Dictionary = {}
+	var marks: Dictionary = PlayerColors.of_all(view.state.players)  # their bean or skin colour
 	for pid: Variant in view.state.players:
 		var p: Dictionary = view.state.players[pid]
 		if bool(p.get("connected", true)):
-			by_color[int(p.get("color", -1))] = p
+			by_color[int(p.get("color", -1))] = pid
 	for i: int in LuckyLounge.PEDESTALS.size():
-		var p: Dictionary = by_color.get(i, {})
-		map.set_pedestal(i, str(p.get("name", "")), bool(p.get("ready", false)))
+		var pid: Variant = by_color.get(i, null)
+		var p: Dictionary = view.state.players.get(pid, {}) if pid != null else {}
+		map.set_pedestal(i, str(p.get("name", "")), bool(p.get("ready", false)), marks.get(pid, Color(0, 0, 0, 0)))
 	# Arrow over the local player's own pedestal until they are ready.
 	var mine: Dictionary = view.state.players.get(local_id, {})
-	map.set_pedestal_marker(int(mine.get("color", -1)), not mine.is_empty() and not bool(mine.get("ready", false)))
+	map.set_pedestal_marker(int(mine.get("color", -1)), not mine.is_empty() and not bool(mine.get("ready", false)), marks.get(local_id, Color(0, 0, 0, 0)))
 	_refresh_settings_board()
 
 

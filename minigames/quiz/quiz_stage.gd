@@ -503,7 +503,7 @@ func _float_mark(mark: Label3D) -> void:
 
 
 func _player_color(pid: int) -> Color:
-	return Palette.player_color(int(state.players.get(pid, {}).get("color", pid - 1)))
+	return PlayerColors.of_player(state.players, pid)
 
 
 func _dot(c: Color, px: int) -> ColorRect:

@@ -765,7 +765,7 @@ func _lobby_head(b: Dictionary) -> Control:
 	ring.name = "Ring"
 	ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ring_color: Color = Palette.VIP_GOLD if leader else Palette.player_color(int(b.get("color", 0)))
+	var ring_color: Color = Palette.VIP_GOLD if leader else PlayerColors.own({"bean_color": int(b.get("color", 0)), "outfit": b.get("outfit", [])})
 	ring.add_theme_stylebox_override(&"panel", LobbyPanel.box(Color(0, 0, 0, 0), ring_color, int(HEAD_SIZE / 2.0), 3 if leader else 2))
 	medal.add_child(ring)
 	return medal

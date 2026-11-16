@@ -377,8 +377,7 @@ func _name(pid: int) -> String:
 
 
 func _player_color(pid: int) -> Color:
-	var info: Dictionary = state.players.get(pid, {}) if state != null else {}
-	return Palette.player_color(int(info.get("color", pid - 1)))
+	return PlayerColors.of_player(state.players, pid) if state != null else Palette.player_color(pid - 1)
 
 
 ## Readable on-screen colour for a wheel colour (black needs to show on a dark UI).

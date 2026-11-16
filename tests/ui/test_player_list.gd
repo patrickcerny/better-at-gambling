@@ -98,7 +98,7 @@ func test_match_rows_sorted_by_money_with_standings_and_crown() -> void:
 
 func test_rows_show_a_bean_portrait_in_its_colour_and_host() -> void:
 	list.show_list(true)
-	assert_eq((list.rows[1]["bar"] as ColorRect).color, Palette.player_color(1), "colour bar: the slot colour")
+	assert_eq((list.rows[1]["bar"] as ColorRect).color, Palette.player_color(9), "colour bar: the bean colour, not the slot colour")
 	assert_string_contains((list.rows[1]["info"] as Label).text, Palette.PLAYER_COLOR_NAMES[9], "the bean's colour by name")
 	assert_string_contains((list.rows[2]["info"] as Label).text, Palette.PLAYER_COLOR_NAMES[2])
 	assert_false((list.rows[1]["info"] as Label).text.contains("King"), "no skin names")

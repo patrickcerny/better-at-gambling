@@ -630,8 +630,7 @@ func _verb(pid: int, verb: String) -> String:
 
 
 func _player_color(pid: int) -> Color:
-	var idx: int = int(state.players.get(pid, {}).get("color", pid - 1)) if state != null else pid - 1
-	return Palette.player_color(idx)
+	return PlayerColors.of_player(state.players, pid) if state != null else Palette.player_color(pid - 1)
 
 
 func _card_text(card: int) -> String:

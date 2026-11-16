@@ -124,7 +124,7 @@ func refresh() -> void:
 		var r: Dictionary = rows[pid]
 		rows_box.move_child(r["frame"] as Node, i)
 		var p: Dictionary = state.players.get(pid, {})
-		var col: Color = Palette.player_color(int(p.get("color", 0)))
+		var col: Color = PlayerColors.of_player(state.players, pid)
 		var bean: Color = Palette.bean_color(p)
 		var mine: bool = pid == local_id
 		(r["frame"] as PanelContainer).add_theme_stylebox_override(&"panel", _row_style(mine))

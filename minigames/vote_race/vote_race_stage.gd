@@ -215,10 +215,9 @@ func _name(p: int) -> String:
 
 
 func _color(p: int) -> Color:
-	var idx: int = p
 	if state != null and state.players.has(p):
-		idx = int(state.players[p].get("color", p))
-	return Palette.player_color(idx)
+		return PlayerColors.of_player(state.players, p)
+	return Palette.player_color(p)
 
 
 func _rebuild_cards() -> void:

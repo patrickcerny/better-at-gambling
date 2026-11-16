@@ -321,8 +321,7 @@ func _name(pid: int) -> String:
 
 
 func _player_color(pid: int) -> Color:
-	var info: Dictionary = state.players.get(pid, {}) if state != null else {}
-	return Palette.player_color(int(info.get("color", pid - 1)))
+	return PlayerColors.of_player(state.players, pid) if state != null else Palette.player_color(pid - 1)
 
 
 func _label(text: String, size: int, color: Color) -> Label:

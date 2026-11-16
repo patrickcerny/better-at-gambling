@@ -175,7 +175,7 @@ func _info(pid: int) -> Dictionary:
 	var color_idx: int = int(p.get("color", pid - 1))
 	return {
 		"name": state.player_name(pid) if state != null else "Player %d" % pid,
-		"color": Palette.player_color(color_idx),
+		"color": PlayerColors.of_player(state.players, pid) if state != null else Palette.player_color(color_idx),
 		"bean": int(p.get("bean_color", color_idx)),
 		"outfit": p.get("outfit", []),
 	}

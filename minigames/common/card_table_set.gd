@@ -122,10 +122,9 @@ func head_point(pid: int) -> Vector3:
 
 
 func _color(pid: int) -> Color:
-	var idx: int = pid
 	if state != null and state.players.has(pid):
-		idx = int(state.players[pid].get("color", pid))
-	return Palette.player_color(idx)
+		return PlayerColors.of_player(state.players, pid)
+	return Palette.player_color(pid)
 
 
 ## A player's chips: their bean colour and animated skin (like their chips on the casino tables).

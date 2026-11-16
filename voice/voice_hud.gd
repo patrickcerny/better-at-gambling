@@ -76,8 +76,7 @@ func _process(delta: float) -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override(&"separation", 8)
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var info: Dictionary = channel.state.players.get(pid, {}) if channel.state != null else {}
-		var col: Color = Palette.player_color(int(info.get("color", pid - 1)))
+		var col: Color = PlayerColors.of_player(channel.state.players, pid) if channel.state != null else Palette.player_color(pid - 1)
 		_icon(row, VoiceIcons.speaker(col, false, 40))
 		_label(row, channel.state.player_name(pid) if channel.state != null else "Player %d" % pid, col)
 		_talkers.add_child(row)
