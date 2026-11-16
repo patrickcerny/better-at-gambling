@@ -226,6 +226,16 @@ func test_browse_cards_show_settings_and_beans() -> void:
 	assert_eq(beans.get_child_count(), 2, "one bean per player")
 
 
+func test_browse_shows_other_versions_without_join() -> void:
+	menu.call(&"_fill_browse", [SteamSvc.public_lobby_entry(8, "Old lobby", 2, 8, {}, "0.0.1"), SteamSvc.public_lobby_entry(9, "Ours", 1, 8)] as Array[Dictionary])
+	var list: Node = menu.find_child("LobbyList", true, false)
+	assert_eq(list.get_child(0).name, &"Lobby9", "joinable lobbies first")
+	assert_true(Array(_label_texts(list)).any(func(t: String) -> bool: return t.begins_with("Version 0.0.1")), "the other version is named")
+	var old: Node = list.find_child("Lobby8", true, false)
+	var join: Button = old.find_children("*", "Button", true, false)[0] as Button
+	assert_true(join.disabled, "another version can't be joined")
+
+
 func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	ProfileManager.profile.daily_last = 0
 	menu._refresh_daily()
