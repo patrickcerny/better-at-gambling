@@ -55,7 +55,7 @@ var _kick_armed: int = -1
 var _kick_armed_until: float = 0.0
 var _length_note: Label
 ## The 8 slot rows, built once and updated in place (rebuilding them made the panel jump on
-## every snapshot, so clicks missed). Each: {frame, swatch, portrait, name, tag, pill, ready, kick, empty}.
+## every snapshot, so clicks missed). Each: {frame, swatch, medal, ring, portrait, name, tag, pill, ready, kick, empty}.
 var _rows: Array[Dictionary] = []
 ## Frame the panel was opened on: the Tab press that opened it must not close it again.
 var _opened_frame: int = -1
@@ -298,16 +298,38 @@ func _make_row() -> Dictionary:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override(&"separation", 10)
 	framed.add_child(row)
-	var sw := ColorRect.new()
-	sw.custom_minimum_size = Vector2(5, 0)
+	# Colour accent and portrait sit inside the card (0.9.65): the old square bar and the
+	# portrait used to poke out past the card's rounded left edge.
+	var sw := Panel.new()
+	sw.name = "Accent"
+	sw.custom_minimum_size = Vector2(5, ROW_HEIGHT - 22.0)
+	sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sw.add_theme_stylebox_override(&"panel", box(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 3))
 	row.add_child(sw)
+	# Round medallion: the bean picture is clipped to it, ringed in the player's colour.
+	var medal := Panel.new()
+	medal.name = "Medallion"
+	var d: float = ROW_HEIGHT - 12.0
+	medal.custom_minimum_size = Vector2(d, d)
+	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	medal.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	medal.add_theme_stylebox_override(&"panel", box(Color("#3A302A"), Color(0, 0, 0, 0), int(d / 2.0)))
+	row.add_child(medal)
 	var portrait := TextureRect.new()
 	portrait.name = "Portrait"
-	portrait.custom_minimum_size = Vector2(40, 50)
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	portrait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(portrait)
+	portrait.set_anchors_preset(Control.PRESET_FULL_RECT)
+	portrait.offset_top = 1.0
+	portrait.offset_bottom = 1.0
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	medal.add_child(portrait)
+	var ring := Panel.new()  # drawn over the clipped picture so the ring stays crisp
+	ring.name = "Ring"
+	ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.add_theme_stylebox_override(&"panel", box(Color(0, 0, 0, 0), Color(0, 0, 0, 0), int(d / 2.0), 2))
+	medal.add_child(ring)
 	var empty := Label.new()
 	empty.text = "Open slot"
 	empty.theme_type_variation = &"MutedLabel"
@@ -352,7 +374,7 @@ func _make_row() -> Dictionary:
 	var pad := Control.new()
 	pad.custom_minimum_size = Vector2(4, 0)
 	row.add_child(pad)
-	return {"frame": framed, "swatch": sw, "portrait": portrait, "name": label, "tag": tag, "pill": pill, "ready": ready, "kick": kick, "kick_gap": kick_gap, "empty": empty}
+	return {"frame": framed, "swatch": sw, "medal": medal, "ring": ring, "portrait": portrait, "name": label, "tag": tag, "pill": pill, "ready": ready, "kick": kick, "kick_gap": kick_gap, "empty": empty}
 
 
 func _heading(text: String) -> Label:
@@ -382,8 +404,15 @@ func _row_box(taken: bool, mine: bool) -> StyleBoxFlat:
 		sb = box(Color("#2B2522"), Color("#3A322C"), 10, 1)
 	else:
 		sb = box(Color("#1E1B19"), Color("#2C2622"), 10, 1)
+	sb.content_margin_left = 8
 	sb.content_margin_right = 6
 	return sb
+
+
+## The accent pill and the portrait ring in the player's colour (clear for an open slot).
+func _tint_row(r: Dictionary, c: Color) -> void:
+	((r["swatch"] as Panel).get_theme_stylebox(&"panel") as StyleBoxFlat).bg_color = c
+	((r["ring"] as Panel).get_theme_stylebox(&"panel") as StyleBoxFlat).border_color = c
 
 
 func _pill_box(on: bool) -> StyleBoxFlat:
@@ -424,9 +453,9 @@ func _refresh() -> void:
 		(r["empty"] as Label).visible = not taken
 		for k: String in ["name", "tag", "pill"]:
 			(r[k] as Control).visible = taken
-		(r["swatch"] as ColorRect).color = Color(0, 0, 0, 0)
+		_tint_row(r, Color(0, 0, 0, 0))
 		var portrait: TextureRect = r["portrait"]
-		portrait.visible = taken
+		(r["medal"] as Control).visible = taken
 		var kick: Button = r["kick"]
 		kick.visible = taken and local_id == state.leader and ids[i] != local_id
 		(r["kick_gap"] as Control).visible = taken and not kick.visible and local_id == state.leader
@@ -440,7 +469,7 @@ func _refresh() -> void:
 		kick.text = "SURE?" if _kick_armed == pid and _now() < _kick_armed_until else "KICK"
 		kick.tooltip_text = "Kick %s from the lobby (they can join again)" % str(p.get("name", "?"))
 		var bean: int = int(p.get("bean_color", p.get("color", 0)))
-		(r["swatch"] as ColorRect).color = Palette.player_color(bean)
+		_tint_row(r, Palette.player_color(bean))
 		portrait.texture = BeanPortraits.texture_for(bean, p.get("outfit", []))
 		var label: Label = r["name"]
 		label.text = str(p.get("name", "?"))
