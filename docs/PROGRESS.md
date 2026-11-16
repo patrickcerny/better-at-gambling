@@ -93,6 +93,23 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.58 Daily Spin
+- Patrick: "Daily spin button auf der Startseite wo du Sachen gewinnen kannst (auch die gezahlte
+  Währung und sehr unwahrscheinlich ein krasser animierter Skin). Mach da ein cooles Wheel."
+  DAILY SPIN under SHOP (gold star when free, else the countdown) opens `DailySpinPanel`: a prize
+  wheel drawn in code (`DailyWheelView`: burgundy/cream/felt slices, gold pegs, a ticking pointer,
+  chasing marquee bulbs, confetti and coins on a win), the jackpot on a turning bean, the odds.
+  Prizes (`DailyWheel`): 100-2,500 red Coins, a mystery piece, 5-50 Gold, and at 0.3 % the new
+  Fortune skin (`skin_fortune`, bean_skin mode 9: a prize wheel spinning on the belly with chasing
+  bulbs, gold coins drifting up; `CosmeticDef.wheel_only`, Steam item 208).
+- Security: with Steam the spin is `triggerItemDrop` on playtime generator 3200 (one drop per 20 h
+  per account, weights in its bundle); prizes are tokens the game redeems (consume for Coins and
+  pieces, exchange for Gold bundles 3311-3314). Timer on Steam server time. Without Steam or before
+  the itemdefs are uploaded: a local spin, Coins and pieces only. docs/STEAM_INVENTORY.md "Daily Spin".
+  itemdefs.json regenerated (162), NOT uploaded (needs Patrick's go). Dev panel: DAILY SPIN AGAIN.
+- Tests: new `test_daily_wheel.gd`; `test_steam_store`, `test_outfits`, `test_player_profile`,
+  `test_bean_colors`, `test_cosmetics_shop`, `test_main_menu`, `test_confirm_and_dev_ui`,
+  `test_dev_mode` green.
 ### 2026-11-16 / 0.9.57 ready pedestals reworked
 - Patrick: "das klipped und passt nicht. reworke die podeste komplett". The column pedestals with
   their side rails clipped (rails through the steps, the abacus over the stair, the colour ring
