@@ -70,6 +70,7 @@ func _ready() -> void:
 	wheel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	wheel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	wheel.landed.connect(_on_landed)
+	wheel.clicked.connect(spin)
 	body.add_child(wheel)
 	body.add_child(_build_side())
 
@@ -368,6 +369,7 @@ func _show_prize() -> void:
 
 func _refresh() -> void:
 	var w: int = wait_s()
+	wheel.clickable = not wheel.busy() and w <= 0
 	if wheel.busy():
 		spin_button.disabled = true
 		spin_button.text = "SPINNING…"
