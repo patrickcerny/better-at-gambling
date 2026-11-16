@@ -19,6 +19,7 @@ func after_each() -> void:
 	DevMode.forced_cosmetics = -1
 	DevMode.used = false
 	ProfileManager.set_dev_unlock_all(false)
+	ProfileManager.set_dev_as_player(false)
 	ProfileManager.profile = _old_profile
 
 
@@ -156,3 +157,44 @@ func test_forced_minigame_needs_enough_players() -> void:
 	assert_eq(dir.forced_next, &"", "used up either way")
 	dir.forced_next = &"vote_race"
 	assert_eq(dir.pick(SeededRng.new(1), 6).id, &"vote_race")
+
+
+## Patrick 2026-11-16: "The dev mode should also be able to remove skins etc ... and level and stuff".
+func test_remove_pieces_set_values_and_play_as_player() -> void:
+	DevMode.forced_cosmetics = -1
+	var p: PlayerProfile = ProfileManager.profile
+	var paid: CosmeticDef = null
+	for d: CosmeticDef in p.shop.items:
+		if d.coin_buyable() and not d.is_free() and d.level <= 0:
+			paid = d
+			break
+	assert_not_null(paid)
+	if paid == null:
+		return
+	p.owned.append(paid.id)
+	assert_eq(DevMode.removable(), [paid.id] as Array[StringName])
+	DevMode.remove_cosmetic(paid.id)
+	assert_false(p.owns(paid.id), "removed")
+	assert_true(DevMode.removable().is_empty())
+	p.owned.append(paid.id)
+	p.achieved.append(&"x")
+	DevMode.remove_all_cosmetics()
+	assert_true(p.owned.is_empty())
+	DevMode.clear_achievements()
+	assert_true(p.achieved.is_empty())
+	DevMode.set_level(7)
+	assert_eq(p.level, 7)
+	DevMode.set_coins(1234)
+	assert_eq(p.coins, 1234)
+	DevMode.reset_profile()
+	assert_eq(ProfileManager.profile.level, 1)
+	assert_eq(ProfileManager.profile.coins, 0)
+	ProfileManager.set_steam_owned([paid.id] as Array[StringName])
+	assert_true(ProfileManager.profile.owns(paid.id), "Steam inventory counts")
+	DevMode.set_as_player(true)
+	assert_true(DevMode.as_player())
+	assert_false(ProfileManager.profile.owns(paid.id), "as a normal player the Steam inventory is hidden")
+	assert_false(DevMode.all_cosmetics())
+	DevMode.set_as_player(false)
+	assert_true(ProfileManager.profile.owns(paid.id))
+	ProfileManager.set_steam_owned([] as Array[StringName])
