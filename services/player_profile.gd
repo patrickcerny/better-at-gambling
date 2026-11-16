@@ -11,6 +11,14 @@ const SECTION: String = "profile"
 const MAX_COINS: int = 9_999_999
 ## How many applied match ids are remembered (`apply_match` adds a match's row once).
 const MAX_APPLIED: int = 32
+## The lifetime statistics `lifetime` keeps (saved under [lifetime]).
+const LIFETIME_KEYS: Array[StringName] = [&"podiums", &"online_matches", &"best_money", &"online_winnings",
+	&"winnings", &"losses", &"hands", &"minigames_won", &"jackpot_won", &"knockouts_dealt",
+	&"knockouts_suffered", &"biggest_bet", &"quiz_points", &"thrown_out"]
+## A lifetime number never passes this (a hand-edited file can't overflow anything).
+const MAX_STAT: int = 2_000_000_000
+## One match can add at most this much to a lifetime number (a sane match is far below).
+const MAX_STAT_PER_MATCH: int = 1_000_000
 
 var xp: int = 0
 var level: int = 1
@@ -32,6 +40,10 @@ var wins: int = 0
 var online_wins: int = 0
 ## Biggest single win at a table ($, in any match).
 var biggest_win: int = 0
+## Lifetime statistics across every match (the MY STATS page, `LeaderboardPanel`): `LIFETIME_KEYS`
+## -> number. Practice counts too, except the `online_` / `best_money` ones (ranked online matches
+## only, the global leaderboards' totals: `LeaderboardRules`).
+var lifetime: Dictionary[StringName, int] = {}
 ## Match ids already applied (newest last).
 var applied: Array[String] = []
 ## The last Daily Spin (unix seconds, Steam's clock when Steam runs; 0 = never), `DailyWheel`.
@@ -197,11 +209,51 @@ func apply_match(match_id: String, row: Dictionary) -> Dictionary:
 		if Achievements.counts_as_online_win(row):
 			online_wins += 1
 	biggest_win = maxi(biggest_win, int(row.get("biggest_win", 0)))
+	_add_lifetime(row)
 	if match_id != "":
 		applied.append(match_id)
 		if applied.size() > MAX_APPLIED:
 			applied = applied.slice(applied.size() - MAX_APPLIED)
 	return {"xp": gained, "coins": match_coins + bonus, "level_bonus": bonus, "level_from": from_level, "level_to": level, "xp_from": from_xp}
+
+
+## Adds one match's row to `lifetime` (each number capped per match).
+func _add_lifetime(row: Dictionary) -> void:
+	var raw: Variant = row.get("stats", {})
+	var st: Dictionary = raw if raw is Dictionary else {}
+	var profit: int = clampi(int(st.get("profit", 0)), -MAX_STAT_PER_MATCH, MAX_STAT_PER_MATCH)
+	if int(row.get("rank", 0)) in [1, 2, 3] and int(row.get("players", 1)) >= 2:
+		_bump(&"podiums", 1)
+	if profit > 0:
+		_bump(&"winnings", profit)
+	elif profit < 0:
+		_bump(&"losses", -profit)
+	_bump(&"hands", _per(st, "hands"))
+	_bump(&"minigames_won", clampi(int(row.get("minigames_won", 0)), 0, MAX_STAT_PER_MATCH))
+	_bump(&"jackpot_won", _per(st, "jackpot_won"))
+	_bump(&"knockouts_dealt", _per(st, "knockouts_dealt"))
+	_bump(&"knockouts_suffered", _per(st, "knockouts_suffered"))
+	_bump(&"quiz_points", _per(st, "quiz_points"))
+	_bump(&"thrown_out", _per(st, "thrown_out"))
+	lifetime[&"biggest_bet"] = maxi(int(lifetime.get(&"biggest_bet", 0)), _per(st, "biggest_bet"))
+	if bool(row.get("ranked", false)) and LeaderboardRules.plausible(row):
+		_bump(&"online_matches", 1)
+		lifetime[&"best_money"] = maxi(int(lifetime.get(&"best_money", 0)), int(row.get("money", 0)))
+		if profit > 0:
+			_bump(&"online_winnings", profit)
+
+
+static func _per(st: Dictionary, key: String) -> int:
+	return clampi(_int(st.get(key, 0)), 0, MAX_STAT_PER_MATCH)
+
+
+func _bump(key: StringName, amount: int) -> void:
+	lifetime[key] = clampi(int(lifetime.get(key, 0)) + maxi(amount, 0), 0, MAX_STAT)
+
+
+## A lifetime statistic (0 when never counted).
+func stat(key: StringName) -> int:
+	return int(lifetime.get(key, 0))
 
 
 # --- Storage ------------------------------------------------------------------------------------
@@ -222,6 +274,8 @@ func to_config(cfg: ConfigFile) -> void:
 	cfg.set_value("stats", "online_wins", online_wins)
 	cfg.set_value("stats", "biggest_win", biggest_win)
 	cfg.set_value("stats", "applied", PackedStringArray(applied))
+	for key: StringName in LIFETIME_KEYS:
+		cfg.set_value("lifetime", String(key), int(lifetime.get(key, 0)))
 	cfg.set_value("daily", "last_spin", daily_last)
 
 
@@ -245,6 +299,9 @@ func from_config(cfg: ConfigFile) -> void:
 	online_wins = _int(cfg.get_value("stats", "online_wins", 0))
 	biggest_win = _int(cfg.get_value("stats", "biggest_win", 0))
 	daily_last = _int(cfg.get_value("daily", "last_spin", 0))
+	lifetime.clear()
+	for key: StringName in LIFETIME_KEYS:
+		lifetime[key] = _int(cfg.get_value("lifetime", String(key), 0))
 	applied.clear()
 	var ap: Variant = cfg.get_value("stats", "applied", PackedStringArray())
 	if ap is PackedStringArray or ap is Array:
@@ -280,6 +337,10 @@ func sanitize() -> void:
 	online_wins = clampi(online_wins, 0, wins)
 	biggest_win = maxi(biggest_win, 0)
 	daily_last = maxi(daily_last, 0)
+	var life: Dictionary[StringName, int] = {}
+	for key: StringName in LIFETIME_KEYS:
+		life[key] = clampi(int(lifetime.get(key, 0)), 0, MAX_STAT)
+	lifetime = life
 	if applied.size() > MAX_APPLIED:
 		applied = applied.slice(applied.size() - MAX_APPLIED)
 

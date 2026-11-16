@@ -63,6 +63,8 @@ var pending_lobby: int = 0
 var last_error: String = ""
 
 var _available: bool = false
+## The global leaderboards (`SteamLeaderboards`; a no-op without Steam).
+var boards: SteamLeaderboards = SteamLeaderboards.new()
 var _steam_id: int = 0
 var _persona: String = ""
 ## Achievements already handed to Steam this run (asked once each).
@@ -121,6 +123,7 @@ func _ready() -> void:
 	steam.connect(&"lobby_match_list", _on_lobby_match_list)
 	steam.connect(&"user_stats_received", _on_user_stats_received)
 	Log.info(&"steam", "Steam on: %s (app %d)" % [_persona, APP_ID])
+	boards = SteamLeaderboards.new(steam)
 	_start_store()
 	# Lifetime achievements follow the profile (level-ups, matches, the shop) and catch up on start.
 	ProfileManager.changed.connect(_on_profile_changed)
@@ -179,6 +182,15 @@ func check_beat_the_dev(beaten: Array[int]) -> void:
 		if sid != _steam_id and not sid in _beat_pending:
 			_beat_pending.append(sid)
 			steam.call("requestUserStats", sid)
+
+
+## After a match: the local player's ranked row (`MatchServer.progress_rows`, already added to the
+## profile) goes on the global leaderboards (`LeaderboardRules.scores_for`). Nothing when developer
+## mode was used this run or the host didn't rank the match.
+func submit_match(row: Dictionary) -> void:
+	if not _available or DevMode.used:
+		return
+	boards.submit(LeaderboardRules.scores_for(row, ProfileManager.profile))
 
 
 func _on_user_stats_received(_game_id: int = 0, result: int = 0, user_id: int = 0) -> void:

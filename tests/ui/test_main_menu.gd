@@ -240,3 +240,23 @@ func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	menu._refresh_daily()
 	assert_string_starts_with(menu.daily_entry.text, "DAILY SPIN  ·  ")
 	ProfileManager.reload()
+
+
+func test_trophy_opens_leaderboards_and_stats() -> void:
+	var trophy: Button = menu.get_node("TrophyButton")
+	var help: Control = menu.get_node("HelpButton")
+	assert_lt(trophy.get_global_rect().position.x, help.get_global_rect().position.x, "left of the ?, bottom right")
+	assert_gt(trophy.get_global_rect().position.y, menu.get_viewport_rect().size.y * 0.8)
+	trophy.pressed.emit()
+	await wait_process_frames(2)
+	var panel: LeaderboardPanel = menu.leaderboards
+	assert_true(panel.visible)
+	assert_true(panel.boards_page.visible)
+	assert_true(panel.status_label.text.contains("Steam"), "headless: no Steam, and it says so")
+	panel.page_buttons[LeaderboardPanel.PAGE_STATS].pressed.emit()
+	await wait_process_frames(2)
+	assert_true(panel.stats_page.visible)
+	assert_false(panel.boards_page.visible)
+	assert_gt(panel.stats_grid.get_child_count(), 20)
+	panel.close()
+	assert_false(panel.visible)
