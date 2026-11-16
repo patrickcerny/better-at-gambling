@@ -217,19 +217,19 @@ void fragment() {
 		float sheen = smoothstep(0.1, 0.0, abs(p.y - p.x * 0.5 - mix(-1.0, 1.0, clamp((cyc - 4.2) / 0.9, 0.0, 1.0))));
 		e += vec3(1.0, 0.85, 0.5) * sheen * stop_flash * 0.9;
 	} else if (mode == 10) {
-		// Bronze statue (achievement Living Legend): cast bronze, green-blue patina settled in the
-		// hollows, polished where hands touch it, a slow warm sheen sliding over.
-		float n = fbm(p * 4.0);
-		float pat = smoothstep(0.52, 0.72, fbm(p * 2.5 + vec3(3.1)) + (0.5 - abs(p.y)) * 0.15);
-		vec3 bronze = mix(vec3(0.17, 0.1, 0.05), vec3(0.48, 0.33, 0.17), n);
-		vec3 verd = mix(vec3(0.16, 0.42, 0.36), vec3(0.36, 0.6, 0.5), noise3(p * 9.0));
-		c = mix(bronze, verd, pat * 0.9);
-		// Polished metal: bright where it faces the eye, dark at the edges.
+		// Bronze statue (achievement Living Legend): smooth polished bronze, bright where it faces
+		// the light and dark at the edges like real metal, thin streaks of green patina running down
+		// from the top, a slow warm gleam sliding over it.
 		float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
-		c *= mix(0.6, 1.15, pow(facing, 2.0)) * mix(1.0, 0.9, pat);
-		float sheen = smoothstep(0.12, 0.0, abs(fract(p.y * 0.4 + p.x * 0.25 - t * 0.12) - 0.5));
-		c += vec3(0.3, 0.2, 0.08) * sheen * (1.0 - pat);
-		e = vec3(0.18, 0.11, 0.03) * sheen * (1.0 - pat);
+		float tone = noise3(p * 1.5) * 0.5 + 0.5;
+		c = mix(vec3(0.22, 0.15, 0.09), vec3(0.6, 0.45, 0.27), pow(facing, 1.6) * (0.8 + 0.2 * tone));
+		c += vec3(0.3, 0.25, 0.15) * pow(facing, 12.0);  // the polished highlight
+		float streak = smoothstep(0.62, 0.8, noise3(vec3(ang * 5.0, p.y * 0.6, 1.3))) * smoothstep(-0.2, 0.6, p.y);
+		streak *= smoothstep(0.35, 0.6, noise3(vec3(ang * 14.0, p.y * 3.0, 7.0)));
+		c = mix(c, vec3(0.28, 0.52, 0.45), streak * 0.75);
+		float gleam = smoothstep(0.08, 0.0, abs(fract(p.y * 0.35 - p.x * 0.2 - t * 0.1) - 0.5));
+		c += vec3(0.28, 0.2, 0.08) * gleam * facing;
+		e = vec3(0.12, 0.08, 0.02) * gleam * facing;
 	} else if (mode == 11) {
 		// Source code (achievement Beat the Dev): amber code scrolling down a warm black screen,
 		// lines of "characters" in columns, the odd line lit up, a blinking cursor.

@@ -34,7 +34,7 @@ const PUPILS: Dictionary = {&"eyes_clover": 0.0, &"eyes_steel": 0.0, &"eyes_card
 
 
 ## Hats built a little small, scaled up about the top of the head (and their spinners with them).
-const BIGGER: Dictionary = {&"hat_banana": 1.3, &"hat_card_house": 1.4, &"hat_beacon": 1.35, &"hat_ice_pack": 1.15}
+const BIGGER: Dictionary = {&"hat_banana": 1.3, &"hat_card_house": 1.4, &"hat_beacon": 1.35}
 
 
 static func hat(k: OutfitMeshKit, id: StringName) -> void:
@@ -54,19 +54,33 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 				k.sphere(root + dir * 0.19, Vector3(0.1, 0.22, 0.028), BANANA, 12, 6, b)
 				k.sphere(root + dir * 0.19 + b * Vector3(0, 0, -0.014), Vector3(0.082, 0.19, 0.02), CREAM_INSIDE, 10, 5, b)
 				k.sphere(root + dir * 0.38, Vector3(0.035, 0.035, 0.03), Color("#5A4A2A"), 6, 3, b)
-		&"hat_paper_boat":
-			# A folded newspaper hat: two triangles meeting at the ridge, the folded band round the head.
+		&"hat_duel_band":
+			# The duel champion's headband: red cloth tied round the head, the knot and its tails at
+			# the back, three gold badges on the front: rock, paper, scissors.
+			var band := Color("#B8322E")
+			k.cylinder(Vector3(0, 0.06, 0), 0.352, 0.356, 0.085, band, 28, Basis.IDENTITY, D)
+			k.cylinder(Vector3(0, 0.03, 0), 0.357, 0.357, 0.012, band.darkened(0.25), 28, Basis.IDENTITY, D)
+			k.cylinder(Vector3(0, 0.09, 0), 0.355, 0.355, 0.012, band.darkened(0.25), 28, Basis.IDENTITY, D)
+			var knot := Vector3(0.0, 0.07, 0.335)
+			k.sphere(knot, Vector3(0.055, 0.05, 0.04), band.darkened(0.1), 10, 5)
 			for side: float in [-1.0, 1.0]:
-				var b := Basis(Vector3.RIGHT, side * 0.16)
-				var place := Transform3D(b * (Basis.IDENTITY if side < 0.0 else Basis(Vector3.UP, PI)), Vector3(0, 0.05, side * 0.07))
-				k.prism(PackedVector2Array([Vector2(-0.46, 0.0), Vector2(0.46, 0.0), Vector2(0.0, 0.42)]), 0.012, place, PAPER)
-				for i: int in 5:  # newsprint lines
-					var y: float = 0.07 + float(i) * 0.05
-					var w: float = 0.38 * (1.0 - y / 0.42) - 0.04
-					if w > 0.04:
-						for z: float in [-0.012, 0.012]:
-							k.box(place * Vector3(-0.03, y, z), Vector3(w * 1.6, 0.014, 0.004), INK.lightened(0.25), place.basis)
-				k.box(place * Vector3(0, 0.035, 0.01 * -side), Vector3(0.9, 0.06, 0.012), PAPER.darkened(0.08), place.basis)
+				var b := Basis(Vector3.BACK, side * 0.5) * Basis(Vector3.RIGHT, 0.5)
+				k.sphere(knot + Vector3(side * 0.05, -0.1, 0.04), Vector3(0.04, 0.13, 0.012), band, 10, 5, b)
+				k.sphere(knot + Vector3(side * 0.06, 0.02, 0.0), Vector3(0.06, 0.035, 0.02), band, 10, 5, Basis(Vector3.BACK, side * 0.4))
+			for i: int in 3:
+				var a: float = PI + (float(i) - 1.0) * 0.42
+				var at := Vector3(sin(a) * 0.362, 0.06, cos(a) * 0.362 * D)
+				var face := Transform3D(Basis(Vector3.UP, a), at)
+				k.prism(OutfitMeshKit.circle_poly(0.045, 18), 0.01, face, OutfitMeshes.GOLD)
+				var mark := face.translated_local(Vector3(0, 0, 0.008))
+				match i:
+					0:  # rock: a round fist-sized pebble
+						k.sphere(mark.origin, Vector3(0.026, 0.022, 0.012), OutfitMeshes.BURGUNDY, 10, 5, mark.basis)
+					1:  # paper: a sheet
+						k.prism(OutfitMeshKit.rect_poly(0.02, 0.027), 0.006, mark, OutfitMeshes.CREAM)
+					2:  # scissors: two blades crossed
+						for s: float in [-1.0, 1.0]:
+							k.prism(OutfitMeshKit.rect_poly(0.006, 0.03), 0.006, mark.rotated_local(Vector3.BACK, s * 0.5), OutfitMeshes.BURGUNDY)
 		&"hat_tray":
 			# A silver tray balanced on the head, two coupes and a folded napkin on it.
 			k.cylinder(Vector3(0, 0.235, 0.0), 0.33, 0.33, 0.018, OutfitMeshes.SILVER, 22)
@@ -94,26 +108,51 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 			for i: int in 3:
 				var p := Vector3(-0.12 + float(i) * 0.13, 0.42 + 0.07 * float(i % 2), 0.05)
 				k.sphere(p, Vector3.ONE * (0.07 + 0.02 * float(i % 2)), Color("#8A8580"), 10, 5)
-		&"hat_paper_crown":
-			# A cut-out cardboard crown: a gold paper band with eight points, crayon jewels.
-			var gold := Color("#E2B23A")
-			k.cylinder(Vector3(0, 0.06, 0), 0.345, 0.345, 0.11, gold, 24, Basis.IDENTITY, D)
-			for i: int in 8:
-				var a: float = TAU * float(i) / 8.0
-				var p := Vector3(sin(a) * 0.345, 0.11, cos(a) * 0.345 * D)
-				k.prism(PackedVector2Array([Vector2(-0.12, 0.0), Vector2(0.12, 0.0), Vector2(0.0, 0.12)]), 0.008, Transform3D(Basis(Vector3.UP, a), p), gold.darkened(0.06 * float(i % 2)))
-			for i: int in 3:
-				var a: float = PI + (float(i) - 1.0) * 0.6
-				k.prism(OutfitMeshKit.circle_poly(0.03, 10), 0.01, Transform3D(Basis(Vector3.UP, a), Vector3(sin(a) * 0.352, 0.06, cos(a) * 0.352 * D)), [OutfitMeshes.RED, OutfitMeshes.BLUE, OutfitMeshes.GREEN][i])
+		&"hat_consolation_crown":
+			# Last place still gets a crown: a gold one, a bit crooked, a red velvet cap inside and a
+			# big blue participation rosette pinned to the front.
+			var crooked := Basis(Vector3.BACK, 0.12)
+			var gold := OutfitMeshes.GOLD
+			k.dome(crooked * Vector3(0, 0.04, 0), Vector3(0.31, 0.2, 0.28), OutfitMeshes.BURGUNDY, 14, crooked)
+			k.cylinder(crooked * Vector3(0, 0.07, 0), 0.35, 0.345, 0.12, gold, 24, crooked, D)
+			k.torus(crooked * Vector3(0, 0.015, 0), 0.34, 0.37, gold.darkened(0.2), 24, crooked * Basis.from_scale(Vector3(1, 0.6, D)))
+			for i: int in 6:
+				var a: float = TAU * float(i) / 6.0
+				var base: Vector3 = crooked * Vector3(sin(a) * 0.345, 0.13, cos(a) * 0.345 * D)
+				k.cylinder(base + crooked * Vector3(0, 0.07, 0), 0.0, 0.07, 0.15, gold, 4, crooked * Basis(Vector3.UP, a + PI * 0.25))
+				k.sphere(base + crooked * Vector3(0, 0.155, 0), Vector3.ONE * 0.026, gold.lightened(0.15), 8, 4)
+				k.sphere(crooked * Vector3(sin(a + PI / 6.0) * 0.352, 0.07, cos(a + PI / 6.0) * 0.352 * D), Vector3(0.022, 0.022, 0.012), [OutfitMeshes.RED, OutfitMeshes.TEAL, OutfitMeshes.CREAM][i % 3], 8, 4, crooked * Basis(Vector3.UP, a + PI / 6.0))
+			var ros := Transform3D(crooked * Basis(Vector3.UP, PI), crooked * Vector3(-0.12, 0.08, -0.36))
+			for side: float in [-1.0, 1.0]:  # the ribbon tails
+				k.prism(PackedVector2Array([Vector2(-0.025, 0.0), Vector2(0.025, 0.0), Vector2(0.03, -0.17), Vector2(0.0, -0.14), Vector2(-0.03, -0.17)]), 0.006, ros.rotated_local(Vector3.BACK, side * 0.25).translated_local(Vector3(0, 0, -0.004)), OutfitMeshes.BLUE.darkened(0.15))
+			for i: int in 14:  # the pleated ring
+				var a: float = TAU * float(i) / 14.0
+				k.prism(PackedVector2Array([Vector2(0, 0), Vector2(0.03, -0.018), Vector2(0.075, 0.0), Vector2(0.03, 0.018)]), 0.008, ros.rotated_local(Vector3.BACK, a), OutfitMeshes.BLUE.lightened(0.12 * float(i % 2)))
+			k.prism(OutfitMeshKit.circle_poly(0.042, 18), 0.014, ros, OutfitMeshes.GOLD)
+			k.prism(OutfitMeshKit.star_poly(5, 0.03, 0.013), 0.02, ros, OutfitMeshes.CREAM)
 		&"hat_ice_pack":
-			# A rubber ice bag cooling a hot head, its screw cap to the side.
-			var b := Basis(Vector3.BACK, 0.35) * Basis(Vector3.RIGHT, 0.1)
-			k.sphere(Vector3(0.03, 0.25, 0.0), Vector3(0.27, 0.1, 0.24), ICE, 16, 8, b)
-			for i: int in 6:  # the ribbed rubber
-				k.torus(Vector3(0.03, 0.25, 0.0) + b * Vector3(0, 0.0, -0.18 + float(i) * 0.07), 0.0, 0.015, ICE.darkened(0.08), 8, b * Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(Vector3(lerpf(0.6, 1.0, sin(PI * float(i) / 5.0)) * 14.0, 1, 4.0)))
-			var cap: Vector3 = Vector3(0.03, 0.25, 0.0) + b * Vector3(0.28, 0.0, 0.0)
-			k.cylinder(cap, 0.07, 0.07, 0.06, OutfitMeshes.SILVER, 14, b * Basis(Vector3.BACK, PI * 0.5))
-			k.cylinder(cap + b * Vector3(0.04, 0, 0), 0.06, 0.06, 0.03, OutfitMeshes.SILVER.darkened(0.15), 14, b * Basis(Vector3.BACK, PI * 0.5))
+			# A rubber ice bag slumped over the head: full of ice on top, flopping down the left side
+			# in soft folds, the screw cap sticking up.
+			var sag := func(a: float) -> float:  # how far down the rim reaches (elevation, radians)
+				return lerpf(0.95, -0.05, smoothstep(-0.2, 1.0, sin(a))) + 0.08 * sin(a * 3.0 + 1.0)
+			for side: int in 2:
+				var at := func(u: float, v: float) -> Vector3:
+					var a: float = u * TAU
+					var el: float = lerpf(PI * 0.5, sag.call(a), v)
+					var fold: float = 0.018 * sin(a * 9.0) * v * v
+					var full: float = 0.06 * pow(cos(clampf(el, 0.0, PI * 0.5) - PI * 0.5), 3.0) * (1.0 - v)  # the lump of ice on top
+					var r: float = 0.37 + fold + (full if side == 0 else 0.0) - (0.0 if side == 0 else 0.012)
+					return Vector3(sin(a) * cos(el) * r, 0.0 + sin(el) * (0.27 + full * 2.0), cos(a) * cos(el) * r * D)
+				var col: Color = ICE if side == 0 else ICE.darkened(0.35)
+				k.surface(at, 48, 14, func(_u: float, v: float) -> Color:
+					return col.darkened(0.08) if side == 0 and fposmod(v * 6.0, 1.0) < 0.12 else col,
+					func(p: Vector3) -> Vector3: return (p - Vector3(0, -0.05, 0)) * (1.0 if side == 0 else -1.0), true)
+			var cap := Vector3(-0.09, 0.33, 0.05)
+			var cb := Basis(Vector3.BACK, 0.35)
+			k.cylinder(cap, 0.075, 0.08, 0.05, OutfitMeshes.SILVER, 16, cb)
+			k.cylinder(cap + cb * Vector3(0, 0.04, 0), 0.065, 0.065, 0.035, OutfitMeshes.SILVER.darkened(0.18), 16, cb)
+			for i: int in 3:  # ice cubes showing through the neck
+				k.box(cap + cb * Vector3(-0.02 + 0.02 * float(i), 0.065, 0.0), Vector3.ONE * 0.025, OutfitMeshes._glow(Color("#E4F0F7"), 0.2), cb * Basis(Vector3.UP, float(i)))
 		&"hat_star":
 			# A gold star floating over the head (it turns: `spinners`), sparkles round it.
 			for i: int in 3:
@@ -152,18 +191,19 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 				OutfitMeshes._tube(k, PackedVector3Array([c + Vector3(0, 0.08, 0), c + Vector3(-side * 0.03, 0.18, 0.0), Vector3(0, 0.46, 0.02)]), 0.012, OutfitMeshes.GREEN.darkened(0.2))
 			k.sphere(Vector3(0.07, 0.47, 0.02), Vector3(0.09, 0.012, 0.045), OutfitMeshes.GREEN, 10, 3, Basis(Vector3.BACK, -0.4))
 		&"hat_plinko":
-			# A little Plinko board standing on the head: a wooden triangle full of gold pegs, a chip.
+			# A little Plinko board standing on the head: a wooden triangle full of gold pegs; a chip
+			# keeps dropping through them into the slots (`spinners`).
 			var face := Transform3D(Basis(Vector3.UP, PI), Vector3(0, 0.17, 0.0))
-			k.prism(PackedVector2Array([Vector2(-0.3, 0.0), Vector2(0.3, 0.0), Vector2(0.0, 0.44)]), 0.05, face, OutfitMeshes.BURGUNDY)
-			k.box(Vector3(0, 0.18, 0), Vector3(0.62, 0.035, 0.07), WOOD)
-			for row: int in 4:
+			k.prism(PackedVector2Array([Vector2(-0.3, 0.0), Vector2(0.3, 0.0), Vector2(0.0, 0.48)]), 0.05, face, OutfitMeshes.BURGUNDY)
+			k.prism(PackedVector2Array([Vector2(-0.33, -0.01), Vector2(0.33, -0.01), Vector2(0.0, 0.52)]), 0.04, face.translated_local(Vector3(0, 0, -0.012)), OutfitMeshes.GOLD.darkened(0.25))
+			k.box(Vector3(0, 0.18, 0), Vector3(0.66, 0.035, 0.08), WOOD)
+			for row: int in PLINKO_ROWS:
 				for j: int in row + 1:
-					var x: float = (float(j) - float(row) * 0.5) * 0.11
-					var y: float = 0.53 - float(row) * 0.085
-					k.cylinder(Vector3(x, y, -0.04), 0.01, 0.01, 0.05, OutfitMeshes.GOLD, 6, Basis(Vector3.RIGHT, PI * 0.5))
-			k.cylinder(Vector3(0.055, 0.37, -0.05), 0.035, 0.035, 0.015, OutfitMeshes.RED, 14, Basis(Vector3.RIGHT, PI * 0.5))
-			for j: int in 5:  # the slots at the bottom
-				k.box(Vector3(-0.22 + float(j) * 0.11, 0.215, -0.03), Vector3(0.012, 0.04, 0.03), OutfitMeshes.GOLD.darkened(0.2))
+					k.cylinder(_plinko_peg(row, j) + Vector3(0, 0, -0.005), 0.011, 0.011, 0.06, OutfitMeshes.GOLD, 6, Basis(Vector3.RIGHT, PI * 0.5))
+			for j: int in 6:  # the slots at the bottom, the middle ones lit
+				k.box(Vector3(-0.25 + float(j) * 0.1, 0.22, -0.035), Vector3(0.012, 0.05, 0.035), OutfitMeshes.GOLD.darkened(0.2))
+			for j: int in 5:
+				k.box(Vector3(-0.2 + float(j) * 0.1, 0.205, -0.03), Vector3(0.08, 0.016, 0.02), OutfitMeshes._glow([OutfitMeshes.RED, OutfitMeshes.GOLD, OutfitMeshes.CREAM, OutfitMeshes.GOLD, OutfitMeshes.RED][j], 0.4))
 		&"hat_full_house":
 			# A tiny house: cream walls, a red roof, a chimney, a door and lit windows.
 			k.box(Vector3(0, 0.29, 0), Vector3(0.36, 0.2, 0.3), OutfitMeshes.CREAM)
@@ -181,12 +221,29 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 			k.dome(Vector3(0, 0.37, 0), Vector3(0.12, 0.08, 0.12), OutfitMeshes._glow(AMBER, 0.35), 16)
 			k.torus(Vector3(0, 0.235, 0), 0.12, 0.15, OutfitMeshes.SILVER, 16)
 		&"hat_logo":
-			# The menu logo in miniature, circling the head (`spinners`); a faint gold ring as its track.
-			k.torus(Vector3(0, 0.36, 0.0), 0.47, 0.49, OutfitMeshes._glow(OutfitMeshes.GOLD, 0.3), 40, Basis.from_scale(Vector3(1, 0.4, 1)))
+			# A twinkle of gold dust where the logo hovers (the logo and its chips move: `spinners`).
+			for i: int in 7:
+				var a: float = TAU * float(i) / 7.0
+				k.sphere(Vector3(sin(a) * 0.18, 0.36 + 0.05 * sin(a * 3.0), cos(a) * 0.18), Vector3.ONE * 0.014, OutfitMeshes._glow(OutfitMeshes.CREAM, 0.7), 6, 3)
 
 
-## Parts that turn on their own (`OutfitMeshes.spinners`): [{mesh, origin, axis, speed}] in hat space
-## (`OutfitMeshes._hat_spinner` puts them on the head).
+## Plinko pegs: rows from the top, in hat space.
+const PLINKO_ROWS: int = 4
+
+
+static func _plinko_peg(row: int, j: int) -> Vector3:
+	return Vector3((float(j) - float(row) * 0.5) * 0.12, 0.56 - float(row) * 0.085, -0.04)
+
+
+## A moving part on a hat (`OutfitMeshes._hat_spinner` plus a looped path, hat space).
+static func _hat_mover(k: OutfitMeshKit, at: Vector3, axis_local: Vector3, speed: float, path_local: PackedVector3Array, period: float) -> Dictionary:
+	var hat := Transform3D(Basis(Vector3.RIGHT, OutfitMeshes.HAT_TILT), OutfitMeshes.HAT_BASE)
+	var path := PackedVector3Array()
+	for q: Vector3 in path_local:
+		path.append(hat.basis * q)
+	return {"mesh": k.commit(), "origin": hat * at, "axis": (hat.basis * axis_local).normalized(), "speed": speed, "path": path, "period": period}
+
+
 static func spinners(id: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	match id:
@@ -201,16 +258,56 @@ static func spinners(id: StringName) -> Array[Dictionary]:
 			for side: float in [-1.0, 1.0]:  # two bright lamp faces sweeping round inside the dome
 				k.box(Vector3(side * 0.08, 0.0, 0), Vector3(0.06, 0.1, 0.12), OutfitMeshes._glow(Color("#FFD27A"), 0.95))
 			out.append(OutfitMeshes._hat_spinner(k, Vector3(0, 0.2 + 0.1 * BIGGER[id], 0), 6.0))
-		&"hat_logo":
+		&"hat_plinko":
 			var k := OutfitMeshKit.new()
-			var at := Vector3(0, 0.0, 0.48)
-			var face := Transform3D(Basis(Vector3.UP, 0.0), at)
-			k.cylinder(at, 0.14, 0.14, 0.03, OutfitMeshes.GOLD, 22, Basis(Vector3.RIGHT, PI * 0.5))
-			k.torus(at, 0.12, 0.145, OutfitMeshes.GOLD.darkened(0.2), 22, Basis(Vector3.RIGHT, PI * 0.5))
-			k.box(at, Vector3(0.34, 0.08, 0.05), OutfitMeshes.BURGUNDY)
+			k.cylinder(Vector3.ZERO, 0.04, 0.04, 0.016, OutfitMeshes.RED, 16, Basis(Vector3.RIGHT, PI * 0.5))
+			for i: int in 6:  # the chip's edge spots
+				var a: float = TAU * float(i) / 6.0
+				k.box(Vector3(cos(a) * 0.036, sin(a) * 0.036, 0), Vector3(0.012, 0.012, 0.018), OutfitMeshes.CREAM, Basis(Vector3.BACK, a))
+			# Bounce off a peg in every row (left, right, right, left), land in a slot, wait, again.
+			var path := PackedVector3Array()
+			var top := Vector3(0, 0.66, -0.07)
+			path.append(top)
+			var x: float = 0.0
+			var turns: Array[float] = [-1.0, 1.0, 1.0, -1.0]
+			for row: int in PLINKO_ROWS:
+				var y: float = _plinko_peg(row, 0).y
+				path.append(Vector3(x, y + 0.045, -0.07))
+				x += turns[row] * 0.06
+				path.append(Vector3(x, y - 0.02, -0.07))
+			path.append(Vector3(x, 0.24, -0.07))
+			for i: int in 4:
+				path.append(Vector3(x, 0.24, -0.07))
+			var rel := PackedVector3Array()
+			for q: Vector3 in path:
+				rel.append(q - top)
+			out.append(_hat_mover(k, top, Vector3.BACK, 7.0, rel, 2.6))
+		&"hat_logo":
+			# The menu logo in miniature: a gold coin with the burgundy banner, hovering and turning
+			# over the head, three chips circling it the other way.
+			var k := OutfitMeshKit.new()
+			k.cylinder(Vector3.ZERO, 0.2, 0.2, 0.045, OutfitMeshes.GOLD, 28, Basis(Vector3.RIGHT, PI * 0.5))
+			k.torus(Vector3.ZERO, 0.175, 0.205, OutfitMeshes.GOLD.darkened(0.25), 28, Basis(Vector3.RIGHT, PI * 0.5))
+			for i: int in 12:  # notches round the coin's edge
+				var a: float = TAU * float(i) / 12.0
+				k.box(Vector3(cos(a) * 0.2, sin(a) * 0.2, 0), Vector3(0.026, 0.026, 0.05), OutfitMeshes.GOLD.lightened(0.15), Basis(Vector3.BACK, a))
+			k.box(Vector3(0, 0.0, 0), Vector3(0.5, 0.12, 0.07), OutfitMeshes.BURGUNDY)
+			for side: float in [-1.0, 1.0]:  # the banner's folded ends
+				k.prism(PackedVector2Array([Vector2(0, 0.045), Vector2(side * 0.06, 0.045), Vector2(side * 0.035, 0.0), Vector2(side * 0.06, -0.045), Vector2(0, -0.045)]), 0.045, Transform3D(Basis.IDENTITY, Vector3(side * 0.25, -0.015, -0.02)), OutfitMeshes.BURGUNDY.darkened(0.25))
 			for s: float in [-1.0, 1.0]:
-				OutfitMeshes._glyph(k, "BaG", face.rotated_local(Vector3.UP, 0.0 if s > 0.0 else PI).translated_local(Vector3(0, -0.02, 0.028)), OutfitMeshes.CREAM, 0.08)
-			out.append(OutfitMeshes._hat_spinner(k, Vector3(0, 0.36, 0), 1.2))
+				var face := Transform3D(Basis(Vector3.UP, 0.0 if s > 0.0 else PI), Vector3(0, -0.03, 0.038 * s))
+				OutfitMeshes._glyph(k, "BETTER AT GAMBLING", face, OutfitMeshes.CREAM, 0.056)
+			var bob := PackedVector3Array()
+			for i: int in 17:
+				bob.append(Vector3(0, 0.03 * sin(TAU * float(i) / 16.0), 0))
+			out.append(_hat_mover(k, Vector3(0, 0.6, 0), Vector3.UP, 2.2, bob, 2.4))
+			var ring := OutfitMeshKit.new()
+			for i: int in 3:
+				var a: float = TAU * float(i) / 3.0
+				var c := Vector3(sin(a) * 0.36, 0.0, cos(a) * 0.36)
+				ring.cylinder(c, 0.06, 0.06, 0.018, [OutfitMeshes.RED, OutfitMeshes.CREAM, OutfitMeshes.BLUE][i], 14, Basis(Vector3.UP, a) * Basis(Vector3.RIGHT, PI * 0.5))
+				ring.sphere(c * 0.8, Vector3.ONE * 0.012, OutfitMeshes._glow(OutfitMeshes.GOLD, 0.6), 6, 3)
+			out.append(OutfitMeshes._hat_spinner(ring, Vector3(0, 0.58, 0), -1.4))
 	return out
 
 
@@ -360,41 +457,81 @@ static func cape(k: OutfitMeshKit, id: StringName) -> void:
 				return OutfitMeshes.BURGUNDY, OutfitMeshes.BURGUNDY.darkened(0.4))
 			OutfitMeshes._clasps(k, OutfitMeshes.GOLD)
 		&"cape_suited_trips":
-			# Midnight velvet, three identical seven of hearts fanned on the back.
-			OutfitMeshes._cape_sheet(k, -0.78, func(_u: float, v: float) -> Color:
-				return OutfitMeshes.GOLD if v > 0.93 or v < 0.03 else OutfitMeshes.NAVY.darkened(0.25), OutfitMeshes.BURGUNDY)
-			_cape_cards(k, ["7", "7", "7"], [true, true, true], 0.34, 0.32)
-			OutfitMeshes._clasps(k, OutfitMeshes.GOLD)
+			# The cape ends in three identical seven of hearts fanned out (the cloth itself is cut
+			# into the cards), midnight velvet above.
+			_card_fan_cape(k, ["7", "7", "7"], true, Color("#1A2235"), 0.32)
 		&"cape_royal_flush":
-			# The best hand there is: ten to ace of spades fanned across black satin, gold trim.
-			OutfitMeshes._cape_sheet(k, -0.8, func(u: float, v: float) -> Color:
-				if v > 0.92 or v < 0.035:
-					return OutfitMeshes.GOLD
-				return OutfitMeshes.BLACK, OutfitMeshes.BURGUNDY)
+			# The best hand there is: the cape ends in ten to ace of spades fanned out, black satin
+			# with a gold collar above.
 			OutfitMeshes._cape_collar(k, OutfitMeshes.GOLD, OutfitMeshes.BLACK, 0.12)
-			_cape_cards(k, ["10", "J", "Q", "K", "A"], [false, false, false, false, false], 0.36, 0.3)
-			OutfitMeshes._clasps(k, OutfitMeshes.GOLD)
+			_card_fan_cape(k, ["10", "J", "Q", "K", "A"], false, OutfitMeshes.BLACK, 0.22)
 
 
-## Playing cards fanned on the back of a cape around `v` (`spread` radians apart): red hearts or
-## black spades, the rank in the corner and a big pip in the middle.
-static func _cape_cards(k: OutfitMeshKit, ranks: Array, red: Array, v: float, spread: float) -> void:
+## A cape whose lower part is a fan of playing cards cut out of the cloth: `ranks` left to right
+## (seen from behind), hearts or spades, `spread` radians between cards; the cloth above in `top`.
+static func _card_fan_cape(k: OutfitMeshKit, ranks: Array, hearts: bool, top: Color, spread: float) -> void:
+	const BOTTOM: float = -0.8
+	const W: float = 1.15  # metres-ish across the cape (u) and down it (v), for the card shapes
+	const H: float = 1.0
+	const CW: float = 0.15  # half a card
+	const CH: float = 0.24
 	var n: int = ranks.size()
-	var base: Transform3D = OutfitMeshes._cape_frame(v + 0.12, 0.01)
+	var pivot := Vector2(0.0, 1.0)  # below the hem: the cards turn about the hand that holds them
+	var pip_col: Color = OutfitMeshes.RED if hearts else OutfitMeshes.BLACK
+	# Card i's own coordinates at cape point (x, y): x right (seen from behind), y down the card.
+	var local := func(i: int, x: float, y: float) -> Vector2:
+		var a: float = (float(i) - float(n - 1) * 0.5) * spread
+		var centre: Vector2 = pivot + Vector2(sin(a), -cos(a)) * 0.42
+		var d := Vector2(x, y) - centre
+		return Vector2(d.x * cos(a) + d.y * sin(a), -d.x * sin(a) + d.y * cos(a))
+	var pip := func(q: Vector2, s: float) -> bool:  # a heart or spade, `s` across, at q
+		var p := q / s
+		if not hearts:
+			p.y = -p.y + 0.15
+			if absf(p.x) < 0.09 + (p.y + 0.95) * 0.25 and p.y < -0.45 and p.y > -0.95:
+				return true  # the spade's stem
+		var x: float = p.x * 1.15
+		var y: float = -p.y * 1.15 + 0.2
+		return pow(x * x + y * y - 1.0, 3.0) - x * x * y * y * y <= 0.0
+	var paint := func(u: float, v: float) -> Color:
+		var x: float = (0.5 - u) * W
+		var y: float = v * H
+		for i: int in range(n - 1, -1, -1):  # the last card lies on top
+			var q: Vector2 = local.call(i, x, y)
+			if absf(q.x) > CW or absf(q.y) > CH:
+				continue
+			if absf(q.x) > CW - 0.012 or absf(q.y) > CH - 0.012:
+				return OutfitMeshes.GOLD  # the gold edge
+			if pip.call(q - Vector2(0.0, 0.03), 0.075):
+				return pip_col
+			for corner: float in [-1.0, 1.0]:  # small pips under the corner index
+				if pip.call(q - Vector2(corner * (CW - 0.04), corner * (CH - 0.1)), 0.022):
+					return pip_col
+			return OutfitMeshes.WHITE
+		if y < 0.42:
+			return OutfitMeshes.GOLD if y > 0.39 or v < 0.03 else top
+		return Color(0, 0, 0, 0)  # cut away round the cards
+	OutfitMeshes._cape_sheet(k, BOTTOM, paint, OutfitMeshes.BURGUNDY, 72, 48)
+	# The corner indices, standing on the cloth where each card's corner is.
 	for i: int in n:
-		var ang: float = -(float(i) - float(n - 1) * 0.5) * spread
-		var lift: float = 0.004 * float(i)
-		k.uv2 = Vector2(0.5 - sin(ang) * 0.12, v)
-		# Each card turns about a point below the fan (where they are held).
-		var card: Transform3D = base.rotated_local(Vector3.BACK, -ang).translated_local(Vector3(0, 0.3, lift))
-		var col: Color = OutfitMeshes.RED if red[i] else OutfitMeshes.BLACK
-		k.prism(OutfitMeshKit.rect_poly(0.125, 0.175), 0.004, card, OutfitMeshes.BLACK)
-		k.prism(OutfitMeshKit.rect_poly(0.118, 0.168), 0.006, card, OutfitMeshes.WHITE)
-		var pip: PackedVector2Array = OutfitMeshKit.heart_poly(0.12) if red[i] else OutfitMeshKit.spade_poly(0.12)
-		k.prism(pip, 0.008, card.translated_local(Vector3(0, -0.01, 0)), col)
-		var corner: Transform3D = card.translated_local(Vector3(-0.075, 0.095, 0.004))
-		corner.basis = corner.basis * Basis(Vector3.UP, PI)
-		OutfitMeshes._glyph(k, str(ranks[i]), corner, col, 0.075)
+		for corner: float in [-1.0, 1.0]:
+			var q := Vector2(corner * (CW - 0.04), corner * (CH - 0.045))
+			var a: float = (float(i) - float(n - 1) * 0.5) * spread
+			var centre: Vector2 = pivot + Vector2(sin(a), -cos(a)) * 0.42
+			var cp: Vector2 = centre + Vector2(q.x * cos(a) - q.y * sin(a), q.x * sin(a) + q.y * cos(a))
+			var u: float = 0.5 - cp.x / W
+			var v: float = cp.y / H
+			var p: Vector3 = OutfitMeshes._cape_at(u, v, BOTTOM, 0.012)
+			var below: Vector3 = OutfitMeshes._cape_at(u, minf(v + 0.02, 1.0), BOTTOM, 0.012)
+			var above: Vector3 = OutfitMeshes._cape_at(u, maxf(v - 0.02, 0.0), BOTTOM, 0.012)
+			var up: Vector3 = (above - below).normalized()
+			var out := Vector3(p.x, 0.0, p.z + 0.03).normalized()
+			out = (out - up * out.dot(up)).normalized()
+			var right: Vector3 = up.cross(out).normalized()
+			# Text reads from behind: +X to the viewer's right, turned with the card.
+			var b := Basis(right, up, out) * Basis(Vector3.BACK, a + (PI if corner > 0.0 else 0.0))
+			k.uv2 = Vector2(u, v)
+			OutfitMeshes._glyph(k, str(ranks[i]), Transform3D(b, p), OutfitMeshes.RED if hearts else OutfitMeshes.BLACK, 0.055)
 	k.uv2 = Vector2.ZERO
 
 
@@ -473,14 +610,15 @@ static func eyes(k: OutfitMeshKit, id: StringName) -> void:
 	var face := Basis(Vector3.RIGHT, PI * 0.5)
 	match id:
 		&"eyes_black_eye":
-			# A purple shiner round the left eye, a sticking plaster on the other cheek.
+			# A purple shiner: a ring lying on the skin round the left eye (outside the eyeball), a
+			# sticking plaster on the other cheek.
 			var e: Vector3 = OutfitMeshes._eye_center(1.0)
-			for ring: int in 2:  # a dark bruise round the eye, a lighter edge
-				var rr: float = r * (1.55 if ring == 0 else 1.3)
-				var y0: float = e.y - 0.012
-				var at := Vector3(e.x, y0, AvatarVisuals.face_z(y0, e.x) - 0.004 - 0.003 * float(ring))
-				var n: Vector3 = (Vector3(e.x * 0.9, 0.15, -0.6)).normalized()
-				k.sphere(at, Vector3(rr, rr * 0.9, 0.012), PLUM.lightened(0.15) if ring == 0 else PLUM.darkened(0.15), 20, 4, Basis.looking_at(n, Vector3.UP))
+			var y0: float = e.y - 0.01
+			var n: Vector3 = (Vector3(e.x * 0.8, 0.12, -0.75)).normalized()
+			var on_skin: Basis = Basis.looking_at(-n, Vector3.UP) * Basis(Vector3.RIGHT, PI * 0.5)
+			var at := Vector3(e.x, y0, AvatarVisuals.face_z(y0, e.x) - 0.004)
+			k.torus(at, r * 1.08, r * 1.7, Color("#7A5A86"), 24, on_skin * Basis.from_scale(Vector3(1.0, 0.15, 0.9)))
+			k.torus(at + n * 0.003, r * 1.05, r * 1.36, Color("#4E3256"), 24, on_skin * Basis.from_scale(Vector3(1.0, 0.15, 0.9)))
 			var o: Vector3 = OutfitMeshes._eye_center(-1.0)
 			var y: float = o.y - r * 1.6
 			var x: float = o.x - 0.04
@@ -535,9 +673,9 @@ static func pupil(k: OutfitMeshKit, id: StringName) -> void:
 			k.prism(OutfitMeshKit.circle_poly(0.5, 16), 0.65, front, dark)
 			k.prism(OutfitMeshKit.rect_poly(0.55, 0.12), 0.7, front.translated_local(Vector3(0.25, 0.45, 0)).rotated_local(Vector3.BACK, 0.5), OutfitMeshes.WHITE)
 		&"eyes_cards":
-			k.prism(OutfitMeshKit.rect_poly(0.95, 1.3), 0.5, front.translated_local(Vector3(0, 0, -0.1)), dark)
-			k.prism(OutfitMeshKit.rect_poly(0.85, 1.2), 0.6, front, OutfitMeshes.WHITE)
-			k.prism(OutfitMeshKit.spade_poly(1.2), 0.7, front.translated_local(Vector3(0, -0.05, 0)), dark)
+			k.prism(OutfitMeshKit.rect_poly(0.68, 0.92), 0.5, front.translated_local(Vector3(0, 0, -0.1)), dark)
+			k.prism(OutfitMeshKit.rect_poly(0.6, 0.84), 0.6, front, OutfitMeshes.WHITE)
+			k.prism(OutfitMeshKit.spade_poly(0.85), 0.7, front.translated_local(Vector3(0, -0.05, 0)), dark)
 
 
 ## Mouth pieces that are objects (the shader draws the rest): in body space at the mouth.

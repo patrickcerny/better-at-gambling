@@ -1718,9 +1718,9 @@ swatch = PackedColorArray(0.4902, 0.5412, 0.6, 1, 0.1098, 0.102, 0.098, 1)
 
 [sub_resource type="Resource" id="a7"]
 script = ExtResource("2")
-id = &"hat_paper_boat"
+id = &"hat_duel_band"
 kind = &"hat"
-display_name = "Paper Hat"
+display_name = "Duel Headband"
 achievement = &"ACH_DUEL_WIN"
 swatch = PackedColorArray(0.9373, 0.902, 0.8235, 1, 0.2275, 0.2078, 0.2, 1)
 
@@ -1814,9 +1814,9 @@ swatch = PackedColorArray(0.7608, 0.2314, 0.1961, 1, 0.7216, 0.7373, 0.7608, 1)
 
 [sub_resource type="Resource" id="a19"]
 script = ExtResource("2")
-id = &"hat_paper_crown"
+id = &"hat_consolation_crown"
 kind = &"hat"
-display_name = "Paper Crown"
+display_name = "Consolation Crown"
 achievement = &"ACH_LAST_PLACE"
 swatch = PackedColorArray(0.8863, 0.698, 0.2275, 1, 0.7608, 0.2314, 0.1961, 1)
 

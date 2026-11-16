@@ -267,7 +267,8 @@ func wear(kind: StringName, id: StringName) -> void:
 			if kind == CosmeticDef.KIND_BEARD:
 				_place_mouth(OutfitMeshes.BEARD_MOUTH_DROP)
 			for sp: MeshInstance3D in _add_spinners(mi, id):
-				_spinners.append({"node": sp, "axis": sp.get_meta(&"axis"), "speed": sp.get_meta(&"speed")})
+				_spinners.append({"node": sp, "axis": sp.get_meta(&"axis"), "speed": sp.get_meta(&"speed"),
+						"origin": sp.get_meta(&"origin"), "path": sp.get_meta(&"path"), "period": sp.get_meta(&"period")})
 			if kind == CosmeticDef.KIND_SHIRT:
 				var sleeve: Color = OutfitMeshes.sleeve_color(id)
 				if sleeve.a > 0.0:
@@ -372,9 +373,20 @@ static func _add_spinners(parent: Node3D, id: StringName) -> Array[MeshInstance3
 		mi.position = sp["origin"]
 		mi.set_meta(&"axis", sp["axis"])
 		mi.set_meta(&"speed", sp["speed"])
+		# Parts that also travel (a Plinko chip dropping, a logo bobbing): a looped path of offsets.
+		mi.set_meta(&"origin", sp["origin"])
+		mi.set_meta(&"path", sp.get("path", PackedVector3Array()))
+		mi.set_meta(&"period", float(sp.get("period", 1.0)))
 		parent.add_child(mi)
 		out.append(mi)
 	return out
+
+
+## A point along a looped path of `path.size()` points at `f` (0..1), each leg taking the same time.
+static func path_at(path: PackedVector3Array, f: float) -> Vector3:
+	var x: float = f * float(path.size() - 1)
+	var i: int = mini(int(floor(x)), path.size() - 2)
+	return path[i].lerp(path[i + 1], x - float(i))
 
 
 static func _outfit_mesh(m: Mesh, node_name: String) -> MeshInstance3D:
@@ -637,7 +649,11 @@ func _animate(frame_delta: float) -> void:
 	_animate_face(delta, em)
 	_animate_cape(delta, speed)
 	for sp: Dictionary in _spinners:
-		(sp["node"] as Node3D).basis = Basis(sp["axis"] as Vector3, _time * float(sp["speed"]))
+		var n3: Node3D = sp["node"]
+		n3.basis = Basis(sp["axis"] as Vector3, _time * float(sp["speed"]))
+		var path: PackedVector3Array = sp["path"]
+		if path.size() > 1:
+			n3.position = (sp["origin"] as Vector3) + path_at(path, fposmod(_time / float(sp["period"]), 1.0))
 	if _pupil_spin != 0.0:
 		for pivot: Node3D in _pupils:
 			(pivot.get_node("Pupil") as Node3D).rotation.z = _time * _pupil_spin
