@@ -777,13 +777,22 @@ func select(id: StringName) -> void:
 	selected = id
 	if d != null:
 		trying[d.kind] = id
-		if d.kind == CosmeticDef.KIND_COLOR:
-			trying.erase(CosmeticDef.KIND_SKIN)  # a plain colour shows without the animated skin
+		_one_look(d)
 	status_label.text = ""
 	if preview != null:
 		preview.face(d != null and d.kind == CosmeticDef.KIND_CAPE)
 		preview.focus(d.kind if d != null else &"")
 	_refresh()
+
+
+## Plain colours and animated skins share one page and one look: trying one on drops a try-on of
+## the other, so only one tile there is ever picked (Patrick 2026-11-16: "why are there 2
+## selected?").
+func _one_look(d: CosmeticDef) -> void:
+	if d.kind == CosmeticDef.KIND_COLOR:
+		trying.erase(CosmeticDef.KIND_SKIN)  # a plain colour shows without the animated skin
+	elif d.kind == CosmeticDef.KIND_SKIN:
+		trying.erase(CosmeticDef.KIND_COLOR)
 
 
 ## A click on a tile: picks it, or (picked already) takes that try-on back off.
@@ -793,6 +802,7 @@ func _on_tile_pressed(id: StringName) -> void:
 		untry(d.kind)
 	elif d != null and selected != id and trying.get(d.kind, &"") == id:
 		selected = id  # stacked further back: just bring it to the front
+		_one_look(d)
 		_refresh()
 	else:
 		select(id)
@@ -991,6 +1001,12 @@ func press_action() -> void:
 	_refresh()
 
 
+## Whether colour `d` is the player's picked colour while an animated skin covers it: the bean
+## shows the skin, pedestals, scoreboards and graphs still show this colour (`PlayerColors`).
+static func _player_colour_under_skin(p: PlayerProfile, d: CosmeticDef) -> bool:
+	return d.kind == CosmeticDef.KIND_COLOR and p.preferred_color == d.color_index and p.outfit.get(CosmeticDef.KIND_SKIN, &"") != &""
+
+
 ## Whether item `d` is what the bean wears now (its colour or one of its outfit pieces).
 static func _wearing(p: PlayerProfile, d: CosmeticDef) -> bool:
 	if d.kind == CosmeticDef.KIND_COLOR:
@@ -1005,6 +1021,8 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	coin.visible = not p.owns(d.id)
 	if wearing:
 		label.text = "WEARING"
+	elif _player_colour_under_skin(p, d):
+		label.text = "PLAYER COLOUR"  # what pedestals, scoreboards and graphs show (`PlayerColors`)
 	elif p.owns(d.id):
 		label.text = "FREE" if d.is_free() else ("DEVELOPER" if d.dev_only else ("JACKPOT" if d.wheel_only else "OWNED"))
 	elif d.premium():
@@ -1022,7 +1040,7 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	# Short of money keeps the currency's colour, only dimmed: a red number next to a Gold Coin read
 	# as a red-coin price (Patrick 2026-11-15).
 	var cur: Color = Palette.COIN_GOLD if d.premium() else (Palette.COIN_RED if d.coin_buyable() else Palette.VIP_GOLD)
-	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else cur))
+	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing or _player_colour_under_skin(p, d) else (Palette.CREAM if p.owns(d.id) else cur))
 	label.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 	coin.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 
@@ -1064,7 +1082,7 @@ func _refresh() -> void:
 			continue
 		var row: Node = b.find_child("PriceRow", true, false)
 		# The wardrobe has no prices: only WEARING on what is worn.
-		(row as Control).visible = not inventory or (d != null and _wearing(p, d))
+		(row as Control).visible = not inventory or (d != null and (_wearing(p, d) or _player_colour_under_skin(p, d)))
 		if d != null:
 			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
 		else:
@@ -1130,7 +1148,7 @@ func _refresh() -> void:
 		action_button.disabled = true
 	elif not p.owns(sel.id):
 		action_button.text = "BUY"
-	elif sel.kind == CosmeticDef.KIND_COLOR and p.preferred_color == sel.color_index:
+	elif sel.kind == CosmeticDef.KIND_COLOR and _wearing(p, sel):
 		action_button.text = "WEARING"
 		action_button.disabled = true
 	elif sel.kind in CosmeticDef.OUTFIT_KINDS and p.is_worn(sel.id):
