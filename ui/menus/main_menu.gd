@@ -70,6 +70,9 @@ var daily_button: DailySpinButton
 var _daily_tick: float = 0.0
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
+## "Your game is out of date" (top right) and the check behind it (`VersionCheck`).
+var update_banner: UpdateBanner
+var version_check: VersionCheck
 ## What the tutorial opened on the first PRACTICE / PLAY ONLINE carries on to when it closes.
 var _after_tutorial: Callable = Callable()
 ## Who gets the focus back when the tutorial closes to the main entries.
@@ -191,6 +194,7 @@ func _ready() -> void:
 		_after_tutorial = Callable()
 		_show_tutorial(help_button))
 	_build_daily()
+	_build_update_banner()
 	how_to_play = HowToPlayPanel.new()
 	how_to_play.name = "HowToPlay"
 	how_to_play.visible = false
@@ -213,6 +217,20 @@ func _ready() -> void:
 	if SteamSvc.pending_lobby != 0:
 		_on_steam_join_requested.call_deferred(SteamSvc.pending_lobby)
 	Log.info(&"menu", "main menu ready")
+
+
+func _build_update_banner() -> void:
+	update_banner = UpdateBanner.new()
+	update_banner.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	update_banner.offset_left = -32.0 - UpdateBanner.WIDTH
+	update_banner.offset_right = -32.0
+	update_banner.offset_top = 28.0
+	update_banner.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	add_child(update_banner)
+	version_check = VersionCheck.new()
+	version_check.name = "VersionCheck"
+	version_check.checked.connect(update_banner.show_verdict)
+	add_child(version_check)
 
 
 func _build_daily() -> void:
@@ -611,6 +629,8 @@ func _fill_friends(parties: Array[Dictionary]) -> void:
 		var title: String = party if party != "" else "%s's lobby" % str(friends[0])
 		var build: String = str(f.get("build", ""))
 		var same: bool = build == "" or build == Protocol.BUILD_ID
+		if not same:
+			version_check.note_peer_build(build)  # a friend is on a newer version: we are behind
 		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if same else "Version %s (you have %s)" % [build, Protocol.BUILD_ID]
 		_friends_list.add_child(_lobby_row(int(f["lobby"]), title, sub, int(f.get("members", 0)), int(f.get("max", 0)), same, f.get("info", {})))
 

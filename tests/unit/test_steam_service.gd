@@ -44,6 +44,7 @@ func test_lobby_checks() -> void:
 	var old: Dictionary = ok.duplicate()
 	old["build"] = "0.0.1"
 	assert_string_contains(SteamParty.check_lobby(old, 2), "same version")
+	assert_string_contains(SteamParty.check_lobby(old, 2), "host's game is out of date", "an older host has to update")
 	assert_string_contains(SteamParty.check_lobby(ok, 76561190000000001), "your own lobby")
 
 
