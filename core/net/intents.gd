@@ -56,6 +56,10 @@ const SCHEMA: Dictionary = {
 	&"set_outfit": {"kind": Kind.NAME, "item": Kind.NAME},
 	&"return_to_lobby": {},
 	&"kick_player": {"target": Kind.INT},
+	## The lobby leader starts the match without waiting for everyone to be ready (Patrick 2026-11-16).
+	&"force_start": {},
+	## The lobby leader starts the next minigame now: the 10 s warning, then the minigame.
+	&"minigame_now": {},
 	&"emote": {"id": Kind.NAME},
 	## Number-key emotes acted out by the bean (`Emotes.ANIMATED`): {"emote": StringName}.
 	&"play_emote": {"emote": Kind.NAME},

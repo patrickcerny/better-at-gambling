@@ -34,6 +34,8 @@ var online_wins: int = 0
 var biggest_win: int = 0
 ## Match ids already applied (newest last).
 var applied: Array[String] = []
+## The last Daily Spin (unix seconds, Steam's clock when Steam runs; 0 = never), `DailyWheel`.
+var daily_last: int = 0
 
 var config: ProgressionConfig
 var shop: CosmeticShop
@@ -112,6 +114,21 @@ func buy(id: StringName) -> StringName:
 	coins -= d.price
 	owned.append(id)
 	return &""
+
+
+## Pays out a Daily Spin prize that lives in the profile (`DailyWheel`): red Coins, or a mystery
+## piece (`piece` from `DailyWheel.mystery_piece`; &"" when everything is owned pays
+## `DailyWheel.PIECE_FALLBACK_COINS`). Returns {coins, piece}: what was added.
+func add_wheel_prize(kind: StringName, amount: int, piece: StringName = &"") -> Dictionary:
+	if kind == DailyWheel.KIND_COINS:
+		return {"coins": add_coins(amount), "piece": &""}
+	if kind == DailyWheel.KIND_PIECE:
+		var d: CosmeticDef = shop.find(piece)
+		if d != null and d.coin_buyable() and not owns(piece):
+			owned.append(piece)
+			return {"coins": 0, "piece": piece}
+		return {"coins": add_coins(DailyWheel.PIECE_FALLBACK_COINS), "piece": &""}
+	return {"coins": 0, "piece": &""}
 
 
 ## Adds (red) Coins (developer mode, tests), up to MAX_COINS. Returns how many were added.
@@ -205,6 +222,7 @@ func to_config(cfg: ConfigFile) -> void:
 	cfg.set_value("stats", "online_wins", online_wins)
 	cfg.set_value("stats", "biggest_win", biggest_win)
 	cfg.set_value("stats", "applied", PackedStringArray(applied))
+	cfg.set_value("daily", "last_spin", daily_last)
 
 
 ## Reads a profile back and makes it sane (see `sanitize`).
@@ -226,6 +244,7 @@ func from_config(cfg: ConfigFile) -> void:
 	wins = _int(cfg.get_value("stats", "wins", 0))
 	online_wins = _int(cfg.get_value("stats", "online_wins", 0))
 	biggest_win = _int(cfg.get_value("stats", "biggest_win", 0))
+	daily_last = _int(cfg.get_value("daily", "last_spin", 0))
 	applied.clear()
 	var ap: Variant = cfg.get_value("stats", "applied", PackedStringArray())
 	if ap is PackedStringArray or ap is Array:
@@ -260,6 +279,7 @@ func sanitize() -> void:
 	wins = clampi(wins, 0, matches)
 	online_wins = clampi(online_wins, 0, wins)
 	biggest_win = maxi(biggest_win, 0)
+	daily_last = maxi(daily_last, 0)
 	if applied.size() > MAX_APPLIED:
 		applied = applied.slice(applied.size() - MAX_APPLIED)
 

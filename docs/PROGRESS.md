@@ -93,6 +93,45 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.59 Daily Spin
+- Patrick: "Daily spin button auf der Startseite wo du Sachen gewinnen kannst (auch die gezahlte
+  Währung und sehr unwahrscheinlich ein krasser animierter Skin). Mach da ein cooles Wheel."
+  DAILY SPIN under SHOP (gold star when free, else the countdown) opens `DailySpinPanel`: a prize
+  wheel drawn in code (`DailyWheelView`: burgundy/cream/felt slices, gold pegs, a ticking pointer,
+  chasing marquee bulbs, confetti and coins on a win), the jackpot on a turning bean, the odds.
+  Prizes (`DailyWheel`): 100-2,500 red Coins, a mystery piece, 5-50 Gold, and at 0.3 % the new
+  Fortune skin (`skin_fortune`, bean_skin mode 9: a prize wheel spinning on the belly with chasing
+  bulbs, gold coins drifting up; `CosmeticDef.wheel_only`, Steam item 208).
+- Security: with Steam the spin is `triggerItemDrop` on playtime generator 3200 (one drop per 20 h
+  per account, weights in its bundle); prizes are tokens the game redeems (consume for Coins and
+  pieces, exchange for Gold bundles 3311-3314). Timer on Steam server time. Without Steam or before
+  the itemdefs are uploaded: a local spin, Coins and pieces only. docs/STEAM_INVENTORY.md "Daily Spin".
+  itemdefs.json regenerated (162), NOT uploaded (needs Patrick's go). Dev panel: DAILY SPIN AGAIN.
+- Tests: new `test_daily_wheel.gd`; `test_steam_store`, `test_outfits`, `test_player_profile`,
+  `test_bean_colors`, `test_cosmetics_shop`, `test_main_menu`, `test_confirm_and_dev_ui`,
+  `test_dev_mode` green.
+### 2026-11-16 / 0.9.58 Leader force start: START NOW in the lobby, START NEXT MINIGAME in the casino
+- Patrick: "Lobby can force start minigame". New intents `force_start` (lobby) and `minigame_now`
+  (casino), leader only, online rooms only.
+- START NOW (lobby panel footer, leader): `LobbyController.forced` makes the doors' countdown run even
+  if not everyone is ready; reset when the match starts or Play Again returns to the lobby.
+- START NEXT MINIGAME (pause menu, leader, casino open, not minigames-only): `MatchServer.minigame_now`
+  jumps the casino clock to the next minigame's 10 s warning; `minigame_forced {by}` puts
+  "X starts the next minigame now!" in the feed. Refused (`no_minigame`) once the warning runs.
+- PauseMenu.set_dev_available no longer crashes before _ready (test_pause_in_minigame was red on main).
+- Tests: test_room_lobby, test_lobby_panel_host, test_pause_menu, test_pause_in_minigame; lint ok.
+
+### 2026-11-16 / 0.9.57 ready pedestals reworked
+- Patrick: "das klipped und passt nicht. reworke die podeste komplett". The column pedestals with
+  their side rails clipped (rails through the steps, the abacus over the stair, the colour ring
+  under the drum) and stood tight against the wall. Now each pedestal is one piece: a deep brown
+  marble footing, a 1.2 x 1.0 m white marble dais 0.8 m high (dark base moulding, colour inlays in
+  gold frames on both sides and either side of the stair, a gold fillet, a polished overhanging cap)
+  and a three-step stair 0.86 m wide that runs straight into it, no rails. 2.5 m apart (1.2 m free),
+  back 0.3 m off the wall, x ±3.2 / 5.7 / 8.2 / 10.7, z 14.85; start-room spawns moved to z 11.4–11.9.
+  The two mirrors on the pedestal wall are gone. Walking up stays one invisible wedge.
+  `test_lobby_pedestals.gd` green. `test_start_room_and_jail.gd`'s jail path test already fails on
+  main before this change (path ends on the floor at (1.3, 1.25, −3.6)), unrelated.
 ### 2026-11-16 / 0.9.56 Taskbar icon on Windows
 - Patrick: after 0.9.48 the window title showed the logo but the taskbar showed the generic app icon.
   Cause: Godot 4.7.2's exe resource editing writes our icon group without its name, and the engine

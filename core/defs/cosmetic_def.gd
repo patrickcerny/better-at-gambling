@@ -44,12 +44,15 @@ const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_
 ## Developers only (Patrick 2026-11-15: "einen super mega hardcore giga krassen skin für developers
 ## only"): owned by and shown to `DevMode` accounts only, never sold or unlocked.
 @export var dev_only: bool = false
+## Only won on the Daily Spin (`DailyWheel.SKIN_ID`, Patrick 2026-11-16): never sold, never
+## unlocked by level; owned when it is in the Steam inventory (`steam_item`).
+@export var wheel_only: bool = false
 ## KIND_COLOR: the palette index (`Palette.player_color`, `Cosmetics.COLOR_COUNT`).
 @export var color_index: int = -1
 
 
 func is_free() -> bool:
-	return price <= 0 and gold <= 0 and level <= 0 and not dev_only
+	return price <= 0 and gold <= 0 and level <= 0 and not dev_only and not wheel_only
 
 
 ## Whether it can be bought with red Coins.

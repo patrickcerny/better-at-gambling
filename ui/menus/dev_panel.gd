@@ -46,6 +46,8 @@ func _ready() -> void:
 	for step: int in LEVEL_STEPS:
 		_button(prof, "+%d LEVEL%s" % [step, "" if step == 1 else "S"], func() -> void: DevMode.set_level(ProfileManager.profile.level + step)).name = "Level%d" % step
 	_button(prof, "LEVEL 1", func() -> void: DevMode.set_level(1)).name = "Level1Reset"
+	# The local Daily Spin timer only: with Steam, Steam still allows one spin per window.
+	_button(prof, "DAILY SPIN AGAIN", func() -> void: ProfileManager.mark_daily_spin(0)).name = "DailyReset"
 	unlock_toggle = CheckButton.new()
 	unlock_toggle.name = "UnlockAll"
 	unlock_toggle.text = "All cosmetics"

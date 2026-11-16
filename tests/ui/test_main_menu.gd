@@ -46,8 +46,8 @@ func test_entries_in_order_without_a_settings_entry() -> void:
 	var box: VBoxContainer = menu.get_node("Center/Column/VBox")
 	var names: PackedStringArray = []
 	for b: Node in box.get_children():
-		names.append((b as Button).text)
-	assert_eq(names, PackedStringArray(["PLAY ONLINE", "PRACTICE", "TUTORIAL", "SHOP", "QUIT"]))
+		names.append((b as Button).text.get_slice("  ", 0))  # DAILY SPIN carries a star or its countdown
+	assert_eq(names, PackedStringArray(["PLAY ONLINE", "PRACTICE", "TUTORIAL", "SHOP", "DAILY SPIN", "QUIT"]))
 
 
 func test_logo_and_entries_are_centred() -> void:
@@ -224,3 +224,21 @@ func test_browse_cards_show_settings_and_beans() -> void:
 	var beans: Node = list.find_child("Beans", true, false)
 	assert_not_null(beans)
 	assert_eq(beans.get_child_count(), 2, "one bean per player")
+
+
+func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
+	ProfileManager.persist = false
+	ProfileManager.profile.daily_last = 0
+	menu._refresh_daily()
+	assert_eq(menu.daily_entry.text, "DAILY SPIN  ★", "a free spin shines")
+	menu.daily_entry.pressed.emit()
+	assert_true(menu.daily_spin.visible)
+	assert_false(menu.daily_spin.spin_button.disabled)
+	menu.daily_spin.spin()
+	assert_true(menu.daily_spin.wheel.busy(), "the wheel turns")
+	assert_gt(ProfileManager.profile.daily_last, 0, "the spin is remembered")
+	menu.daily_spin.close()
+	menu._refresh_daily()
+	assert_string_starts_with(menu.daily_entry.text, "DAILY SPIN  ·  ")
+	ProfileManager.persist = true
+	ProfileManager.reload()
