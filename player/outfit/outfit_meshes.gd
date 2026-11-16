@@ -105,7 +105,10 @@ static func mesh(id: StringName) -> ArrayMesh:
 		if k.is_empty():
 			AchievementMeshes.eyes(k, id)
 	elif s.begins_with("mouth_"):
-		AchievementMeshes.mouth(k, id)  # mouth pieces that are objects (the shader draws the rest)
+		if id == Cigarette.ID:
+			Cigarette.build(k, Cigarette.pivot(), true)  # the still model; worn, it's a `Cigarette` node
+		else:
+			AchievementMeshes.mouth(k, id)  # mouth pieces that are objects (the shader draws the rest)
 	var m: ArrayMesh = null if k.is_empty() else k.commit()
 	if m != null and id == &"eyes_shades":
 		# A second, see-through surface: the tinted lenses (the eyes show through them).
