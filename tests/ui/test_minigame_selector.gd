@@ -73,7 +73,7 @@ func _toggle(sel: MinigameSelector, id: StringName) -> Button:
 func test_host_opens_it_from_the_settings_with_every_game_and_its_picture() -> void:
 	var sel: MinigameSelector = _open(1)
 	assert_true(sel.visible)
-	assert_eq(panel.minigames_button.text, "PICK MINIGAMES: ALL %d" % Registry.minigames.size())
+	assert_eq(panel.minigames_button.text, "ALL %d  ›" % Registry.minigames.size())
 	assert_eq(sel.tiles.size(), Registry.minigames.size())
 	for id: StringName in Registry.minigames:
 		assert_not_null((sel.tiles[id]["picture"] as TextureRect).texture, "%s has a picture" % id)
@@ -89,7 +89,7 @@ func test_toggles_write_the_pool_and_the_last_game_stays_on() -> void:
 	assert_eq(pool.size(), Registry.minigames.size() - 1)
 	assert_false(pool.has("quiz"))
 	_apply("quiz,spy")
-	assert_eq(panel.minigames_button.text, "PICK MINIGAMES: 2 OF %d" % Registry.minigames.size())
+	assert_eq(panel.minigames_button.text, "2 OF %d  ›" % Registry.minigames.size())
 	_toggle(sel, &"lonely_number").button_pressed = true
 	assert_eq(_last_pool(), "quiz,lonely_number,spy", "registry order")
 	_apply("quiz")
@@ -118,7 +118,7 @@ func test_read_only_for_everyone_but_the_leader() -> void:
 	state.lobby_settings["minigame_pool"] = "quiz,spy"
 	var sel: MinigameSelector = _open(2)
 	assert_true(sel.visible, "non-hosts can look")
-	assert_eq(panel.minigames_button.text, "MINIGAMES: 2 OF %d" % Registry.minigames.size())
+	assert_eq(panel.minigames_button.text, "2 OF %d" % Registry.minigames.size())
 	assert_true(sel.all_button.disabled)
 	assert_true(sel.none_button.disabled)
 	for id: StringName in sel.tiles:

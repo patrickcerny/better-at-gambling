@@ -9,15 +9,14 @@ extends Node
 ## in the entrance hall and play from the next minigame on); only the results screen turns new
 ## faces away (`room_in_progress`). Kicks: the party leader's `kick_player` makes the MatchServer
 ## call `kick_player` here, which sends the kicked client `REJECT {code: kicked}` ("You were kicked
-## by the host") and drops it. The 60 s rejoin block lives in this room (`MatchServer.kick_blocked_for`,
-## checked in `_admit`), not in the orchestrator: the room is the one that knows who was kicked,
-## and a kicked player's join token is still accepted by the orchestrator but refused here.
+## by the host") and drops it. There is no rejoin block: a kicked player may join again on their
+## own right away (Patrick 2026-11-15).
 ##
 ## Host mode (`host_mode`, a party hosted on a player's PC, see `SteamParty`): there is no
 ## orchestrator. Every connection comes over loopback, from the host's own game or from its
 ## `HostBridge`, which stamps friends' hellos with the Steam ID Steam vouched for
-## ("steam:<id>"), so the hello's uid is the identity; build/protocol checks, kicks and the 60 s
-## rejoin block apply as everywhere. The room closes once the host (`host_uid`) has been gone for
+## ("steam:<id>"), so the hello's uid is the identity; build/protocol checks and kicks apply as
+## everywhere. The room closes once the host (`host_uid`) has been gone for
 ## `HOST_GONE_CLOSE` seconds (their game quit or crashed), or never showed up.
 
 const HEARTBEAT_INTERVAL: float = 5.0
@@ -146,11 +145,6 @@ func on_hello(peer: int, hello: Variant) -> void:
 
 
 func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> void:
-	var blocked: float = server.kick_blocked_for(uid)
-	if blocked > 0.0:
-		Log.info(&"room", "peer %d (%s) refused: kicked %.0f s ago" % [peer, display_name, Protocol.KICK_REJOIN_SECONDS - blocked])
-		_reject(peer, &"kick_cooldown", "You were kicked from this lobby. Try again in %d s." % ceili(blocked))
-		return
 	var pid: int = server.player_by_uid(uid)
 	if pid >= 0:
 		var old_peer: int = peer_of(pid)

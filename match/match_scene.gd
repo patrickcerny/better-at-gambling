@@ -287,6 +287,11 @@ func _ready() -> void:
 	view.state.station_changed.connect(_on_station_state)
 	view.state.players_changed.connect(_sync_avatars)
 	view.state.lobby_changed.connect(_on_lobby_changed)
+	if SteamSvc.lobby_owner:
+		# Our party's Steam lobby: BROWSE LOBBIES shows its settings and beans (`LobbyInfo`).
+		for sig: Signal in [view.state.lobby_changed, view.state.players_changed, view.state.phase_changed]:
+			sig.connect(func(_a: Variant = null) -> void: _queue_lobby_info())
+		_queue_lobby_info()
 	view.state.peels_changed.connect(_sync_peels)
 	view.state.effects_changed.connect(_refresh_effect_tag)
 	items_ctl = ItemController.new(self)
@@ -627,6 +632,20 @@ func _drop_departed_avatars() -> void:
 		if not view.state.players.has(pid):
 			avatars[pid].queue_free()
 			avatars.erase(pid)
+
+
+var _lobby_info_queued: bool = false
+
+
+## Writes the lobby info to Steam once per frame at most (a snapshot fires several signals).
+func _queue_lobby_info() -> void:
+	if _lobby_info_queued:
+		return
+	_lobby_info_queued = true
+	(func() -> void:
+		_lobby_info_queued = false
+		if is_instance_valid(view) and view.state != null:
+			SteamSvc.publish_lobby_info(LobbyInfo.from_state(view.state))).call_deferred()
 
 
 func _on_lobby_changed() -> void:
