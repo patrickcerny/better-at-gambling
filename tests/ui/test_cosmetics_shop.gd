@@ -285,3 +285,31 @@ func test_achievement_rewards_are_collected() -> void:
 	assert_true(ProfileManager.profile.owns(&"hat_beacon"))
 	assert_eq(panel.collect_tiles.size(), 0)
 	assert_false(panel.collect_dot.visible)
+
+
+## Patrick 2026-11-16: "Add a none selection to every cosmetic first one (except color) else you
+## ALWAYS have to wear something".
+func test_none_tile_first_takes_the_slot_off() -> void:
+	var panel: CosmeticsPanel = _shop()
+	panel.open()
+	assert_false(panel.none_tiles.has(CosmeticDef.KIND_COLOR), "the colours' page has no NONE")
+	var hat_tile: Button = panel.none_tiles[CosmeticDef.KIND_HAT]
+	assert_eq(hat_tile.get_index(), 0, "NONE is the first tile")
+	assert_true(hat_tile.button_pressed, "nothing worn: NONE is picked")
+	var shop: CosmeticShop = CosmeticShop.default()
+	var hat: CosmeticDef = null
+	for d: CosmeticDef in shop.of_kind(CosmeticDef.KIND_HAT):
+		if d.coin_buyable() and d.level == 0:
+			hat = d
+			break
+	ProfileManager.profile.coins = 1_000_000
+	ProfileManager.profile.buy(hat.id)
+	assert_true(ProfileManager.profile.owns(hat.id))
+	assert_true(ProfileManager.wear(hat.id))
+	panel._refresh()
+	assert_false(hat_tile.button_pressed)
+	panel._on_tile_pressed(hat.id)
+	hat_tile.pressed.emit()
+	assert_eq(ProfileManager.profile.outfit.get(CosmeticDef.KIND_HAT, &""), &"", "the hat came off")
+	assert_eq(panel.preview.outfit.get(CosmeticDef.KIND_HAT, &""), &"", "and off the preview")
+	assert_true(hat_tile.button_pressed)
