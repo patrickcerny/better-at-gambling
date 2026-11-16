@@ -227,7 +227,6 @@ func test_browse_cards_show_settings_and_beans() -> void:
 
 
 func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
-	ProfileManager.persist = false
 	ProfileManager.profile.daily_last = 0
 	menu._refresh_daily()
 	assert_eq(menu.daily_entry.text, "DAILY SPIN  ★", "a free spin shines")
@@ -240,5 +239,4 @@ func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	menu.daily_spin.close()
 	menu._refresh_daily()
 	assert_string_starts_with(menu.daily_entry.text, "DAILY SPIN  ·  ")
-	ProfileManager.persist = true
 	ProfileManager.reload()
