@@ -171,6 +171,11 @@ func _ready() -> void:
 	level_pass = LevelPassPanel.new()
 	add_child(level_pass)
 	profile_badge.pressed.connect(level_pass.open)
+	# The Gold Coins on the profile line (and their +): straight to the shop's GOLD packs.
+	profile_badge.gold_pressed.connect(func() -> void:
+		cosmetics_opener[0] = _cosmetics_entry
+		cosmetics.open()
+		cosmetics.open_gold_shop())
 	level_pass.item_pressed.connect(func(id: StringName) -> void:
 		level_pass.close()
 		cosmetics.open()
