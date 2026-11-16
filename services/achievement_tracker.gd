@@ -29,6 +29,9 @@ const HOLDEM_FULL_HOUSE: int = 6
 ## Hold'em hand category of a Royal Flush (`HoldemHand.Rank.ROYAL_FLUSH`). Patrick 2026-11-16:
 ## "Royal flush achievement". Holding one at the showdown or on the bonus bet earns it, won or not.
 const HOLDEM_ROYAL_FLUSH: int = 9
+## "Suited Trips" (Patrick 2026-11-16: "Hit suited trips on blackjack"): like the 21+3 side bet,
+## the player's first two cards and the dealer's up card are the same card (rank and suit; the shoe
+## has 6 decks). Split hands don't count, they were dealt a new second card.
 ## Slots symbol index of the seven (`SlotsLogic.Sym.SEVEN`).
 const SLOTS_SEVEN: int = 4
 ## Jail visits in one match for "Jailbird".
@@ -43,7 +46,7 @@ const IDS: Array[StringName] = [
 	&"ACH_SLOTS_SEVENS", &"ACH_PLINKO_EDGE", &"ACH_HILO_LADDER", &"ACH_WHEEL_WILD", &"ACH_HOLDEM_FULL_HOUSE",
 	&"ACH_ON_TILT", &"ACH_OUCH", &"ACH_JAILBIRD", &"ACH_WET_FLOOR", &"ACH_TRIP_WAITER", &"ACH_HOT_POTATO",
 	&"ACH_BACKSTABBER", &"ACH_COUNTERFEIT", &"ACH_YEET", &"ACH_LAST_PLACE",
-	&"ACH_HOLDEM_ROYAL_FLUSH",
+	&"ACH_HOLDEM_ROYAL_FLUSH", &"ACH_BJ_SUITED_TRIPS",
 ]
 
 ## Blackjack hands lost in a row right now.
@@ -153,6 +156,10 @@ func _on_blackjack(net: int, d: Dictionary, out: Array[StringName]) -> void:
 	var cards: Array[int] = []
 	for c: Variant in d.get("cards", []):
 		cards.append(int(c))
+	var dealer: Array = d.get("dealer", [])
+	if not bool(d.get("split", false)) and cards.size() >= 2 and not dealer.is_empty() \
+			and cards[0] == cards[1] and cards[1] == int(dealer[0]):
+		out.append(&"ACH_BJ_SUITED_TRIPS")
 	if outcome == &"bust" and cards.size() >= 3:
 		var before: Array[int] = cards.slice(0, cards.size() - 1)
 		if HandEval.total(before) >= BJ_GREEDY_TOTAL:

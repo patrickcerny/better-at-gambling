@@ -41,6 +41,7 @@ LABELS = {
     "ACH_YEET": ("", "YEET"),
     "ACH_LAST_PLACE": ("", "LAST"),
     "ACH_HOLDEM_ROYAL_FLUSH": ("ROYAL", "FLUSH"),
+    "ACH_BJ_SUITED_TRIPS": ("SUITED", "TRIPS"),
 }
 
 ON = {

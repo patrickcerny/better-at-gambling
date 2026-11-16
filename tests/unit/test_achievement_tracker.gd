@@ -173,3 +173,17 @@ func test_participation_trophy() -> void:
 func test_server_has_no_local_player() -> void:
 	var t := AchievementTracker.new()
 	assert_true(t.on_event({"type": &"puddle_slip", "player": ME}, -1).is_empty())
+
+
+func test_blackjack_suited_trips() -> void:
+	var t := AchievementTracker.new()
+	var q: int = Card.make(12, 1)  # queen of hearts
+	var trips := func(cards: Array, up: int, extra: Dictionary = {}) -> Array[StringName]:
+		var d: Dictionary = {"outcome": &"push", "cards": cards, "dealer": [up, Card.make(10, 2)]}
+		d.merge(extra)
+		return t.on_event(_result(&"blackjack_1", 0, d), ME, &"blackjack")
+	assert_true(&"ACH_BJ_SUITED_TRIPS" in trips.call([q, q], q))
+	assert_true(&"ACH_BJ_SUITED_TRIPS" in trips.call([q, q, Card.make(2)], q), "hit after the deal still counts")
+	assert_false(&"ACH_BJ_SUITED_TRIPS" in trips.call([q, Card.make(12, 2)], q), "suits differ")
+	assert_false(&"ACH_BJ_SUITED_TRIPS" in trips.call([q, q], Card.make(12, 0)), "dealer suit differs")
+	assert_false(&"ACH_BJ_SUITED_TRIPS" in trips.call([q, q], q, {"split": true}), "split hand")

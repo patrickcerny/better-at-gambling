@@ -64,6 +64,7 @@ const DEFS: Dictionary[StringName, Array] = {
 	&"ACH_LAST_PLACE": ["Participation Trophy", "Finish last in a minigame with 3 or more players."],
 	# 0.10.7 (Patrick 2026-11-16: "Royal flush achievement").
 	&"ACH_HOLDEM_ROYAL_FLUSH": ["Royal Flush", "Get a Royal Flush in Hold'em."],
+	&"ACH_BJ_SUITED_TRIPS": ["Suited Trips", "In blackjack, get dealt two identical cards that also match the dealer's up card in rank and suit."],
 }
 
 ## Patrick 2026-11-15: "a Steam achievement (beat the Dev) where you have to win against me in a
