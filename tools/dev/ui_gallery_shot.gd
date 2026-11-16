@@ -1,7 +1,7 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
 ## `--panel lobby|players|players_lobby|shop|rewards|settings|audio|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining|dev|dev_corner|dev_match|confirm`
-## (tutorial: `--page N` picks the page, `--minigame <id>` opens that game's page)
+## (tutorial: `--page N` picks the page, -1 the overview, `--minigame <id>` opens that game's page)
 ## over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
 
@@ -71,7 +71,10 @@ func _ready() -> void:
 			menu.call(&"_show_tutorial", null)
 			var how: HowToPlayPanel = menu.get("how_to_play")
 			var cl: Cmdline = Cmdline.parse(OS.get_cmdline_user_args())
-			how.show_page(cl.get_int("page", 2))
+			if cl.get_int("page", 2) >= 0:  # `--page -1`: the overview with the three chapter cards
+				how.show_page(cl.get_int("page", 2))
+			else:
+				how.chapter_cards[0].grab_focus.call_deferred()
 			if cl.has("minigame"):
 				how.open_minigame(StringName(cl.get_string("minigame")))
 		"dev":
@@ -100,7 +103,11 @@ func _ready() -> void:
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
 			menu.call(&"_show_online")
-			menu.call(&"_set_status", "Room codes have 5 letters.", true)
+			var online: OnlineMenu = menu.get("online")
+			for c: PictureCard in online.cards():  # no Steam here: as if it ran
+				c.disabled = false
+			online.set_friend_lobbies(2)
+			online.public_card.grab_focus.call_deferred()
 		"browser":
 			# BROWSE LOBBIES: lobby cards with the host's settings and the beans inside (LobbyInfo).
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()

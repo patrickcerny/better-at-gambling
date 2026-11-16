@@ -11,12 +11,13 @@ extends Control
 ## Joining shows the joining screen (`Loading`, with the logo) until the match has loaded;
 ## connection errors from the last online attempt are shown here when we return. There is no
 ## join-by-address (Patrick: "Remove join by ip and port") and no lobby server of ours any more
-## (Patrick 2026-11-14: "nur noch über Steam"): CREATE LOBBY runs the party on this PC, PUBLIC or
-## PRIVATE (Patrick 2026-11-15: "open lobby, private public and browse lobbies"). Private = friends
-## and invited players only (Steam invites, FRIENDS' LOBBIES); public lobbies are also
-## listed under BROWSE LOBBIES for everyone (other versions greyed out, `SteamParty`). Both lists
-## are full screens of small cards with the players' heads (`LobbyListScreen`). Without Steam
-## running the online buttons are just disabled, with no text about it (Patrick: "useless text").
+## (Patrick 2026-11-14: "nur noch über Steam"). PLAY ONLINE is a full screen of four picture cards
+## (`OnlineMenu`, Patrick 2026-11-16): PUBLIC LOBBY and PRIVATE LOBBY run the party on this PC
+## (private = friends and invited players only; public ones are also listed under BROWSE LOBBIES
+## for everyone, other versions greyed out, `SteamParty`), BROWSE LOBBIES and FRIENDS' LOBBIES
+## open full screens of small cards with the players' heads (`LobbyListScreen`). Your name online
+## is your Steam name (`SceneRouter.profile_name`), there is no name field. Without Steam
+## running the cards are just disabled, with no text about it (Patrick: "useless text").
 ## `--connect` stays a dev/test command-line flag.
 
 ## PRACTICE starts a solo casino match: `practice_requested` fires first, then the match scene
@@ -31,21 +32,17 @@ signal practice_requested(settings: Dictionary)
 @onready var _main_box: VBoxContainer = %VBox
 @onready var _column: VBoxContainer = %Column
 
-var _online_box: VBoxContainer
-var _name_edit: LineEdit
-## CREATE LOBBY (the party runs on this PC, friends join through Steam), and friends' lobbies.
-var host_button: Button
-## PUBLIC / PRIVATE for the next CREATE LOBBY (remembered in `online/public_lobby`).
-var public_toggle: Button
-var private_toggle: Button
+## PLAY ONLINE: the four picture cards (`OnlineMenu`).
+var online: OnlineMenu
+## PUBLIC LOBBY / PRIVATE LOBBY (the party runs on this PC, friends join through Steam).
+var public_card: PictureCard
+var private_card: PictureCard
 ## BROWSE LOBBIES and the full-screen PUBLIC LOBBIES it opens.
-var browse_button: Button
+var browse_card: PictureCard
 var browse_screen: LobbyListScreen
 ## FRIENDS' LOBBIES and its full-screen list (the lobbies your Steam friends are in).
-var friends_button: Button
+var friends_card: PictureCard
 var friends_screen: LobbyListScreen
-var _online_back: Button
-var _status: Label
 var _busy: bool = false
 var _settings: SettingsPanel
 var _settings_button: GearButton
@@ -196,7 +193,7 @@ func _ready() -> void:
 	add_child(help_button)
 	help_button.pressed.connect(func() -> void:
 		if _busy:
-			return  # joining: the online box stays up with its status
+			return  # joining: PLAY ONLINE stays up with its status
 		_after_tutorial = Callable()
 		_show_tutorial(help_button))
 	_build_leaderboards()
@@ -296,65 +293,18 @@ func _refresh_daily() -> void:
 	daily_button.set_state(w <= 0, DailyWheel.wait_text(w))
 
 
-func _sub_box(box_name: String, title_text: String, width: float = 540.0) -> VBoxContainer:
-	var box := VBoxContainer.new()
-	box.name = box_name
-	box.custom_minimum_size = Vector2(width, 0)
-	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_theme_constant_override(&"separation", 12)
-	box.visible = false
-	_column.add_child(box)
-	var title := Label.new()
-	title.text = title_text
-	title.theme_type_variation = &"HeadingLabel"
-	title.add_theme_font_size_override(&"font_size", 44)
-	title.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-	box.add_child(title)
-	return box
-
-
 func _build_online() -> void:
-	_online_box = _sub_box("Online", "PLAY ONLINE")
-	_name_edit = LineEdit.new()
-	_name_edit.placeholder_text = "Your name"
-	_name_edit.text = SceneRouter.profile_name()
-	_name_edit.max_length = 24
-	_online_box.add_child(_name_edit)
-	_name_edit.text_submitted.connect(func(_t: String) -> void: _save_name())
-	_name_edit.focus_exited.connect(_save_name)
-	PadKeyboard.attach(_name_edit)  # A on it with a gamepad: Steam's keyboard (Deck) or ours
-	var kind_row := HBoxContainer.new()
-	kind_row.name = "LobbyKind"
-	kind_row.add_theme_constant_override(&"separation", 8)
-	_online_box.add_child(kind_row)
-	var group := ButtonGroup.new()
-	public_toggle = _button("Public", func() -> void: _set_public(true))
-	public_toggle.name = "Public"
-	public_toggle.tooltip_text = "Anyone can find and join it under Browse Lobbies"
-	private_toggle = _button("Private", func() -> void: _set_public(false))
-	private_toggle.name = "Private"
-	private_toggle.tooltip_text = "Only your friends and players you invite can join"
-	for t: Button in [public_toggle, private_toggle]:
-		t.toggle_mode = true
-		t.button_group = group
-		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		kind_row.add_child(t)
-	(public_toggle if lobby_public() else private_toggle).set_pressed_no_signal(true)
-	host_button = _button(HOST_LABEL, _host_steam)
-	host_button.name = "HostParty"
-	_online_box.add_child(host_button)
-	browse_button = _button("Browse Lobbies", _show_browse)
-	browse_button.name = "BrowseLobbies"
-	_online_box.add_child(browse_button)
-	friends_button = _button(FRIENDS_LABEL, _show_friends)
-	friends_button.name = "FriendsLobbies"
-	_online_box.add_child(friends_button)
-	_status = Label.new()
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.custom_minimum_size = Vector2(540, 0)
-	_online_box.add_child(_status)
-	_online_back = _button("Back", _show_main)
-	_online_box.add_child(_online_back)
+	online = OnlineMenu.new()
+	add_child(online)
+	public_card = online.public_card
+	private_card = online.private_card
+	browse_card = online.browse_card
+	friends_card = online.friends_card
+	public_card.pressed.connect(_host_steam.bind(true))
+	private_card.pressed.connect(_host_steam.bind(false))
+	browse_card.pressed.connect(_show_browse)
+	friends_card.pressed.connect(_show_friends)
+	online.back_pressed.connect(_show_main)
 	_build_lists()
 	_refresh_steam_entries()
 
@@ -365,11 +315,11 @@ func _build_lists() -> void:
 	browse_screen = LobbyListScreen.new("Browse", "PUBLIC LOBBIES")
 	add_child(browse_screen)
 	browse_screen.refresh_pressed.connect(_refresh_browse)
-	browse_screen.back_pressed.connect(_back_to_online.bind(browse_button))
+	browse_screen.back_pressed.connect(_back_to_online.bind(browse_card))
 	friends_screen = LobbyListScreen.new("JoinFriend", "FRIENDS' LOBBIES")
 	add_child(friends_screen)
 	friends_screen.refresh_pressed.connect(_refresh_steam_entries)
-	friends_screen.back_pressed.connect(_back_to_online.bind(friends_button))
+	friends_screen.back_pressed.connect(_back_to_online.bind(friends_card))
 	SteamSvc.public_lobbies_received.connect(_on_public_lobbies)
 
 
@@ -432,7 +382,7 @@ func _button(text: String, cb: Callable, min_width: float = 0.0) -> Button:
 func _hide_boxes() -> void:
 	_main_box.visible = false
 	_set_logo_visible(false)
-	_online_box.visible = false
+	online.visible = false
 	browse_screen.visible = false
 	friends_screen.visible = false
 	_set_corner_visible(true)
@@ -443,11 +393,12 @@ func _hide_boxes() -> void:
 
 func _show_online() -> void:
 	_hide_boxes()
-	_online_box.visible = true
+	_set_corner_visible(false)
+	online.visible = true
 	if not _busy:
-		_status.text = ""
+		online.status.text = ""
 	_refresh_steam_entries()
-	(host_button if not host_button.disabled else _online_back).grab_focus()
+	online.focus_first()
 
 
 func _show_browse() -> void:
@@ -473,7 +424,7 @@ func _open_list(screen: LobbyListScreen) -> void:
 	screen.visible = true
 
 
-## BACK / Esc on a lobby list: PLAY ONLINE again, the focus on the button that opened the list.
+## BACK / Esc on a lobby list: PLAY ONLINE again, the focus on the card that opened the list.
 func _back_to_online(opener: Button) -> void:
 	if _busy:
 		return
@@ -487,16 +438,6 @@ func _set_corner_visible(on: bool) -> void:
 	for c: Control in [profile_badge, _settings_button, cosmetics_button, help_button, trophy_button, daily_button, dev_entry]:
 		if c != null:
 			c.visible = on
-
-
-## Whether CREATE LOBBY makes a public lobby (default: private).
-static func lobby_public() -> bool:
-	return bool(Settings.get_value("online", "public_lobby", false))
-
-
-func _set_public(on: bool) -> void:
-	Settings.set_value("online", "public_lobby", on)
-	Settings.save()
 
 
 ## Whether the player has been through the tutorial once (`tutorial/seen` in user://settings.cfg).
@@ -557,8 +498,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if browse_screen.visible or friends_screen.visible:
 		get_viewport().set_input_as_handled()
-		_back_to_online(browse_button if browse_screen.visible else friends_button)
-	elif _online_box.visible:
+		_back_to_online(browse_card if browse_screen.visible else friends_card)
+	elif online.visible:
 		get_viewport().set_input_as_handled()
 		_show_main()
 
@@ -575,21 +516,14 @@ func _set_logo_visible(on: bool) -> void:
 	(_column.get_node("Rule") as Control).visible = on
 
 
-func _save_name() -> void:
-	var n: String = _name_edit.text.strip_edges()
-	if n != "":
-		Settings.set_value("profile", "name", n)
-		Settings.save()
-
-
+## Your name in a lobby: your Steam name (no name field, Patrick 2026-11-16).
 func _display_name() -> String:
-	_save_name()
 	return SceneRouter.profile_name()
 
 
 ## The status line of the open box (PLAY ONLINE or a lobby list).
 func _set_status(text: String, error: bool = false) -> void:
-	for l: Label in [_status, browse_screen.status if browse_screen != null else null, friends_screen.status if friends_screen != null else null]:
+	for l: Label in [online.status if online != null else null, browse_screen.status if browse_screen != null else null, friends_screen.status if friends_screen != null else null]:
 		if l == null:
 			continue
 		l.text = text
@@ -629,8 +563,6 @@ func _on_failed(reason: String) -> void:
 
 # --- Lobbies (Steam) ---------------------------------------------------------------------------
 
-const HOST_LABEL: String = "Create Lobby"
-const FRIENDS_LABEL: String = "Friends' Lobbies"
 const FRIENDS_REFRESH: float = 3.0
 ## BROWSE LOBBIES asks Steam again this often while it is open.
 const BROWSE_REFRESH: float = 8.0
@@ -640,21 +572,19 @@ var _browse_timer: float = 0.0
 var _friend_lobby_ids: Dictionary = {}
 
 
-## Host button state and the friends' parties (Steam only).
+## The cards' state and the friends' parties (Steam only).
 func _refresh_steam_entries() -> void:
 	var on: bool = SteamSvc.is_available()
-	for b: Button in [host_button, browse_button, friends_button, public_toggle, private_toggle]:
-		b.disabled = not on
-	host_button.tooltip_text = "Invite your friends from the lobby" if on else ""
-	friends_button.text = FRIENDS_LABEL
+	for c: PictureCard in online.cards():
+		c.disabled = not on
+	online.set_friend_lobbies(0)
 	if not on:
 		return
 	var parties: Array[Dictionary] = SteamSvc.friend_lobbies()
 	_friend_lobby_ids.clear()
 	for f: Dictionary in parties:
 		_friend_lobby_ids[int(f["lobby"])] = (f["friends"] as Array).duplicate()
-	if not parties.is_empty():
-		friends_button.text = "%s  ·  %d" % [FRIENDS_LABEL, parties.size()]
+	online.set_friend_lobbies(parties.size())
 	_fill_friends(parties)
 
 
@@ -794,7 +724,7 @@ func _process(delta: float) -> void:
 		_browse_timer += delta
 		if _browse_timer >= BROWSE_REFRESH:
 			_refresh_browse()
-	if not (_online_box.visible or friends_screen.visible) or not SteamSvc.is_available():
+	if not (online.visible or friends_screen.visible) or not SteamSvc.is_available():
 		return
 	_friends_timer += delta
 	if _friends_timer >= FRIENDS_REFRESH and not _busy:
@@ -802,15 +732,15 @@ func _process(delta: float) -> void:
 		_refresh_steam_entries()
 
 
-## CREATE LOBBY: start the party server here, open the Steam lobby, then join it.
-func _host_steam() -> void:
+## PUBLIC LOBBY / PRIVATE LOBBY: start the party server here, open the Steam lobby, then join it.
+func _host_steam(public: bool) -> void:
 	if _busy or not SteamSvc.is_available():
 		return
 	_busy = true
 	_set_status("Starting your lobby…")
-	_status.remove_theme_color_override(&"font_color")
+	online.status.remove_theme_color_override(&"font_color")
 	var name_: String = _display_name()
-	var port: int = await Net.steam_party.start_hosting(name_, public_toggle.button_pressed)
+	var port: int = await Net.steam_party.start_hosting(name_, public)
 	if port == 0:
 		_busy = false
 		_set_status(Net.steam_party.last_error, true)
@@ -821,7 +751,7 @@ func _host_steam() -> void:
 func _on_steam_join_requested(lobby_id: int) -> void:
 	if not is_inside_tree():
 		return
-	if not (_online_box.visible or browse_screen.visible or friends_screen.visible):
+	if not (online.visible or browse_screen.visible or friends_screen.visible):
 		_show_online()
 	_join_steam_lobby(lobby_id)
 
@@ -834,7 +764,7 @@ func _join_steam_lobby(lobby_id: int) -> void:
 		return
 	_busy = true
 	_set_status("Joining the lobby…")
-	_status.remove_theme_color_override(&"font_color")
+	online.status.remove_theme_color_override(&"font_color")
 	var host_id: int = await Net.steam_party.enter_lobby(lobby_id)
 	if host_id == 0:
 		_busy = false

@@ -257,15 +257,11 @@ func _build_minigames() -> Control:
 		var tv := VBoxContainer.new()
 		tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tv.add_theme_constant_override(&"separation", 4)
-		tv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 6)
+		tv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 		tile.add_child(tv)
-		var pic := TextureRect.new()
-		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pic.custom_minimum_size = Vector2(0, TILE_PICTURE.y)
+		# Rounded, inside the tile's rounding (Patrick 2026-11-16: "images are clipping").
+		var pic: Panel = PictureCard.rounded_picture(MinigameSelector.picture(def.id), Vector2(0, TILE_PICTURE.y))
 		pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		pic.texture = MinigameSelector.picture(def.id)
 		tv.add_child(pic)
 		var nl := Label.new()
 		nl.mouse_filter = Control.MOUSE_FILTER_IGNORE

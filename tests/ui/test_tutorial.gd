@@ -2,7 +2,8 @@ extends GutTest
 ## Tutorial (Patrick: "add a Tutorial (when you first start the game, you have to click through it
 ## with buttons. After that, theres a questionmark button just like the settings where you can see
 ## it again. The Tutorial pops up when you click practise or play for the first time."): picture
-## pages with BACK / NEXT / DONE and SKIP; the first PRACTICE or PLAY ONLINE shows it once
+## an overview of three chapter cards (Patrick 2026-11-16: "Zuerst ein Screen mit den 3 buttons"),
+## then picture pages with BACK / NEXT / DONE, ALL TOPICS and ✕ ("Mach die controls auch besser"); the first PRACTICE or PLAY ONLINE shows it once
 ## (`tutorial/seen` in user://settings.cfg) and then carries on (PRACTICE: the solo casino match); a "?" next to the gear
 ## opens it from the main menu and from the pause menu.
 
@@ -45,27 +46,53 @@ func _saved_seen() -> bool:
 	return bool(cfg.get_value("tutorial", "seen", false))
 
 
-func test_next_back_done_and_the_counter() -> void:
+func test_overview_first_with_three_chapter_cards() -> void:
+	var how: HowToPlayPanel = await _panel()
+	assert_true(how.on_overview)
+	assert_true(how.overview.visible)
+	assert_false(how.chapter_box.visible)
+	assert_eq(how.chapter_cards.size(), 3)
+	for c: PictureCard in how.chapter_cards:
+		assert_not_null(c.picture.texture, "%s has its picture" % c.name)
+		assert_ne(c.caption_label.text, "")
+	assert_eq(how.chapter_cards.map(func(c: PictureCard) -> String: return c.title_label.text), ["The Casino", "The Items", "The Minigames"])
+	assert_true(how.chapter_cards[0].has_focus(), "THE CASINO is focused")
+	how.chapter_cards[1].pressed.emit()
+	assert_false(how.on_overview)
+	assert_true(how.chapter_box.visible)
+	assert_eq(how.heading.text, "USING ITEMS", "THE ITEMS starts with using them")
+	assert_eq(how.chapter_title.text, "THE ITEMS")
+	how.topics_button.pressed.emit()
+	assert_true(how.on_overview, "ALL TOPICS goes back to the cards")
+	assert_true(how.chapter_cards[1].has_focus(), "on the chapter you came from")
+
+
+func test_next_back_dots_and_done() -> void:
 	var how: HowToPlayPanel = await _panel()
 	var n: int = HowToPlayPanel.PAGES.size()
+	how.open_section(0)
+	var casino: Array[int] = HowToPlayPanel.pages_of(0)
 	assert_eq(how.page, 0)
-	assert_string_ends_with(how.counter.text, " 1 / %d" % n)
-	assert_true(how.back_button.disabled, "no BACK on the first page")
+	assert_eq(how.dots.get_child_count(), casino.size(), "a dot per page of the chapter")
+	assert_false(how.back_button.disabled)
 	assert_true(how.next_button.visible)
 	assert_false(how.done_button.visible, "DONE only on the last page")
-	assert_true(how.skip_button.visible, "SKIP from the start")
 	assert_true(how.next_button.has_focus(), "NEXT is focused")
+	how.back_button.pressed.emit()
+	assert_true(how.on_overview, "BACK on a chapter's first page: the overview")
+	how.open_section(0)
 	how.next_button.pressed.emit()
 	assert_eq(how.page, 1)
-	assert_string_ends_with(how.counter.text, " 2 / %d" % n)
-	assert_false(how.back_button.disabled)
 	how.back_button.pressed.emit()
 	assert_eq(how.page, 0)
+	how.show_page(casino[-1])
+	assert_eq(how.next_button.text, "NEXT: THE ITEMS  ▶", "the chapter's last page says where NEXT goes")
+	how.next_button.pressed.emit()
+	assert_eq(HowToPlayPanel.section_of(how.page), 1, "on into THE ITEMS")
 	for i: int in n + 2:  # past the end stays on the last page
 		if how.next_button.visible:
 			how.next_button.pressed.emit()
 	assert_eq(how.page, n - 1)
-	assert_string_ends_with(how.counter.text, " %d / %d" % [n, n])
 	assert_false(how.next_button.visible)
 	assert_true(how.done_button.visible)
 	assert_true(how.done_button.has_focus(), "DONE is focused on the last page")
@@ -94,30 +121,31 @@ func test_every_page_has_a_picture_heading_and_text() -> void:
 		assert_gt(how.body.text.length(), 40)
 		assert_false(how.body.text.contains("{"), "page %d key names filled in" % (i + 1))
 	assert_eq(how.picture.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_CENTERED, "pictures keep their aspect")
-	assert_eq((how.find_child("Title", true, false) as Label).text, "HOW TO PLAY")
+	assert_eq((how.overview.find_child("Title", true, false) as Label).text, "HOW TO PLAY")
 
 
-func test_three_sections_with_tabs() -> void:
-	# Patrick: "split the tutorial into The casino, The items and The mingamges".
+func test_long_texts_stay_above_the_buttons() -> void:
+	# Patrick 2026-11-16: "how to play clips" (USING ITEMS ran under SKIP / BACK / NEXT).
 	var how: HowToPlayPanel = await _panel()
+	var buttons: Control = how.find_child("Buttons", true, false) as Control
+	for i: int in HowToPlayPanel.PAGES.size():
+		how.show_page(i)
+		await wait_process_frames(1)
+		if not how.page_box.visible:
+			continue
+		var text_bottom: float = how.body_scroll.get_global_rect().end.y
+		assert_lte(text_bottom, buttons.get_global_rect().position.y + 0.5, "page %d text ends above the buttons" % (i + 1))
+		assert_lte(how.page_box.get_combined_minimum_size().y, HowToPlayPanel.CONTENT_SIZE.y + 0.5, "page %d fits its area" % (i + 1))
+
+
+func test_three_chapters_in_order() -> void:
+	# Patrick: "split the tutorial into The casino, The items and The mingamges".
 	assert_eq(HowToPlayPanel.SECTIONS, ["THE CASINO", "THE ITEMS", "THE MINIGAMES"] as Array[String])
-	assert_eq(how.tabs.size(), 3)
 	var last_section: int = 0
 	for i: int in HowToPlayPanel.PAGES.size():
 		var sec: int = HowToPlayPanel.section_of(i)
 		assert_gte(sec, last_section, "pages run in section order")
 		last_section = sec
-	assert_true(how.tabs[0].button_pressed, "THE CASINO lit on the first page")
-	how.tabs[1].pressed.emit()
-	assert_eq(HowToPlayPanel.section_of(how.page), 1)
-	assert_eq(how.heading.text, "USING ITEMS", "THE ITEMS starts with using them")
-	assert_true(how.tabs[1].button_pressed)
-	assert_false(how.tabs[0].button_pressed)
-	assert_string_contains(how.counter.text, "THE ITEMS")
-	how.tabs[2].pressed.emit()
-	assert_eq(how.heading.text, "MINIGAMES")
-	how.tabs[0].pressed.emit()
-	assert_eq(how.page, 0)
 	# Casino pages: smash the button is still there, items moved out of the casino section.
 	var headings: Array[String] = []
 	for p: Array in HowToPlayPanel.PAGES:
@@ -194,13 +222,13 @@ func test_minigame_grid_and_a_page_per_game() -> void:
 	assert_string_contains(how.body.text, "bat")
 	assert_string_contains(how.body.text, "2+ players")
 	assert_eq(how.picture.texture, MinigameSelector.picture(&"bat_heist"))
-	assert_eq(how.back_button.text, "ALL MINIGAMES")
+	assert_eq(how.back_button.text, "◀  ALL MINIGAMES")
 	how.back_button.pressed.emit()
 	assert_eq(how.minigame, &"")
 	assert_true(how.minigames_box.visible, "back to the grid")
 	assert_eq(how.page, grid_page)
 	how.open_minigame(first)
-	assert_eq(how.next_button.text, "NEXT GAME")
+	assert_eq(how.next_button.text, "NEXT GAME  ▶")
 	how.next_button.pressed.emit()
 	assert_eq(how.minigame, second, "NEXT GAME steps through the games")
 	how.open_minigame(StringName(Registry.minigames.keys()[-1]))
@@ -210,19 +238,32 @@ func test_minigame_grid_and_a_page_per_game() -> void:
 	assert_signal_emit_count(how, "closed", 1, "DONE from a game page closes")
 
 
-func test_escape_and_skip_close() -> void:
+func test_escape_steps_back_and_close_closes() -> void:
 	var how: HowToPlayPanel = await _panel()
 	watch_signals(how)
 	var k := InputEventAction.new()
 	k.action = &"ui_cancel"
 	k.pressed = true
+	how.open_minigame(Registry.minigames.keys()[0])
 	get_tree().root.push_input(k)
 	await wait_process_frames(2)
-	assert_false(how.visible, "Esc closes")
-	assert_signal_emitted(how, "closed")
+	assert_eq(how.minigame, &"", "Esc on a game's page: the grid")
+	assert_true(how.minigames_box.visible)
+	get_tree().root.push_input(k)
+	await wait_process_frames(2)
+	assert_true(how.on_overview, "Esc in a chapter: the overview")
+	assert_true(how.visible)
+	get_tree().root.push_input(k)
+	await wait_process_frames(2)
+	assert_false(how.visible, "Esc on the overview closes")
+	assert_signal_emit_count(how, "closed", 1)
 	how.open()
-	how.skip_button.pressed.emit()
-	assert_false(how.visible, "SKIP closes")
+	how.overview_close.pressed.emit()
+	assert_false(how.visible, "CLOSE closes")
+	how.open()
+	how.open_section(2)
+	how.close_button.pressed.emit()
+	assert_false(how.visible, "✕ closes from a chapter")
 
 
 func test_first_practice_shows_the_tutorial_then_starts_the_match() -> void:
@@ -236,7 +277,8 @@ func test_first_practice_shows_the_tutorial_then_starts_the_match() -> void:
 	await wait_process_frames(1)
 	assert_true(how.visible, "the first PRACTICE opens the tutorial")
 	assert_signal_not_emitted(menu, "practice_requested", "the match waits")
-	assert_eq(how.page, 0)
+	assert_true(how.on_overview)
+	how.chapter_cards[0].pressed.emit()
 	for i: int in HowToPlayPanel.PAGES.size() - 1:
 		how.next_button.pressed.emit()
 	how.done_button.pressed.emit()
@@ -252,16 +294,16 @@ func test_first_practice_shows_the_tutorial_then_starts_the_match() -> void:
 	assert_signal_emit_count(menu, "practice_requested", 2)
 
 
-func test_first_practice_skip_also_starts_the_match() -> void:
+func test_first_practice_close_also_starts_the_match() -> void:
 	Settings.set_value("tutorial", "seen", false)
 	var menu: Control = await _menu()
 	menu.set(&"load_match", false)
 	watch_signals(menu)
 	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
 	await wait_process_frames(1)
-	(menu.get("how_to_play") as HowToPlayPanel).skip_button.pressed.emit()
+	(menu.get("how_to_play") as HowToPlayPanel).overview_close.pressed.emit()
 	await wait_process_frames(1)
-	assert_signal_emit_count(menu, "practice_requested", 1, "SKIP carries on to the match")
+	assert_signal_emit_count(menu, "practice_requested", 1, "CLOSE carries on to the match")
 
 
 func test_first_play_online_skip_carries_on_to_the_online_box() -> void:
@@ -271,9 +313,9 @@ func test_first_play_online_skip_carries_on_to_the_online_box() -> void:
 	(menu.get_node("Center/Column/VBox/PlayOnline") as Button).pressed.emit()
 	await wait_process_frames(1)
 	assert_true(how.visible, "the first PLAY ONLINE opens the tutorial")
-	how.skip_button.pressed.emit()
+	how.overview_close.pressed.emit()
 	await wait_process_frames(1)
-	assert_true((menu.find_child("Online", true, false) as Control).visible, "SKIP carries on to PLAY ONLINE")
+	assert_true((menu.find_child("Online", true, false) as Control).visible, "CLOSE carries on to PLAY ONLINE")
 	assert_true(bool(Settings.get_value("tutorial", "seen", false)))
 
 
@@ -304,8 +346,8 @@ func test_question_mark_in_the_main_menu() -> void:
 	await wait_process_frames(1)
 	var how: HowToPlayPanel = menu.get("how_to_play")
 	assert_true(how.visible, "? opens the tutorial")
-	assert_eq(how.page, 0)
-	how.skip_button.pressed.emit()
+	assert_true(how.on_overview)
+	how.overview_close.pressed.emit()
 	await wait_process_frames(1)
 	assert_true((menu.get_node("Center/Column/VBox") as Control).visible, "back to the entries")
 	assert_false((menu.find_child("Online", true, false) as Control).visible, "nothing else opens")
@@ -326,7 +368,7 @@ func test_question_mark_in_the_pause_menu() -> void:
 	await wait_process_frames(1)
 	assert_true(pause.how_to_play.visible, "? opens the tutorial in game")
 	assert_false(pause.panel.visible, "in place of the pause panel")
-	assert_true(pause.how_to_play.next_button.has_focus())
+	assert_true(pause.how_to_play.chapter_cards[0].has_focus(), "the overview, THE CASINO focused")
 	var k := InputEventAction.new()
 	k.action = &"ui_cancel"
 	k.pressed = true
