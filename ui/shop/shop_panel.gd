@@ -199,6 +199,11 @@ func _set_buttons_enabled(on: bool) -> void:
 			(c as Button).disabled = not on
 
 
+## When the stock changes: after the next minigame, or in Practice (no minigames) next round.
+func _restock_text() -> String:
+	return "New stock next round." if state != null and bool(state.lobby_settings.get("no_minigames", false)) else "New stock after the next minigame."
+
+
 func _refresh() -> void:
 	if state == null or _rows == null:
 		return
@@ -206,7 +211,7 @@ func _refresh() -> void:
 		return  # keep "Buying…" until the server answers
 	_bought = bool(Net.request_private_snapshot().get("items", {}).get("shop_bought", false))
 	var money: int = state.balance(local_id)
-	_note.text = "You already bought something this round. New stock after the next minigame." if _bought else "One souvenir per round. Pick wisely."
+	_note.text = ("You already bought something this round. %s" % _restock_text()) if _bought else "One souvenir per round. Pick wisely."
 	_cash.text = "$%s" % Hud._thousands(money)
 	if _thumbs == null and is_inside_tree():
 		_thumbs = ItemThumbnails.new()
@@ -225,7 +230,7 @@ func _refresh() -> void:
 		_rows.add_child(_card(i, state.shop_offers[i], money))
 	if state.shop_offers.is_empty():
 		var l := Label.new()
-		l.text = "Sold out. New stock after the next minigame."
+		l.text = "Sold out. %s" % _restock_text()
 		l.custom_minimum_size = Vector2(0, 200)
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_rows.add_child(l)

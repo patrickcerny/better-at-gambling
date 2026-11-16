@@ -137,6 +137,8 @@ func minigame_now() -> void:
 	var id := StringName(str(minigame_pick.get_selected_metadata()))
 	if _scene.server.dev_minigame_now(id):
 		close()
+	elif _scene.server.phases.no_minigames:
+		_say("Practice has no minigames: start one from DEV MODE in the main menu")
 	else:
 		_say("Only in the casino, and only while a minigame is left this match")
 

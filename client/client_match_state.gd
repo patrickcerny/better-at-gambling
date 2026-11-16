@@ -206,6 +206,8 @@ func _apply(ev: Dictionary) -> void:
 			casino_time = float(ev.get("casino_time", casino_time))
 			segment_index = int(ev.get("segment", segment_index))
 			phase_changed.emit(phase)
+		&"round_turned":
+			segment_index = int(ev.get("segment", segment_index))  # Practice: a new round, no minigame
 		&"last_call":
 			last_call = true
 			_feed("LAST CALL! All winnings ×%.1f" % float(ev["multiplier"]), &"last_call")

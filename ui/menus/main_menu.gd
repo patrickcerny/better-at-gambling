@@ -411,9 +411,10 @@ func start_dev_practice(settings: Dictionary) -> void:
 
 
 ## PRACTICE: the solo casino match straight away (the match scene merges
-## `SceneRouter.practice_settings` over the command line's).
+## `SceneRouter.practice_settings` over the command line's). No minigames (Patrick 2026-11-16):
+## the rounds turn over in the casino where a minigame would start.
 func start_practice() -> void:
-	SceneRouter.practice_settings = {"mode": MatchMode.CASINO}
+	SceneRouter.practice_settings = {"mode": MatchMode.CASINO, "no_minigames": true}
 	practice_requested.emit(SceneRouter.practice_settings)
 	if load_match:
 		SceneRouter.goto(SceneRouter.MATCH)

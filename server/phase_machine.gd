@@ -23,6 +23,11 @@ var regroup_seconds: float = 5.0
 ## `MatchMode.MINIGAMES`: no casino. INTRO and each REGROUP lead straight into the next minigame,
 ## the last REGROUP into RESULTS; casino time never advances.
 var minigames_only: bool = false
+## Practice (Patrick 2026-11-16: "No minigames in the practise mode"): the casino never closes for
+## a minigame. Where one would start the round simply turns over (`&"round_turned"`): a new
+## segment begins (limits, shop stock, Out of Order signs) with no warning, no minigame, no
+## rewards and no regroup.
+var no_minigames: bool = false
 
 
 func _init(p_schedule: MatchSchedule, p_regroup_seconds: float = 5.0) -> void:
@@ -37,7 +42,7 @@ func start() -> void:
 
 
 ## Advances time. Returns a list of notifications: &"last_call", &"segment_ended", &"minigame_due",
-## &"minigame_started", &"match_over".
+## &"minigame_started", &"round_turned", &"match_over".
 func advance(delta: float) -> Array[StringName]:
 	var out: Array[StringName] = []
 	match phase:
@@ -58,6 +63,10 @@ func advance(delta: float) -> Array[StringName]:
 				out.append(&"segment_ended")
 				_go(Phase.Id.RESULTS)
 				out.append(&"match_over")
+			elif no_minigames:
+				if minigames_done < schedule.minigames and casino_time >= schedule.minigame_times()[minigames_done]:
+					minigames_done += 1
+					out.append(&"round_turned")
 			elif minigames_done < schedule.minigames and casino_time >= schedule.minigame_times()[minigames_done] - PRE_MINIGAME_SECONDS:
 				_go(Phase.Id.PRE_MINIGAME)
 				phase_timer = schedule.minigame_times()[minigames_done] - casino_time
@@ -111,9 +120,9 @@ func time_left() -> float:
 	return maxf(schedule.duration_s - casino_time, 0.0)
 
 
-## Seconds until the next minigame (INF if none).
+## Seconds until the next minigame (INF if none, and always in Practice).
 func next_minigame_in() -> float:
-	if minigames_done >= schedule.minigames:
+	if no_minigames or minigames_done >= schedule.minigames:
 		return INF
 	return maxf(schedule.minigame_times()[minigames_done] - casino_time, 0.0)
 

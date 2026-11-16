@@ -180,7 +180,7 @@ func test_practice_starts_the_solo_casino_match() -> void:
 	(menu.get_node("Center/Column/VBox/Practice") as Button).pressed.emit()
 	await wait_process_frames(1)
 	assert_signal_emitted(menu, "practice_requested", "PRACTICE starts the match")
-	assert_eq(SceneRouter.practice_settings, {"mode": MatchMode.CASINO}, "the normal casino match")
+	assert_eq(SceneRouter.practice_settings, {"mode": MatchMode.CASINO, "no_minigames": true}, "the casino match without minigames")
 	assert_null(menu.find_child("PracticeMenu", true, false), "no practice choice box")
 	assert_null(menu.find_child("MinigamesOnly", true, false), "no minigames-only entry")
 	assert_null(menu.get(&"practice_box"))

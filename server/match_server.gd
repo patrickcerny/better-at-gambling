@@ -163,6 +163,9 @@ func configure(p_settings: Dictionary, p_balance: BalanceConfig, p_presets: Matc
 		if Registry.items[id].target_mode == ItemDefinition.TargetMode.LEADER:
 			loot.leader_only.append(id)
 	lobby.settings["items_enabled"] = bool(settings.get("items_enabled", true))
+	# Practice from the main menu: casino only, the rounds turn over without a minigame. Clients
+	# read it from the lobby settings (shop text, HUD).
+	lobby.settings["no_minigames"] = bool(settings.get("no_minigames", false)) and not MatchMode.is_minigames_only(settings)
 	if MatchMode.is_minigames_only(settings):
 		settings["items_enabled"] = false  # no casino to use them in
 	if floor_config == null:
@@ -444,6 +447,7 @@ func _build_schedule() -> void:
 	schedule = MatchSchedule.new(state.minigames, state.gamble_s, balance.last_call_seconds)
 	phases = PhaseMachine.new(schedule, balance.regroup_time)
 	phases.minigames_only = MatchMode.is_minigames_only(settings)
+	phases.no_minigames = not room_mode and bool(lobby.settings.get("no_minigames", false))
 	phases.phase_changed.connect(_on_phase_changed)
 
 
@@ -765,7 +769,7 @@ func dev_give_item(player: int, item: StringName) -> bool:
 ## Jumps the casino clock to just before the next minigame; `id` (if set) is the one that comes.
 ## False when the casino isn't open or no minigame is left this match.
 func dev_minigame_now(id: StringName = &"") -> bool:
-	if phases.phase != Phase.Id.CASINO or phases.minigames_done >= schedule.minigames:
+	if phases.no_minigames or phases.phase != Phase.Id.CASINO or phases.minigames_done >= schedule.minigames:
 		return false
 	dev_used = true
 	minigames.forced_next = id
@@ -778,7 +782,7 @@ func dev_minigame_now(id: StringName = &"") -> bool:
 ## (everyone gets it as usual). False when the casino isn't open, no minigame is left, or the
 ## warning is already running.
 func minigame_now() -> bool:
-	if phases.phase != Phase.Id.CASINO or phases.minigames_done >= schedule.minigames:
+	if phases.no_minigames or phases.phase != Phase.Id.CASINO or phases.minigames_done >= schedule.minigames:
 		return false
 	var at: float = schedule.minigame_times()[phases.minigames_done] - PhaseMachine.PRE_MINIGAME_SECONDS
 	if phases.casino_time >= at:
@@ -882,6 +886,8 @@ func _on_phase_note(note: StringName) -> void:
 			_emit(GameEvents.make(&"segment_ended", {"segment": phases.segment_index()}))
 		&"minigame_started":
 			_start_minigame()
+		&"round_turned":
+			_turn_round()
 		&"match_over":
 			_finish_match()
 
@@ -889,13 +895,7 @@ func _on_phase_note(note: StringName) -> void:
 func _on_phase_changed(from: Phase.Id, to: Phase.Id) -> void:
 	Log.info(&"server", "phase %s (casino %.1f s, segment %d)" % [Phase.name_of(to), phases.casino_time, phases.segment_index()])
 	if to == Phase.Id.CASINO:
-		var seg: int = phases.segment_index()
-		state.segment_index = seg
-		stations.set_limits_multiplier(balance.limits_multiplier(seg))
-		interactions.limits_multiplier = balance.limits_multiplier(seg)
-		if from == Phase.Id.INTRO or from == Phase.Id.REGROUP:
-			items.shop.restock(balance.limits_multiplier(seg))
-			_emit(GameEvents.make(&"shop_restocked", items.shop.wire()))
+		_enter_segment(from == Phase.Id.INTRO or from == Phase.Id.REGROUP)
 		if from == Phase.Id.REGROUP:
 			for id: int in state.players:
 				rules.protect(id, match_time)
@@ -903,6 +903,26 @@ func _on_phase_changed(from: Phase.Id, to: Phase.Id) -> void:
 	_emit(GameEvents.make(&"phase_changed", {"phase": to, "from": from, "phase_name": Phase.name_of(to), "casino_time": snappedf(phases.casino_time, 0.001), "segment": phases.segment_index()}))
 	if to == Phase.Id.REGROUP:
 		_start_regroup()
+
+
+## A casino segment begins: its table limits, and (`restock`) fresh Gift Shop stock.
+func _enter_segment(restock: bool) -> void:
+	var seg: int = phases.segment_index()
+	state.segment_index = seg
+	stations.set_limits_multiplier(balance.limits_multiplier(seg))
+	interactions.limits_multiplier = balance.limits_multiplier(seg)
+	if restock:
+		items.shop.restock(balance.limits_multiplier(seg))
+		_emit(GameEvents.make(&"shop_restocked", items.shop.wire()))
+
+
+## Practice without minigames: where a minigame would start the round turns over in the casino.
+## The next segment's limits and shop stock, and the Out of Order signs come down (they last
+## "until the next minigame" elsewhere). Nobody is stood up and item effects run on.
+func _turn_round() -> void:
+	stations.reopen_all()
+	_enter_segment(true)
+	_emit(GameEvents.make(&"round_turned", {"segment": phases.segment_index()}))
 
 
 ## An Out of Order sign goes up on `sid` (item): the game there stops, every open bet is refunded
