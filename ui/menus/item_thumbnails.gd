@@ -27,21 +27,28 @@ func _ready() -> void:
 		return
 	_viewport = SubViewport.new()
 	_viewport.size = Vector2i(SIZE, SIZE)
-	_viewport.transparent_bg = true
-	_viewport.own_world_3d = true
-	_viewport.msaa_3d = Viewport.MSAA_4X
 	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(_viewport)
+	_stand = build_stage(_viewport)
+
+
+## Sets up `vp` as a little photo booth for one item (transparent background, its own world, the
+## warm key and fill light, the camera a little above): returns the stand to put the model on.
+## Shared with the item bar's live model of the held item (`ItemBar`).
+static func build_stage(vp: SubViewport) -> Node3D:
+	vp.transparent_bg = true
+	vp.own_world_3d = true
+	vp.msaa_3d = Viewport.MSAA_4X
 	var root := Node3D.new()
-	_viewport.add_child(root)
-	_stand = Node3D.new()
-	root.add_child(_stand)
+	vp.add_child(root)
+	var stand := Node3D.new()
+	root.add_child(stand)
 	var cam := Camera3D.new()
 	cam.current = true
 	cam.fov = 30.0
 	cam.position = Vector3(0.0, 0.35, 2.3)
 	root.add_child(cam)
-	cam.look_at(Vector3.ZERO, Vector3.UP)
+	cam.basis = Basis.looking_at(-cam.position, Vector3.UP)
 	var key := DirectionalLight3D.new()
 	key.light_color = Color(1.0, 0.94, 0.84)
 	key.light_energy = 1.2
@@ -60,6 +67,7 @@ func _ready() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	root.add_child(we)
+	return stand
 
 
 ## The picture of item `id` (blank until rendered).
