@@ -1499,7 +1499,7 @@ script = ExtResource("2")
 id = &"cape_legend"
 kind = &"cape"
 display_name = "Legend's Mantle"
-level = 99
+level = 100
 swatch = PackedColorArray(0.85, 0.68, 0.32, 1, 0.41, 0.12, 0.17, 1)
 
 [sub_resource type="Resource" id="p0"]
