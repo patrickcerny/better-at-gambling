@@ -96,7 +96,7 @@ func test_host_mode_refuses_another_build_or_protocol() -> void:
 	assert_eq(fx.server.occupied_slots(), 0)
 
 
-func test_host_mode_kick_blocks_the_steam_id_for_a_minute() -> void:
+func test_host_mode_kicked_steam_id_may_rejoin_right_away() -> void:
 	_setup_room()
 	host.on_hello(2, _hello("steam:%d" % HOST_STEAM, "Patrick"))
 	host.on_hello(3, _hello("steam:%d" % ALICE_STEAM, "Alice"))
@@ -106,12 +106,8 @@ func test_host_mode_kick_blocks_the_steam_id_for_a_minute() -> void:
 	assert_eq(_rejects(3), [&"kicked"] as Array[StringName])
 	host.on_peer_disconnected(3)
 	host.on_hello(4, _hello("steam:%d" % ALICE_STEAM, "Alice again"))
-	assert_eq(_rejects(4), [&"kick_cooldown"] as Array[StringName], "same Steam ID: blocked for 60 s")
-	host.on_hello(5, _hello("steam:76561190000000999", "Bob"))
-	assert_true(_welcomed(5), "someone else still gets in")
-	fx.server.advance(Protocol.KICK_REJOIN_SECONDS + 1.0)
-	host.on_hello(6, _hello("steam:%d" % ALICE_STEAM, "Alice"))
-	assert_true(_welcomed(6), "after a minute she may come back")
+	assert_true(_rejects(4).is_empty(), "no rejoin block")
+	assert_true(_welcomed(4), "she may come straight back on her own")
 
 
 func test_host_mode_room_closes_once_the_host_is_gone() -> void:
@@ -215,7 +211,7 @@ func test_a_friend_plays_through_steam_bridge_and_room() -> void:
 	assert_true(fx.server.lobby.is_ready(pid), "her READY reached the room")
 	assert_gt(friend_events.size(), 0, "server events reach the friend")
 	assert_eq(alice_steam.game_sends(HOST_STEAM).filter(func(s: Dictionary) -> bool: return int(s["channel"]) == Protocol.CHANNEL_EVENTS)[0]["flags"], SteamTransport.SEND_RELIABLE)
-	# The host kicks her: the reason arrives, then the connection goes; she can't come back yet.
+	# The host kicks her: the reason arrives, then the connection goes; she may come back on her own.
 	var leader: int = fx.server.player_by_uid("steam:%d" % HOST_STEAM)
 	assert_true(fx.server.submit_intent(leader, Intents.make(&"kick_player", {"target": pid}))["ok"])
 	for i: int in 90:
@@ -229,5 +225,6 @@ func test_a_friend_plays_through_steam_bridge_and_room() -> void:
 		await _pump(1)
 		if friend_lost.size() > 1:
 			break
-	assert_eq(StringName(friend.get(&"last_error_code")), &"kick_cooldown", "the Steam ID is blocked for a minute")
+	assert_eq(friend_lost.size(), 1, "no rejoin block: the second join is not refused")
+	assert_ne(StringName(friend.get(&"last_error_code")), &"kick_cooldown")
 	_teardown_chain()

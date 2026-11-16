@@ -88,14 +88,17 @@ var _logic_scripts: Dictionary = {}
 var _server_owned: Dictionary[int, bool] = {}
 ## Real seconds since the server started (lobby ordering, network clock).
 var _uptime: float = 0.0
+## Disconnected players → server uptime they dropped at. In the lobby, anyone away for
+## `LOBBY_AWAY_DROP_SECONDS` is removed, so a lobby never fills up with "(away)" ghosts of friends
+## who left (Patrick 2026-11-15). A quick reconnect within that time keeps their slot.
+var _away_since: Dictionary[int, float] = {}
+const LOBBY_AWAY_DROP_SECONDS: float = 60.0
 ## Simulated seconds ever stepped (never reset, unlike `match_time`).
 var _stepped: float = 0.0
 var _leader: int = -1
 ## player → casino segment in which they got the House Comp (once per segment).
 var _comped: Dictionary[int, int] = {}
 var _logic_rng: SeededRng
-## Kicked uids → server uptime until which they may not come back (Protocol.KICK_REJOIN_SECONDS).
-var _kicked: Dictionary[String, float] = {}
 ## Who the current/last minigame started with (late joiners are not in it; the snapshot tells
 ## them to sit it out). Kept through its rewards.
 var _minigame_roster: Array[int] = []
@@ -502,6 +505,7 @@ func player_disconnected(player: int) -> void:
 		return
 	state.players[player].connected = false
 	state.players[player].ready = false
+	_away_since[player] = _uptime
 	rules.status(player).away = true  # untouchable while away (§2.12)
 	lobby.set_connected(player, false, _uptime)
 	if fun_room != null and fun_room.stations.is_seated(player):
@@ -521,6 +525,7 @@ func remove_player(player: int) -> void:
 	if stations.is_seated(player):
 		stand_up(player)
 	state.players.erase(player)
+	_away_since.erase(player)
 	economy.remove_player(player)
 	if fun_room != null:
 		fun_room.remove_player(player)
@@ -536,12 +541,11 @@ func remove_player(player: int) -> void:
 
 ## The party leader kicks `target` (Patrick: "Give the party lead the right to kick players"):
 ## `player_kicked {player, by}` goes out, the room drops their connection with the reason
-## (`kick_handler`), and they can't rejoin for `Protocol.KICK_REJOIN_SECONDS`. In the lobby they
-## are removed outright; in a running match they stay as "away" like any disconnected player.
+## (`kick_handler`). They may come straight back on their own (Patrick 2026-11-15: no rejoin
+## block, a kick just drops them). In the lobby they are removed outright; in a running match they stay as "away" like any disconnected player.
 func kick(target: int, by: int) -> void:
 	if not state.players.has(target):
 		return
-	_kicked[state.players[target].uid] = _uptime + Protocol.KICK_REJOIN_SECONDS
 	Log.info(&"server", "player %d kicked by the party leader (player %d)" % [target, by])
 	_emit(GameEvents.make(&"player_kicked", {"player": target, "by": by}))
 	if kick_handler.is_valid():
@@ -552,22 +556,12 @@ func kick(target: int, by: int) -> void:
 		player_disconnected(target)
 
 
-## Seconds before a kicked identity may join this party again (0 = welcome).
-func kick_blocked_for(uid: String) -> float:
-	if not _kicked.has(uid):
-		return 0.0
-	var left: float = _kicked[uid] - _uptime
-	if left <= 0.0:
-		_kicked.erase(uid)
-		return 0.0
-	return left
-
-
 ## The same identity came back.
 func player_reconnected(player: int) -> void:
 	if not state.players.has(player):
 		return
 	state.players[player].connected = true
+	_away_since.erase(player)
 	# Someone who joined meanwhile may wear our bean colour now: two beans never share one.
 	var ps: PlayerState = state.players[player]
 	var worn: Array[int] = _worn_bean_colors(player)
@@ -824,6 +818,7 @@ func _step(delta: float) -> void:
 
 
 func _tick_lobby(delta: float) -> void:
+	_drop_lobby_ghosts()
 	_keep_out_of_casino()
 	_tick_fun_room(delta)
 	match lobby.tick(delta):
@@ -833,6 +828,17 @@ func _tick_lobby(delta: float) -> void:
 			_emit(GameEvents.make(&"lobby_countdown_cancelled", {}))
 		&"start":
 			start_match()
+
+
+## Removes lobby members who have been disconnected for `LOBBY_AWAY_DROP_SECONDS` (also those
+## who left during the last match, once Play Again brings the room back to the lobby).
+func _drop_lobby_ghosts() -> void:
+	for id: int in _away_since.keys():
+		if not state.players.has(id) or state.players[id].connected:
+			_away_since.erase(id)
+		elif _uptime - _away_since[id] >= LOBBY_AWAY_DROP_SECONDS:
+			Log.info(&"server", "player %d left the lobby (away %.0f s)" % [id, _uptime - _away_since[id]])
+			remove_player(id)
 
 
 ## Server time in seconds (real time since start; the network clock).

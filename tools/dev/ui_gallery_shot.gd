@@ -7,6 +7,7 @@ extends Control
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Big Wendy", "Snake Eyes"]
 const BEAN_COLORS: Array[int] = [15, 1, 9, 3, 13]
+const OUTFITS: Array = [["hat_top"], ["hat_cowboy"], ["hat_wizard", "", "", "", "", "", "", "", "beard_wizard"], ["hat_propeller"], ["hat_chef"]]
 
 
 func _ready() -> void:
@@ -98,16 +99,22 @@ func _ready() -> void:
 			menu.call(&"_show_online")
 			menu.call(&"_set_status", "Room codes have 5 letters.", true)
 		"browser":
+			# BROWSE LOBBIES: lobby cards with the host's settings and the beans inside (LobbyInfo).
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
 			menu.call(&"_hide_boxes")
-			menu.browser_box.visible = true
-			menu.call(&"fill_browser", [
-				{"room_id": "a", "room_code": "KX7PQ", "name": "Patrick's lobby", "players": 5, "max_players": 8, "phase": "match", "mode": "casino", "joinable": true},
-				{"room_id": "b", "room_code": "HN4TW", "name": "Big Wendy's lobby", "players": 2, "max_players": 8, "phase": "lobby", "mode": "minigames", "joinable": true},
-				{"room_id": "c", "room_code": "M2RZD", "name": "Snake Eyes's lobby", "players": 8, "max_players": 8, "phase": "lobby", "mode": "casino", "joinable": false},
-				{"room_id": "d", "room_code": "Q8VCE", "name": "Chip's lobby", "players": 3, "max_players": 8, "phase": "results", "mode": "casino", "joinable": false},
-			])
+			(menu.get(&"_browse_box") as Control).visible = true
+			var info_a: Dictionary = LobbyInfo.from_state(st)
+			var st_b := _state()
+			st_b.lobby_settings = {"minigames": 8, "items_enabled": false, "mode": &"minigames", "minigame_pool": "quiz,spy,hot_potato"}
+			for pid: int in [3, 4, 5]:
+				st_b.players.erase(pid)
+			st_b.phase = Phase.Id.CASINO
+			menu.call(&"_fill_browse", [
+				SteamSvc.public_lobby_entry(1, "Patrick's lobby", 5, 8, LobbyInfo.parse(LobbyInfo.to_text(info_a))),
+				SteamSvc.public_lobby_entry(2, "Big Wendy's lobby", 2, 8, LobbyInfo.parse(LobbyInfo.to_text(LobbyInfo.from_state(st_b)))),
+				SteamSvc.public_lobby_entry(3, "Old version lobby", 1, 8),
+			] as Array[Dictionary])
 		"practice":
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
@@ -124,7 +131,7 @@ func _state() -> ClientMatchState:
 	st.lobby_settings = {"minigames": 5, "gamble_minutes": 3, "items_enabled": true, "mode": &"casino", "public": true}
 	for i: int in NAMES.size():
 		var pid: int = i + 1
-		st.players[pid] = {"id": pid, "name": NAMES[i], "color": i, "ready": i % 2 == 0, "bean_color": BEAN_COLORS[i], "connected": i != 3, "inventory": []}
+		st.players[pid] = {"id": pid, "name": NAMES[i], "color": i, "ready": i % 2 == 0, "bean_color": BEAN_COLORS[i], "connected": i != 3, "inventory": [], "outfit": OUTFITS[i]}
 		st.balances[pid] = [2840, 1950, 1200, 640, 90][i]
 	st.shop_offers = [
 		{"item": "lucky_clover", "price": 150, "rarity": 0}, {"item": "bodyguard", "price": 300, "rarity": 1},
