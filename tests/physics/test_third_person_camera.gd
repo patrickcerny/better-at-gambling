@@ -72,3 +72,27 @@ func test_toggle_while_seated_keeps_first_person_after_standing() -> void:
 	assert_eq(a.cam.mode, PlayerCamera.Mode.FIRST, "stood up in first person")
 	assert_true(a.cam.toggle_mode(), "standing: the toggle works")
 	assert_eq(a.cam.mode, PlayerCamera.Mode.THIRD)
+
+
+## Patrick: "when you go to slots the cam is fucked it needs to go back. When you stand up its in
+## the other mode again". Third person sits down to the plain first-person table view (no bean in
+## the way) and is back on standing up.
+func test_third_person_sits_in_first_person_and_stands_in_third() -> void:
+	var a: PlayerAvatar = await _local()
+	assert_true(a.cam.toggle_mode())
+	assert_eq(a.cam.mode, PlayerCamera.Mode.THIRD)
+	var seat := Node3D.new()
+	add_child_autofree(seat)
+	seat.global_position = Vector3(2, 0, 0)
+	var anchor := Node3D.new()
+	add_child_autofree(anchor)
+	anchor.global_position = Vector3(2, 1.3, -0.4)
+	a.sit(seat, anchor)
+	await wait_seconds(0.6)
+	assert_true(a.cam.first_person(), "seated: first-person table view")
+	assert_false(a.visuals.visible, "the bean is not drawn over the table view")
+	assert_almost_eq(a.cam.camera.global_position.distance_to(anchor.global_position), 0.0, 0.02, "at the station view")
+	a.stand()
+	await wait_physics_frames(5)
+	assert_eq(a.cam.mode, PlayerCamera.Mode.THIRD, "third person again after standing up")
+	assert_true(a.visuals.visible, "own bean shows again in third person")

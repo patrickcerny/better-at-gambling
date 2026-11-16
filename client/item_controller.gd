@@ -561,7 +561,7 @@ func _sync_hand() -> void:
 
 
 func _first_person() -> bool:
-	return scene.local != null and scene.local.cam != null and scene.local.cam.mode == PlayerCamera.Mode.FIRST
+	return scene.local != null and scene.local.cam != null and scene.local.cam.first_person()
 
 
 # --- Input -------------------------------------------------------------------------------------
