@@ -566,6 +566,40 @@ func is_available() -> bool:
 	return _available
 
 
+## For `VersionCheck`: {from_steam (this copy runs from the Steam install), installed (its Steam
+## build id), branches (GodotSteam `getBetaInfo()`: each branch's live build)}; {} without Steam.
+func steam_builds() -> Dictionary:
+	if not _available:
+		return {}
+	var out: Dictionary = {"installed": int(steam.call("getAppBuildId")), "branches": []}
+	var dir: Variant = steam.call("getAppInstallDir", APP_ID) if steam.has_method("getAppInstallDir") else ""
+	var install: String = str((dir as Dictionary).get("directory", "")) if typeof(dir) == TYPE_DICTIONARY else str(dir)
+	out["from_steam"] = runs_from(OS.get_executable_path(), install)
+	if _no_arg_method("getBetaInfo"):
+		var branches: Variant = steam.call("getBetaInfo")
+		if typeof(branches) == TYPE_ARRAY:
+			out["branches"] = branches
+	return out
+
+
+## Whether the executable at `exe` lives inside the Steam install folder `install`.
+static func runs_from(exe: String, install: String) -> bool:
+	if install.strip_edges() == "" or exe == "":
+		return false
+	var e: String = exe.replace("\\", "/").simplify_path().to_lower()
+	var d: String = install.replace("\\", "/").simplify_path().to_lower().trim_suffix("/") + "/"
+	return e.begins_with(d)
+
+
+func _no_arg_method(method: String) -> bool:
+	if not steam.has_method(method):
+		return false
+	for m: Dictionary in steam.get_method_list():
+		if str(m.get("name", "")) == method:
+			return (m.get("args", []) as Array).size() == (m.get("default_args", []) as Array).size()
+	return false
+
+
 ## Steam persona name, or the OS user name as a stand-in.
 func get_persona_name() -> String:
 	if _available and _persona != "":

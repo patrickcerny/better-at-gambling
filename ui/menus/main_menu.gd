@@ -70,6 +70,9 @@ var daily_button: DailySpinButton
 var _daily_tick: float = 0.0
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
+## "Your game is out of date" (top right) and the check behind it (`VersionCheck`).
+var update_banner: UpdateBanner
+var version_check: VersionCheck
 ## The trophy left of the "?": global leaderboards and your lifetime stats (`LeaderboardPanel`).
 var trophy_button: TrophyButton
 var leaderboards: LeaderboardPanel
@@ -195,6 +198,7 @@ func _ready() -> void:
 		_show_tutorial(help_button))
 	_build_leaderboards()
 	_build_daily()
+	_build_update_banner()
 	how_to_play = HowToPlayPanel.new()
 	how_to_play.name = "HowToPlay"
 	how_to_play.visible = false
@@ -217,6 +221,20 @@ func _ready() -> void:
 	if SteamSvc.pending_lobby != 0:
 		_on_steam_join_requested.call_deferred(SteamSvc.pending_lobby)
 	Log.info(&"menu", "main menu ready")
+
+
+func _build_update_banner() -> void:
+	update_banner = UpdateBanner.new()
+	update_banner.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	update_banner.offset_left = -32.0 - UpdateBanner.WIDTH
+	update_banner.offset_right = -32.0
+	update_banner.offset_top = 28.0
+	update_banner.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	add_child(update_banner)
+	version_check = VersionCheck.new()
+	version_check.name = "VersionCheck"
+	version_check.checked.connect(update_banner.show_verdict)
+	add_child(version_check)
 
 
 ## The trophy left of the "?" and the leaderboards / stats panel it opens.
@@ -845,7 +863,9 @@ static func sort_public_lobbies(lobbies: Array[Dictionary], friend_lobbies_: Dic
 static func version_text(build: String) -> String:
 	if build == "":
 		return "Version unknown, refresh in a moment"
-	return "Version %s (you have %s): restart Steam so both run the newest version" % [build, Protocol.BUILD_ID]
+	if VersionCheck.compare_versions(build, Protocol.BUILD_ID) > 0:
+		return "Version %s (you have %s): your game is out of date, restart Steam to update" % [build, Protocol.BUILD_ID]
+	return "Version %s (you have %s): the host's game is out of date" % [build, Protocol.BUILD_ID]
 
 
 ## One row per public lobby: its name, your friends in it, players and JOIN; full ones are left

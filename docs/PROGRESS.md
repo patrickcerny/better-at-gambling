@@ -93,6 +93,16 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.77 Warning when the game is out of date
+- Patrick: "warning if youre a version behind and you start the game". The main menu asks
+  `VersionCheck` on every visit and shows a red UPDATE AVAILABLE card top right when behind.
+  Started from the Steam install: Steam's own `getAppBuildId` (this install) vs `getBetaInfo`
+  (the live build of the picked branch, else the default branch), so it follows what is LIVE on
+  Steam, not GitHub (which runs ahead). Other copies (GitHub zips): the latest GitHub release tag,
+  once per session. Steam copies without Steam running say nothing. Lobby version errors (join,
+  Browse Lobbies) now say whose game is out of date. Tests: `test_version_check.gd`,
+  `test_steam_service.gd`, `test_main_menu.gd`, lint green. Not tried against real Steam yet
+  (needs a live build newer than the installed one).
 ### 2026-11-16 / 0.9.67 Your chips wear your skin
 - Patrick: "the chips you have mirror the skin you use". A player's chip stacks on every table
   (bets, splits, the minigame card tables) and their Plinko chip now wear their animated skin:
