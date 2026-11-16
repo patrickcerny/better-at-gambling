@@ -21,8 +21,9 @@ var hot: Dictionary[StringName, bool] = {}
 ## Station ids that are VIP (limits ×3, entry check).
 var vip: Dictionary[StringName, bool] = {}
 
-## Station id → seconds left on its "Out of Order" sign (item). Nobody new sits, no new bets;
-## rounds already running finish normally.
+## Station id → seconds left on its "Out of Order" sign (item; INF = until the next minigame,
+## Patrick 0.9.71). The round running there is stopped and every open bet refunded when the sign
+## goes up (`close_station`); nobody sits and nobody bets until it comes down.
 var out_of_order: Dictionary[StringName, float] = {}
 ## Seconds until the casino closes (pre-minigame warning, end of match); INF while open.
 var closing_in: float = INF
@@ -192,6 +193,29 @@ static func bet_fields_ok(bet: Dictionary) -> bool:
 	return true
 
 
+## Hangs the Out of Order sign on a station (Patrick 0.9.71: "out of order stops any game and
+## refunds the money", "until the next minigame"): the round there stops at once and every stake
+## still in play goes back to its owner as `bet_refunded` (no win, no loss: the losing-streak luck
+## and the match stats only count settled bets), then `bets_refunded` + `table_reset` tell every
+## client to clear chips, cards, reels and wheels. The server stands the seated players up.
+## Stays closed for `seconds` (INF = until `reopen_all`, which the next minigame calls).
+func close_station(station_id: StringName, seconds: float = INF) -> void:
+	if not logics.has(station_id):
+		return
+	out_of_order[station_id] = seconds
+	logics[station_id].refund_all()
+
+
+## Every Out of Order sign comes down (a minigame starts).
+func reopen_all() -> void:
+	out_of_order.clear()
+
+
+## True while the station has its Out of Order sign up.
+func is_out_of_order(station_id: StringName) -> bool:
+	return out_of_order.has(station_id)
+
+
 ## Ticks every station.
 func tick(delta: float) -> void:
 	for sid: StringName in logics:
@@ -238,7 +262,8 @@ func public_states() -> Dictionary:
 		st["hot"] = hot.get(sid, false)
 		st["vip"] = vip.get(sid, false)
 		if out_of_order.has(sid):
-			st["out_of_order"] = snappedf(out_of_order[sid], 0.1)
+			# -1 = until the next minigame (INF does not survive the wire as a number).
+			st["out_of_order"] = -1.0 if is_inf(out_of_order[sid]) else snappedf(out_of_order[sid], 0.1)
 		out[sid] = st
 	return out
 

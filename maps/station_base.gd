@@ -183,10 +183,10 @@ func seat_position(index: int = 0) -> Vector3:
 	return seats[clampi(index, 0, seats.size() - 1)].global_position
 
 
-## Shows or hides the Out of Order sign (`seconds` left, 0 = open).
+## Shows or hides the Out of Order sign (`seconds` left, 0 = open, < 0 = until the next minigame).
 func set_out_of_order(seconds: float) -> void:
 	out_of_order_left = seconds
-	if seconds <= 0.0:
+	if seconds == 0.0:
 		if out_of_order_sign != null:
 			out_of_order_sign.visible = false
 			out_of_order_cones.visible = false
@@ -210,12 +210,14 @@ func set_out_of_order(seconds: float) -> void:
 			cone.position = Vector3(s.position.x, 0.0, s.position.z) + s.transform.basis.z * 0.5
 			out_of_order_cones.add_child(cone)
 	out_of_order_cones.visible = true
-	out_of_order_sign.text = "OUT OF ORDER\n%ds" % ceili(seconds)
+	out_of_order_sign.text = "OUT OF ORDER" if seconds < 0.0 else "OUT OF ORDER\n%ds" % ceili(seconds)
 	out_of_order_sign.visible = true
 
 
 ## Interaction prompt text.
 func prompt_text(min_bet: int) -> String:
+	if out_of_order_left < 0.0:
+		return "OUT OF ORDER until the next minigame"
 	if out_of_order_left > 0.0:
 		return "OUT OF ORDER (%ds)" % ceili(out_of_order_left)
 	return "%s Play %s — Min $%d" % [InputGlyphs.hint(&"interact"), game_id.capitalize(), min_bet]
