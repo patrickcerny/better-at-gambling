@@ -225,6 +225,7 @@ func _ready() -> void:
 	# at once (`set_outfit`). Colour and skin stay as they joined (Patrick 2026-11-15: no changing
 	# them in the lobby); a new pick counts from the next match.
 	cosmetics_panel = CosmeticsPanel.new()
+	cosmetics_panel.next_match_look = true
 	ui_layer.add_child(cosmetics_panel)
 	cosmetics_panel.outfit_worn.connect(func(kind: StringName, id: StringName) -> void:
 		if kind != CosmeticDef.KIND_SKIN and view.state.phase in [Phase.Id.LOBBY, Phase.Id.RESULTS]:

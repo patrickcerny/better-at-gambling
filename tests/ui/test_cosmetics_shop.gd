@@ -195,3 +195,29 @@ func test_colour_and_skin_page_has_one_pick_and_names_the_player_colour() -> voi
 	panel._on_tile_pressed(&"skin_lava")
 	assert_false(panel.tiles[&"color_blue"].button_pressed, "picking the skin drops the colour try-on")
 	panel.close()
+
+
+func test_the_colour_flow_is_consistent_under_a_skin() -> void:
+	var p: PlayerProfile = ProfileManager.profile
+	p.owned.append(&"skin_lava")
+	ProfileManager.set_preferred_color(4)  # Blue
+	assert_true(ProfileManager.wear(&"skin_lava"))
+	var panel: CosmeticsPanel = _shop()
+	panel.open(true)
+	assert_eq(panel.selected, &"skin_lava", "opens on what the bean shows: the skin, not the hidden colour")
+	assert_eq(panel.preview.outfit.get(CosmeticDef.KIND_SKIN, &""), &"skin_lava")
+	assert_eq(panel.item_kind.text, "ANIMATED SKIN")
+	panel._on_tile_pressed(&"color_blue")
+	assert_eq(panel.item_kind.text, "COLOUR")
+	panel._on_tile_pressed(&"color_blue")
+	assert_eq(panel.selected, &"color_blue", "a second click keeps the colour picked")
+	panel.action_button.pressed.emit()
+	assert_eq(p.outfit.get(CosmeticDef.KIND_SKIN, &""), &"", "wearing a colour takes the skin off")
+	assert_eq(p.preferred_color, 4)
+	assert_eq(panel.action_button.text, "WEARING")
+	assert_string_contains(panel.status_label.text, "from now on")
+	panel.next_match_look = true
+	panel.select(&"skin_lava")
+	panel.action_button.pressed.emit()
+	assert_string_contains(panel.status_label.text, "from your next match", "in a lobby it says when it shows")
+	panel.close()
