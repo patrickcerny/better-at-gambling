@@ -98,6 +98,43 @@ func add_coins(amount: int) -> int:
 	return added
 
 
+## Pays out a Daily Spin prize kept in the profile (red Coins, a mystery piece: `DailyWheel`) and
+## saves. Returns {coins, piece}.
+func add_wheel_prize(kind: StringName, amount: int) -> Dictionary:
+	var piece: StringName = DailyWheel.mystery_piece(profile, randf()) if kind == DailyWheel.KIND_PIECE else &""
+	var got: Dictionary = profile.add_wheel_prize(kind, amount, piece)
+	save()
+	changed.emit()
+	return got
+
+
+## Remembers a Daily Spin at `when` (unix seconds) and saves.
+func mark_daily_spin(when: int) -> void:
+	profile.daily_last = maxi(when, 0)
+	save()
+	changed.emit()
+
+
+## Steam had no spin yet although the profile's timer said so (spun on another PC, or Steam wants
+## a little playtime first): try again in `retry_s`.
+func mark_daily_retry(now: int, retry_s: int = 15 * 60) -> void:
+	var as_if: int = now - DailyWheel.COOLDOWN_S + retry_s
+	if as_if > profile.daily_last:
+		mark_daily_spin(as_if)
+
+
+## Spins the wheel without Steam (`DailyWheel.roll_local`: red Coins and mystery pieces) at `now`
+## and pays the prize. Returns {index, coins, piece, gold}, or {} while the wheel is on cooldown.
+func spin_local(now: int, r: float = randf()) -> Dictionary:
+	if DailyWheel.wait_s(profile.daily_last, now) > 0:
+		return {}
+	var i: int = DailyWheel.roll_local(r)
+	var seg: Dictionary = DailyWheel.segment(i)
+	profile.daily_last = now
+	var got: Dictionary = add_wheel_prize(seg["kind"], int(seg["amount"]))  # saves
+	return {"index": i, "coins": got["coins"], "piece": got["piece"], "gold": 0}
+
+
 ## Buys a cosmetic (see `PlayerProfile.buy`); &"" on success.
 func buy(id: StringName) -> StringName:
 	var err: StringName = profile.buy(id)

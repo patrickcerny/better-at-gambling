@@ -27,6 +27,12 @@ signal store_changed
 signal purchase_finished(ok: bool)
 ## A Gold Coin purchase (exchange) ended: ok (the piece or set is in the inventory) or not.
 signal gold_spent(ok: bool)
+## The Daily Spin's item drop came back (`daily_spin`): {ok, index (the wheel slice won, -1 when
+## Steam gave nothing: the spin isn't ready on Steam yet)}.
+signal daily_spun(result: Dictionary)
+## A Daily Spin prize was paid out: {index, coins (red Coins added), piece (a mystery piece's id or
+## &""), gold (Gold Coins added)}.
+signal daily_redeemed(prize: Dictionary)
 ## `request_public_lobbies` finished: [{lobby, name, members, max}] (BROWSE LOBBIES).
 signal public_lobbies_received(lobbies: Array[Dictionary])
 
@@ -75,6 +81,12 @@ var gold: int = 0
 var _gold_stacks: Array[Dictionary] = []
 ## Exchanges on their way: result handle -> the item definition bought.
 var _exchanging: Dictionary[int, int] = {}
+## The Daily Spin's item drop on its way (its result handle, 0 = none).
+var _dropping: int = 0
+## Wheel prize tokens being redeemed: result handle -> {item_id, def, quantity}, and the token
+## item ids on their way (never redeemed twice at once).
+var _redeeming: Dictionary[int, Dictionary] = {}
+var _redeem_items: Array[int] = []
 ## A public lobby list request is on its way.
 var browsing: bool = false
 var _browse_started: int = 0
@@ -204,6 +216,8 @@ func _start_store() -> void:
 	steam.connect(&"inventory_request_prices_result", _on_prices)
 	steam.connect(&"inventory_start_purchase_result", _on_purchase_result)
 	steam.connect(&"overlay_toggled", _on_overlay_toggled)
+	if steam.has_signal(&"inventory_definition_update"):
+		steam.connect(&"inventory_definition_update", func(_defs: Variant = null) -> void: store_changed.emit())
 	steam.call("loadItemDefinitions")
 	steam.call("requestPrices")
 	refresh_inventory()
@@ -317,6 +331,12 @@ func buy_with_gold(def: int, cost: int) -> bool:
 
 
 func _on_inventory_result(result: int = 0, handle: int = 0, _a: Variant = null, _b: Variant = null) -> void:
+	if handle != 0 and handle == _dropping:
+		_on_daily_drop(result, handle)
+		return
+	if _redeeming.has(handle):
+		_on_redeemed(result, handle)
+		return
 	if _exchanging.has(handle):
 		_exchanging.erase(handle)
 		steam.call("destroyResult", handle)
@@ -348,6 +368,127 @@ func _read_inventory(result: int, handle: int) -> void:
 	Log.info(&"steam", "inventory: %d pieces, %d Gold Coins" % [ids.size(), gold])
 	ProfileManager.set_steam_owned(ids)
 	store_changed.emit()
+	_redeem(items as Array)
+
+
+# --- Daily Spin (`DailyWheel`) -------------------------------------------------------------------
+# Steam decides the spin: `triggerItemDrop` on the wheel's playtime generator grants at most one
+# prize per cooldown per account, picked by the generator's weights. The prize is a token in the
+# Steam inventory; `_redeem` pays it out (Coins and mystery pieces into the profile after Steam has
+# consumed the token, Gold by an exchange for a Gold Coin bundle). Tokens left over (the game shut
+# while redeeming) are paid on the next inventory read.
+
+## Whether Steam can spin the wheel: Steam is running and the wheel's item definitions are loaded
+## (until they are uploaded to Steamworks the game spins locally, without Gold or the skin).
+func daily_ready() -> bool:
+	return _available and def_known(DailyWheel.GENERATOR)
+
+
+## Whether Steam knows item definition `def` (loaded from Steamworks).
+func def_known(def: int) -> bool:
+	if not _available:
+		return false
+	return prop_text(steam.call("getItemDefinitionProperty", def, "name")) != ""
+
+
+## The text of a `getItemDefinitionProperty` answer (a String, or a Dictionary in some GodotSteam
+## versions).
+static func prop_text(v: Variant) -> String:
+	if v is Dictionary:
+		for key: String in ["value", "property", "properties", "name"]:
+			if (v as Dictionary).has(key):
+				return str((v as Dictionary)[key]).strip_edges()
+		return ""
+	return str(v).strip_edges() if v != null else ""
+
+
+## Unix seconds: Steam's server time when Steam runs (turning the PC clock doesn't move it), else
+## the PC's clock.
+func now() -> int:
+	if _available:
+		var t: int = int(steam.call("getServerRealTime"))
+		if t > 0:
+			return t
+	return int(Time.get_unix_time_from_system())
+
+
+## Spins the wheel on Steam (the answer comes as `daily_spun`). False when Steam can't spin now.
+func daily_spin() -> bool:
+	if not daily_ready() or _dropping != 0:
+		return false
+	var h: int = int(steam.call("triggerItemDrop", DailyWheel.GENERATOR))
+	if h <= 0:
+		return false
+	_dropping = h
+	return true
+
+
+func _on_daily_drop(result: int, handle: int) -> void:
+	_dropping = 0
+	var items: Variant = steam.call("getResultItems", handle) if result == 1 else []
+	steam.call("destroyResult", handle)
+	var index: int = -1
+	if items is Array:
+		for it: Variant in items:
+			if it is Dictionary:
+				var i: int = DailyWheel.index_of_item(int((it as Dictionary).get("item_definition", 0)))
+				if i >= 0:
+					index = i
+					break
+	if result != 1:
+		Log.warn(&"steam", "daily spin failed (result %d)" % result)
+	Log.info(&"steam", "daily spin: %s" % ("nothing yet" if index < 0 else DailyWheel.label(index)))
+	daily_spun.emit({"ok": index >= 0, "index": index})
+	if index >= 0:
+		refresh_inventory()  # the token (or the skin) arrives with it; `_redeem` pays it out
+
+
+## Pays out the wheel tokens in an inventory listing (each once at a time).
+func _redeem(items: Array) -> void:
+	for it: Variant in items:
+		if not it is Dictionary:
+			continue
+		var row: Dictionary = it
+		var def: int = int(row.get("item_definition", 0))
+		var item_id: int = int(row.get("item_id", 0))
+		var qty: int = int(row.get("quantity", 1))
+		var i: int = DailyWheel.index_of_item(def)
+		if i < 0 or qty <= 0 or item_id == 0 or item_id in _redeem_items:
+			continue
+		var kind: StringName = DailyWheel.segment(i)["kind"]
+		var h: int = 0
+		if kind == DailyWheel.KIND_COINS or kind == DailyWheel.KIND_PIECE:
+			h = int(steam.call("consumeItem", item_id, qty))
+		elif kind == DailyWheel.KIND_GOLD:
+			qty = 1  # one bundle per token; more tokens in the stack follow on the next read
+			h = int(steam.call("exchangeItems", PackedInt64Array([DailyWheel.gold_bundle(def)]), PackedInt32Array([1]), PackedInt64Array([item_id]), PackedInt32Array([1])))
+		if h > 0:
+			_redeeming[h] = {"item_id": item_id, "def": def, "quantity": qty}
+			_redeem_items.append(item_id)
+
+
+func _on_redeemed(result: int, handle: int) -> void:
+	var r: Dictionary = _redeeming[handle]
+	_redeeming.erase(handle)
+	_redeem_items.erase(int(r["item_id"]))
+	steam.call("destroyResult", handle)
+	if result != 1:
+		Log.warn(&"steam", "daily spin prize not paid (result %d), trying again later" % result)
+		return
+	var i: int = DailyWheel.index_of_item(int(r["def"]))
+	var seg: Dictionary = DailyWheel.segment(i)
+	var prize: Dictionary = {"index": i, "coins": 0, "piece": &"", "gold": 0}
+	if seg["kind"] == DailyWheel.KIND_GOLD:
+		prize["gold"] = int(seg["amount"]) * int(r["quantity"])
+		refresh_inventory()
+	else:
+		for n: int in int(r["quantity"]):
+			var got: Dictionary = ProfileManager.add_wheel_prize(seg["kind"], int(seg["amount"]))
+			prize["coins"] = int(prize["coins"]) + int(got["coins"])
+			if got["piece"] != &"":
+				prize["piece"] = got["piece"]
+	Log.info(&"steam", "daily spin prize paid: %s" % DailyWheel.label(i))
+	daily_redeemed.emit(prize)
 
 
 func _on_prices(result: int = 0, code: Variant = "", _a: Variant = null) -> void:

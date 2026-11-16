@@ -71,6 +71,8 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 		}
 		if d.premium():
 			row["exchange"] = "%dx%d" % [CoinPack.GOLD_ITEM, d.gold]
+		if d.wheel_only:
+			row["description"] = "%s for your bean in Better at Gambling, only won on the Daily Spin." % String(d.kind).capitalize()
 		items.append(row)
 	for k: CosmeticPack in shop.packs:
 		var grants := PackedStringArray()
@@ -89,6 +91,7 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"tradable": false,
 			"marketable": false,
 		})
+	items.append_array(daily_spin_defs())
 	for r: Dictionary in RETIRED:
 		items.append({
 			"itemdefid": r["itemdefid"],
@@ -101,6 +104,56 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"marketable": false,
 		})
 	return {"appid": APP_ID, "items": items}
+
+
+## The Daily Spin (`DailyWheel`): the playtime generator Steam rolls once per cooldown per
+## account (`drop_window` minutes, at most one drop in it), the prize tokens it picks from (the
+## game consumes the Coin and mystery piece tokens and pays them into the profile) and, for each
+## Gold token, the bundle of Gold Coins it is exchanged for. The Fortune skin is a shop item
+## (`CosmeticDef.wheel_only`), listed with the pieces.
+static func daily_spin_defs() -> Array:
+	var out: Array = []
+	out.append({
+		"itemdefid": DailyWheel.GENERATOR,
+		"type": "playtimegenerator",
+		"bundle": DailyWheel.generator_bundle(),
+		"name": "Daily Spin",
+		"description": "One free spin of the prize wheel in Better at Gambling every day.",
+		"drop_interval": 1,
+		"use_drop_window": true,
+		"drop_window": DailyWheel.COOLDOWN_MIN,
+		"drop_max_per_window": 1,
+		"store_hidden": true,
+		"tradable": false,
+		"marketable": false,
+	})
+	for i: int in DailyWheel.count():
+		var seg: Dictionary = DailyWheel.segment(i)
+		if seg["kind"] == DailyWheel.KIND_SKIN:
+			continue
+		var token: int = int(seg["steam_item"])
+		out.append({
+			"itemdefid": token,
+			"type": "item",
+			"name": "Daily Spin: %s" % DailyWheel.label(i).capitalize(),
+			"description": "A Daily Spin prize; the game pays it out on its own.",
+			"store_hidden": true,
+			"tradable": false,
+			"marketable": false,
+		})
+		if seg["kind"] == DailyWheel.KIND_GOLD:
+			out.append({
+				"itemdefid": DailyWheel.gold_bundle(token),
+				"type": "bundle",
+				"bundle": "%dx%d" % [CoinPack.GOLD_ITEM, int(seg["amount"])],
+				"exchange": "%dx1" % token,
+				"name": "%d Gold Coins (Daily Spin)" % int(seg["amount"]),
+				"description": "%d Gold Coins won on the Daily Spin." % int(seg["amount"]),
+				"store_hidden": true,
+				"tradable": false,
+				"marketable": false,
+			})
+	return out
 
 
 ## Valve's price tiers (US cents): Steam sets a fitting price in every currency (Patrick

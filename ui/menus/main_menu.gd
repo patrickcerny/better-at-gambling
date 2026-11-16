@@ -61,6 +61,11 @@ var how_to_play: HowToPlayPanel
 ## for everyone else neither exists.
 var dev_entry: Button
 var dev_panel: DevPanel
+## DAILY SPIN under SHOP and the prize wheel it opens (`DailySpinPanel`); the entry shines while a
+## spin is free and counts down otherwise.
+var daily_entry: Button
+var daily_spin: DailySpinPanel
+var _daily_tick: float = 0.0
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
 ## What the tutorial opened on the first PRACTICE / PLAY ONLINE carries on to when it closes.
@@ -183,6 +188,7 @@ func _ready() -> void:
 		cosmetics.close()
 		_after_tutorial = Callable()
 		_show_tutorial(help_button))
+	_build_daily()
 	how_to_play = HowToPlayPanel.new()
 	how_to_play.name = "HowToPlay"
 	how_to_play.visible = false
@@ -205,6 +211,40 @@ func _ready() -> void:
 	if SteamSvc.pending_lobby != 0:
 		_on_steam_join_requested.call_deferred(SteamSvc.pending_lobby)
 	Log.info(&"menu", "main menu ready")
+
+
+func _build_daily() -> void:
+	daily_entry = Button.new()
+	daily_entry.name = "DailySpin"
+	daily_entry.theme_type_variation = &"MenuEntry"
+	daily_entry.text = "DAILY SPIN"
+	_main_box.add_child(daily_entry)
+	_main_box.move_child(daily_entry, _cosmetics_entry.get_index() + 1)
+	daily_spin = DailySpinPanel.new()
+	add_child(daily_spin)
+	daily_spin.closed.connect(func() -> void:
+		_refresh_daily()
+		if daily_entry.is_visible_in_tree():
+			daily_entry.grab_focus())
+	daily_entry.pressed.connect(func() -> void:
+		_settings.close()
+		cosmetics.close()
+		level_pass.close()
+		daily_spin.open())
+	_refresh_daily()
+
+
+## DAILY SPIN shines gold while a spin is free, else says when the next one is.
+func _refresh_daily() -> void:
+	if daily_entry == null:
+		return
+	var w: int = DailySpinPanel.wait_s()
+	if w <= 0:
+		daily_entry.text = "DAILY SPIN  ★"
+		daily_entry.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	else:
+		daily_entry.text = "DAILY SPIN  ·  %s" % DailyWheel.wait_text(w)
+		daily_entry.remove_theme_color_override(&"font_color")
 
 
 func _sub_box(box_name: String, title_text: String, width: float = 540.0) -> VBoxContainer:
@@ -659,6 +699,10 @@ func _lobby_bean(b: Dictionary) -> Control:
 
 
 func _process(delta: float) -> void:
+	_daily_tick += delta
+	if _daily_tick >= 1.0:
+		_daily_tick = 0.0
+		_refresh_daily()
 	if _browse_box.visible and SteamSvc.is_available() and not _busy:
 		_browse_timer += delta
 		if _browse_timer >= BROWSE_REFRESH:

@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.59 Broke players are pointed to the Odd Jobs button
+### 2026-11-16 / 0.9.60 Broke players are pointed to the Odd Jobs button
 - Patrick: "Indicator wenn man broke ist (weniger geld als 50) zum button". Under $50 (or under the
   House Comp line if the table limits put it higher; `OddJobsController.is_broke`) a gold beacon
   (spinning arrow + "ODD JOBS +$50", drawn through walls) floats over the cabinet, and while the
@@ -103,6 +103,23 @@
   glow and the one-time hint now also start under $50. Test: `test_under_50_points_the_way_to_the_button`
   in tests/physics/test_odd_jobs_cabinet.gd.
 
+### 2026-11-16 / 0.9.59 Daily Spin
+- Patrick: "Daily spin button auf der Startseite wo du Sachen gewinnen kannst (auch die gezahlte
+  Währung und sehr unwahrscheinlich ein krasser animierter Skin). Mach da ein cooles Wheel."
+  DAILY SPIN under SHOP (gold star when free, else the countdown) opens `DailySpinPanel`: a prize
+  wheel drawn in code (`DailyWheelView`: burgundy/cream/felt slices, gold pegs, a ticking pointer,
+  chasing marquee bulbs, confetti and coins on a win), the jackpot on a turning bean, the odds.
+  Prizes (`DailyWheel`): 100-2,500 red Coins, a mystery piece, 5-50 Gold, and at 0.3 % the new
+  Fortune skin (`skin_fortune`, bean_skin mode 9: a prize wheel spinning on the belly with chasing
+  bulbs, gold coins drifting up; `CosmeticDef.wheel_only`, Steam item 208).
+- Security: with Steam the spin is `triggerItemDrop` on playtime generator 3200 (one drop per 20 h
+  per account, weights in its bundle); prizes are tokens the game redeems (consume for Coins and
+  pieces, exchange for Gold bundles 3311-3314). Timer on Steam server time. Without Steam or before
+  the itemdefs are uploaded: a local spin, Coins and pieces only. docs/STEAM_INVENTORY.md "Daily Spin".
+  itemdefs.json regenerated (162), NOT uploaded (needs Patrick's go). Dev panel: DAILY SPIN AGAIN.
+- Tests: new `test_daily_wheel.gd`; `test_steam_store`, `test_outfits`, `test_player_profile`,
+  `test_bean_colors`, `test_cosmetics_shop`, `test_main_menu`, `test_confirm_and_dev_ui`,
+  `test_dev_mode` green.
 ### 2026-11-16 / 0.9.58 Leader force start: START NOW in the lobby, START NEXT MINIGAME in the casino
 - Patrick: "Lobby can force start minigame". New intents `force_start` (lobby) and `minigame_now`
   (casino), leader only, online rooms only.
