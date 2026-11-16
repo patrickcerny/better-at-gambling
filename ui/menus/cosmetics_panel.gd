@@ -1504,12 +1504,15 @@ func _refresh_collect(p: PlayerProfile) -> void:
 			tab_buttons[KIND_COLLECT].grab_focus.call_deferred()
 
 
-## Collects `id` from the COLLECT tab and tries it on.
+## Collects `id` from the COLLECT tab and shows it on the bean as worn, without other try-ons.
 func collect(id: StringName) -> void:
 	var d: CosmeticDef = shop.find(id)
 	if d == null or not ProfileManager.collect(id):
 		return
 	Audio.play(&"cash_register", &"UI", -6.0)
+	# The preview shows what you wear with only this piece on top: earlier try-ons don't stack up.
+	trying.clear()
+	selected = &""
 	select(id)
 	status_label.text = "Collected %s! It's in your cosmetics now: WEAR puts it on." % d.display_name
 
@@ -1520,7 +1523,9 @@ func collect_all() -> void:
 	if got.is_empty():
 		return
 	Audio.play(&"cash_register", &"UI", -6.0)
-	select(got[got.size() - 1])
+	trying.clear()  # the preview goes back to what you wear: nothing stacks up
+	selected = &""
+	_refresh()
 	status_label.text = "Collected %d rewards! They're in your cosmetics now." % got.size()
 
 

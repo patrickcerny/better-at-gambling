@@ -170,18 +170,22 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 				k.torus(Vector3(side * 0.18, 0.47, 0), 0.05, 0.08, gold, 12, Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(Vector3(0.8, 0.3, 1.2)))
 			k.prism(OutfitMeshKit.star_poly(5, 0.05, 0.022), 0.012, Transform3D(Basis(Vector3.RIGHT, -0.2).rotated(Vector3.UP, PI), Vector3(0, 0.45, -0.15)), OutfitMeshes._glow(OutfitMeshes.CREAM, 0.4))
 		&"hat_card_house":
-			# A house of cards: two A-frames, a card across them, a third A-frame on top.
+			# A house of cards, solid from every side: two tents of cards leaning on each other (front
+			# and back card), a card laid across them, a third tent on top. The card backs face out.
 			var place := func(at: Vector3, lean: float) -> void:
-				var b := Basis(Vector3.BACK, lean)
-				k.box(at, Vector3(0.012, 0.2, 0.15), OutfitMeshes.CREAM, b)
-				k.box(at + b * Vector3(signf(lean) * 0.007, 0, 0), Vector3(0.004, 0.17, 0.12), OutfitMeshes.BURGUNDY, b)
-			for x: float in [-0.1, 0.1]:
-				place.call(Vector3(x - 0.045, 0.29, 0), -0.42)
-				place.call(Vector3(x + 0.045, 0.29, 0), 0.42)
-			k.box(Vector3(0, 0.395, 0), Vector3(0.3, 0.012, 0.15), OutfitMeshes.CREAM)
-			k.box(Vector3(0, 0.401, 0), Vector3(0.26, 0.004, 0.12), OutfitMeshes.BURGUNDY)
-			place.call(Vector3(-0.045, 0.495, 0), -0.42)
-			place.call(Vector3(0.045, 0.495, 0), 0.42)
+				var b := Basis(Vector3.RIGHT, lean)
+				var out: Vector3 = b * Vector3(0, 0, -signf(lean) * 0.007)
+				k.box(at, Vector3(0.14, 0.2, 0.01), OutfitMeshes.CREAM, b)
+				k.box(at + out, Vector3(0.118, 0.176, 0.004), OutfitMeshes.BURGUNDY, b)
+				k.box(at + out * 1.25, Vector3(0.036, 0.036, 0.004), OutfitMeshes.GOLD, b * Basis(Vector3.BACK, PI * 0.25))
+			var tent := func(at: Vector3) -> void:
+				place.call(at + Vector3(0, 0, -0.038), 0.36)  # front card, top leaning back
+				place.call(at + Vector3(0, 0, 0.038), -0.36)
+			for x: float in [-0.076, 0.076]:
+				tent.call(Vector3(x, 0.29, 0))
+			k.box(Vector3(0, 0.395, 0), Vector3(0.3, 0.01, 0.17), OutfitMeshes.CREAM)
+			k.box(Vector3(0, 0.4, 0), Vector3(0.27, 0.004, 0.145), OutfitMeshes.BURGUNDY)
+			tent.call(Vector3(0, 0.495, 0))
 		&"hat_cherries":
 			# The slot machine's cherries: two on stalks that meet in a leaf.
 			for side: float in [-1.0, 1.0]:
@@ -512,13 +516,27 @@ static func _card_fan_cape(k: OutfitMeshKit, ranks: Array, hearts: bool, top: Co
 			return OutfitMeshes.GOLD if y > 0.39 or v < 0.03 else top
 		return Color(0, 0, 0, 0)  # cut away round the cards
 	OutfitMeshes._cape_sheet(k, BOTTOM, paint, OutfitMeshes.BURGUNDY, 72, 48)
-	# The corner indices, standing on the cloth where each card's corner is.
+	# The corner indices, standing on the cloth where each card's corner is, like on real cards:
+	# top left upright, bottom right turned half round. Only where no card above covers them.
+	var top_card := func(at: Vector2) -> int:
+		for j: int in range(n - 1, -1, -1):
+			var qq: Vector2 = local.call(j, at.x, at.y)
+			if absf(qq.x) <= CW and absf(qq.y) <= CH:
+				return j
+		return -1
 	for i: int in n:
 		for corner: float in [-1.0, 1.0]:
 			var q := Vector2(corner * (CW - 0.04), corner * (CH - 0.045))
 			var a: float = (float(i) - float(n - 1) * 0.5) * spread
 			var centre: Vector2 = pivot + Vector2(sin(a), -cos(a)) * 0.42
 			var cp: Vector2 = centre + Vector2(q.x * cos(a) - q.y * sin(a), q.x * sin(a) + q.y * cos(a))
+			var hidden: bool = false
+			for o: Vector2 in [Vector2(-0.03, -0.035), Vector2(0.03, -0.035), Vector2(-0.03, 0.035), Vector2(0.03, 0.035), Vector2.ZERO]:
+				var oq: Vector2 = q + o
+				if top_card.call(centre + Vector2(oq.x * cos(a) - oq.y * sin(a), oq.x * sin(a) + oq.y * cos(a))) != i:
+					hidden = true
+			if hidden:
+				continue
 			var u: float = 0.5 - cp.x / W
 			var v: float = cp.y / H
 			var p: Vector3 = OutfitMeshes._cape_at(u, v, BOTTOM, 0.012)
@@ -529,7 +547,8 @@ static func _card_fan_cape(k: OutfitMeshKit, ranks: Array, hearts: bool, top: Co
 			out = (out - up * out.dot(up)).normalized()
 			var right: Vector3 = up.cross(out).normalized()
 			# Text reads from behind: +X to the viewer's right, turned with the card.
-			var b := Basis(right, up, out) * Basis(Vector3.BACK, a + (PI if corner > 0.0 else 0.0))
+			# The card turns by `a` with y down the cloth: seen with y up that is -a.
+			var b := Basis(right, up, out) * Basis(Vector3.BACK, -a + (PI if corner > 0.0 else 0.0))
 			k.uv2 = Vector2(u, v)
 			OutfitMeshes._glyph(k, str(ranks[i]), Transform3D(b, p), OutfitMeshes.RED if hearts else OutfitMeshes.BLACK, 0.055)
 	k.uv2 = Vector2.ZERO
@@ -610,15 +629,25 @@ static func eyes(k: OutfitMeshKit, id: StringName) -> void:
 	var face := Basis(Vector3.RIGHT, PI * 0.5)
 	match id:
 		&"eyes_black_eye":
-			# A purple shiner: a ring lying on the skin round the left eye (outside the eyeball), a
+			# A purple shiner painted flat on the skin round the left eye (outside the eyeball):
+			# dark next to the eye, paler and ragged towards its edge, bigger below than above; a
 			# sticking plaster on the other cheek.
 			var e: Vector3 = OutfitMeshes._eye_center(1.0)
-			var y0: float = e.y - 0.01
-			var n: Vector3 = (Vector3(e.x * 0.8, 0.12, -0.75)).normalized()
-			var on_skin: Basis = Basis.looking_at(-n, Vector3.UP) * Basis(Vector3.RIGHT, PI * 0.5)
-			var at := Vector3(e.x, y0, AvatarVisuals.face_z(y0, e.x) - 0.004)
-			k.torus(at, r * 1.08, r * 1.7, Color("#7A5A86"), 24, on_skin * Basis.from_scale(Vector3(1.0, 0.15, 0.9)))
-			k.torus(at + n * 0.003, r * 1.05, r * 1.36, Color("#4E3256"), 24, on_skin * Basis.from_scale(Vector3(1.0, 0.15, 0.9)))
+			var spot := func(u: float, v: float) -> Vector3:
+				var a: float = u * TAU
+				var reach: float = r * (1.32 + 0.42 * maxf(-sin(a), 0.0) + 0.06 * sin(a * 3.0 + 1.0))
+				var rad: float = lerpf(r * 0.93, reach, v)
+				var x: float = e.x + cos(a) * rad
+				var y: float = e.y + sin(a) * rad * 0.92
+				return Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.0025)
+			k.surface(spot, 40, 6, func(u: float, v: float) -> Color:
+				if v > 0.84 and sin(u * TAU * 9.0) + 0.6 * sin(u * TAU * 4.0) > 0.4:
+					return Color(0, 0, 0, 0)  # a ragged edge
+				if v < 0.34:
+					return Color("#4A2F55")
+				if v < 0.67:
+					return Color("#6B4C7C")
+				return Color("#8C6E86"), func(_p: Vector3) -> Vector3: return Vector3(0, 0, -1), true)
 			var o: Vector3 = OutfitMeshes._eye_center(-1.0)
 			var y: float = o.y - r * 1.6
 			var x: float = o.x - 0.04
