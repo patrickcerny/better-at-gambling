@@ -196,8 +196,6 @@ func on_event(ev: Dictionary) -> void:
 		&"minigame_eliminated":
 			for p: Variant in ev.get("players", []):
 				_drop_player(int(p))
-				if StringName(ev.get("cause", &"")) == &"dropout":
-					feed("%s left the game" % player_name(int(p)), Color(Palette.CREAM, 0.7))
 		&"rewards_started":
 			_close_showdown()
 	_refresh_hud()
@@ -213,12 +211,9 @@ func _on_picked(pid: int, fid: int, card: int, hand: Array) -> void:
 		Audio.play_at(&"card_flip", a, -4.0, 1.1)
 	if pid == local_id:
 		Audio.play(&"chime", &"SFX", -10.0, 1.4)
-		feed("You picked up the %s" % PokerHand.card_name(card).to_lower(), Palette.MONEY_GREEN)
 		var tuple: Array[int] = PokerHand.evaluate(hand)
 		if int(tuple[0]) >= PokerHand.Category.PAIR and hand_names.get(pid, "") != "":
 			_flash_bar_title()
-	elif hand.size() >= HAND_MAX:
-		feed("%s has a full hand: %s" % [player_name(pid), PokerHand.name_of(PokerHand.evaluate(hand)).to_lower()], player_color(pid))
 
 
 func _on_dropped(ev: Dictionary) -> void:
@@ -238,15 +233,12 @@ func _on_dropped(ev: Dictionary) -> void:
 		Audio.play(&"whoosh", &"SFX", -6.0, 1.3)
 		if a != null:
 			Vfx.floating_text(self, a.global_position + Vector3(0, 2.2, 0), "DROPPED!", Palette.LOSS_RED, 90, 0.8, 1.0)
-		feed("%s knocked the %s out of %s's hand" % [player_name(by), PokerHand.card_name(card).to_lower(), player_name(pid)], player_color(by))
 		if pid == local_id:
 			banner("SHOVED! YOU DROPPED A CARD", Palette.LOSS_RED, 1.2)
 		elif by == local_id:
 			banner("THEY DROPPED THE %s!" % PokerHand.card_name(card), Palette.MONEY_GREEN, 1.0)
 	else:
 		Audio.play(&"card_flip", &"UI", -8.0, 0.9)
-		if pid == local_id:
-			feed("You dropped the %s" % PokerHand.card_name(card).to_lower(), Color(Palette.CREAM, 0.8))
 
 
 func _on_over(ev: Dictionary) -> void:

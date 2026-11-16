@@ -22,16 +22,15 @@ func test_bindings_follow_the_input_map() -> void:
 	assert_eq(walk[0]["pad"], "Left stick")
 
 
-func test_preview_cycles_the_sheet() -> void:
+func test_preview_plays_the_video() -> void:
 	var p := MinigamePreview.new()
 	add_child_autofree(p)
 	assert_true(p.set_game(&"quiz"))
-	assert_eq(p.frames, 50, "10 x 5 frames")
-	p._process(0.25)
-	assert_eq(p.frame, 2, "10 fps")
-	p._process(5.0)
-	assert_eq(p.frame, 2, "loops after 5 s")
+	assert_true(p.has_clip, "a real video, not a sprite sheet")
+	assert_true(p.video.stream is VideoStreamTheora)
+	assert_true(p.video.loop)
 	assert_false(p.set_game(&"no_such_game"))
+	assert_false(p.has_clip)
 
 
 func test_rules_card_shows_clip_and_controls() -> void:
@@ -40,7 +39,7 @@ func test_rules_card_shows_clip_and_controls() -> void:
 	var card := MinigameBriefing.new()
 	add_child_autofree(card)
 	card.open({"minigame": &"find_the_lady", "players": [1, 2], "briefing": 30.0}, st, 1)
-	assert_eq(card.preview.frames, 50)
+	assert_true(card.preview.has_clip)
 	assert_eq(card.key_chips.size(), MinigameControls.rows(&"find_the_lady").size())
 	InputGlyphs.set_gamepad(true)
 	card._process(0.1)

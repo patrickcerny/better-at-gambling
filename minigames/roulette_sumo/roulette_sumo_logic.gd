@@ -22,6 +22,11 @@ extends WalkableLogicBase
 ##   at full speed (before: 22 s and 3 s). At full speed the outward pull at r 4.4 is 4.3 m/s
 ##   against a 5.5 m/s walk, so a bean has to keep walking inward to stay on, and past r 5.6 only a
 ##   sprint gets it back.
+## - Start grace (0.9.72, Patrick: "you sometimes spawn in the ball or at the edge and you directly
+##   get disqualified"): for `START_GRACE` s after the go the game clock stands still: the wheel
+##   doesn't turn or drag, the ball sits parked on the rim track, nobody can be hit or fall out.
+##   `roulette_sumo_begin {grace}` tells the clients; the beans spawn on `WheelRoom.SPAWN_RADIUS`
+##   (3.3), well clear of the ball's track, and the ball can't touch anyone for `BALL_GRACE` more.
 ## - Falls: a bean whose flat distance from the centre is past `FALL_RADIUS`, or who is more than
 ##   `FALL_DEPTH` below the deck, is out (`eliminate`, a short tumble, then the gallery).
 ##
@@ -78,11 +83,15 @@ const PUSH_STRENGTH: float = 4.0
 const FALL_KNOCK: float = 1.2
 ## How often the wheel and the ball are re-sent.
 const SYNC_INTERVAL: float = 1.0
+## Seconds after the go before the wheel turns and the ball rolls (see the header).
+const START_GRACE: float = 3.0
 const END_HOLD: float = 3.5
 
 var state: State = State.PLAYING
 var clock: float = 0.0
 var wait_left: float = 0.0
+## Start grace left (s): the clock, the wheel and the ball wait until it runs out.
+var grace_left: float = START_GRACE
 ## player → game clock until which the ball leaves them alone / of their last push.
 var ball_safe_until: Dictionary[int, float] = {}
 var last_push: Dictionary[int, float] = {}
@@ -110,11 +119,14 @@ func _on_room_setup(_context: Dictionary) -> void:
 		pushes[p] = 0
 	# The ball starts on the rim track, rolling round it one way or the other.
 	var a: float = rng.unit() * TAU
+	# It sits still through the start grace; its first segment (when the grace runs out) rolls
+	# it along the track.
 	ball_pos = Vector2(sin(a), cos(a)) * BALL_MAX_R
-	var tangent := Vector2(cos(a), -sin(a)) * (1.0 if rng.unit() < 0.5 else -1.0)
-	ball_vel = tangent * rng.range_float(BALL_MIN_SPEED, BALL_MAX_SPEED)
+	ball_vel = Vector2.ZERO
 	ball_turn = 0.0
-	seg_left = rng.range_float(SEG_MIN, SEG_MAX)
+	seg_left = 0.0
+	for p: int in players:
+		ball_safe_until[p] = BALL_GRACE
 
 
 ## The casino's shove (knockdowns, knockouts), grab and throw are off: the game's own little push
@@ -213,13 +225,19 @@ func tick(delta: float, _now: float) -> void:
 	if not _announced:
 		# The stage only exists after the curtain: say it from the first tick (and in the state).
 		_announced = true
-		events.append(GameEvents.make(&"roulette_sumo_begin", {"players": alive.duplicate(), "seconds": GAME_SECONDS}))
+		events.append(GameEvents.make(&"roulette_sumo_begin", {"players": alive.duplicate(), "seconds": GAME_SECONDS, "grace": snappedf(grace_left, 0.01)}))
 		_sync()
 	if state == State.DONE:
 		wait_left -= delta
 		if wait_left <= 0.0:
 			_finish()
 		return
+	if grace_left > 0.0:
+		grace_left -= delta
+		if grace_left > 0.0:
+			return  # the wheel and the ball wait; nobody can fall out yet
+		events.append(GameEvents.make(&"roulette_sumo_spin", {}))
+		_sync()
 	clock = minf(clock + delta, GAME_SECONDS)
 	_tick_ball(delta)
 	_sync_left -= delta
@@ -245,7 +263,9 @@ func _tick_ball(delta: float) -> void:
 		seg_left = rng.range_float(SEG_MIN, SEG_MAX)
 		var speed: float = rng.range_float(BALL_MIN_SPEED, BALL_MAX_SPEED)
 		ball_turn = rng.range_float(-BALL_MAX_TURN, BALL_MAX_TURN)
-		var dir: Vector2 = ball_vel.normalized() if ball_vel.length() > 0.01 else Vector2.RIGHT
+		# A parked ball (the start) sets off along the rim track, one way or the other.
+		var tangent := Vector2(ball_pos.y, -ball_pos.x).normalized() * (1.0 if rng.unit() < 0.5 else -1.0)
+		var dir: Vector2 = ball_vel.normalized() if ball_vel.length() > 0.01 else (tangent if tangent.length() > 0.5 else Vector2.RIGHT)
 		ball_vel = dir * speed
 		events.append(GameEvents.make(&"roulette_sumo_ball", {"ball": ball_wire(), "clock": snappedf(clock, 0.001)}))
 	var res: Array[Vector2] = step_ball(ball_pos, ball_vel, ball_turn, delta)
@@ -389,9 +409,10 @@ func get_public_state() -> Dictionary:
 	var st: Dictionary = walkable_state()
 	st["state"] = String(State.keys()[state]).to_lower()
 	st["clock"] = snappedf(clock, 0.01)
+	st["grace"] = snappedf(maxf(grace_left, 0.0), 0.01)
 	st["seconds"] = GAME_SECONDS
 	st["angle"] = snappedf(wheel_angle(clock), 0.0001)
-	st["omega"] = snappedf(omega_at(clock), 0.0001)
+	st["omega"] = snappedf(omega_at(clock) if grace_left <= 0.0 else 0.0, 0.0001)
 	st["ball"] = ball_wire()
 	st["winner"] = winner
 	if finished or state == State.DONE:

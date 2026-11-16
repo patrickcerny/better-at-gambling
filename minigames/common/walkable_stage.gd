@@ -11,7 +11,7 @@ extends MinigameStage
 ##   server moves them later (`minigame_player_moved`: the gallery after an elimination, a clamp);
 ## - input: STAGE mode (free cursor) during the rules briefing and the rewards, WALK while playing;
 ## - the action button: E goes to `on_action_pressed` → `minigame_action {kind, target?}`;
-## - a 2D overlay on `ui` with helpers: a clock, a status line, a centre banner, a feed, a prompt.
+## - a 2D overlay on `ui` with helpers: a clock, a status line, a centre banner, a prompt.
 ## Subclasses override `_build_room`, `_build_game(start)`, `action_kind()`, `action_range()`,
 ## `can_act()` and react to their events in `on_event` (call super).
 
@@ -33,7 +33,6 @@ var clock_label: Label = null
 var status_label: Label = null
 var prompt_label: Label = null
 var _banner: Label = null
-var _feed: VBoxContainer = null
 var _clock_panel: PanelContainer = null
 
 
@@ -272,18 +271,10 @@ func _build_overlay() -> void:
 	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	clock_label.custom_minimum_size = Vector2(150, 0)
 	_clock_panel.add_child(clock_label)
-	# Status (top left), feed (top right), prompt (bottom centre), banner (centre).
+	# Status (top left), prompt (bottom centre), banner (centre).
 	status_label = label("", 30, Palette.CREAM)
 	status_label.position = Vector2(24, 18)
 	overlay.add_child(status_label)
-	_feed = VBoxContainer.new()
-	_feed.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_feed.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_feed.position = Vector2(-24, 18)
-	_feed.alignment = BoxContainer.ALIGNMENT_BEGIN
-	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_feed.add_theme_constant_override(&"separation", 4)
-	overlay.add_child(_feed)
 	prompt_label = label("", 34, Palette.CASINO_BLACK)
 	var pill := PanelContainer.new()
 	var ps := StyleBoxFlat.new()
@@ -348,32 +339,6 @@ func banner(text: String, color: Color = Palette.VIP_GOLD, seconds: float = 2.0)
 	t.tween_property(_banner, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_interval(seconds)
 	t.tween_property(_banner, "modulate:a", 0.0, 0.35)
-
-
-## A line on top of the feed (the last `keep` stay).
-func feed(text: String, color: Color = Palette.CREAM, keep: int = 6) -> void:
-	if _feed == null:
-		return
-	var row := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.CASINO_BLACK, 0.72)
-	sb.border_color = Color(Palette.WARM_GOLD, 0.6)
-	sb.border_width_left = 3
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 2
-	sb.content_margin_bottom = 2
-	row.add_theme_stylebox_override(&"panel", sb)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var l: Label = label(text, 24, color)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	row.add_child(l)
-	_feed.add_child(row)
-	_feed.move_child(row, 0)
-	while _feed.get_child_count() > keep:
-		var old: Node = _feed.get_child(_feed.get_child_count() - 1)
-		_feed.remove_child(old)
-		old.queue_free()
 
 
 func label(text: String, size_px: int, color: Color) -> Label:

@@ -30,8 +30,9 @@ const CONE_R: float = 2.3
 const POCKET_IN: float = 2.45
 const POCKET_OUT: float = 5.6
 const NUMBER_OUT: float = 6.45
-## Beans start on this ring of the deck.
-const SPAWN_RADIUS: float = 4.4
+## Beans start on this ring of the deck (0.9.72: 4.4 -> 3.3, Patrick: at 4.4 a slow start meant
+## going over the rim straight away). Well inside the ball's rim track.
+const SPAWN_RADIUS: float = 3.3
 ## Velvet-rope stanchions round the pit.
 const ROPE_RADIUS: float = 9.6
 ## Lucky's croupier dais by the far wall.

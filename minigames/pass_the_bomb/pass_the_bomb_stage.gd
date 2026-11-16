@@ -106,7 +106,6 @@ func on_event(ev: Dictionary) -> void:
 				banner("YOU HAVE THE BOMB!", Palette.LOSS_RED, 1.4)
 			elif int(ev.get("bomb", 1)) > 1:
 				banner("NEW BOMB!", Palette.VIP_GOLD, 1.2)
-			feed("%s has the bomb" % player_name(holder), Palette.CREAM)
 			Audio.play(&"chime", &"SFX", -6.0, 0.8)
 		&"pass_the_bomb_passed":
 			var from: int = int(ev["from"])
@@ -120,7 +119,6 @@ func on_event(ev: Dictionary) -> void:
 				HitPop.at(self, ta.global_position + Vector3(0, 1.2, 0), 1.0)
 				ta.visuals.hit(ta.global_position - (fa.global_position if fa != null else ta.global_position), 0.6)
 				Audio.play_at(&"bonk", ta, -6.0, 1.3)
-			feed("%s  >  %s" % [player_name(from), player_name(to)], player_color(to))
 			if to == local_id:
 				banner("TAGGED! PASS IT ON!", Palette.LOSS_RED, 0.9)
 				if scene != null:
@@ -147,15 +145,8 @@ func on_event(ev: Dictionary) -> void:
 				scene._juice(0.08 if victim == local_id else 0.0, clampf(0.7 - d * 0.06, 0.1, 0.7))
 		&"minigame_eliminated":
 			alive.assign((ev.get("alive", alive) as Array).map(func(v: Variant) -> int: return int(v)))
-			var place: int = int(ev.get("place", 0))
-			for p: Variant in ev.get("players", []):
-				if StringName(ev.get("cause", &"")) == &"dropout":
-					feed("%s left the game" % player_name(int(p)), Color(Palette.CREAM, 0.7))
-				else:
-					feed("%s is out  ·  %s" % [player_name(int(p)), _ordinal(place)], Palette.LOSS_RED)
 		&"pass_the_bomb_fizzled":
 			_set_holder(-1)
-			feed("The bomb fizzled out", Color(Palette.CREAM, 0.7))
 		&"pass_the_bomb_over":
 			done = true
 			_set_holder(-1)
@@ -328,19 +319,6 @@ func _particles(parent: Node3D, amount: int, life: float, from: Color, to: Color
 	p.local_coords = false
 	parent.add_child(p)
 	p.emitting = true
-
-
-static func _ordinal(n: int) -> String:
-	if n % 100 in [11, 12, 13]:
-		return "%dth" % n
-	match n % 10:
-		1:
-			return "%dst" % n
-		2:
-			return "%dnd" % n
-		3:
-			return "%drd" % n
-	return "%dth" % n
 
 
 ## The bomb lives on an avatar outside this stage: it goes with the stage.

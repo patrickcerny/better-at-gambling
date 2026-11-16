@@ -172,7 +172,7 @@ func on_event(ev: Dictionary) -> void:
 			Audio.play(&"countdown_beep", &"SFX", -4.0, 1.2)
 			_say("Go go go! First one under my sign takes the jackpot.", QuizHost.Pose.DRUMROLL)
 		&"jackpot_climb_begin":
-			feed("Reach the JACKPOT sign first", Palette.VIP_GOLD)
+			pass
 		&"jackpot_climb_clock":
 			clock = float(ev.get("clock", clock))
 		&"jackpot_climb_swing":
@@ -206,7 +206,6 @@ func on_event(ev: Dictionary) -> void:
 		&"minigame_eliminated":
 			if StringName(ev.get("cause", &"")) == &"dropout":
 				for p: Variant in ev.get("players", []):
-					feed("%s left the game" % player_name(int(p)), Color(Palette.CREAM, 0.7))
 					_remove_bat(int(p))
 		&"jackpot_climb_over":
 			done = true
@@ -224,7 +223,6 @@ func _on_hit(by: int, target: int, seconds: float) -> void:
 		HitPop.at(self, at, 1.5)
 		Audio.play_at(&"bonk", ta, 0.0, randf_range(0.65, 0.75))
 		Vfx.floating_text(self, at + Vector3(0, 0.6, 0), "BONK!", Palette.VIP_GOLD, 120, 0.9, 1.0)
-	feed("%s  bonked  %s off the chips" % [player_name(by), player_name(target)], player_color(by))
 	if target == local_id:
 		banner("KNOCKED OFF!", Palette.LOSS_RED, 1.0)
 		if scene != null:
@@ -254,7 +252,6 @@ func _on_checkpoint(pid: int, k: int) -> void:
 			t.tween_property(cloth, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	elif a != null:
 		WinFx.coin_burst(self, a.global_position + Vector3(0, 1.2, 0), 8, 2.0)
-	feed("%s reached checkpoint %d" % [player_name(pid), k], player_color(pid))
 	if pid != local_id and randf() < 0.35:
 		_say("%s plants a flag on tier %d!" % [player_name(pid), k], QuizHost.Pose.HAPPY)
 
@@ -318,7 +315,6 @@ func _on_top(ev: Dictionary) -> void:
 			banner("JACKPOT!  #%d" % place, Palette.VIP_GOLD, 2.0)
 			Audio.play(&"big_win" if place == 1 else &"minor_win", &"SFX", -4.0)
 	_flash_sign(("#%d  " % place) + " & ".join(names).to_upper())
-	feed("%s hit the jackpot  (#%d)" % [" & ".join(names), place], Palette.VIP_GOLD)
 	if place == 1:
 		_say("%s rings the jackpot first!" % " and ".join(names), QuizHost.Pose.HAPPY)
 		if local_id not in grp:
@@ -336,7 +332,6 @@ func _announce(ranking: Array, reason: StringName) -> void:
 	if top.size() == 1:
 		var w: int = top[0]
 		banner("YOU WIN!" if w == local_id else "%s WINS!" % player_name(w).to_upper(), Palette.VIP_GOLD, 3.0)
-		feed("%s: %s" % [player_name(w), "first to the jackpot" if is_up(w) else "highest on the chips"], Palette.VIP_GOLD)
 		if is_up(w):
 			_say("%s climbed to the jackpot first. The winner!" % player_name(w), QuizHost.Pose.HAPPY, 4.0)
 		else:

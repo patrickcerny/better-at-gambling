@@ -36,6 +36,7 @@ func _to_game() -> RouletteSumoLogic:
 	g.ball_vel = Vector2.ZERO
 	g.ball_turn = 0.0
 	g.seg_left = 1000.0
+	g.grace_left = 0.0  # past the start grace: the rules apply
 	fx.run(0.1)
 	return g
 

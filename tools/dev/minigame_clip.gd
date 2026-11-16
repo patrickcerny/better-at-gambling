@@ -1,9 +1,11 @@
 extends Node
 ## Dev: records the short looping preview clip a minigame's rules card plays
-## (tools/minigame_clips.sh → assets/minigames/clips/<id>.webp, a sprite sheet).
+## (tools/minigame_clips.sh → assets/minigames/clips/<id>.ogv, a Theora video since 0.9.72).
 ## Table games run their real logic in real time with every seat played by a simple bot that
 ## submits random legal intents; walkable games use their dev shot (tools/dev/<id>_shot.tscn) with
-## the beans walking about and the camera drifting. Frames go to `--out <dir>` as f000.png...
+## the beans walking about and the camera drifting, unless the game has its own scripted clip
+## scene (tools/dev/<id>_clip.tscn, e.g. Roulette Sumo's: beans riding the wheel, a push, the ball
+## bowling one over the rim). Frames go to `--out <dir>` as f000.png... at `--size WxH`.
 ##   xvfb-run -a tools/godot/godot --path . --rendering-method gl_compatibility --fixed-fps 30
 ##     --resolution 1280x720 --audio-driver Dummy res://tools/dev/minigame_clip.tscn --
 ##     --game quiz --out /tmp/clip [--skip S] [--seconds 4] [--every 3] [--warmup 1.0]
@@ -11,8 +13,8 @@ extends Node
 
 const NAMES: Array[String] = ["Patrick", "Chip", "Lucky", "Dice", "Big Wendy", "Snake Eyes"]
 const CLUE_WORDS: Array[String] = ["shiny", "loud", "round", "lucky", "cold", "fast", "red", "rich"]
-## Frame size of the clip (16:9).
-const FRAME: Vector2i = Vector2i(384, 216)
+## Frame size of the clip (16:9), `--size WxH`.
+var frame_size: Vector2i = Vector2i(960, 540)
 ## Walkable games: the beans' wander radius per game (climbs stay on their ledges).
 const WANDER: Dictionary = {&"dodge_the_dice": 0.25, &"jackpot_climb": 0.25, &"roulette_sumo": 0.5}
 const SWINGERS: Array[StringName] = [&"bat_heist", &"jackpot_climb"]
@@ -46,11 +48,18 @@ func _ready() -> void:
 	seconds = c.get_float("seconds", 4.0)
 	every = maxi(c.get_int("every", 3), 1)
 	warmup = c.get_float("warmup", 1.0)
+	var sz: PackedStringArray = c.get_string("size", "960x540").split("x")
+	if sz.size() == 2:
+		frame_size = Vector2i(int(sz[0]), int(sz[1]))
 	_rng.seed = 11
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	var shot: String = "res://tools/dev/%s_shot.tscn" % game
 	walkable = Registry.minigames[game].logic_script.new() is WalkableLogicBase
-	if walkable:
+	var scripted: String = "res://tools/dev/%s_clip.tscn" % game
+	if ResourceLoader.exists(scripted):
+		walkable = false  # the scene moves everything itself
+		add_child((load(scripted) as PackedScene).instantiate())
+	elif walkable:
 		add_child((load(shot) as PackedScene).instantiate())
 		_collect_beans.call_deferred()
 	else:
@@ -207,7 +216,8 @@ func _process(delta: float) -> void:
 	if (_tick - 1) % every != 0:
 		return
 	var img: Image = get_viewport().get_texture().get_image()
-	img.resize(FRAME.x, FRAME.y, Image.INTERPOLATE_LANCZOS)
+	if img.get_size() != frame_size:
+		img.resize(frame_size.x, frame_size.y, Image.INTERPOLATE_LANCZOS)
 	img.save_png("%s/f%03d.png" % [out_dir, _frame])
 	_frame += 1
 	if _frame >= int(round(seconds / (delta * every))):

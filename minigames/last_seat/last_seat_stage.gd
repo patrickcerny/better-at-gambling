@@ -209,8 +209,6 @@ func on_event(ev: Dictionary) -> void:
 					out.append(int(p))
 				if seated.has(int(p)):
 					_unseat(int(p))
-				if StringName(ev.get("cause", &"")) == &"dropout":
-					feed("%s left the game" % player_name(int(p)), Color(Palette.CREAM, 0.7))
 		&"last_seat_winner":
 			_on_winner(int(ev.get("player", -1)))
 		&"rewards_started":
@@ -230,7 +228,6 @@ func _on_round(n: int, count: int) -> void:
 	if _is_dedicated():
 		return
 	if n > 1:
-		feed("Round %d: %d stool%s left" % [n, count, "" if count == 1 else "s"], Palette.VIP_GOLD)
 		_say("Round %d! %d stool%s for %d beans. Music!" % [n, count, "" if count == 1 else "s", alive_players().size()], QuizHost.Pose.HAPPY)
 		Audio.play(&"thud", &"SFX", -6.0, 0.8)  # a stool sinks into the floor
 	else:
@@ -260,7 +257,6 @@ func _on_sat(pid: int, stool: int) -> void:
 	if a != null:
 		Audio.play_at(&"thud", a, -4.0, 1.3)
 		Vfx.floating_text(self, _seat_pos(stool) + Vector3(0, 1.9, 0), "SAFE!", Palette.MONEY_GREEN, 90, 0.7, 1.0)
-	feed("%s grabbed a stool" % player_name(pid), player_color(pid))
 	if pid == local_id:
 		banner("SAFE!", Palette.MONEY_GREEN, 1.0)
 		Audio.play(&"chime", &"SFX", -4.0, 1.2)
@@ -284,7 +280,6 @@ func _on_round_over(standing: Array) -> void:
 		if pid == local_id:
 			banner("NO SEAT! YOU'RE OUT", Palette.LOSS_RED, 2.0)
 	Audio.play(&"loss_sting", &"SFX", -6.0)
-	feed("%s: no seat, out!" % ", ".join(names), Palette.LOSS_RED)
 	_say("%s %s left standing. Out!" % [" and ".join(names), "is" if names.size() == 1 else "are"], QuizHost.Pose.DISAPPOINTED)
 
 
