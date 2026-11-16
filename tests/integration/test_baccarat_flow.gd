@@ -37,7 +37,7 @@ func test_registered_on_the_map_with_a_dealer() -> void:
 	assert_true(SID in fx.server.map_def.hot_table_candidates, "can be the Hot Table like the other tables")
 	assert_true(fx.server.dealers.has(SID), "a dealer stands at the table")
 	assert_true(LuckyLounge.STATIONS.has(SID), "the lounge builds the table")
-	assert_gte(Protocol.PROTOCOL_VERSION, 16, "the new game's state bumped the protocol")
+	assert_gte(Protocol.PROTOCOL_VERSION, 17, "the new game's state bumped the protocol")
 	assert_eq(StringName(_pub()["game"]), &"baccarat")
 	assert_eq(ClientMatchState.station_label(SID), "Baccarat 1")
 

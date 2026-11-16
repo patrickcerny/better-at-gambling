@@ -93,6 +93,19 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.50 Baccarat
+- Patrick: "Adde Baccarat". New table game `baccarat` (Punto Banco, 8-deck shoe, standard tableau):
+  PLAYER 1:1, BANKER 1:1 less 5%, TIE 9:1, P PAIR / B PAIR 11:1, Player and Banker push on a tie.
+  Shared round like roulette (betting window, the cards turn one by one, then the pay); quiet favour
+  per bet type makes each ~101.1% (`tests/sim/test_rtp_baccarat.gd`). Luck moves the pay only
+  (lucky: a one-point loss can come back; jinxed: a win pays 80%).
+- `BaccaratStation`: long table with round corners in deep blue felt, five seats each with its own
+  gold-lined betting panel (PLAYER/BANKER discs in front, P PAIR/TIE/B PAIR behind), the two hands in
+  frames with floating totals, winner outlined, a LAST ROUNDS scoreboard, shoe and chip rack.
+  `BaccaratUi` docks in the right column (hands, five bet buttons with pays, chips, road).
+- Full floor: the pit can't hold a tenth table, so `full_extras` is now two blackjacks (roulette_2 is
+  off the canonical floor; random floors still draw extras by weight). Protocol 17.
+
 ### 2026-11-16 / 0.9.49 Item bar with the item models, NEW ITEM card, fuller explanations
 - Patrick: "Items erklären wichtiger" and "Item inventory bar sollte nicht namen der items zeigen
   sondern die 3d models und onscroll oder equip der name". The three slots (`ItemBar`) are squares
