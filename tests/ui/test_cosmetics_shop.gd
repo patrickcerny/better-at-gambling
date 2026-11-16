@@ -51,6 +51,15 @@ func test_buy_refuse_and_wear() -> void:
 	ProfileManager.changed.emit()
 	assert_eq(panel.coins_label.text, "%d" % (mint.price + 5), "the wallet follows the profile")
 	panel.action_button.pressed.emit()
+	assert_not_null(panel.confirm_dialog, "buying asks first")
+	assert_string_contains(panel.confirm_dialog.text_label.text, "can't be refunded")
+	assert_false(ProfileManager.profile.owns(&"color_mint"), "nothing bought before the answer")
+	panel.confirm_dialog.cancel()
+	assert_false(ProfileManager.profile.owns(&"color_mint"), "CANCEL buys nothing")
+	assert_eq(ProfileManager.profile.coins, mint.price + 5)
+	assert_eq(panel.selected, &"color_mint", "still picked after CANCEL")
+	panel.action_button.pressed.emit()
+	panel.confirm_dialog.confirm()
 	assert_true(ProfileManager.profile.owns(&"color_mint"))
 	assert_eq(ProfileManager.profile.coins, 5)
 	assert_eq(panel.coins_label.text, "5")
@@ -166,6 +175,11 @@ func test_try_ons_stack_and_come_off() -> void:
 	panel._on_tile_pressed(shirt.id)
 	ProfileManager.profile.coins = hat.price + shirt.price
 	panel.look_button.pressed.emit()
+	assert_false(ProfileManager.profile.owns(hat.id), "BUY ALL asks first")
+	assert_string_contains(panel.confirm_dialog.text_label.text, hat.display_name, "lists what is bought")
+	assert_string_contains(panel.confirm_dialog.text_label.text, shirt.display_name)
+	assert_string_contains(panel.confirm_dialog.text_label.text, "can't be refunded")
+	panel.confirm_dialog.confirm()
 	assert_true(ProfileManager.profile.owns(hat.id) and ProfileManager.profile.owns(shirt.id), "bought both")
 	assert_eq(ProfileManager.profile.coins, 0)
 	assert_eq(panel.look_button.text, "WEAR ALL")
@@ -220,4 +234,20 @@ func test_the_colour_flow_is_consistent_under_a_skin() -> void:
 	panel.select(&"skin_lava")
 	panel.action_button.pressed.emit()
 	assert_string_contains(panel.status_label.text, "from your next match", "in a lobby it says when it shows")
+	panel.close()
+
+
+func test_too_few_gold_coins_opens_the_gold_tab() -> void:
+	var panel: CosmeticsPanel = _shop()
+	panel.open()
+	var packs: Array[CoinPack] = CosmeticShop.default().coin_packs
+	assert_false(packs.is_empty(), "gold packs to sell")
+	var smallest: CoinPack = packs[0]
+	for c: CoinPack in packs:
+		if c.gold < smallest.gold:
+			smallest = c
+	panel.open_gold_shop(1)
+	assert_eq(panel.selected, smallest.id, "the smallest pack that covers it is picked")
+	assert_eq(panel.tabs.current_tab, int(panel.tab_buttons[CosmeticsPanel.KIND_COINS].get_meta(&"tab")), "on the GOLD tab")
+	assert_true(panel.steam_button.visible, "ready to buy with Steam")
 	panel.close()
