@@ -119,8 +119,10 @@ extends Resource
 @export var hilo_max_pay: float = 25.0
 ## The streak ladder: right calls in one hand before it cashes out on its own, and the most a pot
 ## can grow to (times the ante).
-@export var hilo_max_rungs: int = 6
+@export var hilo_max_rungs: int = 10
 @export var hilo_pot_cap: float = 50.0
+## Free skips per hand: a card the player doesn't like is replaced by a fresh one (Patrick, 0.9.52).
+@export var hilo_skips: int = 2
 ## The single deck is reshuffled before an ante once fewer cards than this are left.
 @export var hilo_reshuffle_at: int = 15
 ## Seconds to make a call (then the table calls for you) and how long a result stays up.

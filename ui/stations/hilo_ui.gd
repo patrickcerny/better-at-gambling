@@ -4,9 +4,12 @@ extends StationUi
 ## with the chips; once your card is up the two big buttons carry the call's true chance and what
 ## it pays, both straight from the server ("HIGHER ▲ 55% · ×1.74"). After a right call the pot and
 ## your step on the ladder show, and CASH OUT banks it; calling again lets it ride.
-## Keys: ↑ or H higher, ↓ or S lower, P cash out (gamepad: A higher, X lower, RB cash out).
+## A tie pushes (same pot, call again on the tied card); SKIP turns a fresh card up for free,
+## twice per hand (`hilo_skips`). The chances shown leave ties out, since they settle nothing.
+## Keys: ↑ or H higher, ↓ or S lower, P cash out, D or K skip (gamepad: A higher, X lower, RB cash out,
+## Y skip).
 
-const LADDER_STEPS: int = 6
+const LADDER_STEPS: int = 10
 
 var card_label: Label
 var pot_label: Label
@@ -16,6 +19,7 @@ var actions: VBoxContainer
 var higher_btn: Button
 var lower_btn: Button
 var cash_btn: Button
+var skip_btn: Button
 var bet_panel: BetPanel
 var others_label: Label
 
@@ -25,7 +29,7 @@ func _init() -> void:
 
 
 func _panel_height() -> float:
-	return 470.0
+	return 520.0
 
 
 func _dock_right() -> bool:
@@ -50,15 +54,15 @@ func _build() -> void:
 	ladder_row = HBoxContainer.new()
 	ladder_row.name = "Ladder"
 	ladder_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	ladder_row.add_theme_constant_override(&"separation", 6)
+	ladder_row.add_theme_constant_override(&"separation", 4)
 	body.add_child(ladder_row)
 	for i: int in LADDER_STEPS:
 		var l := Label.new()
 		l.text = str(i + 1)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		l.custom_minimum_size = Vector2(40, 32)
-		l.add_theme_font_size_override(&"font_size", 18)
+		l.custom_minimum_size = Vector2(30, 30)
+		l.add_theme_font_size_override(&"font_size", 16)
 		ladder_row.add_child(l)
 		ladder_marks.append(l)
 	actions = VBoxContainer.new()
@@ -80,6 +84,12 @@ func _build() -> void:
 	cash_btn.focus_mode = Control.FOCUS_NONE
 	cash_btn.pressed.connect(cash_out)
 	actions.add_child(cash_btn)
+	skip_btn = Button.new()
+	skip_btn.name = "Skip"
+	skip_btn.custom_minimum_size = Vector2(0, 40)
+	skip_btn.focus_mode = Control.FOCUS_NONE
+	skip_btn.pressed.connect(skip)
+	actions.add_child(skip_btn)
 	others_label = _line("", 16, Color("#9A8F7A"))
 	others_label.name = "Others"
 	others_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -104,10 +114,15 @@ func cash_out() -> bool:
 	return send(&"action", {"action": &"cash_out"})
 
 
+## Turns a fresh card up instead of the one showing (free, `hilo_skips` per hand).
+func skip() -> bool:
+	return send(&"action", {"action": &"skip"})
+
+
 func _hint_text() -> String:
 	if InputGlyphs.gamepad:
 		return InputGlyphs.fill("[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_confirm}] ante\n[{leave_station}] stand up")
-	return InputGlyphs.fill("Aces high, a tie loses\n[1-4] chip  [{bet_confirm}] ante  [{leave_station}] stand up")
+	return InputGlyphs.fill("Aces high, a tie pushes\n[1-4] chip  [{bet_confirm}] ante  [{leave_station}] stand up")
 
 
 func _relabel() -> void:
@@ -124,6 +139,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		lower_btn.pressed.emit()
 	elif event.is_action_pressed(&"bj_split") and cash_btn.visible:
 		cash_btn.pressed.emit()
+	elif (event.is_action_pressed(&"bj_double") or key == KEY_K) and not skip_btn.disabled:
+		skip_btn.pressed.emit()
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -147,12 +164,18 @@ func _refresh() -> void:
 			"lose":
 				status_label.text = "%s: wrong call, the pot is lost" % up
 				pot_label.text = "−$%d" % int(mine.get("stake", 0))
+			"push":
+				status_label.text = "Tie, your ante comes back"
+				pot_label.text = "±$0"
 			"cashed":
 				status_label.text = "Cashed out after %d right call%s" % [rung, "" if rung == 1 else "s"]
 				pot_label.text = "+$%d" % pot
 			_:
 				var secs: int = int(ceil(float(mine.get("timer", 0.0))))
-				status_label.text = ("Right! Ride it or cash out  (%d s)" % secs) if rung > 0 else ("Your call  (%d s)" % secs)
+				if bool(mine.get("push", false)):
+					status_label.text = "Tie, it pushes: call again  (%d s)" % secs
+				else:
+					status_label.text = ("Right! Ride it or cash out  (%d s)" % secs) if rung > 0 else ("Your call  (%d s)" % secs)
 				pot_label.text = ("POT $%d  ·  ×%.2f" % [pot, float(mine.get("mult", 1.0))]) if rung > 0 else ("ANTE $%d" % int(mine.get("stake", 0)))
 	for i: int in ladder_marks.size():
 		var lit: bool = i < rung
@@ -177,15 +200,19 @@ func _refresh_buttons() -> void:
 	var mine: Dictionary = my_hand()
 	var odds: Dictionary = mine.get("odds", {})
 	var pays: Dictionary = mine.get("pays", {})
-	_set_call(higher_btn, "HIGHER ▲", "higher", odds, pays, &"bj_hit")
-	_set_call(lower_btn, "LOWER ▼", "lower", odds, pays, &"bj_stand")
+	_set_call(higher_btn, "HIGHER ▲", "higher", "lower", odds, pays, &"bj_hit")
+	_set_call(lower_btn, "LOWER ▼", "lower", "higher", odds, pays, &"bj_stand")
+	var skips: int = int(mine.get("skips_left", 0))
+	skip_btn.text = "SKIP CARD  (%d left)  %s" % [skips, InputGlyphs.hint(&"bj_double")]
+	skip_btn.disabled = skips <= 0
 	var rung: int = int(mine.get("rung", 0))
 	cash_btn.visible = rung > 0
 	cash_btn.text = "CASH OUT  $%d  %s" % [int(mine.get("pot", 0)), InputGlyphs.hint(&"bj_split")]
 
 
-func _set_call(b: Button, title: String, side: String, odds: Dictionary, pays: Dictionary, action: StringName) -> void:
-	var p: float = float(odds.get(side, 0.0))
+## The chance shown is among the cards that settle the call (a tie pushes, so it is left out).
+func _set_call(b: Button, title: String, side: String, other: String, odds: Dictionary, pays: Dictionary, action: StringName) -> void:
+	var p: float = HiLoLogic.resolved(float(odds.get(side, 0.0)), float(odds.get(other, 0.0)))
 	var pay: float = float(pays.get(side, 0.0))
 	if p <= 0.0:
 		b.text = "%s\nno card can" % title
