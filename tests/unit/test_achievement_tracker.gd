@@ -114,6 +114,10 @@ func test_table_moments() -> void:
 	assert_false(&"ACH_WHEEL_WILD" in t.on_event(_result(&"wheel_1", -100, {"symbol": 5, "won": 0}), ME, &"wheel"))
 	assert_true(&"ACH_HOLDEM_FULL_HOUSE" in t.on_event(_result(&"holdem_1", 300, {"type": &"ante", "rank": 6}), ME, &"holdem"))
 	assert_false(&"ACH_HOLDEM_FULL_HOUSE" in t.on_event(_result(&"holdem_1", -300, {"type": &"ante", "rank": 7}), ME, &"holdem"), "lost anyway")
+	assert_true(&"ACH_HOLDEM_ROYAL_FLUSH" in t.on_event(_result(&"holdem_1", 900, {"type": &"ante", "rank": 9}), ME, &"holdem"))
+	assert_true(&"ACH_HOLDEM_ROYAL_FLUSH" in t.on_event(_result(&"holdem_1", 500, {"type": &"bonus", "rank": 9}), ME, &"holdem"), "bonus bet")
+	assert_false(&"ACH_HOLDEM_ROYAL_FLUSH" in t.on_event(_result(&"holdem_1", 900, {"type": &"ante", "rank": 8}), ME, &"holdem"), "straight flush")
+	assert_false(&"ACH_HOLDEM_ROYAL_FLUSH" in t.on_event(_result(&"holdem_1", -100, {"type": &"ante", "outcome": &"fold"}), ME, &"holdem"), "fold")
 	assert_true(&"ACH_HILO_LADDER" in t.on_event({"type": &"hilo_call", "player": ME, "won": true, "rung": 5}, ME))
 	assert_false(&"ACH_HILO_LADDER" in t.on_event({"type": &"hilo_call", "player": ME, "won": true, "rung": 4}, ME))
 

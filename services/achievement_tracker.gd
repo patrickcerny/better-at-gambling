@@ -26,6 +26,9 @@ const HILO_RUNGS: int = 5
 const WHEEL_WILD_SYMBOLS: Array[int] = [5, 6]
 ## Hold'em hand category for "Full House" (`HoldemHand.NAMES`: 6 = Full House, up to Royal Flush).
 const HOLDEM_FULL_HOUSE: int = 6
+## Hold'em hand category of a Royal Flush (`HoldemHand.Rank.ROYAL_FLUSH`). Patrick 2026-11-16:
+## "Royal flush achievement". Holding one at the showdown or on the bonus bet earns it, won or not.
+const HOLDEM_ROYAL_FLUSH: int = 9
 ## Slots symbol index of the seven (`SlotsLogic.Sym.SEVEN`).
 const SLOTS_SEVEN: int = 4
 ## Jail visits in one match for "Jailbird".
@@ -40,6 +43,7 @@ const IDS: Array[StringName] = [
 	&"ACH_SLOTS_SEVENS", &"ACH_PLINKO_EDGE", &"ACH_HILO_LADDER", &"ACH_WHEEL_WILD", &"ACH_HOLDEM_FULL_HOUSE",
 	&"ACH_ON_TILT", &"ACH_OUCH", &"ACH_JAILBIRD", &"ACH_WET_FLOOR", &"ACH_TRIP_WAITER", &"ACH_HOT_POTATO",
 	&"ACH_BACKSTABBER", &"ACH_COUNTERFEIT", &"ACH_YEET", &"ACH_LAST_PLACE",
+	&"ACH_HOLDEM_ROYAL_FLUSH",
 ]
 
 ## Blackjack hands lost in a row right now.
@@ -132,6 +136,8 @@ func _on_result(ev: Dictionary, game: StringName, out: Array[StringName]) -> voi
 		&"holdem":
 			if net > 0 and StringName(d.get("type", &"")) == &"ante" and int(d.get("rank", -1)) >= HOLDEM_FULL_HOUSE:
 				out.append(&"ACH_HOLDEM_FULL_HOUSE")
+			if int(d.get("rank", -1)) >= HOLDEM_ROYAL_FLUSH:
+				out.append(&"ACH_HOLDEM_ROYAL_FLUSH")
 
 
 func _on_blackjack(net: int, d: Dictionary, out: Array[StringName]) -> void:

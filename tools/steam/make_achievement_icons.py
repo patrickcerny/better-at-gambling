@@ -40,6 +40,7 @@ LABELS = {
     "ACH_COUNTERFEIT": ("FAKE", "$$$"),
     "ACH_YEET": ("", "YEET"),
     "ACH_LAST_PLACE": ("", "LAST"),
+    "ACH_HOLDEM_ROYAL_FLUSH": ("ROYAL", "FLUSH"),
 }
 
 ON = {
