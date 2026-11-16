@@ -15,11 +15,10 @@ extends RefCounted
 ## Once anything dev was used, Steam achievements stay off until the game restarts (`used`), so
 ## a dev level or dev money never unlocks a real achievement.
 
-## SteamID64s that may use developer mode (Patrick's account, from his Steam account page
+## SteamID64s that may use developer mode: Patrick only ("Dev rechte hab nur ich", 2026-11-16; his account, from his Steam account page
 ## 2026-11-15; more from him: "gebe dieser nummer access all. Es werden noch mehr steam ids kommen").
 const STEAM_IDS: Array[int] = [
 	76561198325616486,  # Patrick
-	76561198355845610,  # Patrick 2026-11-15
 ]
 ## SteamID64s that own every cosmetic and the developer skins, but get NO developer mode (Patrick
 ## 2026-11-15: "nicht entwickelermodus. Skin unlock all nur und den neuen dev skin. Keine dev sachen").
@@ -31,6 +30,7 @@ const COSMETIC_IDS: Array[int] = [
 	76561198358513331,
 	76561198138593759,
 	76561198124973959,
+	76561198355845610,  # had developer mode until 0.10.8 (Patrick 2026-11-16: "der zweite soll unlock all haben aber nicht dev rechte. Dev rechte hab nur ich")
 ]
 ## The one account that counts as "the dev" for Beat the Dev (Patrick only).
 const THE_DEV: int = 76561198325616486
@@ -50,14 +50,35 @@ static func allowed() -> bool:
 	return is_dev_id(SteamSvc.get_steam_id() if SteamSvc.is_available() else 0)
 
 
-## Whether this player owns every cosmetic for good (`COSMETIC_IDS`; no developer mode).
+## Whether this player owns every cosmetic for good: the developers (`STEAM_IDS`, Patrick
+## 2026-11-16: "Unlock all mich für immer weil im shop zeigt immer noch an dass es halt kaufbar
+## ist") and `COSMETIC_IDS`. Nothing is bought or saved, the shop just shows every piece as owned.
+## Unlike the DEV panel's toggle it doesn't count as dev use, so achievements stay on.
 static func all_cosmetics() -> bool:
 	if forced_cosmetics >= 0:
 		return forced_cosmetics == 1
 	if forced >= 0:
 		return false
-	var sid: int = SteamSvc.get_steam_id() if SteamSvc.is_available() else 0
-	return sid != 0 and sid in COSMETIC_IDS
+	return owns_everything(SteamSvc.get_steam_id() if SteamSvc.is_available() else 0)
+
+
+## Whether `steam_id` owns every cosmetic for good (developers and `COSMETIC_IDS`).
+static func owns_everything(steam_id: int) -> bool:
+	return steam_id != 0 and (steam_id in STEAM_IDS or steam_id in COSMETIC_IDS)
+
+
+## The achievements a developer account gets on start (Patrick 2026-11-16: "Gib mir auch alle
+## achievements"): all of them, except Beat the Dev for a developer who isn't `THE_DEV`, since
+## Beat the Dev spreads to whoever beats a holder and Patrick's second account would hand it out.
+static func granted_achievements(steam_id: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	if not is_dev_id(steam_id):
+		return out
+	for id: StringName in Achievements.DEFS:
+		if id == Achievements.BEAT_THE_DEV and not is_the_dev(steam_id):
+			continue
+		out.append(id)
+	return out
 
 
 ## Whether this player may wear the developer-only pieces (developers and `COSMETIC_IDS`).
