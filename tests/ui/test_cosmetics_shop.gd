@@ -10,9 +10,11 @@ var menu: Control
 
 func before_each() -> void:
 	ProfileManager.reload()  # fresh, in memory under GUT
+	DailyDeals.off = true  # normal prices: the day's deals are tested in test_daily_deals
 
 
 func after_each() -> void:
+	DailyDeals.off = false
 	ProfileManager.reload()
 
 
@@ -105,6 +107,12 @@ func test_main_menu_opens_the_shop_and_shows_the_profile() -> void:
 	assert_true(shop.visible, "SHOP opens the shop")
 	assert_false(shop.inventory)
 	assert_true(shop.tiles[&"color_mint"].visible, "the shop shows what you don't own")
+	shop.close()
+	assert_eq(badge.gold_label.text, Hud._thousands(SteamSvc.gold), "the Gold Coins on the profile line too")
+	badge.gold_button.pressed.emit()
+	assert_true(shop.visible and not shop.inventory, "the gold + opens the shop")
+	assert_eq(shop.tabs.current_tab, int(shop.tab_buttons[CosmeticsPanel.KIND_COINS].get_meta(&"tab")), "on the GOLD page")
+	assert_not_null(CosmeticShop.default().find_coin_pack(shop.selected), "a gold pack picked")
 	shop.close()
 	(menu.find_child("CosmeticsButton", true, false) as Button).pressed.emit()
 	assert_true(shop.visible and shop.inventory, "the T-shirt opens your inventory")

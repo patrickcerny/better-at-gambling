@@ -57,7 +57,7 @@ static func allowed() -> bool:
 static func all_cosmetics() -> bool:
 	if forced_cosmetics >= 0:
 		return forced_cosmetics == 1
-	if forced >= 0:
+	if forced >= 0 or ProfileManager.dev_as_player:
 		return false
 	return owns_everything(SteamSvc.get_steam_id() if SteamSvc.is_available() else 0)
 
@@ -134,6 +134,96 @@ static func set_unlock_all(on: bool) -> void:
 
 static func unlock_all() -> bool:
 	return ProfileManager.dev_unlock_all
+
+
+## Play as a normal player (on): the developer's own-everything and the Steam inventory are ignored
+## until the game closes, so removed pieces really are gone. Off: own everything again.
+static func set_as_player(on: bool) -> void:
+	ProfileManager.set_dev_as_player(on)
+
+
+static func as_player() -> bool:
+	return ProfileManager.dev_as_player
+
+
+## Sets the Coins to `amount` (saved).
+static func set_coins(amount: int) -> void:
+	mark_used()
+	ProfileManager.profile.coins = clampi(amount, 0, PlayerProfile.MAX_COINS)
+	_save()
+
+
+## The pieces this profile holds for itself (bought with Coins, collected, won on the wheel), in
+## shop order: what REMOVE can take away. Free and level pieces aren't listed (the level decides).
+static func removable() -> Array[StringName]:
+	var p: PlayerProfile = ProfileManager.profile
+	var out: Array[StringName] = []
+	for d: CosmeticDef in p.shop.items:
+		if d.id in p.owned or d.id in p.collected or d.id in p.unseen:
+			out.append(d.id)
+	return out
+
+
+## Takes piece `id` away again: no longer bought, collected or waiting in COLLECT (an achievement
+## or level piece shows up in COLLECT again). Worn: taken off.
+static func remove_cosmetic(id: StringName) -> void:
+	mark_used()
+	var p: PlayerProfile = ProfileManager.profile
+	p.owned.erase(id)
+	p.collected.erase(id)
+	p.unseen.erase(id)
+	p.sanitize()
+	_save()
+
+
+## Takes every bought, collected and won piece away (what's worn falls back to free pieces).
+static func remove_all_cosmetics() -> void:
+	mark_used()
+	var p: PlayerProfile = ProfileManager.profile
+	p.owned.clear()
+	p.collected.clear()
+	p.unseen.clear()
+	p.sanitize()
+	_save()
+
+
+## Forgets the achievements this profile knows of (until Steam syncs them on the next start), so
+## their COLLECT rewards disappear; collected achievement pieces go too.
+static func clear_achievements() -> void:
+	mark_used()
+	var p: PlayerProfile = ProfileManager.profile
+	p.achieved.clear()
+	var keep: Array[StringName] = []
+	for id: StringName in p.collected:
+		var d: CosmeticDef = p.shop.find(id)
+		if d != null and d.achievement == &"":
+			keep.append(id)
+	p.collected = keep
+	p.sanitize()
+	_save()
+
+
+## Lifetime stats and match counts back to zero.
+static func reset_stats() -> void:
+	mark_used()
+	var p: PlayerProfile = ProfileManager.profile
+	p.lifetime.clear()
+	p.matches = 0
+	p.wins = 0
+	p.online_wins = 0
+	p.biggest_win = 0
+	_save()
+
+
+## A fresh profile (`ProfileManager.dev_reset_profile`).
+static func reset_profile() -> void:
+	mark_used()
+	ProfileManager.dev_reset_profile()
+
+
+static func _save() -> void:
+	ProfileManager.save()
+	ProfileManager.changed.emit()
 
 
 # --- Practice -----------------------------------------------------------------------------------

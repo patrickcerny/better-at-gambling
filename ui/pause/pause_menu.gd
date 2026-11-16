@@ -174,7 +174,7 @@ func back() -> void:
 	elif settings.visible:
 		settings.close()
 	elif how_to_play.visible:
-		how_to_play.close()
+		how_to_play.step_back()  # a chapter goes to the overview, the overview closes
 	else:
 		resume()
 

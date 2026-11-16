@@ -23,6 +23,12 @@ func _init() -> void:
 	quit()
 
 
+## The exchange recipes for a Gold price: the normal one, then the DAILY DEALS price
+## (`DailyDeals.cut`, "3100x149;3100x104"), which Steam takes whichever day the game offers it.
+static func gold_recipes(gold: int) -> String:
+	return "%dx%d;%dx%d" % [CoinPack.GOLD_ITEM, gold, CoinPack.GOLD_ITEM, DailyDeals.cut(gold)]
+
+
 ## The whole file: {appid, items}. Gold Coins (Patrick 2026-11-15): one Gold Coin item
 ## (`CoinPack.GOLD_ITEM`), gold packs sold for money that grant N of them, premium pieces and sets
 ## not sold for money but exchanged for Gold Coins ("exchange": "3100x75"), and the other pieces of
@@ -70,7 +76,7 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"marketable": false,
 		}
 		if d.premium():
-			row["exchange"] = "%dx%d" % [CoinPack.GOLD_ITEM, d.gold]
+			row["exchange"] = gold_recipes(d.gold)
 		if d.wheel_only:
 			row["description"] = "%s for your bean in Better at Gambling, only won on the Daily Spin." % String(d.kind).capitalize()
 		items.append(row)
@@ -84,7 +90,7 @@ static func itemdefs(shop: CosmeticShop) -> Dictionary:
 			"itemdefid": k.steam_item,
 			"type": "bundle",
 			"bundle": ";".join(grants),
-			"exchange": "%dx%d" % [CoinPack.GOLD_ITEM, k.gold],
+			"exchange": gold_recipes(k.gold),
 			"name": k.display_name,
 			"description": "The whole %s outfit (%d pieces) for Gold Coins." % [k.display_name, grants.size()],
 			"store_hidden": true,

@@ -8,11 +8,13 @@ const MakeItemdefs := preload("res://tools/steam/make_itemdefs.gd")
 
 
 func before_each() -> void:
+	DailyDeals.off = true  # normal prices: the day's deals are tested in test_daily_deals
 	ProfileManager.set_steam_owned([] as Array[StringName])
 	ProfileManager.reload()
 
 
 func after_each() -> void:
+	DailyDeals.off = false
 	ProfileManager.set_steam_owned([] as Array[StringName])
 	ProfileManager.reload()
 
@@ -128,7 +130,7 @@ func test_the_itemdefs_file_for_steamworks_matches_the_shop() -> void:
 		assert_string_contains(str(i["bundle"]), "%dx" % CoinPack.GOLD_ITEM)
 	var crown: CosmeticDef = CosmeticShop.default().find(&"hat_crown")
 	var row: Dictionary = items.filter(func(i: Dictionary) -> bool: return int(i["itemdefid"]) == crown.steam_item)[0]
-	assert_eq(row["exchange"], "%dx%d" % [CoinPack.GOLD_ITEM, crown.gold])
+	assert_eq(row["exchange"], "%dx%d;%dx%d" % [CoinPack.GOLD_ITEM, crown.gold, CoinPack.GOLD_ITEM, DailyDeals.cut(crown.gold)], "the normal price, then the daily deal")
 	assert_eq(MakeItemdefs.price_category(99), "1;VLV100", "0,99 € is the 1 dollar tier")
 	assert_eq(MakeItemdefs.price_category(199), "1;VLV200")
 	assert_eq(MakeItemdefs.price_category(499), "1;VLV500")

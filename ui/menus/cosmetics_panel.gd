@@ -103,8 +103,12 @@ var _dim: ColorRect
 ## no prices or wallet).
 var wallet: Control
 var hint_label: Label
-## Shop only: today's featured cards over the tabs.
+## Shop only: today's featured cards over the tabs (`DailyDeals`), new ones every UTC day.
 var featured_row: HBoxContainer
+## "DAILY DEALS · 30% OFF · NEW IN 5H 12M" over the featured cards.
+var featured_title: Label
+## The day the featured cards are for (rebuilt when it turns).
+var featured_day: int = -1
 ## Inventory only: "N OF M OWNED" where the shop has the wallet.
 var owned_label: Label
 ## Inventory only: the WEARING column between the stage and the tiles.
@@ -302,12 +306,24 @@ func _ready() -> void:
 	right.add_theme_constant_override(&"separation", 14)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(right)
+	featured_title = Label.new()
+	featured_title.name = "DealsTitle"
+	featured_title.theme_type_variation = &"SmallLabel"
+	featured_title.add_theme_color_override(&"font_color", Palette.WARM_GOLD)
+	right.add_child(featured_title)
 	featured_row = HBoxContainer.new()
 	featured_row.name = "Featured"
 	featured_row.add_theme_constant_override(&"separation", 14)
 	right.add_child(featured_row)
-	for id: StringName in featured_ids():
-		featured_row.add_child(_featured_card(id))
+	_build_featured()
+	var tick := Timer.new()  # keeps "NEW IN ..." counting down and swaps the cards at midnight UTC
+	tick.name = "DealsClock"
+	tick.wait_time = 30.0
+	tick.timeout.connect(func() -> void:
+		if visible:
+			_refresh_places(ProfileManager.profile))
+	add_child(tick)
+	tick.autostart = true
 	var tab_row := HFlowContainer.new()  # wraps onto a second row on narrow screens
 	tab_row.name = "TabIcons"
 	tab_row.add_theme_constant_override(&"h_separation", 8)
@@ -365,26 +381,20 @@ func _ready() -> void:
 	tabs.resized.connect(_fit_columns)  # the tile area settles after the panel: count columns from it
 
 
-## Today's featured ids: premium pieces and sets, a new three every day (the same for everyone).
+## Today's featured ids: the daily deals (`DailyDeals`), Coin pieces first, then Gold pieces or
+## sets; new ones every UTC day, the same for everyone.
 func featured_ids(day: int = -1) -> Array[StringName]:
-	var pool: Array[StringName] = []
-	for d: CosmeticDef in shop.items:
-		if d.premium():
-			pool.append(d.id)
-	for k: CosmeticPack in shop.packs:
-		pool.append(k.id)
-	var out: Array[StringName] = []
-	if pool.is_empty():
-		return out
-	if day < 0:
-		day = int(Time.get_unix_time_from_system() / 86400.0)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash(day)
-	while out.size() < mini(FEATURED, pool.size()):
-		var id: StringName = pool[rng.randi_range(0, pool.size() - 1)]
-		if id not in out:
-			out.append(id)
-	return out
+	return DailyDeals.ids(shop, day)
+
+
+## (Re)builds the featured cards for today.
+func _build_featured() -> void:
+	featured_day = DailyDeals.today()
+	for c: Node in featured_row.get_children():
+		featured_row.remove_child(c)
+		c.queue_free()
+	for id: StringName in featured_ids(featured_day):
+		featured_row.add_child(_featured_card(id))
 
 
 ## A wide FEATURED card: the picture, a gold ribbon, the name and the Gold price.
@@ -433,7 +443,10 @@ func _featured_card(id: StringName) -> Button:
 	col.add_child(ribbon)
 	var rl := Label.new()
 	rl.theme_type_variation = &"SmallLabel"
-	rl.text = "FEATURED" if d != null else "FEATURED SET"
+	var deal: bool = DailyDeals.is_deal(shop, id, featured_day)
+	rl.text = ("DEAL -%d%%" % DailyDeals.PERCENT_OFF) if deal else ("FEATURED" if d != null else "FEATURED SET")
+	ribbon.name = "Ribbon"
+	rl.name = "RibbonLabel"
 	rl.add_theme_color_override(&"font_color", Color("#2A1A10"))
 	rl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ribbon.add_child(rl)
@@ -451,6 +464,26 @@ func _featured_card(id: StringName) -> Button:
 	prow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	(pr[1] as Label).name = "Price"
 	col.add_child(prow)
+	if deal:
+		# The normal price, struck through, after the deal price.
+		var was := Label.new()
+		was.name = "WasPrice"
+		was.theme_type_variation = &"SmallLabel"
+		was.text = Hud._thousands(d.price if d != null and d.coin_buyable() else (d.gold if d != null else pack.gold))
+		was.add_theme_color_override(&"font_color", Color(MUTED, 0.8))
+		was.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		was.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var strike := ColorRect.new()
+		strike.color = Color(MUTED, 0.9)
+		strike.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		strike.anchor_left = 0.0
+		strike.anchor_right = 1.0
+		strike.anchor_top = 0.5
+		strike.anchor_bottom = 0.5
+		strike.offset_top = -1.0
+		strike.offset_bottom = 1.0
+		was.add_child(strike)
+		prow.add_child(was)
 	b.pressed.connect(func() -> void:
 		show_kind(d.kind if d != null else KIND_PACK)
 		select(id))
@@ -520,6 +553,10 @@ func worn_in(p: PlayerProfile, kind: StringName) -> StringName:
 
 ## The shop's featured prices, the wardrobe's slots and the owned count.
 func _refresh_places(p: PlayerProfile) -> void:
+	if featured_row != null and featured_day != DailyDeals.today():
+		_build_featured()  # midnight UTC passed: the new day's deals
+	if featured_title != null:
+		featured_title.text = "DAILY DEALS · %d%% OFF · NEW IN %s" % [DailyDeals.PERCENT_OFF, DailyDeals.time_left_text(DailyDeals.seconds_left())]
 	if featured_row != null:
 		for card: Node in featured_row.get_children():
 			var id := StringName(String(card.name).trim_prefix("Featured_"))
@@ -930,7 +967,7 @@ func look_price() -> int:
 	var p: PlayerProfile = ProfileManager.profile
 	for d: CosmeticDef in look_pieces():
 		if not p.owns(d.id) and d.coin_buyable():
-			total += d.price
+			total += _coins_of(d)
 	return total
 
 
@@ -948,10 +985,11 @@ func press_look() -> void:
 			return
 		var lines: PackedStringArray = []
 		for d: CosmeticDef in to_buy:
-			lines.append("%s · %s · %s Coins" % [d.display_name, _kind_name(d), Hud._thousands(d.price)])
+			lines.append("%s · %s · %s Coins" % [d.display_name, _kind_name(d), Hud._thousands(_coins_of(d))])
+		var day: int = DailyDeals.today()  # the prices shown are the prices paid, even past midnight
 		_confirm_buy("BUY THE WHOLE LOOK?", "\n".join(lines) + "\n\n%d pieces for %s Coins together." % [to_buy.size(), Hud._thousands(look_price())], func() -> void:
 			for d: CosmeticDef in to_buy:
-				ProfileManager.buy(d.id)
+				ProfileManager.buy(d.id, day)
 			status_label.text = "Bought %d pieces! WEAR ALL puts the look on." % to_buy.size()
 			Audio.play(&"cash_register", &"UI", -6.0)
 			_refresh(), look_button)
@@ -1038,10 +1076,10 @@ func _kind_name(d: CosmeticDef) -> String:
 
 
 ## "MORE GOLD NEEDED · BUY MORE": the GOLD tab, with the smallest pack that covers `missing` picked.
-func open_gold_shop(missing: int) -> void:
+func open_gold_shop(missing: int = 0) -> void:
 	var pick: CoinPack = null
 	for c: CoinPack in shop.coin_packs:
-		if c.gold >= missing and (pick == null or c.gold < pick.gold):
+		if c.gold >= maxi(missing, 1) and (pick == null or c.gold < pick.gold):
 			pick = c
 	if pick == null and not shop.coin_packs.is_empty():
 		pick = shop.coin_packs[-1]
@@ -1050,7 +1088,8 @@ func open_gold_shop(missing: int) -> void:
 		select(pick.id)
 		if tiles.has(pick.id):
 			tiles[pick.id].grab_focus()
-	status_label.text = "%s more Gold Coins needed: pick a pack, Steam handles the payment." % Hud._thousands(missing)
+	if missing > 0:
+		status_label.text = "%s more Gold Coins needed: pick a pack, Steam handles the payment." % Hud._thousands(missing)
 
 
 ## Every cosmetic purchase asks first and says it can't be refunded (Patrick: "for both buys both
@@ -1078,16 +1117,16 @@ func _on_gold_spent(ok: bool) -> void:
 
 
 ## Buys `d` with red Coins, or says why not.
-func _buy_with_coins(d: CosmeticDef) -> void:
+func _buy_with_coins(d: CosmeticDef, day: int = -1) -> void:
 	var p: PlayerProfile = ProfileManager.profile
-	match ProfileManager.buy(d.id):
+	match ProfileManager.buy(d.id, day):
 		&"":
 			status_label.text = "Bought %s! Wear it whenever you like." % d.display_name
 			Audio.play(&"cash_register", &"UI", -6.0)
 		&"owned":
 			pass
 		&"not_enough_coins":
-			status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (d.price - p.coins)
+			status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (_coins_of(d) - p.coins)
 			Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
 		&"level" when d.wheel_only:
 			status_label.text = "Only the Daily Spin has it."
@@ -1108,7 +1147,7 @@ func press_action() -> void:
 			var piece: CosmeticDef = shop.find(id)
 			if piece != null:
 				names.append("%s · %s" % [piece.display_name, _kind_name(piece)])
-		_buy_with_gold(pack.display_name, pack.steam_item, pack.gold, "\n".join(names) + "\n\n")
+		_buy_with_gold(pack.display_name, pack.steam_item, _pack_gold(pack), "\n".join(names) + "\n\n")
 		return
 	if pack != null:
 		if ProfileManager.profile.owns_pack(pack):
@@ -1129,10 +1168,11 @@ func press_action() -> void:
 	if p.can_collect(d.id):
 		ProfileManager.collect(d.id)  # owned already (level pass, Daily Spin): wearing it collects it
 	if not p.owns(d.id) and d.premium():
-		_buy_with_gold(d.display_name, d.steam_item, d.gold)
+		_buy_with_gold(d.display_name, d.steam_item, _gold_of(d))
 		return
-	if not p.owns(d.id) and d.coin_buyable() and p.coins >= d.price:
-		_confirm_buy("BUY %s?" % d.display_name.to_upper(), "%s Coins." % Hud._thousands(d.price), func() -> void: _buy_with_coins(d))
+	if not p.owns(d.id) and d.coin_buyable() and p.coins >= _coins_of(d):
+		var day: int = DailyDeals.today()  # the price shown is the price paid, even past midnight
+		_confirm_buy("BUY %s?" % d.display_name.to_upper(), "%s Coins." % Hud._thousands(_coins_of(d)), func() -> void: _buy_with_coins(d, day))
 		return
 	if not p.owns(d.id):
 		_buy_with_coins(d)  # refused: says why
@@ -1193,7 +1233,7 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	elif p.owns(d.id):
 		label.text = "FREE" if d.is_free() else ("DEVELOPER" if d.dev_only else ("JACKPOT" if d.wheel_only else "OWNED"))
 	elif d.premium():
-		label.text = Hud._thousands(d.gold)
+		label.text = Hud._thousands(_gold_of(d))
 	elif d.achievement != &"":
 		label.text = "COLLECT" if p.can_collect(d.id) else "ACHIEVEMENT"
 		coin.visible = false
@@ -1204,9 +1244,9 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 		label.text = "LEVEL %d" % d.level
 		coin.visible = false
 	else:
-		label.text = "%s" % Hud._thousands(d.price)
+		label.text = "%s" % Hud._thousands(_coins_of(d))
 	coin.set_gold(d.premium())
-	var short: bool = not p.owns(d.id) and ((d.coin_buyable() and p.coins < d.price) or (d.premium() and SteamSvc.gold < d.gold))
+	var short: bool = not p.owns(d.id) and ((d.coin_buyable() and p.coins < _coins_of(d)) or (d.premium() and SteamSvc.gold < _gold_of(d)))
 	# Short of money keeps the currency's colour, only dimmed: a red number next to a Gold Coin read
 	# as a red-coin price (Patrick 2026-11-15).
 	var cur: Color = Palette.COIN_GOLD if d.premium() else (Palette.COIN_RED if d.coin_buyable() else Palette.VIP_GOLD)
@@ -1218,8 +1258,23 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 ## Whether piece `d` can be had right now: enough Coins, or enough Gold for a premium one.
 static func _can_get_now(p: PlayerProfile, d: CosmeticDef) -> bool:
 	if d.premium():
-		return SteamSvc.is_available() and SteamSvc.gold >= d.gold
-	return d.coin_buyable() and p.coins >= d.price
+		return SteamSvc.is_available() and SteamSvc.gold >= _gold_of(d)
+	return d.coin_buyable() and p.coins >= _coins_of(d)
+
+
+## Piece `d`'s red Coin price today (`DailyDeals`).
+static func _coins_of(d: CosmeticDef) -> int:
+	return DailyDeals.coin_price(CosmeticShop.default(), d)
+
+
+## Premium piece `d`'s Gold price today (`DailyDeals`).
+static func _gold_of(d: CosmeticDef) -> int:
+	return DailyDeals.gold_price(CosmeticShop.default(), d)
+
+
+## Set `pack`'s Gold price today (`DailyDeals`).
+static func _pack_gold(pack: CosmeticPack) -> int:
+	return DailyDeals.pack_price(CosmeticShop.default(), pack)
 
 
 func _refresh() -> void:
@@ -1301,6 +1356,8 @@ func _refresh() -> void:
 		item_kind.text += " · FREE AT LEVEL %d" % sel.level
 	if sel.achievement != &"":
 		item_kind.text += " · ACHIEVEMENT: %s" % str(achievement_text(sel.achievement)[0]).to_upper()
+	if not p.owns(sel.id) and DailyDeals.is_deal(shop, sel.id):
+		item_kind.text += " · DAILY DEAL -%d%%" % DailyDeals.PERCENT_OFF
 	price_row.visible = true
 	_show_price(price_label, price_coin, p, sel)
 	if inventory and p.owns(sel.id):
@@ -1318,18 +1375,18 @@ func _refresh() -> void:
 		if not SteamSvc.is_available():
 			action_button.text = "GOLD NEEDS STEAM"
 			action_button.disabled = true
-		elif SteamSvc.gold < sel.gold:
-			action_button.text = "%s MORE GOLD NEEDED · BUY MORE" % Hud._thousands(sel.gold - SteamSvc.gold)
+		elif SteamSvc.gold < _gold_of(sel):
+			action_button.text = "%s MORE GOLD NEEDED · BUY MORE" % Hud._thousands(_gold_of(sel) - SteamSvc.gold)
 		else:
-			action_button.text = "BUY FOR %s GOLD" % Hud._thousands(sel.gold)
+			action_button.text = "BUY FOR %s GOLD" % Hud._thousands(_gold_of(sel))
 	elif not p.owns(sel.id) and sel.wheel_only:
 		action_button.text = "ONLY ON THE DAILY SPIN"
 		action_button.disabled = true
 	elif not p.owns(sel.id) and not sel.coin_buyable():
 		action_button.text = "LEVEL PASS · LEVEL %d" % sel.level  # only levelling up unlocks it
 		action_button.disabled = true
-	elif not p.owns(sel.id) and p.coins < sel.price:
-		action_button.text = "%s MORE COINS NEEDED" % Hud._thousands(sel.price - p.coins)
+	elif not p.owns(sel.id) and p.coins < _coins_of(sel):
+		action_button.text = "%s MORE COINS NEEDED" % Hud._thousands(_coins_of(sel) - p.coins)
 		action_button.disabled = true
 	elif not p.owns(sel.id):
 		action_button.text = "BUY"
@@ -1400,8 +1457,8 @@ static func _show_pack_price(label: Label, coin: CoinIcon, p: PlayerProfile, pac
 	var owned: bool = p.owns_pack(pack)
 	coin.visible = not owned
 	coin.set_gold(true)
-	label.text = "OWNED" if owned else Hud._thousands(pack.gold)
-	var short: bool = not owned and SteamSvc.gold < pack.gold
+	label.text = "OWNED" if owned else Hud._thousands(_pack_gold(pack))
+	var short: bool = not owned and SteamSvc.gold < _pack_gold(pack)
 	label.add_theme_color_override(&"font_color", Palette.CREAM if owned else Palette.COIN_GOLD)
 	label.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 	coin.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
@@ -1412,6 +1469,8 @@ static func _show_pack_price(label: Label, coin: CoinIcon, p: PlayerProfile, pac
 func _refresh_pack(p: PlayerProfile, pack: CosmeticPack) -> void:
 	item_name.text = pack.display_name.to_upper()
 	item_kind.text = "SET OF %d PIECES" % pack.pieces.size()
+	if not p.owns_pack(pack) and DailyDeals.is_deal(shop, pack.id):
+		item_kind.text += " · DAILY DEAL -%d%%" % DailyDeals.PERCENT_OFF
 	price_row.visible = true
 	_show_pack_price(price_label, price_coin, p, pack)
 	var worn_color: int = p.preferred_color if p.preferred_color >= 0 else 0
@@ -1428,10 +1487,10 @@ func _refresh_pack(p: PlayerProfile, pack: CosmeticPack) -> void:
 	elif not SteamSvc.is_available():
 		action_button.text = "GOLD NEEDS STEAM"
 		action_button.disabled = true
-	elif SteamSvc.gold < pack.gold:
-		action_button.text = "%s MORE GOLD NEEDED · BUY MORE" % Hud._thousands(pack.gold - SteamSvc.gold)
+	elif SteamSvc.gold < _pack_gold(pack):
+		action_button.text = "%s MORE GOLD NEEDED · BUY MORE" % Hud._thousands(_pack_gold(pack) - SteamSvc.gold)
 	else:
-		action_button.text = "BUY FOR %s GOLD" % Hud._thousands(pack.gold)
+		action_button.text = "BUY FOR %s GOLD" % Hud._thousands(_pack_gold(pack))
 
 
 ## The Steam button: shown when real money can buy the pick, greyed out without Steam.
@@ -1620,6 +1679,7 @@ func set_inventory(on: bool) -> void:
 	wallet.visible = not on
 	owned_label.visible = on
 	featured_row.visible = not on
+	featured_title.visible = not on
 	wardrobe.visible = on
 	stage.add_theme_stylebox_override(&"panel", _stage_style(on))
 	stage.custom_minimum_size.x = 440 if on else 520

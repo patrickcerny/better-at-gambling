@@ -4,9 +4,11 @@ extends PanelContainer
 ## bottom-right corner (`DevButton`, Patrick 2026-11-16: "Devmode kleiner button unten rechts. Auch
 ## menu für das Dev dashboard besser"). A framed overlay over the dimmed menu like the leaderboards:
 ##
-## left, two cards: PROFILE (level and Coins big, then +Coins / levels / Daily Spin / tutorial
-## resets and every cosmetic until the game closes) and PRACTICE (dummies stepper and the big
-## PRACTICE CASINO with the dev tools on, pause menu: DEV TOOLS);
+## first column: PROGRESS (level and Coins big, set either to any number, Daily Spin and tutorial
+## again) and PRACTICE (dummies stepper and the big PRACTICE CASINO with the dev tools on, pause
+## menu: DEV TOOLS); second column: COSMETICS (own everything on/off, remove one piece or all,
+## forget achievements, Patrick 2026-11-16: "The dev mode should also be able to remove skins etc
+## ... and level and stuff") and RESET (stats, the whole profile);
 ## right, the MINIGAMES card: a picture tile per minigame that drops straight into it.
 ## BACK or Esc closes it.
 
@@ -15,12 +17,18 @@ signal closed
 ## A practice match was chosen: the main menu starts it with these settings.
 signal practice_requested(settings: Dictionary)
 
-const LEVEL_STEPS: Array[int] = [1, 10]
 const TILE_PICTURE: Vector2 = Vector2(200, 112)
 const MAX_DUMMIES: int = 7
 
 var dummies: SpinBox
-var unlock_toggle: CheckButton
+## On: the developer owns every cosmetic. Off: plays as a normal player (`DevMode.set_as_player`).
+var own_all_toggle: CheckButton
+var level_spin: SpinBox
+var coins_spin: SpinBox
+## The pieces REMOVE can take (`DevMode.removable`), and the ids in its order.
+var remove_pick: OptionButton
+var _remove_ids: Array[StringName] = []
+var remove_button: Button
 ## "Level 12   ·   48,000 Coins" (tests and the look-dev shot read it).
 var profile_line: Label
 var level_value: Label
@@ -73,13 +81,21 @@ func _ready() -> void:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body)
 	var left := VBoxContainer.new()
-	left.custom_minimum_size.x = 420
+	left.custom_minimum_size.x = 400
 	left.add_theme_constant_override(&"separation", 20)
 	body.add_child(left)
 	left.add_child(_build_profile())
 	var practice := _build_practice()
 	practice.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_child(practice)
+	var mid := VBoxContainer.new()
+	mid.custom_minimum_size.x = 400
+	mid.add_theme_constant_override(&"separation", 20)
+	body.add_child(mid)
+	var cos := _build_cosmetics()
+	cos.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mid.add_child(cos)
+	mid.add_child(_build_reset())
 	var games := _build_minigames()
 	games.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(games)
@@ -94,7 +110,7 @@ func _ready() -> void:
 
 
 func _build_profile() -> Control:
-	var card := _card("PROFILE")
+	var card := _card("PROGRESS")
 	var box: VBoxContainer = card.get_child(0)
 	profile_line = Label.new()
 	profile_line.name = "ProfileLine"
@@ -105,26 +121,74 @@ func _build_profile() -> Control:
 	box.add_child(stats)
 	level_value = _stat(stats, "LEVEL", Palette.VIP_GOLD)
 	coins_value = _stat(stats, "COINS", Palette.COIN_GOLD)
+	var lrow := _row(box, "Level")
+	level_spin = _spin(lrow, "LevelSpin", 1, ProfileManager.profile.config.max_level)
+	_button(lrow, "SET", func() -> void: DevMode.set_level(int(level_spin.value))).name = "SetLevel"
+	_button(lrow, "+1", func() -> void: DevMode.set_level(ProfileManager.profile.level + 1)).name = "Level1"
+	var crow := _row(box, "Coins")
+	coins_spin = _spin(crow, "CoinsSpin", 0, PlayerProfile.MAX_COINS)
+	coins_spin.step = 1000
+	_button(crow, "SET", func() -> void: DevMode.set_coins(int(coins_spin.value))).name = "SetCoins"
+	_button(crow, "+10K", func() -> void: DevMode.add_coins(10000)).name = "Coins"
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override(&"h_separation", 8)
 	grid.add_theme_constant_override(&"v_separation", 8)
 	box.add_child(grid)
-	_button(grid, "+10,000 COINS", func() -> void: DevMode.add_coins(10000)).name = "Coins"
-	for step: int in LEVEL_STEPS:
-		_button(grid, "+%d LEVEL%s" % [step, "" if step == 1 else "S"], func() -> void: DevMode.set_level(ProfileManager.profile.level + step)).name = "Level%d" % step
-	_button(grid, "BACK TO LEVEL 1", func() -> void: DevMode.set_level(1)).name = "Level1Reset"
 	# The local Daily Spin timer only: with Steam, Steam still allows one spin per window.
 	_button(grid, "DAILY SPIN AGAIN", func() -> void: ProfileManager.mark_daily_spin(0)).name = "DailyReset"
 	_button(grid, "SHOW TUTORIAL AGAIN", func() -> void:
 		Settings.set_value("tutorial", "seen", false)
 		Settings.save()).name = "ResetTutorial"
-	unlock_toggle = CheckButton.new()
-	unlock_toggle.name = "UnlockAll"
-	unlock_toggle.text = "All cosmetics (until the game closes)"
-	unlock_toggle.tooltip_text = "Every hat, shirt, colour and pack counts as owned until the game closes. Nothing is bought or saved."
-	unlock_toggle.toggled.connect(DevMode.set_unlock_all)
-	box.add_child(unlock_toggle)
+	return card
+
+
+func _build_cosmetics() -> Control:
+	var card := _card("COSMETICS")
+	var box: VBoxContainer = card.get_child(0)
+	own_all_toggle = CheckButton.new()
+	own_all_toggle.name = "OwnAll"
+	own_all_toggle.text = "Own every cosmetic"
+	own_all_toggle.tooltip_text = "Off: you play as a normal player until the game closes (no dev unlock, Steam inventory hidden), so the shop, COLLECT and removed pieces behave like for everyone else."
+	own_all_toggle.toggled.connect(func(on: bool) -> void: DevMode.set_as_player(not on))
+	box.add_child(own_all_toggle)
+	var note := _muted("Turn it off to see what you really own. Removing needs it off to show.")
+	box.add_child(note)
+	var rrow := HBoxContainer.new()
+	rrow.add_theme_constant_override(&"separation", 8)
+	box.add_child(rrow)
+	remove_pick = OptionButton.new()
+	remove_pick.name = "RemovePick"
+	remove_pick.custom_minimum_size = Vector2(0, 46)
+	remove_pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	remove_pick.clip_text = true
+	rrow.add_child(remove_pick)
+	remove_button = _button(rrow, "REMOVE", func() -> void:
+		var i: int = remove_pick.selected
+		if i >= 0 and i < _remove_ids.size():
+			DevMode.remove_cosmetic(_remove_ids[i]))
+	remove_button.name = "Remove"
+	remove_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	remove_button.custom_minimum_size.x = 120
+	_button(box, "REMOVE ALL BOUGHT & COLLECTED", func() -> void:
+		ConfirmDialog.ask(self, "REMOVE ALL?", "Every piece you bought, collected or won goes. Free and level pieces stay.", "REMOVE ALL", DevMode.remove_all_cosmetics)).name = "RemoveAll"
+	_button(box, "FORGET ACHIEVEMENTS (COLLECT)", DevMode.clear_achievements).name = "ClearAchievements"
+	box.add_child(_muted("Until the next start, when Steam brings them back. Steam itself is not changed."))
+	return card
+
+
+func _build_reset() -> Control:
+	var card := _card("RESET")
+	var box: VBoxContainer = card.get_child(0)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override(&"h_separation", 8)
+	box.add_child(grid)
+	_button(grid, "STATS", DevMode.reset_stats).name = "ResetStats"
+	var whole := _button(grid, "WHOLE PROFILE", func() -> void:
+		ConfirmDialog.ask(self, "RESET PROFILE?", "Level 1, no Coins, nothing bought or collected, no stats. Saved at once.", "RESET", DevMode.reset_profile))
+	whole.name = "ResetProfile"
+	whole.add_theme_color_override(&"font_color", Palette.LOSS_RED)
 	return card
 
 
@@ -156,12 +220,8 @@ func _build_practice() -> Control:
 	casino_button.tooltip_text = "A practice casino with the dummies and the dev tools on (pause menu: DEV TOOLS)."
 	casino_button.theme_type_variation = &"ActionButton"
 	casino_button.custom_minimum_size = Vector2(0, 60)
-	var hint := Label.new()
-	hint.text = "Dev tools in the pause menu: money, items, a minigame now"
-	hint.theme_type_variation = &"SmallLabel"
-	hint.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.55))
+	var hint := _muted("Dev tools in the pause menu: money, items, a minigame now")
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(hint)
 	return card
 
@@ -180,7 +240,7 @@ func _build_minigames() -> Control:
 	box.add_child(scroll)
 	var grid := GridContainer.new()
 	grid.name = "Minigames"
-	grid.columns = 4
+	grid.columns = 3
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override(&"h_separation", 12)
 	grid.add_theme_constant_override(&"v_separation", 12)
@@ -197,15 +257,11 @@ func _build_minigames() -> Control:
 		var tv := VBoxContainer.new()
 		tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tv.add_theme_constant_override(&"separation", 4)
-		tv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 6)
+		tv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 		tile.add_child(tv)
-		var pic := TextureRect.new()
-		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pic.custom_minimum_size = Vector2(0, TILE_PICTURE.y)
+		# Rounded, inside the tile's rounding (Patrick 2026-11-16: "images are clipping").
+		var pic: Panel = PictureCard.rounded_picture(MinigameSelector.picture(def.id), Vector2(0, TILE_PICTURE.y))
 		pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		pic.texture = MinigameSelector.picture(def.id)
 		tv.add_child(pic)
 		var nl := Label.new()
 		nl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -251,7 +307,22 @@ func _refresh() -> void:
 	profile_line.text = "Level %d   ·   %s Coins" % [p.level, coins]
 	level_value.text = str(p.level)
 	coins_value.text = coins
-	unlock_toggle.set_pressed_no_signal(DevMode.unlock_all())
+	level_spin.set_value_no_signal(p.level)
+	coins_spin.set_value_no_signal(p.coins)
+	own_all_toggle.set_pressed_no_signal(not DevMode.as_player())
+	var keep: StringName = _remove_ids[remove_pick.selected] if remove_pick.selected >= 0 and remove_pick.selected < _remove_ids.size() else &""
+	_remove_ids = DevMode.removable()
+	remove_pick.clear()
+	for id: StringName in _remove_ids:
+		var d: CosmeticDef = p.shop.find(id)
+		remove_pick.add_item("%s  (%s)" % [d.display_name, String(d.kind)] if d != null else String(id))
+	if _remove_ids.is_empty():
+		remove_pick.add_item("Nothing bought or collected")
+		remove_pick.disabled = true
+	else:
+		remove_pick.disabled = false
+		remove_pick.select(maxi(_remove_ids.find(keep), 0))
+	remove_button.disabled = _remove_ids.is_empty()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -310,6 +381,40 @@ func _stat(parent: Control, caption: String, col: Color) -> Label:
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col_box.add_child(val)
 	return val
+
+
+## A labelled row: "Level  [spin] [SET] [+1]".
+func _row(parent: Control, caption: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 8)
+	parent.add_child(row)
+	var l := Label.new()
+	l.text = caption
+	l.custom_minimum_size.x = 64
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(l)
+	return row
+
+
+func _spin(parent: Control, node_name: String, lo: int, hi: int) -> SpinBox:
+	var sp := SpinBox.new()
+	sp.name = node_name
+	sp.min_value = lo
+	sp.max_value = hi
+	sp.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sp.custom_minimum_size = Vector2(0, 46)
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(sp)
+	return sp
+
+
+func _muted(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.theme_type_variation = &"SmallLabel"
+	l.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.55))
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
 
 
 func _button(parent: Control, text: String, cb: Callable) -> Button:

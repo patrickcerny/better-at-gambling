@@ -521,7 +521,7 @@ func _start_local(cmd: Cmdline) -> void:
 	_on_server_floor(server.floor_plan)
 	server.world.obstacle_callback = _obstacle_between
 	_owns_server = true
-	var player_name: String = str(Settings.get_value("profile", "name", "You"))
+	var player_name: String = SceneRouter.profile_name()
 	var id: int = Net.start_local(server, player_name)
 	server.set_server_position(id, def.spawn_points[0])
 	if cmd.has("bean-color"):  # dev/screenshots
