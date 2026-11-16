@@ -486,22 +486,15 @@ func _build_minigames(scroll: ScrollContainer) -> void:
 		var def: MinigameDefinition = Registry.minigames[id]
 		var tile := Button.new()
 		tile.name = String(def.id)
-		tile.custom_minimum_size = Vector2(TILE_PICTURE.x + 12, TILE_PICTURE.y + 40)
+		tile.custom_minimum_size = Vector2(TILE_PICTURE.x + 16, TILE_PICTURE.y + 44)
 		tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tile.tooltip_text = MinigameSelector.first_sentence(def.rules_text)
 		var tv := VBoxContainer.new()
 		tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 6)
+		tv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 		tv.add_theme_constant_override(&"separation", 2)
 		tile.add_child(tv)
-		var pic := TextureRect.new()
-		pic.name = "Picture"
-		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pic.custom_minimum_size = TILE_PICTURE
-		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		pic.texture = MinigameSelector.picture(def.id)
-		tv.add_child(pic)
+		tv.add_child(PictureCard.rounded_picture(MinigameSelector.picture(def.id), TILE_PICTURE))
 		var nl := Label.new()
 		nl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		nl.text = def.display_name

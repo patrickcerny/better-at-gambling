@@ -144,3 +144,28 @@ static func _box(bg: Color, border: Color, border_w: int) -> StyleBoxFlat:
 	sb.set_corner_radius_all(RADIUS)
 	sb.anti_aliasing = true
 	return sb
+
+
+## A picture with rounded corners (Patrick 2026-11-16: "images are clipping"): for tiles inside a
+## rounded button, so the picture's corners stay inside the button's rounding. `pic` is the
+## TextureRect inside (named "Picture").
+static func rounded_picture(texture: Texture2D, min_size: Vector2, radius: int = 10) -> Panel:
+	var mask := Panel.new()
+	mask.name = "PictureMask"
+	mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mask.custom_minimum_size = min_size
+	mask.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color.WHITE
+	sb.set_corner_radius_all(radius)
+	sb.anti_aliasing = true
+	mask.add_theme_stylebox_override(&"panel", sb)
+	var pic := TextureRect.new()
+	pic.name = "Picture"
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	pic.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pic.texture = texture
+	mask.add_child(pic)
+	return mask
