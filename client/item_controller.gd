@@ -108,6 +108,8 @@ func on_slot(slot: int) -> void:
 		cancel()
 	if slot < 0 or slot >= _inventory().size():
 		return
+	if _locked_for_minigame():
+		return
 	if slot == held:
 		use_held()
 	else:
@@ -137,7 +139,7 @@ func put_away() -> void:
 ## (or last) one.
 func cycle(step: int) -> void:
 	var inv: Array = _inventory()
-	if inv.is_empty():
+	if inv.is_empty() or _locked_for_minigame():
 		return
 	cancel()
 	var from: int = held
@@ -155,7 +157,7 @@ func use_held() -> void:
 	if held >= inv.size():
 		put_away()
 		return
-	if not _items_allowed():
+	if _locked_for_minigame() or not _items_allowed():
 		return
 	if _clock < _cooldown_until:
 		scene.hud.toast("Item cooldown", 0.8)
@@ -385,6 +387,8 @@ static func rejection_text(error: StringName) -> String:
 			return "Items are off this match"
 		&"wrong_phase":
 			return "Not now"
+		&"minigame_soon":
+			return "Minigame starting, items locked"
 		&"busy":
 			return "They're already in a duel"
 		&"no_station":
@@ -644,9 +648,18 @@ func _choice_input(event: InputEvent) -> bool:
 	return false
 
 
-## In the duel, keys 1–3 pick (the d-pad comes through `on_slot`).
+## In the duel, keys 1–3 or the d-pad (left rock, up paper, right scissors) pick. The duel screen
+## puts the router in MENU mode, so the d-pad's item actions never reach `on_slot`: read them here.
 func _duel_input(event: InputEvent) -> bool:
-	if not duel_panel.is_open() or not (event is InputEventKey) or not (event as InputEventKey).pressed or (event as InputEventKey).echo:
+	if not duel_panel.is_open():
+		return false
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
+		for i: int in 3:
+			if event.is_action_pressed(StringName("item_%d" % (i + 1))):
+				duel_panel.choose(i)
+				return true
+		return false
+	if not (event is InputEventKey) or not (event as InputEventKey).pressed or (event as InputEventKey).echo:
 		return false
 	var k: Key = (event as InputEventKey).physical_keycode
 	if k < KEY_1 or k > KEY_3:
@@ -693,5 +706,12 @@ func _inventory() -> Array:
 
 
 func _items_allowed() -> bool:
-	var ph: Phase.Id = scene.view.state.phase
-	return ph == Phase.Id.CASINO or ph == Phase.Id.PRE_MINIGAME
+	return scene.view.state.phase == Phase.Id.CASINO
+
+
+## The minigame countdown: items stay in the bar but can't be taken out or used.
+func _locked_for_minigame() -> bool:
+	if scene.view.state.phase != Phase.Id.PRE_MINIGAME:
+		return false
+	scene.hud.toast(rejection_text(&"minigame_soon"), 1.2)
+	return true

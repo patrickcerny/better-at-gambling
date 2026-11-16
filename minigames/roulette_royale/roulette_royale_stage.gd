@@ -50,7 +50,7 @@ var banner: Label
 var sub_banner: Label
 var buttons: Array[Button] = []
 var button_row: HBoxContainer
-var board: VBoxContainer
+var board: MinigameScoreboard
 
 
 func _build(start: Dictionary) -> void:
@@ -412,9 +412,6 @@ static func _int_list(a: Variant) -> Array[int]:
 func _refresh_board() -> void:
 	if board == null:
 		return
-	for c: Node in board.get_children():
-		board.remove_child(c)
-		c.free()  # detached: free now (no orphans waiting for the frame end)
 	var order: Array[int] = players.duplicate()
 	order.sort_custom(func(a: int, b: int) -> bool:
 		if finished and int(places.get(a, 99)) != int(places.get(b, 99)):
@@ -426,80 +423,45 @@ func _refresh_board() -> void:
 		if int(hearts.get(a, 0)) != int(hearts.get(b, 0)):
 			return int(hearts.get(a, 0)) > int(hearts.get(b, 0))
 		return a < b)
+	var rows: Array = []
+	var best: int = -1
+	var best_count: int = 0
+	for pid: int in alive:
+		var h: int = int(hearts.get(pid, 0))
+		if h > best:
+			best = h
+			best_count = 1
+		elif h == best:
+			best_count += 1
 	for pid: int in order:
-		board.add_child(_board_row(pid))
-
-
-func _board_row(pid: int) -> Control:
-	var is_alive: bool = pid in alive
-	var row := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Palette.WARM_CHARCOAL if pid != local_id else Palette.VIP_BURGUNDY.darkened(0.2)
-	sb.set_corner_radius_all(8)
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 6
-	sb.content_margin_bottom = 6
-	if pid == local_id:
-		sb.set_border_width_all(2)
-		sb.border_color = Palette.WARM_GOLD
-	row.add_theme_stylebox_override(&"panel", sb)
-	row.modulate = Color.WHITE if is_alive or finished else Color(1, 1, 1, 0.55)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override(&"separation", 2)
-	row.add_child(v)
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override(&"separation", 10)
-	v.add_child(top)
-	var dot := ColorRect.new()
-	dot.custom_minimum_size = Vector2(16, 16)
-	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	dot.color = _player_color(pid)
-	top.add_child(dot)
-	var n := Label.new()
-	n.text = _name(pid) + ("  (you)" if pid == local_id else "")
-	n.add_theme_font_size_override(&"font_size", 26)
-	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	n.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	n.clip_text = true
-	top.add_child(n)
-	var tag := Label.new()
-	tag.add_theme_font_size_override(&"font_size", 22)
-	var place: int = int(places.get(pid, -1))
-	if finished and place > 0:
-		tag.text = "WINNER" if place == 1 else "#%d" % place
-		tag.add_theme_color_override(&"font_color", Palette.VIP_GOLD if place == 1 else Palette.CREAM)
-	elif not is_alive:
-		tag.text = "OUT"
-		tag.add_theme_color_override(&"font_color", Palette.LOSS_RED)
-	elif not shown_picks.is_empty():
-		var c: Variant = _pick_of(pid)
-		tag.text = COLOR_NAMES[COLOR_ORDER.find(c)] if c != null else "NO PICK"
-		tag.add_theme_color_override(&"font_color", _ui_color(COLOR_ORDER.find(c)) if c != null else Palette.CREAM.darkened(0.4))
-	elif picked.has(pid):
-		tag.text = "LOCKED IN"
-		tag.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-	elif picking:
-		tag.text = "thinking…"
-		tag.add_theme_color_override(&"font_color", Palette.CREAM.darkened(0.4))
-	top.add_child(tag)
-	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override(&"separation", 10)
-	v.add_child(bottom)
-	var hv := HeartsView.new()
-	hv.count = int(hearts.get(pid, 0))
-	hv.slots = maxi(RouletteRoyaleLogic.MAX_HEARTS, hv.count)
-	bottom.add_child(hv)
-	var d: int = int(shown_deltas.get(pid, 0))
-	if d != 0 and not finished:
-		var dl := Label.new()
-		dl.text = "%+d" % d
-		dl.add_theme_font_size_override(&"font_size", 24)
-		dl.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if d > 0 else Palette.LOSS_RED)
-		dl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		bottom.add_child(dl)
-	return row
+		var is_alive: bool = pid in alive
+		var h: int = int(hearts.get(pid, 0))
+		var r: Dictionary = {"player": pid, "hearts": h, "max_hearts": maxi(RouletteRoyaleLogic.MAX_HEARTS, h)}
+		var place: int = int(places.get(pid, -1))
+		r["leader"] = (finished and place == 1) or (not finished and is_alive and h == best and best_count == 1)
+		if finished and place > 0:
+			r["rank"] = place
+			if place == 1:
+				r["tag"] = "WINNER"
+				r["tag_color"] = Palette.VIP_GOLD
+		elif not is_alive:
+			r["status"] = &"out"
+			r["tag"] = "OUT"
+			r["tag_color"] = Palette.LOSS_RED
+		elif not shown_picks.is_empty():
+			var c: Variant = _pick_of(pid)
+			r["tag"] = COLOR_NAMES[COLOR_ORDER.find(c)] if c != null else "NO PICK"
+			r["tag_color"] = _ui_color(COLOR_ORDER.find(c)).lightened(0.25) if c != null else Palette.CREAM.darkened(0.4)
+		elif picking:
+			r["status"] = &"done" if picked.has(pid) else &"waiting"
+		var d: int = int(shown_deltas.get(pid, 0))
+		if d != 0 and not finished:
+			r["detail"] = "%+d heart%s" % [d, "" if absi(d) == 1 else "s"]
+		rows.append(r)
+	if not finished:
+		for i: int in rows.size():
+			rows[i]["rank"] = i + 1
+	board.set_rows(rows)
 
 
 func _style_color_button(b: Button, i: int, selected: bool) -> void:
@@ -698,25 +660,14 @@ func _build_ui() -> void:
 		bv.add_child(o)
 		buttons.append(b)
 	# Hearts board, right.
-	var panel := PanelContainer.new()
-	panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	panel.anchor_left = 1.0
-	panel.anchor_right = 1.0
-	panel.offset_left = -400
-	panel.offset_right = -20
-	panel.offset_top = 200
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(panel)
-	var pv := VBoxContainer.new()
-	pv.add_theme_constant_override(&"separation", 6)
-	panel.add_child(pv)
-	var pt := Label.new()
-	pt.theme_type_variation = &"HeadingLabel"
-	pt.text = "HEARTS"
-	pv.add_child(pt)
-	board = VBoxContainer.new()
-	board.add_theme_constant_override(&"separation", 6)
-	pv.add_child(board)
+	board = MinigameScoreboard.new("HEARTS").bind(state, local_id)
+	board.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	board.anchor_left = 1.0
+	board.anchor_right = 1.0
+	board.offset_left = -400
+	board.offset_right = -20
+	board.offset_top = 200
+	root.add_child(board)
 	# Banners, top centre (intro / winner; hidden while the status card is up).
 	banner = Label.new()
 	banner.theme_type_variation = &"TitleLabel"
@@ -748,45 +699,3 @@ func _build_ui() -> void:
 	sub_banner.add_theme_color_override(&"font_outline_color", Palette.CASINO_BLACK)
 	sub_banner.add_theme_constant_override(&"outline_size", 10)
 	root.add_child(sub_banner)
-
-
-## A row of drawn hearts: filled for each heart left, hollow outlines for lost ones (Barlow
-## Condensed has no heart glyph, and emoji would not match the art direction).
-class HeartsView:
-	extends Control
-
-	const SIZE: float = 26.0
-	const GAP: float = 6.0
-
-	var count: int = 0:
-		set(v):
-			count = v
-			queue_redraw()
-	var slots: int = 3:
-		set(v):
-			slots = v
-			custom_minimum_size = Vector2(v * (SIZE + GAP), SIZE)
-			queue_redraw()
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		custom_minimum_size = Vector2(slots * (SIZE + GAP), SIZE)
-
-	func _draw() -> void:
-		for i: int in slots:
-			var pts: PackedVector2Array = _heart(Vector2(i * (SIZE + GAP) + SIZE * 0.5, SIZE * 0.5), SIZE * 0.5)
-			if i < count:
-				draw_colored_polygon(pts, Palette.CASINO_RED.lightened(0.1))
-				draw_polyline(pts + PackedVector2Array([pts[0]]), Palette.CASINO_BLACK, 2.0, true)
-			else:
-				draw_polyline(pts + PackedVector2Array([pts[0]]), Palette.CREAM.darkened(0.55), 2.0, true)
-
-	static func _heart(c: Vector2, r: float) -> PackedVector2Array:
-		var pts := PackedVector2Array()
-		for k: int in 32:
-			var t: float = TAU * float(k) / 32.0
-			# Classic heart curve, scaled to fit a 2r box, point down.
-			var x: float = 16.0 * pow(sin(t), 3)
-			var y: float = 13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t)
-			pts.append(c + Vector2(x, -y - 2.5) * (r / 17.0))
-		return pts

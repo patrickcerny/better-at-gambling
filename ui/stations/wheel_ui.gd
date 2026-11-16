@@ -96,7 +96,20 @@ func bet_on(symbol: int) -> bool:
 	return send(&"place_bet", {"bet": {"symbol": symbol, "amount": bet_panel.chip_value()}})
 
 
+## Gamepad: the stick frames a symbol, A puts a chip on it.
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	out.assign(symbol_buttons)
+	return out
+
+
+func _pad_selected(i: int) -> void:
+	selected_symbol = i
+
+
 func _hint_text() -> String:
+	if InputGlyphs.gamepad:
+		return InputGlyphs.fill("Left stick: pick a symbol  [%s] put a chip on it\n[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_clear}] clear  [{leave_station}] stand up" % InputGlyphs.pad_name("A"))
 	return "%s Stand up   ·   %s another chip on your last symbol" % [InputGlyphs.hint(&"leave_station"), InputGlyphs.hint(&"bet_confirm")]
 
 
@@ -208,7 +221,7 @@ func _symbol_button(i: int) -> Button:
 	chip.content_margin_left = 4
 	chip.content_margin_right = 4
 	badge.add_theme_stylebox_override(&"normal", chip)
-	badge.add_theme_font_size_override(&"font_size", 12)
+	badge.add_theme_font_size_override(&"font_size", 14)
 	badge.anchor_left = 1.0
 	badge.anchor_right = 1.0
 	badge.offset_left = -46
@@ -221,7 +234,7 @@ func _symbol_button(i: int) -> Button:
 	b.add_child(badge)
 	_badges.append(badge)
 	var dots := Label.new()
-	dots.add_theme_font_size_override(&"font_size", 11)
+	dots.add_theme_font_size_override(&"font_size", 14)
 	dots.position = Vector2(5, 1)
 	dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dots.visible = false

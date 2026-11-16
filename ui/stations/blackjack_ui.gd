@@ -20,6 +20,8 @@ var double_btn: Button
 var split_btn: Button
 ## Scissors item: snip the last card (shown only while you hold them).
 var cut_btn: Button
+## Busted with Scissors in hand (the cut window is open): HIT/DOUBLE hide, STAND reads TAKE BUST.
+var rescue_mode: bool = false
 var bet_panel: BetPanel
 var actions: HBoxContainer
 ## The cards, drawn: the dealer's row (a face-down card while you play) and your hand(s).
@@ -140,7 +142,7 @@ func _hint_text() -> String:
 func _relabel() -> void:
 	var tag: String = (" " + hand_tag) if hand_tag != "" else ""
 	hit.text = "HIT%s  %s" % [tag, InputGlyphs.hint(&"bj_hit")]
-	stand.text = "STAND%s  %s" % [tag, InputGlyphs.hint(&"bj_stand")]
+	stand.text = "%s%s  %s" % ["TAKE BUST" if rescue_mode else "STAND", tag, InputGlyphs.hint(&"bj_stand")]
 	double_btn.text = "DOUBLE%s  %s" % [tag, InputGlyphs.hint(&"bj_double")]
 	split_btn.text = "SPLIT  %s" % InputGlyphs.hint(&"bj_split")
 
@@ -148,11 +150,11 @@ func _relabel() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_visible_in_tree():
 		return
-	if event.is_action_pressed(&"bj_hit"):
+	if event.is_action_pressed(&"bj_hit") and hit.visible:
 		hit.pressed.emit()
 	elif event.is_action_pressed(&"bj_stand"):
 		stand.pressed.emit()
-	elif event.is_action_pressed(&"bj_double"):
+	elif event.is_action_pressed(&"bj_double") and double_btn.visible:
 		double_btn.pressed.emit()
 	elif event.is_action_pressed(&"bj_split") and split_btn.visible and not split_btn.disabled:
 		split_btn.pressed.emit()
@@ -193,6 +195,10 @@ func _refresh() -> void:
 	var playing_split: bool = st == BlackjackLogic.State.ACTING and split and not bool(mine.get("done", true))
 	if playing_split:
 		status_label.text = "Your move: hand %d of 2  (%d s)" % [active + 1, int(ceil(timer))]
+	# Busted with Scissors in hand: a few seconds to cut the busting card away.
+	var rescue: bool = st == BlackjackLogic.State.ACTING and bool(mine.get("rescue", false)) and not bool(mine.get("done", true))
+	if rescue:
+		status_label.text = "BUST!  Cut the last card with your Scissors  (%d s)" % int(ceil(timer))
 	if mine.is_empty():
 		hand_label.text = "—"
 		total_label.text = ""
@@ -216,12 +222,15 @@ func _refresh() -> void:
 		total_label.text = _total_text(mine, true)
 	var acting: bool = st == BlackjackLogic.State.ACTING and not mine.is_empty() and not bool(mine.get("done", true))
 	var tag: String = "HAND %d" % (active + 1) if playing_split else ""
-	if tag != hand_tag:
+	if tag != hand_tag or rescue != rescue_mode:
 		hand_tag = tag
+		rescue_mode = rescue
 		_relabel()
 	actions.visible = acting
+	hit.visible = not rescue
+	double_btn.visible = not rescue
 	double_btn.disabled = not acting or (active_hand.get("cards", []) as Array).size() != 2
-	split_btn.visible = acting and bool(mine.get("can_split", false))
+	split_btn.visible = acting and not rescue and bool(mine.get("can_split", false))
 	cut_btn.visible = acting and bool(priv.get("scissors", false))
 	cut_btn.disabled = (active_hand.get("cards", []) as Array).size() < 3
 	bet_panel.visible = (st == BlackjackLogic.State.IDLE or st == BlackjackLogic.State.BETTING) and mine.is_empty()

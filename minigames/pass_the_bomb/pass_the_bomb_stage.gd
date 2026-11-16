@@ -220,16 +220,23 @@ func _update_prompt() -> void:
 func _refresh_status() -> void:
 	if status_label == null:
 		return
-	var who: String = "—"
-	if holder == local_id:
-		who = "YOU!"
-	elif holder >= 0:
-		who = player_name(holder)
-	var lines: String = "BOMB: %s\nLEFT: %d / %d" % [who, alive.size(), roster.size()]
-	if local_id in roster and local_id not in alive:
-		lines += "\nYou're out: watch from the gallery"
-	status_label.text = lines
-	status_label.add_theme_color_override(&"font_color", Palette.LOSS_RED if holder == local_id else Palette.CREAM)
+	var rows: Array = []
+	var gone: Array = []
+	for p: int in roster:
+		var r: Dictionary = {"player": p}
+		if p not in alive:
+			r["status"] = &"out"
+			gone.append(r)
+			continue
+		if p == holder:
+			r["tag"] = "HAS THE BOMB"
+			r["tag_color"] = Palette.LOSS_RED
+		rows.append(r)
+	rows.append_array(gone)
+	for r: Dictionary in rows:
+		r["rank"] = 0  # who is still in has no order
+	var sub: String = "You're out: watch from the gallery" if local_id in roster and local_id not in alive else ""
+	show_board("STILL IN  %d / %d" % [alive.size(), roster.size()], rows, sub)
 
 
 ## Moves the bomb (hand model and the lit icon over the name tag) to `pid` (-1: nobody).

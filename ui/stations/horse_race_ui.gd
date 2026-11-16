@@ -87,7 +87,20 @@ func bet_on(horse: int) -> bool:
 	return send(&"place_bet", {"bet": {"horse": horse, "amount": bet_panel.chip_stake(bet_room())}})
 
 
+## Gamepad: the stick frames a horse, A puts a chip on it.
+func pad_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	out.assign(horse_buttons)
+	return out
+
+
+func _pad_selected(i: int) -> void:
+	selected_horse = i
+
+
 func _hint_text() -> String:
+	if InputGlyphs.gamepad:
+		return InputGlyphs.fill("Left stick: pick a horse  [%s] put a chip on it  [{bet_chip_prev} / {bet_chip_next}] chip  [{leave_station}] stand up" % InputGlyphs.pad_name("A"))
 	return "%s Stand up   ·   one horse per race, the first over the line pays 1:4" % InputGlyphs.hint(&"leave_station")
 
 
@@ -192,7 +205,7 @@ func _horse_button(i: int) -> Button:
 	chip.content_margin_left = 5
 	chip.content_margin_right = 5
 	badge.add_theme_stylebox_override(&"normal", chip)
-	badge.add_theme_font_size_override(&"font_size", 13)
+	badge.add_theme_font_size_override(&"font_size", 14)
 	badge.anchor_left = 1.0
 	badge.anchor_right = 1.0
 	badge.offset_left = -52
@@ -205,7 +218,7 @@ func _horse_button(i: int) -> Button:
 	b.add_child(badge)
 	_badges.append(badge)
 	var dots := Label.new()
-	dots.add_theme_font_size_override(&"font_size", 12)
+	dots.add_theme_font_size_override(&"font_size", 14)
 	dots.position = Vector2(6, 2)
 	dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dots.visible = false

@@ -42,7 +42,7 @@ var answer_voters: Array[HBoxContainer] = []
 var banner: Label
 var sub_banner: Label
 var explanation: Label
-var scoreboard: VBoxContainer
+var scoreboard: MinigameScoreboard
 var bubble: PanelContainer
 var bubble_label: Label
 
@@ -415,57 +415,19 @@ func _total(pid: int) -> int:
 func _refresh_scoreboard() -> void:
 	if scoreboard == null:
 		return
-	for c: Node in scoreboard.get_children():
-		scoreboard.remove_child(c)
-		c.queue_free()
-	var rows: Array = players.duplicate()
-	rows.sort_custom(func(a: int, b: int) -> bool: return _total(a) > _total(b) or (_total(a) == _total(b) and a < b))
-	var place: int = 0
-	var prev: int = -1
-	for i: int in rows.size():
-		var pid: int = rows[i]
-		if i == 0 or _total(pid) != prev:
-			place = i + 1
-		prev = _total(pid)
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override(&"separation", 10)
-		var r := Label.new()
-		r.text = str(place)
-		r.custom_minimum_size = Vector2(26, 0)
-		r.add_theme_font_size_override(&"font_size", 28)
-		r.add_theme_color_override(&"font_color", Palette.VIP_GOLD if place == 1 else Palette.CREAM.darkened(0.25))
-		h.add_child(r)
-		h.add_child(_dot(_player_color(pid), 18))
-		var n := Label.new()
-		n.text = state.player_name(pid)
-		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		n.clip_text = true
-		n.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		n.add_theme_font_size_override(&"font_size", 28)
-		if pid == local_id:
-			n.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-		h.add_child(n)
-		var tag := Label.new()
-		tag.add_theme_font_size_override(&"font_size", 20)
-		tag.custom_minimum_size = Vector2(64, 0)
-		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var order: Array = players.duplicate()
+	order.sort_custom(func(a: int, b: int) -> bool: return _total(a) > _total(b) or (_total(a) == _total(b) and a < b))
+	var rows: Array = []
+	for pid: int in order:
+		var row: Dictionary = {"player": pid, "score": _total(pid)}
 		if last_gain.has(pid) and int(last_gain[pid]) > 0:
-			tag.text = "+%d" % int(last_gain[pid])
-			tag.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
-		elif answering and answered.has(pid):
-			tag.text = "LOCKED"
-			tag.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-		elif answering:
-			tag.text = "…"
-			tag.add_theme_color_override(&"font_color", Palette.CREAM.darkened(0.4))
-		h.add_child(tag)
-		var pts := Label.new()
-		pts.text = Hud._thousands(_total(pid))
-		pts.custom_minimum_size = Vector2(70, 0)
-		pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		pts.add_theme_font_size_override(&"font_size", 28)
-		h.add_child(pts)
-		scoreboard.add_child(h)
+			row["tag"] = "+%d" % int(last_gain[pid])
+			row["tag_color"] = Palette.MONEY_GREEN
+		if answering:
+			row["status"] = &"done" if answered.has(pid) else &"waiting"
+		rows.append(row)
+	MinigameScoreboard.rank_rows(rows)
+	scoreboard.set_rows(rows)
 	for pid: int in podiums:
 		(podiums[pid]["score"] as Label3D).text = Hud._thousands(_total(pid))
 
@@ -888,24 +850,14 @@ func _build_ui() -> void:
 		answer_texts.append(t)
 		answer_voters.append(voters)
 	# Scoreboard, right (below the card's height, above the answers).
-	var sb_panel := PanelContainer.new()
-	sb_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	sb_panel.anchor_left = 1.0
-	sb_panel.anchor_right = 1.0
-	sb_panel.offset_left = -400
-	sb_panel.offset_right = -20
-	sb_panel.offset_top = 250
-	root.add_child(sb_panel)
-	var sbv := VBoxContainer.new()
-	sbv.add_theme_constant_override(&"separation", 4)
-	sb_panel.add_child(sbv)
-	var sbt := Label.new()
-	sbt.theme_type_variation = &"HeadingLabel"
-	sbt.text = "SCORES"
-	sbv.add_child(sbt)
-	scoreboard = VBoxContainer.new()
-	scoreboard.add_theme_constant_override(&"separation", 2)
-	sbv.add_child(scoreboard)
+	scoreboard = MinigameScoreboard.new("SCORES").bind(state, local_id)
+	scoreboard.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	scoreboard.anchor_left = 1.0
+	scoreboard.anchor_right = 1.0
+	scoreboard.offset_left = -400
+	scoreboard.offset_right = -20
+	scoreboard.offset_top = 250
+	root.add_child(scoreboard)
 	# Banners, top centre (only while the question card is hidden).
 	banner = Label.new()
 	banner.theme_type_variation = &"TitleLabel"

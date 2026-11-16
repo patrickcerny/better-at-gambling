@@ -115,6 +115,8 @@ func _build_ui() -> void:
 	set_bg = VoteRaceSet.new()
 	set_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(set_bg)
+	# Gamepad: the d-pad or left stick moves over the racers you can vote for, A votes.
+	root.add_child(PadFocus.make(_pad_cards, can_act))
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -247,6 +249,15 @@ func _size_cards() -> void:
 	_update_spots.call_deferred()
 
 
+## The cards a gamepad can vote with (the votable racers, in card order).
+func _pad_cards() -> Array:
+	var out: Array = []
+	for p: int in vote_targets():
+		if cards.has(p):
+			out.append(cards[p])
+	return out
+
+
 ## Votable racers in card order (the number keys follow it).
 func vote_targets() -> Array[int]:
 	var out: Array[int] = []
@@ -321,7 +332,7 @@ func _update_status() -> void:
 		elif my_vote >= 0:
 			text = ""  # the ✓ on the card you picked says it
 		else:
-			text = "Click a card or press 1-%d: who should NOT step forward?" % vote_targets().size()
+			text = ("Pick a card with the d-pad, %s votes: who should NOT step forward?" % InputGlyphs.pad_name("A")) if InputGlyphs.gamepad else "Click a card or press 1-%d: who should NOT step forward?" % vote_targets().size()
 	elif not reveal.is_empty() and _reveal_paid:
 		var moved: Array[int] = _ints(reveal.get("moved", []))
 		if local_id in _ints(reveal.get("finished", [])) and finish_place.has(local_id):

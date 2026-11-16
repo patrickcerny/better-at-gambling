@@ -77,13 +77,13 @@ func _to_px(t: float, money: float) -> Vector2:
 func _draw() -> void:
 	if lines.is_empty() or font == null:
 		return
-	var axis: Color = Palette.CREAM.darkened(0.45)
+	var axis: Color = Color("#A99C84")
 	var fs: int = 20
 	# Money scale: 4 gridlines.
 	for k: int in 5:
 		var m: float = lerpf(_lo, _hi, k / 4.0)
 		var y: float = _to_px(0.0, m).y
-		draw_line(Vector2(PAD_LEFT, y), Vector2(size.x - PAD_RIGHT, y), Color(axis, 0.25), 1.0)
+		draw_line(Vector2(PAD_LEFT, y), Vector2(size.x - PAD_RIGHT, y), Color(axis, 0.14), 1.0)
 		draw_string(font, Vector2(4.0, y + 7.0), "$" + Hud._thousands(int(roundf(m / 10.0) * 10.0)), HORIZONTAL_ALIGNMENT_RIGHT, PAD_LEFT - 12.0, fs, axis)
 	# Start money guide (dashed).
 	var sy: float = _to_px(0.0, start_money).y
@@ -117,6 +117,18 @@ func _draw() -> void:
 			continue
 		var c: Color = line["color"]
 		var w: float = 5.0 if line["local"] else 3.0
+		if line["local"]:
+			# A soft glow of your colour under your own line, down to the bottom of the plot.
+			var floor_y: float = size.y - PAD_BOTTOM
+			var area := PackedVector2Array(pts)
+			area.append(Vector2(pts[-1].x, floor_y))
+			area.append(Vector2(pts[0].x, floor_y))
+			var cols := PackedColorArray()
+			for p: Vector2 in area:
+				cols.append(Color(c, 0.22 * clampf(1.0 - (p.y - PAD_TOP) / maxf(floor_y - PAD_TOP, 1.0), 0.0, 1.0)))
+			if Geometry2D.triangulate_polygon(area).size() > 0:
+				draw_polygon(area, cols)
 		draw_polyline(pts, Color(Palette.CASINO_BLACK, 0.6), w + 3.0, true)
 		draw_polyline(pts, c, w, true)
-		draw_circle(pts[-1], w + 2.5, c)
+		draw_circle(pts[-1], w + 3.5, Color(Palette.CASINO_BLACK, 0.7))
+		draw_circle(pts[-1], w + 2.0, c)

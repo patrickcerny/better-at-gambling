@@ -67,23 +67,15 @@ func test_joypad_cycles_chips() -> void:
 	assert_eq(panel.selected_chip, 1, "LB moves back")
 
 
-func test_focus_navigation_reaches_every_button() -> void:
-	var first: Button = panel._chip_buttons[0]
-	first.grab_focus()
-	var seen: Dictionary = {}
-	for i: int in 40:
-		var f: Control = get_viewport().gui_get_focus_owner()
-		if f != null:
-			seen[f.get_instance_id()] = f
-		var ev := InputEventAction.new()
-		ev.action = &"ui_right" if i % 2 == 0 else &"ui_down"
-		ev.pressed = true
-		get_tree().root.push_input(ev)
-		await wait_process_frames(1)
-	var buttons: int = 0
-	for n: Node in panel.find_children("*", "Button", true, false):
-		buttons += 1
-	assert_gt(seen.size(), 4, "focus walks across chips and actions (%d of %d buttons reached)" % [seen.size(), buttons])
+## Nothing in the panel takes GUI focus (a focused chip took the d-pad's items and A's bet away
+## from a gamepad at the table); the pad reaches everything through its own buttons instead.
+func test_no_focus_and_the_pad_reaches_every_action() -> void:
+	await wait_process_frames(1)
+	assert_null(get_viewport().gui_get_focus_owner(), "no chip grabs the focus")
+	for n: Node in panel.find_children("*", "ChipToken", true, false):
+		assert_eq((n as Control).focus_mode, Control.FOCUS_NONE)
+	for action: StringName in [&"bet_chip_prev", &"bet_chip_next", &"bet_confirm", &"bet_clear", &"bet_repeat"]:
+		assert_ne(InputGlyphs.labels(action, true).size(), 0, "%s has a pad button" % action)
 
 
 func test_instant_mode_confirms_on_chip_press() -> void:

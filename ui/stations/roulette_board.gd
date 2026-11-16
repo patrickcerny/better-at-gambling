@@ -45,6 +45,13 @@ var open: bool = true:
 
 var hover_type: StringName = &""
 var hover_value: int = 0
+## Gamepad pointer on the layout (control coordinates; NAN = not shown): the left stick moves it
+## like a mouse (`pad_nudge`), so every bet the mouse can reach (splits, corners…) is reachable.
+var pad_cursor: Vector2 = Vector2(NAN, NAN)
+## `origin()` when the pointer last moved (the layout centres itself as the panel resizes).
+var _pad_origin: Vector2 = Vector2.ZERO
+## Pointer speed at full stick, px per second.
+const PAD_SPEED: float = 300.0
 
 
 func _init() -> void:
@@ -65,6 +72,7 @@ func origin() -> Vector2:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
+		pad_cursor = Vector2(NAN, NAN)
 		var hit: Array = spot_at((event as InputEventMouseMotion).position)
 		_set_hover(hit[0], hit[1])
 	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
@@ -72,6 +80,41 @@ func _gui_input(event: InputEvent) -> void:
 		if open and hit[0] != &"":
 			spot_clicked.emit(hit[0], hit[1])
 			accept_event()
+
+
+## Moves the gamepad pointer by `stick` (-1..1 per axis) for `delta` seconds; it starts on 17.
+func pad_nudge(stick: Vector2, delta: float) -> void:
+	if is_nan(pad_cursor.x):
+		pad_cursor = number_rect(17).get_center()
+	elif origin() != _pad_origin:
+		pad_cursor += origin() - _pad_origin  # the panel laid out again: stay on the same spot
+	_pad_origin = origin()
+	var lo: Vector2 = origin() + Vector2(1, 1)
+	var hi: Vector2 = origin() + custom_minimum_size - Vector2(3, 3)
+	pad_cursor = (pad_cursor + stick * PAD_SPEED * delta).clamp(lo, hi)
+	var hit: Array = spot_at(pad_cursor)
+	_set_hover(hit[0], hit[1])
+	queue_redraw()
+
+
+## Hides the gamepad pointer (the mouse took over).
+func pad_hide() -> void:
+	if is_nan(pad_cursor.x):
+		return
+	pad_cursor = Vector2(NAN, NAN)
+	_set_hover(&"", 0)
+	queue_redraw()
+
+
+## A on the pointer: bets on the spot under it. True when a bet was asked for.
+func pad_click() -> bool:
+	if not open or is_nan(pad_cursor.x):
+		return false
+	var hit: Array = spot_at(pad_cursor)
+	if hit[0] == &"":
+		return false
+	spot_clicked.emit(hit[0], hit[1])
+	return true
 
 
 func _set_hover(type: StringName, value: int) -> void:
@@ -249,6 +292,11 @@ func _draw() -> void:
 		var p: Vector2 = spot_point(hover_type, hover_value)
 		draw_circle(p, 9.0, Color(Palette.VIP_GOLD, 0.55))
 		draw_arc(p, 9.0, 0, TAU, 24, Palette.CREAM, 1.5, true)
+	if not is_nan(pad_cursor.x) and open:
+		# The gamepad pointer: a gold ring with a dot, over everything.
+		draw_arc(pad_cursor, 11.0, 0, TAU, 32, Color(0, 0, 0, 0.6), 5.0, true)
+		draw_arc(pad_cursor, 11.0, 0, TAU, 32, Palette.VIP_GOLD, 3.0, true)
+		draw_circle(pad_cursor, 2.5, Palette.CREAM)
 
 
 func _tile(r: Rect2, color: Color, text: String, font: Font, fs: int, lit: bool, win: bool) -> void:

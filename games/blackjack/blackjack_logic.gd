@@ -8,6 +8,9 @@ extends StationLogicBase
 ## blackjack), Dealer Bust Bonus on wins. A split plays its hands one after the other: the first
 ## hand gets its second card at once, the second hand when play moves on to it, and the splitting
 ## player's clock gains `bj_split_time_bonus` decision times.
+## Scissors: a hit that busts a player holding them opens a short rescue window (`bj_scissors_window`)
+## instead of ending the hand: "cut" snips the busting card and play goes on with the clock that was
+## left, "stand" (or the window running out) takes the bust.
 
 enum State { IDLE, BETTING, ACTING, PAYOUT }
 
@@ -100,12 +103,19 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 	var h: Dictionary = hands[p]
 	var idx: int = int(h.get("active", 0))
 	var cur: Dictionary = active_hand(h)
+	# Busted with Scissors in hand: only the cut or taking the bust (stand) are left.
+	if h.has("rescue") and action != &"cut" and action != &"stand":
+		return fail(&"busted")
 	match action:
 		&"hit":
 			_deal_card(p, cur["cards"])
-			if HandEval.total(cur["cards"]) >= 21:
+			if HandEval.is_bust(cur["cards"]) and _can_cut(p, cur):
+				_open_rescue(h)
+			elif HandEval.total(cur["cards"]) >= 21:
 				_finish_active(p, h)
 		&"stand":
+			if h.has("rescue"):
+				_close_rescue(h)
 			_finish_active(p, h)
 		&"double":
 			if (cur["cards"] as Array).size() != 2:
@@ -137,11 +147,16 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 				_finish_active(p, h)
 		&"cut":
 			# Scissors: snip off your last card (not after doubling, at least 3 cards in hand).
-			if cur["doubled"] or (cur["cards"] as Array).size() < 3 or not modifiers.has_flag(p, &"scissors", game_id):
+			if not _can_cut(p, cur):
 				return fail(&"cannot_cut")
 			modifiers.consume_flag(p, &"scissors")
 			var cut: int = (cur["cards"] as Array).pop_back()
 			shoe.return_card(cut)
+			if h.has("rescue"):
+				# Saved from the bust: back to the decision clock that was left.
+				_close_rescue(h)
+				if HandEval.total(cur["cards"]) >= 21:
+					_finish_active(p, h)
 		_:
 			return fail(&"unknown_action")
 	var ev: Dictionary = {"station": station_id, "player": p, "action": action, "cards": (cur["cards"] as Array).duplicate()}
@@ -151,6 +166,22 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 	events.append(GameEvents.make(&"bj_action", ev))
 	_check_all_done()
 	return OK_RESULT
+
+
+## The Scissors can snip the hand's last card: held, not doubled, at least 3 cards.
+func _can_cut(p: int, cur: Dictionary) -> bool:
+	return not cur["doubled"] and (cur["cards"] as Array).size() >= 3 and modifiers.has_flag(p, &"scissors", game_id)
+
+
+## A hit busted a player holding Scissors: the hand waits `bj_scissors_window` seconds for the cut.
+func _open_rescue(h: Dictionary) -> void:
+	h["rescue"] = maxf(float(h.get("clock", 0.0)), 0.0)  # the clock left, given back after a cut
+	h["clock"] = balance.bj_scissors_window
+
+
+func _close_rescue(h: Dictionary) -> void:
+	h["clock"] = maxf(float(h["rescue"]), 1.0)
+	h.erase("rescue")
 
 
 ## True when the player's hand is a first-two-card pair of equal value and has not been split.
@@ -200,7 +231,12 @@ func tick(delta: float) -> void:
 					continue
 				h["clock"] = float(h.get("clock", 0.0)) - delta
 				if float(h["clock"]) <= 0.0:
-					h["done"] = true
+					if h.has("rescue"):
+						# No cut in time: the hand is bust, a split moves on to its other hand.
+						_close_rescue(h)
+						_finish_active(p, h)
+					else:
+						h["done"] = true
 			timer = _longest_clock()
 			_check_all_done()
 		State.PAYOUT:
@@ -271,6 +307,8 @@ func get_public_state() -> Dictionary:
 		hs[p] = {"stake": h["stake"], "cards": (h["cards"] as Array).duplicate(), "done": h["done"], "total": HandEval.total(h["cards"])}
 		if state == State.ACTING and not h["done"]:
 			hs[p]["clock"] = maxf(float(h.get("clock", 0.0)), 0.0)
+			if h.has("rescue"):
+				hs[p]["rescue"] = true
 		if h.has("split"):
 			var sh: Dictionary = h["split"]
 			hs[p]["active"] = int(h["active"])

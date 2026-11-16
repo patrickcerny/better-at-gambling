@@ -120,7 +120,8 @@ func pull() -> bool:
 
 
 func _hint_text() -> String:
-	return InputGlyphs.fill("[1-4] stake   ·   [{bet_confirm}] / [{interact}] pull again\n[{leave_station}] step away")
+	var stake_keys: String = "{bet_chip_prev} / {bet_chip_next}" if InputGlyphs.gamepad else "1-4"
+	return InputGlyphs.fill("[%s] stake   ·   [{bet_confirm}] / [{interact}] pull again\n[{leave_station}] step away" % stake_keys)
 
 
 func _rules_text() -> String:

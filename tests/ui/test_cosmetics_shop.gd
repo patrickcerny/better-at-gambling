@@ -30,7 +30,10 @@ func test_buy_refuse_and_wear() -> void:
 	assert_true(panel.visible)
 	assert_eq(panel.tiles.size(), CosmeticShop.default().items.size() + CosmeticShop.default().packs.size() + CosmeticShop.default().coin_packs.size(), "a tile per item, per pack and per coin pack")
 	assert_eq(panel.selected, &"color_orange", "no preferred colour yet: the first item")
-	assert_true(panel.find_child("COLOURS", true, false) != null, "a COLOURS tab")
+	assert_true(panel.find_child("SKINS", true, false) != null, "one SKINS tab")
+	var page: Node = panel.find_child("SKINS", true, false)
+	assert_true(page.find_child("color_mint", true, false) != null and page.find_child("skin_lava", true, false) != null, "plain colours and animated skins on one page")
+	assert_eq(panel.tab_buttons[CosmeticDef.KIND_COLOR], panel.tab_buttons[CosmeticDef.KIND_SKIN], "one tab button for both")
 	var price: Label = panel.tiles[&"color_mint"].find_child("Price", true, false) as Label
 	var mint: CosmeticDef = CosmeticShop.default().find(&"color_mint")
 	assert_eq(price.text, Hud._thousands(mint.price), "the number, with a coin icon next to it")

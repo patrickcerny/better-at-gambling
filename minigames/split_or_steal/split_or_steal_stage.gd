@@ -77,7 +77,7 @@ var status_label: Label
 var button_row: HBoxContainer
 var choice_buttons: Dictionary[String, Button] = {}
 var schedule_box: VBoxContainer
-var standings: VBoxContainer
+var standings: MinigameScoreboard
 var bubble: PanelContainer
 var bubble_label: Label
 var _headless: bool = false
@@ -474,7 +474,7 @@ func _seat_bean(pid: int, side: int, animate: bool) -> void:
 	if side >= 0:
 		bean.position = Vector3(0, PODIUM_TOP, 0)
 		bean.scale = Vector3.ONE
-		bean.rotation = Vector3(0, PI - 0.18 * (1.0 if side == 0 else -1.0), 0)  # face out, a little towards each other
+		bean.rotation = Vector3(0, PI + 0.18 * (1.0 if side == 0 else -1.0), 0)  # face out, a little towards each other
 	else:
 		bean.position = Vector3.ZERO
 		bean.scale = Vector3.ONE * AUDIENCE_SCALE
@@ -725,41 +725,25 @@ func _gain_text(pid: int, pts: int, p_house: int) -> String:
 func _refresh_standings() -> void:
 	if standings == null:
 		return
-	for c: Node in standings.get_children():
-		standings.remove_child(c)
-		c.queue_free()
-	var rows: Array = players.duplicate()
-	rows.sort_custom(func(a: int, b: int) -> bool:
+	var order: Array = players.duplicate()
+	order.sort_custom(func(a: int, b: int) -> bool:
 		if _pts(a) != _pts(b):
 			return _pts(a) > _pts(b)
 		if _stl(a) != _stl(b):
 			return _stl(a) < _stl(b)
 		return a < b)
-	var place: int = 0
-	for i: int in rows.size():
-		var pid: int = rows[i]
-		if i == 0 or _pts(pid) != _pts(rows[i - 1]) or _stl(pid) != _stl(rows[i - 1]):
-			place = i + 1
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override(&"separation", 8)
-		h.add_child(_label(str(place), 22, Palette.VIP_GOLD if place == 1 else Palette.CREAM.darkened(0.25), 22))
-		h.add_child(_dot(_player_color(pid), 14))
-		var n: Label = _label(state.player_name(pid), 22, Palette.VIP_GOLD if pid == local_id else Palette.CREAM)
-		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		n.clip_text = true
-		n.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		h.add_child(n)
-		var on: bool = pid in pair and phase != Step.OUTRO
-		var tag: Label = _label("ON STAGE" if on else "", 14, Palette.WARM_GOLD, 70)
-		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		h.add_child(tag)
-		var pts: Label = _label(str(_pts(pid)), 24, Palette.CREAM, 34)
-		pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		h.add_child(pts)
-		var stl: Label = _label("%d stl" % _stl(pid), 14, Palette.LOSS_RED.lerp(Palette.CREAM, 0.3) if _stl(pid) > 0 else MUTED, 56)
-		stl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		h.add_child(stl)
-		standings.add_child(h)
+	var rows: Array = []
+	for pid: int in order:
+		var r: Dictionary = {"player": pid, "score": _pts(pid), "steals": _stl(pid),
+			"detail": "%d steal%s" % [_stl(pid), "" if _stl(pid) == 1 else "s"]}
+		if pid in pair and phase != Step.OUTRO:
+			r["tag"] = "ON STAGE"
+			r["tag_color"] = Palette.WARM_GOLD
+			if phase == Step.DECIDE:
+				r["status"] = &"done" if locked.has(pid) else &"waiting"
+		rows.append(r)
+	MinigameScoreboard.rank_rows(rows, "score", "steals")
+	standings.set_rows(rows)
 
 
 ## The host speaks (speech bubble) and strikes a pose (`hold` 0 = keep the pose).
@@ -999,7 +983,7 @@ func _build_seat(pid: int, idx: int) -> void:
 	var seat := Node3D.new()
 	seat.name = "Seat%d" % pid
 	seat.position = Vector3(s * (SEAT_X0 + SEAT_STEP * slot), SEAT_Y + 0.06, SEAT_Z)
-	seat.rotation.y = PI + s * 0.45  # face the camera, turned towards the podiums
+	seat.rotation.y = PI - s * 0.45  # face the camera, turned in towards the podiums (−Z is the bean's front)
 	add_child(seat)
 	var bean := AvatarVisuals.new()
 	bean.scale = Vector3.ONE * AUDIENCE_SCALE
@@ -1216,15 +1200,14 @@ func _build_ui() -> void:
 	schedule_box = VBoxContainer.new()
 	schedule_box.add_theme_constant_override(&"separation", 2)
 	left.add_child(schedule_box)
-	var right := _side_panel(root, "STANDINGS", false)
-	standings = VBoxContainer.new()
-	standings.add_theme_constant_override(&"separation", 2)
-	right.add_child(standings)
-	right.add_child(_label("Ties: fewer steals wins", 16, MUTED))
-	var voice := _label(_voice_hint(), 16, MUTED)
-	voice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	voice.custom_minimum_size = Vector2(340, 0)
-	right.add_child(voice)
+	standings = MinigameScoreboard.new("STANDINGS", "fewer steals breaks ties").bind(state, local_id)
+	standings.anchor_left = 1.0
+	standings.anchor_right = 1.0
+	standings.offset_left = -400.0
+	standings.offset_right = -20.0
+	standings.offset_top = 20.0
+	root.add_child(standings)
+	standings.add_footer(_voice_hint())
 
 	# Lucky's speech bubble (follows the host on screen).
 	bubble = PanelContainer.new()
@@ -1280,11 +1263,8 @@ func _choice_button(c: String) -> Button:
 
 func _side_panel(root: Control, title: String, left: bool) -> VBoxContainer:
 	var p := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = PANEL_BG
-	sb.set_corner_radius_all(14)
-	sb.set_border_width_all(2)
-	sb.border_color = Palette.WARM_GOLD.darkened(0.2)
+	var sb: StyleBoxFlat = TableSkin.panel_box()  # matches the shared scoreboard opposite
+	p.draw.connect(TableSkin.draw_frame.bind(p))
 	sb.content_margin_left = 18
 	sb.content_margin_right = 18
 	sb.content_margin_top = 12
