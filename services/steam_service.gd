@@ -39,7 +39,7 @@ signal public_lobbies_received(lobbies: Array[Dictionary])
 ## The game's own Steamworks App ID (was 480 "Spacewar" for tests until 0.9.16).
 const APP_ID: int = 5623410
 const LOBBY_GAME: String = "better_at_gambling"
-## PRIVATE lobbies: only Steam friends (the "Join a friend" list) and invited players get in.
+## PRIVATE lobbies: only Steam friends (FRIENDS' LOBBIES) and invited players get in.
 const LOBBY_TYPE_FRIENDS_ONLY: int = 1
 ## PUBLIC lobbies: also listed under BROWSE LOBBIES for everyone on the same version.
 const LOBBY_TYPE_PUBLIC: int = 2
