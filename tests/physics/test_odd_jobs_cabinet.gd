@@ -200,3 +200,57 @@ func test_glow_only_while_broke() -> void:
 	await wait_seconds(0.3)
 	assert_false(cab.glowing, "money again: glow off")
 	assert_false(cab.lamp_light.visible)
+
+
+## Under $50 (Patrick: "Indicator wenn man broke ist (weniger geld als 50) zum button"): a beacon
+## floats over the cabinet and, while the cabinet is off screen, a gold arrow on the screen edge
+## points at it; both go at the cabinet and once you have $50 again.
+func test_under_50_points_the_way_to_the_button() -> void:
+	var me: int = scene.local_id
+	var cab: OddJobsCabinet = scene.map.odd_jobs
+	await wait_process_frames(2)
+	assert_false(cab.beacon.visible, "no beacon with money")
+	assert_true(scene.hud.odd_jobs_pointer == null or not scene.hud.odd_jobs_pointer.visible, "no arrow with money")
+	await _go_broke()
+	scene.server.economy.apply(me, 30, &"test")
+	await wait_seconds(0.3)
+	assert_eq(scene.server.economy.balance(me), 30)
+	assert_gt(30, OddJobsController.broke_line(scene.cfg, 0), "$30 is over the House Comp line")
+	assert_true(scene.odd_jobs.broke, "$30 counts as broke")
+	# Across the casino with the cabinet behind you: beacon up and the arrow on the screen edge.
+	var away: Vector3 = Vector3(0, 0, 0)
+	scene.local.teleport(away, PI / 2.0)
+	scene.server.set_server_position(me, away)
+	await wait_process_frames(6)
+	assert_true(cab.beacon.visible, "the beacon floats over the cabinet")
+	assert_not_null(scene.hud.odd_jobs_pointer)
+	assert_true(scene.hud.odd_jobs_pointer.visible, "an arrow points the way")
+	assert_true(scene.hud.odd_jobs_tag.visible, "with its ODD JOBS tag")
+	var screen: Rect2 = scene.get_viewport().get_visible_rect()
+	assert_true(screen.has_point(scene.hud.odd_jobs_pointer.position), "the arrow stays on screen")
+	var c: Vector2 = scene.hud.odd_jobs_tag.position + scene.hud.odd_jobs_tag.size * 0.5
+	assert_true(screen.has_point(c), "and so does its tag")
+	# At the cabinet: no beacon, no arrow (the lamps and the outline take over).
+	await _stand_and_look(scene.map.odd_jobs.button_center())
+	assert_false(cab.beacon.visible, "no beacon at the cabinet")
+	assert_false(scene.hud.odd_jobs_pointer.visible, "no arrow at the cabinet")
+	assert_true(cab.glowing, "the cabinet still glows")
+	# Back across the room, then $50: everything goes.
+	scene.local.teleport(away, PI / 2.0)
+	scene.server.set_server_position(me, away)
+	await wait_process_frames(6)
+	assert_true(scene.hud.odd_jobs_pointer.visible)
+	scene.server.economy.apply(me, 20, &"test")
+	await wait_seconds(0.3)
+	assert_eq(scene.server.economy.balance(me), OddJobsController.BROKE_BELOW)
+	assert_false(scene.odd_jobs.broke, "$50 is not broke")
+	assert_false(cab.beacon.visible, "beacon gone at $50")
+	assert_false(scene.hud.odd_jobs_pointer.visible, "arrow gone at $50")
+	assert_false(cab.glowing)
+
+
+func test_is_broke_under_50_or_the_comp_line() -> void:
+	assert_true(OddJobsController.is_broke(49, 10))
+	assert_false(OddJobsController.is_broke(50, 10))
+	assert_true(OddJobsController.is_broke(70, 80), "a higher comp line wins")
+	assert_false(OddJobsController.is_broke(80, 80))

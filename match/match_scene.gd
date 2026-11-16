@@ -1364,8 +1364,16 @@ func _point_at_hot_table() -> void:
 	if node == null or local == null or local.cam == null or results_panel != null:
 		hud.set_hot_pointer(false)
 		return
+	var at: Dictionary = edge_pointer(node.global_position + Vector3(0, 2.0, 0))
+	hud.set_hot_pointer(not at.is_empty(), at.get("pos", Vector2.ZERO), at.get("angle", 0.0))
+
+
+## Where a screen-edge arrow towards world point `target` goes: {pos, angle} on the screen's edge,
+## or {} when the target is on screen (no arrow needed) or there is no camera.
+func edge_pointer(target: Vector3) -> Dictionary:
+	if local == null or local.cam == null:
+		return {}
 	var cam: Camera3D = local.cam.camera
-	var target: Vector3 = node.global_position + Vector3(0, 2.0, 0)
 	var size: Vector2 = get_viewport().get_visible_rect().size
 	var centre: Vector2 = size * 0.5
 	var dir: Vector2
@@ -1378,8 +1386,7 @@ func _point_at_hot_table() -> void:
 		var on_screen: bool = not cam.is_position_behind(target)
 		var p: Vector2 = PixelView.to_canvas(cam, cam.unproject_position(target), hud)
 		if on_screen and Rect2(Vector2.ZERO, size).grow(-40.0).has_point(p):
-			hud.set_hot_pointer(false)
-			return
+			return {}
 		dir = p - centre
 		if not on_screen:
 			dir = -dir  # unproject mirrors points behind the camera
@@ -1388,7 +1395,7 @@ func _point_at_hot_table() -> void:
 	dir = dir.normalized()
 	var half: Vector2 = centre - Vector2(70, 90)
 	var t: float = minf(absf(half.x / dir.x) if dir.x != 0.0 else INF, absf(half.y / dir.y) if dir.y != 0.0 else INF)
-	hud.set_hot_pointer(true, centre + dir * t, dir.angle())
+	return {"pos": centre + dir * t, "angle": dir.angle()}
 
 
 ## The item's model (ItemModels) pops up in front of the user for a moment.

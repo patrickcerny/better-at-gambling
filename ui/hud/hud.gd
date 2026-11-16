@@ -35,6 +35,9 @@ var minigame_warning: Label
 ## Hot Table line under the timer ("HOT: Roulette 1 ×1.25 0:24").
 var hot_label: Label
 var hot_pointer: Polygon2D
+## Gold arrow + tag towards the Odd Jobs button while you are broke.
+var odd_jobs_pointer: Polygon2D
+var odd_jobs_tag: Label
 var _last_warning_second: int = -1
 
 ## Beer: the money counter shows "$???" and no +/- pops until you sober up.
@@ -90,22 +93,53 @@ func set_prompt(text: String) -> void:
 ## Screen-edge arrow towards the hot table (`angle` in radians, 0 = pointing right).
 func set_hot_pointer(on: bool, pos: Vector2 = Vector2.ZERO, angle: float = 0.0) -> void:
 	if hot_pointer == null:
-		hot_pointer = Polygon2D.new()
-		hot_pointer.name = "HotPointer"
-		hot_pointer.polygon = PackedVector2Array([Vector2(44, 0), Vector2(-10, -34), Vector2(-10, -14), Vector2(-40, -14), Vector2(-40, 14), Vector2(-10, 14), Vector2(-10, 34)])
-		hot_pointer.color = Color(1.0, 0.55, 0.1)
-		var outline := Line2D.new()
-		outline.points = hot_pointer.polygon
-		outline.closed = true
-		outline.width = 5.0
-		outline.default_color = Palette.CASINO_BLACK
-		hot_pointer.add_child(outline)
-		add_child(hot_pointer)
-	hot_pointer.visible = on
+		hot_pointer = _make_pointer("HotPointer", Color(1.0, 0.55, 0.1))
+	_place_pointer(hot_pointer, on, pos, angle)
+
+
+## Screen-edge arrow towards the Odd Jobs button while the local player is broke, with an
+## "ODD JOBS +$50" tag beside it (towards the screen centre, so it never leaves the screen).
+func set_odd_jobs_pointer(on: bool, pos: Vector2 = Vector2.ZERO, angle: float = 0.0) -> void:
+	if odd_jobs_pointer == null:
+		odd_jobs_pointer = _make_pointer("OddJobsPointer", Palette.VIP_GOLD)
+		odd_jobs_tag = Label.new()
+		odd_jobs_tag.name = "OddJobsPointerTag"
+		odd_jobs_tag.text = "ODD JOBS +$%d" % OddJobs.PAYOUT
+		odd_jobs_tag.add_theme_font_size_override(&"font_size", 22)
+		odd_jobs_tag.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+		odd_jobs_tag.add_theme_color_override(&"font_outline_color", Palette.CASINO_BLACK)
+		odd_jobs_tag.add_theme_constant_override(&"outline_size", 8)
+		odd_jobs_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(odd_jobs_tag)
+	_place_pointer(odd_jobs_pointer, on, pos, angle)
+	odd_jobs_tag.visible = on
 	if on:
-		hot_pointer.position = pos
-		hot_pointer.rotation = angle
-		hot_pointer.scale = Vector2.ONE * (1.0 + absf(sin(Time.get_ticks_msec() / 160.0)) * 0.2)
+		var size: Vector2 = odd_jobs_tag.get_combined_minimum_size()
+		odd_jobs_tag.size = size
+		odd_jobs_tag.position = pos - Vector2.from_angle(angle) * 75.0 - size * 0.5
+
+
+func _make_pointer(n: String, color: Color) -> Polygon2D:
+	var p := Polygon2D.new()
+	p.name = n
+	p.polygon = PackedVector2Array([Vector2(44, 0), Vector2(-10, -34), Vector2(-10, -14), Vector2(-40, -14), Vector2(-40, 14), Vector2(-10, 14), Vector2(-10, 34)])
+	p.color = color
+	var outline := Line2D.new()
+	outline.points = p.polygon
+	outline.closed = true
+	outline.width = 5.0
+	outline.default_color = Palette.CASINO_BLACK
+	p.add_child(outline)
+	add_child(p)
+	return p
+
+
+func _place_pointer(p: Polygon2D, on: bool, pos: Vector2, angle: float) -> void:
+	p.visible = on
+	if on:
+		p.position = pos
+		p.rotation = angle
+		p.scale = Vector2.ONE * (1.0 + absf(sin(Time.get_ticks_msec() / 160.0)) * 0.2)
 
 
 ## Big centred banner (items, the Hot Table) for `seconds`, then it fades. A new banner replaces the
