@@ -14,6 +14,8 @@ licence or attribution for its models.
   on y = 0, front facing +z (the statues and the bat/revolver keep the orientation the game code
   expects; see each recipe's comment).
 - `tools/models/make_textures.py`: paints the picture-frame painting and the roulette number ring.
+- `tools/models/make_surfaces.py`: paints the lounge surface textures (marble, parquet, panels,
+  ceiling, velvet, brass, carpet fibre) in `assets/textures/`, also replacing the CC0 sets used before.
 - `tools/models/build_models.gd`: writes every recipe to `assets/models/own/<id>.glb`.
 - `tools/models/render_models.gd`: look-dev renders of model files from three angles.
 
