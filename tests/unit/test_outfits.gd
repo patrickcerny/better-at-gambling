@@ -150,6 +150,7 @@ func test_the_shop_sells_and_puts_on_outfit_pieces() -> void:
 	assert_eq(panel.preview.outfit.get(&"hat"), &"hat_top", "the preview tries it on")
 	assert_string_contains(panel.action_button.text, "BUY")
 	panel.action_button.pressed.emit()
+	panel.confirm_dialog.confirm()
 	assert_true(ProfileManager.profile.owns(&"hat_top"))
 	assert_eq(panel.action_button.text, "WEAR")
 	panel.action_button.pressed.emit()

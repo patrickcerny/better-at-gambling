@@ -62,7 +62,7 @@ const DEFS: Dictionary[StringName, Array] = {
 	&"ACH_COUNTERFEIT": ["Counterfeiter", "Get caught paying with Fake Cash."],
 	&"ACH_YEET": ["Yeet", "Throw another player."],
 	&"ACH_LAST_PLACE": ["Participation Trophy", "Finish last in a minigame with 3 or more players."],
-	# 0.10.7 (Patrick 2026-11-16: "Royal flush achievement").
+	# 0.10.15 (Patrick 2026-11-16: "Royal flush achievement").
 	&"ACH_HOLDEM_ROYAL_FLUSH": ["Royal Flush", "Get a Royal Flush in Hold'em."],
 	&"ACH_BJ_SUITED_TRIPS": ["Suited Trips", "In blackjack, get dealt two identical cards that also match the dealer's up card in rank and suit."],
 }
