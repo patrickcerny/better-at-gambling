@@ -108,7 +108,7 @@ func test_create_lobby_needs_steam() -> void:
 	assert_true(host.disabled, "disabled without Steam")
 	assert_eq(host.tooltip_text, "")
 	assert_true(host.is_visible_in_tree())
-	for n: String in ["BrowseLobbies", "Public", "Private"]:
+	for n: String in ["BrowseLobbies", "FriendsLobbies", "Public", "Private"]:
 		var b: Button = menu.find_child(n, true, false) as Button
 		assert_not_null(b, n)
 		if b != null:
@@ -219,11 +219,30 @@ func test_browse_cards_show_settings_and_beans() -> void:
 	var list: Node = menu.find_child("LobbyList", true, false)
 	var texts: PackedStringArray = _label_texts(list)
 	assert_true("Casino · 5 minigames · 3 min gambling · items on" in texts, "the lobby's settings")
-	assert_true("★ Patrick" in texts, "the leader's bean")
-	assert_true("Anna" in texts)
 	var beans: Node = list.find_child("Beans", true, false)
 	assert_not_null(beans)
-	assert_eq(beans.get_child_count(), 2, "one bean per player")
+	assert_eq(beans.get_child_count(), 2, "one head per player")
+	var tips: Array = beans.get_children().map(func(h: Control) -> String: return h.tooltip_text)
+	assert_eq(tips, ["★ Patrick", "Anna"], "names as tooltips, the leader starred")
+	for h: Control in beans.get_children():
+		assert_eq(h.custom_minimum_size, Vector2(42, 42), "just a small head")
+
+
+func test_lobby_lists_are_full_screens() -> void:
+	for screen: LobbyListScreen in [menu.browse_screen, menu.friends_screen]:
+		assert_eq(screen.get_parent(), menu, "over the whole menu, not in the centre column")
+		assert_eq(screen.anchor_right, 1.0)
+		assert_eq(screen.anchor_bottom, 1.0)
+	assert_eq(menu.friends_screen.title.text, "FRIENDS' LOBBIES")
+	assert_false(Array(_label_texts(menu._online_box)).has("JOIN A FRIEND"), "no friends list under PLAY ONLINE")
+	menu._open_list(menu.friends_screen)
+	assert_true(menu.friends_screen.visible)
+	assert_false(menu.profile_badge.visible, "corner things step aside")
+	assert_false(menu._online_box.visible)
+	menu._back_to_online(menu.friends_button)
+	assert_false(menu.friends_screen.visible)
+	assert_true(menu._online_box.visible)
+	assert_true(menu.profile_badge.visible)
 
 
 func test_browse_shows_other_versions_without_join() -> void:
