@@ -23,10 +23,10 @@ var regroup_seconds: float = 5.0
 ## `MatchMode.MINIGAMES`: no casino. INTRO and each REGROUP lead straight into the next minigame,
 ## the last REGROUP into RESULTS; casino time never advances.
 var minigames_only: bool = false
-## Practice (Patrick 2026-11-16: "No minigames in the practise mode"): the casino never closes for
-## a minigame. Where one would start the round simply turns over (`&"round_turned"`): a new
-## segment begins (limits, shop stock, Out of Order signs) with no warning, no minigame, no
-## rewards and no regroup.
+## Practice (Patrick 2026-11-16: "No minigames in the practise mode", "Practise mode hat keinen
+## Timer"): an endless casino. No minigames, no Last Call and no end: every `schedule.segment_s`
+## of casino time the round quietly turns over (`&"round_turned"`: limits, shop stock, Out of
+## Order signs) with no warning, no minigame, no rewards and no regroup. Hot Tables keep coming.
 var no_minigames: bool = false
 
 
@@ -55,6 +55,11 @@ func advance(delta: float) -> Array[StringName]:
 					_go(Phase.Id.CASINO)
 		Phase.Id.CASINO:
 			casino_time += delta
+			if no_minigames:
+				if casino_time >= schedule.segment_s * float(minigames_done + 1):
+					minigames_done += 1
+					out.append(&"round_turned")
+				return out
 			if not last_call_announced and schedule.is_last_call(casino_time):
 				last_call_announced = true
 				out.append(&"last_call")
@@ -63,10 +68,6 @@ func advance(delta: float) -> Array[StringName]:
 				out.append(&"segment_ended")
 				_go(Phase.Id.RESULTS)
 				out.append(&"match_over")
-			elif no_minigames:
-				if minigames_done < schedule.minigames and casino_time >= schedule.minigame_times()[minigames_done]:
-					minigames_done += 1
-					out.append(&"round_turned")
 			elif minigames_done < schedule.minigames and casino_time >= schedule.minigame_times()[minigames_done] - PRE_MINIGAME_SECONDS:
 				_go(Phase.Id.PRE_MINIGAME)
 				phase_timer = schedule.minigame_times()[minigames_done] - casino_time
@@ -115,8 +116,10 @@ func segment_index() -> int:
 	return minigames_done
 
 
-## Casino seconds remaining.
+## Casino seconds remaining (INF in the endless Practice).
 func time_left() -> float:
+	if no_minigames:
+		return INF
 	return maxf(schedule.duration_s - casino_time, 0.0)
 
 
