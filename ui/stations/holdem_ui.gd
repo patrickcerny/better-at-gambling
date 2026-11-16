@@ -9,6 +9,9 @@ extends StationUi
 ## A call, X fold). Key names follow the device in use (InputGlyphs).
 
 var cards_label: Label
+## The board and your two hole cards, drawn.
+var board_row: CardRow
+var hole_row: CardRow
 var hand_label: Label
 var dealer_label: Label
 var result_label: Label
@@ -53,8 +56,16 @@ func _build() -> void:
 	status_label.custom_minimum_size = Vector2(120, 0)
 	dealer_label = _line("", 22, Palette.WARM_GOLD)
 	dealer_label.name = "Dealer"
+	board_row = CardRow.new(70.0)
+	board_row.name = "BoardRow"
+	board_row.add_theme_constant_override(&"separation", 4)
+	body.add_child(board_row)
+	hole_row = CardRow.new(84.0)
+	hole_row.name = "HoleRow"
+	body.add_child(hole_row)
 	cards_label = _line("", 26, Palette.CREAM)
 	cards_label.name = "Cards"
+	cards_label.visible = false  # the drawn cards above show them; the text stays for the record
 	hand_label = _line("", 34, Palette.VIP_GOLD)
 	hand_label.name = "Hand"
 	result_label = _line("", 22, Palette.CREAM)
@@ -68,6 +79,8 @@ func _build() -> void:
 	body.add_child(actions)
 	fold_btn = _action("Fold", fold)
 	call_btn = _action("Call", call_it)
+	TableSkin.style_button(fold_btn, &"red", 26)
+	TableSkin.style_button(call_btn, &"gold", 26)
 	var bonus_title := _line("AA BONUS  ·  pays on your first five cards", 17, Palette.WARM_GOLD)
 	bonus_title.name = "BonusTitle"
 	bonus_row = HBoxContainer.new()
@@ -218,6 +231,10 @@ func _refresh() -> void:
 	else:
 		cards_label.text = "%s   |   %s" % ["  ".join(_labels(hole)), "  ".join(_labels(board))]
 		hand_label.text = "FOLDED" if decision == HoldemLogic.FOLD else String(mine.get("hand", ""))
+	board_row.visible = not board.is_empty()
+	board_row.show_cards(board)
+	hole_row.visible = not hole.is_empty()
+	hole_row.show_cards(hole, decision == HoldemLogic.FOLD)
 	dealer_label.text = _dealer_text()
 	result_label.text = _result_text(mine)
 	actions.visible = deciding

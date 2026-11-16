@@ -37,6 +37,19 @@ var rules_toggle: Button
 var rules_label: Label
 ## InputGlyphs.epoch the key hints were last written for.
 var _glyph_epoch: int = -1
+## The engraved title row (the title between two brass rules) and the felt band the status
+## line sits in.
+var header: HBoxContainer
+var status_band: PanelContainer
+## The draining brass bar under the status band: how long bets stay open / you have to act.
+var countdown: CountdownBar
+## The ribbon over the panel's top edge that shows a round's result ("WIN +$120").
+var result_ribbon: PanelContainer
+var result_ribbon_label: Label
+## A round's results arrive one per bet: summed over a short window into one ribbon.
+var _ribbon_stake: int = 0
+var _ribbon_net: int = 0
+var _ribbon_pending: bool = false
 
 
 func _ready() -> void:
@@ -84,15 +97,39 @@ func _ready() -> void:
 			panel.anchor_bottom = 0.0
 			panel.offset_bottom = COLUMN_MARGIN.y
 			panel.grow_vertical = Control.GROW_DIRECTION_END
+	panel.add_theme_stylebox_override(&"panel", TableSkin.panel_box())
+	panel.draw.connect(func() -> void: TableSkin.draw_frame(panel))
 	add_child(panel)
 	body = VBoxContainer.new()
 	body.add_theme_constant_override(&"separation", 10)
 	panel.add_child(body)
+	header = HBoxContainer.new()
+	header.name = "Header"
+	header.alignment = BoxContainer.ALIGNMENT_CENTER
+	header.add_theme_constant_override(&"separation", 12)
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(header)
+	var left_rule := DecoRule.new(false, 56.0)
+	left_rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(left_rule)
 	title = Label.new()
 	title.theme_type_variation = &"HeadingLabel"
 	title.text = game_title
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	body.add_child(title)
+	title.add_theme_font_override(&"font", TableSkin.black_font())
+	title.add_theme_font_size_override(&"font_size", 34)
+	title.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	title.add_theme_color_override(&"font_outline_color", Color("#3A2410"))
+	title.add_theme_constant_override(&"outline_size", 6)
+	title.add_theme_color_override(&"font_shadow_color", Color(0, 0, 0, 0.6))
+	title.add_theme_constant_override(&"shadow_offset_y", 3)
+	title.add_theme_constant_override(&"shadow_offset_x", 0)
+	header.add_child(title)
+	var right_rule := DecoRule.new(true, 56.0)
+	right_rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(right_rule)
+	# A hidden title (the slot machine's marquee says what it is) takes its rules with it.
+	title.visibility_changed.connect(func() -> void: header.visible = title.visible)
 	play_money_label = Label.new()
 	play_money_label.name = "PlayMoney"
 	play_money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -100,10 +137,29 @@ func _ready() -> void:
 	play_money_label.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 	play_money_label.visible = false
 	body.add_child(play_money_label)
+	status_band = PanelContainer.new()
+	status_band.name = "StatusBand"
+	status_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_band.add_theme_stylebox_override(&"panel", TableSkin.band_box(Color(TableSkin.FELT_DEEP, 0.95), Color(TableSkin.BRASS, 0.7)))
+	body.add_child(status_band)
 	status_label = Label.new()
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override(&"font_size", 26)
-	body.add_child(status_label)
+	status_label.add_theme_font_override(&"font", TableSkin.heavy_font())
+	status_label.add_theme_color_override(&"font_color", Palette.CREAM)
+	status_label.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.45))
+	status_label.add_theme_constant_override(&"outline_size", 4)
+	status_band.add_child(status_label)
+	# An empty status line takes its band away too.
+	status_band.visible = false
+	countdown = CountdownBar.new()
+	countdown.name = "Countdown"
+	body.add_child(countdown)
+	_build_ribbon()
+	if _dock_column():
+		# The column has a fixed height: a tighter rhythm keeps the folded-open rules inside it.
+		body.add_theme_constant_override(&"separation", 6)
+		title.add_theme_font_size_override(&"font_size", 30)
 	_build()
 	if _dock_column() and _column_fills_height():
 		# The key hint and the folded rules sit at the foot of the column.
@@ -112,11 +168,13 @@ func _ready() -> void:
 		push.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		push.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		body.add_child(push)
+	TableSkin.skin_buttons(panel)
 	hint = Label.new()
 	hint.theme_type_variation = &"SmallLabel"
 	hint.text = _hint_text()
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_color_override(&"font_color", Color("#9A8F7A"))
+	hint.add_theme_font_size_override(&"font_size", 16)
 	body.add_child(hint)
 	var how: String = _rules_text()
 	if not how.is_empty():
@@ -140,6 +198,7 @@ func open(p_station: StringName, p_local: int, p_state: ClientMatchState) -> voi
 	_on_open()
 	_update_glyphs()
 	_refresh()
+	_after_refresh()
 
 
 ## How the game works, folded away under the key hint: one small "HOW IT WORKS" line that opens
@@ -195,6 +254,7 @@ func update_state(p_pub: Dictionary, p_priv: Dictionary) -> void:
 		if _glyph_epoch != InputGlyphs.epoch:
 			_update_glyphs()
 		_refresh()
+		_after_refresh()
 
 
 ## Rewrites every key hint for the device in use (keyboard + mouse or gamepad).
@@ -202,6 +262,115 @@ func _update_glyphs() -> void:
 	_glyph_epoch = InputGlyphs.epoch
 	hint.text = _hint_text()
 	_relabel()
+
+
+## The look that follows every redraw: the status band shows only with a status, and the
+## countdown follows the public `timer` (`_countdown_seconds`).
+func _after_refresh() -> void:
+	status_band.visible = status_label.visible and status_label.text != ""
+	var left: float = _countdown_seconds()
+	countdown.feed(left, str(pub.get("state", "")))
+
+
+## Seconds left on the table's clock for the countdown bar (-1 = no bar). Default: the public
+## `timer` while it runs.
+func _countdown_seconds() -> float:
+	if not pub.has("timer"):
+		return -1.0
+	return float(pub.get("timer", 0.0))
+
+
+## The result ribbon (`round_result` events for you at this table, summed per round).
+func _build_ribbon() -> void:
+	result_ribbon = PanelContainer.new()
+	result_ribbon.name = "ResultRibbon"
+	result_ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	result_ribbon.visible = false
+	result_ribbon.z_index = 5
+	add_child(result_ribbon)
+	result_ribbon_label = Label.new()
+	result_ribbon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_ribbon_label.add_theme_font_override(&"font", TableSkin.black_font())
+	result_ribbon_label.add_theme_font_size_override(&"font_size", 34)
+	result_ribbon_label.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.5))
+	result_ribbon_label.add_theme_constant_override(&"outline_size", 6)
+	result_ribbon.add_child(result_ribbon_label)
+	panel.item_rect_changed.connect(func() -> void:
+		if result_ribbon.visible:
+			_place_ribbon())
+	if not Net.event_received.is_connected(_on_table_event):
+		Net.event_received.connect(_on_table_event)
+	tree_exiting.connect(func() -> void:
+		if Net.event_received.is_connected(_on_table_event):
+			Net.event_received.disconnect(_on_table_event))
+
+
+func _on_table_event(ev: Dictionary) -> void:
+	if not visible or not _shows_result_ribbon() or StringName(ev.get("type", &"")) != &"round_result":
+		return
+	if StringName(ev.get("station", &"")) != station_id or int(ev.get("player", -1)) != local_id:
+		return
+	_ribbon_stake += int(ev.get("stake", 0))
+	_ribbon_net += int(ev.get("net", 0))
+	if not _ribbon_pending:
+		_ribbon_pending = true
+		get_tree().create_timer(0.35).timeout.connect(_flush_ribbon)
+
+
+func _flush_ribbon() -> void:
+	_ribbon_pending = false
+	var net: int = _ribbon_net
+	var stake: int = _ribbon_stake
+	_ribbon_net = 0
+	_ribbon_stake = 0
+	if stake <= 0 and net == 0:
+		return
+	show_result(net)
+
+
+## Shows the ribbon for a result of `net` (won > 0, lost < 0, push 0) for a few seconds.
+func show_result(net: int) -> void:
+	var face: Color
+	var ink: Color = Palette.CREAM
+	if net > 0:
+		result_ribbon_label.text = "WIN  +%s" % money(net)
+		face = Color("#C9973F")
+		ink = Palette.CASINO_BLACK
+		Audio.play(&"ui_click", &"UI", -14.0, 1.5)
+	elif net < 0:
+		result_ribbon_label.text = "LOST  %s" % money(-net)
+		face = Color("#7A1F28")
+	else:
+		result_ribbon_label.text = "PUSH  ·  BET BACK"
+		face = TableSkin.WALNUT_LIGHT
+	result_ribbon_label.add_theme_color_override(&"font_color", ink)
+	result_ribbon_label.add_theme_constant_override(&"outline_size", 0 if net > 0 else 6)
+	var sb: StyleBoxFlat = TableSkin.band_box(face, Palette.VIP_GOLD if net > 0 else Color(Palette.CREAM, 0.6), 10)
+	sb.set_border_width_all(2)
+	sb.content_margin_left = 28
+	sb.content_margin_right = 28
+	sb.shadow_color = Color(Palette.VIP_GOLD, 0.45) if net > 0 else Color(0, 0, 0, 0.5)
+	sb.shadow_size = 18 if net > 0 else 10
+	result_ribbon.add_theme_stylebox_override(&"panel", sb)
+	result_ribbon.visible = true
+	result_ribbon.reset_size()
+	_place_ribbon()
+	result_ribbon.modulate = Color.WHITE
+	TableSkin.pop(result_ribbon, 0.3)
+	var tw: Tween = result_ribbon.create_tween()
+	tw.tween_interval(2.6)
+	tw.tween_property(result_ribbon, ^"modulate:a", 0.0, 0.5)
+	tw.tween_callback(func() -> void: result_ribbon.visible = false)
+
+
+func _place_ribbon() -> void:
+	var r: Rect2 = panel.get_rect()
+	result_ribbon.position = Vector2(r.position.x + (r.size.x - result_ribbon.size.x) * 0.5, r.position.y - result_ribbon.size.y * 0.55)
+
+
+## False for tables whose results are many small ones shown elsewhere (Plinko's chip history).
+func _shows_result_ribbon() -> bool:
+	return true
 
 
 ## Sends an intent for this station; shows the rejection if any.

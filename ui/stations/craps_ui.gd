@@ -111,6 +111,7 @@ func _build() -> void:
 		shoot_button.add_theme_color_override(state_name, Palette.CASINO_BLACK)
 	shoot_button.add_theme_color_override(&"font_disabled_color", Palette.CREAM.darkened(0.35))
 	shoot_button.pressed.connect(shoot)
+	TableSkin.style_button(shoot_button, &"gold", 24)
 	bets_row.add_child(shoot_button)
 
 

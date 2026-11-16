@@ -122,6 +122,7 @@ func _build() -> void:
 	stop_btn.name = "Stop"
 	stop_btn.text = "STOP  [Enter]"
 	stop_btn.custom_minimum_size = Vector2(200, 52)
+	TableSkin.style_button(stop_btn, &"gold", 24)
 	stop_btn.pressed.connect(func() -> void: send(&"action", {"action": &"stop"}))
 	row.add_child(stop_btn)
 	info_label = Label.new()
@@ -148,6 +149,8 @@ func _build_paytable() -> void:
 	paytable.offset_bottom = 300.0
 	paytable.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	paytable.grow_vertical = Control.GROW_DIRECTION_BOTH
+	paytable.add_theme_stylebox_override(&"panel", TableSkin.panel_box())
+	paytable.draw.connect(func() -> void: TableSkin.draw_frame(paytable))
 	add_child(paytable)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override(&"separation", 5)

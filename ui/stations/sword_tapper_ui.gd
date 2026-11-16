@@ -82,6 +82,7 @@ func _build() -> void:
 	pull_btn.focus_mode = Control.FOCUS_NONE
 	pull_btn.add_theme_font_size_override(&"font_size", 28)
 	pull_btn.pressed.connect(pull)
+	TableSkin.style_button(pull_btn, &"gold", 24)
 	body.add_child(pull_btn)
 	history_label = _line("", 15, Color("#9A8F7A"))
 	history_label.name = "History"

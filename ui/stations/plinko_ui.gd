@@ -82,6 +82,7 @@ func _build() -> void:
 	drop_btn.custom_minimum_size = Vector2(PANEL_W - 48, 54)
 	drop_btn.focus_mode = Control.FOCUS_NONE
 	drop_btn.pressed.connect(drop)
+	TableSkin.style_button(drop_btn, &"gold", 26)
 	body.add_child(drop_btn)
 	history_box = VBoxContainer.new()
 	history_box.add_theme_constant_override(&"separation", 0)

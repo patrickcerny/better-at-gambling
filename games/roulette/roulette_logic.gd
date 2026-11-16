@@ -11,8 +11,15 @@ const WHEEL_ORDER: Array[int] = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13,
 const RED: Array[int] = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
 ## Bet type → profit ratio (x:1).
 const RATIOS: Dictionary = {
-	&"straight": 35, &"red": 1, &"black": 1, &"odd": 1, &"even": 1, &"low": 1, &"high": 1, &"dozen": 2, &"column": 2,
+	&"straight": 35, &"split": 17, &"street": 11, &"corner": 8, &"line": 5,
+	&"red": 1, &"black": 1, &"odd": 1, &"even": 1, &"low": 1, &"high": 1, &"dozen": 2, &"column": 2,
 }
+## Inside bets on more than one number (the chip sits on a line or a corner of the layout):
+## split = two touching numbers (`value` = low * 100 + high, the zero splits with 1, 2 or 3),
+## street = a row of three (`value` = its first number 1, 4 … 34), corner = four around a cross
+## (`value` = its top-left number; 0 is the "first four" 0-1-2-3), line = two rows, six numbers
+## (`value` = the first number 1, 4 … 31).
+const MULTI_INSIDE: Array[StringName] = [&"split", &"street", &"corner", &"line"]
 const EVEN_MONEY: Array[StringName] = [&"red", &"black", &"odd", &"even", &"low", &"high"]
 ## Seconds from `roulette_result` (the ball starts dropping) until the bets pay: the ball's drop
 ## into its pocket on the wheel (`RouletteWheelFx.DROP_TIME`).
@@ -254,16 +261,83 @@ static func is_valid_value(type: StringName, value: int) -> bool:
 			return value >= 0 and value <= 36
 		&"dozen", &"column":
 			return value >= 1 and value <= 3
+		&"split":
+			var a: int = value / 100
+			var b: int = value % 100
+			if value < 0 or a >= b or b > 36:
+				return false
+			if a == 0:
+				return b <= 3
+			return b - a == 3 or (b - a == 1 and a % 3 != 0)
+		&"street":
+			return value >= 1 and value <= 34 and value % 3 == 1
+		&"corner":
+			return value == 0 or (value >= 1 and value <= 32 and value % 3 != 0)
+		&"line":
+			return value >= 1 and value <= 31 and value % 3 == 1
 	return true
+
+
+## The numbers an inside bet covers (straight, split, street, corner, line); empty for the
+## outside bets and for an invalid value.
+static func covered(type: StringName, value: int) -> Array[int]:
+	if not is_valid_value(type, value):
+		return []
+	match type:
+		&"straight":
+			return [value]
+		&"split":
+			return [value / 100, value % 100]
+		&"street":
+			return [value, value + 1, value + 2]
+		&"corner":
+			if value == 0:
+				return [0, 1, 2, 3]
+			return [value, value + 1, value + 3, value + 4]
+		&"line":
+			return [value, value + 1, value + 2, value + 3, value + 4, value + 5]
+	return []
+
+
+## The split value of two touching numbers (either order), -1 if they don't touch.
+static func split_value(a: int, b: int) -> int:
+	var v: int = mini(a, b) * 100 + maxi(a, b)
+	return v if is_valid_value(&"split", v) else -1
+
+
+## A short name of a bet: "17", "SPLIT 17-20", "CORNER 1-2-4-5", "RED", "2nd 12" …
+static func bet_name(type: StringName, value: int) -> String:
+	match type:
+		&"straight":
+			return str(value)
+		&"split", &"street", &"corner", &"line":
+			var nums: Array[int] = covered(type, value)
+			if type == &"corner" and value == 0:
+				return "FIRST FOUR 0-1-2-3"
+			if type == &"street" or type == &"line":
+				return "%s %d-%d" % [String(type).to_upper(), nums[0], nums[nums.size() - 1]]
+			var parts: PackedStringArray = []
+			for n: int in nums:
+				parts.append(str(n))
+			return "%s %s" % [String(type).to_upper(), "-".join(parts)]
+		&"dozen":
+			return ["1st 12", "2nd 12", "3rd 12"][clampi(value - 1, 0, 2)]
+		&"column":
+			return "COLUMN %d" % value
+		&"low":
+			return "1-18"
+		&"high":
+			return "19-36"
+	return String(type).to_upper()
 
 
 ## True if the bet wins on `number`.
 static func wins(type: StringName, value: int, number: int) -> bool:
+	if type == &"straight" or type in MULTI_INSIDE:
+		return number in covered(type, value)
 	if number == 0:
-		return type == &"straight" and value == 0
+		return false
 	match type:
-		&"straight":
-			return value == number
 		&"red":
 			return number in RED
 		&"black":

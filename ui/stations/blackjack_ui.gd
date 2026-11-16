@@ -22,6 +22,12 @@ var split_btn: Button
 var cut_btn: Button
 var bet_panel: BetPanel
 var actions: HBoxContainer
+## The cards, drawn: the dealer's row (a face-down card while you play) and your hand(s).
+var dealer_box: VBoxContainer
+var dealer_cards: CardRow
+var dealer_total: Label
+var hands_box: VBoxContainer
+var hand_rows: Array[CardRow] = []
 ## After a split, the hand the buttons play ("HAND 1" / "HAND 2"; "" when not split).
 var hand_tag: String = ""
 
@@ -31,7 +37,7 @@ func _init() -> void:
 
 
 func _panel_height() -> float:
-	return 420.0
+	return 560.0
 
 
 func _dock_right() -> bool:
@@ -51,6 +57,7 @@ func wants_camera_lock() -> bool:
 
 
 func _build() -> void:
+	panel.offset_left = panel.offset_right - 500.0
 	dealer_label = _line("DEALER  —", 22, Palette.WARM_GOLD)
 	dealer_label.visible = false  # the dealer's cards are on the felt
 	seats_row = HBoxContainer.new()
@@ -69,18 +76,48 @@ func _build() -> void:
 		p.add_child(l)
 		seat_panels.append(p)
 		seat_labels.append(l)
+	dealer_box = VBoxContainer.new()
+	dealer_box.name = "DealerBox"
+	dealer_box.add_theme_constant_override(&"separation", 4)
+	dealer_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(dealer_box)
+	dealer_box.add_child(TableSkin.caption("DEALER"))
+	var drow := HBoxContainer.new()
+	drow.alignment = BoxContainer.ALIGNMENT_CENTER
+	drow.add_theme_constant_override(&"separation", 14)
+	dealer_box.add_child(drow)
+	dealer_cards = CardRow.new(58.0)
+	drow.add_child(dealer_cards)
+	dealer_total = TableSkin.label("", 26, Palette.CREAM, true)
+	dealer_total.custom_minimum_size = Vector2(44, 0)
+	drow.add_child(dealer_total)
+	hands_box = VBoxContainer.new()
+	hands_box.name = "HandsBox"
+	hands_box.add_theme_constant_override(&"separation", 12)
+	hands_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(hands_box)
+	hands_box.add_child(TableSkin.caption("YOUR HAND"))
+	for i: int in 2:
+		var r := CardRow.new(84.0)
+		r.name = "Hand%d" % (i + 1)
+		hands_box.add_child(r)
+		hand_rows.append(r)
 	hand_label = _line("—", 30, Palette.CREAM)
-	total_label = _line("", 30, Palette.VIP_GOLD)
+	hand_label.visible = false  # the cards above show the hand; the text stays for the record
+	total_label = _line("", 36, Palette.VIP_GOLD)
+	total_label.add_theme_font_override(&"font", TableSkin.black_font())
+	total_label.add_theme_color_override(&"font_outline_color", Color("#3A2410"))
+	total_label.add_theme_constant_override(&"outline_size", 6)
 	others_label = _line("", 20, Color("#9A8F7A"))
 	actions = HBoxContainer.new()
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
-	actions.add_theme_constant_override(&"separation", 14)
+	actions.add_theme_constant_override(&"separation", 8)
 	body.add_child(actions)
-	hit = _action("HIT", func() -> void: send(&"action", {"action": &"hit"}))
-	stand = _action("STAND", func() -> void: send(&"action", {"action": &"stand"}))
-	double_btn = _action("DOUBLE", func() -> void: send(&"action", {"action": &"double"}))
-	split_btn = _action("SPLIT", func() -> void: send(&"action", {"action": &"split"}))
-	cut_btn = _action("CUT  [C]", func() -> void: send(&"action", {"action": &"cut"}))
+	hit = _action("HIT", func() -> void: send(&"action", {"action": &"hit"}), &"felt")
+	stand = _action("STAND", func() -> void: send(&"action", {"action": &"stand"}), &"red")
+	double_btn = _action("DOUBLE", func() -> void: send(&"action", {"action": &"double"}), &"gold")
+	split_btn = _action("SPLIT", func() -> void: send(&"action", {"action": &"split"}), &"ghost")
+	cut_btn = _action("CUT  [C]", func() -> void: send(&"action", {"action": &"cut"}), &"ghost")
 	cut_btn.visible = false
 	bet_panel = BetPanel.new()
 	bet_panel.confirmed.connect(func(a: int) -> void: send(&"place_bet", {"bet": {"amount": a}}))
@@ -189,6 +226,27 @@ func _refresh() -> void:
 	bet_panel.visible = (st == BlackjackLogic.State.IDLE or st == BlackjackLogic.State.BETTING) and mine.is_empty()
 	_refresh_seats(pub.get("seats", []), hands)
 	others_label.text = ""
+	_refresh_cards(st, dealer, mine, split, active, playing_split)
+
+
+## The drawn cards: the dealer's (a hole card face down while hands are played) and yours, both
+## split hands with the one you are playing underlined in gold.
+func _refresh_cards(st: int, dealer: Array, mine: Dictionary, split: bool, active: int, playing_split: bool) -> void:
+	var shown: Array = dealer.duplicate()
+	if st == BlackjackLogic.State.ACTING and dealer.size() == 1:
+		shown.append(-1)
+	dealer_box.visible = not dealer.is_empty()
+	dealer_cards.show_cards(shown)
+	dealer_total.text = str(HandEval.total(_ints(dealer))) if not dealer.is_empty() else ""
+	var cards: Array = mine.get("cards", [])
+	hands_box.visible = not cards.is_empty()
+	hand_rows[0].show_cards(cards, int(mine.get("total", 0)) > 21)
+	hand_rows[0].active = playing_split and active == 0
+	hand_rows[1].visible = split
+	if split:
+		var h2: Dictionary = mine["split"]
+		hand_rows[1].show_cards(h2.get("cards", []), int(h2.get("total", 0)) > 21)
+		hand_rows[1].active = playing_split and active == 1
 
 
 ## Every seat: who sits there, their cards and total, their bet, and whether they're done.
@@ -270,11 +328,12 @@ func _line(text: String, size: int, color: Color) -> Label:
 	return l
 
 
-func _action(text: String, on_pressed: Callable) -> Button:
+func _action(text: String, on_pressed: Callable, kind: StringName = &"felt") -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(170, 56)
-	b.theme_type_variation = &"ActionButton"
+	b.custom_minimum_size = Vector2(0, 56)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	TableSkin.style_button(b, kind, 24)
 	b.pressed.connect(on_pressed)
 	actions.add_child(b)
 	return b

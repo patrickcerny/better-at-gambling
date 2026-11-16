@@ -67,6 +67,7 @@ func _build() -> void:
 	reveal_btn.custom_minimum_size = Vector2(190, 60)
 	reveal_btn.focus_mode = Control.FOCUS_NONE
 	reveal_btn.pressed.connect(reveal_all)
+	TableSkin.style_button(reveal_btn, &"gold", 24)
 	row.add_child(reveal_btn)
 	info_label = Label.new()
 	info_label.name = "Info"

@@ -9,6 +9,8 @@ extends StationUi
 const LADDER_STEPS: int = 6
 
 var card_label: Label
+## Your cards, drawn (the one showing last).
+var card_row: CardRow
 var pot_label: Label
 var ladder_row: HBoxContainer
 var ladder_marks: Array[Label] = []
@@ -43,6 +45,9 @@ func my_hand() -> Dictionary:
 
 
 func _build() -> void:
+	card_row = CardRow.new(88.0)
+	card_row.name = "CardRow"
+	body.add_child(card_row)
 	card_label = _line("", 30, Palette.CREAM)
 	card_label.name = "Card"
 	pot_label = _line("", 24, Palette.VIP_GOLD)
@@ -79,6 +84,7 @@ func _build() -> void:
 	cash_btn.custom_minimum_size = Vector2(0, 52)
 	cash_btn.focus_mode = Control.FOCUS_NONE
 	cash_btn.pressed.connect(cash_out)
+	TableSkin.style_button(cash_btn, &"gold", 26)
 	actions.add_child(cash_btn)
 	others_label = _line("", 16, Color("#9A8F7A"))
 	others_label.name = "Others"
@@ -135,6 +141,8 @@ func _refresh() -> void:
 	var playing: bool = phase == "play"
 	var cards: Array = mine.get("cards", [])
 	var rung: int = int(mine.get("rung", 0))
+	card_row.visible = not cards.is_empty()
+	card_row.show_cards(cards.slice(maxi(cards.size() - 5, 0)), phase == "lost")
 	if mine.is_empty():
 		status_label.text = "Ante up for a card"
 		card_label.text = ""

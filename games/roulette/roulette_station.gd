@@ -147,6 +147,19 @@ static func bet_spot(type: StringName, value: int) -> Vector3:
 			return Vector3(0.25 + ((value - 1) * 4 + 1.5) * 0.18, FELT_Y, DOZEN_Z)
 		&"column":
 			return Vector3(2.4, FELT_Y, ROW_Z0 - (value - 1) * ROW_STEP)
+		&"split", &"corner", &"street", &"line":
+			# On the line or the cross between the numbers it covers (a street or a six line on
+			# the row's outer edge, towards the player, like on a real felt).
+			var nums: Array[int] = RouletteLogic.covered(type, value)
+			if nums.is_empty():
+				return bet_spot(&"straight", 0)
+			var c := Vector3.ZERO
+			for n: int in nums:
+				c += bet_spot(&"straight", n)
+			c /= nums.size()
+			if type == &"street" or type == &"line":
+				c.z = ROW_Z0 + ROW_STEP * 0.5
+			return c
 	var i: int = maxi(OUTSIDE_BETS.find(type), 0)
 	return Vector3(0.34 + i * 0.36, FELT_Y, EVEN_Z)
 
@@ -160,4 +173,6 @@ static func spot_half_size(type: StringName) -> Vector2:
 			return Vector2(0.065, 0.14)
 		&"dozen":
 			return Vector2(0.35, 0.09)
+		&"split", &"corner", &"street", &"line":
+			return Vector2(0.06, 0.06)
 	return Vector2(0.17, 0.09)
