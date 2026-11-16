@@ -284,3 +284,24 @@ func test_click_through_the_world_view_picks_the_card() -> void:
 	assert_eq(sent.size(), 1, "a window click on the card reaches the stage inside the world view")
 	if sent.size() == 1:
 		assert_eq(int(sent[0]["slot"]), 2)
+
+
+func _pad(button: JoyButton) -> void:
+	var ev := InputEventJoypadButton.new()
+	ev.button_index = button
+	ev.pressed = true
+	stage._unhandled_input(ev)
+
+
+func test_gamepad_dpad_moves_the_highlight_and_a_picks() -> void:
+	_to_pick()
+	_pad(JOY_BUTTON_DPAD_RIGHT)
+	assert_eq(stage.hover_slot, 0)
+	_pad(JOY_BUTTON_DPAD_RIGHT)
+	assert_eq(stage.hover_slot, 1)
+	_pad(JOY_BUTTON_DPAD_LEFT)
+	_pad(JOY_BUTTON_DPAD_LEFT)
+	assert_eq(stage.hover_slot, stage.card_count - 1, "wraps round")
+	_pad(JOY_BUTTON_A)
+	assert_eq(sent.size(), 1)
+	assert_eq(int(sent[0]["slot"]), stage.card_count - 1)

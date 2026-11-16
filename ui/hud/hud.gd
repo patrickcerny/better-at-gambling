@@ -519,7 +519,7 @@ static func in_play_text(st: ClientMatchState, pid: int) -> String:
 				if int(pub.get("state", 0)) != HoldemLogic.State.PAYOUT:
 					var h: Dictionary = HoldemStation.hand_of(pub.get("hands", {}), pid)
 					if not h.is_empty() and StringName(h.get("decision", &"")) != HoldemLogic.FOLD:
-						amount += int(h.get("ante", 0)) + int(h.get("call", 0))
+						amount += int(h.get("ante", 0)) + int(h.get("call", 0)) + int(h.get("river", 0))
 					if not h.is_empty() and int(h.get("bonus_returned", -1)) < 0:
 						amount += int(h.get("bonus", 0))
 		if amount > 0:
