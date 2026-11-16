@@ -378,8 +378,126 @@ func _near_opening(p: Vector3, radius: float) -> bool:
 
 
 func _ceiling() -> void:
-	# Coffered dark wood; the chandeliers hang against it.
-	_retexture_solid("Ceiling", _tex("coffered_ceiling", 2.6, Color(0.95, 0.88, 0.8), 0.5, 0.75))
+	# Real coffers instead of a flat slab (0.9.63, Patrick: "nicht so hässlich flach"): a grid of
+	# mahogany beams with gold edge beads and gold bosses where they cross, and in each coffer a
+	# wine-red damask panel framed in gold with a gold rosette. A chandelier gets a big gold
+	# medallion instead. The lines are picked so every chandelier and pedestal spot hangs in a
+	# coffer, never in a beam. All of it is batched (a handful of MultiMeshes) and never collides.
+	_retexture_solid("Ceiling", _tex("damask_wallpaper", 1.8, Color(0.74, 0.4, 0.34), 0.25, 0.7))
+	_retexture_solid("CeilingWaiting", _tex("coffered_ceiling", 2.6, Color(0.95, 0.88, 0.8), 0.5, 0.75))
+	var hx: float = LuckyLounge.SIZE_X * 0.5 - 0.25
+	var hz: float = LuckyLounge.SIZE_Z * 0.5 - 0.25
+	var lobby_z0: float = LuckyLounge.LOBBY_DOORS_Z - LuckyLounge.LOBBY_WALL_T * 0.5
+	var lobby_z1: float = LuckyLounge.LOBBY_DOORS_Z + LuckyLounge.LOBBY_WALL_T * 0.5
+	# Casino floor.
+	_coffers(Rect2(-hx, -hz, hx * 2.0, lobby_z0 + hz), _sym_lines(4.3, hx), [-13.55, -9.55, -5.55, -1.55, 2.45, 6.45])
+	# Start room (its own spacing: the ready pedestals' spotlights stay clear of the beams).
+	_coffers(Rect2(-hx, lobby_z1, hx * 2.0, hz - lobby_z1), _sym_lines(4.6, hx), [13.3])
+	# VIP lounge.
+	var vx: float = LuckyLounge.VIP_X - 0.25
+	var vz: float = LuckyLounge.VIP_Z_FAR + 0.25
+	_coffers(Rect2(-vx, vz, vx * 2.0, -LuckyLounge.SIZE_Z * 0.5 - 0.25 - vz), _sym_lines(3.0, vx), [-23.5, -18.5])
+	# Race Hall.
+	var ax0: float = LuckyLounge.SIZE_X * 0.5 + 0.25
+	var ax1: float = LuckyLounge.ANNEX_X1 - 0.25
+	var az0: float = LuckyLounge.ANNEX_Z0 + 0.25
+	var az1: float = LuckyLounge.ANNEX_Z1 - 0.25
+	_coffers(Rect2(ax0, az0, ax1 - ax0, az1 - az0), [27.25, 30.75], [-22.5, -14.5])
+
+
+## Beam lines at ±(k + ½)·`step` inside ±`half` (the room's middle is a coffer, not a beam).
+static func _sym_lines(step: float, half: float) -> Array[float]:
+	var out: Array[float] = []
+	var x: float = step * 0.5
+	while x < half - 0.6:
+		out.append(-x)
+		out.append(x)
+		x += step
+	out.sort()
+	return out
+
+
+## One coffered ceiling over `area` (x/z, under the slab at WALL_H): beams along `xs` (running
+## along z) and `zs` (running along x), a gold-framed panel and rosette in every coffer.
+func _coffers(area: Rect2, xs: Array[float], zs: Array[float]) -> void:
+	const BEAM_W: float = 0.36
+	const BEAM_D: float = 0.4
+	var top: float = LuckyLounge.WALL_H
+	var bottom: float = top - BEAM_D
+	var x0: float = area.position.x
+	var x1: float = area.end.x
+	var z0: float = area.position.y
+	var z1: float = area.end.y
+	var cx: float = (x0 + x1) * 0.5
+	var cz: float = (z0 + z1) * 0.5
+	var beam_mat: StandardMaterial3D = _tex("wooden_panels", 2.1, Color(0.5, 0.36, 0.3), 0.4, 0.55)
+	for x: float in xs:
+		_box(Vector3(BEAM_W, BEAM_D, z1 - z0), Vector3(x, top - BEAM_D * 0.5, cz), beam_mat, "beam")
+		for side: float in [-1.0, 1.0]:
+			_box(Vector3(0.05, 0.05, z1 - z0), Vector3(x + side * (BEAM_W * 0.5 - 0.01), bottom + 0.02, cz), _gold_mat, "gold")
+	for z: float in zs:
+		_box(Vector3(x1 - x0, BEAM_D, BEAM_W), Vector3(cx, top - BEAM_D * 0.5, z), beam_mat, "beam")
+		for side: float in [-1.0, 1.0]:
+			_box(Vector3(x1 - x0, 0.05, 0.05), Vector3(cx, bottom + 0.02, z + side * (BEAM_W * 0.5 - 0.01)), _gold_mat, "gold")
+	var boss := CylinderMesh.new()
+	boss.top_radius = 0.26
+	boss.bottom_radius = 0.2
+	boss.height = 0.1
+	boss.radial_segments = 8
+	for x: float in xs:
+		for z: float in zs:
+			_add(&"boss", boss, _gold_mat, Transform3D(Basis(Vector3.UP, PI / 8.0), Vector3(x, bottom - 0.04, z)))
+	# The coffers: walls and beams bound them.
+	var bx: Array[float] = [x0]
+	bx.append_array(xs)
+	bx.append(x1)
+	var bz: Array[float] = [z0]
+	bz.append_array(zs)
+	bz.append(z1)
+	var rosette := CylinderMesh.new()
+	rosette.top_radius = 0.22
+	rosette.bottom_radius = 0.3
+	rosette.height = 0.06
+	rosette.radial_segments = 12
+	var medallion := TorusMesh.new()
+	medallion.inner_radius = 0.55
+	medallion.outer_radius = 0.72
+	medallion.rings = 20
+	medallion.ring_segments = 4
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.5
+	disc.bottom_radius = 0.6
+	disc.height = 0.05
+	disc.radial_segments = 16
+	for i: int in bx.size() - 1:
+		for j: int in bz.size() - 1:
+			var a := Vector2(bx[i] + (0.0 if i == 0 else BEAM_W * 0.5), bz[j] + (0.0 if j == 0 else BEAM_W * 0.5))
+			var b := Vector2(bx[i + 1] - (0.0 if i + 1 == bx.size() - 1 else BEAM_W * 0.5), bz[j + 1] - (0.0 if j + 1 == bz.size() - 1 else BEAM_W * 0.5))
+			var inset: float = 0.32
+			var w: float = b.x - a.x - inset * 2.0
+			var d: float = b.y - a.y - inset * 2.0
+			if w < 0.8 or d < 0.8:
+				continue
+			var mid := Vector3((a.x + b.x) * 0.5, top - 0.02, (a.y + b.y) * 0.5)
+			# Gold frame inside the coffer.
+			_box(Vector3(w, 0.04, 0.06), mid + Vector3(0, 0, -d * 0.5), _gold_mat, "gold")
+			_box(Vector3(w, 0.04, 0.06), mid + Vector3(0, 0, d * 0.5), _gold_mat, "gold")
+			_box(Vector3(0.06, 0.04, d), mid + Vector3(-w * 0.5, 0, 0), _gold_mat, "gold")
+			_box(Vector3(0.06, 0.04, d), mid + Vector3(w * 0.5, 0, 0), _gold_mat, "gold")
+			if not _chandelier_near(mid, 1.4) and minf(w, d) > 1.4:
+				_add(&"rosette", rosette, _gold_mat, Transform3D(Basis(), mid + Vector3(0, -0.01, 0)))
+	for p: Vector3 in CHANDELIERS:
+		if p.x < x0 or p.x > x1 or p.z < z0 or p.z > z1:
+			continue
+		_add(&"medallion", medallion, _gold_mat, Transform3D(Basis(), Vector3(p.x, top - 0.04, p.z)))
+		_add(&"medallion_disc", disc, _gold_mat, Transform3D(Basis(), Vector3(p.x, top - 0.03, p.z)))
+
+
+func _chandelier_near(p: Vector3, r: float) -> bool:
+	for c: Vector3 in CHANDELIERS:
+		if Vector2(c.x, c.z).distance_to(Vector2(p.x, p.z)) < r:
+			return true
+	return false
 
 
 # --- Columns, VIP lounge ----------------------------------------------------------------------

@@ -69,6 +69,11 @@ static func outfit_of(p: Dictionary) -> Dictionary:
 	return outfit_dict(p.get("outfit", []))
 
 
+## The animated skin in a player's wire dictionary (&"" when they wear none).
+static func skin_of(p: Dictionary) -> StringName:
+	return StringName(str(outfit_of(p).get(CosmeticDef.KIND_SKIN, "")))
+
+
 ## The first slot colour not in `taken` (0 when all are).
 static func free_slot(taken: Array[int]) -> int:
 	for c: int in SLOT_COLORS:

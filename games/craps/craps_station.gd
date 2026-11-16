@@ -65,7 +65,6 @@ func _build_visuals() -> void:
 	seat_count = SEAT_XS.size()
 	interact_radius = 3.0
 	hot_center = Vector3(0, 0, 0.3)
-	_rug(Vector2(6.4, 4.8), Color("#41243A").darkened(0.35))
 	var wood := Color("#3A2A1E")
 	GreyboxKit.box(self, Vector3(TABLE_L, FELT_Y - 0.02, TABLE_D), Vector3(0, (FELT_Y - 0.02) * 0.5, 0), wood, "Body")
 	# The rails: solid walls round the felt up to the leaning rail.

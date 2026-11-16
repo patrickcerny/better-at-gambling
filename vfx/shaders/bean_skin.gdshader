@@ -2,6 +2,8 @@
 // whole bean, in the beans' toon light (soft 3-band ramp + warm rim). Warm casino colours, no neon
 // (docs/ART_DIRECTION.md). `mode`: 0 gold rush, 1 rainbow, 2 molten lava, 3 starry night,
 // 4 lucky felt, 5 candy swirl, 6 deep sea, 7 marble, 8 the house (developers only), 9 fortune (Daily Spin only). Client only.
+// `chip`: the same pattern on a casino chip (ChipStack, PlinkoChip): the chip's flat face (local
+// XZ, radius CHIP_FACE) is laid over the bean's belly, so each chip shows a window of the skin.
 shader_type spatial;
 render_mode cull_back;
 
@@ -10,11 +12,25 @@ uniform float rim_strength : hint_range(0.0, 1.0) = 0.4;
 uniform vec4 rim_color : source_color = vec4(1.0, 0.82, 0.5, 1.0);
 uniform float steps = 3.0;
 uniform float softness : hint_range(0.0, 0.5) = 0.08;
+uniform bool chip = false;
+// Chip face radius in its own mesh units (1.0 for a unit disc), and which local axis is the face's
+// normal: false = Y (a chip lying flat), true = Z (a chip standing up, Plinko).
+uniform float chip_face = 1.0;
+uniform bool chip_upright = false;
+// Albedo multiplier (alternate chips in a stack are a shade darker so the count reads).
+uniform float shade = 1.0;
 
 varying vec3 v_pos;
 
 void vertex() {
-	v_pos = VERTEX;
+	if (chip) {
+		// Face -> the bean's belly window: x stays, the face's other axis becomes height (centred on
+		// y -0.33, where the Fortune wheel sits), the thickness becomes depth in front of the body.
+		vec3 q = VERTEX * (0.28 / chip_face);
+		v_pos = chip_upright ? vec3(q.x, q.y - 0.33, 0.3 + q.z) : vec3(q.x, -q.z - 0.33, 0.3 + q.y);
+	} else {
+		v_pos = VERTEX;
+	}
 }
 
 float hash3(vec3 p) {
@@ -209,8 +225,8 @@ void fragment() {
 		c = mix(c, vec3(0.85, 0.66, 0.3), fleck);
 		e = vec3(0.6, 0.42, 0.12) * fleck * (0.5 + 0.5 * sin(t * 2.0 + p.x * 20.0));
 	}
-	ALBEDO = c;
-	EMISSION = e;
+	ALBEDO = c * shade;
+	EMISSION = e * shade;
 	ROUGHNESS = 0.6;
 	SPECULAR = 0.3;
 }

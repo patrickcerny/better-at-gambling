@@ -2,10 +2,12 @@ extends Node3D
 ## Dev: a roulette table, a blackjack table and a slot machine playing a scripted round through
 ## `TableFx` (chips slide on, the ball spins and drops, reels stop, win/lose effects), for
 ## screenshots. Run with tools/screenshot.gd --scene res://tools/dev/table_fx_shot.tscn
-## [--view roulette|wheel|blackjack|slots|wide] [--hot] [--frames N]; pass --fixed-fps 60 to the engine so N frames = N/60 s.
+## [--view roulette|wheel|blackjack|slots|wide|chips] [--hot] [--skins] [--frames N] (--skins: players
+## 1-4 wear the gold, rainbow, fortune and lava skins, so their chips do too); pass --fixed-fps 60 to the engine so N frames = N/60 s.
 
 var fx: TableFx
 var stations: Dictionary = {}
+var skins: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -59,6 +61,9 @@ func _ready() -> void:
 		"plinko":
 			cam.position = Vector3(0, 2.6, -2.2)
 			cam.look_at(Vector3(0, 2.4, -7))
+		"chips":
+			cam.position = Vector3(0.35, 1.45, 0.75)
+			cam.look_at(Vector3(0.3, 0.92, 0.05))
 		"wide":
 			cam.position = Vector3(0, 6, 9)
 			cam.look_at(Vector3(-0.5, 0.8, 0))
@@ -66,6 +71,9 @@ func _ready() -> void:
 			cam.position = Vector3(0.7, 2.3, 2.2)
 			cam.look_at(Vector3(0.5, 0.9, 0.0))
 	cam.current = true
+	if args.has_flag("skins"):
+		skins = [&"skin_gold", &"skin_rainbow", &"skin_fortune", &"skin_lava"]
+		fx.skin_of = func(pid: int) -> StringName: return skins[(pid - 1) % skins.size()]
 	if args.has_flag("hot"):
 		(stations[&"roulette_1"] as StationBase).set_hot(true)
 	_play()
@@ -106,4 +114,4 @@ func _play() -> void:
 
 ## Same playback as `MatchScene._drop_plinko_chip` (a quick fall, as for a late result).
 func _drop_plinko(drop_id: int, slot: int) -> void:
-	(stations[&"plinko_1"] as PlinkoStation).drop_chip(slot, drop_id, Palette.CASINO_RED, 0.9)
+	(stations[&"plinko_1"] as PlinkoStation).drop_chip(slot, drop_id, Palette.CASINO_RED, 0.9, &"", skins[0] if not skins.is_empty() else &"")
