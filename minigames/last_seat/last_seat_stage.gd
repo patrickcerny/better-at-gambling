@@ -12,7 +12,7 @@ extends WalkableStage
 ## (top left), the feed, Lucky's lines (bottom left) and a context prompt.
 ##
 ## The server decides every claim; this side only sends `minigame_action {kind: "sit", target}`
-## when E is pressed near a free stool (running onto one claims it on the server by itself).
+## when E / the click (gamepad X / RT) is pressed near a free stool. Walking onto one does nothing.
 
 const SIT_REACH: float = LastSeatLogic.SIT_REACH
 ## How fast the stools glide to where they belong (per second, exponential).
@@ -146,6 +146,11 @@ func input_mode() -> InputRouter.Mode:
 	if going and not over and seated.has(local_id):
 		return InputRouter.Mode.SEATED
 	return super.input_mode()
+
+
+## The click sits down too (grabbing is off in this game).
+func on_grab_pressed() -> bool:
+	return on_action_pressed()
 
 
 ## E: claim the free stool nearest to us in reach (the server checks with its own positions).
@@ -493,9 +498,9 @@ func _update_prompt() -> void:
 	elif music_on:
 		set_prompt("KEEP WALKING ROUND THE TABLE...")
 	elif scramble and local_stool() >= 0:
-		set_prompt("SIT!  [{interact}]")
+		set_prompt("SIT!  [{interact} / {grab}]")
 	elif scramble:
-		set_prompt("RUN FOR A STOOL!")
+		set_prompt("RUN TO A STOOL, THEN [{interact} / {grab}]")
 	else:
 		set_prompt("")
 

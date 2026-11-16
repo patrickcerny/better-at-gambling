@@ -15,7 +15,12 @@ const MODE_LABELS: Array[String] = ["Push to talk (T)", "Open mic", "Off"]
 ## The mode when the settings hold none (or an unknown one): `Settings.DEFAULTS` voice/mode.
 const DEFAULT_MODE: String = "open_mic"
 
-## The live channel (the settings panel's mute list reads it); null outside a match.
+## Settings section for each other player's own volume and mute (`player_key` / `volume|mute`).
+const PLAYERS_SECTION: String = "voice_players"
+## Loudest a single player can be turned up (200 %).
+const MAX_PLAYER_VOLUME: float = 2.0
+
+## The live channel (the settings panel's player voice list reads it); null outside a match.
 static var current: VoiceChannel = null
 
 ## Voice runs only against a real server (online); Practice has nobody to talk to.
@@ -28,6 +33,8 @@ var capture: VoiceCapture
 var hud: VoiceHud = null
 var playbacks: Dictionary[int, VoicePlayback] = {}
 var muted: Dictionary[int, bool] = {}
+## Per-player volume set this match (else the saved one, `volume_of`).
+var volumes: Dictionary[int, float] = {}
 var received_packets: int = 0
 ## Packets received per speaker (also those that were ignored, see `diagnostics`).
 var received_from: Dictionary[int, int] = {}
@@ -176,6 +183,7 @@ func _process(delta: float) -> void:
 		if pb == null:
 			playbacks.erase(pid)  # the avatar went away with it
 			continue
+		pb.player_volume = volume_of(pid)
 		_set_mouth(pid, pb.mouth.openness)
 	_set_mouth(local_id, capture.mouth.openness)
 
@@ -228,7 +236,7 @@ func _on_voice(data: PackedByteArray) -> void:
 		return
 	if speaker == local_id:
 		return
-	if muted.get(speaker, false):
+	if is_muted(speaker):
 		if _once("muted", speaker):
 			Log.info(&"voice", "voice from player %d ignored: muted" % speaker)
 		return
@@ -338,11 +346,68 @@ func set_muted(pid: int, on: bool) -> void:
 		if pb != null:
 			pb.clear()
 	else:
-		muted.erase(pid)
+		muted[pid] = false
+	_remember(pid, "mute", on)
 
 
 func is_muted(pid: int) -> bool:
-	return muted.get(pid, false)
+	if muted.has(pid):
+		return muted[pid]
+	return bool(_saved(pid, "mute", false))
+
+
+## Sets how loud `pid` is for us (1 = normal, up to `MAX_PLAYER_VOLUME`), remembered per player.
+func set_volume(pid: int, v: float) -> void:
+	v = clampf(v, 0.0, MAX_PLAYER_VOLUME)
+	volumes[pid] = v
+	var pb: VoicePlayback = _live_playback(pid)
+	if pb != null:
+		pb.player_volume = v
+	_remember(pid, "volume", v)
+
+
+## How loud `pid` is for us (1 = normal).
+func volume_of(pid: int) -> float:
+	if volumes.has(pid):
+		return volumes[pid]
+	return clampf(float(_saved(pid, "volume", 1.0)), 0.0, MAX_PLAYER_VOLUME)
+
+
+## The settings key a player's own volume and mute live under: their Steam id, so it holds across
+## matches and names. "" for players without one (LAN/dev): kept for this match only.
+func player_key(pid: int) -> String:
+	if state == null:
+		return ""
+	return settings_key(str(state.players.get(pid, {}).get("uid", "")))
+
+
+## `steam:7656…` -> `steam_7656…`; anything else -> "".
+static func settings_key(uid: String) -> String:
+	if not uid.begins_with("steam:") or not uid.trim_prefix("steam:").is_valid_int():
+		return ""
+	return "steam_" + uid.trim_prefix("steam:")
+
+
+func _saved(pid: int, what: String, default: Variant) -> Variant:
+	var key: String = player_key(pid)
+	if key == "":
+		return default
+	return Settings.get_value(PLAYERS_SECTION, "%s/%s" % [key, what], default)
+
+
+func _remember(pid: int, what: String, value: Variant) -> void:
+	var key: String = player_key(pid)
+	if key == "":
+		return
+	var path: String = "%s/%s" % [key, what]
+	var normal: bool = (what == "volume" and is_equal_approx(float(value), 1.0)) or (what == "mute" and not bool(value))
+	if normal:
+		if not Settings.has_value(PLAYERS_SECTION, path):
+			return
+		Settings.erase_value(PLAYERS_SECTION, path)
+	else:
+		Settings.set_value(PLAYERS_SECTION, path, value)
+	Settings.save()
 
 
 ## True while `pid` is audibly talking (we are talking: our own transmit state).
@@ -353,7 +418,7 @@ func is_talking(pid: int) -> bool:
 	return pb != null and pb.is_talking()
 
 
-## Other players, for mute lists: [{id, name, muted}].
+## Other players, for the voice list: [{id, name, muted, volume}].
 func roster() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if state == null:
@@ -361,5 +426,5 @@ func roster() -> Array[Dictionary]:
 	for pid: int in state.players:
 		if pid == local_id:
 			continue
-		out.append({"id": pid, "name": state.player_name(pid), "muted": is_muted(pid)})
+		out.append({"id": pid, "name": state.player_name(pid), "muted": is_muted(pid), "volume": volume_of(pid)})
 	return out

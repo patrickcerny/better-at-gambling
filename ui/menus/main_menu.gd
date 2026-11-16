@@ -113,6 +113,7 @@ func _ready() -> void:
 	add_child(shade)
 	move_child(shade, 2)
 	(%Footer as Label).text = "BUILD %s" % Protocol.BUILD_ID
+	_menu_icons()
 	_quit.pressed.connect(_on_quit_pressed)
 	_practice.pressed.connect(func() -> void: _tutorial_first(start_practice))
 	_play_online.pressed.connect(func() -> void: _tutorial_first(_show_online))
@@ -223,6 +224,33 @@ func _ready() -> void:
 	if SteamSvc.pending_lobby != 0:
 		_on_steam_join_requested.call_deferred(SteamSvc.pending_lobby)
 	Log.info(&"menu", "main menu ready")
+
+
+## Each entry gets its own logo left of its name (Patrick 2026-11-16: "its only text right now make
+## it better with logos to distinguish"): three beans for PLAY ONLINE, a chip for PRACTICE, a book
+## for TUTORIAL, a bag for SHOP, a door for QUIT (assets/icons/menu/, drawn by us). They turn gold
+## with the text on hover and focus.
+const MENU_ICONS: Dictionary = {
+	&"PlayOnline": "online", &"Practice": "practice", &"Tutorial": "tutorial", &"Cosmetics": "shop", &"Quit": "quit",
+}
+
+
+func _menu_icons() -> void:
+	for n: StringName in MENU_ICONS:
+		var b: Button = _main_box.get_node_or_null(NodePath(String(n))) as Button
+		var path: String = "res://assets/icons/menu/%s.svg" % MENU_ICONS[n]
+		if b == null or not ResourceLoader.exists(path):
+			continue
+		b.icon = load(path) as Texture2D
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.expand_icon = false
+		b.add_theme_constant_override(&"icon_max_width", 52)
+		b.add_theme_constant_override(&"h_separation", 18)
+		b.add_theme_color_override(&"icon_normal_color", Palette.CREAM)
+		b.add_theme_color_override(&"icon_hover_color", Palette.VIP_GOLD)
+		b.add_theme_color_override(&"icon_focus_color", Palette.VIP_GOLD)
+		b.add_theme_color_override(&"icon_hover_pressed_color", Palette.VIP_GOLD)
+		b.add_theme_color_override(&"icon_pressed_color", Palette.CASINO_RED)
 
 
 func _build_update_banner() -> void:

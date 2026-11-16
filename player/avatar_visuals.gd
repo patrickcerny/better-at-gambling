@@ -291,9 +291,7 @@ func wear(kind: StringName, id: StringName) -> void:
 			_outfit_nodes[kind] = mi
 			if kind == CosmeticDef.KIND_BEARD:
 				_place_mouth(OutfitMeshes.BEARD_MOUTH_DROP)
-			for sp: MeshInstance3D in _add_spinners(mi, id):
-				_spinners.append({"node": sp, "axis": sp.get_meta(&"axis"), "speed": sp.get_meta(&"speed"),
-						"origin": sp.get_meta(&"origin"), "path": sp.get_meta(&"path"), "period": sp.get_meta(&"period")})
+			_track_spinners(mi, id)
 			if kind == CosmeticDef.KIND_SHIRT:
 				var sleeve: Color = OutfitMeshes.sleeve_color(id)
 				if sleeve.a > 0.0:
@@ -354,6 +352,7 @@ func _wear_eyes(id: StringName) -> void:
 		var mi: MeshInstance3D = _outfit_mesh(m, "OutfitEyes")
 		body.add_child(mi)
 		_outfit_nodes[CosmeticDef.KIND_EYES] = mi
+		_track_spinners(mi, id)  # greedy eyes' pupils look round
 	var shape: ArrayMesh = OutfitMeshes.pupil_mesh(id)
 	if shape != null:
 		_pupil_spin = float(OutfitMeshes.PUPILS.get(id, 0.0))
@@ -390,6 +389,14 @@ func _take_off_eyes() -> void:
 	_lashes.clear()
 
 
+## Adds piece `id`'s moving parts under `mi` and animates them from now on.
+func _track_spinners(mi: Node3D, id: StringName) -> void:
+	for sp: MeshInstance3D in _add_spinners(mi, id):
+		_spinners.append({"node": sp, "axis": sp.get_meta(&"axis"), "speed": sp.get_meta(&"speed"),
+				"origin": sp.get_meta(&"origin"), "path": sp.get_meta(&"path"), "period": sp.get_meta(&"period"),
+				"scales": sp.get_meta(&"scales"), "phase": sp.get_meta(&"phase")})
+
+
 ## Adds the parts of piece `id` that turn on their own under `parent` (body space), each with its
 ## turning axis and speed in metadata.
 static func _add_spinners(parent: Node3D, id: StringName) -> Array[MeshInstance3D]:
@@ -403,6 +410,9 @@ static func _add_spinners(parent: Node3D, id: StringName) -> Array[MeshInstance3
 		mi.set_meta(&"origin", sp["origin"])
 		mi.set_meta(&"path", sp.get("path", PackedVector3Array()))
 		mi.set_meta(&"period", float(sp.get("period", 1.0)))
+		# Parts that grow and shrink on the same loop (smoke puffs), and where in the loop they start.
+		mi.set_meta(&"scales", sp.get("scales", PackedFloat32Array()))
+		mi.set_meta(&"phase", float(sp.get("phase", 0.0)))
 		parent.add_child(mi)
 		out.append(mi)
 	return out
@@ -413,6 +423,13 @@ static func path_at(path: PackedVector3Array, f: float) -> Vector3:
 	var x: float = f * float(path.size() - 1)
 	var i: int = mini(int(floor(x)), path.size() - 2)
 	return path[i].lerp(path[i + 1], x - float(i))
+
+
+## A size along a looped list of `scales` at `f` (0..1), like `path_at`.
+static func scale_at(scales: PackedFloat32Array, f: float) -> float:
+	var x: float = f * float(scales.size() - 1)
+	var i: int = mini(int(floor(x)), scales.size() - 2)
+	return lerpf(scales[i], scales[i + 1], x - float(i))
 
 
 static func _outfit_mesh(m: Mesh, node_name: String) -> MeshInstance3D:
@@ -677,9 +694,13 @@ func _animate(frame_delta: float) -> void:
 	for sp: Dictionary in _spinners:
 		var n3: Node3D = sp["node"]
 		n3.basis = Basis(sp["axis"] as Vector3, _time * float(sp["speed"]))
+		var f: float = fposmod(_time / float(sp["period"]) + float(sp["phase"]), 1.0)
 		var path: PackedVector3Array = sp["path"]
 		if path.size() > 1:
-			n3.position = (sp["origin"] as Vector3) + path_at(path, fposmod(_time / float(sp["period"]), 1.0))
+			n3.position = (sp["origin"] as Vector3) + path_at(path, f)
+		var scales: PackedFloat32Array = sp["scales"]
+		if scales.size() > 1:
+			n3.basis = n3.basis.scaled(Vector3.ONE * maxf(scale_at(scales, f), 0.001))
 	if _pupil_spin != 0.0:
 		for pivot: Node3D in _pupils:
 			(pivot.get_node("Pupil") as Node3D).rotation.z = _time * _pupil_spin

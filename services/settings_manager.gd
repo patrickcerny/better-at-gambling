@@ -104,6 +104,17 @@ func set_value(section: String, key: String, value: Variant) -> void:
 	_cfg.set_value(section, key, value)
 
 
+## True when the settings file holds this value (not just a default).
+func has_value(section: String, key: String) -> bool:
+	return _cfg.has_section_key(section, key)
+
+
+## Removes a stored value (back to its default); call `save()` to persist.
+func erase_value(section: String, key: String) -> void:
+	if _cfg.has_section_key(section, key):
+		_cfg.erase_section_key(section, key)
+
+
 ## Writes, applies and announces a player-facing setting (the settings panel).
 func change(section: String, key: String, value: Variant) -> void:
 	set_value(section, key, value)
