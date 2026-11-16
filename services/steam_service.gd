@@ -130,6 +130,8 @@ func _ready() -> void:
 	# Lifetime achievements follow the profile (level-ups, matches, the shop) and catch up on start.
 	ProfileManager.changed.connect(_on_profile_changed)
 	_on_profile_changed()
+	# The developers own every achievement (`DevMode.granted_achievements`), set once per start.
+	unlock_achievements(DevMode.granted_achievements(_steam_id))
 
 
 func _process(_delta: float) -> void:
