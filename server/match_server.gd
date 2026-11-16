@@ -742,10 +742,14 @@ func advance(real_delta: float) -> void:
 
 # --- Developer mode (Practice only: `DevMatchPanel`, the server runs on Patrick's own PC) ---------
 
+## A developer tool touched this server: none of its matches go on a leaderboard any more.
+var dev_used: bool = false
+
 ## Adds `amount` $ (negative takes) to `player`'s money.
 func dev_give_money(player: int, amount: int) -> bool:
 	if not economy.has_player(player) or amount == 0:
 		return false
+	dev_used = true
 	if amount < 0:
 		economy.take_up_to(player, -amount, &"dev")
 		return true
@@ -754,6 +758,7 @@ func dev_give_money(player: int, amount: int) -> bool:
 
 ## Gives `player` item `item` (the normal path: a full bag asks what to throw away).
 func dev_give_item(player: int, item: StringName) -> bool:
+	dev_used = true
 	return items.give(player, item, match_time)
 
 
@@ -762,6 +767,7 @@ func dev_give_item(player: int, item: StringName) -> bool:
 func dev_minigame_now(id: StringName = &"") -> bool:
 	if phases.phase != Phase.Id.CASINO or phases.minigames_done >= schedule.minigames:
 		return false
+	dev_used = true
 	minigames.forced_next = id
 	var at: float = schedule.minigame_times()[phases.minigames_done] - PhaseMachine.PRE_MINIGAME_SECONDS + 9.0
 	phases.casino_time = maxf(phases.casino_time, at)
@@ -974,6 +980,13 @@ func progress_rows(standings: Array[Dictionary]) -> Dictionary:
 		out[id]["minigames_won"] = int(st.get("minigames_won", 0))
 		out[id]["money"] = economy.balance(id)
 		out[id]["players"] = standings.size()
+		# Lifetime statistics (`PlayerProfile.lifetime`) and the global leaderboards
+		# (`LeaderboardRules`): this server decides whether the row may go on a leaderboard.
+		out[id]["stats"] = {"profit": economy.balance(id) - balance.start_money, "hands": int(st.get("hands", 0)),
+			"knockouts_dealt": int(st.get("knockouts_dealt", 0)), "knockouts_suffered": int(st.get("knockouts_suffered", 0)),
+			"jackpot_won": int(st.get("jackpot_won", 0)), "biggest_bet": int(st.get("biggest_bet", 0)),
+			"quiz_points": int(st.get("quiz_points", 0)), "thrown_out": int(st.get("thrown_out", 0))}
+		out[id]["ranked"] = LeaderboardRules.ranked(out[id], room_mode, dev_used)
 	return out
 
 

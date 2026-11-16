@@ -226,6 +226,16 @@ func test_browse_cards_show_settings_and_beans() -> void:
 	assert_eq(beans.get_child_count(), 2, "one bean per player")
 
 
+func test_browse_shows_other_versions_without_join() -> void:
+	menu.call(&"_fill_browse", [SteamSvc.public_lobby_entry(8, "Old lobby", 2, 8, {}, "0.0.1"), SteamSvc.public_lobby_entry(9, "Ours", 1, 8)] as Array[Dictionary])
+	var list: Node = menu.find_child("LobbyList", true, false)
+	assert_eq(list.get_child(0).name, &"Lobby9", "joinable lobbies first")
+	assert_true(Array(_label_texts(list)).any(func(t: String) -> bool: return t.begins_with("Version 0.0.1")), "the other version is named")
+	var old: Node = list.find_child("Lobby8", true, false)
+	var join: Button = old.find_children("*", "Button", true, false)[0] as Button
+	assert_true(join.disabled, "another version can't be joined")
+
+
 func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	ProfileManager.profile.daily_last = 0
 	menu._refresh_daily()
@@ -244,3 +254,23 @@ func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	assert_false(menu.daily_button.spin_ready, "and rests with the countdown")
 	assert_ne(menu.daily_button.wait_text, "")
 	ProfileManager.reload()
+
+
+func test_trophy_opens_leaderboards_and_stats() -> void:
+	var trophy: Button = menu.get_node("TrophyButton")
+	var help: Control = menu.get_node("HelpButton")
+	assert_lt(trophy.get_global_rect().position.x, help.get_global_rect().position.x, "left of the ?, bottom right")
+	assert_gt(trophy.get_global_rect().position.y, menu.get_viewport_rect().size.y * 0.8)
+	trophy.pressed.emit()
+	await wait_process_frames(2)
+	var panel: LeaderboardPanel = menu.leaderboards
+	assert_true(panel.visible)
+	assert_true(panel.boards_page.visible)
+	assert_true(panel.status_label.text.contains("Steam"), "headless: no Steam, and it says so")
+	panel.page_buttons[LeaderboardPanel.PAGE_STATS].pressed.emit()
+	await wait_process_frames(2)
+	assert_true(panel.stats_page.visible)
+	assert_false(panel.boards_page.visible)
+	assert_gt(panel.stats_grid.get_child_count(), 20)
+	panel.close()
+	assert_false(panel.visible)

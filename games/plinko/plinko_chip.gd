@@ -11,6 +11,8 @@ signal landed(slot: int)
 const LINGER: float = 1.4
 
 var color: Color = Palette.CASINO_RED
+## The dropper's animated skin (&"" = none): the body wears its pattern instead of `color`.
+var skin: StringName = &""
 var board: PlinkoStation
 var flight: PlinkoFlight
 ## Natural seconds of flight per real second.
@@ -38,7 +40,8 @@ func _ready() -> void:
 	cm.radial_segments = 20
 	cm.rings = 1
 	body.mesh = cm
-	body.material_override = GreyboxKit.material(color, 0.1, 0.5)
+	var skin_mat: Material = ToonMaterial.make_chip_skin(skin, PlinkoStation.CHIP_R) if skin != &"" else null
+	body.material_override = skin_mat if skin_mat != null else GreyboxKit.material(color, 0.1, 0.5)
 	body.rotation.x = PI * 0.5
 	_disc.add_child(body)
 	# Cream edge spots (like a casino chip) and a cream centre so the spin reads.

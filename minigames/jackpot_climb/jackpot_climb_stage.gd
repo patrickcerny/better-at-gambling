@@ -527,7 +527,7 @@ func _swing_bat(pid: int) -> void:
 
 func _update_view_bat() -> void:
 	var me: PlayerAvatar = local_avatar()
-	var want: bool = me != null and me.cam != null and me.cam.mode == PlayerCamera.Mode.FIRST and bats.has(local_id) and not done and not over
+	var want: bool = me != null and me.cam != null and me.cam.first_person() and bats.has(local_id) and not done and not over
 	if want and (_view_bat == null or not is_instance_valid(_view_bat)):
 		_view_bat = ItemModels.make_view(&"baseball_bat")
 		_view_bat.name = "ClimbViewBat"

@@ -20,22 +20,30 @@ const NO_COLOR: Color = Color(0, 0, 0, 0)
 
 ## Colour html -> [face, edge band, rim] materials, shared by every stack in that colour.
 static var _materials: Dictionary[String, Array] = {}
+## "skin|colour html" -> the same for chips in an animated skin.
+static var _skin_materials: Dictionary[String, Array] = {}
+## Alternate chips in a skin stack are this much darker, so the chip count still reads.
+const SKIN_BAND_SHADE: float = 0.72
 
 var amount: int = 0
 ## The table minimum one chip stands for (0 = unknown, a fixed size scale is used).
 var unit: int = 0
 var color: Color = NO_COLOR
+## The owner's animated skin (`CosmeticDef.KIND_SKIN` id, &"" = none): the chips wear its pattern
+## (Patrick 2026-11-16: "the chips you have mirror the skin you use"), the rim stays `color`.
+var skin: StringName = &""
 var _from: Vector3
 
 
-## Builds a stack for `amount` dollars in its owner's `p_color`; one chip per `p_unit` (the table
-## minimum at the current limits), see `chip_count`.
-static func make(p_amount: int, p_color: Color = NO_COLOR, p_unit: int = 0) -> ChipStack:
+## Builds a stack for `amount` dollars in its owner's `p_color` (and skin `p_skin`, see `skin`);
+## one chip per `p_unit` (the table minimum at the current limits), see `chip_count`.
+static func make(p_amount: int, p_color: Color = NO_COLOR, p_unit: int = 0, p_skin: StringName = &"") -> ChipStack:
 	var s := ChipStack.new()
 	s.name = "ChipStack"
 	s.amount = p_amount
 	s.unit = p_unit
 	s.color = p_color if p_color.a > 0.0 else tier_color(p_amount)
+	s.skin = p_skin if ToonMaterial.skin_flat(p_skin).a > 0.0 else &""
 	s._build()
 	return s
 
@@ -79,6 +87,27 @@ static func materials_for(c: Color) -> Array:
 	return _materials[key]
 
 
+## [face, darker band, rim] for chips in skin `p_skin` with a rim in the owner's colour `c`
+## (cached; falls back to `materials_for(c)` for unknown skins).
+static func skin_materials_for(p_skin: StringName, c: Color) -> Array:
+	var flat: Color = ToonMaterial.skin_flat(p_skin)
+	if flat.a <= 0.0:
+		return materials_for(c)
+	var key: String = String(p_skin) + "|" + c.to_html(false) + ("" if Vfx.enabled() and ToonMaterial.enabled else "|flat")
+	if not _skin_materials.has(key):
+		# The rim is the owner's colour, so two players in the same skin still tell their chips
+		# apart; when it would vanish on the pattern it falls back to cream / charcoal.
+		var rim: Color = c
+		if absf(c.get_luminance() - flat.get_luminance()) < 0.12:
+			rim = Palette.WARM_CHARCOAL if is_light(flat) else Palette.CREAM
+		_skin_materials[key] = [
+			ToonMaterial.make_chip_skin(p_skin, CHIP_RADIUS),
+			ToonMaterial.make_chip_skin(p_skin, CHIP_RADIUS, false, SKIN_BAND_SHADE),
+			GreyboxKit.material(rim, 0.0, 0.6),
+		]
+	return _skin_materials[key]
+
+
 func _build() -> void:
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = CHIP_RADIUS
@@ -91,7 +120,7 @@ func _build() -> void:
 	edge.outer_radius = CHIP_RADIUS * 0.9
 	edge.rings = 14
 	edge.ring_segments = 4
-	var mats: Array = materials_for(color)
+	var mats: Array = skin_materials_for(skin, color) if skin != &"" else materials_for(color)
 	var n: int = chip_count(amount, unit)
 	for i: int in n:
 		var col: int = i / COLUMN_CHIPS

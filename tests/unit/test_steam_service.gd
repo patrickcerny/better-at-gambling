@@ -89,3 +89,16 @@ func test_friends_in_one_lobby_are_one_entry() -> void:
 	assert_eq(out[1]["members"], 1, "at least the friend we see in it")
 	assert_eq(SteamSvc.friends_text(out[0]["friends"]), "Anna, Ben and 2 more")
 	assert_eq(SteamSvc.friends_text(["Anna", "Ben"]), "Anna and Ben")
+
+
+func test_friends_public_lobbies_join_the_search_results() -> void:
+	var found: Array[Dictionary] = [SteamSvc.public_lobby_entry(1, "Found", 2, 8)]
+	var friends: Array[Dictionary] = [
+		{"lobby": 1, "party": "Found", "build": Protocol.BUILD_ID, "public": true, "members": 2, "max": 8},
+		{"lobby": 2, "party": "Anna's lobby", "build": "0.0.1", "public": true, "members": 3, "max": 8},
+		{"lobby": 3, "party": "Private", "build": Protocol.BUILD_ID, "public": false, "members": 1, "max": 8},
+		{"lobby": 4, "party": "Full", "build": Protocol.BUILD_ID, "public": true, "members": 8, "max": 8},
+	]
+	var out: Array[Dictionary] = SteamSvc.merge_friend_public(found, friends)
+	assert_eq(out.map(func(e: Dictionary) -> int: return int(e["lobby"])), [1, 2], "a missed public friend lobby is added once; private and full ones are not")
+	assert_eq(out[1]["build"], "0.0.1", "its version comes along")

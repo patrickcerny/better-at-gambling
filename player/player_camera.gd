@@ -85,15 +85,21 @@ func activate() -> void:
 	camera.current = true
 
 
-## Flips first/third person. During an emote view the player takes the camera back: it ends,
-## and the view goes to first person (the one you are not looking at).
-func toggle_mode() -> void:
+## Flips first/third person and returns true if the view changed. During an emote view the
+## player takes the camera back: it ends, and the view goes to first person (the one you are not
+## looking at). Seated it does nothing: the station view hides the mode, so a press there flipped
+## it unseen and you stood up in third person (Patrick: "why am i 3d person?").
+func toggle_mode() -> bool:
 	if emote_view:
 		emote_view = false
 		emote_blend = 0.0
-		mode = Mode.FIRST
-		return
+		if anchor == null:
+			mode = Mode.FIRST  # seated the table view comes back and the picked mode is kept
+		return true
+	if anchor != null:
+		return false
 	mode = Mode.THIRD if mode == Mode.FIRST else Mode.FIRST
+	return true
 
 
 ## The local player started an emote: swing round to watch it. `mode` stays what the player
@@ -107,9 +113,17 @@ func end_emote_view() -> void:
 	emote_view = false
 
 
-## True while the camera sees the body: third person, or swinging to or from an emote view.
+## True when the view is first person: the picked mode, or any seat (a station always uses its
+## own first-person table view; third person comes back on standing up). Patrick: "when you go
+## to slots the cam is fucked": seated in third person the bean was drawn over the table view.
+func first_person() -> bool:
+	return mode == Mode.FIRST or anchor != null
+
+
+## True while the camera sees the body: third person (not seated), or swinging to or from an
+## emote view.
 func shows_body() -> bool:
-	return mode == Mode.THIRD or emote_blend > 0.02
+	return not first_person() or emote_blend > 0.02
 
 
 ## True while the emote view (fully or partly) replaces the player's own view.
@@ -188,7 +202,7 @@ func emote_transform() -> Transform3D:
 
 ## The player's own view: seated station view, ragdoll follow, third or first person.
 func _update_base(speed: float, on_floor: bool, ragdolled: bool, delta: float) -> void:
-	var third: bool = mode == Mode.THIRD or ragdolled
+	var third: bool = not first_person() or ragdolled
 	var up_rot := Basis.from_euler(Vector3(pitch, yaw, 0.0))
 	if anchor != null:
 		_anchor_blend = minf(_anchor_blend + delta / 0.4, 1.0)
