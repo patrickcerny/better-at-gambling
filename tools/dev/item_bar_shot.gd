@@ -4,6 +4,7 @@ extends Control
 ##   --items a,b,c   the inventory (default lucky_clover,black_cat,baseball_bat)
 ##   --hold N        slot in hand (default -1)
 ##   --info          open the info card on the held item
+##   --luck P [--streak S]  luck points on the plaque
 ##   --quiet         no "NEW ITEM" card (inventory set before the bar is shown)
 
 
@@ -20,8 +21,8 @@ func _ready() -> void:
 	bar.anchor_right = 0.5
 	bar.anchor_top = 1.0
 	bar.anchor_bottom = 1.0
-	bar.offset_left = -380
-	bar.offset_right = 380
+	bar.offset_left = -960
+	bar.offset_right = 960
 	bar.offset_top = -600
 	bar.offset_bottom = -20
 	add_child(bar)
@@ -38,3 +39,6 @@ func _ready() -> void:
 		bar.set_held(hold)
 	if args.has("info"):
 		bar.toggle_info()
+	# --luck 2 --streak 0.75: luck points (and the losing streak's share) on the plaque.
+	if args.has("luck"):
+		bar.set_private({"luck": args.get_float("luck", 0.0), "streak": args.get_float("streak", 0.0)})

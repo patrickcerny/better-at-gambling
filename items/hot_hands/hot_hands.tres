@@ -7,7 +7,7 @@
 script = ExtResource("1")
 id = &"hot_hands"
 display_name = "Hot Hands"
-description = "Blackjack luck +3 and you peek the dealer's hole card for your next 3 hands."
+description = "Blackjack luck +36% and you peek the dealer's hole card for your next 3 hands."
 rarity = 0
 target_mode = 0
 requires_proximity = false

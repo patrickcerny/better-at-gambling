@@ -435,7 +435,7 @@ func _seat_order() -> Array[int]:
 
 ## Two hole cards; the player's luck may reroll the pair (judged by `preflop_strength`).
 func _draw_hole(p: int) -> Array[int]:
-	var lk: int = modifiers.get_luck(p, game_id)
+	var lk: float = modifiers.get_luck(p, game_id)
 	var d: LuckRng.Draw = luck.draw(lk, func() -> Array[int]: return _take(2), func(cards: Array[int]) -> float: return preflop_strength(cards))
 	if d.rerolled:
 		_put_back(d.rejected as Array[int])
@@ -452,7 +452,7 @@ func _draw_flop(order: Array[int]) -> Array[int]:
 		_put_back(current[0])
 		current[0] = _take(3)
 	for p: int in order:
-		var lk: int = modifiers.get_luck(p, game_id)
+		var lk: float = modifiers.get_luck(p, game_id)
 		if lk == 0:
 			continue
 		var hole: Array[int] = hands[p]["hole"]
@@ -579,7 +579,7 @@ func _draw_rest(callers: Array[int]) -> Array[int]:
 		_put_back(current[0])
 		current[0] = _take(4)
 	for p: int in callers:
-		var lk: int = modifiers.get_luck(p, game_id)
+		var lk: float = modifiers.get_luck(p, game_id)
 		if lk == 0:
 			continue
 		var d: LuckRng.Draw = luck.draw(lk, func() -> Array[int]:

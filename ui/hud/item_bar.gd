@@ -8,7 +8,11 @@ extends Control
 ## item does and how to use it for `SELECTION_SECONDS`; I opens the info card. A new item in the
 ## inventory gets its own bigger "NEW ITEM" card first (`PICKUP_SECONDS`, one after another), so
 ## nobody has to guess what they just got (Patrick: "Items erklären wichtiger").
-## Above them: the half-ring luck gauge, running effects with their timers, the aim line
+## Right of the slots: the luck plaque (0.9.57, Patrick: the half-ring gauge "sieht mega kacke aus",
+## "rechts neben die items"): luck as a reroll chance in percent (−36 % … +36 %), a word, a bar from
+## the centre and the losing streak's share; hidden while luck is 0. The item cards (NEW ITEM, the
+## picked item, the I card) sit right of it (Patrick: "die info über das item kommt auch auf der
+## rechten seite neben dem luck indicator"). Above the slots: running effects with their timers, the aim line
 ## ("Black Cat → Anna" / "No one in reach"), the two-button choice some items ask before they go
 ## out (Pickpocket's greed, the duel stake) and the "inventory full" discard choice.
 ## Pure display apart from the choice buttons: ItemController feeds it.
@@ -18,6 +22,11 @@ signal choice_made(index: int)
 
 const SLOTS: int = 3
 const LUCK_MAX: int = 3
+## Width of the luck plaque right of the slots.
+const LUCK_W: float = 210.0
+## Width of the item cards right of the luck plaque, and the gap to it.
+const CARD_W: float = 510.0
+const CARD_GAP: float = 18.0
 const SELECTION_SECONDS: float = 3.5
 ## How long the "NEW ITEM" card stays (counted only while the bar is on screen).
 const PICKUP_SECONDS: float = 6.0
@@ -26,8 +35,9 @@ const SLOT_SIZE: float = 84.0
 const HELD_SCALE: float = 1.14
 ## Pixel size of the live render of the held item.
 const LIVE_SIZE: int = 160
-## Turn speed of the held item's live model (radians per second).
-const LIVE_SPIN: float = 0.9
+## The held item's live model swings ±LIVE_SWING radians, LIVE_SPIN radians of phase per second.
+const LIVE_SPIN: float = 1.2
+const LIVE_SWING: float = 0.6
 
 var slots: Array[PanelContainer] = []
 ## The item picture in each slot (texture null = empty slot).
@@ -35,13 +45,24 @@ var slot_icons: Array[TextureRect] = []
 ## The name under each slot: only the held one shows it.
 var slot_names: Array[Label] = []
 var slot_keys: Array[Label] = []
+## The luck plaque right of the slots: the bar (`luck_dial`, drawn), the percent, its word and
+## the losing streak's share.
+var luck_panel: PanelContainer
+## The plaque's place right of the slots (kept while the plaque is hidden).
+var luck_slot: Control
 var luck_dial: Control
 var luck_label: Label
+var luck_value: Label
+var luck_streak: Label
+## Luck points from the losing streak (part of `luck`).
+var streak: float = 0.0
+## The item cards' column right of the luck plaque (bottom-aligned with the slots).
+var side: VBoxContainer
+var _slot_row: HBoxContainer
 var effects_label: Label
 var target_label: Label
 var discard_panel: PanelContainer
 var discard_label: Label
-var info_hint: Label
 ## "[LMB / E] use   [RMB] put away" while something is in your hand.
 var keys_label: Label
 var info_panel: PanelContainer
@@ -75,6 +96,7 @@ var _live_vp: SubViewport
 var _live_stand: Node3D
 var _live_model: Node3D
 var _live_item: StringName = &""
+var _live_t: float = 0.0
 ## Two-button choice before a use goes out.
 var choice_panel: PanelContainer
 var choice_title: Label
@@ -83,7 +105,8 @@ var choice_buttons: Array[Button] = []
 var selected: int = -1
 
 var inventory: Array = []
-var luck: int = 0
+## Luck in points (1 point = `luck_reroll_per_point` reroll chance), fractional.
+var luck: float = 0.0
 var seated: bool = false
 var _selection_left: float = 0.0
 
@@ -104,12 +127,15 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_place_side()
 	if _selection_left > 0.0:
 		_selection_left -= delta
 		if _selection_left <= 0.0:
 			selection_panel.visible = false
 	if _live_model != null:
-		_live_model.rotation.y += LIVE_SPIN * delta
+		# Swings to either side instead of a full turn, so the front stays towards you.
+		_live_t += delta
+		_live_stand.rotation.y = sin(_live_t * LIVE_SPIN) * LIVE_SWING
 	if pickup_item != &"":
 		# The card waits while another card, a choice or a table seat has the space.
 		var room: bool = not seated and not selection_panel.visible and not info_panel.visible and not choice_panel.visible and not discard_panel.visible
@@ -118,6 +144,22 @@ func _process(delta: float) -> void:
 			_pickup_left -= delta
 			if _pickup_left <= 0.0:
 				_next_pickup()
+
+
+## Keeps the item cards right of the luck plaque's place, their
+## bottom level with the slots' bottom.
+func _place_side() -> void:
+	if side == null or _slot_row == null:
+		return
+	var r: Rect2 = luck_slot.get_global_rect()
+	var bottom: float = 0.0
+	for p: PanelContainer in slots:
+		bottom = maxf(bottom, p.get_global_rect().end.y)
+	var inv: Transform2D = get_global_transform().affine_inverse()
+	var x: float = (inv * Vector2(r.end.x, 0.0)).x + CARD_GAP
+	var y: float = (inv * Vector2(0.0, bottom)).y
+	side.position = Vector2(x, 0.0)
+	side.size = Vector2(CARD_W, maxf(y, 0.0))
 
 
 ## Shows the inventory (item ids, oldest first) in the three slots. Items that weren't there
@@ -148,7 +190,6 @@ func set_inventory(inv: Array) -> void:
 	for id: StringName in fresh:
 		announce(id)
 	var item: StringName = selected_item()
-	info_hint.visible = item != &""
 	keys_label.visible = item != &""
 	keys_label.text = hint_text()
 	if item == &"":
@@ -245,7 +286,9 @@ func _set_live(id: StringName) -> void:
 	if id == &"":
 		return
 	_live_model = ItemModels.make(id, 1.0)
-	_live_model.rotation_degrees = Vector3(0.0, -28.0, 0.0)
+	# The model turns about the stand's y; its own tilt (`ItemThumbnails.TILT`) stays put.
+	_live_model.rotation_degrees = ItemThumbnails.preview_rotation(id)
+	_live_stand.rotation_degrees = Vector3.ZERO
 	_live_stand.add_child(_live_model)
 
 
@@ -425,9 +468,23 @@ func set_cooldown(frac: float) -> void:
 
 ## The private item state from the server: {luck, effects:[{item, left, uses}], discard?}.
 func set_private(priv: Dictionary) -> void:
-	luck = int(priv.get("luck", 0))
-	luck_label.text = "LUCK %s%d" % ["+" if luck > 0 else "", luck]
-	luck_label.add_theme_color_override(&"font_color", Palette.MONEY_GREEN if luck > 0 else (Palette.LOSS_RED if luck < 0 else Palette.CREAM))
+	luck = float(priv.get("luck", 0.0))
+	streak = float(priv.get("streak", 0.0))
+	var pct: int = luck_percent(luck)
+	var was: String = luck_value.text
+	luck_value.text = luck_text(pct)
+	luck_value.add_theme_color_override(&"font_color", luck_color(pct).lightened(0.15))
+	luck_label.text = luck_word(pct)
+	luck_label.add_theme_color_override(&"font_color", luck_color(pct).lightened(0.3))
+	var sp: int = luck_percent(streak)
+	luck_streak.text = "LOSING STREAK +%d%%" % sp if sp > 0 else ""
+	luck_streak.visible = sp > 0
+	luck_panel.add_theme_stylebox_override(&"panel", _luck_style(pct))
+	luck_panel.visible = pct != 0
+	if was != luck_value.text and is_inside_tree() and luck_panel.visible:
+		# A change flashes the plaque once so it's noticed.
+		luck_panel.modulate = Color(1.6, 1.5, 1.2)
+		luck_panel.create_tween().tween_property(luck_panel, "modulate", Color.WHITE, 0.6)
 	_update_luck_dial()
 	var lines: PackedStringArray = []
 	for e: Dictionary in priv.get("effects", []):
@@ -614,28 +671,16 @@ func _build() -> void:
 	keys_label = _label(&"SmallLabel", Palette.WARM_GOLD)
 	keys_label.add_theme_font_size_override(&"font_size", 18)
 	keys_label.visible = false
-	col.add_child(keys_label)
+	# The key line, "[I] more info" next to it.
+	var keys_row := HBoxContainer.new()
+	keys_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	keys_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	keys_row.add_theme_constant_override(&"separation", 18)
+	col.add_child(keys_row)
+	keys_row.add_child(keys_label)
 	effects_label = _label(&"SmallLabel")
 	effects_label.visible = false
 	col.add_child(effects_label)
-	# Luck dial gauge (red to green, swinging needle) centred over the slots, "LUCK +2" on top of
-	# it (Patrick: "center the barometer. the luck thingy should be on top of the barometer").
-	var luck_row := VBoxContainer.new()
-	luck_row.name = "LuckRow"
-	luck_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	luck_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	luck_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	luck_row.add_theme_constant_override(&"separation", 2)
-	col.add_child(luck_row)
-	luck_label = _label(&"SmallLabel")
-	luck_label.text = "LUCK 0"
-	luck_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	luck_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	luck_row.add_child(luck_label)
-	luck_dial = _create_luck_dial()
-	luck_dial.custom_minimum_size = Vector2(150, 78)
-	luck_dial.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	luck_row.add_child(luck_dial)
 	# Item info card (I on the held item): picture, name, tag, the whole description, how to use.
 	info_panel = _panel(Palette.WARM_GOLD)
 	col.add_child(info_panel)
@@ -660,7 +705,7 @@ func _build() -> void:
 	info_label = _label(&"SmallLabel")
 	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info_label.custom_minimum_size = Vector2(440, 0)
+	info_label.custom_minimum_size = Vector2(350, 0)
 	iv.add_child(info_label)
 	# "NEW ITEM": picture, name, what it does, how to take it out and use it.
 	pickup_panel = _panel(Palette.WARM_GOLD)
@@ -670,7 +715,7 @@ func _build() -> void:
 	ph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ph.add_theme_constant_override(&"separation", 16)
 	pickup_panel.add_child(ph)
-	pickup_icon = _icon(120.0)
+	pickup_icon = _icon(96.0)
 	ph.add_child(pickup_icon)
 	var pv := VBoxContainer.new()
 	pv.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -682,17 +727,17 @@ func _build() -> void:
 	pv.add_child(pickup_title)
 	pickup_name = _label(&"HeadingLabel", Palette.CREAM)
 	pickup_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	pickup_name.add_theme_font_size_override(&"font_size", 34)
+	pickup_name.add_theme_font_size_override(&"font_size", 30)
 	pv.add_child(pickup_name)
 	pickup_desc = _label(&"SmallLabel")
 	pickup_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	pickup_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	pickup_desc.custom_minimum_size = Vector2(440, 0)
+	pickup_desc.custom_minimum_size = Vector2(360, 0)
 	pv.add_child(pickup_desc)
 	pickup_use = _label(&"SmallLabel", Palette.WARM_GOLD)
 	pickup_use.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	pickup_use.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	pickup_use.custom_minimum_size = Vector2(440, 0)
+	pickup_use.custom_minimum_size = Vector2(360, 0)
 	pv.add_child(pickup_use)
 	# What you just picked: name, tag, what it does and how to use it.
 	selection_panel = _panel(Palette.WARM_GOLD)
@@ -708,11 +753,11 @@ func _build() -> void:
 	sv.add_child(selection_tag)
 	selection_desc = _label(&"SmallLabel")
 	selection_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	selection_desc.custom_minimum_size = Vector2(560, 0)
+	selection_desc.custom_minimum_size = Vector2(440, 0)
 	sv.add_child(selection_desc)
 	selection_use = _label(&"SmallLabel", Palette.WARM_GOLD)
 	selection_use.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	selection_use.custom_minimum_size = Vector2(560, 0)
+	selection_use.custom_minimum_size = Vector2(440, 0)
 	sv.add_child(selection_use)
 	# Inventory slots: three squares with the item models, the held one bigger with its name under
 	# it, the info hint to their right.
@@ -743,7 +788,7 @@ func _build() -> void:
 		p.add_child(k)
 		var n := _label(&"SmallLabel")
 		n.add_theme_font_size_override(&"font_size", 17)
-		n.custom_minimum_size = Vector2(SLOT_SIZE + 60.0, 24)
+		n.custom_minimum_size = Vector2(SLOT_SIZE + 30.0, 24)
 		n.clip_text = true
 		n.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		sc.add_child(n)
@@ -751,59 +796,159 @@ func _build() -> void:
 		slot_icons.append(icon)
 		slot_keys.append(k)
 		slot_names.append(n)
-	info_hint = _label(&"SmallLabel", Palette.WARM_GOLD)
-	info_hint.text = "[I] more info"
-	info_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	info_hint.visible = false
-	row.add_child(info_hint)
-	for l: Label in [discard_label, choice_title, target_label, keys_label, effects_label, luck_label, info_label, info_name, info_tag, selection_name, selection_tag, selection_desc, selection_use, info_hint, pickup_title, pickup_name, pickup_desc, pickup_use] + slot_keys + slot_names:
+	# The luck plaque right of the slots; an empty spacer as wide on the left keeps the slots centred.
+	luck_panel = PanelContainer.new()
+	luck_panel.name = "LuckMeter"
+	luck_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	luck_panel.add_theme_stylebox_override(&"panel", _luck_style(0))
+	# Its place stays taken while it is hidden, so the slots and the cards don't jump.
+	luck_slot = Control.new()
+	luck_slot.name = "LuckSlot"
+	luck_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	luck_slot.custom_minimum_size = Vector2(LUCK_W, SLOT_SIZE)
+	luck_slot.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(luck_slot)
+	luck_slot.add_child(luck_panel)
+	luck_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(LUCK_W, 0)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(spacer)
+	row.move_child(spacer, 0)
+	var lv := VBoxContainer.new()
+	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lv.alignment = BoxContainer.ALIGNMENT_CENTER
+	lv.add_theme_constant_override(&"separation", 0)
+	luck_panel.add_child(lv)
+	var top := HBoxContainer.new()
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_theme_constant_override(&"separation", 8)
+	lv.add_child(top)
+	var cap := _label(&"SmallLabel", Palette.WARM_GOLD)
+	cap.text = "LUCK"
+	cap.add_theme_font_size_override(&"font_size", 15)
+	top.add_child(cap)
+	luck_label = _label(&"SmallLabel", Palette.CREAM)
+	luck_label.add_theme_font_size_override(&"font_size", 15)
+	luck_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	luck_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(luck_label)
+	var mid := HBoxContainer.new()
+	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mid.add_theme_constant_override(&"separation", 8)
+	lv.add_child(mid)
+	luck_value = _label(&"HeadingLabel", Palette.CREAM)
+	luck_value.add_theme_font_size_override(&"font_size", 30)
+	luck_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	mid.add_child(luck_value)
+	luck_streak = _label(&"SmallLabel", Palette.VIP_GOLD)
+	luck_streak.add_theme_font_size_override(&"font_size", 13)
+	luck_streak.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	luck_streak.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	luck_streak.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	luck_streak.visible = false
+	mid.add_child(luck_streak)
+	luck_dial = _create_luck_dial()
+	luck_dial.custom_minimum_size = Vector2(LUCK_W - 24.0, 12)
+	lv.add_child(luck_dial)
+	for l: Label in [cap, luck_value, luck_streak]:
+		_outline(l)
+	luck_panel.visible = false
+	# The item cards right of the luck plaque (`_place_side` keeps them there).
+	side = VBoxContainer.new()
+	side.name = "ItemCards"
+	side.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	side.alignment = BoxContainer.ALIGNMENT_END
+	side.add_theme_constant_override(&"separation", 8)
+	add_child(side)
+	for card: PanelContainer in [info_panel, pickup_panel, selection_panel]:
+		card.get_parent().remove_child(card)
+		card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		side.add_child(card)
+	_slot_row = row
+	for l: Label in [discard_label, choice_title, target_label, keys_label, effects_label, luck_label, info_label, info_name, info_tag, selection_name, selection_tag, selection_desc, selection_use, pickup_title, pickup_name, pickup_desc, pickup_use] + slot_keys + slot_names:
 		_outline(l)
 	set_private({})
 
 
-## Creates the luck barometer: a half ring (red on the left, gold in the middle, green on the
-## right) with tick marks and a tapered needle swinging from a hub at the bottom centre.
+## Luck points as the reroll chance in percent, signed (+2 points = +24).
+static func luck_percent(points: float) -> int:
+	return roundi(points * Registry.balance.luck_reroll_per_point * 100.0)
+
+
+## "+24%", "−9%".
+static func luck_text(pct: int) -> String:
+	if pct > 0:
+		return "+%d%%" % pct
+	return "−%d%%" % -pct if pct < 0 else "0%"
+
+
+## One word for the luck level, next to the caption.
+static func luck_word(pct: int) -> String:
+	if pct >= 30:
+		return "ON FIRE"
+	if pct > 0:
+		return "LUCKY"
+	if pct <= -30:
+		return "CURSED"
+	if pct < 0:
+		return "JINXED"
+	return ""
+
+
+## Green for good luck, red for bad, gold for none.
+static func luck_color(v: int) -> Color:
+	if v > 0:
+		return Palette.MONEY_GREEN
+	if v < 0:
+		return Palette.LOSS_RED
+	return Palette.WARM_GOLD
+
+
+## The plaque: the slots' velvet, its border and glow taking the luck's colour.
+static func _luck_style(pct: int) -> StyleBoxFlat:
+	var sb := _slot_style(luck_color(pct), false, true)
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 9
+	sb.shadow_color = Color(luck_color(pct), 0.3)
+	sb.shadow_size = 6
+	return sb
+
+
+## Creates the luck bar: a dark track with a gold centre mark, filled from the centre to the
+## current luck (green right, red left); the losing streak's share of it is striped in gold.
 func _create_luck_dial() -> Control:
 	var dial := Control.new()
 	dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dial.draw.connect(func() -> void:
-		var size: Vector2 = dial.size
-		var hub := Vector2(size.x * 0.5, size.y - 6.0)
-		var radius: float = minf(size.x * 0.5, size.y) - 14.0
-		if radius < 8.0:
-			return
-		var band: float = maxf(radius * 0.3, 6.0)
-		# Upper half circle runs from PI (left) over 1.5 PI (top) to 2 PI (right).
-		dial.draw_arc(hub, radius, PI, TAU, 48, Palette.CASINO_BLACK, band + 6.0, true)
-		var steps: int = 36
-		for i: int in steps:
-			var t0: float = float(i) / steps
-			var t1: float = float(i + 1) / steps
-			var mid: float = (t0 + t1) * 0.5
-			var color: Color
-			if mid < 0.5:
-				color = Palette.LOSS_RED.lerp(Palette.WARM_GOLD, mid * 2.0)
-			else:
-				color = Palette.WARM_GOLD.lerp(Palette.MONEY_GREEN, (mid - 0.5) * 2.0)
-			dial.draw_arc(hub, radius, PI + t0 * PI, PI + t1 * PI + 0.01, 4, color, band, true)
-		# Ticks for each luck step (−3…+3); the ends and the centre are longer.
-		for i: int in range(-3, 4):
-			var a: float = PI + (float(i) + 3.0) / 6.0 * PI
-			var dir := Vector2(cos(a), sin(a))
-			var len: float = band * 0.9 if i % 3 == 0 else band * 0.45
-			var outer: Vector2 = hub + dir * (radius + band * 0.5)
-			dial.draw_line(outer, outer - dir * len, Palette.CREAM, 2.0, true)
-		# Needle: tapered triangle pointing at the current luck, with a round hub.
-		var needle_t: float = clampf((float(luck) + 3.0) / 6.0, 0.0, 1.0)
-		var na: float = PI + needle_t * PI
-		var ndir := Vector2(cos(na), sin(na))
-		var side := Vector2(-ndir.y, ndir.x) * 3.5
-		var tip: Vector2 = hub + ndir * (radius - band * 0.5 - 1.0)
-		var needle := PackedVector2Array([tip, hub + side, hub - ndir * 5.0, hub - side])
-		dial.draw_colored_polygon(needle, Palette.CASINO_BLACK)
-		dial.draw_colored_polygon(PackedVector2Array([tip, hub + side * 0.6, hub - ndir * 3.0, hub - side * 0.6]), Palette.CREAM)
-		dial.draw_circle(hub, 6.0, Palette.CASINO_BLACK)
-		dial.draw_circle(hub, 4.0, Palette.WARM_GOLD)
+		var sz: Vector2 = dial.size
+		var mid: float = sz.x * 0.5
+		var h: float = sz.y
+		dial.draw_rect(Rect2(0, 0, sz.x, h), Color(Palette.CASINO_BLACK, 0.95))
+		dial.draw_rect(Rect2(0, 0, sz.x, h), Color(Palette.WARM_GOLD, 0.35), false, 1.0)
+		var cap: float = float(LUCK_MAX)
+		var t: float = clampf(luck / cap, -1.0, 1.0)
+		var w: float = absf(t) * (mid - 2.0)
+		if w > 0.5:
+			var col: Color = luck_color(1 if t > 0.0 else -1)
+			var x0: float = mid if t > 0.0 else mid - w
+			dial.draw_rect(Rect2(x0, 2, w, h - 4), col)
+			dial.draw_rect(Rect2(x0, 2, w, (h - 4) * 0.4), Color(1, 1, 1, 0.18))
+			# The losing streak's share, at the outer end of a green fill.
+			var sw: float = clampf(streak / cap, 0.0, 1.0) * (mid - 2.0)
+			if t > 0.0 and sw > 0.5:
+				var sx: float = mid + w - minf(sw, w)
+				var k: float = sx
+				while k < mid + w:
+					dial.draw_rect(Rect2(k, 2, minf(3.0, mid + w - k), h - 4), Palette.VIP_GOLD)
+					k += 6.0
+		# Quarter ticks and the centre mark.
+		for q: int in [1, 3]:
+			var x: float = sz.x * q / 4.0
+			dial.draw_line(Vector2(x, 2), Vector2(x, h - 2), Color(Palette.CREAM, 0.25), 1.0)
+		dial.draw_line(Vector2(mid, -2), Vector2(mid, h + 2), Palette.WARM_GOLD, 2.0)
 	)
 	return dial
 

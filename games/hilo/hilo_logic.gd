@@ -278,7 +278,7 @@ func _draw_next(p: int, shown: int, guess: String) -> int:
 	if loses(guess, shown, value_of(card)) and rng.chance(balance.hilo_favour):
 		_put_back(card)
 		card = _draw()
-	var lk: int = modifiers.get_luck(p, game_id)
+	var lk: float = modifiers.get_luck(p, game_id)
 	if lk == 0:
 		return card
 	var first: Array[bool] = [true]

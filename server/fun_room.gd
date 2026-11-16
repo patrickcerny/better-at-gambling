@@ -30,7 +30,7 @@ var _inside: Dictionary[int, bool] = {}
 ## `games`: station id → game id (`MapDefinition.fun_stations`).
 func _init(games: Dictionary, logic_scripts: Dictionary, balance: BalanceConfig, rng: SeededRng, p_area: AABB) -> void:
 	area = p_area
-	stations.setup(games, logic_scripts, balance, economy, ModifierStack.new(balance.luck_clamp), rng, null)
+	stations.setup(games, logic_scripts, balance, economy, ModifierStack.new(balance.luck_clamp).use_streak(balance), rng, null)
 	stations.set_limits_multiplier(balance.limits_multiplier(0))
 
 

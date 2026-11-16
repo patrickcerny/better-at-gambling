@@ -316,7 +316,7 @@ func _settle_bet(bet: Dictionary, p: int, b: int) -> int:
 	var base_return: int = 0
 	var ret: float = gross_return(type, winner, player_cards, banker_cards)
 	if ret > 1.0:
-		var lk: int = modifiers.get_luck(pid, game_id)
+		var lk: float = modifiers.get_luck(pid, game_id)
 		if lk < 0 and (type == PLAYER or type == BANKER) and rng.chance(luck.reroll_chance(lk)):
 			base_return = stake + int(floor(stake * (ret - 1.0) * JINX_SHARE))
 			details["jinxed"] = true

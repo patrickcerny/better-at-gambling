@@ -1,6 +1,6 @@
 class_name LuckRng
 extends RefCounted
-## Luck as rerolls (§2.7). With luck L > 0, with probability `reroll_per_point * L` a second
+## Luck as rerolls (§2.7). Luck is in points (fractional since 0.9.57). With luck L > 0, with probability `reroll_per_point * L` a second
 ## candidate is drawn and the higher-quality one kept; L < 0 keeps the lower one. L = 0 never
 ## rerolls. Luck is clamped to ±`clamp_abs`.
 
@@ -28,22 +28,22 @@ func _init(p_rng: SeededRng, p_reroll_per_point: float = 0.12, p_clamp_abs: int 
 
 
 ## Clamps a raw luck sum into the allowed range.
-func clamp_luck(luck: int) -> int:
-	return clampi(luck, -clamp_abs, clamp_abs)
+func clamp_luck(luck: float) -> float:
+	return clampf(luck, -clamp_abs, clamp_abs)
 
 
 ## Probability that a draw at this luck rerolls.
-func reroll_chance(luck: int) -> float:
-	return reroll_per_point * absi(clamp_luck(luck))
+func reroll_chance(luck: float) -> float:
+	return reroll_per_point * absf(clamp_luck(luck))
 
 
 ## Draws `generator.call()`; may reroll per luck, comparing `quality.call(value) -> float`.
 ## Ties keep the first draw, so a reroll never gives a lucky player a worse result.
-func draw(luck: int, generator: Callable, quality: Callable) -> Draw:
+func draw(luck: float, generator: Callable, quality: Callable) -> Draw:
 	var d := Draw.new()
 	d.value = generator.call()
-	var l: int = clamp_luck(luck)
-	if l == 0 or not rng.chance(reroll_chance(l)):
+	var l: float = clamp_luck(luck)
+	if l == 0.0 or not rng.chance(reroll_chance(l)):
 		return d
 	var second: Variant = generator.call()
 	d.rerolled = true

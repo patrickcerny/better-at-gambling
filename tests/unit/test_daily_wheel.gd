@@ -6,13 +6,11 @@ const MakeItemdefs := preload("res://tools/steam/make_itemdefs.gd")
 
 
 func before_each() -> void:
-	ProfileManager.persist = false
 	ProfileManager.set_steam_owned([] as Array[StringName])
 	ProfileManager.profile = PlayerProfile.new()
 
 
 func after_each() -> void:
-	ProfileManager.persist = true
 	ProfileManager.set_steam_owned([] as Array[StringName])
 	ProfileManager.reload()
 

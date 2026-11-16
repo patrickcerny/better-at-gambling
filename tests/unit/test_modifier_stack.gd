@@ -57,3 +57,28 @@ func test_rounds_left() -> void:
 	s.consume_round(1, &"slots")
 	s.consume_round(1, &"slots")
 	assert_eq(s.get_luck(1, &"slots"), 0)
+
+
+func test_losing_streak_grows_luck_and_a_win_clears_it() -> void:
+	var cfg := BalanceConfig.new()
+	var s := ModifierStack.new(cfg.luck_clamp).use_streak(cfg)
+	s.note_result(1, 100, 0)
+	assert_almost_eq(s.get_luck(1), cfg.luck_streak_step, 0.0001, "one loss: a bit of luck")
+	s.note_result(1, 100, 100)
+	assert_almost_eq(s.get_luck(1), cfg.luck_streak_step, 0.0001, "a push changes nothing")
+	s.note_result(1, cfg.luck_streak_min_stake - 1, 0)
+	assert_almost_eq(s.get_luck(1), cfg.luck_streak_step, 0.0001, "tiny bets don't count")
+	for i: int in 20:
+		s.note_result(1, 100, 0)
+	assert_almost_eq(s.get_luck(1), cfg.luck_streak_cap, 0.0001, "capped")
+	s.add(1, _mod(&"clover", 2))
+	assert_almost_eq(s.get_luck(1), minf(2.0 + cfg.luck_streak_cap, cfg.luck_clamp), 0.0001, "adds to item luck, clamped")
+	s.note_result(1, 100, 250)
+	assert_almost_eq(s.get_luck(1), 2.0, 0.0001, "a win clears the streak")
+	assert_eq(s.streak_luck(2), 0.0, "per player")
+
+
+func test_streak_off_by_default() -> void:
+	var s := ModifierStack.new()
+	s.note_result(1, 100, 0)
+	assert_eq(s.get_luck(1), 0.0)

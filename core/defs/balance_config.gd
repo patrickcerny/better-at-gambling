@@ -21,6 +21,16 @@ extends Resource
 @export_group("Luck")
 @export var luck_reroll_per_point: float = 0.12
 @export var luck_clamp: int = 3
+## Losing streak (0.9.57, Patrick: "wenn man oft hintereinander verliert dein luck immer bisschen
+## steigt"): each lost bet of at least `luck_streak_min_stake` adds this many luck points (0.125 =
+## +1.5 % reroll chance), up to `luck_streak_cap` (0.5 = +6 %); the next win clears it. Kept small:
+## at +3 % a step slots paid 109 % (tests/sim/test_rtp_streak.gd).
+@export var luck_streak_step: float = 0.125
+@export var luck_streak_cap: float = 0.5
+@export var luck_streak_min_stake: int = 25
+## Games where a reroll is worth a lot (slots keeps the better of two whole spins) count the streak
+## luck at this share (slots 0.5: 105 % → 103 %).
+@export var luck_streak_scale: Dictionary = {&"slots": 0.5}
 
 @export_group("Blackjack")
 @export var bj_decks: int = 6

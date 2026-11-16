@@ -13,7 +13,7 @@ func activate(ctx: ItemContext) -> Dictionary:
 	m.id = ctx.def.id
 	m.source_player = ctx.user
 	m.game_id = StringName(ctx.param("game", ""))
-	m.luck = int(ctx.param("luck", 0))
+	m.luck = float(ctx.param("luck", 0))
 	m.payout_multiplier = float(ctx.param("payout_multiplier", 1.0))
 	m.consume_on_win = bool(ctx.param("consume_on_win", false))
 	m.refund_on_loss = bool(ctx.param("refund_on_loss", false))

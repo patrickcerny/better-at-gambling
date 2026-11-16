@@ -96,7 +96,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	stake = amount
 	stake_covered = last_covered
 	serial += 1
-	var lk: int = modifiers.get_luck(p, game_id)
+	var lk: float = modifiers.get_luck(p, game_id)
 	var d: LuckRng.Draw = luck.draw(lk, func() -> Dictionary: return draw_pull(rng, balance),
 		func(x: Dictionary) -> float: return pull_multiplier(x, balance))
 	pull = d.value

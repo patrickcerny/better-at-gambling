@@ -203,7 +203,7 @@ func _build_match_systems(seed_value: int) -> void:
 	state.match_seed = seed_value
 	rng = SeededRng.new(seed_value)
 	luck_rng = LuckRng.new(rng, balance.luck_reroll_per_point, balance.luck_clamp)
-	modifiers = ModifierStack.new(balance.luck_clamp)
+	modifiers = ModifierStack.new(balance.luck_clamp).use_streak(balance)
 	jackpot = ProgressiveJackpot.new(balance.jackpot_feed_rate, balance.jackpot_seed)
 	rules = InteractionRules.new(balance)
 	pickups = PickupSystem.new(economy)
