@@ -64,7 +64,7 @@ func test_ante_call_ride_and_cash_out_through_the_ledger() -> void:
 	assert_almost_eq(float(odds["higher"]) + float(odds["lower"]) + float(odds["tie"]), 1.0, 0.0001)
 	assert_almost_eq(float(odds["higher"]), 36.0 / 51.0, 0.0001, "the snapshot carries the true chance")
 	var pay1: float = float(h["pays"]["higher"])
-	assert_eq(pay1, HiLoLogic.pay_for(36.0 / 51.0, Registry.balance), "and the pay the server will use")
+	assert_eq(pay1, HiLoLogic.pay_for(36.0 / 51.0, 12.0 / 51.0, 3.0 / 51.0, Registry.balance), "and the pay the server will use")
 	assert_true(fx.intent(p, &"action", {"station": SID, "action": &"higher"})["ok"], "5 then 9")
 	h = _hand(p)
 	assert_eq(int(h["rung"]), 1)
@@ -92,11 +92,14 @@ func test_a_wrong_call_loses_and_the_house_keeps_the_ante() -> void:
 	var p: int = fx.player_ids[1]
 	fx.intent(p, &"sit", {"station": SID})
 	var start: int = fx.server.economy.balance(p)
-	# Ace up, call lower, the next two are aces: a tie loses even if the house redraws once.
-	_stack([Card.make(1), Card.make(1, 1), Card.make(1, 2)])
+	# Ace up: skip it for a 5, call lower, the next two are a 9 and a 10: wrong even if the house
+	# redraws once.
+	_stack([Card.make(1), Card.make(5, 1), Card.make(9, 2), Card.make(10, 2)])
 	assert_true(fx.intent(p, &"place_bet", {"station": SID, "bet": {"amount": 25}})["ok"])
 	assert_eq(fx.intent(p, &"action", {"station": SID, "action": &"higher"})["error"], &"no_chance", "nothing beats an ace")
 	assert_eq(fx.intent(p, &"action", {"station": SID, "action": &"cash_out"})["error"], &"nothing_to_cash")
+	assert_true(fx.intent(p, &"action", {"station": SID, "action": &"skip"})["ok"], "skip the ace")
+	assert_eq(int(_hand(p)["skips_left"]), Registry.balance.hilo_skips - 1, "the snapshot counts the skips")
 	assert_true(fx.intent(p, &"action", {"station": SID, "action": &"lower"})["ok"])
 	assert_eq(fx.server.economy.balance(p), start - 25)
 	assert_eq(int(_results(p)[0]["returned"]), 0)

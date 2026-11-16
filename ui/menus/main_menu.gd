@@ -278,19 +278,20 @@ func _build_online() -> void:
 
 ## BROWSE LOBBIES: the public lobbies of this version, with their player count and JOIN.
 func _build_browse() -> void:
-	_browse_box = _sub_box("Browse", "PUBLIC LOBBIES", 620.0)
+	_browse_box = _sub_box("Browse", "PUBLIC LOBBIES", 700.0)
+	add_child(BeanPortraits.new())  # the beans on the lobby cards
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 360)
+	scroll.custom_minimum_size = Vector2(0, 470)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_browse_box.add_child(scroll)
 	_browse_list = VBoxContainer.new()
 	_browse_list.name = "LobbyList"
 	_browse_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_browse_list.add_theme_constant_override(&"separation", 6)
+	_browse_list.add_theme_constant_override(&"separation", 10)
 	scroll.add_child(_browse_list)
 	_browse_status = Label.new()
 	_browse_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_browse_status.custom_minimum_size = Vector2(620, 0)
+	_browse_status.custom_minimum_size = Vector2(700, 0)
 	_browse_box.add_child(_browse_status)
 	_browse_refresh = _button("Refresh", _refresh_browse)
 	_browse_refresh.name = "Refresh"
@@ -553,39 +554,108 @@ func _fill_friends(parties: Array[Dictionary]) -> void:
 		var build: String = str(f.get("build", ""))
 		var same: bool = build == "" or build == Protocol.BUILD_ID
 		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if same else "Version %s (you have %s)" % [build, Protocol.BUILD_ID]
-		_friends_list.add_child(_lobby_row(int(f["lobby"]), title, sub, int(f.get("members", 0)), int(f.get("max", 0)), same))
+		_friends_list.add_child(_lobby_row(int(f["lobby"]), title, sub, int(f.get("members", 0)), int(f.get("max", 0)), same, f.get("info", {})))
 
 
-## One lobby: name, a small line under it, players, JOIN.
-func _lobby_row(lid: int, title_text: String, sub_text: String, members: int, max_members: int, joinable: bool = true) -> Control:
+## One lobby as a card (Patrick 2026-11-15: "was grad eingestellt ist und kleine anzeige von allen
+## beans die grad drinnen sind mit namen"): its name and who of your friends is in it, players and
+## JOIN; under that the host's settings (mode, minigames, gambling time, items) and a line-up of the
+## beans inside in their outfits, with names. Hosts on an older version send no `info`: then
+## the card is just the top line.
+func _lobby_row(lid: int, title_text: String, sub_text: String, members: int, max_members: int, joinable: bool = true, info: Dictionary = {}) -> Control:
+	var card := PanelContainer.new()
+	card.name = "Lobby%d" % lid
+	card.add_theme_stylebox_override(&"panel", LobbyPanel.box(Color("#221E1C"), Color("#3A322C"), 14, 1))
+	(card.get_theme_stylebox(&"panel") as StyleBoxFlat).set_content_margin_all(12)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override(&"separation", 6)
+	card.add_child(v)
 	var row := HBoxContainer.new()
-	row.name = "Lobby%d" % lid
 	row.add_theme_constant_override(&"separation", 12)
+	v.add_child(row)
 	var text := VBoxContainer.new()
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_theme_constant_override(&"separation", 0)
+	text.add_theme_constant_override(&"separation", -2)
 	row.add_child(text)
 	var title := Label.new()
 	title.text = title_text
 	title.clip_text = true
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title.add_theme_font_size_override(&"font_size", 28)
 	text.add_child(title)
-	if sub_text != "":
+	var settings: String = LobbyInfo.settings_text(info)
+	for line: String in [sub_text, settings]:
+		if line == "":
+			continue
 		var sub := Label.new()
-		sub.text = sub_text
+		sub.text = line
 		sub.theme_type_variation = &"MutedLabel"
+		sub.add_theme_font_size_override(&"font_size", 18)
+		if line == sub_text and sub_text.begins_with("Friends"):
+			sub.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 		sub.clip_text = true
 		sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		text.add_child(sub)
+	var right := VBoxContainer.new()
+	right.alignment = BoxContainer.ALIGNMENT_CENTER
+	right.add_theme_constant_override(&"separation", 0)
+	row.add_child(right)
 	var count := Label.new()
 	count.text = "%d/%d" % [members, max_members if max_members > 0 else Protocol.MAX_PLAYERS] if members > 0 else ""
-	count.custom_minimum_size = Vector2(56, 0)
-	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	row.add_child(count)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
+	right.add_child(count)
+	if bool(info.get("playing", false)):
+		var playing := Label.new()
+		playing.text = "IN A MATCH"
+		playing.theme_type_variation = &"SmallLabel"
+		playing.add_theme_font_size_override(&"font_size", 14)
+		playing.add_theme_color_override(&"font_color", Palette.CASINO_RED.lightened(0.25))
+		right.add_child(playing)
 	var join := _button("Join", func() -> void: _join_steam_lobby(lid), 120.0)
 	join.disabled = not joinable
+	join.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(join)
-	return row
+	var beans: Array = info.get("beans", [])
+	if not beans.is_empty():
+		var stage := PanelContainer.new()  # a dark strip the beans stand on
+		var sb: StyleBoxFlat = LobbyPanel.box(Color("#181514"), Color("#2C2622"), 10, 1)
+		sb.content_margin_left = 6
+		sb.content_margin_right = 6
+		sb.content_margin_top = 4
+		sb.content_margin_bottom = 4
+		stage.add_theme_stylebox_override(&"panel", sb)
+		v.add_child(stage)
+		var lineup := HBoxContainer.new()
+		lineup.name = "Beans"
+		lineup.add_theme_constant_override(&"separation", 4)
+		stage.add_child(lineup)
+		for b: Dictionary in beans:
+			lineup.add_child(_lobby_bean(b))
+	return card
+
+
+## One bean of a lobby card: its little picture in its colour and outfit, the name under it.
+func _lobby_bean(b: Dictionary) -> Control:
+	var cell := VBoxContainer.new()
+	cell.custom_minimum_size = Vector2(72, 0)
+	cell.add_theme_constant_override(&"separation", -2)
+	var pic := TextureRect.new()
+	pic.custom_minimum_size = Vector2(72, 88)
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.texture = BeanPortraits.texture_for(int(b.get("color", 0)), b.get("outfit", []), BeanPortraits.Framing.FULL)
+	cell.add_child(pic)
+	var name_ := Label.new()
+	name_.text = ("★ " if bool(b.get("leader", false)) else "") + str(b.get("name", ""))
+	name_.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_.clip_text = true
+	name_.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_.custom_minimum_size = Vector2(72, 0)
+	name_.add_theme_font_size_override(&"font_size", 15)
+	name_.add_theme_color_override(&"font_color", Palette.VIP_GOLD if bool(b.get("leader", false)) else Palette.CREAM)
+	cell.add_child(name_)
+	return cell
 
 
 func _process(delta: float) -> void:
@@ -691,7 +761,7 @@ func _fill_browse(lobbies: Array[Dictionary]) -> void:
 		var lid: int = int(l["lobby"])
 		var friends: Array = _friend_lobby_ids.get(lid, [])
 		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if not friends.is_empty() else ""
-		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"])))
+		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), true, l.get("info", {})))
 	if had_focus:
 		_browse_refresh.grab_focus()
 

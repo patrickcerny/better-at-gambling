@@ -382,9 +382,9 @@ func _build() -> void:
 	items.anchor_right = 0.5
 	items.anchor_top = 1.0
 	items.anchor_bottom = 1.0
-	items.offset_left = -340
-	items.offset_right = 340
-	items.offset_top = -420
+	items.offset_left = -380
+	items.offset_right = 380
+	items.offset_top = -600
 	items.offset_bottom = -20
 	add_child(items)
 	# Left-bottom: feed.
@@ -484,6 +484,11 @@ static func in_play_text(st: ClientMatchState, pid: int) -> String:
 					for b: Dictionary in pub.get("bets", []):
 						if int(b["player"]) == pid:
 							amount += int(b["amount"])
+			&"baccarat":
+				if int(pub.get("state", 0)) != BaccaratLogic.State.RESULT:
+					for b: Dictionary in pub.get("bets", []):
+						if int(b["player"]) == pid:
+							amount += int(b["amount"])
 			&"wheel":
 				var ws: int = int(pub.get("state", 0))
 				if ws == WheelLogic.State.BETTING or ws == WheelLogic.State.SPINNING:
@@ -519,7 +524,7 @@ static func in_play_text(st: ClientMatchState, pid: int) -> String:
 				if int(pub.get("state", 0)) != HoldemLogic.State.PAYOUT:
 					var h: Dictionary = HoldemStation.hand_of(pub.get("hands", {}), pid)
 					if not h.is_empty() and StringName(h.get("decision", &"")) != HoldemLogic.FOLD:
-						amount += int(h.get("ante", 0)) + int(h.get("call", 0))
+						amount += int(h.get("ante", 0)) + int(h.get("call", 0)) + int(h.get("river", 0))
 					if not h.is_empty() and int(h.get("bonus_returned", -1)) < 0:
 						amount += int(h.get("bonus", 0))
 		if amount > 0:

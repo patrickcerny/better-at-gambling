@@ -1,6 +1,6 @@
 extends GutTest
 ## Hi-Lo table: one single deck (aces high), every player's own hand: ante, a card up, call HIGHER
-## or LOWER (a tie loses) at the true chance shown and the pay locked with it, then cash out or
+## or LOWER (a tie pushes, two free skips per hand) at the true chance shown and the pay locked with it, then cash out or
 ## ride the pot up the ladder. The server quietly redraws a losing card now and then and luck
 ## rerolls it; none of that is published.
 
@@ -36,8 +36,12 @@ func test_aces_are_high_and_twos_low() -> void:
 	assert_eq(HiLoLogic.value_of(_c(13)), 13)
 	assert_true(HiLoLogic.wins(HiLoLogic.HIGHER, 13, 14), "an ace beats a king")
 	assert_true(HiLoLogic.wins(HiLoLogic.LOWER, 3, 2))
-	assert_false(HiLoLogic.wins(HiLoLogic.HIGHER, 9, 9), "a tie loses a higher call")
-	assert_false(HiLoLogic.wins(HiLoLogic.LOWER, 9, 9), "and a lower call")
+	assert_false(HiLoLogic.wins(HiLoLogic.HIGHER, 9, 9), "a tie wins no higher call")
+	assert_false(HiLoLogic.loses(HiLoLogic.HIGHER, 9, 9), "and loses none: it pushes")
+	assert_false(HiLoLogic.wins(HiLoLogic.LOWER, 9, 9))
+	assert_false(HiLoLogic.loses(HiLoLogic.LOWER, 9, 9))
+	assert_true(HiLoLogic.loses(HiLoLogic.HIGHER, 9, 8))
+	assert_true(HiLoLogic.loses(HiLoLogic.LOWER, 9, 10))
 
 
 func test_the_odds_table_sums_to_one() -> void:
@@ -70,13 +74,18 @@ func test_pays_follow_the_honest_odds() -> void:
 	var line: String = "fresh deck:"
 	for row: Dictionary in table:
 		for side: String in ["higher", "lower"]:
-			var p: float = float(row[side])
+			var w: float = float(row[side])
+			var l: float = float(row["lower" if side == "higher" else "higher"])
+			var tie: float = float(row["tie"])
 			var pay: float = float(row["pay_" + side])
-			if p <= 0.0:
+			if w <= 0.0:
 				assert_eq(pay, 0.0, "value %d %s cannot come in and pays nothing" % [row["value"], side])
 				continue
+			# Ties push, so the odds that count are among the cards that settle the call.
+			var p: float = HiLoLogic.resolved(w, l)
 			assert_lte(pay, 1.0 / p + 0.000001, "never above the fair odds (value %d %s)" % [row["value"], side])
-			var back: float = pay * p * (1.0 + cfg.hilo_favour * (1.0 - p))
+			var f: float = cfg.hilo_favour
+			var back: float = pay * w * (1.0 + f * l) / (w + l - f * l * tie)
 			assert_between(back, 1.0, cfg.hilo_return + 0.000001, "value %d %s returns %.4f with the favour" % [row["value"], side, back])
 			assert_lt(pay * p, 1.0 + 0.000001, "the printed odds keep a house edge (value %d %s)" % [row["value"], side])
 		line += " %d:%.0f%%x%.2f/%.0f%%x%.2f" % [row["value"], float(row["higher"]) * 100.0, row["pay_higher"], float(row["lower"]) * 100.0, row["pay_lower"]]
@@ -91,7 +100,7 @@ func test_pays_follow_the_honest_odds() -> void:
 	assert_lt(float(three["pay_higher"]), 1.2, "higher than a 3 is nearly sure and pays little")
 	assert_eq(float(table[0]["pay_lower"]), 0.0, "nothing is lower than a 2")
 	assert_eq(float(table[12]["pay_higher"]), 0.0, "nothing is higher than an ace")
-	assert_eq(HiLoLogic.pay_for(0.001, cfg), cfg.hilo_max_pay, "a hair-thin chance pays the table maximum")
+	assert_eq(HiLoLogic.pay_for(0.001, 0.9, 0.099, cfg), cfg.hilo_max_pay, "a hair-thin chance pays the table maximum")
 
 
 func test_ante_deals_a_card_and_locks_its_odds() -> void:
@@ -183,21 +192,96 @@ func test_right_calls_ride_up_the_ladder_and_cash_out() -> void:
 	assert_eq(int(hl.get_public_state()["state"]), HiLoLogic.State.IDLE)
 
 
-func test_a_wrong_call_or_a_tie_loses_the_pot() -> void:
+func test_a_tie_pushes_and_the_call_opens_again() -> void:
 	fx.balance.hilo_favour = 0.0
-	_stack([_c(9), _c(9, 3), _c(5), _c(11)])
+	_stack([_c(9), _c(9, 3), _c(5)])
 	hl.place_bet(1, {"amount": 30})
 	assert_true(hl.player_action(1, &"higher")["ok"])
-	assert_eq(hl.hands[1]["outcome"], &"lose", "9 then 9: a tie loses")
-	assert_eq(fx.economy.balance(1), 970)
+	var h: Dictionary = hl.hands[1]
+	assert_eq(h["phase"], HiLoLogic.PLAY, "9 then 9: a tie pushes, the hand goes on")
+	assert_eq(int(h["rung"]), 0, "no step up the ladder")
+	assert_true(bool(h["push"]))
+	assert_eq(h["cards"], [_c(9), _c(9, 3)] as Array[int], "the tied card is the new one up")
+	assert_eq(fx.economy.balance(1), 970, "the ante still rides")
+	assert_eq(HiLoLogic.pot_of(h), 30)
+	var call: Dictionary = _types(hl.drain_events(), &"hilo_call")[0]
+	assert_true(bool(call["push"]))
+	assert_false(bool(call["won"]))
+	assert_true(bool(hl.get_public_state()["hands"][1]["push"]), "the client shows the push")
+	assert_true(hl.player_action(1, &"lower")["ok"], "a fresh call on the tied 9")
+	assert_eq(int(hl.hands[1]["rung"]), 1, "9 then 5: lower was right")
+	assert_false(bool(hl.hands[1]["push"]))
+	# A push after a right call keeps the pot as it is.
+	var pot: int = HiLoLogic.pot_of(hl.hands[1])
+	_stack([_c(5, 2)])
+	hl.player_action(1, &"higher")
+	assert_eq(int(hl.hands[1]["rung"]), 1)
+	assert_eq(HiLoLogic.pot_of(hl.hands[1]), pot, "a tie neither grows nor loses the pot")
+	hl.player_action(1, &"cash_out")
+	assert_eq(fx.economy.balance(1), 970 + pot)
+
+
+func test_a_tie_at_the_timeout_gives_the_ante_back() -> void:
+	fx.balance.hilo_favour = 0.0
+	_stack([_c(8), _c(8, 2)])
 	hl.place_bet(1, {"amount": 30})
-	assert_eq(hl.hands[1]["cards"], [_c(5)] as Array[int], "a new ante replaces the finished hand")
+	hl.tick(fx.balance.hilo_action_time + 0.1)
+	assert_eq(hl.hands[1]["outcome"], HiLoLogic.PUSH, "the table's call tied: a push")
+	assert_eq(fx.economy.balance(1), 1000, "the ante comes back")
+
+
+func test_a_skip_turns_a_fresh_card_up() -> void:
+	fx.balance.hilo_favour = 0.0
+	_stack([_c(8), _c(13), _c(2), _c(7)])
+	hl.place_bet(1, {"amount": 30})
+	assert_eq(int(hl.get_public_state()["hands"][1]["skips_left"]), 2)
+	hl.drain_events()
+	assert_true(hl.player_action(1, &"skip")["ok"], "an 8 is a coin flip: skip it")
+	var h: Dictionary = hl.hands[1]
+	assert_eq(h["cards"], [_c(8), _c(13)] as Array[int], "a king is up now")
+	assert_almost_eq(float(h["odds"]["higher"]), 4.0 / 50.0, 0.000001, "the call is priced on the king (8 and king are out)")
+	assert_eq(fx.economy.balance(1), 970, "skipping is free")
+	assert_eq(_types(hl.drain_events(), &"hilo_skip").size(), 1)
+	assert_eq(int(hl.get_public_state()["hands"][1]["skips_left"]), 1)
+	assert_true(hl.player_action(1, &"skip")["ok"])
+	assert_eq(int(hl.get_public_state()["hands"][1]["skips_left"]), 0)
+	assert_eq(hl.player_action(1, &"skip")["error"], &"no_skips_left", "two per hand")
+	assert_true(hl.player_action(1, &"higher")["ok"], "2 then 7")
+	assert_eq(int(hl.hands[1]["rung"]), 1)
+	hl.player_action(1, &"cash_out")
+	hl.place_bet(1, {"amount": 30})
+	assert_eq(int(hl.get_public_state()["hands"][1]["skips_left"]), 2, "a new hand gets its skips back")
+
+
+func test_long_runs_never_drain_the_deck() -> void:
+	# Four seats each holding a long run: a reshuffle still leaves enough cards to deal.
+	hl.join(3)
+	hl.join(4)
+	for p: int in [1, 2, 3, 4]:
+		hl.place_bet(p, {"amount": 10})
+	var run: int = 0
+	for p: int in [1, 2, 3, 4]:
+		var cards: Array = hl.hands[p]["cards"]
+		while cards.size() < 13 and not hl.deck.is_empty():
+			cards.append(hl.deck.pop_back())
+		run += cards.size()
+	assert_gt(run, 50, "the runs hold nearly the whole deck")
+	hl._reshuffle()
+	assert_gte(hl.deck.size(), HiLoLogic.MIN_FRESH_DECK, "the passed cards go back in")
+	for p: int in [1, 2, 3, 4]:
+		assert_false(int((hl.hands[p]["cards"] as Array).back()) in hl.deck, "the cards up stay out")
+
+
+func test_a_wrong_call_loses_the_pot() -> void:
+	fx.balance.hilo_favour = 0.0
+	_stack([_c(5), _c(11)])
+	hl.place_bet(1, {"amount": 30})
 	hl.player_action(1, &"lower")
 	assert_eq(hl.hands[1]["outcome"], &"lose", "5 then jack: lower was wrong")
-	assert_eq(fx.economy.balance(1), 940)
+	assert_eq(fx.economy.balance(1), 970)
 	var res: Array[Dictionary] = _types(hl.drain_events(), &"round_result")
-	assert_eq(res.size(), 2)
-	assert_eq(int(res[1]["net"]), -30)
+	assert_eq(res.size(), 1)
+	assert_eq(int(res[0]["net"]), -30)
 
 
 func test_the_ladder_tops_out() -> void:

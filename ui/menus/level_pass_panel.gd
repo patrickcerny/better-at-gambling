@@ -40,6 +40,13 @@ var spot_button: Button
 ## The cosmetic the spotlight shows.
 var spot_id: StringName = &""
 var _dim: ColorRect
+## Drag to scroll the track (Patrick 2026-11-15: "drag season pass to scroll also"): where the
+## left button went down, the scroll offset then, and whether it turned into a drag (a drag
+## never counts as a click on a reward).
+var _drag_from: float = -1.0
+var _drag_base: int = 0
+var _dragged: bool = false
+const DRAG_START: float = 8.0
 
 
 func _ready() -> void:
@@ -269,7 +276,9 @@ func _card(lvl: int, cfg: ProgressionConfig) -> PanelContainer:
 		b.tooltip_text = d.display_name + ("  (level pass only)" if pass_only(d) else "")
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		b.pressed.connect(func() -> void: item_pressed.emit(d.id))
+		b.pressed.connect(func() -> void:
+			if not _dragged:
+				item_pressed.emit(d.id))
 		mid.add_child(b)
 	var name_l := Label.new()
 	name_l.name = "Name"
@@ -410,6 +419,30 @@ func close() -> void:
 func _exit_tree() -> void:
 	if _dim != null and _dim.get_parent() == null:
 		_dim.free()
+
+
+func _input(event: InputEvent) -> void:
+	if not visible or scroll == null:
+		return
+	var mb := event as InputEventMouseButton
+	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
+		if mb.pressed:
+			_dragged = false
+			_drag_from = mb.position.x if scroll.get_global_rect().has_point(mb.position) else -1.0
+			_drag_base = scroll.scroll_horizontal
+		else:
+			# The release still reaches the reward button (so it un-presses); `_dragged` keeps it
+			# from counting as a click.
+			_drag_from = -1.0
+		return
+	var mm := event as InputEventMouseMotion
+	if mm != null and _drag_from >= 0.0 and (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		var dx: float = mm.position.x - _drag_from
+		if not _dragged and absf(dx) >= DRAG_START:
+			_dragged = true
+		if _dragged:
+			scroll.scroll_horizontal = maxi(_drag_base - int(dx), 0)
+			get_viewport().set_input_as_handled()
 
 
 func _unhandled_input(event: InputEvent) -> void:

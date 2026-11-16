@@ -202,7 +202,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
-	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()], [&"sword_tapper", SwordTapperUi.new()], [&"holdem", HoldemUi.new()]]:
+	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()], [&"sword_tapper", SwordTapperUi.new()], [&"holdem", HoldemUi.new()], [&"baccarat", BaccaratUi.new()]]:
 		var ui: StationUi = pair[1]
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
@@ -287,6 +287,11 @@ func _ready() -> void:
 	view.state.station_changed.connect(_on_station_state)
 	view.state.players_changed.connect(_sync_avatars)
 	view.state.lobby_changed.connect(_on_lobby_changed)
+	if SteamSvc.lobby_owner:
+		# Our party's Steam lobby: BROWSE LOBBIES shows its settings and beans (`LobbyInfo`).
+		for sig: Signal in [view.state.lobby_changed, view.state.players_changed, view.state.phase_changed]:
+			sig.connect(func(_a: Variant = null) -> void: _queue_lobby_info())
+		_queue_lobby_info()
 	view.state.peels_changed.connect(_sync_peels)
 	view.state.effects_changed.connect(_refresh_effect_tag)
 	items_ctl = ItemController.new(self)
@@ -629,6 +634,20 @@ func _drop_departed_avatars() -> void:
 			avatars.erase(pid)
 
 
+var _lobby_info_queued: bool = false
+
+
+## Writes the lobby info to Steam once per frame at most (a snapshot fires several signals).
+func _queue_lobby_info() -> void:
+	if _lobby_info_queued:
+		return
+	_lobby_info_queued = true
+	(func() -> void:
+		_lobby_info_queued = false
+		if is_instance_valid(view) and view.state != null:
+			SteamSvc.publish_lobby_info(LobbyInfo.from_state(view.state))).call_deferred()
+
+
 func _on_lobby_changed() -> void:
 	var cd: int = ceili(view.state.countdown) if view.state.countdown > 0.0 else -1
 	if cd != _countdown_shown:
@@ -865,6 +884,38 @@ func _refresh_pedestals() -> void:
 	# Arrow over the local player's own pedestal until they are ready.
 	var mine: Dictionary = view.state.players.get(local_id, {})
 	map.set_pedestal_marker(int(mine.get("color", -1)), not mine.is_empty() and not bool(mine.get("ready", false)))
+	_refresh_settings_board()
+
+
+## The lobby settings board on the start room wall: the current settings for everyone to read.
+func _refresh_settings_board() -> void:
+	var rows: Array = settings_board_rows(view.state.lobby_settings)
+	var host: Dictionary = view.state.players.get(view.state.leader, {})
+	var footer: String = "HOST ★ %s · walk up and press E to change" % str(host.get("name", "?")).to_upper() if not host.is_empty() else ""
+	if view.state.leader == local_id and not host.is_empty():
+		footer = "YOU HOST ★ · walk up and press E to change"
+	map.set_settings_board(rows, footer)
+
+
+## The board's rows for `settings` (the shared lobby settings): [label, value] each.
+static func settings_board_rows(settings: Dictionary) -> Array:
+	var presets: MatchPresets = Registry.presets
+	var mg: int = int(settings.get("minigames", presets.default_minigames))
+	var gm: int = int(settings.get("gamble_minutes", presets.default_gamble_minutes))
+	var minigames_only: bool = MatchMode.is_minigames_only(settings)
+	var pool: PackedStringArray = str(settings.get("minigame_pool", "")).split(",", false)
+	var all: int = Registry.minigames.size()
+	var on: int = 0
+	for id: StringName in Registry.minigames:
+		if pool.is_empty() or pool.has(String(id)):
+			on += 1
+	return [
+		["MODE", MatchMode.label(settings.get("mode", MatchMode.CASINO)).to_upper()],
+		["MINIGAMES", "%d" % mg],
+		["GAMBLING BETWEEN", "—" if minigames_only else "%d MIN" % gm],
+		["ITEMS", "ON" if bool(settings.get("items_enabled", true)) else "OFF"],
+		["MINIGAME PICK", "ALL %d" % all if on == all else "%d OF %d" % [on, all]],
+	]
 
 
 ## SERVER: a client's own avatar moved.
@@ -2152,7 +2203,11 @@ func _on_interact() -> void:
 		return
 	var lobby_spot: StringName = _lobby_spot()
 	if lobby_spot != &"":
-		_open_lobby_panel(lobby_spot)
+		# Patrick: everyone reads the board, only the host opens (and changes) the settings.
+		if view.state.leader == local_id:
+			_open_lobby_panel(lobby_spot)
+		else:
+			hud.toast("Only the host ★ can change the lobby settings", 2.0)
 		return
 	if casino_floor != null and casino_floor.interact():
 		return
@@ -2416,12 +2471,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 # --- World checks ------------------------------------------------------------------------------
 
-## &"settings" when the local player stands at the settings tablet in the lobby.
+## &"settings" when the local player stands at the settings board in the lobby.
 func _lobby_spot() -> StringName:
 	if local == null or not view.state.room_mode or view.state.phase != Phase.Id.LOBBY:
 		return &""
 	var p: Vector3 = local.global_position
-	if LuckyLounge.near_settings_tablet(p):
+	if LuckyLounge.near_settings_board(p):
 		return &"settings"
 	return &""
 
@@ -2436,7 +2491,7 @@ func _update_prompt() -> void:
 		return
 	match _lobby_spot():
 		&"settings":
-			hud.set_prompt(InputGlyphs.fill("[{interact}] Lobby settings" if view.state.leader == local_id else "[{interact}] Lobby settings (only the leader ★ can change them)"))
+			hud.set_prompt(InputGlyphs.fill("[{interact}] Lobby settings") if view.state.leader == local_id else "Only the host ★ can change the lobby settings")
 			return
 	var floor_prompt: String = casino_floor.prompt() if casino_floor != null else ""
 	if floor_prompt != "":
@@ -2700,6 +2755,8 @@ func _on_station_state(sid: StringName) -> void:
 			(node as SwordTapperStation).show_state(st)
 		elif node is HoldemStation:
 			(node as HoldemStation).show_round(st)
+		elif node is BaccaratStation:
+			(node as BaccaratStation).show_round(st)
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 	_update_look_lock()
@@ -2855,6 +2912,8 @@ func _min_bet(st: StationBase) -> int:
 			base = cfg.sword_min_bet
 		&"holdem":
 			base = cfg.holdem_min_bet
+		&"baccarat":
+			base = cfg.baccarat_min_bet
 	return int(floor(base * mult))
 
 

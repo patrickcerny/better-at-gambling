@@ -29,6 +29,15 @@ static func is_soft(cards: Array[int]) -> bool:
 	return has_ace and hard + 10 <= 21
 
 
+## The total as a player reads it: a soft hand under 21 shows both counts ("7 / 17", the ace as
+## 1 or 11) while it is still being played; `final` (stood, settled, dealer done) shows the best only.
+static func total_text(cards: Array[int], final: bool = false) -> String:
+	var t: int = total(cards)
+	if not final and t < 21 and is_soft(cards):
+		return "%d / %d" % [t - 10, t]
+	return str(t)
+
+
 ## Two-card 21.
 static func is_blackjack(cards: Array[int]) -> bool:
 	return cards.size() == 2 and total(cards) == 21

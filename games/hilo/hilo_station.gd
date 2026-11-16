@@ -3,7 +3,7 @@ extends StationBase
 ## The Hi-Lo table: an oval card table with burgundy felt, a padded leather rail on dark wood and
 ## brass, four stools along the players' (+z) side and the dealer standing on the far side by the
 ## deck. Each seat has its own spot on the felt where its hand's run of cards is dealt (the last
-## card is the one up), a printed six-step ladder that lights up with every right call, and the
+## card is the one up), a printed ten-step ladder that lights up with every right call, and the
 ## pot on a little brass card behind the cards. "HI · LO" and the house rules are printed in gold.
 ## Presentation only: every card and number comes from the server's public state.
 
@@ -23,8 +23,10 @@ const BET_Z: float = 0.58
 ## the name is printed between them.
 const DECK_POS: Vector3 = Vector3(0.62, TABLE_TOP, -0.42)
 const HOUSE_SPOT: Vector3 = Vector3(-0.62, TABLE_TOP + 0.05, -0.45)
-const LADDER_STEPS: int = 6
-const LADDER_GAP: float = 0.1
+const LADDER_STEPS: int = 10
+const LADDER_GAP: float = 0.072
+## How far a seat's run of cards may fan out sideways (the next seat's cards start 0.9 over).
+const RUN_WIDTH: float = 0.6
 ## Seated eye: how far it leans in from the stool, its height, its pitch, and where it looks.
 const SEAT_EYE_LEAN: float = 0.45
 const SEAT_EYE_HEIGHT: float = 1.5
@@ -66,7 +68,7 @@ func _build_visuals() -> void:
 		var pos := Vector3(SEAT_XS[i], 0.0, SEAT_Z)
 		_stool(pos, "Stool%d" % i)
 		_add_seat(pos + Vector3(0, 0.5, 0), 0.0)
-		cards.spots[i] = [card_spot(i), 0.0]
+		cards.spots[i] = [card_spot(i), 0.0, fan_step(1)]
 		var eye := Node3D.new()
 		eye.name = "SeatCamera%d" % i
 		eye.position = Vector3(SEAT_XS[i], SEAT_EYE_HEIGHT, SEAT_Z - SEAT_EYE_LEAN)
@@ -100,6 +102,11 @@ static func card_spot(i: int) -> Vector3:
 	return Vector3(SEAT_XS[clampi(i, 0, SEAT_XS.size() - 1)] - 0.12, TABLE_TOP, CARD_Z)
 
 
+## Sideways step per card for a run of `n` cards: the normal fan, squeezed to fit RUN_WIDTH.
+static func fan_step(n: int) -> float:
+	return minf(TableCards.FAN.x, RUN_WIDTH / float(maxi(n - 1, 1)))
+
+
 ## Where seat `i`'s ante goes (local).
 static func bet_spot(i: int) -> Vector3:
 	return Vector3(SEAT_XS[clampi(i, 0, SEAT_XS.size() - 1)], TABLE_TOP, BET_Z)
@@ -116,6 +123,8 @@ func show_round(pub: Dictionary) -> void:
 		var h: Dictionary = hand_of(hands, pid) if pid >= 0 else {}
 		if not h.is_empty():
 			by_seat[i] = h.get("cards", [])
+			# A long run (ten calls, skips and pushes) squeezes its fan so it never reaches the next seat.
+			cards.move_pile(i, [card_spot(i), 0.0, fan_step((by_seat[i] as Array).size())])
 		_show_seat(i, h)
 	cards.show_cards(by_seat, [])
 	if deck_stack != null:
@@ -245,7 +254,7 @@ func _arc_piece(c: Vector3, end: float, a0: float, a1: float, r: float, thick: f
 ## The gold print on the felt: the game's name and the house rules, read from the players' side.
 func _build_print() -> void:
 	_felt_text("HI · LO", Vector3(0.08, TABLE_TOP + 0.002, -0.42), 80, 0.002, "PrintName")
-	_felt_text("ACES HIGH  ·  A TIE LOSES  ·  RIDE OR CASH OUT", Vector3(0.0, TABLE_TOP + 0.002, -0.17), 36, 0.0019, "PrintRules")
+	_felt_text("ACES HIGH  ·  A TIE PUSHES  ·  SKIP TWICE  ·  RIDE OR CASH OUT", Vector3(0.0, TABLE_TOP + 0.002, -0.17), 36, 0.0019, "PrintRules")
 
 
 func _felt_text(text: String, pos: Vector3, size: int, pixel: float, node_name: String) -> Label3D:
@@ -265,7 +274,7 @@ func _felt_text(text: String, pos: Vector3, size: int, pixel: float, node_name: 
 	return l
 
 
-## Per seat: a gold ring for the ante, the six ladder steps and the pot card behind the cards.
+## Per seat: a gold ring for the ante, the ten ladder steps and the pot card behind the cards.
 func _build_seat_marks() -> void:
 	_lamp_on = GreyboxKit.gold().duplicate() as StandardMaterial3D  # lit below: not the shared gold
 	_lamp_on.emission_enabled = true
@@ -291,8 +300,8 @@ func _build_seat_marks() -> void:
 			var lamp := MeshInstance3D.new()
 			lamp.name = "Ladder%d_%d" % [i, s]
 			var disc := CylinderMesh.new()
-			disc.top_radius = 0.03
-			disc.bottom_radius = 0.03
+			disc.top_radius = 0.026
+			disc.bottom_radius = 0.026
 			disc.height = 0.008
 			disc.radial_segments = 12
 			lamp.mesh = disc

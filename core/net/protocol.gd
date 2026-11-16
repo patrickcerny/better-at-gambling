@@ -2,9 +2,9 @@ class_name Protocol
 extends RefCounted
 ## Network protocol constants (§4.1). Bump PROTOCOL_VERSION on any wire change.
 
-const PROTOCOL_VERSION: int = 15
+const PROTOCOL_VERSION: int = 17
 ## Build string clients and servers must share exactly (the orchestrator checks it too).
-const BUILD_ID: String = "0.9.40"
+const BUILD_ID: String = "0.9.53"
 const DEFAULT_PORT: int = 24680
 const MAX_PLAYERS: int = 8
 const SERVER_TICK_HZ: int = 20
@@ -39,10 +39,6 @@ enum Msg {
 	BYE,  ## C→S leaving on purpose
 	LOADED,  ## C→S {}: the match scene is built; the server tightens this peer's timeout
 }
-
-## A player the party leader kicked can't come back into that party for this long (the room
-## enforces it: `MatchServer.kick_blocked_for`).
-const KICK_REJOIN_SECONDS: float = 60.0
 
 ## Rejection codes (REJECT.code) with player-facing text.
 const REJECT_TEXT: Dictionary = {

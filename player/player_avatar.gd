@@ -309,6 +309,7 @@ func start_ragdoll(velocity: Vector3, max_time: float = 2.5, puppet: bool = fals
 	ragdoll.impact.connect(func(s: float, w: bool) -> void: ragdoll_impact.emit(s, w))
 	ragdoll.settled.connect(_on_ragdoll_settled)
 	visuals.set_ragdoll(ragdoll)
+	visuals.visible = true  # the bean itself rides the ragdoll, also in first person
 	nametag.visible = false
 	_collision.disabled = true
 	velocity = Vector3.ZERO

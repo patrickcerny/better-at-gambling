@@ -7,13 +7,15 @@ extends StationLogicBase
 ##
 ## IDLE → BETTING (the window opens on the first ante; others can still ante) → deal: two hole
 ## cards to every hand, two face down to the dealer, the flop → DECIDING (everyone at once, each on
-## their own clock; out of time = FOLD, the real rule) → showdown: turn, river, the dealer turns
-## over → PAYOUT → IDLE. One fresh 52-card deck, shuffled from the server's rng, per hand.
+## their own clock; out of time = FOLD, the real rule) → the turn → RIVER (every called hand may
+## put down a RIVER BET of one ante or CHECK, each on their own clock; out of time = check) → the
+## river, the dealer turns over → PAYOUT → IDLE. One fresh 52-card deck, shuffled from the server's rng, per hand.
 ##
 ## FOLD loses the ante. CALL puts up twice the ante. At the showdown the dealer qualifies with a
 ## pair of fours or better: if not, the ante pays by the ante paytable and the call pushes; if so,
 ## the better five of seven cards wins (ante by the paytable, call 1:1), a tie pushes both and a
-## dealer win takes both. The optional AA Bonus pays on the player's first five cards (hole cards
+## dealer win takes both. The RIVER BET (Patrick: "Poker river bet") goes with the call: it pays 1:1
+## when the hand wins and comes back when the dealer does not qualify or ties. The optional AA Bonus pays on the player's first five cards (hole cards
 ## and flop) whatever the player does next; it settles as soon as the flop is out. The money is
 ## decided here only: the clients show what the public state says.
 ##
@@ -22,14 +24,20 @@ extends StationLogicBase
 ## unseen cards drawn again once with `holdem_favour` chance, a flop that pays no bonus bet with
 ## `holdem_bonus_favour` chance; then every player's luck rerolls like every other table's cards.
 ## Nothing of it reaches a client. The dealer's two cards lie face down from the deal, so which two
-## they are is only drawn at the showdown (nobody can tell the difference).
+## they are is only drawn at the showdown (nobody can tell the difference). Turn, river and the
+## dealer's two are drawn together when the turn comes; the river and the dealer's cards stay on
+## the server (`hidden`) until the showdown.
 
-enum State { IDLE, BETTING, DECIDING, PAYOUT }
+## RIVER comes last so the numbers of the older states stay the same on the wire.
+enum State { IDLE, BETTING, DECIDING, PAYOUT, RIVER }
 
 const SEATS: int = 4
 ## A hand's decision.
 const CALL: StringName = &"call"
 const FOLD: StringName = &"fold"
+## A called hand's choice once the turn is out: one more ante (RIVER_BET) or nothing (CHECK).
+const RIVER_BET: StringName = &"river"
+const CHECK: StringName = &"check"
 ## Felt spot names (the bet types in `bet_placed` / `round_result` details).
 const ANTE: StringName = &"ante"
 const BONUS: StringName = &"bonus"
@@ -40,7 +48,8 @@ var seats: Array[int] = []
 var state: State = State.IDLE
 var timer: float = 0.0
 ## player → {ante, bonus, call, covered (Fake Cash part of each, per spot), hole: Array[int],
-## decision (&"" / call / fold), clock, settled (the ante and call), bonus_settled, gone (stood up
+## decision (&"" / call / fold), river (the river bet), river_covered, river_decision (&"" / river /
+## check), clock, settled (the ante and call), bonus_settled, gone (stood up
 ## before the deal), outcome, returned, bonus_returned}.
 var hands: Dictionary[int, Dictionary] = {}
 ## The community cards: the flop, then all five after the showdown.
@@ -48,6 +57,9 @@ var board: Array[int] = []
 ## The dealer's two cards (empty until the showdown draws them).
 var dealer: Array[int] = []
 var dealer_score: int = -1
+## The river and the dealer's two, drawn with the turn and kept off the public state until the
+## showdown (empty outside RIVER).
+var hidden: Array[int] = []
 ## The deck still to deal (the top is the back of the array).
 var deck: Array[int] = []
 var hands_played: int = 0
@@ -81,7 +93,7 @@ func join(p: int) -> Dictionary:
 
 ## Standing up: an ante still waiting for the deal is dealt and then folds (its bonus still plays);
 ## a hand that has not decided folds at once (the table's auto rule, like the clock running out). A
-## called hand plays on to the showdown.
+## called hand plays on to the showdown (an open river decision checks).
 func leave(p: int) -> void:
 	var idx: int = seats.find(p)
 	if idx >= 0:
@@ -93,6 +105,9 @@ func leave(p: int) -> void:
 	elif state == State.DECIDING and hands[p]["decision"] == &"":
 		_fold(p)
 		_check_all_done()
+	elif state == State.RIVER and p in _river_open():
+		_check(p)
+		_check_river_done()
 
 
 ## Ante limits after the limits multiplier.
@@ -165,7 +180,7 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 		bonus_covered = last_covered
 	hands[p] = {
 		"ante": amount, "bonus": bonus, "call": 0, "covered": covered, "bonus_covered": bonus_covered, "call_covered": 0,
-		"hole": [] as Array[int], "decision": &"", "clock": 0.0, "settled": false, "bonus_settled": bonus == 0,
+		"hole": [] as Array[int], "decision": &"", "river": 0, "river_covered": 0, "river_decision": &"", "clock": 0.0, "settled": false, "bonus_settled": bonus == 0,
 		"gone": false, "outcome": &"", "returned": 0, "bonus_returned": -1,
 	}
 	events.append(GameEvents.bet_placed(p, station_id, amount, with_all_in(bet, {"game": game_id, "type": ANTE})))
@@ -178,8 +193,11 @@ func place_bet(p: int, bet: Dictionary) -> Dictionary:
 	return OK_RESULT
 
 
-## `call` (twice the ante) or `fold`, once per hand while the flop is out.
+## `call` (twice the ante) or `fold`, once per hand while the flop is out; then, once the turn is
+## out, `river` (one more ante) or `check` for every called hand.
 func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dictionary:
+	if state == State.RIVER:
+		return _river_action(p, action)
 	if state != State.DECIDING:
 		return fail(&"wrong_state")
 	if not hands.has(p) or hands[p]["decision"] != &"":
@@ -203,6 +221,29 @@ func player_action(p: int, action: StringName, _params: Dictionary = {}) -> Dict
 	return OK_RESULT
 
 
+func _river_action(p: int, action: StringName) -> Dictionary:
+	if not hands.has(p) or hands[p]["decision"] != CALL or hands[p]["river_decision"] != &"":
+		return fail(&"no_active_hand")
+	var h: Dictionary = hands[p]
+	match action:
+		RIVER_BET:
+			var amount: int = int(h["ante"])
+			if not _take_stake(p, amount):
+				return fail(&"insufficient_funds")
+			h["river"] = amount
+			h["river_covered"] = last_covered
+			h["river_decision"] = RIVER_BET
+			# On the CALL spot: it settles with the call.
+			events.append(GameEvents.bet_placed(p, station_id, amount, {"game": game_id, "type": CALL_BET, "river": true}))
+			events.append(GameEvents.make(&"holdem_action", {"station": station_id, "player": p, "action": RIVER_BET}))
+		CHECK:
+			_check(p)
+		_:
+			return fail(&"unknown_action")
+	_check_river_done()
+	return OK_RESULT
+
+
 func tick(delta: float) -> void:
 	if _fast_for(seats.filter(func(x: int) -> bool: return x >= 0)):
 		delta *= 2.0  # Energy Drink, alone at the table
@@ -222,6 +263,15 @@ func tick(delta: float) -> void:
 					_fold(p)
 			timer = _longest_clock()
 			_check_all_done()
+		State.RIVER:
+			# Out of time = check (nothing more goes down).
+			for p: int in _river_open():
+				var h: Dictionary = hands[p]
+				h["clock"] = float(h["clock"]) - delta
+				if float(h["clock"]) <= 0.0:
+					_check(p)
+			timer = _longest_clock()
+			_check_river_done()
 		State.PAYOUT:
 			timer -= delta
 			if timer <= 0.0:
@@ -230,8 +280,11 @@ func tick(delta: float) -> void:
 
 func _longest_clock() -> float:
 	var out: float = 0.0
+	var open: Array[int] = []
+	if state == State.RIVER:
+		open = _river_open()
 	for p: int in hands.keys():
-		if hands[p]["decision"] == &"":
+		if hands[p]["decision"] == &"" or p in open:
 			out = maxf(out, float(hands[p]["clock"]))
 	return out
 
@@ -240,7 +293,7 @@ func round_seconds() -> float:
 	# The rest of the betting window, a full decision clock and the showdown: a hand dealt before
 	# a minigame is decided at the table (the clock folds it), so stalling a bad hand into the
 	# minigame for a refund no longer works.
-	return (timer if state == State.BETTING else balance.holdem_betting_window) + balance.holdem_action_time + 4.0
+	return (timer if state == State.BETTING else balance.holdem_betting_window) + balance.holdem_action_time + balance.holdem_river_time + 4.0
 
 
 func has_stake(p: int) -> bool:
@@ -257,6 +310,10 @@ func auto_resolve() -> void:
 			if hands[p]["decision"] == &"":
 				_fold(p)
 		_check_all_done()
+	if state == State.RIVER:
+		for p: int in _river_open():
+			_check(p)
+		_check_river_done()
 	if state == State.PAYOUT:
 		_end_round()
 
@@ -276,11 +333,14 @@ func refund_all() -> void:
 			_refund(p, int(h["ante"]), int(h["covered"]), totals)
 			if int(h["call"]) > 0:
 				_refund(p, int(h["call"]), int(h["call_covered"]), totals)
+			if int(h["river"]) > 0:
+				_refund(p, int(h["river"]), int(h["river_covered"]), totals)
 		if bool(h["settled"]) or (int(h["bonus"]) > 0 and int(h["bonus_returned"]) >= 0):
 			modifiers.consume_round(p, game_id)  # something of this hand was played
 	hands.clear()
 	board.clear()
 	dealer.clear()
+	hidden.clear()
 	dealer_score = -1
 	deck.clear()
 	state = State.IDLE
@@ -295,7 +355,7 @@ func get_public_state() -> Dictionary:
 		var h: Dictionary = hands[p]
 		var hole: Array[int] = h["hole"]
 		var row: Dictionary = {
-			"ante": h["ante"], "bonus": h["bonus"], "call": h["call"], "hole": hole.duplicate(),
+			"ante": h["ante"], "bonus": h["bonus"], "call": h["call"], "river": h["river"], "river_decision": h["river_decision"], "hole": hole.duplicate(),
 			"decision": h["decision"], "outcome": h["outcome"], "returned": h["returned"], "bonus_returned": h["bonus_returned"],
 		}
 		if not hole.is_empty():
@@ -306,12 +366,12 @@ func get_public_state() -> Dictionary:
 			row["hand"] = HoldemHand.describe(score)
 			if revealed and h["decision"] == CALL:
 				row["best"] = HoldemHand.best_five(mine)
-		if state == State.DECIDING and h["decision"] == &"":
+		if (state == State.DECIDING and h["decision"] == &"") or (state == State.RIVER and h["decision"] == CALL and h["river_decision"] == &""):
 			row["clock"] = maxf(float(h["clock"]), 0.0)
 		hs[p] = row
 	var out: Dictionary = {
 		"game": game_id, "state": state, "timer": timer, "seats": seats.duplicate(), "hands": hs,
-		"board": board.duplicate(), "dealer": dealer.duplicate(), "dealer_down": 2 if state == State.DECIDING else 0,
+		"board": board.duplicate(), "dealer": dealer.duplicate(), "dealer_down": 2 if state == State.DECIDING or state == State.RIVER else 0,
 	}
 	if revealed:
 		out["dealer_hand"] = HoldemHand.describe(dealer_score)
@@ -341,6 +401,7 @@ func _deal() -> void:
 	rigged.clear()
 	board.clear()
 	dealer.clear()
+	hidden.clear()
 	dealer_score = -1
 	var order: Array[int] = _seat_order()
 	for p: int in order:
@@ -455,16 +516,64 @@ func _check_all_done() -> void:
 	for p: int in hands.keys():
 		if hands[p]["decision"] == &"":
 			return
-	_showdown()
+	_turn()
 
 
-## Turn, river and the dealer's two cards (one draw of the four unseen cards, with the house rule
-## and the players' luck), then every called hand is paid.
-func _showdown() -> void:
-	var callers: Array[int] = []
+## Every decision is in: turn, river and the dealer's two are drawn (`_draw_rest`), the turn goes
+## on the board and every called hand gets its river clock. Nobody called: straight to the showdown.
+func _turn() -> void:
+	var callers: Array[int] = _callers()
+	var rest: Array[int] = _draw_rest(callers)
+	if callers.is_empty():
+		_showdown(rest)
+		return
+	board.append(rest[0])
+	hidden = rest.slice(1, 4)
+	state = State.RIVER
+	events.append(GameEvents.make(&"holdem_turn", {"station": station_id, "board": board.duplicate()}))
+	for p: int in callers:
+		hands[p]["clock"] = balance.holdem_river_time
+		if not p in seats:
+			_check(p)  # stood up after calling: nobody there to bet the river
+	timer = _longest_clock()
+	_check_river_done()
+
+
+## Called hands that still have to bet the river or check.
+func _river_open() -> Array[int]:
+	var out: Array[int] = []
+	for p: int in hands.keys():
+		if hands[p]["decision"] == CALL and hands[p]["river_decision"] == &"":
+			out.append(p)
+	return out
+
+
+func _check(p: int) -> void:
+	hands[p]["river_decision"] = CHECK
+	events.append(GameEvents.make(&"holdem_action", {"station": station_id, "player": p, "action": CHECK}))
+
+
+func _check_river_done() -> void:
+	if state != State.RIVER or not _river_open().is_empty():
+		return
+	var rest: Array[int] = [board[3]]
+	rest.append_array(hidden)
+	board.resize(3)
+	hidden.clear()
+	_showdown(rest)
+
+
+func _callers() -> Array[int]:
+	var out: Array[int] = []
 	for p: int in _seat_order():
 		if hands[p]["decision"] == CALL:
-			callers.append(p)
+			out.append(p)
+	return out
+
+
+## The four unseen cards [turn, river, dealer, dealer] in one draw, with the house rule and the
+## players' luck (judged on the ante and call, before any river bet).
+func _draw_rest(callers: Array[int]) -> Array[int]:
 	var current: Array = [_take(4)]
 	if not callers.is_empty() and _nobody_wins_somebody_loses(callers, current[0]) and rng.chance(balance.holdem_favour):
 		_put_back(current[0])
@@ -482,7 +591,13 @@ func _showdown() -> void:
 		current[0] = d.value
 		if d.luck_changed:
 			events.append(GameEvents.luck_flourish(p, station_id, &"lucky" if lk > 0 else &"jinxed"))
-	var rest: Array[int] = current[0]
+	return current[0] as Array[int]
+
+
+## The river and the dealer's two cards turn over (`rest` = [turn, river, dealer, dealer]), then
+## every called hand is paid: ante and call as before, the river bet like the call.
+func _showdown(rest: Array[int]) -> void:
+	var callers: Array[int] = _callers()
 	board.append_array(rest.slice(0, 2))
 	dealer = rest.slice(2, 4)
 	var all: Array[int] = dealer.duplicate()
@@ -496,7 +611,7 @@ func _showdown() -> void:
 		cards.append_array(board)
 		var score: int = HoldemHand.evaluate(cards)
 		var ante: int = int(h["ante"])
-		var call: int = int(h["call"])
+		var call: int = int(h["call"]) + int(h["river"])
 		var outcome: StringName = main_outcome(score, dealer_score)
 		var ret: int = main_return(ante, call, score, dealer_score, balance)
 		h["settled"] = true
@@ -543,6 +658,7 @@ func _end_round() -> void:
 	hands.clear()
 	board.clear()
 	dealer.clear()
+	hidden.clear()
 	dealer_score = -1
 	deck.clear()
 	state = State.IDLE

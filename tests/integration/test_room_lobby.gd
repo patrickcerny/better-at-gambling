@@ -162,3 +162,21 @@ func test_validator_rules() -> void:
 		if _intent(b, &"emote", {"id": &"wave"})["error"] == &"rate_limited":
 			limited += 1
 	assert_eq(limited, 10, "more than 20 intents per second are dropped")
+
+
+## Patrick 2026-11-15: friends who left stayed in the lobby list as "(away)" forever.
+func test_players_away_from_the_lobby_are_dropped_after_a_while() -> void:
+	var a: int = server.add_player("dev:a", "A")
+	var b: int = server.add_player("dev:b", "B")
+	var c: int = server.add_player("dev:c", "C")
+	server.player_disconnected(b)
+	server.player_disconnected(c)
+	_tick(5.0)
+	server.player_reconnected(c)
+	assert_true(server.state.players.has(b), "a short drop keeps the slot")
+	_tick(MatchServer.LOBBY_AWAY_DROP_SECONDS)
+	assert_false(server.state.players.has(b), "gone for good after a while")
+	assert_eq(int(_of(&"player_removed").back()["player"]), b)
+	assert_true(server.state.players.has(a))
+	assert_true(server.state.players.has(c), "came back in time: stays")
+	assert_eq(server.player_by_uid("dev:b"), -1, "B joins as a new player next time")

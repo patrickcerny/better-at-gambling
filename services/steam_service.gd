@@ -49,6 +49,8 @@ var steam: Object = null
 ## Lobby we are in (0 = none) and whether we own it.
 var lobby_id: int = 0
 var lobby_owner: bool = false
+## The `LobbyInfo` text last written to our lobby (only changes are sent to Steam).
+var _info_sent: String = ""
 ## A lobby to join that arrived before anyone could act on it (launch argument, or a join request
 ## while a match was loading). The main menu picks it up.
 var pending_lobby: int = 0
@@ -477,6 +479,7 @@ func leave_lobby() -> void:
 		steam.call("clearRichPresence")
 	lobby_id = 0
 	lobby_owner = false
+	_info_sent = ""
 
 
 ## Opens the Steam overlay's invite dialog for our lobby.
@@ -484,6 +487,19 @@ func invite_friends() -> bool:
 	if not _available or lobby_id == 0:
 		return false
 	steam.call("activateGameOverlayInviteDialog", lobby_id)
+	return true
+
+
+## The host's game: what BROWSE LOBBIES shows about our lobby (settings and the beans in it, see
+## `LobbyInfo`). Only an owned lobby is written, and only when something changed.
+func publish_lobby_info(info: Dictionary) -> bool:
+	if not _available or not lobby_owner or lobby_id == 0:
+		return false
+	var text: String = LobbyInfo.to_text(info)
+	if text == _info_sent:
+		return false
+	_info_sent = text
+	steam.call("setLobbyData", lobby_id, LobbyInfo.KEY, text)
 	return true
 
 
@@ -524,7 +540,8 @@ func friend_lobbies() -> Array[Dictionary]:
 		elif kind != LOBBY_GAME:
 			continue
 		seen.append({"name": str(steam.call("getFriendPersonaName", fid)), "lobby": lid, "party": lobby_data(lid, "name"),
-			"build": lobby_data(lid, "build"), "members": int(steam.call("getNumLobbyMembers", lid)), "max": int(steam.call("getLobbyMemberLimit", lid))})
+			"build": lobby_data(lid, "build"), "members": int(steam.call("getNumLobbyMembers", lid)), "max": int(steam.call("getLobbyMemberLimit", lid)),
+			"info": LobbyInfo.parse(lobby_data(lid, LobbyInfo.KEY))})
 	return group_friend_lobbies(seen)
 
 
@@ -541,7 +558,7 @@ static func group_friend_lobbies(seen: Array[Dictionary]) -> Array[Dictionary]:
 			continue
 		at[lid] = out.size()
 		out.append({"lobby": lid, "party": str(f.get("party", "")), "build": str(f.get("build", "")), "friends": [str(f["name"])],
-			"members": int(f.get("members", 0)), "max": int(f.get("max", 0))})
+			"members": int(f.get("members", 0)), "max": int(f.get("max", 0)), "info": f.get("info", {})})
 	for e: Dictionary in out:
 		e["members"] = maxi(int(e["members"]), (e["friends"] as Array).size())  # Steam may not know yet
 	return out
@@ -599,13 +616,15 @@ func _on_lobby_match_list(lobbies: Array = []) -> void:
 		var lid: int = int(v)
 		if lid == 0 or lid == lobby_id:
 			continue
-		out.append(public_lobby_entry(lid, lobby_data(lid, "name"), int(steam.call("getNumLobbyMembers", lid)), int(steam.call("getLobbyMemberLimit", lid))))
+		var e: Dictionary = public_lobby_entry(lid, lobby_data(lid, "name"), int(steam.call("getNumLobbyMembers", lid)), int(steam.call("getLobbyMemberLimit", lid)))
+		e["info"] = LobbyInfo.parse(lobby_data(lid, LobbyInfo.KEY))
+		out.append(e)
 	public_lobbies_received.emit(out)
 
 
-## One row of BROWSE LOBBIES.
-static func public_lobby_entry(lid: int, party: String, members: int, max_members: int) -> Dictionary:
-	return {"lobby": lid, "name": party if party.strip_edges() != "" else "Lobby", "members": members, "max": max_members if max_members > 0 else Protocol.MAX_PLAYERS}
+## One row of BROWSE LOBBIES (`info`: the host's `LobbyInfo`, {} from an older host).
+static func public_lobby_entry(lid: int, party: String, members: int, max_members: int, info: Dictionary = {}) -> Dictionary:
+	return {"lobby": lid, "name": party if party.strip_edges() != "" else "Lobby", "members": members, "max": max_members if max_members > 0 else Protocol.MAX_PLAYERS, "info": info}
 
 
 func _on_lobby_chat_update(id: int, _changed: int, _making_change: int, _state: int) -> void:

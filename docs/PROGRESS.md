@@ -93,6 +93,128 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.53 Baccarat
+- Patrick: "Adde Baccarat". New table game `baccarat` (Punto Banco, 8-deck shoe, standard tableau):
+  PLAYER 1:1, BANKER 1:1 less 5%, TIE 9:1, P PAIR / B PAIR 11:1, Player and Banker push on a tie.
+  Shared round like roulette (betting window, the cards turn one by one, then the pay); quiet favour
+  per bet type makes each ~101.1% (`tests/sim/test_rtp_baccarat.gd`). Luck moves the pay only
+  (lucky: a one-point loss can come back; jinxed: a win pays 80%).
+- `BaccaratStation`: long table with round corners in deep blue felt, five seats each with its own
+  gold-lined betting panel (PLAYER/BANKER discs in front, P PAIR/TIE/B PAIR behind), the two hands in
+  frames with floating totals, winner outlined, a LAST ROUNDS scoreboard, shoe and chip rack.
+  `BaccaratUi` docks in the right column (hands, five bet buttons with pays, chips, road).
+- Full floor: the pit can't hold a tenth table, so `full_extras` is now two blackjacks (roulette_2 is
+  off the canonical floor; random floors still draw extras by weight). Protocol 17.
+- Floor generator: with seven table games a random pit draw could leave one out (seed 48); such a
+  draw now searches rows that take them all instead of failing.
+### 2026-11-16 / 0.9.50 Lobby panel redesign, lobby cards with beans, no kick rejoin block
+- Patrick: "auch das UI ist veraltet … Wenn man jemanden kickt soll er nicht einen throttle haben" and
+  "Die browse lobbies ist was grad eingestellt ist und kleine anzeige von allen beans … mit namen".
+- Kick: the 60 s rejoin block is gone (`MatchServer._kicked`/`kick_blocked_for`, `RoomHost` kick_cooldown
+  check, `Protocol.KICK_REJOIN_SECONDS`); a kicked player can join again on their own right away.
+- "(away)" ghosts: players who left stayed in the lobby list forever. In the lobby, anyone disconnected
+  for `MatchServer.LOBBY_AWAY_DROP_SECONDS` (60 s, Patrick 0.9.51) is removed (also those who left during the last match,
+  once Play Again returns to the lobby); a quick reconnect keeps the slot.
+- `LobbyPanel` redesign: fully opaque panel (pedestal names no longer show through), header with lobby
+  kind and player count, status band (countdown or hint + "x / y READY"), player rows with a bean
+  portrait in its outfit, LEADER/YOU tags, READY pills, KICK aligned; MATCH SETTINGS card with one row
+  per setting; footer LEAVE LOBBY | COSMETICS, INVITE FRIENDS, CLOSE.
+- `BeanPortraits` (ui/common): one offscreen viewport renders cached bean pictures (head or full bean).
+- BROWSE LOBBIES / JOIN A FRIEND: one card per lobby with the host's settings ("Casino · 5 minigames ·
+  3 min gambling · items on") and a line-up of the beans inside in their outfits with names (★ leader),
+  "IN A MATCH" when playing. The host's game writes `LobbyInfo` JSON to the Steam lobby data key `info`
+  (`SteamSvc.publish_lobby_info`, from match_scene when it owns the lobby); browsers parse it untrusted.
+- Tests: test_lobby_info (new), test_room_lobby (ghost drop), test_lobby_kick, test_host_mode,
+  test_main_menu (cards), test_minigame_selector; lint ok. Gallery: `--panel lobby`, `--panel browser`.
+
+### 2026-11-16 / 0.9.49 Item bar with the item models, NEW ITEM card, fuller explanations
+- Patrick: "Items erklären wichtiger" and "Item inventory bar sollte nicht namen der items zeigen
+  sondern die 3d models und onscroll oder equip der name". The three slots (`ItemBar`) are squares
+  with the item's model (`ItemThumbnails`, still pictures); the held slot is bigger, its model turns
+  live in a small SubViewport (`ItemThumbnails.build_stage`, shared photo booth) and its name shows
+  under it. No names otherwise.
+- New items: a "NEW ITEM" card (picture, rarity, FOR YOU / ON OTHERS / TRAP, duration, the whole
+  description, how to take it out and how to use it), one after another, 6 s each while the bar is
+  on screen; it waits while you sit or another card is up, and taking the item out skips it.
+- Picking a slot: the card shows the whole description (not just the first sentence), the tag
+  line and how to use it (aim, reach, key) for 3.5 s. The I card has the picture and the same lines.
+- Look-dev: `scripts/screenshot.sh res://tools/dev/item_bar_shot.tscn name 60 [--hold N] [--info] [--quiet] [--items a,b,c]`.
+- Tests: `tests/ui/test_item_bar.gd` (models in slots, held name, NEW ITEM queue, copies count),
+  `tests/physics/test_items_scene.gd` updated. Ran: those two, reward panel items, pause menu, shop
+  panel, HUD toasts, items/duels/shop, check_scripts (no full suite, Patrick's rule).
+
+### 2026-11-16 / 0.9.48 Own game icon instead of the Godot icon
+- Patrick: the game (also started through Steam) showed the Godot icon in the taskbar. The project now
+  has its own icon: `assets/icons/icon.png` (512 px, runtime window/taskbar icon via
+  `application/config/icon`), `icon.ico` (16 to 256 px, `config/windows_native_icon` and the Windows
+  preset's `application/icon`) and `icon.icns` (`config/macos_native_icon` and the macOS preset). Same
+  coin logo as the Steam icons (`better-at-gambling/steam/icons/` in the project files).
+- Windows preset: `application/modify_resources=true`, so the export writes the icon, product name and
+  file description into the .exe (Godot 4.7 does this natively, no rcedit needed).
+
+### 2026-11-16 / 0.9.47 Minigame rules card: preview clip + controls
+- Patrick: "Controls und gifs bei den minigames". The rules card before every minigame
+  (MinigameBriefing) is wider: a looping 5 s preview clip on the left (MinigamePreview plays the
+  sprite sheet assets/minigames/clips/<id>.webp, 50 frames 384x216 at 10 fps), how to play and a
+  controls table on the right (MinigameControls: keyboard and gamepad keycaps per action, filled from
+  the InputMap, the column of the device used last is lit, a dash where a device can't do it).
+  Player ready states are pills; the READY hint follows the device.
+- Clips: `tools/minigame_clips.sh [id ...]` runs tools/dev/minigame_clip.tscn under Xvfb with
+  `--fixed-fps 30`. Table games run their real logic in real time with every seat played by a bot that
+  sends random legal intents (per-game skip in the script); walkable games use their dev shot with the
+  beans walking one lap and the camera drifting so the loop joins. Imported lossy (compress/mode=1),
+  ~7.6 MB of source for all 16.
+- Gamepad gaps closed: Forehead Poker A = STAY / B = FOLD, Find the Lady D-pad moves the highlight and
+  A picks. Still mouse/keyboard only: Lonely Number, Vote Race, Spy, Grab Your Hand's card select
+  (shown as a dash on the card).
+- Known, not from this change: tests/ui/test_pause_in_minigame.gd fails 2/3 on main too
+  (PauseMenu.set_dev_available touches a null node, pause_menu.gd:113).
+### 2026-11-16 / 0.9.46 pedestal stairs and the lobby settings board
+- Patrick: "mach die stairs noch besser". The pedestal stairs were four thin slabs hanging in the
+  air over a visible wedge. Now `_build_stair`: four solid steps standing on the floor and running
+  into the column, polished treads that overhang their risers with a gold nosing and a shadow line,
+  dark marble cheek walls along the slope with a gold cap rail, newel posts with gold balls at the
+  foot. Walking is still the one invisible wedge (no lips), 0.9 m wide; 1.1 m gap between stairs.
+- Patrick: "mach lieber da eine große tafel an der wand ... settings LESBAR (nur host kann ui öffnen
+  und verändern)". The brass tablet stand is gone; a 4.2 x 2.7 m framed felt board hangs on the start
+  room's north wall west of the lobby doors (`SETTINGS_BOARD_*`) with a picture light, showing mode,
+  minigames, gambling minutes, items and the minigame pick live for everyone, and the host in the
+  footer. E in front of it opens the lobby settings for the host only; anyone else gets a toast.
+  Tests: `test_start_room_and_jail.gd` (board follows the settings, non-host cannot open).
+### 2026-11-15 / 0.9.45 Casino Hold'em river bet
+- Patrick: "Poker river bet". Before, the turn and the river came out together straight after the
+  CALL, with no betting in between. Now the turn comes out on its own (state `RIVER`, appended to
+  `HoldemLogic.State` so the older numbers stay), and every called hand puts down a RIVER BET (one
+  ante) or CHECKs on its own clock (`BalanceConfig.holdem_river_time` 10 s; out of time, standing up
+  or the match end = check). The river bet pays 1:1 like the call, comes back when the dealer does
+  not qualify or ties. Turn, river and the dealer's two are still drawn together (house rule and
+  luck unchanged, judged on ante + call); river and dealer stay in `hidden` on the server until the
+  showdown. Chips go on the CALL spot and settle with the hand. Same two buttons in the overlay
+  (C = river bet, F = check). Protocol 16. The RTP sim checks the river, so its numbers are unchanged.
+### 2026-11-15 / 0.9.43 end screen with the stats stays up for 10 s
+- Patrick: "Es hat auch den endscreen mit den stats einfach direct geskipped lass den verpflichtend paar
+  sekunden bleiben bis man leaven kann". Cause: PLAY AGAIN had the focus from the first frame, so a
+  Space / Enter / pad A still held from the match pressed it at once; the leader's press sent
+  `return_to_lobby` and took the whole room back to the lobby. Now PLAY AGAIN / LEAVE are greyed out
+  with a countdown ("LEAVE LOBBY (7)") for `BalanceConfig.results_min_time` (10 s) and only get the
+  focus when they unlock; the server also refuses `return_to_lobby` with `too_early` until 10 s
+  after `match_ended` (`MatchServer.results_lock_in`).
+### 2026-11-15 / 0.9.42 blackjack soft totals, lobby clipping
+- Patrick: "Soft 17 zb 7 / 17". A soft hand still in play shows both counts ("7 / 17", a lone ace
+  "1 / 11") in the panel, the seat panels, the 3D split tags and the dealer's up card;
+  `HandEval.total_text(cards, final)`. Stood/settled hands and the revealed dealer show the best total.
+- "kann man splits doublen?": yes, double after split already worked (test_split_takes_equal_stake...).
+- "Der screenshot clipped": the start-room wall's velvet panels ran behind the doorway column pair;
+  `LoungeDecor._walls` now starts a run's panels `PILLAR_CLEAR` past a column standing in the wall.
+- "da clipped was": the entrance hall's cross brass inlay ran through the red runner at the same
+  height (gold line across the carpet); it now stops at the runner's brass edges.
+### 2026-11-15 / 0.9.41 thrown and knocked-out beans keep their own look
+- Patrick: "wenn man jemanden wirft, ändert sich das model so weird. Verwende da das normale model und
+  skews nicht so". The ragdoll drew a stand-in bean of its own (plain colour, no skin/face/outfit
+  extras, capsule arms stretched shoulder-to-hand with a sheared basis). RagdollBody is physics only
+  now (meshes hidden); `AvatarVisuals._follow_ragdoll` puts the player's own rig on the torso (rotation
+  only, no scale/shear), arms and legs flail by ragdoll speed (`RagdollBody.speed`), shocked face while
+  flying, KO face from `knocked_out`. Look-dev: bean_shot.tscn --view chaos --at 0.35 / 2.5.
 ### 2026-11-15 / 0.9.40 Plinko chips invisible after the floor changed
 - Patrick: "cant see my plinkoballs". When a new floor layout moves Plinko, the server opens a fresh
   `PlinkoLogic` whose drop ids start at 1 again, but `MatchScene._plinko_seen` still held

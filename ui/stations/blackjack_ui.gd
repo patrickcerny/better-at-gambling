@@ -202,7 +202,8 @@ func _refresh() -> void:
 		for i: int in 2:
 			var h: Dictionary = mine if i == 0 else mine["split"]
 			var playing: bool = playing_split and active == i
-			lines.append("%sHAND %d   %s   %s" % ["» " if playing else "", i + 1, " ".join(_labels(h.get("cards", []))), _total_text(h, false)])
+			var hand_done: bool = bool(mine.get("first_done", false)) if i == 0 else bool(mine.get("done", false))
+			lines.append("%sHAND %d   %s   %s" % ["» " if playing else "", i + 1, " ".join(_labels(h.get("cards", []))), _total_text(h, false, hand_done)])
 		hand_label.text = "\n".join(lines)
 		# The big number is the hand you are playing; both stakes once you are done.
 		if playing_split:
@@ -279,20 +280,23 @@ func _refresh_seats(seats: Array, hands: Dictionary) -> void:
 			var cards: Array = h.get("cards", [])
 			lines.append(" ".join(_labels(cards)) if not cards.is_empty() else "—")
 			var total: int = int(h.get("total", 0))
+			var shown: String = HandEval.total_text(_ints(cards), bool(h.get("done", false)))
 			var tail: String = ""
 			if total > 21:
 				tail = "  BUST"
 			elif bool(h.get("done", false)) and not cards.is_empty():
 				tail = "  STAND"
-			lines.append("%s$%d%s" % [("%d  ·  " % total) if total > 0 else "", int(h.get("stake", 0)), tail])
+			lines.append("%s$%d%s" % [("%s  ·  " % shown) if total > 0 else "", int(h.get("stake", 0)), tail])
 		l.text = "\n".join(lines)
 		l.add_theme_color_override(&"font_color", Palette.VIP_GOLD if me else Palette.CREAM)
 
 
-## "18", "23  BUST", "21  BLACKJACK!" (a natural only counts on an unsplit hand).
-static func _total_text(h: Dictionary, natural: bool) -> String:
+## "18", "7 / 17" (soft, still in play), "23  BUST", "21  BLACKJACK!" (a natural only counts on
+## an unsplit hand).
+static func _total_text(h: Dictionary, natural: bool, done: Variant = null) -> String:
 	var total: int = int(h.get("total", 0))
-	var out: String = ("%d" % total) if total > 0 else ""
+	var finished: bool = bool(h.get("done", false)) if done == null else bool(done)
+	var out: String = HandEval.total_text(_ints(h.get("cards", [])), finished) if total > 0 else ""
 	if total > 21:
 		out += "  BUST"
 	elif natural and total == 21 and (h.get("cards", []) as Array).size() == 2:
@@ -307,7 +311,7 @@ func _labels(cards: Array) -> Array[String]:
 	return out
 
 
-func _ints(cards: Array) -> Array[int]:
+static func _ints(cards: Array) -> Array[int]:
 	var out: Array[int] = []
 	for c: Variant in cards:
 		out.append(int(c))

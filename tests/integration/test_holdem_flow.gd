@@ -1,6 +1,6 @@
 extends GutTest
 ## Casino Hold'em through the real server: sit, ante (and the AA Bonus), the deal after the
-## betting window, FOLD or CALL through the ledger, the clock running out folds, "Table closing!"
+## betting window, FOLD or CALL through the ledger, the turn and the RIVER BET or CHECK, the clock running out folds, "Table closing!"
 ## refuses a hand that could not finish, a minigame gives every open ante and call back (a bonus
 ## the flop settled stays settled), and standing up mid-hand folds.
 
@@ -88,13 +88,17 @@ func test_ante_bonus_call_and_win_through_the_ledger() -> void:
 	var bonus: Dictionary = _results(p)[0]
 	assert_eq(int(bonus["returned"]), 80, "the AA Bonus settled with the flop")
 	assert_true(fx.intent(p, &"action", {"station": SID, "action": &"call"})["ok"])
+	assert_eq(logic.state, HoldemLogic.State.RIVER, "the turn is out")
+	assert_eq((_pub()["board"] as Array).size(), 4)
+	assert_eq((_pub()["dealer"] as Array).size(), 0, "the dealer's cards still down")
+	assert_true(fx.intent(p, &"action", {"station": SID, "action": &"river"})["ok"])
 	var main: Dictionary = _results(p)[1]
 	assert_eq(StringName(main["details"]["outcome"]), &"win")
 	var mult: float = float((main["details"] as Dictionary).get("multiplier", 1.0))
-	var paid: int = 60 + int(floor(60 * mult + 0.000001))
-	assert_eq(int(main["returned"]), paid, "ante 1:1 and call 1:1 (times any hot table / Last Call)")
+	var paid: int = 80 + int(floor(80 * mult + 0.000001))
+	assert_eq(int(main["returned"]), paid, "ante, call and river bet 1:1 (times any hot table / Last Call)")
 	var bmult: float = float((bonus["details"] as Dictionary).get("multiplier", 1.0))
-	assert_eq(fx.server.economy.balance(p), start - 30 - 40 + (10 + int(floor(70 * bmult + 0.000001))) + paid)
+	assert_eq(fx.server.economy.balance(p), start - 30 - 40 - 20 + (10 + int(floor(70 * bmult + 0.000001))) + paid)
 	var reasons: Array = fx.of_type(&"money_changed").filter(func(e: Dictionary) -> bool: return int(e["player"]) == p).map(func(e: Dictionary) -> StringName: return StringName(e["reason"]))
 	assert_true(&"bet_holdem" in reasons and &"win_holdem" in reasons, "through the ledger: %s" % str(reasons))
 	assert_eq(fx.of_type(&"holdem_showdown").size(), 1)
@@ -185,5 +189,6 @@ func test_standing_up_mid_hand_folds() -> void:
 	assert_true(fx.intent(p, &"sit", {"station": SID})["ok"], "the seat is free again")
 	# A called hand left behind plays on to the showdown.
 	assert_true(fx.intent(q, &"action", {"station": SID, "action": &"call"})["ok"])
+	assert_true(fx.intent(q, &"action", {"station": SID, "action": &"check"})["ok"])
 	assert_eq(_results(q).size(), 1)
 	assert_ne(StringName(_results(q)[0]["details"]["outcome"]), &"fold")
