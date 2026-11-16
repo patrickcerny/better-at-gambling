@@ -189,3 +189,21 @@ func test_wheel_view_stops_on_the_target() -> void:
 	assert_eq(landed, [7] as Array[int])
 	assert_eq(DailyWheelView.index_at(w.angle), 7)
 	assert_false(w.busy())
+
+
+func test_the_wheel_never_gives_gold_or_level_pieces() -> void:
+	# Patrick 2026-11-16: "Dont be able to win money or level locked skins". The only cosmetic slices
+	# are the mystery piece (a red-Coin shop piece) and the wheel-only Fortune skin.
+	var p: PlayerProfile = ProfileManager.profile
+	for k: int in 200:
+		var id: StringName = DailyWheel.mystery_piece(p, float(k) / 200.0)
+		var d: CosmeticDef = p.shop.find(id)
+		assert_false(d.premium() or d.gold > 0, "%s is not a Gold piece" % id)
+		assert_eq(d.level, 0, "%s is not a level pass piece" % id)
+		assert_false(d.wheel_only)
+		assert_ne(d.kind, CosmeticDef.KIND_SKIN, "no shop skins")
+	for i: int in DailyWheel.count():
+		if DailyWheel.segment(i)["kind"] == DailyWheel.KIND_SKIN:
+			var s: CosmeticDef = p.shop.find(DailyWheel.SKIN_ID)
+			assert_eq(s.steam_item, int(DailyWheel.segment(i)["steam_item"]))
+			assert_true(s.wheel_only, "the only skin is the wheel-only one")
