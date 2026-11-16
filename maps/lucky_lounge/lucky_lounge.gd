@@ -83,16 +83,26 @@ const SHOP_POS: Vector3 = Vector3(19.6, 0, 0.9)
 ## north side: its centre, and where players stand to use it.
 const ODD_JOBS_CABINET: Vector3 = Vector3(21.35, 0, -2.6)
 const ODD_JOBS_POS: Vector3 = Vector3(20.3, 0, -2.6)
-## The lobby settings tablet on its brass stand (0.9.4, Patrick: "settings tablet into the lobby
-## room"), west of the middle of the start room by the host's spot: walk up and press E for the
-## lobby settings. Where it stands, which way its screen faces (yaw), and how close you must be.
-const SETTINGS_TABLET_POS: Vector3 = Vector3(-10.6, 0, 9.9)
-const SETTINGS_TABLET_YAW: float = -PI * 0.6
-const SETTINGS_TABLET_RANGE: float = 1.8
+## The lobby settings board (0.9.41, Patrick: "mach lieber da eine große tafel an der wand"):
+## a big framed board on the start room's north wall, west of the lobby doors, that shows the
+## lobby's settings to everyone, live. Only the host opens the settings there (walk up, press E).
+## Where its middle hangs (x, wall face z), its size, and the spot in front of it you use it from.
+const SETTINGS_BOARD_X: float = -11.0
+const SETTINGS_BOARD_SIZE: Vector2 = Vector2(4.2, 2.7)
+const SETTINGS_BOARD_Y: float = 2.75
+const SETTINGS_BOARD_SPOT: Vector3 = Vector3(-11.0, 0, 9.5)
+const SETTINGS_BOARD_RANGE: float = 2.0
+## Rows on the board: [left label, right value] each.
+const SETTINGS_BOARD_ROWS: int = 5
 ## Radius around a ready pedestal's centre that counts as standing on it, and how high its top is
 ## (you have to be up on it, not beside it).
 const PAD_RADIUS: float = 0.75
 const PEDESTAL_TOP: float = 0.8
+## The marble stair in front of each pedestal: how many steps, how long (floor to column) and
+## how wide between its cheek walls.
+const STAIR_STEPS: int = 4
+const STAIR_LEN: float = 1.7
+const STAIR_W: float = 0.9
 ## Floor layers (y): carpet 0.01, area rugs 0.02, station rugs 0.03. Keep 1 cm apart.
 const AREA_RUG_Y: float = 0.02
 const STATION_RUG_Y: float = 0.03
@@ -235,6 +245,10 @@ var _glow_level: Array[float] = []
 var _glow_tweens: Array[Tween] = []
 ## Bobbing arrow over the local player's own pedestal (built on first use, client only).
 var pedestal_marker: Node3D
+## The lobby settings board's labels: title, [left, right] per row, and the footer.
+var settings_board_title: Label3D
+var settings_board_rows: Array = []
+var settings_board_footer: Label3D
 var _marker_base_y: float = 0.0
 var _marker_time: float = 0.0
 var vip_gate_area: Area3D
@@ -552,50 +566,94 @@ func _build_lobby() -> void:
 	for x: float in [-16.5, 18.0]:
 		var couch: Node3D = GreyboxKit.box(self, Vector3(2.4, 0.9, 1.0), Vector3(x, 0.45, SIZE_Z * 0.5 - 0.8), Color("#24304A"), "Couch")
 		PropModels.dress(couch, &"couch", 0.45, 0.0, 2.5).rotation.y = PI
-	_build_settings_tablet()
+	_build_settings_board()
 	_build_lobby_doors()
 
 
-## The lobby settings tablet: a brass pedestal stand with a tilted black tablet on top, its screen
-## lit with the lobby's colours and a "LOBBY SETTINGS / press E" title. The pole is solid.
-func _build_settings_tablet() -> void:
+## The lobby settings board on the start room's north wall, facing the room (+z): a gold frame
+## around a dark green felt panel, "LOBBY SETTINGS" at the top, one row per setting (name left,
+## value right in gold) and a footer naming the host. `set_settings_board` writes the rows.
+func _build_settings_board() -> void:
 	var root := Node3D.new()
-	root.name = "SettingsTablet"
-	root.position = SETTINGS_TABLET_POS
-	root.rotation.y = SETTINGS_TABLET_YAW
+	root.name = "SettingsBoard"
+	root.position = Vector3(SETTINGS_BOARD_X, SETTINGS_BOARD_Y, LOBBY_DOORS_Z + LOBBY_WALL_T * 0.5)
 	add_child(root)
-	GreyboxKit.cylinder(root, 0.26, 0.05, Vector3(0, 0.025, 0), Palette.WARM_GOLD, "TabletFoot", false, 0.85)
-	GreyboxKit.cylinder(root, 0.045, 1.0, Vector3(0, 0.5, 0), Palette.WARM_GOLD, "TabletPole", true, 0.85)
-	var head := Node3D.new()
-	head.name = "Head"
-	head.position = Vector3(0, 1.2, -0.1)
-	head.rotation.x = deg_to_rad(35.0)  # screen tilted up towards whoever stands in front (−z)
-	root.add_child(head)
-	_mesh_box(head, Vector3(0.12, 0.12, 0.08), Vector3(0, -0.12, 0.06), GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)).name = "Bracket"
-	_mesh_box(head, Vector3(0.66, 0.46, 0.04), Vector3.ZERO, GreyboxKit.material(Palette.CASINO_BLACK, 0.3, 0.4)).name = "Bezel"
-	var screen_mat := StandardMaterial3D.new()
-	screen_mat.albedo_color = Palette.FELT_GREEN.darkened(0.45)
-	screen_mat.emission_enabled = true
-	screen_mat.emission = Palette.FELT_GREEN.darkened(0.2)
-	screen_mat.emission_energy_multiplier = 0.6
-	_mesh_box(head, Vector3(0.58, 0.38, 0.01), Vector3(0, 0, -0.021), screen_mat).name = "Screen"
-	_mesh_box(head, Vector3(0.68, 0.03, 0.05), Vector3(0, -0.245, 0), GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)).name = "Lip"
-	for spec: Array in [["LOBBY SETTINGS", 30, 0.08, Palette.VIP_GOLD], ["press E", 22, -0.07, Palette.CREAM]]:
-		var l := Label3D.new()
-		l.text = spec[0]
-		l.font_size = spec[1]
-		l.pixel_size = 0.0035
-		l.modulate = spec[3]
-		l.outline_modulate = Palette.CASINO_BLACK
-		l.outline_size = 6
-		l.position = Vector3(0, spec[2], -0.03)
-		l.rotation.y = PI  # read from the screen side (−z)
-		head.add_child(l)
+	var size: Vector2 = SETTINGS_BOARD_SIZE
+	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
+	_mesh_box(root, Vector3(size.x + 0.16, size.y + 0.16, 0.05), Vector3(0, 0, 0.025), gold).name = "Frame"
+	_mesh_box(root, Vector3(size.x + 0.04, size.y + 0.04, 0.02), Vector3(0, 0, 0.06), GreyboxKit.material(Palette.CASINO_BLACK, 0.2, 0.5)).name = "Bezel"
+	var felt := StandardMaterial3D.new()
+	felt.albedo_color = Palette.FELT_GREEN.darkened(0.5)
+	felt.roughness = 0.95
+	felt.emission_enabled = true
+	felt.emission = Palette.FELT_GREEN.darkened(0.55)
+	felt.emission_energy_multiplier = 0.5
+	_mesh_box(root, Vector3(size.x - 0.04, size.y - 0.04, 0.01), Vector3(0, 0, 0.075), felt).name = "Felt"
+	var front: float = 0.085
+	var top: float = size.y * 0.5
+	# Gold corner studs and a crest on top of the frame.
+	for cx: float in [-1.0, 1.0]:
+		for cy: float in [-1.0, 1.0]:
+			_mesh_box(root, Vector3(0.12, 0.12, 0.03), Vector3(cx * (size.x * 0.5 + 0.02), cy * (top + 0.02), 0.065), gold).name = "Stud"
+	settings_board_title = _board_label(root, "LOBBY SETTINGS", 80, Vector3(0, top - 0.3, front), Palette.VIP_GOLD, HORIZONTAL_ALIGNMENT_CENTER, 0.0055)
+	_mesh_box(root, Vector3(size.x - 0.5, 0.02, 0.005), Vector3(0, top - 0.56, front), gold).name = "Rule"
+	var row_h: float = 0.32
+	var x_in: float = size.x * 0.5 - 0.26
+	settings_board_rows.clear()
+	for r: int in SETTINGS_BOARD_ROWS:
+		var y: float = top - 0.8 - r * row_h
+		var left: Label3D = _board_label(root, "", 48, Vector3(-x_in, y, front), Palette.CREAM.darkened(0.08), HORIZONTAL_ALIGNMENT_LEFT, 0.005)
+		var right: Label3D = _board_label(root, "", 48, Vector3(x_in, y, front), Palette.VIP_GOLD, HORIZONTAL_ALIGNMENT_RIGHT, 0.005)
+		settings_board_rows.append([left, right])
+	_mesh_box(root, Vector3(size.x - 0.5, 0.014, 0.005), Vector3(0, -top + 0.34, front), gold).name = "FootRule"
+	settings_board_footer = _board_label(root, "", 36, Vector3(0, -top + 0.19, front), Palette.CREAM.darkened(0.25), HORIZONTAL_ALIGNMENT_CENTER, 0.0045)
+	# A brass picture light over the board, its warm strip lit.
+	var strip := StandardMaterial3D.new()
+	strip.albedo_color = Palette.CREAM
+	strip.emission_enabled = true
+	strip.emission = Color(1.0, 0.8, 0.5)
+	strip.emission_energy_multiplier = 1.4
+	var lamp_y: float = top + 0.24
+	_mesh_box(root, Vector3(2.2, 0.08, 0.12), Vector3(0, lamp_y, 0.3), gold).name = "PictureLight"
+	_mesh_box(root, Vector3(2.1, 0.02, 0.08), Vector3(0, lamp_y - 0.05, 0.3), strip).name = "PictureLightStrip"
+	for ax: float in [-0.75, 0.75]:
+		_mesh_box(root, Vector3(0.04, 0.04, 0.26), Vector3(ax, lamp_y, 0.13), gold).name = "PictureLightArm"
+		_mesh_box(root, Vector3(0.12, 0.16, 0.03), Vector3(ax, lamp_y, 0.015), gold).name = "PictureLightMount"
 
 
-## True when `pos` (feet) is close enough to the settings tablet to use it.
-static func near_settings_tablet(pos: Vector3) -> bool:
-	return Vector2(pos.x - SETTINGS_TABLET_POS.x, pos.z - SETTINGS_TABLET_POS.z).length() < SETTINGS_TABLET_RANGE
+func _board_label(parent: Node3D, text: String, font_size: int, pos: Vector3, color: Color, align: HorizontalAlignment, px: float) -> Label3D:
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = font_size
+	l.pixel_size = px
+	l.modulate = color
+	l.outline_modulate = Palette.CASINO_BLACK
+	l.outline_size = 8
+	l.horizontal_alignment = align
+	l.double_sided = false
+	l.position = pos
+	parent.add_child(l)
+	return l
+
+
+## Writes the board: `rows` is [[label, value], ...] (up to `SETTINGS_BOARD_ROWS`), `footer` the
+## line at the bottom. Labels only change when the text does.
+func set_settings_board(rows: Array, footer: String) -> void:
+	for r: int in settings_board_rows.size():
+		var pair: Array = rows[r] if r < rows.size() else ["", ""]
+		var left: Label3D = settings_board_rows[r][0]
+		var right: Label3D = settings_board_rows[r][1]
+		if left.text != str(pair[0]):
+			left.text = str(pair[0])
+		if right.text != str(pair[1]):
+			right.text = str(pair[1])
+	if settings_board_footer != null and settings_board_footer.text != footer:
+		settings_board_footer.text = footer
+
+
+## True when `pos` (feet) is close enough to the settings board to use it.
+static func near_settings_board(pos: Vector3) -> bool:
+	return Vector2(pos.x - SETTINGS_BOARD_SPOT.x, pos.z - SETTINGS_BOARD_SPOT.z).length() < SETTINGS_BOARD_RANGE
 
 
 func _build_lobby_doors() -> void:
@@ -669,8 +727,8 @@ func _mesh_box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> Me
 
 
 ## A Greek marble column pedestal (plinth, fluted drum with a band in the player's colour,
-## echinus and abacus, 0.8 m high) with a four-step marble stair in front of it. The stair's
-## collision is one smooth wedge (no step lips to catch on); the column is a plain block.
+## echinus and abacus, 0.8 m high) with a four-step marble stair in front of it (`_build_stair`).
+## The stair's collision is one smooth wedge (no step lips to catch on); the column is a plain block.
 func _build_pedestal(i: int, pos: Vector3) -> void:
 	var root := Node3D.new()
 	root.name = "Pedestal%d" % i
@@ -704,15 +762,7 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	var top: Node3D = GreyboxKit.box(root, Vector3(0.9, 0.06, 0.9), Vector3(0, PEDESTAL_TOP - 0.03, 0), MARBLE, "Abacus", false)
 	var top_mesh: MeshInstance3D = top.get_node("Mesh") as MeshInstance3D
 	top_mesh.material_override = marble
-	# Stair up from the room side (−z): a smooth wedge to walk on, dressed as four marble steps.
-	var stair_len: float = 1.7
-	GreyboxKit.ramp(root, Vector3(0, 0, -0.45 - stair_len), Vector3(0, PEDESTAL_TOP, -0.45), 0.9, MARBLE, "Stair")
-	for k: int in 4:
-		var rise: float = PEDESTAL_TOP / 4.0
-		var run: float = stair_len / 4.0
-		# Step k climbs from the room side: lowest tread farthest from the column.
-		var step: Node3D = GreyboxKit.box(root, Vector3(0.96, rise, run), Vector3(0, rise * (k + 0.5), -0.45 - stair_len + run * (k + 0.5)), MARBLE if k % 2 == 0 else MARBLE_DARK, "Step%d" % k, false)
-		(step.get_node("Mesh") as MeshInstance3D).material_override = marble if k % 2 == 0 else marble_dark
+	_build_stair(root, marble, marble_dark)
 	pedestal_labels.append(_build_name_plate(root, i))
 	pedestal_tops.append(top_mesh)
 	_build_glow(root)
@@ -720,6 +770,103 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	_glow_level.append(0.0)
 	_glow_tweens.append(null)
 	_set_glow(0.0, i)
+
+
+## The marble stair up to the column from the room side (−z), 0.9.41 (Patrick: "mach die stairs
+## noch besser"): four solid steps that stand on the floor and run back into the column (no
+## floating slabs), each with a polished tread that overhangs its riser and a thin gold nosing,
+## flanked by two dark marble cheek walls that follow the slope with a gold cap rail and end in a
+## small newel post at the foot. Walking stays on one smooth invisible wedge (no step lips).
+func _build_stair(root: Node3D, marble: StandardMaterial3D, marble_dark: StandardMaterial3D) -> void:
+	var back: float = -0.45  # the column's front face (abacus)
+	var front: float = back - STAIR_LEN
+	var ramp: Node3D = GreyboxKit.ramp(root, Vector3(0, 0, front), Vector3(0, PEDESTAL_TOP, back), 0.9, MARBLE, "Stair")
+	(ramp.get_node("Mesh") as MeshInstance3D).visible = false
+	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
+	var tread_mat: StandardMaterial3D = GreyboxKit.material(MARBLE.lightened(0.06), 0.0, 0.35)
+	var rise: float = PEDESTAL_TOP / STAIR_STEPS
+	var run: float = STAIR_LEN / STAIR_STEPS
+	var w: float = STAIR_W
+	var tread_t: float = 0.04
+	var over: float = 0.03  # how far a tread overhangs its riser
+	for k: int in STAIR_STEPS:
+		var top: float = rise * (k + 1)
+		var z0: float = front + run * k
+		var z1: float = z0 + run if k < STAIR_STEPS - 1 else back
+		# The riser block: floor to just under the tread, its own run only (no overlaps).
+		var body_h: float = top - tread_t
+		_mesh_box(root, Vector3(w, body_h, z1 - z0), Vector3(0, body_h * 0.5, (z0 + z1) * 0.5), marble).name = "Step%d" % k
+		# The tread on top, overhanging the riser in front, and its gold nosing strip.
+		var tz0: float = z0 - over
+		_mesh_box(root, Vector3(w + 0.02, tread_t, z1 - tz0), Vector3(0, top - tread_t * 0.5, (tz0 + z1) * 0.5), tread_mat).name = "Tread%d" % k
+		_mesh_box(root, Vector3(w + 0.024, 0.014, 0.014), Vector3(0, top - tread_t * 0.5, tz0 - 0.004), gold).name = "Nosing%d" % k
+		# A shadow line under the overhang so each step reads as its own.
+		_mesh_box(root, Vector3(w - 0.002, 0.02, 0.006), Vector3(0, body_h - 0.01, z0 - 0.002), marble_dark).name = "Reveal%d" % k
+	# Cheek walls either side: floor up to a sloped top just above the treads, gold cap rail on it.
+	var cheek_t: float = 0.08
+	var cx: float = w * 0.5 + 0.01 + cheek_t * 0.5
+	var h_front: float = 0.12
+	var h_back: float = PEDESTAL_TOP + 0.1
+	var cz0: float = front - over
+	for side: float in [-1.0, 1.0]:
+		var x: float = side * cx
+		var cheek := MeshInstance3D.new()
+		cheek.name = "Cheek" if side < 0.0 else "CheekR"
+		cheek.mesh = _side_prism(cheek_t, cz0, back, h_front, h_back)
+		cheek.material_override = marble_dark
+		cheek.position.x = x
+		root.add_child(cheek)
+		var cap_from := Vector3(x, h_front + 0.012, cz0)
+		var cap_to := Vector3(x, h_back + 0.012, back)
+		var cap: Node3D = GreyboxKit.beam(root, cap_from, cap_to, Vector2(cheek_t + 0.02, 0.024), Palette.WARM_GOLD, "CheekCap", false)
+		(cap.get_node("Mesh") as MeshInstance3D).material_override = gold
+		# Newel post at the foot, with a gold cap and ball.
+		var newel_h: float = 0.34
+		_mesh_box(root, Vector3(0.13, newel_h, 0.13), Vector3(x, newel_h * 0.5, cz0 - 0.04), marble_dark).name = "Newel"
+		_mesh_box(root, Vector3(0.15, 0.025, 0.15), Vector3(x, newel_h + 0.0125, cz0 - 0.04), gold).name = "NewelCap"
+		var ball := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.045
+		sm.height = 0.09
+		sm.radial_segments = 12
+		sm.rings = 6
+		ball.mesh = sm
+		ball.material_override = gold
+		ball.position = Vector3(x, newel_h + 0.025 + 0.04, cz0 - 0.04)
+		root.add_child(ball)
+
+
+## A side wall of thickness `t` (centred on x = 0) whose profile runs from z0 to z1 along the
+## floor, `h0` high at z0 and `h1` high at z1 (a straight sloped top).
+func _side_prism(t: float, z0: float, z1: float, h0: float, h1: float) -> ArrayMesh:
+	var hx: float = t * 0.5
+	var p: Array[Vector2] = [Vector2(z0, 0.0), Vector2(z1, 0.0), Vector2(z1, h1), Vector2(z0, h0)]  # (z, y), counter-clockwise seen from +x
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var r: Array[Vector3] = []
+	var l: Array[Vector3] = []
+	for q: Vector2 in p:
+		r.append(Vector3(hx, q.y, q.x))
+		l.append(Vector3(-hx, q.y, q.x))
+	# Outer faces: +x and −x.
+	_tri3(st, r[0], r[2], r[1])
+	_tri3(st, r[0], r[3], r[2])
+	_tri3(st, l[0], l[1], l[2])
+	_tri3(st, l[0], l[2], l[3])
+	# The four edge faces around the profile.
+	for e: int in 4:
+		var a: int = e
+		var b: int = (e + 1) % 4
+		_tri3(st, l[a], r[a], r[b])
+		_tri3(st, l[a], r[b], l[b])
+	st.generate_normals()
+	return st.commit()
+
+
+func _tri3(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	st.add_vertex(a)
+	st.add_vertex(b)
+	st.add_vertex(c)
 
 
 ## The brass name plate on a slim post behind the column (between it and the wall), facing the
