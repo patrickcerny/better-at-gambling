@@ -13,8 +13,9 @@ extends Control
 ## join-by-address (Patrick: "Remove join by ip and port") and no lobby server of ours any more
 ## (Patrick 2026-11-14: "nur noch über Steam"): CREATE LOBBY runs the party on this PC, PUBLIC or
 ## PRIVATE (Patrick 2026-11-15: "open lobby, private public and browse lobbies"). Private = friends
-## and invited players only (Steam invites, the "Join a friend" list); public lobbies are also
-## listed under BROWSE LOBBIES for everyone on the same version (`SteamParty`). Without Steam
+## and invited players only (Steam invites, FRIENDS' LOBBIES); public lobbies are also
+## listed under BROWSE LOBBIES for everyone (other versions greyed out, `SteamParty`). Both lists
+## are full screens of small cards with the players' heads (`LobbyListScreen`). Without Steam
 ## running the online buttons are just disabled, with no text about it (Patrick: "useless text").
 ## `--connect` stays a dev/test command-line flag.
 
@@ -37,15 +38,13 @@ var host_button: Button
 ## PUBLIC / PRIVATE for the next CREATE LOBBY (remembered in `online/public_lobby`).
 var public_toggle: Button
 var private_toggle: Button
-## BROWSE LOBBIES and the public lobby list it opens.
+## BROWSE LOBBIES and the full-screen PUBLIC LOBBIES it opens.
 var browse_button: Button
-var _browse_box: VBoxContainer
-var _browse_list: VBoxContainer
-var _browse_status: Label
-var _browse_refresh: Button
+var browse_screen: LobbyListScreen
+## FRIENDS' LOBBIES and its full-screen list (the lobbies your Steam friends are in).
+var friends_button: Button
+var friends_screen: LobbyListScreen
 var _online_back: Button
-var friends_box: VBoxContainer
-var _friends_list: VBoxContainer
 var _status: Label
 var _busy: bool = false
 var _settings: SettingsPanel
@@ -70,6 +69,9 @@ var daily_button: DailySpinButton
 var _daily_tick: float = 0.0
 ## The "?" left of the T-shirt: the tutorial any time.
 var help_button: HelpButton
+## "Your game is out of date" (top right) and the check behind it (`VersionCheck`).
+var update_banner: UpdateBanner
+var version_check: VersionCheck
 ## The trophy left of the "?": global leaderboards and your lifetime stats (`LeaderboardPanel`).
 var trophy_button: TrophyButton
 var leaderboards: LeaderboardPanel
@@ -195,6 +197,7 @@ func _ready() -> void:
 		_show_tutorial(help_button))
 	_build_leaderboards()
 	_build_daily()
+	_build_update_banner()
 	how_to_play = HowToPlayPanel.new()
 	how_to_play.name = "HowToPlay"
 	how_to_play.visible = false
@@ -217,6 +220,20 @@ func _ready() -> void:
 	if SteamSvc.pending_lobby != 0:
 		_on_steam_join_requested.call_deferred(SteamSvc.pending_lobby)
 	Log.info(&"menu", "main menu ready")
+
+
+func _build_update_banner() -> void:
+	update_banner = UpdateBanner.new()
+	update_banner.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	update_banner.offset_left = -32.0 - UpdateBanner.WIDTH
+	update_banner.offset_right = -32.0
+	update_banner.offset_top = 28.0
+	update_banner.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	add_child(update_banner)
+	version_check = VersionCheck.new()
+	version_check.name = "VersionCheck"
+	version_check.checked.connect(update_banner.show_verdict)
+	add_child(version_check)
 
 
 ## The trophy left of the "?" and the leaderboards / stats panel it opens.
@@ -344,47 +361,30 @@ func _build_online() -> void:
 	browse_button = _button("Browse Lobbies", _show_browse)
 	browse_button.name = "BrowseLobbies"
 	_online_box.add_child(browse_button)
-	friends_box = VBoxContainer.new()
-	friends_box.name = "JoinFriend"
-	friends_box.add_theme_constant_override(&"separation", 6)
-	_online_box.add_child(friends_box)
-	var friends_title := Label.new()
-	friends_title.text = "JOIN A FRIEND"
-	friends_title.theme_type_variation = &"SmallLabel"
-	friends_box.add_child(friends_title)
-	_friends_list = VBoxContainer.new()
-	friends_box.add_child(_friends_list)
-	_refresh_steam_entries()
+	friends_button = _button(FRIENDS_LABEL, _show_friends)
+	friends_button.name = "FriendsLobbies"
+	_online_box.add_child(friends_button)
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.custom_minimum_size = Vector2(540, 0)
 	_online_box.add_child(_status)
 	_online_back = _button("Back", _show_main)
 	_online_box.add_child(_online_back)
-	_build_browse()
+	_build_lists()
+	_refresh_steam_entries()
 
 
-## BROWSE LOBBIES: the public lobbies of this version, with their player count and JOIN.
-func _build_browse() -> void:
-	_browse_box = _sub_box("Browse", "PUBLIC LOBBIES", 700.0)
-	add_child(BeanPortraits.new())  # the beans on the lobby cards
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 470)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_browse_box.add_child(scroll)
-	_browse_list = VBoxContainer.new()
-	_browse_list.name = "LobbyList"
-	_browse_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_browse_list.add_theme_constant_override(&"separation", 10)
-	scroll.add_child(_browse_list)
-	_browse_status = Label.new()
-	_browse_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_browse_status.custom_minimum_size = Vector2(700, 0)
-	_browse_box.add_child(_browse_status)
-	_browse_refresh = _button("Refresh", _refresh_browse)
-	_browse_refresh.name = "Refresh"
-	_browse_box.add_child(_browse_refresh)
-	_browse_box.add_child(_button("Back", _show_online))
+## PUBLIC LOBBIES and FRIENDS' LOBBIES: full screens over the whole menu (`LobbyListScreen`).
+func _build_lists() -> void:
+	add_child(BeanPortraits.new())  # the heads on the lobby cards
+	browse_screen = LobbyListScreen.new("Browse", "PUBLIC LOBBIES")
+	add_child(browse_screen)
+	browse_screen.refresh_pressed.connect(_refresh_browse)
+	browse_screen.back_pressed.connect(_back_to_online.bind(browse_button))
+	friends_screen = LobbyListScreen.new("JoinFriend", "FRIENDS' LOBBIES")
+	add_child(friends_screen)
+	friends_screen.refresh_pressed.connect(_refresh_steam_entries)
+	friends_screen.back_pressed.connect(_back_to_online.bind(friends_button))
 	SteamSvc.public_lobbies_received.connect(_on_public_lobbies)
 
 
@@ -446,7 +446,9 @@ func _hide_boxes() -> void:
 	_main_box.visible = false
 	_set_logo_visible(false)
 	_online_box.visible = false
-	_browse_box.visible = false
+	browse_screen.visible = false
+	friends_screen.visible = false
+	_set_corner_visible(true)
 	how_to_play.visible = false
 	if dev_panel != null:
 		dev_panel.visible = false
@@ -464,11 +466,40 @@ func _show_online() -> void:
 func _show_browse() -> void:
 	if _busy or not SteamSvc.is_available():
 		return
-	_hide_boxes()
-	_browse_box.visible = true
-	_browse_status.text = ""
+	_open_list(browse_screen)
 	_refresh_browse()
-	_browse_refresh.grab_focus()
+	browse_screen.focus_first()
+
+
+func _show_friends() -> void:
+	if _busy or not SteamSvc.is_available():
+		return
+	_open_list(friends_screen)
+	_refresh_steam_entries()
+	friends_screen.focus_first()
+
+
+func _open_list(screen: LobbyListScreen) -> void:
+	_hide_boxes()
+	_set_corner_visible(false)
+	screen.status.text = ""
+	screen.visible = true
+
+
+## BACK / Esc on a lobby list: PLAY ONLINE again, the focus on the button that opened the list.
+func _back_to_online(opener: Button) -> void:
+	if _busy:
+		return
+	_show_online()
+	if not opener.disabled:
+		opener.grab_focus()
+
+
+## The profile line and the corner buttons step aside while a full-screen lobby list is open.
+func _set_corner_visible(on: bool) -> void:
+	for c: Control in [profile_badge, _settings_button, cosmetics_button, help_button, trophy_button, daily_button]:
+		if c != null:
+			c.visible = on
 
 
 ## Whether CREATE LOBBY makes a public lobby (default: private).
@@ -530,10 +561,9 @@ func _show_main() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed(&"ui_cancel"):
 		return
-	if _browse_box.visible:
+	if browse_screen.visible or friends_screen.visible:
 		get_viewport().set_input_as_handled()
-		if not _busy:
-			_show_online()
+		_back_to_online(browse_button if browse_screen.visible else friends_button)
 	elif _online_box.visible:
 		get_viewport().set_input_as_handled()
 		_show_main()
@@ -557,9 +587,9 @@ func _display_name() -> String:
 	return SceneRouter.profile_name()
 
 
-## The status line of the open box (PLAY ONLINE or PUBLIC LOBBIES).
+## The status line of the open box (PLAY ONLINE or a lobby list).
 func _set_status(text: String, error: bool = false) -> void:
-	for l: Label in [_status, _browse_status]:
+	for l: Label in [_status, browse_screen.status if browse_screen != null else null, friends_screen.status if friends_screen != null else null]:
 		if l == null:
 			continue
 		l.text = text
@@ -600,41 +630,37 @@ func _on_failed(reason: String) -> void:
 # --- Lobbies (Steam) ---------------------------------------------------------------------------
 
 const HOST_LABEL: String = "Create Lobby"
+const FRIENDS_LABEL: String = "Friends' Lobbies"
 const FRIENDS_REFRESH: float = 3.0
 ## BROWSE LOBBIES asks Steam again this often while it is open.
 const BROWSE_REFRESH: float = 8.0
 var _friends_timer: float = 0.0
 var _browse_timer: float = 0.0
-## Lobby id -> names of your friends in it (from "Join a friend"), for BROWSE LOBBIES.
+## Lobby id -> names of your friends in it (from FRIENDS' LOBBIES), for BROWSE LOBBIES.
 var _friend_lobby_ids: Dictionary = {}
 
 
 ## Host button state and the friends' parties (Steam only).
 func _refresh_steam_entries() -> void:
 	var on: bool = SteamSvc.is_available()
-	for b: Button in [host_button, browse_button, public_toggle, private_toggle]:
+	for b: Button in [host_button, browse_button, friends_button, public_toggle, private_toggle]:
 		b.disabled = not on
 	host_button.tooltip_text = "Invite your friends from the lobby" if on else ""
-	friends_box.visible = on
+	friends_button.text = FRIENDS_LABEL
 	if not on:
 		return
 	var parties: Array[Dictionary] = SteamSvc.friend_lobbies()
 	_friend_lobby_ids.clear()
 	for f: Dictionary in parties:
 		_friend_lobby_ids[int(f["lobby"])] = (f["friends"] as Array).duplicate()
+	if not parties.is_empty():
+		friends_button.text = "%s  ·  %d" % [FRIENDS_LABEL, parties.size()]
 	_fill_friends(parties)
 
 
-## JOIN A FRIEND: one row per lobby (never one per friend), with who of your friends is in it.
+## FRIENDS' LOBBIES: one card per lobby (never one per friend), with who of your friends is in it.
 func _fill_friends(parties: Array[Dictionary]) -> void:
-	for c: Node in _friends_list.get_children():
-		_friends_list.remove_child(c)
-		c.queue_free()
-	if parties.is_empty():
-		var none := Label.new()
-		none.text = "No friends in a lobby right now."
-		none.theme_type_variation = &"MutedLabel"
-		_friends_list.add_child(none)
+	var cards: Array[Control] = []
 	for f: Dictionary in parties:
 		var friends: Array = f["friends"]
 		var party: String = str(f.get("party", ""))
@@ -642,34 +668,40 @@ func _fill_friends(parties: Array[Dictionary]) -> void:
 		var build: String = str(f.get("build", ""))
 		var same: bool = build == "" or build == Protocol.BUILD_ID
 		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if same else "Version %s (you have %s)" % [build, Protocol.BUILD_ID]
-		_friends_list.add_child(_lobby_row(int(f["lobby"]), title, sub, int(f.get("members", 0)), int(f.get("max", 0)), same, f.get("info", {})))
+		cards.append(_lobby_row(int(f["lobby"]), title, sub, int(f.get("members", 0)), int(f.get("max", 0)), same, f.get("info", {})))
+	friends_screen.set_cards(cards, "No friends in a lobby right now.")
 
 
-## One lobby as a card (Patrick 2026-11-15: "was grad eingestellt ist und kleine anzeige von allen
-## beans die grad drinnen sind mit namen"): its name and who of your friends is in it, players and
-## JOIN; under that the host's settings (mode, minigames, gambling time, items) and a line-up of the
-## beans inside in their outfits, with names. Hosts on an older version send no `info`: then
-## the card is just the top line.
+## One lobby as a small card (Patrick 2026-11-16: "way smaller the stuff only peek the heads of
+## the players"): its name, who of your friends is in it (or why it can't be joined), the host's
+## settings, players and JOIN on top; under that a row of the players' heads in their colour and
+## outfit, the leader's ring in gold, the names as tooltips. Hosts on an older version send no
+## `info`: then there are no settings and no heads.
 func _lobby_row(lid: int, title_text: String, sub_text: String, members: int, max_members: int, joinable: bool = true, info: Dictionary = {}) -> Control:
 	var card := PanelContainer.new()
 	card.name = "Lobby%d" % lid
-	card.add_theme_stylebox_override(&"panel", LobbyPanel.box(Color("#221E1C"), Color("#3A322C"), 14, 1))
-	(card.get_theme_stylebox(&"panel") as StyleBoxFlat).set_content_margin_all(12)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.custom_minimum_size = Vector2(LobbyListScreen.CARD_WIDTH, 0)
+	var sb: StyleBoxFlat = LobbyPanel.box(Color("#221E1C"), Color("#3A322C"), 12, 1)
+	sb.set_content_margin_all(10)
+	card.add_theme_stylebox_override(&"panel", sb)
+	if not joinable:
+		card.modulate = Color(1, 1, 1, 0.55)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override(&"separation", 6)
 	card.add_child(v)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override(&"separation", 12)
+	row.add_theme_constant_override(&"separation", 10)
 	v.add_child(row)
 	var text := VBoxContainer.new()
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_theme_constant_override(&"separation", -2)
+	text.add_theme_constant_override(&"separation", -3)
 	row.add_child(text)
 	var title := Label.new()
 	title.text = title_text
 	title.clip_text = true
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	title.add_theme_font_size_override(&"font_size", 28)
+	title.add_theme_font_size_override(&"font_size", 21)
 	text.add_child(title)
 	var settings: String = LobbyInfo.settings_text(info)
 	for line: String in [sub_text, settings]:
@@ -677,8 +709,10 @@ func _lobby_row(lid: int, title_text: String, sub_text: String, members: int, ma
 			continue
 		var sub := Label.new()
 		sub.text = line
+		sub.tooltip_text = line
+		sub.mouse_filter = Control.MOUSE_FILTER_PASS
 		sub.theme_type_variation = &"MutedLabel"
-		sub.add_theme_font_size_override(&"font_size", 18)
+		sub.add_theme_font_size_override(&"font_size", 14)
 		if line == sub_text and sub_text.begins_with("Friends"):
 			sub.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 		sub.clip_text = true
@@ -686,64 +720,69 @@ func _lobby_row(lid: int, title_text: String, sub_text: String, members: int, ma
 		text.add_child(sub)
 	var right := VBoxContainer.new()
 	right.alignment = BoxContainer.ALIGNMENT_CENTER
-	right.add_theme_constant_override(&"separation", 0)
+	right.add_theme_constant_override(&"separation", -2)
 	row.add_child(right)
 	var count := Label.new()
 	count.text = "%d/%d" % [members, max_members if max_members > 0 else Protocol.MAX_PLAYERS] if members > 0 else ""
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count.add_theme_font_size_override(&"font_size", 20)
 	count.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
 	right.add_child(count)
 	if bool(info.get("playing", false)):
 		var playing := Label.new()
 		playing.text = "IN A MATCH"
 		playing.theme_type_variation = &"SmallLabel"
-		playing.add_theme_font_size_override(&"font_size", 14)
+		playing.add_theme_font_size_override(&"font_size", 11)
 		playing.add_theme_color_override(&"font_color", Palette.CASINO_RED.lightened(0.25))
 		right.add_child(playing)
-	var join := _button("Join", func() -> void: _join_steam_lobby(lid), 120.0)
+	var join := _button("Join", func() -> void: _join_steam_lobby(lid), 92.0)
+	join.name = "Join"
+	join.custom_minimum_size.y = 40
+	join.add_theme_font_size_override(&"font_size", 18)
 	join.disabled = not joinable
 	join.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(join)
 	var beans: Array = info.get("beans", [])
 	if not beans.is_empty():
-		var stage := PanelContainer.new()  # a dark strip the beans stand on
-		var sb: StyleBoxFlat = LobbyPanel.box(Color("#181514"), Color("#2C2622"), 10, 1)
-		sb.content_margin_left = 6
-		sb.content_margin_right = 6
-		sb.content_margin_top = 4
-		sb.content_margin_bottom = 4
-		stage.add_theme_stylebox_override(&"panel", sb)
-		v.add_child(stage)
-		var lineup := HBoxContainer.new()
-		lineup.name = "Beans"
-		lineup.add_theme_constant_override(&"separation", 4)
-		stage.add_child(lineup)
+		var heads := HBoxContainer.new()
+		heads.name = "Beans"
+		heads.add_theme_constant_override(&"separation", 5)
+		v.add_child(heads)
 		for b: Dictionary in beans:
-			lineup.add_child(_lobby_bean(b))
+			heads.add_child(_lobby_head(b))
 	return card
 
 
-## One bean of a lobby card: its little picture in its colour and outfit, the name under it.
-func _lobby_bean(b: Dictionary) -> Control:
-	var cell := VBoxContainer.new()
-	cell.custom_minimum_size = Vector2(72, 0)
-	cell.add_theme_constant_override(&"separation", -2)
+const HEAD_SIZE: float = 42.0
+
+
+## One player of a lobby card: a round peek of the bean's head in its outfit, ringed in its
+## colour (gold for the leader, with a star), the name as the tooltip.
+func _lobby_head(b: Dictionary) -> Control:
+	var leader: bool = bool(b.get("leader", false))
+	var name_: String = str(b.get("name", ""))
+	var medal := Panel.new()
+	medal.name = "Head"
+	medal.custom_minimum_size = Vector2(HEAD_SIZE, HEAD_SIZE)
+	medal.tooltip_text = ("★ " if leader else "") + name_
+	medal.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	medal.add_theme_stylebox_override(&"panel", LobbyPanel.box(Color("#3A302A"), Color(0, 0, 0, 0), int(HEAD_SIZE / 2.0)))
 	var pic := TextureRect.new()
-	pic.custom_minimum_size = Vector2(72, 88)
+	pic.name = "Portrait"
 	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	pic.texture = BeanPortraits.texture_for(int(b.get("color", 0)), b.get("outfit", []), BeanPortraits.Framing.FULL)
-	cell.add_child(pic)
-	var name_ := Label.new()
-	name_.text = ("★ " if bool(b.get("leader", false)) else "") + str(b.get("name", ""))
-	name_.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_.clip_text = true
-	name_.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	name_.custom_minimum_size = Vector2(72, 0)
-	name_.add_theme_font_size_override(&"font_size", 15)
-	name_.add_theme_color_override(&"font_color", Palette.VIP_GOLD if bool(b.get("leader", false)) else Palette.CREAM)
-	cell.add_child(name_)
-	return cell
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	pic.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.texture = BeanPortraits.texture_for(int(b.get("color", 0)), b.get("outfit", []), BeanPortraits.Framing.HEAD)
+	medal.add_child(pic)
+	var ring := Panel.new()  # over the clipped picture so the ring stays crisp
+	ring.name = "Ring"
+	ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ring_color: Color = Palette.VIP_GOLD if leader else Palette.player_color(int(b.get("color", 0)))
+	ring.add_theme_stylebox_override(&"panel", LobbyPanel.box(Color(0, 0, 0, 0), ring_color, int(HEAD_SIZE / 2.0), 3 if leader else 2))
+	medal.add_child(ring)
+	return medal
 
 
 func _process(delta: float) -> void:
@@ -751,11 +790,11 @@ func _process(delta: float) -> void:
 	if _daily_tick >= 1.0:
 		_daily_tick = 0.0
 		_refresh_daily()
-	if _browse_box.visible and SteamSvc.is_available() and not _busy:
+	if browse_screen.visible and SteamSvc.is_available() and not _busy:
 		_browse_timer += delta
 		if _browse_timer >= BROWSE_REFRESH:
 			_refresh_browse()
-	if not _online_box.visible or not SteamSvc.is_available():
+	if not (_online_box.visible or friends_screen.visible) or not SteamSvc.is_available():
 		return
 	_friends_timer += delta
 	if _friends_timer >= FRIENDS_REFRESH and not _busy:
@@ -782,7 +821,7 @@ func _host_steam() -> void:
 func _on_steam_join_requested(lobby_id: int) -> void:
 	if not is_inside_tree():
 		return
-	if not _online_box.visible:
+	if not (_online_box.visible or browse_screen.visible or friends_screen.visible):
 		_show_online()
 	_join_steam_lobby(lobby_id)
 
@@ -811,12 +850,12 @@ func _refresh_browse() -> void:
 	_friend_lobby_ids.clear()
 	for f: Dictionary in SteamSvc.friend_lobbies():
 		_friend_lobby_ids[int(f["lobby"])] = (f["friends"] as Array).duplicate()
-	if not SteamSvc.request_public_lobbies() and _browse_list.get_child_count() == 0:
+	if not SteamSvc.request_public_lobbies() and browse_screen.grid.get_child_count() == 0:
 		_fill_browse([])
 
 
 func _on_public_lobbies(lobbies: Array[Dictionary]) -> void:
-	if _browse_box.visible:
+	if browse_screen.visible:
 		_fill_browse(lobbies)
 
 
@@ -845,21 +884,15 @@ static func sort_public_lobbies(lobbies: Array[Dictionary], friend_lobbies_: Dic
 static func version_text(build: String) -> String:
 	if build == "":
 		return "Version unknown, refresh in a moment"
-	return "Version %s (you have %s): restart Steam so both run the newest version" % [build, Protocol.BUILD_ID]
+	if VersionCheck.compare_versions(build, Protocol.BUILD_ID) > 0:
+		return "Version %s (you have %s): your game is out of date, restart Steam to update" % [build, Protocol.BUILD_ID]
+	return "Version %s (you have %s): the host's game is out of date" % [build, Protocol.BUILD_ID]
 
 
-## One row per public lobby: its name, your friends in it, players and JOIN; full ones are left
+## One card per public lobby: its name, your friends in it, players and JOIN; full ones are left
 ## out by Steam.
 func _fill_browse(lobbies: Array[Dictionary]) -> void:
-	var had_focus: bool = _browse_list.get_viewport() != null and _browse_list.is_ancestor_of(_browse_list.get_viewport().gui_get_focus_owner())
-	for c: Node in _browse_list.get_children():
-		_browse_list.remove_child(c)
-		c.queue_free()
-	if lobbies.is_empty():
-		var none := Label.new()
-		none.text = "No public lobbies right now. Create one!"
-		none.theme_type_variation = &"MutedLabel"
-		_browse_list.add_child(none)
+	var cards: Array[Control] = []
 	for l: Dictionary in sort_public_lobbies(lobbies, _friend_lobby_ids):
 		var lid: int = int(l["lobby"])
 		var friends: Array = _friend_lobby_ids.get(lid, [])
@@ -868,9 +901,8 @@ func _fill_browse(lobbies: Array[Dictionary]) -> void:
 		var same: bool = build == Protocol.BUILD_ID
 		if not same:
 			sub = version_text(build)
-		_browse_list.add_child(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), same, l.get("info", {})))
-	if had_focus:
-		_browse_refresh.grab_focus()
+		cards.append(_lobby_row(lid, str(l["name"]), sub, int(l["members"]), int(l["max"]), same, l.get("info", {})))
+	browse_screen.set_cards(cards, "No public lobbies right now. Create one!")
 
 
 ## QUIT asks first (Patrick: "Are you sure Dialog after quit game or leave game").

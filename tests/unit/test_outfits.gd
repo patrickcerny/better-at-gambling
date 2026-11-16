@@ -140,7 +140,7 @@ func test_the_shop_sells_and_puts_on_outfit_pieces() -> void:
 	var panel := CosmeticsPanel.new()
 	layer.add_child(panel)
 	panel.open()
-	for tab: String in ["COLOURS", "HATS", "SHIRTS", "TROUSERS", "CAPES", "BOOTS"]:
+	for tab: String in ["SKINS", "HATS", "SHIRTS", "TROUSERS", "CAPES", "BOOTS"]:
 		assert_not_null(panel.find_child(tab, true, false), "a %s tab" % tab)
 	var worn: Array = []
 	panel.outfit_worn.connect(func(kind: StringName, id: StringName) -> void: worn.append([kind, id]))

@@ -82,3 +82,20 @@ func test_soft_hand_shows_both_totals_until_done() -> void:
 	st["hands"][1]["done"] = true
 	ui.update_state(st, {})
 	assert_eq(ui.total_label.text, "17", "stood: the best total only")
+
+
+func test_bust_with_scissors_offers_the_cut() -> void:
+	var cards: Array = [Card.make(10, 0), Card.make(6, 1), Card.make(10, 2)]
+	ui.update_state({"state": BlackjackLogic.State.ACTING, "timer": 4.0, "seats": [1, -1, -1, -1], "dealer": [Card.make(9, 1)], "dealer_revealed": false,
+		"hands": {1: {"stake": 50, "cards": cards, "done": false, "total": 26, "clock": 4.0, "rescue": true}}}, {"scissors": true})
+	assert_true(ui.actions.visible)
+	assert_true(ui.cut_btn.visible and not ui.cut_btn.disabled, "the cut is on offer")
+	assert_false(ui.hit.visible, "no hitting a bust")
+	assert_false(ui.double_btn.visible)
+	assert_string_contains(ui.stand.text, "TAKE BUST")
+	assert_string_contains(ui.status_label.text, "BUST!")
+	# Cut: back to a normal hand.
+	ui.update_state({"state": BlackjackLogic.State.ACTING, "timer": 6.0, "seats": [1, -1, -1, -1], "dealer": [Card.make(9, 1)], "dealer_revealed": false,
+		"hands": {1: {"stake": 50, "cards": cards.slice(0, 2), "done": false, "total": 16, "clock": 6.0}}}, {})
+	assert_true(ui.hit.visible)
+	assert_true(ui.stand.text.begins_with("STAND"), ui.stand.text)
