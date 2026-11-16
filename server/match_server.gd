@@ -92,7 +92,7 @@ var _uptime: float = 0.0
 ## `LOBBY_AWAY_DROP_SECONDS` is removed, so a lobby never fills up with "(away)" ghosts of friends
 ## who left (Patrick 2026-11-15). A quick reconnect within that time keeps their slot.
 var _away_since: Dictionary[int, float] = {}
-const LOBBY_AWAY_DROP_SECONDS: float = 15.0
+const LOBBY_AWAY_DROP_SECONDS: float = 60.0
 ## Simulated seconds ever stepped (never reset, unlike `match_time`).
 var _stepped: float = 0.0
 var _leader: int = -1

@@ -99,7 +99,7 @@
 - Kick: the 60 s rejoin block is gone (`MatchServer._kicked`/`kick_blocked_for`, `RoomHost` kick_cooldown
   check, `Protocol.KICK_REJOIN_SECONDS`); a kicked player can join again on their own right away.
 - "(away)" ghosts: players who left stayed in the lobby list forever. In the lobby, anyone disconnected
-  for `MatchServer.LOBBY_AWAY_DROP_SECONDS` (15 s) is removed (also those who left during the last match,
+  for `MatchServer.LOBBY_AWAY_DROP_SECONDS` (60 s, Patrick 0.9.51) is removed (also those who left during the last match,
   once Play Again returns to the lobby); a quick reconnect keeps the slot.
 - `LobbyPanel` redesign: fully opaque panel (pedestal names no longer show through), header with lobby
   kind and player count, status band (countdown or hint + "x / y READY"), player rows with a bean
