@@ -33,6 +33,7 @@ const NOMINAL: Dictionary = {
 	&"scratch": Rect2(-0.8, -1.255, 1.6, 2.435),
 	&"sword_tapper": Rect2(-0.7, -0.7, 1.4, 2.15),
 	&"holdem": Rect2(-2.12, -1.9, 4.24, 3.58),
+	&"baccarat": Rect2(-1.93, -1.95, 3.86, 3.67),
 }
 ## The solid part of each game in its own frame (what people walk round: its colliders, stools
 ## included; `FloorGeometry.obstacles`), when the map has measured nothing.
@@ -47,6 +48,7 @@ const NOMINAL_SOLID: Dictionary = {
 	&"scratch": Rect2(-0.8, -1.255, 1.6, 2.355),
 	&"sword_tapper": Rect2(-0.7, -0.7, 1.4, 1.4),
 	&"holdem": Rect2(-2.12, -0.92, 4.24, 2.52),
+	&"baccarat": Rect2(-1.93, -0.98, 3.86, 2.62),
 }
 ## A game nobody measured yet, by footprint: the biggest of its kind (a table as wide as roulette
 ## and as deep as the pit lets a row be).

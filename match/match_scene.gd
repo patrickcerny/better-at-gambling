@@ -202,7 +202,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	ui_layer.add_child(hud)
-	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()], [&"sword_tapper", SwordTapperUi.new()], [&"holdem", HoldemUi.new()]]:
+	for pair: Array in [[&"blackjack", BlackjackUi.new()], [&"roulette", RouletteUi.new()], [&"slots", SlotsUi.new()], [&"plinko", PlinkoUi.new()], [&"horse_race", HorseRaceUi.new()], [&"wheel", WheelUi.new()], [&"craps", CrapsUi.new()], [&"hilo", HiLoUi.new()], [&"scratch", ScratchUi.new()], [&"sword_tapper", SwordTapperUi.new()], [&"holdem", HoldemUi.new()], [&"baccarat", BaccaratUi.new()]]:
 		var ui: StationUi = pair[1]
 		ui.name = String(pair[0]).capitalize() + "Ui"
 		ui.visible = false
@@ -2700,6 +2700,8 @@ func _on_station_state(sid: StringName) -> void:
 			(node as SwordTapperStation).show_state(st)
 		elif node is HoldemStation:
 			(node as HoldemStation).show_round(st)
+		elif node is BaccaratStation:
+			(node as BaccaratStation).show_round(st)
 	if current_ui != null and current_ui.station_id == sid:
 		current_ui.update_state(st, Net.request_private_snapshot().get("station", {}))
 	_update_look_lock()
@@ -2855,6 +2857,8 @@ func _min_bet(st: StationBase) -> int:
 			base = cfg.sword_min_bet
 		&"holdem":
 			base = cfg.holdem_min_bet
+		&"baccarat":
+			base = cfg.baccarat_min_bet
 	return int(floor(base * mult))
 
 

@@ -158,6 +158,35 @@ extends Resource
 ## Seconds the showdown stays up before the next hand.
 @export var holdem_result_time: float = 4.0
 
+@export_group("Baccarat")
+## Punto Banco from an eight-deck shoe. Minimum per bet and maximum total per round (× limits).
+@export var baccarat_min_bet: int = 10
+@export var baccarat_max_total: int = 300
+## Seconds the table takes bets before the cards come out (the table only cycles while someone sits).
+@export var baccarat_betting_time: float = 12.0
+## Seconds between two cards turning over (P, B, P, B, then the third cards), and after the last
+## card until the bets pay.
+@export var baccarat_card_time: float = 0.8
+@export var baccarat_settle_time: float = 0.9
+## Seconds the result stays up before the next round opens.
+@export var baccarat_result_time: float = 4.0
+## Printed pays (profit per $1): Banker 1:1 less the commission, Tie 9:1, either Pair 11:1;
+## Player pays 1:1. Player and Banker bets push on a tie.
+@export var baccarat_banker_commission: float = 0.05
+@export var baccarat_tie_pays: int = 9
+@export var baccarat_pair_pays: int = 11
+## The quiet favour (0.9.6 rule: every table pays the player a little more than it costs, but
+## doesn't show it): extra fraction of the total return (stake + winnings) on a winning bet,
+## rounded stochastically. The printed pays return 98.76% (Player), 98.94% (Banker), 95.16% (Tie)
+## and 89.64% (Pairs) of the stake in eight decks; these make each about 101.1%
+## (exact, `tests/sim/test_rtp_baccarat.gd`).
+@export var baccarat_player_favour: float = 0.0262
+@export var baccarat_banker_favour: float = 0.0241
+@export var baccarat_tie_favour: float = 0.0624
+@export var baccarat_pair_favour: float = 0.1279
+@export var baccarat_decks: int = 8
+@export var baccarat_penetration: float = 0.85
+
 @export_group("Slots")
 @export var slots_bet_sizes: PackedInt32Array = PackedInt32Array([10, 25, 50, 100])
 @export var slots_spin_time: float = 1.6

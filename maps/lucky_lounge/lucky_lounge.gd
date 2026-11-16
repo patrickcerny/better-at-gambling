@@ -1505,6 +1505,8 @@ func _make_station(kind: StringName) -> StationBase:
 			return SwordTapperStation.new()
 		&"holdem":
 			return HoldemStation.new()
+		&"baccarat":
+			return BaccaratStation.new()
 	# A newer game can bring its own station scene (`GameDefinition.station_scene`).
 	var def: GameDefinition = Registry.games.get(kind, null)
 	if def != null and def.station_scene != null:

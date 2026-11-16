@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RegistryList" load_steps=13 format=3]
+[gd_resource type="Resource" script_class="RegistryList" load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://core/defs/registry_list.gd" id="1"]
 [ext_resource type="Resource" path="res://games/blackjack/blackjack.tres" id="2"]
@@ -12,7 +12,8 @@
 [ext_resource type="Resource" path="res://games/scratch/scratch.tres" id="10"]
 [ext_resource type="Resource" path="res://games/sword_tapper/sword_tapper.tres" id="11"]
 [ext_resource type="Resource" path="res://games/holdem/holdem.tres" id="12"]
+[ext_resource type="Resource" path="res://games/baccarat/baccarat.tres" id="13"]
 
 [resource]
 script = ExtResource("1")
-entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("9"), ExtResource("10"), ExtResource("11"), ExtResource("12")])
+entries = Array[Resource]([ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("9"), ExtResource("10"), ExtResource("11"), ExtResource("12"), ExtResource("13")])
