@@ -93,6 +93,10 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.10.2 Daily Spin only as the big button
+- Patrick: the DAILY SPIN entry in the main menu list goes; only the big wheel button above the corner
+  buttons stays (it opens the wheel, shines when a spin is free, counts down otherwise).
+
 ### 2026-11-16 / 0.9.82 Every game, minigame and menu on a gamepad and the Steam Deck
 - Patrick: "gehe ALLE games und minigames und controls für den controller und fürs steamdeck durch
   ob das geht. Wenn ja, implementiere es und teste alles."

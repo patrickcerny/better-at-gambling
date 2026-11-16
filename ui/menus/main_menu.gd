@@ -60,9 +60,7 @@ var how_to_play: HowToPlayPanel
 ## for everyone else neither exists.
 var dev_entry: Button
 var dev_panel: DevPanel
-## DAILY SPIN under SHOP and the prize wheel it opens (`DailySpinPanel`); the entry shines while a
-## spin is free and counts down otherwise.
-var daily_entry: Button
+## The prize wheel the big Daily Spin button opens (`DailySpinPanel`).
 var daily_spin: DailySpinPanel
 ## The big wheel button above the corner buttons (Patrick 2026-11-16), always there.
 var daily_button: DailySpinButton
@@ -263,24 +261,17 @@ func _build_leaderboards() -> void:
 
 
 func _build_daily() -> void:
-	daily_entry = Button.new()
-	daily_entry.name = "DailySpin"
-	daily_entry.theme_type_variation = &"MenuEntry"
-	daily_entry.text = "DAILY SPIN"
-	_main_box.add_child(daily_entry)
-	_main_box.move_child(daily_entry, _cosmetics_entry.get_index() + 1)
 	daily_spin = DailySpinPanel.new()
 	add_child(daily_spin)
 	daily_spin.closed.connect(func() -> void:
 		_refresh_daily()
-		if daily_entry.is_visible_in_tree():
-			daily_entry.grab_focus())
+		if daily_button.is_visible_in_tree():
+			daily_button.grab_focus())
 	var open_daily := func() -> void:
 		_settings.close()
 		cosmetics.close()
 		level_pass.close()
 		daily_spin.open()
-	daily_entry.pressed.connect(open_daily)
 	# The big wheel above the three corner buttons, as wide as they are together.
 	daily_button = DailySpinButton.new()
 	daily_button.name = "DailySpinButton"
@@ -297,19 +288,12 @@ func _build_daily() -> void:
 	_refresh_daily()
 
 
-## DAILY SPIN shines gold while a spin is free, else says when the next one is.
+## The big wheel button shines while a spin is free, else says when the next one is.
 func _refresh_daily() -> void:
-	if daily_entry == null:
+	if daily_button == null:
 		return
 	var w: int = DailySpinPanel.wait_s()
-	if daily_button != null:
-		daily_button.set_state(w <= 0, DailyWheel.wait_text(w))
-	if w <= 0:
-		daily_entry.text = "DAILY SPIN  ★"
-		daily_entry.add_theme_color_override(&"font_color", Palette.VIP_GOLD)
-	else:
-		daily_entry.text = "DAILY SPIN  ·  %s" % DailyWheel.wait_text(w)
-		daily_entry.remove_theme_color_override(&"font_color")
+	daily_button.set_state(w <= 0, DailyWheel.wait_text(w))
 
 
 func _sub_box(box_name: String, title_text: String, width: float = 540.0) -> VBoxContainer:

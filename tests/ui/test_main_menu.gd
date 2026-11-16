@@ -46,8 +46,8 @@ func test_entries_in_order_without_a_settings_entry() -> void:
 	var box: VBoxContainer = menu.get_node("Center/Column/VBox")
 	var names: PackedStringArray = []
 	for b: Node in box.get_children():
-		names.append((b as Button).text.get_slice("  ", 0))  # DAILY SPIN carries a star or its countdown
-	assert_eq(names, PackedStringArray(["PLAY ONLINE", "PRACTICE", "TUTORIAL", "SHOP", "DAILY SPIN", "QUIT"]))
+		names.append((b as Button).text)
+	assert_eq(names, PackedStringArray(["PLAY ONLINE", "PRACTICE", "TUTORIAL", "SHOP", "QUIT"]))
 
 
 func test_logo_and_entries_are_centred() -> void:
@@ -258,10 +258,10 @@ func test_browse_shows_other_versions_without_join() -> void:
 func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	ProfileManager.profile.daily_last = 0
 	menu._refresh_daily()
-	assert_eq(menu.daily_entry.text, "DAILY SPIN  ★", "a free spin shines")
-	assert_true(menu.daily_button.spin_ready, "the big wheel button shines too")
+	assert_true(menu.daily_button.spin_ready, "the big wheel button shines")
+	assert_null(menu.get_node("Center/Column/VBox").get_node_or_null("DailySpin"), "no DAILY SPIN entry in the menu list")
 	assert_eq(menu.daily_button.size.x, DailySpinButton.SIZE, "as wide as the three corner buttons")
-	menu.daily_entry.pressed.emit()
+	menu.daily_button.pressed.emit()
 	assert_true(menu.daily_spin.visible)
 	assert_false(menu.daily_spin.spin_button.disabled)
 	menu.daily_spin.spin()
@@ -269,7 +269,6 @@ func test_daily_spin_opens_the_wheel_and_counts_down() -> void:
 	assert_gt(ProfileManager.profile.daily_last, 0, "the spin is remembered")
 	menu.daily_spin.close()
 	menu._refresh_daily()
-	assert_string_starts_with(menu.daily_entry.text, "DAILY SPIN  ·  ")
 	assert_false(menu.daily_button.spin_ready, "and rests with the countdown")
 	assert_ne(menu.daily_button.wait_text, "")
 	ProfileManager.reload()
