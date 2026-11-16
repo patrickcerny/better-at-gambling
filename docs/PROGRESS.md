@@ -93,6 +93,23 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.46 Minigame rules card: preview clip + controls
+- Patrick: "Controls und gifs bei den minigames". The rules card before every minigame
+  (MinigameBriefing) is wider: a looping 5 s preview clip on the left (MinigamePreview plays the
+  sprite sheet assets/minigames/clips/<id>.webp, 50 frames 384x216 at 10 fps), how to play and a
+  controls table on the right (MinigameControls: keyboard and gamepad keycaps per action, filled from
+  the InputMap, the column of the device used last is lit, a dash where a device can't do it).
+  Player ready states are pills; the READY hint follows the device.
+- Clips: `tools/minigame_clips.sh [id ...]` runs tools/dev/minigame_clip.tscn under Xvfb with
+  `--fixed-fps 30`. Table games run their real logic in real time with every seat played by a bot that
+  sends random legal intents (per-game skip in the script); walkable games use their dev shot with the
+  beans walking one lap and the camera drifting so the loop joins. Imported lossy (compress/mode=1),
+  ~7.6 MB of source for all 16.
+- Gamepad gaps closed: Forehead Poker A = STAY / B = FOLD, Find the Lady D-pad moves the highlight and
+  A picks. Still mouse/keyboard only: Lonely Number, Vote Race, Spy, Grab Your Hand's card select
+  (shown as a dash on the card).
+- Known, not from this change: tests/ui/test_pause_in_minigame.gd fails 2/3 on main too
+  (PauseMenu.set_dev_available touches a null node, pause_menu.gd:113).
 ### 2026-11-15 / 0.9.45 Casino Hold'em river bet
 - Patrick: "Poker river bet". Before, the turn and the river came out together straight after the
   CALL, with no betting in between. Now the turn comes out on its own (state `RIVER`, appended to
