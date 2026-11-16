@@ -99,7 +99,6 @@ func _build_visuals() -> void:
 	if not Vfx.enabled():
 		return
 	var brass: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
-	_round_rug(2.4)
 	_build_plinth(brass)
 	_build_stone()
 	_build_sword(brass)

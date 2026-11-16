@@ -54,7 +54,6 @@ func _build_visuals() -> void:
 	seat_count = SEAT_XS.size()
 	interact_radius = 2.8
 	hot_center = Vector3(0, 0, 0.3)
-	_rug(Vector2(5.8, 4.2), Palette.VIP_BURGUNDY.darkened(0.5))
 	# Collision: one box the size of the oval; the table you see is built from parts below.
 	var body: Node3D = GreyboxKit.box(self, Vector3(2.0 * (HALF_L + RAIL_OUTER), TABLE_TOP, 2.0 * RAIL_OUTER), Vector3(0, TABLE_TOP * 0.5, 0), WOOD_COLOR, "Body")
 	(body.get_node(^"Mesh") as Node3D).visible = false

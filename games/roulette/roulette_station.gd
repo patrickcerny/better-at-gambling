@@ -8,7 +8,6 @@ func _build_visuals() -> void:
 	game_id = &"roulette"
 	seat_count = 6
 	hot_center = Vector3(0.5, 0, 0)
-	_rug(Vector2(7.0, 5.0), Palette.CASINO_RED.darkened(0.55))
 	# Body x −2.5..2.7: the wheel (1.6 m across, centred at WHEEL_X) rests in its well entirely on
 	# the table, the layout fills the other end.
 	GreyboxKit.box(self, Vector3(5.2, 0.9, 1.8), Vector3(0.1, 0.45, 0), Color("#3A2A1E"), "Body")

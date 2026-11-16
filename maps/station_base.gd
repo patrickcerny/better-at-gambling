@@ -260,20 +260,3 @@ func _stool(local_pos: Vector3, name: String = "Stool") -> void:
 	PropModels.shade(PropModels.dress(solid, &"seat", 0.25, 0.5), 0.7)
 
 
-## Patrick's round rug, `width` across.
-func _round_rug(width: float) -> void:
-	var rug: Node3D = PropModels.shade(PropModels.make(&"rug", 0.0, width), 0.45)
-	rug.position.y = LuckyLounge.STATION_RUG_Y
-	add_child(rug)
-
-
-func _rug(size: Vector2, color: Color) -> void:
-	var mesh := PlaneMesh.new()
-	mesh.size = size
-	var mi := MeshInstance3D.new()
-	mi.name = "Rug"
-	mi.mesh = mesh
-	# Patterned carpet on clients (same shader as the lounge floor), flat colour headless.
-	mi.material_override = LoungeDecor._carpet(color, color.darkened(0.25), 1.0) if Vfx.enabled() else GreyboxKit.material(color)
-	mi.position.y = LuckyLounge.STATION_RUG_Y
-	add_child(mi)
