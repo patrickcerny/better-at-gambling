@@ -45,8 +45,16 @@ func _dump() -> void:
 		pieces[String(d.id)] = {"kind": String(d.kind), "tris": Array(tris)}
 		root.remove_child(v)
 		v.free()
+	# How far each cape spreads round each bulky shirt / trousers (AvatarVisuals scales it so).
+	var spreads: Dictionary = {}
+	for c: CosmeticDef in CosmeticShop.default().of_kind(CosmeticDef.KIND_CAPE):
+		for kind: StringName in [CosmeticDef.KIND_SHIRT, CosmeticDef.KIND_PANTS]:
+			for d: CosmeticDef in CosmeticShop.default().of_kind(kind):
+				var s: float = OutfitMeshes.cape_spread(c.id, [d.id] as Array[StringName])
+				if s > 1.001:
+					spreads["%s|%s" % [c.id, d.id]] = s
 	var f := FileAccess.open(out_path, FileAccess.WRITE)
-	f.store_string(JSON.stringify({"parts": _arrays(parts), "pieces": pieces}))
+	f.store_string(JSON.stringify({"parts": _arrays(parts), "pieces": pieces, "spreads": spreads}))
 	f.close()
 	print("dumped %d pieces" % pieces.size())
 
