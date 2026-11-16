@@ -80,3 +80,29 @@ func test_open_focuses_an_offer_that_can_be_bought() -> void:
 	state.balances[1] = 100  # only the $80 beer is affordable
 	panel.open()
 	assert_eq(panel.get_viewport().gui_get_focus_owner(), _buttons()[1])
+
+
+## "press 3 or click clips": a long description (Out of Order Sign) pushed the price and buy hint
+## out of the card. Every item, on a full 4-card row: the hint sits inside its card and the whole
+## description is shown.
+func test_every_item_card_fits_its_text() -> void:
+	var ids: Array = Registry.items.keys()
+	ids.sort()
+	var i: int = 0
+	while i < ids.size():
+		var offers: Array = []
+		for j: int in range(i, mini(i + 4, ids.size())):
+			offers.append({"item": ids[j], "price": 150, "rarity": 1})
+		state.shop_offers = offers
+		panel._bought = false
+		panel.open()
+		await wait_process_frames(3)
+		for b: Button in _buttons():
+			var card: Rect2 = b.get_global_rect()
+			assert_almost_eq(card.size.y, ShopPanel.CARD_SIZE.y, 0.5, "cards keep their size")
+			var labels: Array[Node] = b.find_children("*", "Label", true, false)
+			var hint: Label = labels[labels.size() - 1]
+			assert_true(card.encloses(hint.get_global_rect()), "%s: buy hint inside the card" % b.name)
+			var d: Label = b.find_child("Description", true, false)
+			assert_eq(d.get_visible_line_count(), d.get_line_count(), "%s: whole description shown (%s)" % [b.name, d.text])
+		i += 4

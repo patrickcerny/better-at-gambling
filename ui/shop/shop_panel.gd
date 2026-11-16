@@ -14,6 +14,9 @@ signal closed
 
 const CARD_SIZE: Vector2 = Vector2(250, 452)
 const THUMB: float = 150.0
+## Description font size range: the biggest size whose wrapped text fits the card wins.
+const DESC_FONT_MAX: int = 18
+const DESC_FONT_MIN: int = 12
 
 var state: ClientMatchState
 var local_id: int = -1
@@ -299,8 +302,13 @@ func _card(i: int, o: Dictionary, money: int) -> Button:
 	d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	d.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	d.add_theme_font_size_override(&"font_size", 18)
+	# The card keeps its size: the description only gets the space that is left and never
+	# pushes the price / buy hint out of the card. Long texts step their font down until they
+	# fit (Out of Order Sign, Sunglasses, Scissors), clipped as the last resort.
+	d.clip_text = true
+	d.add_theme_font_size_override(&"font_size", DESC_FONT_MAX)
 	d.add_theme_color_override(&"font_color", Palette.CREAM.darkened(0.22))
+	d.resized.connect(_fit_description.bind(d))
 	v.add_child(d)
 	var rule := ColorRect.new()
 	rule.custom_minimum_size = Vector2(0, 2)
@@ -329,6 +337,36 @@ func _card(i: int, o: Dictionary, money: int) -> Button:
 	if b.disabled:
 		v.modulate = Color(1, 1, 1, 0.55)
 	return b
+
+
+## Largest font size (DESC_FONT_MAX down to DESC_FONT_MIN) at which the whole description
+## wraps inside the label's current height.
+static func _fit_description(d: Label) -> void:
+	if d.size.y <= 0.0 or d.size.x <= 0.0:
+		return
+	var font: Font = d.get_theme_font(&"font")
+	var spacing: int = d.get_theme_constant(&"line_spacing")
+	var width: float = d.size.x
+	var fs: int = DESC_FONT_MIN
+	for s: int in range(DESC_FONT_MAX, DESC_FONT_MIN - 1, -1):
+		if _wrapped_height(font, d.text, width, s, spacing) <= d.size.y:
+			fs = s
+			break
+	if d.get_theme_font_size(&"font_size") != fs:
+		d.add_theme_font_size_override(&"font_size", fs)
+
+
+static func _wrapped_height(font: Font, text: String, width: float, font_size: int, spacing: int) -> float:
+	var lines: int = 0
+	var para := TextParagraph.new()
+	para.width = width
+	para.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
+	para.add_string(text, font, font_size)
+	lines = para.get_line_count()
+	var h: float = 0.0
+	for i: int in lines:
+		h += para.get_line_size(i).y
+	return h + float(spacing * maxi(lines - 1, 0))
 
 
 static func _frame_style() -> StyleBoxFlat:
