@@ -212,6 +212,8 @@ func _process(delta: float) -> void:
 	_flash_money()
 	var t: int = int(ceil(maxf(state.time_left, 0.0)))
 	timer_label.text = "%02d:%02d" % [t / 60, t % 60]
+	# Practice is endless (Patrick 2026-11-16: "Practise mode hat keinen Timer"): no match clock.
+	timer_label.visible = not (bool(state.lobby_settings.get("no_minigames", false)) or state.time_left < 0.0)
 	rank_label.text = "%s / %d" % [_ordinal(state.rank_of(local_id)), maxi(state.balances.size(), 1)]
 	rank_label.visible = state.balances.size() > 1  # alone (practice): no "1st / 1"
 	jackpot_label.text = "JACKPOT $%s" % _thousands(state.jackpot)
@@ -451,7 +453,23 @@ func _build() -> void:
 	prompt_label = _centre_label(80, 30, Palette.CREAM)
 	prompt_label.visible = false
 	toast_label = _centre_label(-120, 40, Palette.VIP_GOLD)
+	toast_label.name = "Toast"
 	toast_label.visible = false
+	# A dark plate sized to the text: the toast sits mid-screen, over the slot machine's JACKPOT
+	# sign and other 3D lettering, and must never read as one jumble with it.
+	toast_label.offset_left = 0
+	toast_label.offset_right = 0
+	toast_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	var plate := StyleBoxFlat.new()
+	plate.bg_color = Color(Palette.CASINO_BLACK, 0.88)
+	plate.set_corner_radius_all(12)
+	plate.border_color = Color(Palette.VIP_GOLD, 0.6)
+	plate.set_border_width_all(2)
+	plate.content_margin_left = 22
+	plate.content_margin_right = 22
+	plate.content_margin_top = 6
+	plate.content_margin_bottom = 8
+	toast_label.add_theme_stylebox_override(&"normal", plate)
 	last_call_banner = _centre_label(-320, 56, Palette.LOSS_RED)
 	last_call_banner.theme_type_variation = &"TitleLabel"
 	last_call_banner.visible = false

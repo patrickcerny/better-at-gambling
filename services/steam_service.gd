@@ -130,6 +130,9 @@ func _ready() -> void:
 	# Lifetime achievements follow the profile (level-ups, matches, the shop) and catch up on start.
 	ProfileManager.changed.connect(_on_profile_changed)
 	_on_profile_changed()
+	# The developers own every achievement (`DevMode.granted_achievements`), set once per start.
+	unlock_achievements(DevMode.granted_achievements(_steam_id))
+	sync_achievements()
 
 
 func _process(_delta: float) -> void:
@@ -164,7 +167,22 @@ func unlock_achievements(ids: Array[StringName]) -> Array[StringName]:
 	if not fresh.is_empty():
 		steam.call("storeStats")
 		Log.info(&"steam", "achievements unlocked: %s" % ", ".join(fresh))
+		sync_achievements()
 	return fresh
+
+
+## Tells the profile which achievements this account holds, so their rewards (`CosmeticDef.
+## achievement`) can be collected in the shop, also ones earned before the rewards existed.
+func sync_achievements() -> void:
+	if not _available:
+		return
+	var held: Array[StringName] = []
+	for d: CosmeticDef in ProfileManager.profile.shop.items:
+		if d.achievement != &"" and not d.achievement in held:
+			var have: Variant = steam.call("getAchievement", String(d.achievement))
+			if have is Dictionary and bool((have as Dictionary).get("achieved", false)):
+				held.append(d.achievement)
+	ProfileManager.note_achieved(held)
 
 
 ## Beat the Dev (`Achievements.BEAT_THE_DEV`): `beaten` are the Steam IDs of the players the local

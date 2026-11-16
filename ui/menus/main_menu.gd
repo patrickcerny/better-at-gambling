@@ -51,10 +51,12 @@ var cosmetics_button: TShirtButton
 var cosmetics: CosmeticsPanel
 ## Level, XP bar and Coins in the top-left corner.
 var profile_badge: ProfileBadge
+## The red dots on the T-shirt and the COSMETICS entry: rewards waiting in the COLLECT tab.
+var _shop_dots: Array[NotifyDot] = []
 var level_pass: LevelPassPanel
 var how_to_play: HowToPlayPanel
-## DEV MODE under TUTORIAL and the panel it opens: only for Patrick's Steam account (`DevMode`);
-## for everyone else neither exists.
+## The small dev button (bottom right, `DevButton`) and the Dev Dashboard it opens: only for
+## Patrick's Steam account (`DevMode`); for everyone else neither exists.
 var dev_entry: Button
 var dev_panel: DevPanel
 ## The prize wheel the big Daily Spin button opens (`DailySpinPanel`).
@@ -70,6 +72,9 @@ var version_check: VersionCheck
 ## The trophy left of the "?": global leaderboards and your lifetime stats (`LeaderboardPanel`).
 var trophy_button: TrophyButton
 var leaderboards: LeaderboardPanel
+## Settings, cosmetics, level pass, leaderboards, daily spin, tutorial and dev panel: opening one
+## closes whichever other one is open (Patrick 2026-11-16).
+var dialogs := DialogGroup.new()
 ## What the tutorial opened on the first PRACTICE / PLAY ONLINE carries on to when it closes.
 var _after_tutorial: Callable = Callable()
 ## Who gets the focus back when the tutorial closes to the main entries.
@@ -125,9 +130,7 @@ func _ready() -> void:
 	_settings = SettingsPanel.new()
 	add_child(_settings)
 	_settings.closed.connect(func() -> void: _settings_button.grab_focus())
-	_settings_button.pressed.connect(func() -> void:
-		cosmetics.close()
-		_settings.open(false))
+	_settings_button.pressed.connect(func() -> void: _settings.open(false))
 	# The cosmetics shop: the T-shirt left of the gear and the COSMETICS entry.
 	cosmetics_button = TShirtButton.new()
 	cosmetics_button.name = "CosmeticsButton"
@@ -148,12 +151,14 @@ func _ready() -> void:
 	cosmetics_button.tooltip_text = "My cosmetics"
 	cosmetics_button.pressed.connect(func() -> void:
 		cosmetics_opener[0] = cosmetics_button
-		_settings.close()
 		cosmetics.open(true))  # the T-shirt: your own things, to wear
 	_cosmetics_entry.pressed.connect(func() -> void:
 		cosmetics_opener[0] = _cosmetics_entry
-		_settings.close()
 		cosmetics.open())
+	# Rewards waiting in the shop's COLLECT tab: a red dot with the count on both shop buttons.
+	_shop_dots = [NotifyDot.attach(cosmetics_button), NotifyDot.attach(_cosmetics_entry, true)]
+	ProfileManager.changed.connect(_count_shop_dots)
+	_count_shop_dots()
 	profile_badge = ProfileBadge.new()
 	profile_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	profile_badge.offset_left = 32.0
@@ -162,9 +167,7 @@ func _ready() -> void:
 	# Click the profile line: the level pass (every level's Coins and unlocks).
 	level_pass = LevelPassPanel.new()
 	add_child(level_pass)
-	profile_badge.pressed.connect(func() -> void:
-		_settings.close()
-		level_pass.open())
+	profile_badge.pressed.connect(level_pass.open)
 	level_pass.item_pressed.connect(func(id: StringName) -> void:
 		level_pass.close()
 		cosmetics.open()
@@ -186,8 +189,6 @@ func _ready() -> void:
 	help_button.pressed.connect(func() -> void:
 		if _busy:
 			return  # joining: PLAY ONLINE stays up with its status
-		_settings.close()
-		cosmetics.close()
 		_after_tutorial = Callable()
 		_show_tutorial(help_button))
 	_build_leaderboards()
@@ -201,6 +202,8 @@ func _ready() -> void:
 	if DevMode.allowed():
 		_build_dev()
 	_build_online()
+	for d: Control in [_settings, cosmetics, level_pass, leaderboards, daily_spin, how_to_play, dev_panel]:
+		dialogs.add(d)
 	_practice.grab_focus()
 	Audio.set_mood(&"menu")
 	if DisplayServer.get_name() != "headless":
@@ -251,9 +254,6 @@ func _build_leaderboards() -> void:
 	trophy_button.pressed.connect(func() -> void:
 		if _busy:
 			return
-		_settings.close()
-		cosmetics.close()
-		level_pass.close()
 		leaderboards.open())
 
 
@@ -264,11 +264,6 @@ func _build_daily() -> void:
 		_refresh_daily()
 		if daily_button.is_visible_in_tree():
 			daily_button.grab_focus())
-	var open_daily := func() -> void:
-		_settings.close()
-		cosmetics.close()
-		level_pass.close()
-		daily_spin.open()
 	# The big wheel above the three corner buttons, as wide as they are together.
 	daily_button = DailySpinButton.new()
 	daily_button.name = "DailySpinButton"
@@ -281,7 +276,7 @@ func _build_daily() -> void:
 	daily_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	add_child(daily_button)
 	move_child(daily_button, daily_spin.get_index())  # under the wheel panel
-	daily_button.pressed.connect(open_daily)
+	daily_button.pressed.connect(daily_spin.open)
 	_refresh_daily()
 
 
@@ -323,29 +318,30 @@ func _build_lists() -> void:
 	SteamSvc.public_lobbies_received.connect(_on_public_lobbies)
 
 
-## Developer mode (Patrick only): DEV MODE under TUTORIAL and its panel.
+## Developer mode (Patrick only): the small "</>" corner button above the trophy, left of the
+## Daily Spin wheel (Patrick 2026-11-16), and the Dev Dashboard it opens.
 func _build_dev() -> void:
-	dev_entry = Button.new()
-	dev_entry.name = "DevMode"
-	dev_entry.text = "DEV MODE"
-	dev_entry.custom_minimum_size = _tutorial.custom_minimum_size
-	dev_entry.alignment = _tutorial.alignment
-	dev_entry.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
-	_main_box.add_child(dev_entry)
-	_main_box.move_child(dev_entry, _tutorial.get_index() + 1)
 	dev_panel = DevPanel.new()
-	dev_panel.visible = false
-	_column.add_child(dev_panel)
+	add_child(dev_panel)
+	dev_entry = DevButton.new()
+	dev_entry.name = "DevMode"
+	dev_entry.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	# Right-aligned with the trophy, its bottom level with the wheel's.
+	dev_entry.offset_right = -80.0 - 3.0 * GearButton.SIZE
+	dev_entry.offset_left = dev_entry.offset_right - DevButton.SMALL
+	dev_entry.offset_bottom = -48.0 - GearButton.SIZE
+	dev_entry.offset_top = dev_entry.offset_bottom - DevButton.SMALL
+	dev_entry.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	dev_entry.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(dev_entry)
+	move_child(dev_entry, trophy_button.get_index())  # with the corner buttons, under every panel
 	dev_entry.pressed.connect(func() -> void:
 		if _busy:
 			return
-		_settings.close()
-		cosmetics.close()
-		_hide_boxes()
 		dev_panel.open())
 	dev_panel.closed.connect(func() -> void:
-		_show_main()
-		dev_entry.grab_focus())
+		if dev_entry.is_visible_in_tree():
+			dev_entry.grab_focus())
 	dev_panel.practice_requested.connect(start_dev_practice)
 
 
@@ -387,7 +383,7 @@ func _hide_boxes() -> void:
 	_set_corner_visible(true)
 	how_to_play.visible = false
 	if dev_panel != null:
-		dev_panel.visible = false
+		dev_panel.close()
 
 
 func _show_online() -> void:
@@ -434,7 +430,7 @@ func _back_to_online(opener: Button) -> void:
 
 ## The profile line and the corner buttons step aside while a full-screen lobby list is open.
 func _set_corner_visible(on: bool) -> void:
-	for c: Control in [profile_badge, _settings_button, cosmetics_button, help_button, trophy_button, daily_button]:
+	for c: Control in [profile_badge, _settings_button, cosmetics_button, help_button, trophy_button, daily_button, dev_entry]:
 		if c != null:
 			c.visible = on
 
@@ -462,7 +458,14 @@ func _show_tutorial(opener: Control) -> void:
 
 
 ## DONE / SKIP / Esc: remembered as seen; on to the chosen match or box, or back to the entries.
+## Closed because another dialog opened (settings, cosmetics, ...): just back to the entries.
 func _on_tutorial_closed() -> void:
+	if dialogs.replacing != null:
+		# Not `_show_main()`: its `_hide_boxes()` would close the dialog that is opening.
+		_after_tutorial = Callable()
+		_set_logo_visible(true)
+		_main_box.visible = true
+		return
 	Settings.set_value("tutorial", "seen", true)
 	Settings.save()
 	var next: Callable = _after_tutorial
@@ -494,6 +497,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif online.visible:
 		get_viewport().set_input_as_handled()
 		_show_main()
+
+
+func _count_shop_dots() -> void:
+	var n: int = ProfileManager.profile.collectable().size()
+	for dot: NotifyDot in _shop_dots:
+		dot.count = n
 
 
 ## The sub-menus are tall: the big logo steps aside while one is open.

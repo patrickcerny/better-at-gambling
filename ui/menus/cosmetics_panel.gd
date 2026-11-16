@@ -30,10 +30,13 @@ const KIND_TITLES: Dictionary = {
 	CosmeticDef.KIND_COLOR: "SKINS", CosmeticDef.KIND_SKIN: "SKINS", CosmeticDef.KIND_HAT: "HATS",
 	CosmeticDef.KIND_SHIRT: "SHIRTS", CosmeticDef.KIND_PANTS: "TROUSERS", CosmeticDef.KIND_CAPE: "CAPES",
 	CosmeticDef.KIND_BOOTS: "BOOTS", CosmeticDef.KIND_EYES: "EYES", CosmeticDef.KIND_MOUTH: "MOUTHS",
-	CosmeticDef.KIND_BEARD: "BEARDS", KIND_PACK: "PACKS", KIND_COINS: "GOLD",
+	CosmeticDef.KIND_BEARD: "BEARDS", KIND_PACK: "PACKS", KIND_COINS: "GOLD", KIND_COLLECT: "COLLECT",
 }
 ## The packs tab's key (not a `CosmeticDef` kind).
 const KIND_PACK: StringName = &"pack"
+## The COLLECT page's key: achievement rewards, level-pass pieces and Daily Spin wins to collect
+## (Patrick 2026-11-16: "There should be a collect stuff (from wheel achievements etc) in the shop").
+const KIND_COLLECT: StringName = &"collect"
 ## The coins page's key (opened by the + next to the wallet; no tab icon).
 const KIND_COINS: StringName = &"coins"
 ## The piece each tab's icon shows.
@@ -41,13 +44,16 @@ const TAB_ICONS: Dictionary = {
 	CosmeticDef.KIND_COLOR: &"skin_rainbow", CosmeticDef.KIND_SKIN: &"skin_rainbow", CosmeticDef.KIND_HAT: &"hat_top",
 	CosmeticDef.KIND_SHIRT: &"shirt_tux", CosmeticDef.KIND_PANTS: &"pants_jeans", CosmeticDef.KIND_CAPE: &"cape_hero",
 	CosmeticDef.KIND_BOOTS: &"boots_sneakers", CosmeticDef.KIND_EYES: &"eyes_star", CosmeticDef.KIND_MOUTH: &"mouth_tongue",
-	CosmeticDef.KIND_BEARD: &"beard_full", KIND_PACK: &"pack_royal",
+	CosmeticDef.KIND_BEARD: &"beard_full", KIND_PACK: &"pack_royal", KIND_COLLECT: &"hat_trophy",
 }
 const MUTED := Color("#B9A98C")
 
 ## Inventory mode (the T-shirt in the menu's corner): only what the player owns, to wear it.
 ## Shop mode (SHOP in the menu) shows everything to buy.
 var inventory: bool = false
+## Opened in a match lobby: colour and skin stay as the player joined (Patrick 2026-11-15) and
+## count from the next match, so the panel says so instead of "from now on".
+var next_match_look: bool = false
 var title_label: Label
 ## Switches between the shop and the inventory.
 var switch_button: Button
@@ -71,6 +77,8 @@ var price_row: HBoxContainer
 var price_label: Label
 var price_coin: CoinIcon
 var action_button: Button
+## The open "Buy ...? Can't be refunded" question, if any.
+var confirm_dialog: ConfirmDialog
 ## Pays real money through Steam (a piece or a pack).
 var steam_button: Button
 var status_label: Label
@@ -101,6 +109,12 @@ var wardrobe: PanelContainer
 ## Kind -> its slot in the WEARING column.
 var slots: Dictionary[StringName, Button] = {}
 var stage: PanelContainer
+## The COLLECT page: its tiles (id -> tile), the grid, COLLECT ALL, the empty note, the tab's dot.
+var collect_tiles: Dictionary[StringName, Button] = {}
+var collect_grid: GridContainer
+var collect_all_button: Button
+var collect_note: Label
+var collect_dot: NotifyDot
 ## How many featured cards the shop shows.
 const FEATURED: int = 3
 
@@ -316,6 +330,7 @@ func _ready() -> void:
 		tab_row.add_child(_tab_button(kind, tabs.get_tab_count() - 1))
 		if kind == CosmeticDef.KIND_COLOR:
 			tab_buttons[CosmeticDef.KIND_SKIN] = tab_buttons[kind]
+	_build_collect_page(tab_row)
 	if not shop.packs.is_empty():
 		var pgrid: GridContainer = _grid_tab(str(KIND_TITLES[KIND_PACK]))
 		for k: CosmeticPack in shop.packs:
@@ -649,7 +664,7 @@ func _tile(d: CosmeticDef, pack: CosmeticPack = null) -> Button:
 	b.tooltip_text = title if d != null else "%s: a set of %d pieces for Gold Coins" % [title, pack.pieces.size()]
 	b.clip_contents = true
 	SettingsPanel.style_tab(b)
-	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
 		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
 		sb.set_corner_radius_all(18)
 		b.add_theme_stylebox_override(st, sb)
@@ -711,7 +726,7 @@ func _coin_tile(c: CoinPack) -> Button:
 	b.custom_minimum_size = TILE
 	b.tooltip_text = "%s Gold Coins" % Hud._thousands(c.gold)
 	SettingsPanel.style_tab(b)
-	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
 		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
 		sb.set_corner_radius_all(18)
 		b.add_theme_stylebox_override(st, sb)
@@ -777,22 +792,37 @@ func select(id: StringName) -> void:
 	selected = id
 	if d != null:
 		trying[d.kind] = id
-		if d.kind == CosmeticDef.KIND_COLOR:
-			trying.erase(CosmeticDef.KIND_SKIN)  # a plain colour shows without the animated skin
+		_one_look(d)
 	status_label.text = ""
+	if d != null and d.achievement != &"" and not ProfileManager.profile.owns(id) and not ProfileManager.profile.can_collect(id):
+		var ach: Array = achievement_text(d.achievement)
+		status_label.text = "Achievement reward: unlock \"%s\" (%s) to get it." % [ach[0], ach[1]]
 	if preview != null:
 		preview.face(d != null and d.kind == CosmeticDef.KIND_CAPE)
 		preview.focus(d.kind if d != null else &"")
 	_refresh()
 
 
+## Plain colours and animated skins share one page and one look: trying one on drops a try-on of
+## the other, so only one tile there is ever picked (Patrick 2026-11-16: "why are there 2
+## selected?").
+func _one_look(d: CosmeticDef) -> void:
+	if d.kind == CosmeticDef.KIND_COLOR:
+		trying.erase(CosmeticDef.KIND_SKIN)  # a plain colour shows without the animated skin
+	elif d.kind == CosmeticDef.KIND_SKIN:
+		trying.erase(CosmeticDef.KIND_COLOR)
+
+
 ## A click on a tile: picks it, or (picked already) takes that try-on back off.
 func _on_tile_pressed(id: StringName) -> void:
 	var d: CosmeticDef = shop.find(id)
 	if d != null and selected == id and trying.get(d.kind, &"") == id:
+		if d.kind == CosmeticDef.KIND_COLOR or d.kind == CosmeticDef.KIND_SKIN:
+			return  # the bean always has a colour or a skin: a second click keeps the pick
 		untry(d.kind)
 	elif d != null and selected != id and trying.get(d.kind, &"") == id:
 		selected = id  # stacked further back: just bring it to the front
+		_one_look(d)
 		_refresh()
 	else:
 		select(id)
@@ -849,17 +879,24 @@ func press_look() -> void:
 			status_label.text = "Not enough Coins for the whole look: %s more to go." % Hud._thousands(look_price() - p.coins)
 			_refresh()
 			return
+		var lines: PackedStringArray = []
 		for d: CosmeticDef in to_buy:
-			ProfileManager.buy(d.id)
-		status_label.text = "Bought %d pieces! WEAR ALL puts the look on." % to_buy.size()
-		Audio.play(&"cash_register", &"UI", -6.0)
-		_refresh()
+			lines.append("%s · %s · %s Coins" % [d.display_name, _kind_name(d), Hud._thousands(d.price)])
+		_confirm_buy("BUY THE WHOLE LOOK?", "\n".join(lines) + "\n\n%d pieces for %s Coins together." % [to_buy.size(), Hud._thousands(look_price())], func() -> void:
+			for d: CosmeticDef in to_buy:
+				ProfileManager.buy(d.id)
+			status_label.text = "Bought %d pieces! WEAR ALL puts the look on." % to_buy.size()
+			Audio.play(&"cash_register", &"UI", -6.0)
+			_refresh(), look_button)
 		return
 	var n: int = 0
 	for d: CosmeticDef in look_pieces():
 		if not p.owns(d.id):
 			continue
 		if d.kind == CosmeticDef.KIND_COLOR:
+			if p.outfit.get(CosmeticDef.KIND_SKIN, &"") != &"" and not trying.has(CosmeticDef.KIND_SKIN):
+				ProfileManager.take_off(CosmeticDef.KIND_SKIN)  # the plain colour shows, as on the stage
+				outfit_worn.emit(CosmeticDef.KIND_SKIN, &"")
 			ProfileManager.set_preferred_color(d.color_index)
 			color_worn.emit(d.color_index)
 			n += 1
@@ -910,16 +947,58 @@ func _on_purchase_finished(ok: bool) -> void:
 
 
 ## A premium piece or a set paid in Gold Coins: Steam exchanges them (the answer: `_on_gold_spent`).
-func _buy_with_gold(title: String, def: int, cost: int) -> void:
+## Too few Gold Coins: off to the GOLD tab to get more. Enough: asks first (no refunds).
+func _buy_with_gold(title: String, def: int, cost: int, contents: String = "") -> void:
 	if not SteamSvc.is_available():
 		status_label.text = "Gold Coins need Steam running."
 	elif SteamSvc.gold < cost:
-		status_label.text = "Not enough Gold Coins: %s more to go (+ next to them)." % Hud._thousands(cost - SteamSvc.gold)
-	elif SteamSvc.buy_with_gold(def, cost):
-		status_label.text = "Buying %s..." % title
+		open_gold_shop(cost - SteamSvc.gold)
+		return
 	else:
-		status_label.text = "Can't buy that right now, try again in a moment."
+		_confirm_buy("BUY %s?" % title.to_upper(), contents + "%s Gold Coins." % Hud._thousands(cost), func() -> void:
+			if SteamSvc.buy_with_gold(def, cost):
+				status_label.text = "Buying %s..." % title
+			else:
+				status_label.text = "Can't buy that right now, try again in a moment."
+			_refresh())
+		return
 	_refresh()
+
+
+## "Hat", "Skin" ...: what a piece is, for the purchase lists.
+func _kind_name(d: CosmeticDef) -> String:
+	return str(KIND_TITLES.get(d.kind, "")).trim_suffix("S").replace("TROUSER", "TROUSERS").capitalize()
+
+
+## "MORE GOLD NEEDED · BUY MORE": the GOLD tab, with the smallest pack that covers `missing` picked.
+func open_gold_shop(missing: int) -> void:
+	var pick: CoinPack = null
+	for c: CoinPack in shop.coin_packs:
+		if c.gold >= missing and (pick == null or c.gold < pick.gold):
+			pick = c
+	if pick == null and not shop.coin_packs.is_empty():
+		pick = shop.coin_packs[-1]
+	show_kind(KIND_COINS)
+	if pick != null:
+		select(pick.id)
+		if tiles.has(pick.id):
+			tiles[pick.id].grab_focus()
+	status_label.text = "%s more Gold Coins needed: pick a pack, Steam handles the payment." % Hud._thousands(missing)
+
+
+## Every cosmetic purchase asks first and says it can't be refunded (Patrick: "for both buys both
+## currencies dialog about non refundability of the bought skin"). `on_yes` buys.
+func _confirm_buy(title: String, price_text: String, on_yes: Callable, from: Control = null) -> void:
+	if confirm_dialog != null and is_instance_valid(confirm_dialog) and confirm_dialog.visible:
+		return
+	# CANCEL hands the focus back here: to the button, never to a tile (that would pick it).
+	var back: Control = from if from != null else action_button
+	if back.is_visible_in_tree():
+		back.grab_focus()
+	var host: Node = get_parent() if get_parent() != null else self
+	confirm_dialog = ConfirmDialog.ask(host, title, "%s\nCosmetics can't be refunded once bought." % price_text, "BUY", on_yes)
+	for c: StringName in [&"font_color", &"font_hover_color", &"font_focus_color"]:
+		confirm_dialog.yes_button.add_theme_color_override(c, Palette.COIN_GOLD)
 
 
 func _on_gold_spent(ok: bool) -> void:
@@ -931,11 +1010,38 @@ func _on_gold_spent(ok: bool) -> void:
 	_refresh()
 
 
-## BUY when not owned (refused with a message when the Coins don't reach), else WEAR / TAKE OFF.
+## Buys `d` with red Coins, or says why not.
+func _buy_with_coins(d: CosmeticDef) -> void:
+	var p: PlayerProfile = ProfileManager.profile
+	match ProfileManager.buy(d.id):
+		&"":
+			status_label.text = "Bought %s! Wear it whenever you like." % d.display_name
+			Audio.play(&"cash_register", &"UI", -6.0)
+		&"owned":
+			pass
+		&"not_enough_coins":
+			status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (d.price - p.coins)
+			Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
+		&"level" when d.wheel_only:
+			status_label.text = "Only the Daily Spin has it."
+		&"level":
+			status_label.text = "Reach level %d to unlock it (you're level %d)." % [d.level, p.level]
+		_:
+			status_label.text = "Can't buy that right now."
+	_refresh()
+
+
+## BUY when not owned (asks first, as no purchase can be refunded; refused with a message when the
+## Coins don't reach; too few Gold Coins opens the GOLD tab), else WEAR / TAKE OFF.
 func press_action() -> void:
 	var pack: CosmeticPack = shop.find_pack(selected)
 	if pack != null and not ProfileManager.profile.owns_pack(pack):
-		_buy_with_gold(pack.display_name, pack.steam_item, pack.gold)
+		var names: PackedStringArray = []
+		for id: StringName in pack.pieces:
+			var piece: CosmeticDef = shop.find(id)
+			if piece != null:
+				names.append("%s · %s" % [piece.display_name, _kind_name(piece)])
+		_buy_with_gold(pack.display_name, pack.steam_item, pack.gold, "\n".join(names) + "\n\n")
 		return
 	if pack != null:
 		if ProfileManager.profile.owns_pack(pack):
@@ -950,25 +1056,19 @@ func press_action() -> void:
 	if d == null:
 		return
 	var p: PlayerProfile = ProfileManager.profile
+	if p.can_collect(d.id) and not p.owns(d.id):
+		collect(d.id)
+		return
+	if p.can_collect(d.id):
+		ProfileManager.collect(d.id)  # owned already (level pass, Daily Spin): wearing it collects it
 	if not p.owns(d.id) and d.premium():
 		_buy_with_gold(d.display_name, d.steam_item, d.gold)
 		return
+	if not p.owns(d.id) and d.coin_buyable() and p.coins >= d.price:
+		_confirm_buy("BUY %s?" % d.display_name.to_upper(), "%s Coins." % Hud._thousands(d.price), func() -> void: _buy_with_coins(d))
+		return
 	if not p.owns(d.id):
-		var err: StringName = ProfileManager.buy(d.id)
-		match err:
-			&"":
-				status_label.text = "Bought %s! Wear it whenever you like." % d.display_name
-				Audio.play(&"cash_register", &"UI", -6.0)
-			&"not_enough_coins":
-				status_label.text = "Not enough Coins: %d more to go. Play matches to earn them." % (d.price - p.coins)
-				Audio.play(&"ui_hover", &"UI", -8.0, 0.6)
-			&"level" when d.wheel_only:
-				status_label.text = "Only the Daily Spin has it."
-			&"level":
-				status_label.text = "Reach level %d to unlock it (you're level %d)." % [d.level, p.level]
-			_:
-				status_label.text = "Can't buy that right now."
-		_refresh()
+		_buy_with_coins(d)  # refused: says why
 		return
 	if d.kind == CosmeticDef.KIND_COLOR and not _wearing(p, d):
 		# One skins page: a plain colour takes an animated skin off (else nothing would change).
@@ -979,16 +1079,32 @@ func press_action() -> void:
 		if p.preferred_color != d.color_index:
 			ProfileManager.set_preferred_color(d.color_index)
 			color_worn.emit(d.color_index)
-		status_label.text = "Your bean wears %s from now on." % d.display_name
+		status_label.text = "Your bean is %s %s." % [d.display_name, _from_when()]
 	elif d.kind in CosmeticDef.OUTFIT_KINDS:
+		var the: String = "" if d.kind == CosmeticDef.KIND_SKIN else "the "
 		if p.is_worn(d.id):
 			ProfileManager.take_off(d.kind)
-			status_label.text = "Took off the %s." % d.display_name
+			if d.kind == CosmeticDef.KIND_SKIN:
+				var c: CosmeticDef = shop.color_item(p.preferred_color if p.preferred_color >= 0 else 0)
+				status_label.text = "Took off %s: your bean is %s again %s." % [d.display_name, c.display_name if c != null else "plain", _from_when()]
+			else:
+				status_label.text = "Took off the %s." % d.display_name
 			outfit_worn.emit(d.kind, &"")
 		elif ProfileManager.wear(d.id):
-			status_label.text = "Your bean wears the %s from now on." % d.display_name
+			status_label.text = "Your bean wears %s%s %s." % [the, d.display_name, _from_when() if d.kind == CosmeticDef.KIND_SKIN else "from now on"]
 			outfit_worn.emit(d.kind, d.id)
 	_refresh()
+
+
+## When a new colour or skin shows: at once, or in a match lobby from the next match.
+func _from_when() -> String:
+	return "from your next match" if next_match_look else "from now on"
+
+
+## Whether colour `d` is the player's picked colour while an animated skin covers it: the bean
+## shows the skin, pedestals, scoreboards and graphs still show this colour (`PlayerColors`).
+static func _player_colour_under_skin(p: PlayerProfile, d: CosmeticDef) -> bool:
+	return d.kind == CosmeticDef.KIND_COLOR and p.preferred_color == d.color_index and p.outfit.get(CosmeticDef.KIND_SKIN, &"") != &""
 
 
 ## Whether item `d` is what the bean wears now (its colour or one of its outfit pieces).
@@ -1005,10 +1121,15 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	coin.visible = not p.owns(d.id)
 	if wearing:
 		label.text = "WEARING"
+	elif _player_colour_under_skin(p, d):
+		label.text = "PLAYER COLOUR"  # what pedestals, scoreboards and graphs show (`PlayerColors`)
 	elif p.owns(d.id):
 		label.text = "FREE" if d.is_free() else ("DEVELOPER" if d.dev_only else ("JACKPOT" if d.wheel_only else "OWNED"))
 	elif d.premium():
 		label.text = Hud._thousands(d.gold)
+	elif d.achievement != &"":
+		label.text = "COLLECT" if p.can_collect(d.id) else "ACHIEVEMENT"
+		coin.visible = false
 	elif d.wheel_only:
 		label.text = "DAILY SPIN"
 		coin.visible = false
@@ -1022,7 +1143,7 @@ static func _show_price(label: Label, coin: CoinIcon, p: PlayerProfile, d: Cosme
 	# Short of money keeps the currency's colour, only dimmed: a red number next to a Gold Coin read
 	# as a red-coin price (Patrick 2026-11-15).
 	var cur: Color = Palette.COIN_GOLD if d.premium() else (Palette.COIN_RED if d.coin_buyable() else Palette.VIP_GOLD)
-	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing else (Palette.CREAM if p.owns(d.id) else cur))
+	label.add_theme_color_override(&"font_color", Palette.VIP_GOLD if wearing or _player_colour_under_skin(p, d) else (Palette.CREAM if p.owns(d.id) else cur))
 	label.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 	coin.modulate = Color(1, 1, 1, 0.6) if short else Color.WHITE
 
@@ -1050,7 +1171,7 @@ func _refresh() -> void:
 			(badge as Control).visible = d != null and not p.owns(id)
 		# Out of reach for now (level not reached and no Coins price, or too few Coins): a lock in
 		# the corner, the picture stays bright (a dimmed bean read as a broken one).
-		var locked: bool = d != null and not p.owns(id) and not _can_get_now(p, d)
+		var locked: bool = d != null and not p.owns(id) and not _can_get_now(p, d) and not p.can_collect(id)
 		var lock: Control = b.get_node_or_null("Lock") as Control
 		if lock != null:
 			lock.visible = locked
@@ -1064,11 +1185,12 @@ func _refresh() -> void:
 			continue
 		var row: Node = b.find_child("PriceRow", true, false)
 		# The wardrobe has no prices: only WEARING on what is worn.
-		(row as Control).visible = not inventory or (d != null and _wearing(p, d))
+		(row as Control).visible = not inventory or (d != null and (_wearing(p, d) or _player_colour_under_skin(p, d)))
 		if d != null:
 			_show_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, d)
 		else:
 			_show_pack_price(row.get_node("Price") as Label, row.get_child(1) as CoinIcon, p, shop.find_pack(id))
+	_refresh_collect(p)
 	_refresh_look(p)
 	_refresh_places(p)
 	var pack: CosmeticPack = shop.find_pack(selected)
@@ -1100,8 +1222,14 @@ func _refresh() -> void:
 		return
 	item_name.text = sel.display_name.to_upper()
 	item_kind.text = str(KIND_TITLES.get(sel.kind, "")).trim_suffix("S").replace("TROUSER", "TROUSERS")
+	if sel.kind == CosmeticDef.KIND_COLOR:
+		item_kind.text = "COLOUR"
+	elif sel.kind == CosmeticDef.KIND_SKIN:
+		item_kind.text = "ANIMATED SKIN"
 	if sel.level > 0 and not p.owns(sel.id):
 		item_kind.text += " · FREE AT LEVEL %d" % sel.level
+	if sel.achievement != &"":
+		item_kind.text += " · ACHIEVEMENT: %s" % str(achievement_text(sel.achievement)[0]).to_upper()
 	price_row.visible = true
 	_show_price(price_label, price_coin, p, sel)
 	if inventory and p.owns(sel.id):
@@ -1110,13 +1238,17 @@ func _refresh() -> void:
 	action_button.disabled = false
 	action_button.visible = true
 	steam_button.visible = false
-	if not p.owns(sel.id) and sel.premium():
+	if not p.owns(sel.id) and p.can_collect(sel.id):
+		action_button.text = "COLLECT"
+	elif not p.owns(sel.id) and sel.achievement != &"":
+		action_button.text = "ACHIEVEMENT REWARD"
+		action_button.disabled = true
+	elif not p.owns(sel.id) and sel.premium():
 		if not SteamSvc.is_available():
 			action_button.text = "GOLD NEEDS STEAM"
 			action_button.disabled = true
 		elif SteamSvc.gold < sel.gold:
-			action_button.text = "%s MORE GOLD NEEDED" % Hud._thousands(sel.gold - SteamSvc.gold)
-			action_button.disabled = true
+			action_button.text = "%s MORE GOLD NEEDED · BUY MORE" % Hud._thousands(sel.gold - SteamSvc.gold)
 		else:
 			action_button.text = "BUY FOR %s GOLD" % Hud._thousands(sel.gold)
 	elif not p.owns(sel.id) and sel.wheel_only:
@@ -1130,7 +1262,7 @@ func _refresh() -> void:
 		action_button.disabled = true
 	elif not p.owns(sel.id):
 		action_button.text = "BUY"
-	elif sel.kind == CosmeticDef.KIND_COLOR and p.preferred_color == sel.color_index:
+	elif sel.kind == CosmeticDef.KIND_COLOR and _wearing(p, sel):
 		action_button.text = "WEARING"
 		action_button.disabled = true
 	elif sel.kind in CosmeticDef.OUTFIT_KINDS and p.is_worn(sel.id):
@@ -1180,7 +1312,7 @@ func _refresh_look(p: PlayerProfile) -> void:
 	if to_buy > 0:
 		look_label.text += " · %s COINS TOGETHER" % Hud._thousands(total)
 	if unbuyable > 0:
-		look_label.text += " · %d NEED GOLD OR A LEVEL" % unbuyable
+		look_label.text += " · %d NOT FOR COINS" % unbuyable
 	look_button.visible = true
 	if to_buy > 0:
 		look_button.text = "BUY ALL · %s" % Hud._thousands(total)
@@ -1226,8 +1358,7 @@ func _refresh_pack(p: PlayerProfile, pack: CosmeticPack) -> void:
 		action_button.text = "GOLD NEEDS STEAM"
 		action_button.disabled = true
 	elif SteamSvc.gold < pack.gold:
-		action_button.text = "%s MORE GOLD NEEDED" % Hud._thousands(pack.gold - SteamSvc.gold)
-		action_button.disabled = true
+		action_button.text = "%s MORE GOLD NEEDED · BUY MORE" % Hud._thousands(pack.gold - SteamSvc.gold)
 	else:
 		action_button.text = "BUY FOR %s GOLD" % Hud._thousands(pack.gold)
 
@@ -1243,6 +1374,156 @@ func _show_steam_button(on: bool, def: int, cents: int, verb: String) -> void:
 	steam_button.tooltip_text = "" if SteamSvc.is_available() else "Needs Steam running"
 
 
+## The COLLECT page and its icon tab (with the red dot): COLLECT ALL over a grid of what waits.
+func _build_collect_page(tab_row: Container) -> void:
+	var page := VBoxContainer.new()
+	page.name = KIND_TITLES[KIND_COLLECT]
+	page.add_theme_constant_override(&"separation", 12)
+	tabs.add_child(page)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override(&"separation", 14)
+	page.add_child(head)
+	collect_note = Label.new()
+	collect_note.name = "Note"
+	collect_note.theme_type_variation = &"SmallLabel"
+	collect_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	collect_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	collect_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	head.add_child(collect_note)
+	collect_all_button = Button.new()
+	collect_all_button.name = "CollectAll"
+	collect_all_button.text = "COLLECT ALL"
+	collect_all_button.custom_minimum_size = Vector2(220, 48)
+	collect_all_button.pressed.connect(collect_all)
+	head.add_child(collect_all_button)
+	var scroll := ScrollContainer.new()
+	scroll.name = "Scroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_child(scroll)
+	collect_grid = GridContainer.new()
+	collect_grid.name = "Grid"
+	collect_grid.columns = COLUMNS
+	collect_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	collect_grid.add_theme_constant_override(&"h_separation", 14)
+	collect_grid.add_theme_constant_override(&"v_separation", 14)
+	scroll.add_child(collect_grid)
+	var tab: Button = _tab_button(KIND_COLLECT, tabs.get_tab_count() - 1)
+	tab.tooltip_text = "Collect: achievement rewards, level-pass pieces and Daily Spin wins"
+	tab_row.add_child(tab)
+	tab_row.move_child(tab, 0)  # first: that's where the red dot leads
+	collect_dot = NotifyDot.attach(tab)
+
+
+## [name, description] of achievement `id` (`Achievements.DEFS`); a hidden one not held yet stays a secret.
+static func achievement_text(id: StringName) -> Array:
+	var def: Variant = Achievements.DEFS.get(id, null)
+	if id in Achievements.HIDDEN and not id in ProfileManager.profile.achieved:
+		def = null
+	if def is Array and (def as Array).size() >= 2:
+		return [str(def[0]), str(def[1])]
+	return ["???", "a hidden achievement"]
+
+
+## Where a reward in the COLLECT tab comes from.
+static func collect_source(d: CosmeticDef) -> String:
+	if d.achievement != &"":
+		return str(achievement_text(d.achievement)[0]).to_upper()
+	if d.level > 0:
+		return "LEVEL %d" % d.level
+	return "DAILY SPIN"
+
+
+## A COLLECT tile: the piece's picture, its name, where it comes from; a click collects it.
+func _collect_tile(d: CosmeticDef) -> Button:
+	var b := Button.new()
+	b.name = String(d.id)
+	b.custom_minimum_size = TILE
+	var from: String = ("achievement \"%s\"" % achievement_text(d.achievement)[0]) if d.achievement != &"" else collect_source(d).capitalize()
+	b.tooltip_text = "%s (%s): click to collect" % [d.display_name, from]
+	b.clip_contents = true
+	SettingsPanel.style_tab(b)
+	for st: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
+		var sb: StyleBoxFlat = (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
+		sb.set_corner_radius_all(18)
+		b.add_theme_stylebox_override(st, sb)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override(&"separation", 2)
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 10)
+	b.add_child(box)
+	var pic := TextureRect.new()
+	pic.name = "Picture"
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.texture = CosmeticThumbnails.texture_for(d.id)
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(pic)
+	for line: Array in [[d.display_name.to_upper(), &"", Palette.CREAM], [collect_source(d), &"SmallLabel", MUTED], ["COLLECT", &"SmallLabel", Palette.VIP_GOLD]]:
+		var l := Label.new()
+		l.text = str(line[0])
+		l.theme_type_variation = line[1]
+		l.add_theme_color_override(&"font_color", line[2])
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		l.clip_text = true
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(l)
+	b.pressed.connect(collect.bind(d.id))
+	return b
+
+
+## Rebuilds the COLLECT grid when what waits has changed; sets the dot and COLLECT ALL.
+func _refresh_collect(p: PlayerProfile) -> void:
+	if collect_grid == null:
+		return
+	var ids: Array[StringName] = p.collectable()
+	collect_dot.count = ids.size()
+	collect_all_button.visible = ids.size() > 1
+	collect_note.text = ("Rewards waiting for you: achievements, level-pass pieces and Daily Spin wins. Click one to collect it." if not ids.is_empty()
+		else "Nothing to collect right now. Every achievement unlocks a piece you can't buy: they land here, with new level-pass pieces and Daily Spin wins.")
+	if Array(ids) == collect_tiles.keys():
+		return
+	var focus: Control = collect_grid.get_viewport().gui_get_focus_owner() if collect_grid.is_inside_tree() else null
+	var had_focus: bool = focus != null and collect_grid.is_ancestor_of(focus)
+	for t: Node in collect_grid.get_children():
+		collect_grid.remove_child(t)
+		t.queue_free()
+	collect_tiles.clear()
+	for id: StringName in ids:
+		var t: Button = _collect_tile(shop.find(id))
+		collect_grid.add_child(t)
+		collect_tiles[id] = t
+	_fit_columns.call_deferred()
+	if had_focus:
+		if not ids.is_empty():
+			collect_tiles[ids[0]].grab_focus.call_deferred()
+		else:
+			tab_buttons[KIND_COLLECT].grab_focus.call_deferred()
+
+
+## Collects `id` from the COLLECT tab and tries it on.
+func collect(id: StringName) -> void:
+	var d: CosmeticDef = shop.find(id)
+	if d == null or not ProfileManager.collect(id):
+		return
+	Audio.play(&"cash_register", &"UI", -6.0)
+	select(id)
+	status_label.text = "Collected %s! It's in your cosmetics now: WEAR puts it on." % d.display_name
+
+
+## Collects everything the COLLECT tab holds.
+func collect_all() -> void:
+	var got: Array[StringName] = ProfileManager.collect_all()
+	if got.is_empty():
+		return
+	Audio.play(&"cash_register", &"UI", -6.0)
+	select(got[got.size() - 1])
+	status_label.text = "Collected %d rewards! They're in your cosmetics now." % got.size()
+
+
 ## As many tile columns as fit.
 func _fit_columns() -> void:
 	if tabs == null:
@@ -1250,7 +1531,7 @@ func _fit_columns() -> void:
 	var w: float = tabs.size.x - 24.0
 	var cols: int = clampi(int(floor((w + 14.0) / (TILE.x + 14.0))), 2, 8)
 	for scroll: Node in tabs.get_children():
-		var grid: GridContainer = scroll.get_node_or_null("Grid") as GridContainer
+		var grid: GridContainer = scroll.find_child("Grid", true, false) as GridContainer
 		if grid != null:
 			grid.columns = cols
 			# The tiles share the whole width (no empty strip to the right).
@@ -1294,10 +1575,10 @@ func open(as_inventory: bool = false) -> void:
 	set_inventory(as_inventory)
 	SteamSvc.refresh_inventory()  # bought on another PC, or in the Steam store
 	var p: PlayerProfile = ProfileManager.profile
-	var worn: CosmeticDef = shop.color_item(p.preferred_color)
+	var worn: StringName = worn_in(p, CosmeticDef.KIND_COLOR)  # the skin when one covers the colour
 	selected = &""
 	trying.clear()
-	select(worn.id if worn != null else (shop.items[0].id if not shop.items.is_empty() else &""))
+	select(worn if worn != &"" else (shop.items[0].id if not shop.items.is_empty() else &""))
 	status_label.text = ""
 	_refresh()
 	back_button.text = "BACK %s" % InputGlyphs.hint(&"ui_cancel")
@@ -1312,6 +1593,8 @@ func open(as_inventory: bool = false) -> void:
 	visible = true
 	var sel: CosmeticDef = shop.find(selected)
 	show_kind(sel.kind if sel != null else (KIND_PACK if shop.find_pack(selected) != null else CosmeticDef.KIND_COLOR))
+	if not p.collectable().is_empty():
+		show_kind(KIND_COLLECT)  # rewards are waiting: the red dot brought the player here
 	_fit_columns.call_deferred()
 	if tiles.has(selected):
 		tiles[selected].grab_focus()

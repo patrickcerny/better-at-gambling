@@ -51,6 +51,15 @@ func test_buy_refuse_and_wear() -> void:
 	ProfileManager.changed.emit()
 	assert_eq(panel.coins_label.text, "%d" % (mint.price + 5), "the wallet follows the profile")
 	panel.action_button.pressed.emit()
+	assert_not_null(panel.confirm_dialog, "buying asks first")
+	assert_string_contains(panel.confirm_dialog.text_label.text, "can't be refunded")
+	assert_false(ProfileManager.profile.owns(&"color_mint"), "nothing bought before the answer")
+	panel.confirm_dialog.cancel()
+	assert_false(ProfileManager.profile.owns(&"color_mint"), "CANCEL buys nothing")
+	assert_eq(ProfileManager.profile.coins, mint.price + 5)
+	assert_eq(panel.selected, &"color_mint", "still picked after CANCEL")
+	panel.action_button.pressed.emit()
+	panel.confirm_dialog.confirm()
 	assert_true(ProfileManager.profile.owns(&"color_mint"))
 	assert_eq(ProfileManager.profile.coins, 5)
 	assert_eq(panel.coins_label.text, "5")
@@ -166,6 +175,11 @@ func test_try_ons_stack_and_come_off() -> void:
 	panel._on_tile_pressed(shirt.id)
 	ProfileManager.profile.coins = hat.price + shirt.price
 	panel.look_button.pressed.emit()
+	assert_false(ProfileManager.profile.owns(hat.id), "BUY ALL asks first")
+	assert_string_contains(panel.confirm_dialog.text_label.text, hat.display_name, "lists what is bought")
+	assert_string_contains(panel.confirm_dialog.text_label.text, shirt.display_name)
+	assert_string_contains(panel.confirm_dialog.text_label.text, "can't be refunded")
+	panel.confirm_dialog.confirm()
 	assert_true(ProfileManager.profile.owns(hat.id) and ProfileManager.profile.owns(shirt.id), "bought both")
 	assert_eq(ProfileManager.profile.coins, 0)
 	assert_eq(panel.look_button.text, "WEAR ALL")
@@ -174,3 +188,92 @@ func test_try_ons_stack_and_come_off() -> void:
 	panel.reset_look()
 	assert_true(panel.trying.is_empty())
 	panel.close()
+
+
+func test_colour_and_skin_page_has_one_pick_and_names_the_player_colour() -> void:
+	# Patrick 2026-11-16: BLUE and THE HOUSE both looked picked, BLUE said WEARING under a skin.
+	var p: PlayerProfile = ProfileManager.profile
+	p.owned.append(&"skin_lava")
+	ProfileManager.set_preferred_color(4)  # Blue
+	assert_true(ProfileManager.wear(&"skin_lava"))
+	var panel: CosmeticsPanel = _shop()
+	panel.open(true)
+	panel._on_tile_pressed(&"color_blue")
+	panel._on_tile_pressed(&"skin_lava")
+	panel._on_tile_pressed(&"color_blue")  # back to the colour that was tried on before
+	assert_true(panel.tiles[&"color_blue"].button_pressed)
+	assert_false(panel.tiles[&"skin_lava"].button_pressed, "only one tile on the page is picked")
+	assert_false(panel.preview.outfit.has(CosmeticDef.KIND_SKIN), "the preview shows the plain colour")
+	assert_eq(panel.action_button.text, "WEAR", "a skin covers it: wearing Blue takes the skin off")
+	assert_eq((panel.tiles[&"color_blue"].find_child("Price", true, false) as Label).text, "PLAYER COLOUR", "pedestals and scoreboards still show it")
+	panel._on_tile_pressed(&"skin_lava")
+	assert_false(panel.tiles[&"color_blue"].button_pressed, "picking the skin drops the colour try-on")
+	panel.close()
+
+
+func test_the_colour_flow_is_consistent_under_a_skin() -> void:
+	var p: PlayerProfile = ProfileManager.profile
+	p.owned.append(&"skin_lava")
+	ProfileManager.set_preferred_color(4)  # Blue
+	assert_true(ProfileManager.wear(&"skin_lava"))
+	var panel: CosmeticsPanel = _shop()
+	panel.open(true)
+	assert_eq(panel.selected, &"skin_lava", "opens on what the bean shows: the skin, not the hidden colour")
+	assert_eq(panel.preview.outfit.get(CosmeticDef.KIND_SKIN, &""), &"skin_lava")
+	assert_eq(panel.item_kind.text, "ANIMATED SKIN")
+	panel._on_tile_pressed(&"color_blue")
+	assert_eq(panel.item_kind.text, "COLOUR")
+	panel._on_tile_pressed(&"color_blue")
+	assert_eq(panel.selected, &"color_blue", "a second click keeps the colour picked")
+	panel.action_button.pressed.emit()
+	assert_eq(p.outfit.get(CosmeticDef.KIND_SKIN, &""), &"", "wearing a colour takes the skin off")
+	assert_eq(p.preferred_color, 4)
+	assert_eq(panel.action_button.text, "WEARING")
+	assert_string_contains(panel.status_label.text, "from now on")
+	panel.next_match_look = true
+	panel.select(&"skin_lava")
+	panel.action_button.pressed.emit()
+	assert_string_contains(panel.status_label.text, "from your next match", "in a lobby it says when it shows")
+	panel.close()
+
+
+func test_too_few_gold_coins_opens_the_gold_tab() -> void:
+	var panel: CosmeticsPanel = _shop()
+	panel.open()
+	var packs: Array[CoinPack] = CosmeticShop.default().coin_packs
+	assert_false(packs.is_empty(), "gold packs to sell")
+	var smallest: CoinPack = packs[0]
+	for c: CoinPack in packs:
+		if c.gold < smallest.gold:
+			smallest = c
+	panel.open_gold_shop(1)
+	assert_eq(panel.selected, smallest.id, "the smallest pack that covers it is picked")
+	assert_eq(panel.tabs.current_tab, int(panel.tab_buttons[CosmeticsPanel.KIND_COINS].get_meta(&"tab")), "on the GOLD tab")
+	assert_true(panel.steam_button.visible, "ready to buy with Steam")
+	panel.close()
+
+
+## Achievement rewards (Patrick 2026-11-16): locked in the shop with the achievement named, then
+## waiting in COLLECT (with the red dot) once the achievement is held; collecting owns it.
+func test_achievement_rewards_are_collected() -> void:
+	var panel: CosmeticsPanel = _shop()
+	panel.open()
+	panel.select(&"hat_card_house")
+	assert_eq(panel.action_button.text, "ACHIEVEMENT REWARD")
+	assert_true(panel.action_button.disabled, "can't be bought")
+	assert_string_contains(panel.status_label.text, "Five Card Trick")
+	assert_eq((panel.tiles[&"hat_card_house"].find_child("Price", true, false) as Label).text, "ACHIEVEMENT")
+	assert_eq(panel.collect_tiles.size(), 0)
+	assert_false(panel.collect_dot.visible)
+	ProfileManager.note_achieved([&"ACH_BJ_FIVE_CARDS", &"ACH_JACKPOT"])
+	assert_eq(panel.collect_tiles.size(), 2, "both wait in COLLECT")
+	assert_eq(panel.collect_dot.count, 2)
+	assert_eq(panel.action_button.text, "COLLECT")
+	panel.collect_tiles[&"hat_card_house"].pressed.emit()
+	assert_true(ProfileManager.profile.owns(&"hat_card_house"))
+	assert_eq(panel.collect_tiles.size(), 1)
+	assert_eq(panel.action_button.text, "WEAR", "collected: it can be worn")
+	panel.collect_all_button.pressed.emit()
+	assert_true(ProfileManager.profile.owns(&"hat_beacon"))
+	assert_eq(panel.collect_tiles.size(), 0)
+	assert_false(panel.collect_dot.visible)

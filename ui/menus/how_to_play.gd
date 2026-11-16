@@ -75,6 +75,8 @@ var chapter_title: Label
 var picture: TextureRect
 var heading: Label
 var body: Label
+## The text scrolls when it is longer than the room under the picture.
+var body_scroll: ScrollContainer
 ## The dots under the page: one per page of the open chapter, the current one in gold.
 var dots: HBoxContainer
 var topics_button: Button
@@ -144,11 +146,19 @@ func _ready() -> void:
 	heading.name = "Heading"
 	heading.theme_type_variation = &"HeadingLabel"
 	page_box.add_child(heading)
+	# Long texts scroll inside the page instead of running under the buttons (Patrick 2026-11-16:
+	# "how to play clips").
+	body_scroll = ScrollContainer.new()
+	body_scroll.name = "BodyScroll"
+	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page_box.add_child(body_scroll)
 	body = Label.new()
 	body.name = "Body"
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.custom_minimum_size = Vector2(720, 150)
-	page_box.add_child(body)
+	body.custom_minimum_size = Vector2(700, 0)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_scroll.add_child(body)
 	items_box = _scroll(content, "Items")
 	_build_items(items_box)
 	minigames_box = _scroll(content, "Minigames")
@@ -284,6 +294,7 @@ func show_page(i: int) -> void:
 	page_box.visible = special != ALL_ITEMS and special != ALL_MINIGAMES
 	items_box.visible = special == ALL_ITEMS
 	minigames_box.visible = special == ALL_MINIGAMES
+	body_scroll.scroll_vertical = 0
 	if page_box.visible:
 		body.text = InputGlyphs.fill(str(PAGES[page][2]))
 		picture.texture = _load_picture(special)
@@ -317,6 +328,7 @@ func open_minigame(id: StringName) -> void:
 	items_box.visible = false
 	minigames_box.visible = false
 	picture.texture = MinigameSelector.picture(id)
+	body_scroll.scroll_vertical = 0
 	heading.text = def.display_name.to_upper()
 	body.text = InputGlyphs.fill("%s\n\n%d+ players." % [def.rules_text.strip_edges(), maxi(def.min_players, 1)])
 	var ids: Array = Registry.minigames.keys()

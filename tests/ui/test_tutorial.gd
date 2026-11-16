@@ -124,6 +124,20 @@ func test_every_page_has_a_picture_heading_and_text() -> void:
 	assert_eq((how.overview.find_child("Title", true, false) as Label).text, "HOW TO PLAY")
 
 
+func test_long_texts_stay_above_the_buttons() -> void:
+	# Patrick 2026-11-16: "how to play clips" (USING ITEMS ran under SKIP / BACK / NEXT).
+	var how: HowToPlayPanel = await _panel()
+	var buttons: Control = how.find_child("Buttons", true, false) as Control
+	for i: int in HowToPlayPanel.PAGES.size():
+		how.show_page(i)
+		await wait_process_frames(1)
+		if not how.page_box.visible:
+			continue
+		var text_bottom: float = how.body_scroll.get_global_rect().end.y
+		assert_lte(text_bottom, buttons.get_global_rect().position.y + 0.5, "page %d text ends above the buttons" % (i + 1))
+		assert_lte(how.page_box.get_combined_minimum_size().y, HowToPlayPanel.CONTENT_SIZE.y + 0.5, "page %d fits its area" % (i + 1))
+
+
 func test_three_chapters_in_order() -> void:
 	# Patrick: "split the tutorial into The casino, The items and The mingamges".
 	assert_eq(HowToPlayPanel.SECTIONS, ["THE CASINO", "THE ITEMS", "THE MINIGAMES"] as Array[String])

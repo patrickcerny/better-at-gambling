@@ -23,11 +23,14 @@ const PLAYER_COLORS: Array[Color] = [
 	Color("#A6D94A"), Color("#3A3533"), Color("#C9CED4"), Color("#F2C14E"),
 	Color("#B87333"), Color("#7A3B69"), Color("#F08A6C"), Color("#2F5D3A"),
 	Color("#23304A"), Color("#E3A795"), Color("#2E5BBA"), Color("#E8D3A2"),
+	# Achievement rewards (CosmeticDef.achievement).
+	Color("#9E8540"), Color("#7D8590"), Color("#6B3A26"),
 ]
 const PLAYER_COLOR_NAMES: Array[String] = [
 	"Orange", "Sky", "Green", "Yellow", "Blue", "Vermilion", "Pink", "Cream",
 	"Ruby", "Mint", "Lavender", "Teal", "Lime", "Onyx", "Silver", "Gold",
 	"Copper", "Plum", "Coral", "Forest", "Navy", "Rose Gold", "Sapphire", "Champagne",
+	"Brass", "Handcuff Steel", "Roulette Mahogany",
 ]
 ## The Coins (out-of-match currency) gold.
 const COIN_GOLD := Color("#F5C542")

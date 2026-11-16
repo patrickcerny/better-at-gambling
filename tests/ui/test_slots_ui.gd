@@ -97,3 +97,19 @@ func test_paytable_sits_on_the_right_clear_of_the_strip() -> void:
 	assert_true(pay.position.y >= 0.0 and pay.end.y <= root.size.y)
 	assert_false(pay.intersects(strip), "paytable does not cover the bet strip")
 	assert_true(strip.end.y <= root.size.y - 100.0, "strip clears the item bar")
+
+
+## Patrick: "gives me invalid amount if I only have 40. Disable the button if I don't have this
+## much money anymore". Chips you can't pay are greyed out and the pull bets a listed size.
+func test_chips_over_the_balance_are_greyed_out() -> void:
+	var sizes: Array[int] = ui.bet_panel.chips
+	ui.bet_panel.select_chip(sizes.size() - 1)
+	ui.state.balances[1] = sizes[1] + 3
+	ui.update_state(ui.state.stations[&"slot_1"], {})
+	assert_eq(ui.bet_panel.selected_chip, 1, "the picked max bet drops to the dearest one you can pay")
+	for i: int in sizes.size():
+		assert_eq(ui.bet_panel._chip_buttons[i].disabled, i > 1, "chip %d" % i)
+		assert_eq(ui.bet_panel._chip_buttons[i].text, "$%d" % sizes[i], "every chip shows its own value")
+	watch_signals(ui.bet_panel)
+	ui.bet_panel.select_chip(sizes.size() - 1)
+	assert_signal_emitted_with_parameters(ui.bet_panel, "confirmed", [sizes[1]])

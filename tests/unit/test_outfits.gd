@@ -42,7 +42,7 @@ func test_fifteen_pieces_per_slot_each_with_a_model() -> void:
 			assert_false(d.id in ids, "%s is listed once" % d.id)
 			ids.append(d.id)
 			assert_false(d.is_free(), "%s is bought or unlocked" % d.id)
-			assert_true(d.coin_buyable() or d.premium() or d.level > 0 or d.dev_only or (d.wheel_only and d.steam_item > 0), "%s can be had somehow" % d.id)
+			assert_true(d.coin_buyable() or d.premium() or d.level > 0 or d.dev_only or (d.wheel_only and d.steam_item > 0) or d.achievement != &"", "%s can be had somehow" % d.id)
 	for d: CosmeticDef in shop.of_kind(CosmeticDef.KIND_BEARD):
 		assert_true(OutfitMeshes.has_model(d.id), "%s has a model" % d.id)
 	for d: CosmeticDef in shop.of_kind(CosmeticDef.KIND_SKIN):
@@ -150,6 +150,7 @@ func test_the_shop_sells_and_puts_on_outfit_pieces() -> void:
 	assert_eq(panel.preview.outfit.get(&"hat"), &"hat_top", "the preview tries it on")
 	assert_string_contains(panel.action_button.text, "BUY")
 	panel.action_button.pressed.emit()
+	panel.confirm_dialog.confirm()
 	assert_true(ProfileManager.profile.owns(&"hat_top"))
 	assert_eq(panel.action_button.text, "WEAR")
 	panel.action_button.pressed.emit()

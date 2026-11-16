@@ -21,6 +21,7 @@ func test_every_rule_names_a_defined_achievement() -> void:
 	p.sanitize()
 	p.biggest_win = 99999
 	p.owned.append(&"x")
+	p.logo_spins = Achievements.LOGO_SPINS
 	var all: Array[StringName] = Achievements.from_profile(p)
 	all.append_array(Achievements.from_match(_row(1, false, 4, {"minigames_won": 3, "biggest_win": 9999, "money": 9999})))
 	all.append_array(Achievements.from_match(_row(4, false, 4, {"money": 0})))

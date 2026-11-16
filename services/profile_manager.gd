@@ -108,6 +108,15 @@ func add_wheel_prize(kind: StringName, amount: int) -> Dictionary:
 	return got
 
 
+## Adds `turns` full turns of the main menu logo (`Logo3DView`) and saves. Returns the new total.
+## No `changed`: nothing on screen shows it, and it fires several times a second while spinning.
+func add_logo_spins(turns: int) -> int:
+	if turns > 0:
+		profile.logo_spins = mini(profile.logo_spins + turns, PlayerProfile.MAX_STAT)
+		save()
+	return profile.logo_spins
+
+
 ## Remembers a Daily Spin at `when` (unix seconds) and saves.
 func mark_daily_spin(when: int) -> void:
 	profile.daily_last = maxi(when, 0)
@@ -133,6 +142,35 @@ func spin_local(now: int, r: float = randf()) -> Dictionary:
 	profile.daily_last = now
 	var got: Dictionary = add_wheel_prize(seg["kind"], int(seg["amount"]))  # saves
 	return {"index": i, "coins": got["coins"], "piece": got["piece"], "gold": 0}
+
+
+## Collects a reward from the shop's COLLECT tab (`PlayerProfile.collect`) and saves.
+func collect(id: StringName) -> bool:
+	if not profile.collect(id):
+		return false
+	save()
+	changed.emit()
+	return true
+
+
+## Collects everything the COLLECT tab holds. Returns what was collected.
+func collect_all() -> Array[StringName]:
+	var got: Array[StringName] = []
+	for id: StringName in profile.collectable():
+		if profile.collect(id):
+			got.append(id)
+	if not got.is_empty():
+		save()
+		changed.emit()
+	return got
+
+
+## Achievements Steam says this player holds (`SteamSvc.sync_achievements`): their rewards wait in
+## the COLLECT tab.
+func note_achieved(ids: Array[StringName]) -> void:
+	if profile.note_achieved(ids):
+		save()
+		changed.emit()
 
 
 ## Buys a cosmetic (see `PlayerProfile.buy`); &"" on success.
