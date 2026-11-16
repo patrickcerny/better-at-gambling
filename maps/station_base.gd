@@ -9,6 +9,9 @@ extends Node3D
 @export var interact_radius: float = 2.6
 @export var is_vip: bool = false
 
+## Floor the station keeps beyond its colliders, in its own frame (x, z), for the floor layouts
+## (`LuckyLounge.station_rect`); an empty rect adds nothing.
+var floor_extent: Rect2 = Rect2()
 ## Seat transforms (world-space nodes).
 var seats: Array[Node3D] = []
 ## Where the camera eases to while seated.

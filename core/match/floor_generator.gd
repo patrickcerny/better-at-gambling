@@ -31,7 +31,7 @@ const NOMINAL: Dictionary = {
 	&"slots": Rect2(-0.45, -0.35, 0.9, 1.55),
 	&"plinko": Rect2(-2.05, -0.35, 4.1, 2.85),
 	&"scratch": Rect2(-0.8, -1.255, 1.6, 2.435),
-	&"sword_tapper": Rect2(-0.7, -0.7, 1.4, 2.15),
+	&"sword_tapper": Rect2(-0.7, -0.92, 1.4, 2.37),
 	&"holdem": Rect2(-2.12, -1.9, 4.24, 3.58),
 	&"baccarat": Rect2(-1.93, -1.95, 3.86, 3.67),
 }

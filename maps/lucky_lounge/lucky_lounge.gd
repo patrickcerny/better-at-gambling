@@ -1521,7 +1521,8 @@ static func nav_obstacles(root: Node, inv: Transform3D, skip: Array[Node]) -> Ar
 	return out
 
 
-## A station's floor in its own frame (x, z): its static colliders, its chairs and its dealer.
+## A station's floor in its own frame (x, z): its static colliders, its chairs, its dealer and its
+## `floor_extent`.
 static func station_rect(st: StationBase) -> Rect2:
 	var inv: Transform3D = st.global_transform.affine_inverse()
 	var box := AABB()
@@ -1542,6 +1543,12 @@ static func station_rect(st: StationBase) -> Rect2:
 		var o: Vector3 = DealerLogic.OFFSETS[st.game_id]
 		extras.append(o + Vector3(0.35, 0, 0.35))
 		extras.append(o - Vector3(0.35, 0, 0.35))
+	# Visuals that reach past the colliders (a flared foot, a rim) and the wall's wainscot: the
+	# station keeps that floor too, so standing with its back to a wall nothing pokes into it.
+	var ext: Rect2 = st.floor_extent
+	if ext.has_area():
+		extras.append(Vector3(ext.position.x, 0, ext.position.y))
+		extras.append(Vector3(ext.end.x, 0, ext.end.y))
 	for p: Vector3 in extras:
 		box = AABB(p, Vector3.ZERO) if first else box.expand(p)
 		first = false
