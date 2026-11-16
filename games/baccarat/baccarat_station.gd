@@ -41,10 +41,13 @@ const HOUSE_SPOT: Vector3 = Vector3(0.0, TABLE_TOP + 0.05, -0.66)
 const ROAD_POS: Vector3 = Vector3(-1.38, TABLE_TOP, -0.56)
 ## Each seat's view: high over the players' side, right of the middle, so the two hands, the
 ## seat's own spots and the scoreboard fill the left two thirds (the overlay is a column down the
-## right third). Each seat's eye moves `SEAT_EYE_SHIFT` of its stool's x along.
-const SEAT_EYE: Vector3 = Vector3(0.3, 1.95, 1.12)
-const SEAT_AIM: Vector3 = Vector3(0.45, TABLE_TOP, -0.08)
-const SEAT_EYE_SHIFT: float = 0.55
+## right third). Each seat's eye moves `SEAT_EYE_SHIFT` of its stool's x along. Eye and aim share
+## their x: the view looks straight down the table (no yaw), so the layout stays square on screen,
+## and the eye sits high enough that an outer seat's own spots stay off the screen edge (a yawed,
+## low eye made the print look skewed and chip stacks at the edge look tilted, Patrick 2026-11-16).
+const SEAT_EYE: Vector3 = Vector3(0.6, 2.45, 0.85)
+const SEAT_AIM: Vector3 = Vector3(0.6, TABLE_TOP, -0.1)
+const SEAT_EYE_SHIFT: float = 0.4
 const FELT_COLOR: Color = Color("#10254A")
 const PRINT_COLOR: Color = Color("#D6A84B")
 const RAIL_COLOR: Color = Color("#2B1B16")

@@ -2,7 +2,7 @@ extends Node3D
 ## Dev: the Casino Hold'em table for screenshots: three hands after the flop (one deciding, one
 ## called, one folded), the dealer's two face down and a stand-in dealer; `--showdown` turns the
 ## turn, the river and the dealer's cards over. Run with
-## scripts/screenshot.sh res://tools/dev/holdem_shot.tscn holdem 60 --view close|seat|wide [--seat N] [--showdown]
+## scripts/screenshot.sh res://tools/dev/holdem_shot.tscn holdem 60 --view close|seat|wide|chips [--seat N] [--showdown]
 
 var _station: HoldemStation
 
@@ -66,6 +66,18 @@ func _ready() -> void:
 		hands[2]["outcome"] = &"lose"
 	_station.set_viewer_seat(seat)
 	_station.show_round(pub)
+	# The bets on the printed spots, as TableFx lays them (seat index = position in "seats").
+	for si: int in (pub["seats"] as Array).size():
+		var pid: int = int(pub["seats"][si])
+		if pid < 0:
+			continue
+		var h: Dictionary = hands[pid]
+		for type: StringName in [HoldemLogic.BONUS, HoldemLogic.ANTE, HoldemLogic.CALL_BET]:
+			var amt: int = int(h.get({HoldemLogic.BONUS: "bonus", HoldemLogic.ANTE: "ante", HoldemLogic.CALL_BET: "call"}[type], 0))
+			if amt > 0:
+				var stack: ChipStack = ChipStack.make(amt, Palette.CASINO_RED, 5, &"")
+				_station.add_child(stack)
+				stack.position = HoldemStation.bet_spot(si, type)
 	var cam := Camera3D.new()
 	cam.fov = 50.0
 	add_child(cam)
@@ -73,6 +85,11 @@ func _ready() -> void:
 		"seat":
 			cam.fov = 85.0  # the default (Settings "video/fov")
 			cam.global_transform = _station.camera_for_seat(seat).global_transform
+		"chips":  # low and close over a seat's betting row
+			cam.fov = 85.0
+			var spot: Vector3 = HoldemStation.bet_spot(seat, HoldemLogic.ANTE)
+			cam.position = spot + Vector3(0.1, 0.35, 0.45)
+			cam.look_at(spot)
 		"wide":
 			cam.position = Vector3(3.6, 3.6, 5.6)
 			cam.look_at(Vector3(0, 0.6, 0))

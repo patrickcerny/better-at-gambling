@@ -61,8 +61,9 @@ func test_every_seat_camera_frames_the_game_left_of_the_overlay() -> void:
 		var br: Vector2 = cam.unproject_position(hs.to_global(board[9]))
 		gut.p("seat %d: game spans %.0f%% × %.0f%% of the screen, the board %.0f%% of its width" % [seat, (span.y - span.x) / view.size.x * 100.0, (span_y.y - span_y.x) / view.size.y * 100.0, (br.x - bl.x) / view.size.x * 100.0])
 		# The middle seats' own spots sit under the board, so their span is the narrowest (about a
-		# third of the screen against 60 % for the end seats); the height is where the room is.
-		assert_gt(span.y - span.x, view.size.x * 0.33, "seat %d: the game fills the left of the screen" % seat)
+		# quarter of the screen against 50 % for the end seats: the view looks straight down the
+		# table, no yaw, so the print stays square); the height is where the room is.
+		assert_gt(span.y - span.x, view.size.x * 0.22, "seat %d: the game fills the left of the screen" % seat)
 		assert_gt(span_y.y - span_y.x, view.size.y * 0.7, "seat %d: and most of its height" % seat)
 		assert_gt(br.x - bl.x, view.size.x * 0.21, "seat %d: the board is big enough to read" % seat)
 	cam.free()

@@ -34,10 +34,14 @@ const HOUSE_SPOT: Vector3 = Vector3(-0.8, TABLE_TOP + 0.05, -0.52)
 ## Each seat's view (0.9.14 rule, Patrick: "almost the whole screen should be the game"): high over
 ## the players' side of the felt and right of the middle, so the board, the dealer's cards, the
 ## seat's own cards and spots fill the left two thirds of the screen (the overlay is a column down
-## the right third). Each seat's eye moves `SEAT_EYE_SHIFT` of its stool's x along.
-const SEAT_EYE: Vector3 = Vector3(0.3, 1.9, 0.96)
-const SEAT_AIM: Vector3 = Vector3(0.5, TABLE_TOP, -0.02)
-const SEAT_EYE_SHIFT: float = 0.58
+## the right third). Each seat's eye moves `SEAT_EYE_SHIFT` of its stool's x along. Eye and aim
+## share their x: the view looks straight down the table (no yaw), so the print, the card frames
+## and the rails stay square on screen (a yawed eye made them look skewed, Patrick 2026-11-16).
+const SEAT_EYE: Vector3 = Vector3(0.45, 2.25, 0.84)
+const SEAT_AIM: Vector3 = Vector3(0.45, TABLE_TOP, -0.12)
+## The eye sits high enough that an outer seat's own spots stay well off the screen edge, where
+## the wide-angle stretch made its chip stacks look tilted and sunk into the felt.
+const SEAT_EYE_SHIFT: float = 0.5
 const FELT_COLOR: Color = Color("#1F5A43")
 const PRINT_COLOR: Color = Color("#D6A84B")
 const RAIL_COLOR: Color = Color("#2B1B16")

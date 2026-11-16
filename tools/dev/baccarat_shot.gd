@@ -54,16 +54,16 @@ func _ready() -> void:
 	add_child(cam)
 	match view:
 		"seat":
-			cam.fov = 75.0
+			cam.fov = 85.0  # the default (Settings "video/fov")
 			cam.global_transform = _station.camera_for_seat(0).global_transform
 		"wide":
 			cam.position = Vector3(3.2, 3.4, 5.2)
 			cam.look_at(Vector3(0, 0.6, 0))
 		"seat2":
-			cam.fov = 75.0
+			cam.fov = 85.0  # the default (Settings "video/fov")
 			cam.global_transform = _station.camera_for_seat(2).global_transform
 		"seat4":
-			cam.fov = 75.0
+			cam.fov = 85.0  # the default (Settings "video/fov")
 			cam.global_transform = _station.camera_for_seat(4).global_transform
 		_:
 			cam.position = Vector3(0.6, 2.2, 2.9)
