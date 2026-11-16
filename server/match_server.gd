@@ -1384,6 +1384,10 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 		&"use_item":
 			if not bool(settings.get("items_enabled", true)):
 				return StationLogicBase.fail(&"items_off")
+			if phases.phase == Phase.Id.PRE_MINIGAME:
+				# The minigame countdown: the item stays in the inventory (its effect would end
+				# with the segment a few seconds later anyway).
+				return StationLogicBase.fail(&"minigame_soon")
 			var opts: Dictionary = {}
 			if intent.has("option"):
 				opts["option"] = int(intent["option"])

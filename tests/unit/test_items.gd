@@ -48,6 +48,26 @@ func _near(a: int, b: int, d: float = 2.0) -> void:
 	world.set_transform(b, world.get_position(a) + Vector3(d, 0, 0), 0.0)
 
 
+# --- Minigame start ----------------------------------------------------------------------------
+
+func test_minigame_start_ends_every_item_effect() -> void:
+	# Patrick 2026-11-16: an item used right before a minigame must not be kept for later or
+	# carried into the minigame (Energy Drink speed, Beer blur): the segment end clears them all.
+	_give(1, [&"energy_drink", &"lucky_clover", &"beer"])
+	assert_true(_use(1)["ok"])
+	now += cfg.item_cooldown
+	assert_true(_use(1)["ok"])
+	now += cfg.item_cooldown
+	assert_true(_use(1)["ok"])
+	assert_eq(mods.get_mods(1).size(), 3)
+	sys.events.clear()
+	sys.end_segment()
+	assert_eq(mods.get_mods(1).size(), 0, "nothing survives into the minigame")
+	assert_eq(mods.get_luck(1), 0)
+	assert_eq(_events(&"effect_ended").size(), 3, "clients drop the tags, speed and blur")
+	assert_eq(players[1].inventory, [&"empty_bottle"] as Array[StringName], "the beer still leaves its bottle")
+
+
 # --- Self items --------------------------------------------------------------------------------
 
 func test_lucky_clover_adds_luck_and_expires() -> void:

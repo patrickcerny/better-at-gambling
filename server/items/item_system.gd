@@ -363,9 +363,13 @@ func observe(ev: Dictionary, now: float) -> void:
 				events.append(GameEvents.make(&"grease_spill", {"player": target, "attacker": ev.get("attacker", -1), "amount": extra, "piles": piles}))
 
 
-## The casino segment ended: segment-long items (Hot Hands, Loaded Reels) run out.
+## The casino segment ended (a minigame starts, or the match is over): every item effect runs
+## out, not just the segment-long ones (Hot Hands, Loaded Reels). Nothing used in the casino
+## carries into the minigame (an Energy Drink racing, a Beer's blur) or is left over after it.
+## Items are locked during the countdown before (MatchServer), so an item is used with its full
+## effect in the casino or stays in the inventory.
 func end_segment() -> void:
-	modifiers.expire_flag(&"segment_end")
+	modifiers.expire_all(&"expired")
 	duels.cancel_all()
 
 
