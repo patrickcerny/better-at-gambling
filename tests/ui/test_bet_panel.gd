@@ -104,15 +104,19 @@ func test_over_the_balance_clamps_to_all_in() -> void:
 	panel._adjust(panel.amount + 25)
 	assert_eq(panel.amount, 37, "adding chips stays all-in")
 	assert_signal_emit_count(panel, "went_all_in", 1, "the toast fires once per bet")
-	assert_eq(panel._chip_buttons[3].text, "$37", "a chip worth more than you have shows what it bets")
-	assert_eq(panel._chip_buttons[0].text, "$10")
+	assert_eq(panel._chip_buttons[3].text, "$100", "a chip keeps its own value")
+	assert_true(panel._chip_buttons[3].disabled, "and is greyed out when you can't pay it")
+	assert_true(panel._chip_buttons[2].disabled)
+	assert_false(panel._chip_buttons[1].disabled)
+	assert_false(panel._chip_buttons[0].disabled)
 	panel.set_amount(20)
 	assert_false(panel.all_in)
 	assert_false(tag.visible)
 	_press(&"bet_chip_4", false)
+	assert_eq(panel.selected_chip, 1, "a greyed chip picks the dearest one you can pay")
 	panel.clear()
 	_press(&"bet_confirm", false)
-	assert_signal_emitted_with_parameters(panel, "confirmed", [37])
+	assert_signal_emitted_with_parameters(panel, "confirmed", [25])
 
 
 func test_table_max_still_caps() -> void:
@@ -141,21 +145,28 @@ func test_balance_drop_reclamps_the_bet() -> void:
 func test_chip_stake_for_layout_tables() -> void:
 	panel.set_balance(30)
 	panel.select_chip(3)
-	watch_signals(panel)
-	assert_eq(panel.chip_stake(), 30, "a $100 chip on the layout bets the $30 you have")
-	assert_true(panel.all_in)
-	assert_signal_emit_count(panel, "went_all_in", 1)
-	assert_eq(panel.chip_stake(200), 30)
-	assert_signal_emit_count(panel, "went_all_in", 1)
+	assert_eq(panel.chip_stake(), 25, "a $100 chip you can't pay falls back to the $25 you can")
+	assert_false(panel.all_in)
 	panel.set_balance(1000)
+	panel.select_chip(3)
 	assert_eq(panel.chip_stake(40), 40, "what is left of the table total caps it")
 	assert_false(panel.all_in)
 
 
-func test_instant_mode_goes_all_in() -> void:
-	panel.setup([10, 25, 50, 100], 10, 100, "PULL", true)
-	panel.set_balance(42)
+## Slots (Patrick: "gives me invalid amount if I only have 40. Disable the button"): an instant
+## panel never pulls with an amount it doesn't list; chips you can't pay are greyed out.
+func test_instant_mode_never_bets_an_unlisted_amount() -> void:
+	panel.setup([15, 37, 75, 150], 15, 150, "PULL", true)
+	panel.select_chip(3)
+	panel.set_balance(40)
+	assert_eq(panel.selected_chip, 1, "the picked $150 drops to the $37 you can pay")
+	assert_true(panel._chip_buttons[2].disabled)
+	assert_true(panel._chip_buttons[3].disabled)
 	watch_signals(panel)
 	_press(&"bet_chip_4", false)
-	assert_signal_emitted_with_parameters(panel, "confirmed", [42])
-	assert_signal_emit_count(panel, "went_all_in", 1)
+	assert_signal_emitted_with_parameters(panel, "confirmed", [37])
+	assert_signal_emit_count(panel, "went_all_in", 0)
+	# Nothing affordable: the smallest, and the server says "Not enough money".
+	panel.set_balance(10)
+	_press(&"bet_chip_2", false)
+	assert_signal_emitted_with_parameters(panel, "confirmed", [15], 1)
