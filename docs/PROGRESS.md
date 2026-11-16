@@ -93,6 +93,16 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.9.58 Broke players are pointed to the Odd Jobs button
+- Patrick: "Indicator wenn man broke ist (weniger geld als 50) zum button". Under $50 (or under the
+  House Comp line if the table limits put it higher; `OddJobsController.is_broke`) a gold beacon
+  (spinning arrow + "ODD JOBS +$50", drawn through walls) floats over the cabinet, and while the
+  cabinet is off screen a gold arrow with an "ODD JOBS +$50" tag sits on the screen edge
+  (`hud.set_odd_jobs_pointer`, same edge maths as the Hot Table arrow, now `MatchScene.edge_pointer`).
+  Both hide at the cabinet, while seated or knocked out, on the results screen and at $50. The cabinet
+  glow and the one-time hint now also start under $50. Test: `test_under_50_points_the_way_to_the_button`
+  in tests/physics/test_odd_jobs_cabinet.gd.
+
 ### 2026-11-16 / 0.9.57 ready pedestals reworked
 - Patrick: "das klipped und passt nicht. reworke die podeste komplett". The column pedestals with
   their side rails clipped (rails through the steps, the abacus over the stair, the colour ring
