@@ -217,6 +217,11 @@ func wear(kind: StringName, id: StringName) -> void:
 					seg.material_override = _skin_mat
 		CosmeticDef.KIND_MOUTH:
 			_mouth_mat.set_shader_parameter(&"style", OutfitMeshes.mouth_style(id))
+			var mm: ArrayMesh = OutfitMeshes.mesh(id)  # a party horn, a straw
+			if mm != null:
+				var mmi: MeshInstance3D = _outfit_mesh(mm, "OutfitMouth")
+				body.add_child(mmi)
+				_outfit_nodes[kind] = mmi
 		CosmeticDef.KIND_EYES:
 			_wear_eyes(id)
 		CosmeticDef.KIND_BOOTS:
@@ -390,7 +395,7 @@ static func dress(parent: Node3D, o: Dictionary) -> Array[MeshInstance3D]:
 		var mat: Material = ToonMaterial.make_skin(skin)
 		if mat != null:
 			(parent as MeshInstance3D).material_override = mat
-	for kind: StringName in [CosmeticDef.KIND_HAT, CosmeticDef.KIND_SHIRT, CosmeticDef.KIND_PANTS, CosmeticDef.KIND_CAPE, CosmeticDef.KIND_BEARD, CosmeticDef.KIND_EYES]:
+	for kind: StringName in [CosmeticDef.KIND_HAT, CosmeticDef.KIND_SHIRT, CosmeticDef.KIND_PANTS, CosmeticDef.KIND_CAPE, CosmeticDef.KIND_BEARD, CosmeticDef.KIND_EYES, CosmeticDef.KIND_MOUTH]:
 		var id: StringName = StringName(str(o.get(kind, "")))
 		if id == &"" or not String(id).begins_with(String(kind) + "_"):
 			continue

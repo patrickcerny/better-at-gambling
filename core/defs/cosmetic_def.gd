@@ -47,12 +47,15 @@ const OUTFIT_KINDS: Array[StringName] = [KIND_HAT, KIND_SHIRT, KIND_PANTS, KIND_
 ## Only won on the Daily Spin (`DailyWheel.SKIN_ID`, Patrick 2026-11-16): never sold, never
 ## unlocked by level; owned when it is in the Steam inventory (`steam_item`).
 @export var wheel_only: bool = false
+## Only unlocked by this Steam achievement (`Achievements.DEFS`, Patrick 2026-11-16: "Each
+## achievement should also unlock something"): never sold, not on the pass or the Daily Spin.
+@export var achievement: StringName = &""
 ## KIND_COLOR: the palette index (`Palette.player_color`, `Cosmetics.COLOR_COUNT`).
 @export var color_index: int = -1
 
 
 func is_free() -> bool:
-	return price <= 0 and gold <= 0 and level <= 0 and not dev_only and not wheel_only
+	return price <= 0 and gold <= 0 and level <= 0 and not dev_only and not wheel_only and achievement == &""
 
 
 ## Whether it can be bought with red Coins.

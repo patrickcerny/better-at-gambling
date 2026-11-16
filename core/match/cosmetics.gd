@@ -18,7 +18,7 @@ extends RefCounted
 ## (`PlayerProfile`, no accounts), so the client offers owned colours only.
 
 ## Every bean colour: the 8 free ones, then the ones bought with Coins.
-const COLOR_COUNT: int = 24
+const COLOR_COUNT: int = 27
 ## The free colours the server hands out as slot colours.
 const SLOT_COLORS: int = 8
 

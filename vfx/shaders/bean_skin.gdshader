@@ -1,7 +1,7 @@
 // Animated bean skins (CosmeticDef KIND_SKIN, ToonMaterial.make_skin): a moving pattern over the
 // whole bean, in the beans' toon light (soft 3-band ramp + warm rim). Warm casino colours, no neon
 // (docs/ART_DIRECTION.md). `mode`: 0 gold rush, 1 rainbow, 2 molten lava, 3 starry night,
-// 4 lucky felt, 5 candy swirl, 6 deep sea, 7 marble, 8 the house (developers only), 9 fortune (Daily Spin only). Client only.
+// 4 lucky felt, 5 candy swirl, 6 deep sea, 7 marble, 8 the house (developers only), 9 fortune (Daily Spin only), 10 bronze, 11 source code, 12 crystal ball (achievement rewards). Client only.
 // `chip`: the same pattern on a casino chip (ChipStack, PlinkoChip): the chip's flat face (local
 // XZ, radius CHIP_FACE) is laid over the bean's belly, so each chip shows a window of the skin.
 shader_type spatial;
@@ -216,6 +216,57 @@ void fragment() {
 		// Jackpot sheen: gold light sweeping over the whole bean when the wheel stops.
 		float sheen = smoothstep(0.1, 0.0, abs(p.y - p.x * 0.5 - mix(-1.0, 1.0, clamp((cyc - 4.2) / 0.9, 0.0, 1.0))));
 		e += vec3(1.0, 0.85, 0.5) * sheen * stop_flash * 0.9;
+	} else if (mode == 10) {
+		// Bronze statue (achievement Living Legend): cast bronze, green-blue patina settled in the
+		// hollows, polished where hands touch it, a slow warm sheen sliding over.
+		float n = fbm(p * 4.0);
+		float pat = smoothstep(0.52, 0.72, fbm(p * 2.5 + vec3(3.1)) + (0.5 - abs(p.y)) * 0.15);
+		vec3 bronze = mix(vec3(0.17, 0.1, 0.05), vec3(0.48, 0.33, 0.17), n);
+		vec3 verd = mix(vec3(0.16, 0.42, 0.36), vec3(0.36, 0.6, 0.5), noise3(p * 9.0));
+		c = mix(bronze, verd, pat * 0.9);
+		// Polished metal: bright where it faces the eye, dark at the edges.
+		float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+		c *= mix(0.6, 1.15, pow(facing, 2.0)) * mix(1.0, 0.9, pat);
+		float sheen = smoothstep(0.12, 0.0, abs(fract(p.y * 0.4 + p.x * 0.25 - t * 0.12) - 0.5));
+		c += vec3(0.3, 0.2, 0.08) * sheen * (1.0 - pat);
+		e = vec3(0.18, 0.11, 0.03) * sheen * (1.0 - pat);
+	} else if (mode == 11) {
+		// Source code (achievement Beat the Dev): amber code scrolling down a warm black screen,
+		// lines of "characters" in columns, the odd line lit up, a blinking cursor.
+		c = vec3(0.06, 0.045, 0.04);
+		vec2 q = vec2(ang / 6.2832 * 30.0, p.y * 15.0 + t * 1.4);
+		vec2 cell = floor(q);
+		vec2 f = fract(q);
+		float line_len = hash3(vec3(0.0, cell.y, 2.0)) * 16.0 + 3.0;
+		float indent = floor(hash3(vec3(1.0, cell.y, 4.0)) * 4.0) * 2.0;
+		float col = mod(cell.x + 30.0, 30.0);
+		float on = step(indent, col) * step(col, indent + line_len) * step(0.2, hash3(vec3(cell, 5.0))) * step(0.22, hash3(vec3(4.0, cell.y, 8.0)));
+		// A "character": a few strokes in a 3 x 4 grid inside the cell.
+		vec2 g = floor(vec2(f.x * 3.0, f.y * 4.0));
+		float stroke = step(0.45, hash3(vec3(cell * 1.7 + g, 9.0)));
+		float glyph = on * stroke * step(0.12, f.x) * step(f.x, 0.88) * step(0.22, f.y) * step(f.y, 0.78);
+		float hot = step(0.93, hash3(vec3(2.0, cell.y, 7.0)));
+		vec3 amber = mix(vec3(0.85, 0.52, 0.16), vec3(1.0, 0.82, 0.45), hot);
+		c = mix(c, amber * (0.55 + 0.45 * hash3(vec3(cell, 3.0))), glyph);
+		e = amber * glyph * (0.35 + hot * 0.6);
+		float cur = step(0.5, fract(t * 1.6)) * step(abs(col - indent - line_len - 1.0), 0.5) * step(0.75, hash3(vec3(3.0, cell.y, 1.0)));
+		c = mix(c, vec3(1.0, 0.85, 0.5), cur);
+		e += vec3(0.8, 0.55, 0.2) * cur;
+	} else if (mode == 12) {
+		// Crystal ball (achievement Psychic): milky lilac glass, mist turning slowly inside, soft
+		// glints, a warm glow deep in the middle.
+		vec3 r = vec3(p.x * cos(t * 0.3) - p.z * sin(t * 0.3), p.y, p.x * sin(t * 0.3) + p.z * cos(t * 0.3));
+		float mist = fbm(r * 2.2 + vec3(0.0, t * 0.15, 0.0));
+		float swirl = sin(ang * 2.0 + p.y * 4.0 + mist * 5.0 - t * 0.6) * 0.5 + 0.5;
+		c = mix(vec3(0.42, 0.42, 0.66), vec3(0.8, 0.8, 0.92), mist);
+		c = mix(c, vec3(0.44, 0.3, 0.6), swirl * 0.4);
+		float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+		c *= mix(0.45, 1.05, facing);  // glass: darker towards the edge
+		float core = smoothstep(0.55, 0.0, length(p.xy * vec2(1.6, 0.9)));
+		e = vec3(0.45, 0.3, 0.42) * swirl * 0.25 + vec3(0.9, 0.7, 0.45) * core * (0.25 + 0.1 * sin(t * 1.3));
+		vec3 cell = floor(p * 20.0);
+		float glint = step(0.95, hash3(cell)) * pow(max(sin(t * 2.0 + hash3(cell + 1.7) * 30.0), 0.0), 8.0);
+		e += vec3(1.0, 0.95, 0.9) * glint * smoothstep(0.5, 0.1, length(fract(p * 20.0) - 0.5));
 	} else {
 		// Marble: slowly drifting veins with gold flecks.
 		float v = sin(p.y * 5.0 + fbm(p * 2.5 + vec3(t * 0.03)) * 6.0);

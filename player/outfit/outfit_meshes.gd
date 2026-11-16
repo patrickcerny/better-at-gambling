@@ -80,18 +80,32 @@ static func mesh(id: StringName) -> ArrayMesh:
 	if s.begins_with("hat_"):
 		k.xf = Transform3D(Basis(Vector3.RIGHT, HAT_TILT), HAT_BASE)
 		_hat(k, id)
+		if k.is_empty():
+			AchievementMeshes.hat(k, id)
 	elif s.begins_with("shirt_"):
 		_shirt(k, id)
+		if k.is_empty():
+			AchievementMeshes.shirt(k, id)
 	elif s.begins_with("pants_"):
 		_pants(k, id)
+		if k.is_empty():
+			AchievementMeshes.pants(k, id)
 	elif s.begins_with("cape_"):
 		k.record_uv2 = true  # cloth coordinates for `CapeCloth`
 		_cape(k, id)
+		if k.is_empty():
+			AchievementMeshes.cape(k, id)
 		_cape_bottoms[id] = _cape_bottom
 	elif s.begins_with("beard_"):
 		_beard(k, id)
+		if k.is_empty():
+			AchievementMeshes.beard(k, id)
 	elif s.begins_with("eyes_"):
 		_glasses(k, id)
+		if k.is_empty():
+			AchievementMeshes.eyes(k, id)
+	elif s.begins_with("mouth_"):
+		AchievementMeshes.mouth(k, id)  # mouth pieces that are objects (the shader draws the rest)
 	var m: ArrayMesh = null if k.is_empty() else k.commit()
 	if m != null and id == &"eyes_shades":
 		# A second, see-through surface: the tinted lenses (the eyes show through them).
@@ -138,9 +152,13 @@ static func boot_meshes(id: StringName) -> Array[ArrayMesh]:
 		return _boot_cache[id]
 	var k := OutfitMeshKit.new()
 	_boots(k, id)
+	if k.is_empty():
+		AchievementMeshes.boots(k, id)
 	var out: Array[ArrayMesh] = []
 	if not k.is_empty():
-		out = [k.commit(), k.mirrored().commit()]
+		var left: ArrayMesh = k.mirrored().commit()
+		AchievementMeshes.right_boot_extra(k, id)  # a ball and chain trails one foot only
+		out = [k.commit(), left]
 	_boot_cache[id] = out
 	return out
 
@@ -154,7 +172,7 @@ static func has_model(id: StringName) -> bool:
 
 ## The sleeve colour of a shirt (alpha 0: no sleeves).
 static func sleeve_color(id: StringName) -> Color:
-	return SLEEVES.get(id, Color(0, 0, 0, 0))
+	return SLEEVES.get(id, AchievementMeshes.SLEEVES.get(id, Color(0, 0, 0, 0)))
 
 
 ## The shared material: the beans' toon look, coloured by the vertex colours.
@@ -191,6 +209,7 @@ static func spinners(id: StringName) -> Array[Dictionary]:
 					var back: float = ang - 0.16 * float(j + 1)
 					k.sphere(Basis(Vector3.UP, back) * Vector3(0, 0, 0.47), Vector3.ONE * (0.016 - float(j) * 0.004), _glow(CREAM, 0.6), 6, 3)
 			out.append(_hat_spinner(k, Vector3(0, 0.3, 0), 1.3))
+	out.append_array(AchievementMeshes.spinners(id))
 	_spin_cache[id] = out
 	return out
 
@@ -1564,7 +1583,7 @@ const PUPILS: Dictionary = {&"eyes_star": 0.0, &"eyes_heart": 0.0, &"eyes_dollar
 
 ## The mouth shader's style for mouth piece `id` (0: the plain mouth).
 static func mouth_style(id: StringName) -> int:
-	return MOUTH_STYLES.get(id, 0)
+	return MOUTH_STYLES.get(id, AchievementMeshes.MOUTH_STYLES.get(id, 0))
 
 
 ## Whether eye piece `id` has long lashes.
@@ -1765,7 +1784,7 @@ static var _pupil_cache: Dictionary = {}
 ## The pupil of eye piece `id` (null: the plain round pupil), in the pupil's own space: a unit
 ## shape facing -Z, its front at z = -1 (`AvatarVisuals` scales it to the pupil's size).
 static func pupil_mesh(id: StringName) -> ArrayMesh:
-	if not PUPILS.has(id):
+	if not PUPILS.has(id) and not AchievementMeshes.PUPILS.has(id):
 		return null
 	if _pupil_cache.has(id):
 		return _pupil_cache[id]
@@ -1802,6 +1821,8 @@ static func pupil_mesh(id: StringName) -> ArrayMesh:
 				var p3 := Vector3(cos(a1) * (r1 - w), sin(a1) * (r1 - w), z)
 				k.tri(p0, p1, p2, n, PURPLE)
 				k.tri(p0, p2, p3, n, PURPLE)
+		_:
+			AchievementMeshes.pupil(k, id)
 	var m: ArrayMesh = k.commit()
 	_pupil_cache[id] = m
 	return m

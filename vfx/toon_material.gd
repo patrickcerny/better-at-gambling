@@ -14,11 +14,14 @@ const SKIN_MODES: Dictionary = {
 	&"skin_gold": 0, &"skin_rainbow": 1, &"skin_lava": 2, &"skin_galaxy": 3,
 	&"skin_felt": 4, &"skin_candy": 5, &"skin_ocean": 6, &"skin_marble": 7,
 	&"skin_the_house": 8, &"skin_fortune": 9,
+	# Achievement rewards (AchievementMeshes).
+	&"skin_bronze": 10, &"skin_source": 11, &"skin_crystal": 12,
 }
 const SKIN_FLAT: Array[Color] = [
 	Color("#D9AE52"), Color("#C8503A"), Color("#5A2A1E"), Color("#2A2A5A"),
 	Color("#275E49"), Color("#E39AA6"), Color("#1F4E6B"), Color("#EDE6DA"),
-	Color("#16100E"), Color("#681F2C"),
+	Color("#16100E"), Color("#681F2C"), Color("#9C6A35"), Color("#1A1412"),
+	Color("#B9AFCF"),
 ]
 
 ## Off switch (side-by-side comparison shots).

@@ -4,7 +4,7 @@
 //   open    0 (closed line) .. 1 (wide open)
 //   round   0 (lens mouth) .. 1 (round `O`)
 //   style   the mouth piece worn (OutfitMeshes.MOUTH_STYLES): 0 plain, 1 tongue out, 2 buck
-//           teeth, 3 lipstick, 4 a gold tooth, 5 fangs, 6 a gold grill
+//           teeth, 3 lipstick, 4 a gold tooth, 5 fangs, 6 a gold grill, 7 a sly grin, 8 a gap tooth
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_opaque;
 
@@ -43,6 +43,14 @@ float extra(vec2 p, float lower, out vec3 col) {
 		vec2 q = vec2(abs(p.x) - 0.3, p.y - lower);
 		float wid = 0.065 * clamp(1.0 + q.y / 0.21, 0.0, 1.0);
 		return max(abs(q.x) - wid, max(q.y - 0.04, -q.y - 0.21));
+	} else if (style == 7) {
+		// A sly grin: one sharp tooth at the raised corner.
+		vec2 q = vec2(p.x - 0.32, p.y - lower);
+		float wid = 0.05 * clamp(1.0 + q.y / 0.15, 0.0, 1.0);
+		return max(abs(q.x) - wid, max(q.y - 0.04, -q.y - 0.15));
+	} else if (style == 8) {
+		// A gap tooth: one front tooth left, the other knocked out.
+		return sd_box(vec2(p.x + 0.095, p.y - (lower - 0.09)), vec2(0.075, 0.11)) - 0.02;
 	} else if (style == 6) {
 		col = fract(p.x * 7.0) < 0.12 ? gold_color.rgb * 0.7 : gold_color.rgb;
 		return sd_box(p - vec2(0.0, lower - 0.05), vec2(0.36, 0.065)) - 0.02;
@@ -56,7 +64,8 @@ void fragment() {
 	float w = width;
 	float k = clamp(1.0 - (p.x * p.x) / (w * w), 0.0, 1.0);
 	// The mouth's centre line curls up at the corners for a smile, down for a frown.
-	float centre = smile * 0.5 * ((p.x * p.x) / (w * w) - 0.45) + smirk * 0.5 * pow(max(p.x / w, 0.0), 2.0);
+	float sm = style == 7 ? max(smirk, 0.9) : smirk;
+	float centre = smile * 0.5 * ((p.x * p.x) / (w * w) - 0.45) + sm * 0.5 * pow(max(p.x / w, 0.0), 2.0);
 	float line = style == 3 ? 0.11 : 0.075;
 	float upper = centre + line + open * 0.18 * k;
 	float lower = centre - line - open * 0.85 * k;
@@ -70,7 +79,7 @@ void fragment() {
 		discard;
 	}
 	vec3 lc = style == 3 ? lipstick_color.rgb : line_color.rgb;
-	if (de <= 0.0 && (d > -0.05 || open < 0.12 || style == 5 || style == 2)) {
+	if (de <= 0.0 && (d > -0.05 || open < 0.12 || style == 5 || style == 2 || style == 7 || style == 8)) {
 		ALBEDO = de > -0.03 ? lc : piece;
 	} else {
 		vec3 c = lc;
