@@ -176,6 +176,8 @@ func test_try_ons_stack_and_come_off() -> void:
 	ProfileManager.profile.coins = hat.price + shirt.price
 	panel.look_button.pressed.emit()
 	assert_false(ProfileManager.profile.owns(hat.id), "BUY ALL asks first")
+	assert_string_contains(panel.confirm_dialog.text_label.text, hat.display_name, "lists what is bought")
+	assert_string_contains(panel.confirm_dialog.text_label.text, shirt.display_name)
 	assert_string_contains(panel.confirm_dialog.text_label.text, "can't be refunded")
 	panel.confirm_dialog.confirm()
 	assert_true(ProfileManager.profile.owns(hat.id) and ProfileManager.profile.owns(shirt.id), "bought both")

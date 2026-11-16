@@ -851,7 +851,10 @@ func press_look() -> void:
 			status_label.text = "Not enough Coins for the whole look: %s more to go." % Hud._thousands(look_price() - p.coins)
 			_refresh()
 			return
-		_confirm_buy("BUY THE WHOLE LOOK?", "%d pieces for %s Coins." % [to_buy.size(), Hud._thousands(look_price())], func() -> void:
+		var lines: PackedStringArray = []
+		for d: CosmeticDef in to_buy:
+			lines.append("%s · %s · %s Coins" % [d.display_name, _kind_name(d), Hud._thousands(d.price)])
+		_confirm_buy("BUY THE WHOLE LOOK?", "\n".join(lines) + "\n\n%d pieces for %s Coins together." % [to_buy.size(), Hud._thousands(look_price())], func() -> void:
 			for d: CosmeticDef in to_buy:
 				ProfileManager.buy(d.id)
 			status_label.text = "Bought %d pieces! WEAR ALL puts the look on." % to_buy.size()
@@ -914,14 +917,14 @@ func _on_purchase_finished(ok: bool) -> void:
 
 ## A premium piece or a set paid in Gold Coins: Steam exchanges them (the answer: `_on_gold_spent`).
 ## Too few Gold Coins: off to the GOLD tab to get more. Enough: asks first (no refunds).
-func _buy_with_gold(title: String, def: int, cost: int) -> void:
+func _buy_with_gold(title: String, def: int, cost: int, contents: String = "") -> void:
 	if not SteamSvc.is_available():
 		status_label.text = "Gold Coins need Steam running."
 	elif SteamSvc.gold < cost:
 		open_gold_shop(cost - SteamSvc.gold)
 		return
 	else:
-		_confirm_buy("BUY %s?" % title.to_upper(), "%s Gold Coins." % Hud._thousands(cost), func() -> void:
+		_confirm_buy("BUY %s?" % title.to_upper(), contents + "%s Gold Coins." % Hud._thousands(cost), func() -> void:
 			if SteamSvc.buy_with_gold(def, cost):
 				status_label.text = "Buying %s..." % title
 			else:
@@ -929,6 +932,11 @@ func _buy_with_gold(title: String, def: int, cost: int) -> void:
 			_refresh())
 		return
 	_refresh()
+
+
+## "Hat", "Skin" ...: what a piece is, for the purchase lists.
+func _kind_name(d: CosmeticDef) -> String:
+	return str(KIND_TITLES.get(d.kind, "")).trim_suffix("S").replace("TROUSER", "TROUSERS").capitalize()
 
 
 ## "MORE GOLD NEEDED · BUY MORE": the GOLD tab, with the smallest pack that covers `missing` picked.
@@ -997,7 +1005,12 @@ func _buy_with_coins(d: CosmeticDef) -> void:
 func press_action() -> void:
 	var pack: CosmeticPack = shop.find_pack(selected)
 	if pack != null and not ProfileManager.profile.owns_pack(pack):
-		_buy_with_gold(pack.display_name, pack.steam_item, pack.gold)
+		var names: PackedStringArray = []
+		for id: StringName in pack.pieces:
+			var piece: CosmeticDef = shop.find(id)
+			if piece != null:
+				names.append("%s · %s" % [piece.display_name, _kind_name(piece)])
+		_buy_with_gold(pack.display_name, pack.steam_item, pack.gold, "\n".join(names) + "\n\n")
 		return
 	if pack != null:
 		if ProfileManager.profile.owns_pack(pack):
