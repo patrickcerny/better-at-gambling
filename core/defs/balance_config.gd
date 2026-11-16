@@ -43,6 +43,9 @@ extends Resource
 ## A split gives the splitting player this many extra decision clocks (x bj_action_time) on top
 ## of what they had left, so both hands can be played (1.0 = the full decision time again).
 @export var bj_split_time_bonus: float = 1.0
+## Holding Scissors when a hit busts you: this many seconds to cut the busting card away before
+## the hand counts as bust (the rest of your decision clock comes back after the cut).
+@export var bj_scissors_window: float = 5.0
 ## Profit ratio paid on winning hands when the dealer busts (1.0 = plain 1:1).
 @export var bj_dealer_bust_bonus: float = 1.07
 @export var bj_blackjack_ratio: float = 1.5

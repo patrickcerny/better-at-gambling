@@ -108,6 +108,8 @@ func on_slot(slot: int) -> void:
 		cancel()
 	if slot < 0 or slot >= _inventory().size():
 		return
+	if _locked_for_minigame():
+		return
 	if slot == held:
 		use_held()
 	else:
@@ -137,7 +139,7 @@ func put_away() -> void:
 ## (or last) one.
 func cycle(step: int) -> void:
 	var inv: Array = _inventory()
-	if inv.is_empty():
+	if inv.is_empty() or _locked_for_minigame():
 		return
 	cancel()
 	var from: int = held
@@ -155,7 +157,7 @@ func use_held() -> void:
 	if held >= inv.size():
 		put_away()
 		return
-	if not _items_allowed():
+	if _locked_for_minigame() or not _items_allowed():
 		return
 	if _clock < _cooldown_until:
 		scene.hud.toast("Item cooldown", 0.8)
@@ -385,6 +387,8 @@ static func rejection_text(error: StringName) -> String:
 			return "Items are off this match"
 		&"wrong_phase":
 			return "Not now"
+		&"minigame_soon":
+			return "Minigame starting, items locked"
 		&"busy":
 			return "They're already in a duel"
 		&"no_station":
@@ -684,5 +688,12 @@ func _inventory() -> Array:
 
 
 func _items_allowed() -> bool:
-	var ph: Phase.Id = scene.view.state.phase
-	return ph == Phase.Id.CASINO or ph == Phase.Id.PRE_MINIGAME
+	return scene.view.state.phase == Phase.Id.CASINO
+
+
+## The minigame countdown: items stay in the bar but can't be taken out or used.
+func _locked_for_minigame() -> bool:
+	if scene.view.state.phase != Phase.Id.PRE_MINIGAME:
+		return false
+	scene.hud.toast(rejection_text(&"minigame_soon"), 1.2)
+	return true
