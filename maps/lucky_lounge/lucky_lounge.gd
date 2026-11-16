@@ -36,9 +36,9 @@ const GAMES_PATH: String = "res://data/registry/games.tres"
 ## `full_floor_plan`) plus the fixed stations.
 static var _full_plan: Dictionary = {}
 static var STATIONS: Dictionary = _full_floor_stations()
-const SPAWNS: Array[Vector3] = [  # start-room spots: in front of the pedestal stairs (z ≥ 12.95)
-	Vector3(-6, 0, 12.3), Vector3(-4, 0, 11.8), Vector3(-2, 0, 12.3), Vector3(2, 0, 12.3),
-	Vector3(4, 0, 11.8), Vector3(6, 0, 12.3), Vector3(-8, 0, 12.3), Vector3(8, 0, 12.3),
+const SPAWNS: Array[Vector3] = [  # start-room spots: in front of the pedestal stairs (z ≥ 12.85)
+	Vector3(-6, 0, 11.9), Vector3(-4, 0, 11.4), Vector3(-2, 0, 11.9), Vector3(2, 0, 11.9),
+	Vector3(4, 0, 11.4), Vector3(6, 0, 11.9), Vector3(-8, 0, 11.9), Vector3(8, 0, 11.9),
 ]
 ## The guards' rounds, along the aisles every floor keeps open (docs/FLOOR_PLAN.md): the west
 ## and the east half of the floor, each round its pit block and along the walls.
@@ -98,20 +98,22 @@ const SETTINGS_BOARD_ROWS: int = 5
 ## (you have to be up on it, not beside it).
 const PAD_RADIUS: float = 0.75
 const PEDESTAL_TOP: float = 0.8
-## The marble stair in front of each pedestal: how many steps, how long (floor to column) and
-## how wide between its cheek walls.
-const STAIR_STEPS: int = 4
-const STAIR_LEN: float = 1.7
-const STAIR_W: float = 0.9
+## Each pedestal's dais (body width x depth, without moulding and cap) and the stair in front of
+## it: how many steps below the top, how long (floor to dais) and how wide.
+const DAIS_SIZE: Vector2 = Vector2(1.2, 1.0)
+const STAIR_STEPS: int = 3
+const STAIR_LEN: float = 1.35
+const STAIR_W: float = 0.86
 ## Floor layers (y): carpet 0.01, area rugs 0.02, station rugs 0.03. Keep 1 cm apart.
 const AREA_RUG_Y: float = 0.02
 const STATION_RUG_Y: float = 0.03
-## The ready pedestals (0.8.15, Patrick: "Podeste"): Greek marble column pedestals along the
+## The ready pedestals (0.8.15, Patrick: "Podeste"; reworked 0.9.56): marble daises along the
 ## south wall of the start room, one per player colour, nearest the door first, each with a
-## marble stair up to its top. The revolving door gap runs x −2..2.
+## marble stair up to its top; 2.5 m apart (1.2 m free between two), the back 0.3 m off the wall.
+## The revolving door gap runs x −2..2.
 const PEDESTALS: Array[Vector3] = [
-	Vector3(-3.0, 0, 15.1), Vector3(3.0, 0, 15.1), Vector3(-5.2, 0, 15.1), Vector3(5.2, 0, 15.1),
-	Vector3(-7.4, 0, 15.1), Vector3(7.4, 0, 15.1), Vector3(-9.6, 0, 15.1), Vector3(9.6, 0, 15.1),
+	Vector3(-3.2, 0, 14.85), Vector3(3.2, 0, 14.85), Vector3(-5.7, 0, 14.85), Vector3(5.7, 0, 14.85),
+	Vector3(-8.2, 0, 14.85), Vector3(8.2, 0, 14.85), Vector3(-10.7, 0, 14.85), Vector3(10.7, 0, 14.85),
 ]
 ## The glow from above a ready pedestal: warm gold spotlight, how bright, how long it fades.
 const PEDESTAL_GLOW: Color = Color(1.0, 0.8, 0.45)
@@ -125,6 +127,8 @@ const PEDESTAL_PLATE_Y: float = 3.5
 const PEDESTAL_NAME_SIZE: int = 44
 const MARBLE: Color = Color("#E6DFD2")
 const MARBLE_DARK: Color = Color("#B9AE9C")
+## The pedestals' footing and base moulding: deep brown marble so the white dais stands on it.
+const MARBLE_DEEP: Color = Color("#4E3A2C")
 ## The wall between the start room and the casino (centre line) and its doorway: the lobby
 ## doors fill x −LOBBY_DOOR_HALF..LOBBY_DOOR_HALF, LOBBY_DOOR_H high.
 const LOBBY_DOORS_Z: float = 8.4
@@ -726,9 +730,12 @@ func _mesh_box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> Me
 	return mi
 
 
-## A Greek marble column pedestal (plinth, fluted drum with a band in the player's colour,
-## echinus and abacus, 0.8 m high) with a four-step marble stair in front of it (`_build_stair`).
-## The stair's collision is one smooth wedge (no step lips to catch on); the column is a plain block.
+## A ready pedestal (0.9.56, Patrick: "reworke die podeste komplett"): one marble piece on a dark
+## marble footing, a square dais 0.8 m high (base moulding, a body with an inlay panel in the
+## player's colour on each side and either side of the stair, a gold fillet and an overhanging cap)
+## with a three-step stair in front that runs straight into it. Nothing overlaps or pokes through:
+## every part sits on the one below, the stair is narrower than the dais and has no rails. You walk
+## up on one smooth invisible wedge (no step lips); the dais is a plain block.
 func _build_pedestal(i: int, pos: Vector3) -> void:
 	var root := Node3D.new()
 	root.name = "Pedestal%d" % i
@@ -737,32 +744,66 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	add_child(root)
 	var marble: StandardMaterial3D = GreyboxKit.material(MARBLE, 0.0, 0.45)
 	var marble_dark: StandardMaterial3D = GreyboxKit.material(MARBLE_DARK, 0.0, 0.5)
-	# The block you stand on (collision only; the column's looks are the visuals below).
+	var polished: StandardMaterial3D = GreyboxKit.material(MARBLE.lightened(0.06), 0.0, 0.3)
+	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
+	var colour: StandardMaterial3D = GreyboxKit.material(Palette.player_color(i), 0.1, 0.45)
+	var deep: StandardMaterial3D = GreyboxKit.material(MARBLE_DEEP, 0.0, 0.35)
+	var hw: float = DAIS_SIZE.x * 0.5  # body half width
+	var hd: float = DAIS_SIZE.y * 0.5  # body half depth
+	var front: float = -hd  # the body's front face
+	var foot: float = front - STAIR_LEN  # the stair's lowest riser
+	# The block you stand on (collision only) and the walking wedge up the stair.
 	var body := StaticBody3D.new()
 	body.name = "Block"
 	body.add_to_group(&"navsource")
 	var bs := BoxShape3D.new()
-	bs.size = Vector3(0.9, PEDESTAL_TOP, 0.9)
+	bs.size = Vector3(DAIS_SIZE.x + 0.1, PEDESTAL_TOP, DAIS_SIZE.y + 0.1)
 	var cs := CollisionShape3D.new()
 	cs.shape = bs
 	cs.position.y = PEDESTAL_TOP * 0.5
 	body.add_child(cs)
 	root.add_child(body)
-	# Plinth, drum with 16 flutes, colour band, echinus and abacus.
-	(GreyboxKit.box(root, Vector3(1.0, 0.16, 1.0), Vector3(0, 0.08, 0), MARBLE, "Plinth", false).get_node("Mesh") as MeshInstance3D).material_override = marble
-	GreyboxKit.cylinder(root, 0.40, 0.03, Vector3(0, 0.175, 0), Palette.player_color(i), "Band", false)
-	(GreyboxKit.cylinder(root, 0.36, 0.5, Vector3(0, 0.44, 0), MARBLE, "Drum", false).get_node("Mesh") as MeshInstance3D).material_override = marble
-	for f: int in 16:
-		var a: float = TAU * f / 16.0
-		var flute: Node3D = GreyboxKit.box(root, Vector3(0.05, 0.46, 0.04), Vector3(cos(a) * 0.36, 0.44, sin(a) * 0.36), MARBLE_DARK, "Flute%d" % f, false)
-		flute.rotation.y = -a
-		(flute.get_node("Mesh") as MeshInstance3D).material_override = marble_dark
-	(GreyboxKit.cylinder(root, 0.44, 0.05, Vector3(0, 0.715, 0), MARBLE_DARK, "Echinus", false).get_node("Mesh") as MeshInstance3D).material_override = marble_dark
-	GreyboxKit.box(root, Vector3(0.94, 0.012, 0.94), Vector3(0, 0.745, 0), Palette.WARM_GOLD, "Trim", false)
-	var top: Node3D = GreyboxKit.box(root, Vector3(0.9, 0.06, 0.9), Vector3(0, PEDESTAL_TOP - 0.03, 0), MARBLE, "Abacus", false)
-	var top_mesh: MeshInstance3D = top.get_node("Mesh") as MeshInstance3D
-	top_mesh.material_override = marble
-	_build_stair(root, marble, marble_dark)
+	var ramp: Node3D = GreyboxKit.ramp(root, Vector3(0, 0, foot - 0.03), Vector3(0, PEDESTAL_TOP, front - 0.05), STAIR_W, MARBLE, "Stair")
+	(ramp.get_node("Mesh") as MeshInstance3D).visible = false
+	# Footing: one dark slab under the dais and the stair, a gold line along its front edge.
+	var base_h: float = 0.05
+	var fz0: float = foot - 0.1
+	var fz1: float = hd + 0.08
+	_mesh_box(root, Vector3(DAIS_SIZE.x + 0.2, base_h, fz1 - fz0), Vector3(0, base_h * 0.5, (fz0 + fz1) * 0.5), deep).name = "Footing"
+	_mesh_box(root, Vector3(DAIS_SIZE.x + 0.21, 0.012, 0.012), Vector3(0, base_h - 0.006, fz0 - 0.001), gold).name = "FootingEdge"
+	# The dais: base moulding, body, gold fillet, overhanging cap (the top you stand on).
+	var mould_h: float = 0.09
+	_mesh_box(root, Vector3(DAIS_SIZE.x + 0.08, mould_h, DAIS_SIZE.y + 0.08), Vector3(0, base_h + mould_h * 0.5, 0), deep).name = "Moulding"
+	var cap_h: float = 0.07
+	var body_y0: float = base_h + mould_h
+	var body_y1: float = PEDESTAL_TOP - cap_h
+	_mesh_box(root, Vector3(DAIS_SIZE.x, body_y1 - body_y0, DAIS_SIZE.y), Vector3(0, (body_y0 + body_y1) * 0.5, 0), marble).name = "Body"
+	_mesh_box(root, Vector3(DAIS_SIZE.x + 0.03, 0.02, DAIS_SIZE.y + 0.03), Vector3(0, body_y1 - 0.01, 0), gold).name = "Fillet"
+	var top_mesh: MeshInstance3D = _mesh_box(root, Vector3(DAIS_SIZE.x + 0.1, cap_h, DAIS_SIZE.y + 0.1), Vector3(0, PEDESTAL_TOP - cap_h * 0.5, 0), polished)
+	top_mesh.name = "Cap"
+	# Colour inlays in gold frames: one on each side face, one either side of the stair in front.
+	var mid_y: float = (body_y0 + body_y1) * 0.5 - 0.01
+	var inlay_h: float = (body_y1 - body_y0) - 0.16
+	for sx: float in [-1.0, 1.0]:
+		_mesh_box(root, Vector3(0.012, inlay_h + 0.04, DAIS_SIZE.y - 0.2), Vector3(sx * (hw + 0.006), mid_y, 0), gold).name = "InlayFrame"
+		_mesh_box(root, Vector3(0.012, inlay_h, DAIS_SIZE.y - 0.24), Vector3(sx * (hw + 0.012), mid_y, 0), colour).name = "Inlay"
+		var cx: float = sx * (STAIR_W * 0.5 + (hw - STAIR_W * 0.5) * 0.5)
+		var iw: float = hw - STAIR_W * 0.5 - 0.06
+		_mesh_box(root, Vector3(iw + 0.04, inlay_h + 0.04, 0.012), Vector3(cx, mid_y, front - 0.006), gold).name = "InlayFrame"
+		_mesh_box(root, Vector3(iw, inlay_h, 0.012), Vector3(cx, mid_y, front - 0.012), colour).name = "Inlay"
+	# The stair: solid risers from the footing up, polished treads with a gold nosing.
+	var rise: float = PEDESTAL_TOP / (STAIR_STEPS + 1)
+	var run: float = STAIR_LEN / STAIR_STEPS
+	var tread_t: float = 0.04
+	var over: float = 0.025
+	for k: int in STAIR_STEPS:
+		var top: float = rise * (k + 1)
+		var z0: float = foot + run * k
+		var z1: float = z0 + run if k < STAIR_STEPS - 1 else front
+		var bh: float = top - tread_t - base_h
+		_mesh_box(root, Vector3(STAIR_W, bh, z1 - z0), Vector3(0, base_h + bh * 0.5, (z0 + z1) * 0.5), marble_dark).name = "Step%d" % k
+		_mesh_box(root, Vector3(STAIR_W + 0.02, tread_t, z1 - z0 + over), Vector3(0, top - tread_t * 0.5, (z0 - over + z1) * 0.5), polished).name = "Tread%d" % k
+		_mesh_box(root, Vector3(STAIR_W + 0.024, 0.014, 0.014), Vector3(0, top - tread_t * 0.5, z0 - over - 0.004), gold).name = "Nosing%d" % k
 	pedestal_labels.append(_build_name_plate(root, i))
 	pedestal_tops.append(top_mesh)
 	_build_glow(root)
@@ -772,104 +813,7 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	_set_glow(0.0, i)
 
 
-## The marble stair up to the column from the room side (−z), 0.9.46 (Patrick: "mach die stairs
-## noch besser"): four solid steps that stand on the floor and run back into the column (no
-## floating slabs), each with a polished tread that overhangs its riser and a thin gold nosing,
-## flanked by two dark marble cheek walls that follow the slope with a gold cap rail and end in a
-## small newel post at the foot. Walking stays on one smooth invisible wedge (no step lips).
-func _build_stair(root: Node3D, marble: StandardMaterial3D, marble_dark: StandardMaterial3D) -> void:
-	var back: float = -0.45  # the column's front face (abacus)
-	var front: float = back - STAIR_LEN
-	var ramp: Node3D = GreyboxKit.ramp(root, Vector3(0, 0, front), Vector3(0, PEDESTAL_TOP, back), 0.9, MARBLE, "Stair")
-	(ramp.get_node("Mesh") as MeshInstance3D).visible = false
-	var gold: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
-	var tread_mat: StandardMaterial3D = GreyboxKit.material(MARBLE.lightened(0.06), 0.0, 0.35)
-	var rise: float = PEDESTAL_TOP / STAIR_STEPS
-	var run: float = STAIR_LEN / STAIR_STEPS
-	var w: float = STAIR_W
-	var tread_t: float = 0.04
-	var over: float = 0.03  # how far a tread overhangs its riser
-	for k: int in STAIR_STEPS:
-		var top: float = rise * (k + 1)
-		var z0: float = front + run * k
-		var z1: float = z0 + run if k < STAIR_STEPS - 1 else back
-		# The riser block: floor to just under the tread, its own run only (no overlaps).
-		var body_h: float = top - tread_t
-		_mesh_box(root, Vector3(w, body_h, z1 - z0), Vector3(0, body_h * 0.5, (z0 + z1) * 0.5), marble).name = "Step%d" % k
-		# The tread on top, overhanging the riser in front, and its gold nosing strip.
-		var tz0: float = z0 - over
-		_mesh_box(root, Vector3(w + 0.02, tread_t, z1 - tz0), Vector3(0, top - tread_t * 0.5, (tz0 + z1) * 0.5), tread_mat).name = "Tread%d" % k
-		_mesh_box(root, Vector3(w + 0.024, 0.014, 0.014), Vector3(0, top - tread_t * 0.5, tz0 - 0.004), gold).name = "Nosing%d" % k
-		# A shadow line under the overhang so each step reads as its own.
-		_mesh_box(root, Vector3(w - 0.002, 0.02, 0.006), Vector3(0, body_h - 0.01, z0 - 0.002), marble_dark).name = "Reveal%d" % k
-	# Cheek walls either side: floor up to a sloped top just above the treads, gold cap rail on it.
-	var cheek_t: float = 0.08
-	var cx: float = w * 0.5 + 0.01 + cheek_t * 0.5
-	var h_front: float = 0.12
-	var h_back: float = PEDESTAL_TOP + 0.1
-	var cz0: float = front - over
-	for side: float in [-1.0, 1.0]:
-		var x: float = side * cx
-		var cheek := MeshInstance3D.new()
-		cheek.name = "Cheek" if side < 0.0 else "CheekR"
-		cheek.mesh = _side_prism(cheek_t, cz0, back, h_front, h_back)
-		cheek.material_override = marble_dark
-		cheek.position.x = x
-		root.add_child(cheek)
-		var cap_from := Vector3(x, h_front + 0.012, cz0)
-		var cap_to := Vector3(x, h_back + 0.012, back)
-		var cap: Node3D = GreyboxKit.beam(root, cap_from, cap_to, Vector2(cheek_t + 0.02, 0.024), Palette.WARM_GOLD, "CheekCap", false)
-		(cap.get_node("Mesh") as MeshInstance3D).material_override = gold
-		# Newel post at the foot, with a gold cap and ball.
-		var newel_h: float = 0.34
-		_mesh_box(root, Vector3(0.13, newel_h, 0.13), Vector3(x, newel_h * 0.5, cz0 - 0.04), marble_dark).name = "Newel"
-		_mesh_box(root, Vector3(0.15, 0.025, 0.15), Vector3(x, newel_h + 0.0125, cz0 - 0.04), gold).name = "NewelCap"
-		var ball := MeshInstance3D.new()
-		var sm := SphereMesh.new()
-		sm.radius = 0.045
-		sm.height = 0.09
-		sm.radial_segments = 12
-		sm.rings = 6
-		ball.mesh = sm
-		ball.material_override = gold
-		ball.position = Vector3(x, newel_h + 0.025 + 0.04, cz0 - 0.04)
-		root.add_child(ball)
-
-
-## A side wall of thickness `t` (centred on x = 0) whose profile runs from z0 to z1 along the
-## floor, `h0` high at z0 and `h1` high at z1 (a straight sloped top).
-func _side_prism(t: float, z0: float, z1: float, h0: float, h1: float) -> ArrayMesh:
-	var hx: float = t * 0.5
-	var p: Array[Vector2] = [Vector2(z0, 0.0), Vector2(z1, 0.0), Vector2(z1, h1), Vector2(z0, h0)]  # (z, y), counter-clockwise seen from +x
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var r: Array[Vector3] = []
-	var l: Array[Vector3] = []
-	for q: Vector2 in p:
-		r.append(Vector3(hx, q.y, q.x))
-		l.append(Vector3(-hx, q.y, q.x))
-	# Outer faces: +x and −x.
-	_tri3(st, r[0], r[2], r[1])
-	_tri3(st, r[0], r[3], r[2])
-	_tri3(st, l[0], l[1], l[2])
-	_tri3(st, l[0], l[2], l[3])
-	# The four edge faces around the profile.
-	for e: int in 4:
-		var a: int = e
-		var b: int = (e + 1) % 4
-		_tri3(st, l[a], r[a], r[b])
-		_tri3(st, l[a], r[b], l[b])
-	st.generate_normals()
-	return st.commit()
-
-
-func _tri3(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
-	st.add_vertex(a)
-	st.add_vertex(b)
-	st.add_vertex(c)
-
-
-## The brass name plate on a slim post behind the column (between it and the wall), facing the
+## The brass name plate on a slim post behind the pedestal (between it and the wall), facing the
 ## room; high enough to read over the head of whoever stands on the pedestal.
 func _build_name_plate(root: Node3D, i: int) -> Label3D:
 	var brass: StandardMaterial3D = GreyboxKit.material(Palette.WARM_GOLD, 0.85, 0.3)
