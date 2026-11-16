@@ -21,15 +21,17 @@ func _play(hands: int, pick: StringName, rides: int, luck_points: int, seed_valu
 	var staked: float = 0.0
 	var back: float = 0.0
 	var sq: float = 0.0
-	# The exact expected return of every first call as it was offered: pay × p × (1 + favour × (1 − p)).
+	# The exact expected return of the calls that settle a hand, as they were offered: a settled call
+	# wins with w·(1 + favour·l) / (w + l − favour·l·tie) and pays what it showed (ties push).
 	var expect: float = 0.0
 	var printed: float = 0.0
+	var expect_w: float = 0.0
+	var printed_w: float = 0.0
 	var f: float = fx.balance.hilo_favour
 	var hits: int = 0
 	for i: int in hands:
 		var before: int = fx.economy.balance(1)
 		t.place_bet(1, {"amount": 100})
-		var first_call: bool = true
 		while t.has_stake(1):
 			var h: Dictionary = t.hands[1]
 			if int(h["rung"]) >= rides:
@@ -43,12 +45,18 @@ func _play(hands: int, pick: StringName, rides: int, luck_points: int, seed_valu
 				call = &"lower" if hi >= lo else &"higher"
 			elif pick == &"random":
 				call = &"higher" if (r.chance(0.5) and hi > 0.0) or lo <= 0.0 else &"lower"
-			if first_call:
-				var p: float = float(o[String(call)])
+			if int(h["rung"]) == 0:
+				# Every call before the first right one (a tie pushes and offers a new call), weighted
+				# by how likely it is the one that settles the hand.
+				var w: float = float(o[String(call)])
+				var l: float = lo if call == &"higher" else hi
+				var tie: float = float(o["tie"])
 				var pay: float = minf(float(h["pays"][String(call)]), fx.balance.hilo_pot_cap)
-				expect += pay * p * (1.0 + f * (1.0 - p))
-				printed += pay * p
-				first_call = false
+				var settles: float = (w + l) - f * l * tie
+				expect += pay * w * (1.0 + f * l)
+				expect_w += settles
+				printed += pay * w
+				printed_w += w + l
 			t.player_action(1, call)
 		var net: int = fx.economy.balance(1) - before
 		var ret: float = (100.0 + net) / 100.0
@@ -60,7 +68,7 @@ func _play(hands: int, pick: StringName, rides: int, luck_points: int, seed_valu
 		t.tick(10.0)  # clears the finished hand
 	var mean: float = back / staked
 	var sigma: float = sqrt(maxf(sq / hands - mean * mean, 0.0) / hands)
-	return {"rtp": mean, "hit": float(hits) / hands, "expect": expect / hands, "printed": printed / hands, "sigma": sigma}
+	return {"rtp": mean, "hit": float(hits) / hands, "expect": expect / expect_w, "printed": printed / printed_w, "sigma": sigma}
 
 
 func test_every_way_to_play_returns_a_little_more_than_it_costs() -> void:

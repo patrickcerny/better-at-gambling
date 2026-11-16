@@ -64,10 +64,11 @@ The cabinet's lamps pulse and the button is outlined while you are below the Hou
   roll), the rules folded under a HOW IT WORKS line.
 - **Hi-Lo** (casino floor; east of the roulette pit on the full floor): oval card table, a dealer, 4 seats, one shared
   single deck (aces high, reshuffled under 15 cards). Everyone plays their own hand: ante, a card is
-  turned up, call HIGHER or LOWER (a tie loses). Each call shows its true chance from the cards left
+  turned up, call HIGHER or LOWER (standard online rules since 0.9.50: a tie pushes, the pot stays and
+  you call again on the tied card; two free SKIPs per hand turn a fresh card up). Each call shows its true chance from the cards left
   and its pay, locked when the card goes up: the fair odds less a small edge (×2.00 at 47% on an 8,
   ×1.06 at 94%, ×11.42 at 8%), at most ×25. A right call multiplies the pot; ride it on the next
-  card or cash out; the ladder stops at 6 right calls or 50× the ante. Timeout (15 s), standing up
+  card or cash out; the ladder stops at 10 right calls or 50× the ante. Timeout (15 s), standing up
   or the match end: a won pot is cashed out, a fresh ante takes the likelier side. A minigame gives
   fresh antes back and banks won pots. House rule as at the horse race (0.9.6): a call that would
   lose has its card redrawn once with 15% chance, then luck rerolls it; never shown. $10–$100.

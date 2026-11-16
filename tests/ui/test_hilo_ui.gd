@@ -29,7 +29,7 @@ func _pub(hands: Dictionary) -> Dictionary:
 
 
 func _hand(cards: Array, rung: int, odds: Dictionary, pays: Dictionary, pot: int = 20) -> Dictionary:
-	return {"stake": 20, "cards": cards, "phase": "play", "rung": rung, "mult": float(pot) / 20.0, "pot": pot, "odds": odds, "pays": pays, "timer": 12.0, "outcome": "", "guess": ""}
+	return {"stake": 20, "cards": cards, "phase": "play", "rung": rung, "mult": float(pot) / 20.0, "pot": pot, "odds": odds, "pays": pays, "timer": 12.0, "outcome": "", "guess": "", "push": false, "skips_left": 2}
 
 
 func test_no_hand_shows_the_ante_chips() -> void:
@@ -48,14 +48,16 @@ func test_the_call_buttons_show_the_true_odds_and_pays() -> void:
 	assert_true(ui.actions.visible)
 	assert_false(ui.bet_panel.visible, "no second ante while the call is open")
 	assert_string_contains(ui.higher_btn.text, "HIGHER")
-	assert_string_contains(ui.higher_btn.text, "55%")
+	assert_string_contains(ui.higher_btn.text, "58%", "ties push: the chance among the cards that settle it")
 	assert_string_contains(ui.higher_btn.text, "×1.74")
 	assert_string_contains(ui.lower_btn.text, "LOWER")
-	assert_string_contains(ui.lower_btn.text, "39%")
+	assert_string_contains(ui.lower_btn.text, "42%")
 	assert_string_contains(ui.lower_btn.text, "×2.38")
 	assert_false(ui.higher_btn.disabled)
 	assert_false(ui.lower_btn.disabled)
 	assert_false(ui.cash_btn.visible, "nothing to cash before a right call")
+	assert_false(ui.skip_btn.disabled)
+	assert_string_contains(ui.skip_btn.text, "2 left")
 	assert_string_contains(ui.card_label.text, "7♥")
 	assert_string_contains(ui.status_label.text, "12 s")
 	assert_string_contains(ui.others_label.text, "Bob: watching")
@@ -67,7 +69,7 @@ func test_an_impossible_call_is_greyed_out() -> void:
 	ui.update_state(_pub({1: _hand([Card.make(1, 2)], 0, odds, pays)}), {})
 	assert_true(ui.higher_btn.disabled, "nothing beats an ace")
 	assert_false(ui.lower_btn.disabled)
-	assert_string_contains(ui.lower_btn.text, "94%")
+	assert_string_contains(ui.lower_btn.text, "100%", "an ace can only tie or lose to lower")
 	assert_eq(HiLoUi.percent(0.004), "<1%")
 	assert_eq(HiLoUi.percent(0.996), ">99%")
 	assert_eq(StationUi.rejection_text(&"no_chance"), "No card can do that")
@@ -89,7 +91,7 @@ func test_after_a_right_call_ride_or_cash_out() -> void:
 		if sb.bg_color == Palette.VIP_GOLD:
 			lit += 1
 	assert_eq(lit, 2, "two steps up the ladder")
-	assert_string_contains(ui.higher_btn.text, "31%", "the next call's odds for the ride")
+	assert_string_contains(ui.higher_btn.text, "33%", "the next call's odds for the ride")
 	assert_string_contains(ui.others_label.text, "Bob: Q♠")
 
 
@@ -107,3 +109,19 @@ func test_results_read_plainly() -> void:
 	ui.update_state(_pub({1: won}), {})
 	assert_string_contains(ui.pot_label.text, "+$88")
 	assert_string_contains(ui.status_label.text, "2 right calls")
+
+
+func test_a_push_and_the_skips_left_show() -> void:
+	var odds: Dictionary = {"higher": 0.31, "lower": 0.63, "tie": 0.06}
+	var pays: Dictionary = {"higher": 2.94, "lower": 1.53}
+	var h: Dictionary = _hand([Card.make(9), Card.make(9, 1)], 0, odds, pays)
+	h["push"] = true
+	h["skips_left"] = 0
+	ui.update_state(_pub({1: h}), {})
+	assert_string_contains(ui.status_label.text, "Tie, it pushes")
+	assert_true(ui.skip_btn.disabled, "no skips left")
+	assert_string_contains(ui.skip_btn.text, "0 left")
+	h["phase"] = "done"
+	h["outcome"] = "push"
+	ui.update_state(_pub({1: h}), {})
+	assert_string_contains(ui.status_label.text, "ante comes back")
