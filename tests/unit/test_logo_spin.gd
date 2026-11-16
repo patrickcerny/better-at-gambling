@@ -205,7 +205,7 @@ func test_a_damaged_spin_count_is_cleaned() -> void:
 	cfg.set_value("stats", "logo_spins", "lots")
 	p.from_config(cfg)
 	assert_eq(p.logo_spins, 0)
-	var old := ConfigFile.new()  # a profile from before 0.10.20
+	var old := ConfigFile.new()  # a profile from before 0.10.24
 	p.from_config(old)
 	assert_eq(p.logo_spins, 0)
 

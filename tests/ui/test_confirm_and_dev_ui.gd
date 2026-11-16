@@ -88,14 +88,17 @@ func test_dev_entry_for_patrick() -> void:
 	DevMode.forced = 1
 	var menu: Control = await _menu()
 	var entry: Button = menu.find_child("DevMode", true, false) as Button
-	assert_not_null(entry, "DEV MODE under TUTORIAL")
+	assert_not_null(entry, "the small dev button in the corner")
 	if entry == null:
 		return
-	assert_eq(entry.get_index(), (menu.get_node("Center/Column/VBox/Tutorial") as Control).get_index() + 1)
+	assert_true(entry is DevButton)
+	assert_null((menu.get_node("Center/Column/VBox") as Control).find_child("DevMode", false, false), "no longer a menu entry")
+	var spin: Control = menu.get("daily_button")
+	assert_false(entry.get_rect().intersects(spin.get_rect()), "clear of the Daily Spin wheel")
 	entry.pressed.emit()
 	var dev: DevPanel = menu.get("dev_panel")
 	assert_true(dev.visible)
-	assert_false((menu.get_node("Center/Column/VBox") as Control).visible)
+	assert_eq(dev.level_value.text, str(ProfileManager.profile.level))
 	assert_eq(dev.minigame_tiles.size(), Registry.minigames.size(), "a tile per minigame")
 	menu.set(&"load_match", false)
 	watch_signals(menu)
