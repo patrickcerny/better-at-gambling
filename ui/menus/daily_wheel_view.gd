@@ -12,6 +12,8 @@ extends Control
 ## `stop_anywhere` stops it on no prize (Steam said not yet). `landed` fires when it rests.
 
 signal landed(index: int)
+## The wheel itself was clicked (Patrick 2026-11-16: "be able to click the wheel to spin it").
+signal clicked
 
 enum State { IDLE, REVVING, STOPPING, WON }
 
@@ -56,10 +58,15 @@ var _bits: Array[Dictionary] = []
 var _win_t: float = 0.0
 ## Slices that can't be won here (no Steam): drawn a little dimmed.
 var dimmed: Array[int] = []
+## Whether a click on the wheel spins it (set by the panel while a spin is free): the hand cursor.
+var clickable: bool = false:
+	set(v):
+		clickable = v
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if v else Control.CURSOR_ARROW
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	if custom_minimum_size == Vector2.ZERO:
 		custom_minimum_size = Vector2(560, 560)
 
@@ -198,6 +205,21 @@ func _move_bits(delta: float) -> void:
 
 func _radius() -> float:
 	return minf(size.x, size.y) * 0.40
+
+
+func _gui_input(event: InputEvent) -> void:
+	var mb := event as InputEventMouseButton
+	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if hits(mb.position):
+		accept_event()
+		clicked.emit()
+
+
+## Whether `p` (local) is on the wheel, rim included.
+func hits(p: Vector2) -> bool:
+	var c: Vector2 = size * 0.5 + Vector2(0, minf(size.x, size.y) * 0.03)
+	return p.distance_to(c) <= _radius() * 1.17
 
 
 func _draw() -> void:

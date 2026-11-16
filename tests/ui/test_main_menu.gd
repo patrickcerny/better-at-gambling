@@ -348,3 +348,26 @@ func test_replaced_first_run_tutorial_does_not_start_the_match() -> void:
 	assert_signal_not_emitted(menu, "practice_requested")
 	assert_false(bool(Settings.get_value("tutorial", "seen", false)))
 	menu._settings.close()
+
+
+func test_clicking_the_wheel_spins_it() -> void:
+	ProfileManager.profile.daily_last = 0
+	menu.daily_button.pressed.emit()
+	await wait_process_frames(2)
+	var wheel: DailyWheelView = menu.daily_spin.wheel
+	assert_true(wheel.clickable, "a free spin: the wheel takes a click")
+	var corner := InputEventMouseButton.new()
+	corner.button_index = MOUSE_BUTTON_LEFT
+	corner.pressed = true
+	corner.position = Vector2(1, 1)
+	wheel._gui_input(corner)
+	assert_false(wheel.busy(), "a click beside the wheel does nothing")
+	var click := corner.duplicate() as InputEventMouseButton
+	click.position = wheel.size * 0.5
+	wheel._gui_input(click)
+	assert_true(wheel.busy(), "a click on the wheel spins it")
+	assert_gt(ProfileManager.profile.daily_last, 0)
+	menu.daily_spin._refresh()
+	assert_false(wheel.clickable, "not while it turns")
+	menu.daily_spin.close()
+	ProfileManager.reload()
