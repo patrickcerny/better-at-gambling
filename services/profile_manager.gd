@@ -209,9 +209,10 @@ func note_achieved(ids: Array[StringName]) -> void:
 		changed.emit()
 
 
-## Buys a cosmetic (see `PlayerProfile.buy`); &"" on success.
-func buy(id: StringName) -> StringName:
-	var err: StringName = profile.buy(id)
+## Buys a cosmetic (see `PlayerProfile.buy`) at today's price (`DailyDeals`, or the deal of `day`
+## the buyer was shown); &"" on success.
+func buy(id: StringName, day: int = -1) -> StringName:
+	var err: StringName = profile.buy(id, day if day >= 0 else DailyDeals.today())
 	if err == &"":
 		save()
 		changed.emit()

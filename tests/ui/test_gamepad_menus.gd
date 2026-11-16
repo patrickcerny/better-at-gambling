@@ -71,39 +71,12 @@ func test_main_menu_a_opens_play_online_and_b_comes_back() -> void:
 	online.grab_focus()
 	_pad(JOY_BUTTON_A)
 	await wait_process_frames(1)
-	assert_true((menu.get(&"_online_box") as Control).visible, "A opened PLAY ONLINE")
+	assert_true((menu.get(&"online") as Control).visible, "A opened PLAY ONLINE")
 	assert_not_null(get_viewport().gui_get_focus_owner(), "something in it has the focus")
 	_pad(JOY_BUTTON_B)
 	await wait_process_frames(1)
-	assert_false((menu.get(&"_online_box") as Control).visible, "B went back")
+	assert_false((menu.get(&"online") as Control).visible, "B went back")
 	assert_eq(get_viewport().gui_get_focus_owner(), online, "focus back on PLAY ONLINE")
-
-
-func test_name_field_a_opens_the_keyboard() -> void:
-	var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
-	add_child_autofree(menu)
-	await wait_process_frames(3)
-	menu.call(&"_show_online")
-	var edit: LineEdit = menu.get(&"_name_edit")
-	var before: String = edit.text
-	edit.grab_focus()
-	_pad(JOY_BUTTON_A)
-	var kb: PadKeyboard = PadKeyboard.current
-	assert_not_null(kb, "no Steam in the tests: the in-game keyboard")
-	assert_eq(kb.target, edit)
-	assert_not_null(get_viewport().gui_get_focus_owner(), "a key has the focus")
-	assert_true(kb.is_ancestor_of(get_viewport().gui_get_focus_owner()))
-	_pad(JOY_BUTTON_A)
-	assert_eq(edit.text.length(), before.length() + 1, "A types the focused key")
-	_pad(JOY_BUTTON_Y)
-	assert_true(edit.text.ends_with(" "), "Y is a space")
-	_pad(JOY_BUTTON_X)
-	_pad(JOY_BUTTON_X)
-	assert_eq(edit.text, before, "X deletes")
-	_pad(JOY_BUTTON_B)
-	await wait_process_frames(1)
-	assert_null(PadKeyboard.current, "B closes it")
-	assert_eq(get_viewport().gui_get_focus_owner(), edit, "back on the field")
 
 
 func test_keyboard_keeps_max_length_and_word_capitals() -> void:

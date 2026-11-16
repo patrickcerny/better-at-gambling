@@ -38,10 +38,14 @@ func _ready() -> void:
 		goto.call_deferred(MATCH)
 
 
-## Player-facing name: the saved profile name, or a fresh "Player####" (`--name` overrides).
+## Player-facing name: your Steam name (Patrick 2026-11-16: "nicht setzbar sondern einfach der
+## Name aus Steam"); without Steam the saved profile name, or a fresh "Player####" (`--name`
+## overrides both).
 func profile_name() -> String:
 	if cmdline != null and cmdline.has("name"):
 		return cmdline.get_string("name")
+	if SteamSvc.is_available() and SteamSvc.get_persona_name() != "":
+		return SteamSvc.get_persona_name()
 	var n: String = str(Settings.get_value("profile", "name", ""))
 	if n == "":
 		n = "Player%04d" % randi_range(1000, 9999)
