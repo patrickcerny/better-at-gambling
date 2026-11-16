@@ -85,15 +85,20 @@ func activate() -> void:
 	camera.current = true
 
 
-## Flips first/third person. During an emote view the player takes the camera back: it ends,
-## and the view goes to first person (the one you are not looking at).
-func toggle_mode() -> void:
+## Flips first/third person and returns true if the view changed. During an emote view the
+## player takes the camera back: it ends, and the view goes to first person (the one you are not
+## looking at). Seated it does nothing: the station view hides the mode, so a press there flipped
+## it unseen and you stood up in third person (Patrick: "why am i 3d person?").
+func toggle_mode() -> bool:
 	if emote_view:
 		emote_view = false
 		emote_blend = 0.0
 		mode = Mode.FIRST
-		return
+		return true
+	if anchor != null:
+		return false
 	mode = Mode.THIRD if mode == Mode.FIRST else Mode.FIRST
+	return true
 
 
 ## The local player started an emote: swing round to watch it. `mode` stays what the player

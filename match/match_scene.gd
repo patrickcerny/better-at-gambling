@@ -369,6 +369,19 @@ func _ready() -> void:
 	Log.info(&"match", "match scene ready: %d players, local=%d" % [avatars.size(), local_id])
 
 
+## V / the gamepad's View button flips first and third person (not while seated, see
+## `PlayerCamera.toggle_mode`). A toast says which view you are in and how to switch back, so a
+## stray press is no mystery (Patrick: "why am i 3d person?").
+func _on_toggle_camera() -> void:
+	if local == null or local.cam == null:
+		return
+	if not local.cam.toggle_mode():
+		return  # seated: the station view stays, the mode is left alone
+	if hud != null:
+		var third: bool = local.cam.mode == PlayerCamera.Mode.THIRD
+		hud.toast("%s person  (%s to switch)" % ["Third" if third else "First", InputGlyphs.key(&"toggle_camera")], 1.6)
+
+
 func _exit_tree() -> void:
 	if Net.event_received.is_connected(_on_event):
 		Net.event_received.disconnect(_on_event)
@@ -706,9 +719,7 @@ func _connect_router() -> void:
 	router.jump.connect(func() -> void:
 		if local != null and local.state == PlayerAvatar.State.HELD:
 			Net.send_intent(Intents.make(&"break_free")))
-	router.toggle_camera.connect(func() -> void:
-		if local != null and local.cam != null:
-			local.cam.toggle_mode())
+	router.toggle_camera.connect(_on_toggle_camera)
 	router.emote_wheel_toggled.connect(func(open: bool) -> void:
 		if open:
 			emote_wheel.open()

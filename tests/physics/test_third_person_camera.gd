@@ -51,3 +51,24 @@ func test_third_person_is_straight_behind_and_still_turns() -> void:
 	var turned: Vector3 = a.cam.camera.global_position - a.global_position
 	assert_gt(absf(turned.x), 2.0, "swung round to the side: %s" % turned)
 	assert_almost_eq(_side_offset(a), 0.0, 0.05, "still dead centre after the turn")
+
+
+## Patrick: "why am i 3d person?". V pressed at a station flipped the mode unseen (the station view
+## hides it) and you stood up in third person. Seated, the toggle now does nothing.
+func test_toggle_while_seated_keeps_first_person_after_standing() -> void:
+	var a: PlayerAvatar = await _local()
+	var seat := Node3D.new()
+	add_child_autofree(seat)
+	seat.global_position = Vector3(2, 0, 0)
+	var anchor := Node3D.new()
+	add_child_autofree(anchor)
+	anchor.global_position = Vector3(2, 1.3, -0.4)
+	a.sit(seat, anchor)
+	await wait_physics_frames(3)
+	assert_false(a.cam.toggle_mode(), "seated: no flip")
+	assert_eq(a.cam.mode, PlayerCamera.Mode.FIRST)
+	a.stand()
+	await wait_physics_frames(3)
+	assert_eq(a.cam.mode, PlayerCamera.Mode.FIRST, "stood up in first person")
+	assert_true(a.cam.toggle_mode(), "standing: the toggle works")
+	assert_eq(a.cam.mode, PlayerCamera.Mode.THIRD)
