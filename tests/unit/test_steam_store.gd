@@ -156,10 +156,13 @@ func test_the_shop_sells_premium_and_sets_for_gold() -> void:
 	assert_true(panel.action_button.disabled, "too few Coins: no buying")
 	assert_string_contains(panel.action_button.text, "MORE COINS NEEDED")
 	assert_false((panel.tiles[&"hat_police"].find_child("PriceRow", true, false).get_child(1) as CoinIcon).gold, "a red Coin")
-	assert_ne((panel.tiles[&"hat_police"].find_child("Picture", true, false) as Control).modulate, Color.WHITE, "out of reach: greyed out")
+	var lock: Control = panel.tiles[&"hat_police"].get_node("Lock") as Control
+	assert_true(lock.visible, "out of reach: a lock in the corner")
+	assert_eq((panel.tiles[&"hat_police"].find_child("Picture", true, false) as Control).modulate, Color.WHITE, "the picture stays bright")
 	ProfileManager.profile.coins = 99999
 	panel.select(&"hat_crown")
 	panel.select(&"hat_police")
+	assert_false(lock.visible, "enough Coins: no lock")
 	assert_false(panel.action_button.disabled)
 	assert_eq(panel.action_button.text, "BUY")
 	assert_false(panel.steam_button.visible)
