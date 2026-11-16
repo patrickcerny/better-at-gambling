@@ -629,8 +629,6 @@ func _fill_friends(parties: Array[Dictionary]) -> void:
 		var title: String = party if party != "" else "%s's lobby" % str(friends[0])
 		var build: String = str(f.get("build", ""))
 		var same: bool = build == "" or build == Protocol.BUILD_ID
-		if not same:
-			version_check.note_peer_build(build)  # a friend is on a newer version: we are behind
 		var sub: String = "Friends: %s" % SteamSvc.friends_text(friends) if same else "Version %s (you have %s)" % [build, Protocol.BUILD_ID]
 		_friends_list.add_child(_lobby_row(int(f["lobby"]), title, sub, int(f.get("members", 0)), int(f.get("max", 0)), same, f.get("info", {})))
 
@@ -835,7 +833,9 @@ static func sort_public_lobbies(lobbies: Array[Dictionary], friend_lobbies_: Dic
 static func version_text(build: String) -> String:
 	if build == "":
 		return "Version unknown, refresh in a moment"
-	return "Version %s (you have %s): restart Steam so both run the newest version" % [build, Protocol.BUILD_ID]
+	if VersionCheck.compare_versions(build, Protocol.BUILD_ID) > 0:
+		return "Version %s (you have %s): your game is out of date, restart Steam to update" % [build, Protocol.BUILD_ID]
+	return "Version %s (you have %s): the host's game is out of date" % [build, Protocol.BUILD_ID]
 
 
 ## One row per public lobby: its name, your friends in it, players and JOIN; full ones are left

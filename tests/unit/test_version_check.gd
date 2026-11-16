@@ -59,16 +59,8 @@ func test_banner_shows_only_when_behind() -> void:
 	assert_string_contains(b.message(), Protocol.BUILD_ID)
 
 
-func test_peer_build_marks_us_behind() -> void:
-	var saved: Dictionary = VersionCheck.verdict
-	VersionCheck.verdict = {}
-	var vc := VersionCheck.new()
-	add_child_autofree(vc)
-	vc.note_peer_build(Protocol.BUILD_ID)
-	assert_eq(VersionCheck.verdict, {}, "same version: nothing")
-	vc.note_peer_build("0.0.1")
-	assert_eq(VersionCheck.verdict, {}, "an older friend: nothing")
-	vc.note_peer_build("99.0.0")
-	assert_true(VersionCheck.verdict.get("outdated", false))
-	assert_eq(VersionCheck.verdict.get("source"), &"peer")
-	VersionCheck.verdict = saved
+
+func test_steam_copy_by_path() -> void:
+	assert_true(VersionCheck.steam_copy("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Better at Gambling\\BetterAtGambling.exe"))
+	assert_true(VersionCheck.steam_copy("/home/a/.local/share/Steam/steamapps/common/Better at Gambling/BetterAtGambling.x86_64"))
+	assert_false(VersionCheck.steam_copy("C:/Users/patri/Desktop/BetterAtGambling/BetterAtGambling.exe"))
