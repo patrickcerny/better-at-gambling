@@ -474,7 +474,7 @@ func _seat_bean(pid: int, side: int, animate: bool) -> void:
 	if side >= 0:
 		bean.position = Vector3(0, PODIUM_TOP, 0)
 		bean.scale = Vector3.ONE
-		bean.rotation = Vector3(0, PI - 0.18 * (1.0 if side == 0 else -1.0), 0)  # face out, a little towards each other
+		bean.rotation = Vector3(0, PI + 0.18 * (1.0 if side == 0 else -1.0), 0)  # face out, a little towards each other
 	else:
 		bean.position = Vector3.ZERO
 		bean.scale = Vector3.ONE * AUDIENCE_SCALE
@@ -999,7 +999,7 @@ func _build_seat(pid: int, idx: int) -> void:
 	var seat := Node3D.new()
 	seat.name = "Seat%d" % pid
 	seat.position = Vector3(s * (SEAT_X0 + SEAT_STEP * slot), SEAT_Y + 0.06, SEAT_Z)
-	seat.rotation.y = PI + s * 0.45  # face the camera, turned towards the podiums
+	seat.rotation.y = PI - s * 0.45  # face the camera, turned in towards the podiums (−Z is the bean's front)
 	add_child(seat)
 	var bean := AvatarVisuals.new()
 	bean.scale = Vector3.ONE * AUDIENCE_SCALE
