@@ -8,7 +8,7 @@
 script = ExtResource("1")
 id = &"last_seat"
 display_name = "Last Seat at the Table"
-rules_text = "Musical chairs: wander round the table while the music plays, then run onto a stool when it stops. One stool short each round: whoever is left standing is out. Shoving allowed!"
+rules_text = "Musical chairs: wander round the table while the music plays, then run to a stool and press E or click to sit when it stops. One stool short each round: whoever is left standing is out. Shoving allowed!"
 logic_script = ExtResource("2")
 stage_script = ExtResource("3")
 min_players = 2
