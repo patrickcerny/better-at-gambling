@@ -2,8 +2,8 @@ extends GutTest
 ## Main menu (Patrick's playtest notes): the logo and entries are centred; PLAY ONLINE, PRACTICE,
 ## TUTORIAL, QUIT; the settings sit behind a small gear in the bottom-right corner; no "Rejoin
 ## last party" and no LAN/IP hosting; lobbies only through Steam (Patrick 2026-11-14: "nur noch
-## über Steam", and the button just says CREATE LOBBY), PUBLIC / PRIVATE and BROWSE LOBBIES
-## (Patrick 2026-11-15), all simply disabled when Steam isn't running (as in these headless tests),
+## über Steam"); PLAY ONLINE is four picture cards (Patrick 2026-11-16): PUBLIC LOBBY, PRIVATE
+## LOBBY, BROWSE LOBBIES, FRIENDS' LOBBIES, all simply disabled when Steam isn't running (as in these headless tests),
 ## with no "Start Steam" text (Patrick: "useless text"); TUTORIAL opens the how-to-play pages and
 ## DONE returns. (The first-run tutorial gate is in test_tutorial.gd; here the tutorial counts as
 ## seen.) PLAY ONLINE has no join-by-address and no room codes; PRACTICE goes
@@ -91,7 +91,7 @@ func test_only_steam_hosting_and_no_rejoin() -> void:
 		assert_false(t.to_lower().contains("rejoin"), "no Rejoin last party: %s" % t)
 	assert_false(menu.has_method(&"_host_local"))
 	assert_false(menu.has_method(&"_rejoin_last"))
-	assert_true("Create Lobby" in _texts(menu), "the online form is still there")
+	assert_true(menu.online.visible, "the online screen is there")
 	for e: Node in menu.find_children("*", "LineEdit", true, false):
 		assert_false((e as LineEdit).placeholder_text.to_lower().contains("code"), "no room codes")
 
@@ -100,39 +100,50 @@ func test_create_lobby_needs_steam() -> void:
 	assert_false(SteamSvc.is_available(), "no Steam client in the headless tests")
 	menu.call(&"_show_online")
 	await wait_process_frames(1)
-	var host: Button = menu.find_child("HostParty", true, false) as Button
-	assert_not_null(host, "CREATE LOBBY under PLAY ONLINE")
-	if host == null:
-		return
-	assert_eq(host.text, "Create Lobby")
-	assert_true(host.disabled, "disabled without Steam")
-	assert_eq(host.tooltip_text, "")
-	assert_true(host.is_visible_in_tree())
-	for n: String in ["BrowseLobbies", "FriendsLobbies", "Public", "Private"]:
-		var b: Button = menu.find_child(n, true, false) as Button
-		assert_not_null(b, n)
-		if b != null:
-			assert_true(b.disabled, "%s disabled without Steam" % n)
+	for n: String in ["CreatePublic", "CreatePrivate", "BrowseLobbies", "FriendsLobbies"]:
+		var c: PictureCard = menu.find_child(n, true, false) as PictureCard
+		assert_not_null(c, n)
+		if c != null:
+			assert_true(c.disabled, "%s disabled without Steam" % n)
+			assert_true(c.is_visible_in_tree())
 	for t: String in _texts(menu) + _label_texts(menu):
 		assert_false(t.to_lower().contains("start steam"), "no Start Steam text: %s" % t)
 	assert_false((menu.find_child("JoinFriend", true, false) as Control).visible, "no friends list without Steam")
-	host.pressed.emit()  # even if it fired: nothing starts, nothing breaks
+	menu.public_card.pressed.emit()  # even if it fired: nothing starts, nothing breaks
 	await wait_process_frames(2)
 	assert_eq(Net.mode, Net.Mode.NONE)
 	assert_eq(Net.steam_party.server_pid, 0, "no server process started")
 
 
-func test_public_or_private_lobby_is_remembered() -> void:
-	var before: bool = menu.call(&"lobby_public")
-	menu.call(&"_set_public", true)
-	assert_true(menu.call(&"lobby_public"))
-	menu.call(&"_set_public", false)
-	assert_false(menu.call(&"lobby_public"))
-	menu.call(&"_set_public", before)
-	var priv: Button = menu.find_child("Private", true, false) as Button
-	var pub: Button = menu.find_child("Public", true, false) as Button
-	assert_true(priv.toggle_mode and pub.toggle_mode)
-	assert_eq(priv.button_group, pub.button_group, "one or the other")
+## Patrick 2026-11-16: "der play online button sollte uns jetzt in ein menu bringen mit bildern als
+## buttons und die bild beschreiben was abgeht" and "Der Name in der Lobby ist auch nicht setzbar".
+func test_play_online_is_four_picture_cards_without_a_name_field() -> void:
+	menu.call(&"_show_online")
+	await wait_process_frames(2)
+	var online: OnlineMenu = menu.online
+	assert_eq(online.get_parent(), menu, "a full screen over the menu")
+	assert_eq(online.anchor_right, 1.0)
+	assert_eq(online.anchor_bottom, 1.0)
+	assert_eq(online.cards().size(), 4)
+	for c: PictureCard in online.cards():
+		assert_not_null(c.picture.texture, "%s has its picture" % c.name)
+		assert_ne(c.caption_label.text, "", "%s says what happens" % c.name)
+		assert_gt(c.size.x, 250.0, "%s is big" % c.name)
+	assert_eq(online.grid.columns, 4, "four in a row")
+	assert_eq(menu.find_children("*", "LineEdit", true, false).filter(func(e: Node) -> bool: return (e as Control).is_visible_in_tree()).size(), 0, "no name field")
+	assert_false(menu.profile_badge.visible, "corner things step aside")
+	online.set_friend_lobbies(2)
+	assert_eq(online.friends_card.title_label.text, "Friends' Lobbies  ·  2")
+	online.back_button.pressed.emit()
+	assert_false(online.visible)
+	assert_true((menu.get_node("Center/Column/VBox") as Control).visible)
+	assert_true(menu.profile_badge.visible)
+
+
+func test_online_name_is_the_steam_name() -> void:
+	# No Steam here: the saved name; with Steam `SceneRouter.profile_name` is the persona name.
+	assert_false(menu.has_method(&"_save_name"), "nothing to type a name into")
+	assert_eq(menu.call(&"_display_name"), SceneRouter.profile_name())
 
 
 func test_browse_list_rows() -> void:
@@ -197,8 +208,9 @@ func test_tutorial_pages_and_done() -> void:
 	assert_true(how.visible)
 	assert_false((menu.get_node("Center/Column/VBox") as Control).visible, "entries step aside")
 	assert_gte(HowToPlayPanel.PAGES.size(), 7, "goal, moving, tables, items, odd jobs, minigames, rough play, jail, friends")
+	assert_true(how.on_overview, "the three chapter cards first")
+	how.chapter_cards[0].pressed.emit()
 	assert_eq(how.page, 0)
-	assert_true(how.back_button.disabled)
 	for i: int in HowToPlayPanel.PAGES.size() - 1:
 		how.next_button.pressed.emit()
 	assert_eq(how.page, HowToPlayPanel.PAGES.size() - 1)
@@ -234,15 +246,14 @@ func test_lobby_lists_are_full_screens() -> void:
 		assert_eq(screen.anchor_right, 1.0)
 		assert_eq(screen.anchor_bottom, 1.0)
 	assert_eq(menu.friends_screen.title.text, "FRIENDS' LOBBIES")
-	assert_false(Array(_label_texts(menu._online_box)).has("JOIN A FRIEND"), "no friends list under PLAY ONLINE")
+	assert_false(Array(_label_texts(menu.online)).has("JOIN A FRIEND"), "no friends list under PLAY ONLINE")
 	menu._open_list(menu.friends_screen)
 	assert_true(menu.friends_screen.visible)
 	assert_false(menu.profile_badge.visible, "corner things step aside")
-	assert_false(menu._online_box.visible)
-	menu._back_to_online(menu.friends_button)
+	assert_false(menu.online.visible)
+	menu._back_to_online(menu.friends_card)
 	assert_false(menu.friends_screen.visible)
-	assert_true(menu._online_box.visible)
-	assert_true(menu.profile_badge.visible)
+	assert_true(menu.online.visible)
 
 
 func test_browse_shows_other_versions_without_join() -> void:
