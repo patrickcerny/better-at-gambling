@@ -86,7 +86,7 @@ func _line_up(front: int, dist: float = 2.5) -> void:
 func test_key_holds_the_item_then_uses_it() -> void:
 	_give([&"lucky_clover"])
 	await wait_process_frames(2)
-	assert_eq(scene.hud.items.slot_names[0].text, "Lucky Clover")
+	assert_eq(scene.hud.items.slot_item(0), &"lucky_clover", "the slot shows the item (its model)")
 	assert_eq(scene.items_ctl.held, -1, "hands empty at first")
 	await _key(KEY_1)
 	assert_eq(scene.items_ctl.held, 0, "key 1 takes it out")
@@ -105,7 +105,7 @@ func test_key_holds_the_item_then_uses_it() -> void:
 	assert_string_contains(scene.hud.items.effects_label.text, "Lucky Clover")
 	assert_true(scene.hud.item_banner.visible, "activation banner")
 	assert_eq(scene.effect_tags[scene.local_id].text, "LUCKY")
-	assert_eq(scene.hud.items.slot_names[0].text, "—")
+	assert_eq(scene.hud.items.slot_item(0), &"")
 	assert_eq(scene.items_ctl.held, -1, "used up: hands empty again")
 	assert_null(scene.items_ctl.held_model)
 

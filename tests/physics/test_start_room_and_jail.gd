@@ -121,7 +121,7 @@ func test_the_cell_is_recessed_into_the_east_wall() -> void:
 		assert_lt(Vector2(end.x - LuckyLounge.JAIL_DOOR.x, end.z - LuckyLounge.JAIL_DOOR.z).length(), 0.3, "the path ends at the gate (%s)" % end)
 
 
-func test_e_at_the_settings_tablet_opens_the_lobby_settings_for_the_host() -> void:
+func test_e_at_the_settings_board_opens_the_lobby_settings_for_the_host() -> void:
 	await _wait_in_lobby()
 	await wait_seconds(0.3)
 	scene.view.state.room_mode = true
@@ -132,12 +132,39 @@ func test_e_at_the_settings_tablet_opens_the_lobby_settings_for_the_host() -> vo
 	await wait_physics_frames(3)
 	scene._on_interact()
 	assert_false(scene.lobby_panel.visible, "nothing to use here")
-	# Walk up to the tablet's screen side and press E.
-	var front: Vector3 = LuckyLounge.SETTINGS_TABLET_POS + Basis(Vector3.UP, LuckyLounge.SETTINGS_TABLET_YAW) * Vector3(0, 0, -0.9)
-	_put(front, 0.0)
+	# Walk up to the board on the wall and press E.
+	_put(LuckyLounge.SETTINGS_BOARD_SPOT, 0.0)
 	await wait_physics_frames(3)
-	assert_true(LuckyLounge.near_settings_tablet(scene.local.global_position), "at the tablet")
+	assert_true(LuckyLounge.near_settings_board(scene.local.global_position), "at the board")
 	scene._update_prompt()
 	scene._on_interact()
 	assert_true(scene.lobby_panel.visible, "the lobby settings open")
 	scene.lobby_panel.close()
+
+
+func test_the_settings_board_shows_the_settings_to_everyone_and_only_the_host_opens_it() -> void:
+	await _wait_in_lobby()
+	await wait_seconds(0.3)
+	scene.view.state.room_mode = true
+	scene.view.state.phase = Phase.Id.LOBBY
+	var board: Node3D = scene.map.get_node("SettingsBoard") as Node3D
+	assert_lt(board.global_position.z - LuckyLounge.LOBBY_DOORS_Z, 0.5, "on the start room's north wall")
+	assert_eq(scene.map.settings_board_rows.size(), LuckyLounge.SETTINGS_BOARD_ROWS)
+	scene.view.state.lobby_settings["items_enabled"] = false
+	scene.view.state.lobby_settings["minigames"] = 4
+	await wait_seconds(0.4)
+	var texts: Dictionary = {}
+	for pair: Array in scene.map.settings_board_rows:
+		texts[(pair[0] as Label3D).text] = (pair[1] as Label3D).text
+	assert_eq(texts.get("ITEMS", ""), "OFF", "the board follows the settings live")
+	assert_eq(texts.get("MINIGAMES", ""), "4")
+	assert_true(texts.has("MODE"))
+	assert_string_contains(scene.map.settings_board_footer.text, "HOST")
+	# Somebody else hosts: E at the board does not open the settings.
+	var me: int = scene.local_id
+	scene.view.state.leader = me + 1000
+	_put(LuckyLounge.SETTINGS_BOARD_SPOT, 0.0)
+	await wait_physics_frames(3)
+	scene._on_interact()
+	assert_false(scene.lobby_panel.visible, "only the host opens the lobby settings")
+	scene.view.state.leader = me

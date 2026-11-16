@@ -24,14 +24,17 @@ func test_nothing_is_held_until_a_slot_is_picked() -> void:
 	assert_false(bar.selection_panel.visible)
 
 
-func test_picking_flashes_name_and_one_line_description() -> void:
+func test_picking_flashes_name_description_and_how_to_use() -> void:
 	bar.set_inventory([&"lucky_clover", &"black_cat"])
 	bar.set_held(1)
 	assert_eq(bar.selected_item(), &"black_cat")
 	assert_true(bar.selection_panel.visible)
 	assert_eq(bar.selection_name.text, "Black Cat")
-	assert_eq(bar.selection_desc.text, ItemBar.short_description(&"black_cat"))
+	assert_eq(bar.selection_desc.text, RewardPanel.item_description(&"black_cat"), "the whole description")
 	assert_ne(bar.selection_desc.text, "")
+	assert_string_contains(bar.selection_tag.text, "ON OTHERS")
+	assert_string_contains(bar.selection_tag.text, "45 s")
+	assert_string_contains(bar.selection_use.text, "look at a player")
 	assert_true(bar.keys_label.visible, "use / put away keys over the slots")
 	assert_true(bar.info_hint.visible, "i for info next to the slots")
 	await wait_seconds(ItemBar.SELECTION_SECONDS + 0.3)
@@ -40,6 +43,45 @@ func test_picking_flashes_name_and_one_line_description() -> void:
 	assert_eq(bar.selected, -1)
 	assert_false(bar.info_hint.visible)
 	assert_false(bar.keys_label.visible)
+
+
+func test_slots_show_models_and_only_the_held_name() -> void:
+	bar.set_inventory([&"lucky_clover", &"black_cat"])
+	assert_eq(bar.slot_item(0), &"lucky_clover")
+	assert_eq(bar.slot_item(1), &"black_cat")
+	assert_eq(bar.slot_item(2), &"")
+	assert_not_null(bar.slot_icons[0].texture, "a picture of the model, not a name")
+	assert_null(bar.slot_icons[2].texture, "empty slot")
+	for n: Label in bar.slot_names:
+		assert_eq(n.text, "", "no names while nothing is held")
+	bar.set_held(1)
+	assert_eq(bar.slot_names[1].text, "Black Cat", "the held one shows its name")
+	assert_eq(bar.slot_names[0].text, "")
+	assert_gt(bar.slots[1].custom_minimum_size.x, bar.slots[0].custom_minimum_size.x, "the held slot is bigger")
+
+
+func test_new_item_gets_its_own_card() -> void:
+	bar.set_inventory([&"lucky_clover"])
+	assert_true(bar.pickup_panel.visible, "NEW ITEM card")
+	assert_eq(bar.pickup_name.text, "Lucky Clover")
+	assert_eq(bar.pickup_desc.text, RewardPanel.item_description(&"lucky_clover"))
+	assert_string_contains(bar.pickup_use.text, "[1]")
+	bar.set_inventory([&"lucky_clover", &"mirror", &"black_cat"])
+	assert_eq(bar.pickup_item, &"lucky_clover", "one card at a time")
+	assert_eq(bar.pickup_queue, [&"mirror", &"black_cat"] as Array[StringName])
+	bar.set_held(0)
+	assert_eq(bar.pickup_item, &"mirror", "taking it out skips its card")
+	await wait_seconds(ItemBar.SELECTION_SECONDS + 0.2)
+	assert_true(bar.pickup_panel.visible, "the next card shows once the flash is gone")
+	await wait_seconds(ItemBar.PICKUP_SECONDS + 0.2)
+	assert_eq(bar.pickup_item, &"black_cat")
+	bar.set_inventory([&"mirror", &"black_cat"])
+	assert_eq(bar.pickup_queue.size(), 0, "using one is no new item")
+
+
+func test_new_items_counts_copies() -> void:
+	assert_eq(ItemBar.new_items([&"black_cat"], [&"black_cat", &"black_cat"]), [&"black_cat"] as Array[StringName])
+	assert_eq(ItemBar.new_items([&"a", &"b"], [&"b"]), [] as Array[StringName])
 
 
 func test_short_description_is_the_first_sentence() -> void:

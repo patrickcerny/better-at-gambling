@@ -155,6 +155,9 @@ extends Resource
 @export var holdem_betting_window: float = 8.0
 ## Each player's clock to FOLD or CALL once the flop is out; out of time = fold (the real rule).
 @export var holdem_action_time: float = 15.0
+## Each called hand's clock to put down the RIVER BET (one more ante) or CHECK once the turn is out;
+## out of time = check.
+@export var holdem_river_time: float = 10.0
 ## Seconds the showdown stays up before the next hand.
 @export var holdem_result_time: float = 4.0
 
@@ -341,6 +344,9 @@ extends Resource
 @export_group("Results")
 ## Seconds the results screen stays up before an online room returns to its lobby on its own.
 @export var results_return_time: float = 60.0
+## Seconds the results screen stays up for everyone before Play again / Leave can be pressed
+## (Patrick, 0.9.43: the end screen got skipped straight away by a key still held from the match).
+@export var results_min_time: float = 10.0
 
 
 ## House Comp after `minigames_played` minigames (the last `comp_amounts` entry from then on).

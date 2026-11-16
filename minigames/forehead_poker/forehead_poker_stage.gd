@@ -999,6 +999,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				rel.y = -rel.y
 			look(rel.x, rel.y)
 		return
+	var pad := event as InputEventJoypadButton
+	if pad != null:
+		if pad.pressed and can_act() and (pad.button_index == JOY_BUTTON_A or pad.button_index == JOY_BUTTON_B):
+			act(ForeheadPokerLogic.STAY if pad.button_index == JOY_BUTTON_A else ForeheadPokerLogic.FOLD)
+			get_viewport().set_input_as_handled()
+		return
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo or not can_act():
 		return
