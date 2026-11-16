@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<!-- TUTORIAL: an open book (our own drawing) -->
+<path d="M32 16 Q20 9 5 12 L5 50 Q20 47 32 54 Z" fill="#ffffff" stroke="#151414" stroke-width="3" stroke-linejoin="round"/>
+<path d="M32 16 Q44 9 59 12 L59 50 Q44 47 32 54 Z" fill="#ffffff" stroke="#151414" stroke-width="3" stroke-linejoin="round"/>
+<g stroke="#151414" stroke-width="2.5" stroke-linecap="round" fill="none">
+<path d="M11 22 Q19 20 26 23"/><path d="M11 30 Q19 28 26 31"/><path d="M11 38 Q19 36 26 39"/>
+<path d="M38 23 Q45 20 53 22"/><path d="M38 31 Q45 28 53 30"/><path d="M38 39 Q45 36 53 38"/>
+</g>
+</svg>
