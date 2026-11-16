@@ -5,7 +5,7 @@ extends StationBase
 ## has its prize printed on the velvet beside it (for the stake of the pull); warm white when idle,
 ## gold when the sword lights it, the big ruby at the top of the ring red. The player stands in
 ## front of it (+z). A soft warm spotlight shaft with a few slow dust motes falls on it from above
-## only while a winning pull plays (0.10.10, Patrick: "entferne den glow. der kommt nur wenn du
+## only while a winning pull plays (0.10.16, Patrick: "entferne den glow. der kommt nur wenn du
 ## gewinnst (slow glow fade in)"): it fades in slowly as the sword comes free and out after it sinks back.
 ##
 ## Presentation only (client-side; a headless server builds the solid plinth and nothing else). On
