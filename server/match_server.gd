@@ -768,6 +768,19 @@ func dev_minigame_now(id: StringName = &"") -> bool:
 	return true
 
 
+## The leader's START NEXT MINIGAME: the casino clock jumps to the next minigame's 10 s warning
+## (everyone gets it as usual). False when the casino isn't open, no minigame is left, or the
+## warning is already running.
+func minigame_now() -> bool:
+	if phases.phase != Phase.Id.CASINO or phases.minigames_done >= schedule.minigames:
+		return false
+	var at: float = schedule.minigame_times()[phases.minigames_done] - PhaseMachine.PRE_MINIGAME_SECONDS
+	if phases.casino_time >= at:
+		return false
+	phases.casino_time = at
+	return true
+
+
 ## Runs the simulation until the match is over or `max_seconds` elapsed (tests/sims).
 func run_to_end(max_seconds: float = 36000.0) -> void:
 	var elapsed: float = 0.0
@@ -1128,6 +1141,7 @@ func return_to_lobby() -> void:
 	if not room_mode or phases.phase != Phase.Id.RESULTS:
 		return
 	running = false
+	lobby.forced = false
 	economy = Economy.new()
 	for id: int in state.players:
 		economy.add_player(id, balance.start_money)
@@ -1399,6 +1413,24 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			if not (typeof(t) in [TYPE_INT, TYPE_FLOAT]) or int(t) == player or not state.players.has(int(t)):
 				return StationLogicBase.fail(&"bad_target")
 			kick(int(t), player)
+			return StationLogicBase.OK_RESULT
+		&"force_start":
+			if not room_mode:
+				return StationLogicBase.fail(&"not_room")
+			if player != lobby.leader():
+				return StationLogicBase.fail(&"not_leader")
+			lobby.forced = true
+			Log.info(&"server", "player %d force-starts the match" % player)
+			return StationLogicBase.OK_RESULT
+		&"minigame_now":
+			if not room_mode:
+				return StationLogicBase.fail(&"not_room")
+			if player != lobby.leader():
+				return StationLogicBase.fail(&"not_leader")
+			if not minigame_now():
+				return StationLogicBase.fail(&"no_minigame")
+			Log.info(&"server", "player %d starts the next minigame now" % player)
+			_emit(GameEvents.make(&"minigame_forced", {"by": player}))
 			return StationLogicBase.OK_RESULT
 		&"set_ready":
 			lobby.set_panel_ready(player, bool(intent["ready"]))

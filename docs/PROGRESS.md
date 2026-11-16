@@ -93,7 +93,7 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
-### 2026-11-16 / 0.9.58 Broke players are pointed to the Odd Jobs button
+### 2026-11-16 / 0.9.59 Broke players are pointed to the Odd Jobs button
 - Patrick: "Indicator wenn man broke ist (weniger geld als 50) zum button". Under $50 (or under the
   House Comp line if the table limits put it higher; `OddJobsController.is_broke`) a gold beacon
   (spinning arrow + "ODD JOBS +$50", drawn through walls) floats over the cabinet, and while the
@@ -102,6 +102,17 @@
   Both hide at the cabinet, while seated or knocked out, on the results screen and at $50. The cabinet
   glow and the one-time hint now also start under $50. Test: `test_under_50_points_the_way_to_the_button`
   in tests/physics/test_odd_jobs_cabinet.gd.
+
+### 2026-11-16 / 0.9.58 Leader force start: START NOW in the lobby, START NEXT MINIGAME in the casino
+- Patrick: "Lobby can force start minigame". New intents `force_start` (lobby) and `minigame_now`
+  (casino), leader only, online rooms only.
+- START NOW (lobby panel footer, leader): `LobbyController.forced` makes the doors' countdown run even
+  if not everyone is ready; reset when the match starts or Play Again returns to the lobby.
+- START NEXT MINIGAME (pause menu, leader, casino open, not minigames-only): `MatchServer.minigame_now`
+  jumps the casino clock to the next minigame's 10 s warning; `minigame_forced {by}` puts
+  "X starts the next minigame now!" in the feed. Refused (`no_minigame`) once the warning runs.
+- PauseMenu.set_dev_available no longer crashes before _ready (test_pause_in_minigame was red on main).
+- Tests: test_room_lobby, test_lobby_panel_host, test_pause_menu, test_pause_in_minigame; lint ok.
 
 ### 2026-11-16 / 0.9.57 ready pedestals reworked
 - Patrick: "das klipped und passt nicht. reworke die podeste komplett". The column pedestals with

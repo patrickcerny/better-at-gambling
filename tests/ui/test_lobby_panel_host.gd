@@ -104,3 +104,21 @@ func test_mode_toggle_sends_lobby_settings() -> void:
 	assert_string_contains(panel.mode_button.text, "MINIGAMES ONLY")
 	assert_true((panel._steppers["gamble_minutes"]["plus"] as Button).disabled, "no gambling time in minigames only")
 	assert_string_contains(panel._length_note.text, "back to back")
+
+
+func test_start_now_is_for_the_leader_only() -> void:
+	state.room_mode = true
+	panel.bind(state, 1)
+	panel.open()
+	await wait_process_frames(1)
+	assert_true(panel.start_button.visible)
+	panel.start_button.pressed.emit()
+	assert_eq(fake.sent[-1]["type"], &"force_start")
+	state.countdown = 4.0
+	state.lobby_changed.emit()
+	assert_true(panel.start_button.disabled, "already counting down")
+	Net.local_player_id = 2
+	var other := LobbyPanel.new()
+	add_child_autofree(other)
+	other.bind(state, 2)
+	assert_false(other.start_button.visible)

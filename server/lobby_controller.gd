@@ -143,9 +143,14 @@ func set_setting(player: int, key: String, value: Variant) -> StringName:
 	return &""
 
 
+## The leader's START NOW: the countdown runs even though not everyone is ready (`tick`), until
+## the match starts or the room is back in the lobby.
+var forced: bool = false
+
+
 ## Advances the countdown. Returns &"countdown_started", &"countdown_cancelled", &"start" or &"".
 func tick(delta: float) -> StringName:
-	var ready: bool = all_ready()
+	var ready: bool = all_ready() or (forced and participant_count() > 0)
 	if countdown < 0.0:
 		if ready:
 			countdown = COUNTDOWN_SECONDS
@@ -157,6 +162,7 @@ func tick(delta: float) -> StringName:
 	countdown -= delta
 	if countdown <= 0.0:
 		countdown = -1.0
+		forced = false
 		return &"start"
 	return &""
 

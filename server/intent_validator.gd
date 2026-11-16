@@ -27,6 +27,8 @@ const PHASES: Dictionary = {
 	&"set_color": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"set_outfit": [Phase.Id.LOBBY, Phase.Id.RESULTS],
 	&"return_to_lobby": [Phase.Id.RESULTS],
+	&"force_start": [Phase.Id.LOBBY],
+	&"minigame_now": [Phase.Id.CASINO],
 	&"megaphone": [Phase.Id.CASINO, Phase.Id.PRE_MINIGAME],
 }
 
