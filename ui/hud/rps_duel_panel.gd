@@ -116,6 +116,8 @@ func show_duel(d: Dictionary, other: String) -> void:
 		_my_pick = -1
 	duel = d
 	visible = true
+	for i: int in buttons.size():
+		buttons[i].text = "%s\n[%s]" % [NAMES[i], key_for(i)]
 	vs_label.text = "vs %s   ·   stake $%d" % [other, int(d.get("stake", 0))]
 	timer_label.text = "%d s" % ceili(float(d.get("left", 0.0)))
 	var mine: bool = bool(d.get("picked", false)) or _my_pick >= 0
@@ -128,6 +130,13 @@ func show_duel(d: Dictionary, other: String) -> void:
 		status_label.text = "You picked %s. Waiting for %s…" % [NAMES[_my_pick], other] if _my_pick >= 0 else "Waiting for %s…" % other
 	else:
 		status_label.text = "Pick one! (no pick = a random one)"
+
+
+## The key or pad button that picks `i` (1-3, or the d-pad: left rock, up paper, right scissors).
+static func key_for(i: int) -> String:
+	if InputGlyphs.gamepad:
+		return ["◀", "▲", "▶"][i]
+	return str(i + 1)
 
 
 ## The local player picked `choice` (button, key or d-pad).

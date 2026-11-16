@@ -77,6 +77,9 @@ func _build() -> void:
 	bet_panel.chip_gap = 6
 	bet_panel.add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
 	bet_panel.cleared.connect(func() -> void: send(&"clear_bets"))
+	bet_panel.repeated.connect(func() -> void:  # R / Y puts last spin's bets down again
+		if rebet_btn.visible:
+			rebet())
 	body.add_child(bet_panel)
 	rebet_btn = Button.new()
 	rebet_btn.name = "Rebet"
@@ -100,6 +103,34 @@ func _on_open() -> void:
 	bet_panel.configure_visibility(false, false, true, false)
 
 
+## Gamepad: the left stick moves a pointer over the layout (any bet the mouse can reach), A puts
+## the chip down where it points.
+func _process(delta: float) -> void:
+	super(delta)
+	if not visible or board == null:
+		return
+	if not InputGlyphs.gamepad or not board.open:
+		board.pad_hide()
+		return
+	var stick: Vector2 = left_stick()
+	if stick.length() < 0.2:
+		stick = Vector2.ZERO
+	board.pad_nudge(stick * stick.length(), delta)  # squared: fine moves near the middle
+
+
+func _input(event: InputEvent) -> void:
+	super(event)
+	if visible and event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed and (event as InputEventJoypadButton).button_index == JOY_BUTTON_A and InputGlyphs.gamepad:
+		board.pad_click()
+		get_viewport().set_input_as_handled()  # A is the pointer's click here, never "confirm"
+
+
+func _hint_text() -> String:
+	if InputGlyphs.gamepad:
+		return InputGlyphs.fill("Left stick: point at a bet  [%s] put a chip there\n[{bet_chip_prev} / {bet_chip_next}] chip  [{bet_clear}] clear  [{bet_repeat}] rebet  [{leave_station}] stand up" % InputGlyphs.pad_name("A"))
+	return super()
+
+
 func _on_spot(type: StringName, value: int) -> void:
 	if send(&"place_bet", {"bet": {"type": type, "value": value, "amount": bet_panel.chip_stake(bet_room())}}):
 		Audio.play(&"chip_clack", &"UI", -10.0, randf_range(0.95, 1.1))
@@ -107,7 +138,7 @@ func _on_spot(type: StringName, value: int) -> void:
 
 func _on_hover(type: StringName, value: int) -> void:
 	if type == &"":
-		spot_info.text = "Click a number, a line or a corner" if board.open else ""
+		spot_info.text = ("Point at a number, a line or a corner" if InputGlyphs.gamepad else "Click a number, a line or a corner") if board.open else ""
 		return
 	spot_info.text = "%s  ·  pays %d : 1" % [RouletteLogic.bet_name(type, value), int(RouletteLogic.RATIOS.get(type, 0))]
 
@@ -175,7 +206,7 @@ func _refresh() -> void:
 		var sum: int = 0
 		for b: Dictionary in last_round:
 			sum += int(b["amount"])
-		rebet_btn.text = "REBET  $%d" % sum
+		rebet_btn.text = "REBET  $%d  %s" % [sum, InputGlyphs.hint(&"bet_repeat")]
 
 
 ## The strip of past numbers: newest first and biggest, in their pocket colours.

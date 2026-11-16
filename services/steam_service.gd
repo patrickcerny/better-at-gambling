@@ -122,6 +122,8 @@ func _ready() -> void:
 	steam.connect(&"lobby_chat_update", _on_lobby_chat_update)
 	steam.connect(&"lobby_match_list", _on_lobby_match_list)
 	steam.connect(&"user_stats_received", _on_user_stats_received)
+	if steam.has_method(&"isSteamRunningOnSteamDeck") and bool(steam.call("isSteamRunningOnSteamDeck")):
+		InputGlyphs.set_deck(true)
 	Log.info(&"steam", "Steam on: %s (app %d)" % [_persona, APP_ID])
 	boards = SteamLeaderboards.new(steam)
 	_start_store()
@@ -559,6 +561,22 @@ static func _launch_lobby(args: PackedStringArray) -> int:
 	if i >= 0 and i + 1 < args.size() and args[i + 1].is_valid_int():
 		return int(args[i + 1])
 	return 0
+
+
+## Opens Steam's floating on-screen keyboard over a text field (`rect` in window pixels) so a
+## gamepad or the Deck can type into it; the keys arrive as normal key presses. False when Steam
+## can't show one here (no Steam, not in Big Picture or on a Deck): use `PadKeyboard` instead.
+func show_text_keyboard(rect: Rect2, single_line: bool = true) -> bool:
+	if not _available or not steam.has_method(&"showFloatingGamepadTextInput"):
+		return false
+	var mode: int = 0 if single_line else 1  # FLOATING_GAMEPAD_TEXT_INPUT_MODE_SINGLE_LINE / MULTIPLE_LINES
+	return bool(steam.call("showFloatingGamepadTextInput", mode, int(rect.position.x), int(rect.position.y), int(rect.size.x), int(rect.size.y)))
+
+
+## Closes Steam's floating keyboard (after the text was sent).
+func hide_text_keyboard() -> void:
+	if _available and steam.has_method(&"dismissFloatingGamepadTextInput"):
+		steam.call("dismissFloatingGamepadTextInput")
 
 
 ## True when a Steam client is running and the API initialised.

@@ -26,6 +26,8 @@ const DEFAULTS: Dictionary = {
 	"controls": {"mouse_sensitivity": 1.0, "invert_y": false, "stick_sensitivity": 1.0},
 	"video": {"fov": 85.0, "fullscreen": false, "vsync": true, "max_fps": 0},
 }
+## True on a Steam Deck (InputGlyphs.on_steam_deck): fullscreen by default, Deck button names.
+var on_deck: bool = false
 ## Frame limit choices (Settings > Video): 0 is off, `MATCH_MONITOR` follows the screen's refresh rate.
 const MATCH_MONITOR: int = -1
 const FPS_CAPS: Array[int] = [0, 30, 60, 90, 120, 144, 165, 240, MATCH_MONITOR]
@@ -58,6 +60,8 @@ var _applied_input_device: String = ""
 
 
 func _ready() -> void:
+	on_deck = InputGlyphs.on_steam_deck()
+	InputGlyphs.set_deck(on_deck)
 	if FileAccess.file_exists(PATH):
 		var err: Error = _cfg.load(PATH)
 		if err != OK:
@@ -75,6 +79,8 @@ func _ready() -> void:
 func get_value(section: String, key: String, default: Variant = null) -> Variant:
 	if default == null and DEFAULTS.has(section):
 		default = (DEFAULTS[section] as Dictionary).get(key, null)
+		if section == "video" and key == "fullscreen" and on_deck:
+			default = true  # the Deck shows one window on its whole 1280x800 screen
 	return _cfg.get_value(section, key, default)
 
 

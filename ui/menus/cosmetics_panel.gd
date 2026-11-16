@@ -376,7 +376,7 @@ func _featured_card(id: StringName) -> Button:
 	b.custom_minimum_size = Vector2(0, 118)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.clip_contents = true
-	b.focus_mode = Control.FOCUS_NONE
+	b.focus_mode = Control.FOCUS_ALL  # a gamepad reaches the featured offers too
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	b.tooltip_text = (d.display_name if d != null else pack.display_name)
 	var normal := _box(Color("#3A2318"), Color(Palette.COIN_GOLD, 0.75), 2, 18, 10)
@@ -384,7 +384,9 @@ func _featured_card(id: StringName) -> Button:
 	b.add_theme_stylebox_override(&"normal", normal)
 	b.add_theme_stylebox_override(&"hover", hover)
 	b.add_theme_stylebox_override(&"pressed", hover)
-	b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+	var ring := _box(Color(0, 0, 0, 0), Palette.VIP_GOLD, 4, 18, 10)
+	ring.draw_center = false
+	b.add_theme_stylebox_override(&"focus", ring)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override(&"separation", 10)
@@ -463,7 +465,7 @@ func _build_wardrobe() -> PanelContainer:
 		b.custom_minimum_size = Vector2(72, 72)
 		b.expand_icon = true
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.focus_mode = Control.FOCUS_NONE
+		b.focus_mode = Control.FOCUS_ALL  # the outfit slots, on a gamepad too
 		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		b.theme_type_variation = &"SmallLabel"
 		b.add_theme_font_size_override(&"font_size", 15)
@@ -472,7 +474,9 @@ func _build_wardrobe() -> PanelContainer:
 		b.add_theme_stylebox_override(&"normal", _box(Color("#2A1D14"), Color("#5A4128"), 2, 14, 6))
 		b.add_theme_stylebox_override(&"hover", _box(Color("#36261A"), Palette.WARM_GOLD, 2, 14, 6))
 		b.add_theme_stylebox_override(&"pressed", _box(Color("#36261A"), Palette.WARM_GOLD, 2, 14, 6))
-		b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+		var slot_ring := _box(Color(0, 0, 0, 0), Palette.VIP_GOLD, 3, 14, 6)
+		slot_ring.draw_center = false
+		b.add_theme_stylebox_override(&"focus", slot_ring)
 		b.pressed.connect(func() -> void:
 			show_kind(kind)
 			var worn: StringName = worn_in(ProfileManager.profile, kind)

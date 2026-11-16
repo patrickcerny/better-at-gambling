@@ -6,7 +6,7 @@ extends WalkableStage
 ## over one takes it (it shrinks into their hand) and every bean's hand is fanned over their head
 ## (`HandFan`, with its name: "PAIR", "FLUSH"...). The overlay shows the clock, everyone's hand
 ## name (top left), the feed, Lucky's lines (bottom left) and our own hand as five big cards along
-## the bottom: number keys 1–5 or the mouse wheel pick the card E drops (the worst card unless we
+## the bottom: number keys 1–5, the mouse wheel or the d-pad pick the card E drops (the worst card unless we
 ## picked one). At the whistle the hands fan out big over every head and a showdown table lists
 ## them best first; Lucky names the winner.
 ##
@@ -157,10 +157,23 @@ func _input(event: InputEvent) -> void:
 		return
 	var mb := event as InputEventMouseButton
 	if mb != null and mb.pressed and (mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN):
-		var n: int = my_hand().size()
-		var cur: int = selected if selected >= 0 else 0
-		select_slot(posmod(cur + (1 if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1), n))
+		step_slot(1 if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
 		get_viewport().set_input_as_handled()
+		return
+	# Gamepad: d-pad left / right walks the hand (this room has no items for the d-pad to use).
+	var jb := event as InputEventJoypadButton
+	if jb != null and jb.pressed and (jb.button_index == JOY_BUTTON_DPAD_LEFT or jb.button_index == JOY_BUTTON_DPAD_RIGHT):
+		step_slot(1 if jb.button_index == JOY_BUTTON_DPAD_RIGHT else -1)
+		get_viewport().set_input_as_handled()
+
+
+## Moves the picked card `by` slots along the hand (wrapping round).
+func step_slot(by: int) -> void:
+	var n: int = my_hand().size()
+	if n == 0:
+		return
+	var cur: int = selected if selected >= 0 and selected < n else 0
+	select_slot(posmod(cur + by, n))
 
 
 # --- Events -------------------------------------------------------------------------------------
@@ -534,7 +547,8 @@ func _refresh_bar() -> void:
 		_bar.add_child(slot)
 	var tuple: Array[int] = PokerHand.evaluate(hand)
 	_bar_title.text = PokerHand.describe(tuple) if not hand.is_empty() else "YOUR HAND"
-	_bar_hint.text = InputGlyphs.fill("[{interact}] DROP  ·  1-5 / WHEEL: PICK A CARD") if not hand.is_empty() else "WALK OVER CARDS TO PICK THEM UP"
+	var pick: String = "D-PAD ◀ ▶" if InputGlyphs.gamepad else "1-5 / WHEEL"
+	_bar_hint.text = InputGlyphs.fill("[{interact}] DROP  ·  %s: PICK A CARD" % pick) if not hand.is_empty() else "WALK OVER CARDS TO PICK THEM UP"
 	_bar_panel.visible = local_id in roster and local_id not in gone and not over and not done
 
 

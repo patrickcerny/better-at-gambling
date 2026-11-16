@@ -21,7 +21,7 @@ const ACTIONS: Array = [
 	["shove", 0.5, ["mouse:2", "joy:10"]],
 	["toggle_camera", 0.5, ["key:V", "joy:4"]],
 	["emote_wheel", 0.5, ["key:G", "joy:12"]],
-	["ping", 0.5, ["mouse:3", "key:Z"]],
+	["ping", 0.5, ["mouse:3", "key:Z", "axis:4:1"]],
 	["item_1", 0.5, ["key:1", "joy:13"]],
 	["item_2", 0.5, ["key:2", "joy:11"]],
 	["item_3", 0.5, ["key:3", "joy:14"]],
@@ -48,6 +48,10 @@ const ACTIONS: Array = [
 	["bj_split", 0.5, ["key:P", "joy:10"]],
 	["break_free", 0.5, ["key:Space", "joy:0"]],
 	["shake", 0.5, ["key:E", "joy:2"]],
+	# Godot's own UI actions have no gamepad buttons: A presses the focused button, B goes back
+	# (every menu closes on ui_cancel), so menus work on a pad and the Steam Deck.
+	["ui_accept", 0.5, ["key:Enter", "key:Kp Enter", "key:Space", "joy:0"]],
+	["ui_cancel", 0.5, ["key:Escape", "joy:1"]],
 	# Tab is the leaderboard / lobby panel key: it must not move GUI focus (it pulled focus off READY).
 	["ui_focus_next", 0.5, []],
 ]

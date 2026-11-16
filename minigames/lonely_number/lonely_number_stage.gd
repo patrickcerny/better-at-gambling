@@ -101,6 +101,8 @@ func _build_ui() -> void:
 	status_label = _label("", 24, Palette.CREAM)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	left.add_child(status_label)
+	# Gamepad: the d-pad or left stick walks the grid, A locks the number in.
+	root.add_child(PadFocus.make(func() -> Array: return buttons, _can_pick))
 
 	# Right: scoreboard and last round's reveal.
 	var right := VBoxContainer.new()
@@ -255,7 +257,8 @@ func _refresh() -> void:
 	elif picking and my_pick > 0:
 		status_label.text = "You picked %d - waiting for others (%d/%d)" % [my_pick, picked.size(), players.size()]
 	elif picking:
-		status_label.text = ("Typed: %s  (Enter to lock in)" % _typed) if _typed != "" else "Pick a number! (%d/%d picked)" % [picked.size(), players.size()]
+		var how: String = (" - %s to lock in" % InputGlyphs.pad_name("A")) if InputGlyphs.gamepad else ""
+		status_label.text = ("Typed: %s  (Enter to lock in)" % _typed) if _typed != "" else "Pick a number!%s (%d/%d picked)" % [how, picked.size(), players.size()]
 	else:
 		status_label.text = "Next round coming up..." if round < ROUNDS else "Tallying..."
 	_refresh_scores()

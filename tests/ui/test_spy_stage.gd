@@ -251,3 +251,73 @@ func test_late_join_mid_vote_from_the_snapshot() -> void:
 	assert_eq(late.clues[first], ["steel"])
 	assert_true(late.can_vote_now())
 	assert_eq(late.secret_card.big.text, "VAULT")
+
+
+# --- Gamepad -------------------------------------------------------------------------------------
+
+func _pad(button: JoyButton) -> void:
+	for down: bool in [true, false]:
+		var ev := InputEventJoypadButton.new()
+		ev.button_index = button
+		ev.pressed = down
+		get_tree().root.push_input(ev)
+
+
+func after_each() -> void:
+	PadKeyboard.close_current()
+	InputGlyphs.set_gamepad(false)
+
+
+func test_gamepad_y_calls_a_vote_and_a_votes() -> void:
+	_make(5, false)
+	InputGlyphs.set_gamepad(true)
+	logic.tick(SpyLogic.INTRO_TIME + 0.01, 0.0)
+	_pump()
+	assert_string_contains(stage.vote_button.text, "[Y]")
+	_pad(JOY_BUTTON_Y)
+	assert_eq(sent.size(), 1)
+	assert_eq(sent[0]["type"], &"spy_call_vote")
+	_pump()
+	assert_true(stage.can_vote_now())
+	await wait_process_frames(2)
+	var targets: Array[int] = stage.vote_targets()
+	assert_eq(get_viewport().gui_get_focus_owner(), stage.cards[targets[0]], "a suspect has the focus")
+	_pad(JOY_BUTTON_DPAD_RIGHT)
+	_pad(JOY_BUTTON_A)
+	assert_eq(sent.size(), 2)
+	assert_eq(sent[1]["type"], &"spy_vote")
+	assert_eq(int(sent[1]["target"]), targets[1])
+
+
+func test_gamepad_turn_opens_the_keyboard_and_done_says_the_clue() -> void:
+	_make(4, false)
+	InputGlyphs.set_gamepad(true)
+	_to_my_turn()
+	assert_true(stage.entry.visible)
+	var kb: PadKeyboard = PadKeyboard.current
+	assert_not_null(kb, "no Steam here: the in-game keyboard comes up on your turn")
+	assert_eq(kb.target, stage.entry)
+	for ch: String in ["S", "A", "F", "E"]:
+		kb.type_text(ch)
+	assert_eq(stage.entry.text, "Safe", "a capital, then small letters")
+	_pad(JOY_BUTTON_X)
+	assert_eq(stage.entry.text, "Saf", "X deletes")
+	kb.type_text("E")
+	_pad(JOY_BUTTON_START)
+	assert_null(PadKeyboard.current, "DONE closes it")
+	assert_eq(sent.size(), 1, "and says the clue")
+	assert_eq(sent[0]["type"], &"spy_clue")
+	assert_eq(sent[0]["text"], "Safe")
+
+
+func test_gamepad_b_closes_the_keyboard_and_a_brings_it_back() -> void:
+	_make(4, false)
+	InputGlyphs.set_gamepad(true)
+	_to_my_turn()
+	assert_not_null(PadKeyboard.current)
+	_pad(JOY_BUTTON_B)
+	await wait_process_frames(1)
+	assert_null(PadKeyboard.current, "B closes it without sending")
+	assert_eq(sent.size(), 0)
+	_pad(JOY_BUTTON_A)
+	assert_not_null(PadKeyboard.current, "A on the clue field opens it again")
