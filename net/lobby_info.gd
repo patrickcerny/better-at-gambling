@@ -30,7 +30,7 @@ static func from_state(state: ClientMatchState) -> Dictionary:
 		ids.push_front(state.leader)
 	for pid: int in ids:
 		var p: Dictionary = state.players[pid]
-		if not bool(p.get("connected", true)):
+		if not bool(p.get("connected", true)) or bool(p.get("dev", false)):
 			continue
 		var outfit: Array = Array(Cosmetics.sanitize_outfit(p.get("outfit", [])))
 		while not outfit.is_empty() and str(outfit.back()) == "":

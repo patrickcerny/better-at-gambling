@@ -697,9 +697,19 @@ func _lobby_row(lid: int, title_text: String, sub_text: String, members: int, ma
 	join.name = "Join"
 	join.custom_minimum_size.y = 40
 	join.add_theme_font_size_override(&"font_size", 18)
-	join.disabled = not joinable
+	join.disabled = not joinable or (max_members > 0 and members >= max_members)
 	join.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(join)
+	if is_the_dev() and joinable:
+		# The dev joins any lobby, full or playing, as the dev (`SteamParty.join_as_dev`).
+		var dev := _button("DEV", func() -> void: _join_as_dev(lid), 72.0)
+		dev.name = "DevJoin"
+		dev.tooltip_text = "Join as the dev: endless money ($-1), no rank, no minigames, troll tools in the pause menu"
+		dev.custom_minimum_size.y = 40
+		dev.add_theme_font_size_override(&"font_size", 18)
+		dev.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
+		dev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(dev)
 	var beans: Array = info.get("beans", [])
 	if not beans.is_empty():
 		var heads := HBoxContainer.new()
@@ -800,6 +810,27 @@ func _join_steam_lobby(lobby_id: int) -> void:
 		return
 	var name_: String = _display_name()
 	_connect(func() -> Error: return Net.steam_party.join_host(host_id, name_, SceneRouter.profile_cosmetics()), "JOINING")
+
+
+## Patrick's own Steam account (`DevMode.THE_DEV`; tests: `DevMode.forced`).
+static func is_the_dev() -> bool:
+	if DevMode.forced >= 0:
+		return DevMode.forced == 1
+	return SteamSvc.is_available() and DevMode.is_the_dev(SteamSvc.get_steam_id())
+
+
+## DEV on a lobby card: straight into the host's game as the dev, past a full lobby.
+func _join_as_dev(lobby_id: int) -> void:
+	if _busy or not is_the_dev():
+		return
+	_busy = true
+	_set_status("Joining as the dev…")
+	var name_: String = _display_name()
+	_connect(func() -> Error:
+		var err: Error = Net.steam_party.join_as_dev(lobby_id, name_, SceneRouter.profile_cosmetics())
+		if err != OK:
+			Net.last_error = Net.steam_party.last_error
+		return err, "JOINING AS THE DEV")
 
 
 ## Asks Steam for the public lobbies again (the list redraws when they arrive).

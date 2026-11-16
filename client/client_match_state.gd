@@ -43,6 +43,9 @@ var duration_s: float = 1080.0
 var regroup_in: float = -1.0
 var players: Dictionary[int, Dictionary] = {}
 var balances: Dictionary[int, int] = {}
+## The dev's money (`PlayerState.dev`, endless, shown as -1): kept out of `balances` so ranks,
+## the crown, the Tab list and the lobby card never count him.
+var dev_balances: Dictionary[int, int] = {}
 var stations: Dictionary = {}
 var jackpot: int = 0
 var last_seq: int = 0
@@ -118,8 +121,9 @@ func apply_snapshot(snap: Dictionary) -> void:
 		players[int(id)] = snap["players"][id]
 		seat_of[int(id)] = StringName(snap["players"][id].get("station", ""))
 	balances.clear()
+	dev_balances.clear()
 	for id: Variant in snap.get("balances", {}):
-		balances[int(id)] = int(snap["balances"][id])
+		_set_balance(int(id), int(snap["balances"][id]))
 	stations = (snap.get("stations", {}) as Dictionary).duplicate(true)
 	jackpot = int(snap.get("jackpot", 0))
 	last_seq = int(snap.get("seq", 0))
@@ -198,6 +202,8 @@ func _apply(ev: Dictionary) -> void:
 		&"player_joined":
 			var p: Dictionary = ev["player"]
 			players[int(p["id"])] = p
+			if bool(p.get("dev", false)) and balances.has(int(p["id"])):
+				_set_balance(int(p["id"]), balances[int(p["id"])])
 			players_changed.emit()
 		&"phase_changed":
 			phase = int(ev["phase"]) as Phase.Id
@@ -218,7 +224,7 @@ func _apply(ev: Dictionary) -> void:
 				if not _replaying:
 					fun_money_changed.emit(int(ev["player"]), int(ev["amount"]), int(ev["balance"]), StringName(ev["reason"]))
 				return
-			balances[int(ev["player"])] = int(ev["balance"])
+			_set_balance(int(ev["player"]), int(ev["balance"]))
 			if not _replaying:
 				money_changed.emit(int(ev["player"]), int(ev["amount"]), int(ev["balance"]), StringName(ev["reason"]))
 		&"player_sat":
@@ -294,6 +300,7 @@ func _apply(ev: Dictionary) -> void:
 		&"player_removed":
 			players.erase(int(ev["player"]))
 			balances.erase(int(ev["player"]))
+			dev_balances.erase(int(ev["player"]))
 			players_changed.emit()
 			lobby_changed.emit()
 		&"match_started":
@@ -554,7 +561,22 @@ func player_name(id: int) -> String:
 
 ## Balance of a player.
 func balance(id: int) -> int:
+	if dev_balances.has(id):
+		return dev_balances[id]
 	return balances.get(id, 0)
+
+
+## Whether `id` joined as the dev (`MatchServer.gods`).
+func is_dev(id: int) -> bool:
+	return bool(players.get(id, {}).get("dev", false))
+
+
+func _set_balance(id: int, amount: int) -> void:
+	if is_dev(id):
+		balances.erase(id)
+		dev_balances[id] = amount
+	else:
+		balances[id] = amount
 
 
 ## Play-money balance in the waiting room (0 before the first visit).

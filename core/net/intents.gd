@@ -70,6 +70,8 @@ const SCHEMA: Dictionary = {
 	&"shake": {},
 	&"break_free": {},
 	&"megaphone": {},
+	## The dev's in-match tools (`MatchServer.dev_troll`; refused for everyone else).
+	&"dev_troll": {"action": Kind.NAME},
 }
 
 ## Fields an intent may carry on top: checked when present, never required.
@@ -82,6 +84,7 @@ const OPTIONAL: Dictionary = {
 	&"move": {"airborne": Kind.BOOL},
 	&"release": {"aim": Kind.VEC3},
 	&"shove": {"target": Kind.INT},
+	&"dev_troll": {"target": Kind.INT, "amount": Kind.INT, "item": Kind.NAME, "text": Kind.TEXT},
 }
 
 

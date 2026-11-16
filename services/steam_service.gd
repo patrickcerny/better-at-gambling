@@ -705,7 +705,8 @@ func request_public_lobbies() -> bool:
 	_browse_started = now
 	steam.call("addRequestLobbyListStringFilter", "game", LOBBY_GAME, LOBBY_COMPARISON_EQUAL)
 	steam.call("addRequestLobbyListStringFilter", "public", "1", LOBBY_COMPARISON_EQUAL)
-	steam.call("addRequestLobbyListFilterSlotsAvailable", 1)
+	if not DevMode.is_the_dev(get_steam_id()):
+		steam.call("addRequestLobbyListFilterSlotsAvailable", 1)  # the dev sees full lobbies too
 	steam.call("addRequestLobbyListDistanceFilter", LOBBY_DISTANCE_FILTER_WORLDWIDE)
 	steam.call("addRequestLobbyListResultCountFilter", PUBLIC_LOBBY_LIMIT)
 	steam.call("requestLobbyList")
@@ -841,6 +842,8 @@ func _on_lobby_created(result: int, id: int) -> void:
 	steam.call("setLobbyData", id, "build", Protocol.BUILD_ID)
 	steam.call("setLobbyData", id, "name", party)
 	steam.call("setLobbyData", id, "public", "1" if bool(get_meta(&"party_public", false)) else "0")
+	# Who to connect to without entering the lobby (the dev joins full ones, `SteamParty.join_as_dev`).
+	steam.call("setLobbyData", id, "host", str(get_steam_id()))
 	steam.call("setLobbyJoinable", id, true)
 	steam.call("setRichPresence", "status", party)
 	Log.info(&"steam", "party lobby %d created" % id)

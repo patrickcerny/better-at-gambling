@@ -462,23 +462,27 @@ func open_lobby() -> void:
 ## Adds a participant and returns its player id. The slot colour is fixed and unique; `bean_color`
 ## is the player's preferred bean colour from their profile (`Cosmetics.bean_color_for`), `outfit`
 ## the pieces they wear (anything a client sent: `Cosmetics.sanitize_outfit` cleans it).
-func add_player(uid: String, display_name: String, bean_color: int = -1, outfit: Variant = []) -> int:
+func add_player(uid: String, display_name: String, bean_color: int = -1, outfit: Variant = [], god: bool = false) -> int:
 	var p := PlayerState.new()
 	p.id = _next_player_id
 	_next_player_id += 1
 	p.uid = uid
 	p.display_name = display_name
+	p.dev = god
+	if god:
+		gods[p.id] = true
 	# Slot colours are not picked (Patrick, 2026-10-05): everyone gets the first free one. The bean
 	# wears the preferred colour when no other bean does (0.9.16, the pedestal colour panel).
 	p.color_index = lobby.free_color(_taken_colors(), -1)
 	p.bean_color = Cosmetics.bean_color_for(bean_color, p.color_index, _worn_bean_colors(-1))
 	p.outfit = Cosmetics.sanitize_outfit(outfit)
 	state.add_player(p)
-	economy.add_player(p.id, balance.start_money)
+	economy.add_player(p.id, GOD_MONEY if god else balance.start_money)
 	_reset_stats(p.id)
-	money_history.add_player(p.id, balance.start_money)
+	if not god:
+		money_history.add_player(p.id, balance.start_money)
+		lobby.join(p.id, _uptime + p.id * 0.001)  # the dev never leads, readies or blocks the start
 	world.set_transform(p.id, Vector3.ZERO, 0.0)
-	lobby.join(p.id, _uptime + p.id * 0.001)
 	var late: bool = room_mode and phases.phase != Phase.Id.LOBBY
 	if late:
 		# Joining a running match (Patrick: "Let players join running rounds"): normal starting cash
@@ -490,6 +494,9 @@ func add_player(uid: String, display_name: String, bean_color: int = -1, outfit:
 		rules.protect(p.id, match_time)
 		Log.info(&"server", "%s joined the running match (phase %s)" % [display_name, Phase.name_of(phases.phase)])
 	_emit(GameEvents.make(&"player_joined", {"player": p.to_wire(), "late": late}))
+	if god:
+		Log.info(&"server", "%s joined as the dev" % display_name)
+		_emit(GameEvents.make(&"dev_joined", {"player": p.id}))
 	_check_leader()
 	return p.id
 
@@ -498,7 +505,7 @@ func add_player(uid: String, display_name: String, bean_color: int = -1, outfit:
 func occupied_slots() -> int:
 	var n: int = 0
 	for id: int in state.players:
-		if state.players[id].connected:
+		if state.players[id].connected and not gods.has(id):
 			n += 1
 	return n
 
@@ -529,6 +536,7 @@ func remove_player(player: int) -> void:
 	if stations.is_seated(player):
 		stand_up(player)
 	state.players.erase(player)
+	gods.erase(player)
 	_away_since.erase(player)
 	economy.remove_player(player)
 	if fun_room != null:
@@ -548,8 +556,8 @@ func remove_player(player: int) -> void:
 ## (`kick_handler`). They may come straight back on their own (Patrick 2026-11-15: no rejoin
 ## block, a kick just drops them). In the lobby they are removed outright; in a running match they stay as "away" like any disconnected player.
 func kick(target: int, by: int) -> void:
-	if not state.players.has(target):
-		return
+	if not state.players.has(target) or gods.has(target):
+		return  # nobody kicks the dev
 	Log.info(&"server", "player %d kicked by the party leader (player %d)" % [target, by])
 	_emit(GameEvents.make(&"player_kicked", {"player": target, "by": by}))
 	if kick_handler.is_valid():
@@ -725,6 +733,7 @@ func get_private_snapshot(player: int) -> Dictionary:
 ## Advances the simulation by real seconds (scaled by `timescale`), in fixed 20 Hz steps.
 func advance(real_delta: float) -> void:
 	_uptime += real_delta
+	_top_up_gods()
 	if not running:
 		if room_mode and phases.phase == Phase.Id.LOBBY:
 			_tick_lobby(real_delta)
@@ -742,6 +751,106 @@ func advance(real_delta: float) -> void:
 		_step(TICK)
 		steps += 1
 	_flush()
+
+
+# --- The dev joins (Patrick 2026-11-16) ------------------------------------------------------
+## "We will also be able to join ANY lobby not requiring it to be full, having -1 dollar and being
+## able to play anything i want (moneywise) minigames i do not participate ... ill have different
+## stuff in the dev menu ingame to troll the players". Only `DevMode.THE_DEV`, whose identity the
+## host's Steam bridge vouches for (`steam_id_of_uid`), and only when his hello asks for it
+## (`RoomHost`): a full room or the results screen don't turn him away, he takes no slot, never
+## leads, his money is endless (shown as -1) and counts for nothing (standings, awards, ranks,
+## the money graph), the minigames run without him, nobody can kick him, and `dev_troll` intents
+## are his alone.
+
+## The dev's money, topped up whenever it falls under `GOD_REFILL_BELOW`.
+const GOD_MONEY: int = 1_000_000_000
+const GOD_REFILL_BELOW: int = 500_000_000
+## Player ids that joined as the dev.
+var gods: Dictionary[int, bool] = {}
+
+
+## Whether `player` joined as the dev.
+func is_god(player: int) -> bool:
+	return gods.has(player)
+
+
+## Whether a hello from `uid` may join as the dev.
+static func may_be_god(uid: String) -> bool:
+	return DevMode.is_the_dev(steam_id_of_uid(uid))
+
+
+func _top_up_gods() -> void:
+	for id: int in gods:
+		var have: int = economy.balance(id)
+		if economy.has_player(id) and have < GOD_REFILL_BELOW:
+			economy.apply(id, GOD_MONEY - have, &"dev")
+
+
+## The dev's in-match tools (`DevTrollPanel`): what `action` does to `target` (and with `amount`,
+## `item` or `text`). Knocks, jails and messages leave the match ranked; money, items and a forced
+## minigame make it unranked like the Practice tools (`dev_used`).
+func dev_troll(player: int, intent: Dictionary) -> Dictionary:
+	if not gods.has(player):
+		return StationLogicBase.fail(&"not_dev")
+	var action: StringName = StringName(intent["action"])
+	var target: int = int(intent.get("target", -1))
+	var amount: int = clampi(int(intent.get("amount", 0)), 0, 1_000_000)
+	var item: StringName = StringName(str(intent.get("item", "")))
+	var targets: Array[int] = []
+	if target == -2:  # everyone but the dev
+		for id: int in state.players:
+			if not gods.has(id) and state.players[id].connected:
+				targets.append(id)
+	elif state.players.has(target) and not gods.has(target):
+		targets.append(target)
+	var needs_target: bool = not action in [&"minigame", &"say"]
+	if needs_target and targets.is_empty():
+		return StationLogicBase.fail(&"no_target")
+	match action:
+		&"knock":
+			for id: int in targets:
+				if is_seated_anywhere(id):
+					stand_up(id)
+				items.knock_down(id, 3.0, player, &"dev", match_time)
+		&"freeze":
+			for id: int in targets:
+				if is_seated_anywhere(id):
+					stand_up(id)
+				items.knock_down(id, 6.0, player, &"puddle", match_time)
+		&"jail":
+			for id: int in targets:
+				put_in_jail(id)
+		&"free":
+			for id: int in targets:
+				release_from_jail(id, false)
+		&"give_money", &"take_money":
+			if amount <= 0:
+				return StationLogicBase.fail(&"no_amount")
+			dev_used = true
+			for id: int in targets:
+				if action == &"give_money":
+					economy.apply(id, amount, &"dev")
+				else:
+					economy.take_up_to(id, amount, &"dev")
+		&"give_item":
+			if not Registry.items.has(item):
+				return StationLogicBase.fail(&"unknown_item")
+			dev_used = true
+			for id: int in targets:
+				items.give(id, item, match_time)
+		&"minigame":
+			if not dev_minigame_now(item):
+				return StationLogicBase.fail(&"not_now")
+		&"say":
+			var text: String = str(intent.get("text", "")).strip_edges().left(120)
+			if text == "":
+				return StationLogicBase.fail(&"no_text")
+			_emit(GameEvents.make(&"dev_message", {"player": player, "text": text}))
+		_:
+			return StationLogicBase.fail(&"unknown_action")
+	_emit(GameEvents.make(&"dev_trolled", {"player": player, "action": action, "targets": targets}))
+	return StationLogicBase.OK_RESULT
 
 
 # --- Developer mode (Practice only: `DevMatchPanel`, the server runs on Patrick's own PC) ---------
@@ -1033,7 +1142,7 @@ func _start_minigame() -> void:
 			release_from_jail(id)
 	var players: Array[int] = []
 	for id: int in state.players:
-		if state.players[id].connected:
+		if state.players[id].connected and not gods.has(id):  # the dev watches
 			players.append(id)
 	minigame = minigames.begin(players, _logic_rng.fork(), balance, _quiz_stats(), half_rtt_provider) if minigames.has_minigames() and not players.is_empty() else null
 	if minigame == null:
@@ -1165,13 +1274,17 @@ func get_awards() -> Array[Dictionary]:
 	for row: Dictionary in get_standings():
 		if stats.has(int(row["player"])):
 			stats[int(row["player"])]["final_rank"] = int(row["rank"])
-	return Awards.pick(stats, _names(), 4)
+	var counted: Dictionary = stats.duplicate()
+	for id: int in gods:
+		counted.erase(id)
+	return Awards.pick(counted, _names(), 4)
 
 
 func _balances() -> Dictionary:
 	var out: Dictionary = {}
 	for id: int in state.players:
-		out[id] = economy.balance(id)
+		if not gods.has(id):
+			out[id] = economy.balance(id)
 	return out
 
 
@@ -1191,7 +1304,7 @@ func return_to_lobby() -> void:
 	lobby.forced = false
 	economy = Economy.new()
 	for id: int in state.players:
-		economy.add_player(id, balance.start_money)
+		economy.add_player(id, GOD_MONEY if gods.has(id) else balance.start_money)
 		var p: PlayerState = state.players[id]
 		p.inventory.clear()
 		p.quiz_points = 0
@@ -1239,6 +1352,8 @@ static func steam_id_of_uid(uid: String) -> int:
 func get_standings() -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for id: int in state.players:
+		if gods.has(id):
+			continue  # the dev's money is no score
 		var p: PlayerState = state.players[id]
 		rows.append({"player": id, "name": p.display_name, "money": economy.balance(id), "quiz_points": p.quiz_points, "biggest_win": p.biggest_win,
 			"steam_id": steam_id_of_uid(p.uid)})
@@ -1261,6 +1376,8 @@ func get_standings() -> Array[Dictionary]:
 func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 	var type: StringName = StringName(intent["type"])
 	match type:
+		&"dev_troll":
+			return dev_troll(player, intent)
 		&"sit":
 			if rules.is_knocked_down(player, match_time) or interactions.is_held(player):
 				return StationLogicBase.fail(&"incapacitated")
@@ -1800,9 +1917,10 @@ func _track_ranks() -> void:
 		return
 	var money: Array = []
 	for id: int in state.players:
-		money.append(economy.balance(id))
+		if not gods.has(id):
+			money.append(economy.balance(id))
 	for id: int in state.players:
-		if not stats.has(id):
+		if not stats.has(id) or gods.has(id):
 			continue
 		var mine: int = economy.balance(id)
 		var rank: int = 1 + money.filter(func(m: int) -> bool: return m > mine).size()

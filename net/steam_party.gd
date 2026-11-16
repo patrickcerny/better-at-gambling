@@ -137,6 +137,26 @@ func join_host(host_steam_id: int, display_name: String, cosmetics: Dictionary) 
 	return err
 
 
+## The dev joins a party without entering its Steam lobby (Patrick 2026-11-16: "join ANY lobby not
+## requiring it to be full"): straight to the host's game (the lobby's "host" data, else its
+## owner) with `god` in the hello; the room server checks his Steam ID (`MatchServer.may_be_god`).
+## Returns ERR_UNAVAILABLE with `last_error` set when the host isn't known.
+func join_as_dev(lobby_id: int, display_name: String, cosmetics: Dictionary) -> Error:
+	last_error = ""
+	var host: int = int(SteamSvc.lobby_data(lobby_id, "host")) if SteamSvc.lobby_data(lobby_id, "host").is_valid_int() else 0
+	if host == 0:
+		host = SteamSvc.lobby_owner_of(lobby_id)
+	if host == 0 or host == SteamSvc.get_steam_id():
+		last_error = "That lobby's host is unknown (an older version). Join normally."
+		return ERR_UNAVAILABLE
+	stop_hosting()
+	var hello: Dictionary = {"name": display_name, "god": true, "color": int(cosmetics.get("color", -1)), "outfit": cosmetics.get("outfit", PackedStringArray())}
+	var err: Error = Net.join_server("steam:%d" % host, 0, hello, {"transport": "steam", "steam_id": host})
+	if err == OK:
+		Net.room = {"host": "steam:%d" % host, "port": 0, "steam_lobby": 0}
+	return err
+
+
 ## Why a lobby can't be joined ("" = fine): not our game, another build, or ourselves.
 static func check_lobby(info: Dictionary, my_steam_id: int) -> String:
 	if str(info.get("game", "")) != SteamSvc.LOBBY_GAME:

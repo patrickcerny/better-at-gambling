@@ -65,6 +65,8 @@ var results_panel: ResultsStage = null
 var pause_menu: PauseMenu = null
 ## Developer mode's in-match tools (Practice, Patrick only), built on first use.
 var dev_panel: DevMatchPanel = null
+## The dev's in-match tools online (`joined_as_dev`).
+var troll_panel: DevTrollPanel = null
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
 ## The rules screen over the stage until everyone is ready (or 30 s pass).
@@ -1092,6 +1094,11 @@ func _on_event(ev: Dictionary) -> void:
 					hud.toast("Back inside. Behave.", 2.0)
 			if net_world != null:
 				net_world.reset_player(pid)
+		&"dev_joined":
+			_on_dev_joined(int(ev["player"]))
+		&"dev_message":
+			hud.banner("DEV: %s" % str(ev.get("text", "")), Palette.MONEY_GREEN, 4.0)
+			Audio.play(&"announcer_opening", &"SFX", -4.0)
 		&"player_kicked":
 			if int(ev["player"]) != local_id:
 				hud.toast("%s was kicked by the host" % view.state.player_name(int(ev["player"])), 3.0)
@@ -2422,6 +2429,9 @@ func _on_pause() -> void:
 	if dev_panel != null and dev_panel.visible:
 		dev_panel.close()  # back to play
 		return
+	if troll_panel != null and troll_panel.visible:
+		troll_panel.close()
+		return
 	if pause_menu != null and pause_menu.visible:
 		pause_menu.back()  # settings → pause menu → play
 	elif router.mode == InputRouter.Mode.MENU:
@@ -2443,20 +2453,44 @@ func _on_pause() -> void:
 			pause_layer.add_child(pause_menu)
 		router.set_mode(InputRouter.Mode.MENU)
 		var st: ClientMatchState = view.state
+		pause_menu.set_dev_available(dev_tools_available())  # joined as the dev: known once the snapshot is in
 		pause_menu.set_minigame_now_available(st.room_mode and local_id == st.leader and st.phase == Phase.Id.CASINO and not MatchMode.is_minigames_only(st.lobby_settings))
 		pause_menu.open()
 
 
-## Developer mode in a match: Patrick only (`DevMode`), and only in Practice, where the server
-## runs on this PC (never online, so a host can't change a friends' match).
+## Developer mode in a match: Patrick only (`DevMode`): in Practice, where the server runs on this
+## PC, the Practice tools; online only when he joined as the dev (`MatchServer.gods`), the
+## `DevTrollPanel`, whose every action the room server checks again.
 func dev_tools_available() -> bool:
-	return role == Role.PRACTICE and _owns_server and server != null and DevMode.allowed()
+	return (role == Role.PRACTICE and _owns_server and server != null and DevMode.allowed()) or joined_as_dev()
+
+
+## Joined this online room as the dev (`MatchServer.gods`).
+func joined_as_dev() -> bool:
+	return role == Role.CLIENT and view != null and view.state.is_dev(local_id)
+
+
+## The dev walked in (Patrick 2026-11-16: "When i join (ill give you a song later)"): a banner for
+## everyone and the dev's entrance song: audio/sfx/dev_join.wav is a placeholder fanfare (the big
+## win sting); Patrick's song goes in as audio/sfx/dev_join-v1.ogg, which wins over it.
+func _on_dev_joined(_player: int) -> void:
+	hud.banner("THE DEV HAS ENTERED THE CASINO", Palette.MONEY_GREEN, 5.0)
+	Audio.play(&"dev_join", &"SFX", -2.0)
 
 
 ## DEV TOOLS in the pause menu: the dev panel over the game (the cursor stays free while it is open).
 func _open_dev_tools() -> void:
 	if not dev_tools_available():
 		_resume_play()
+		return
+	if joined_as_dev():
+		if troll_panel == null:
+			troll_panel = DevTrollPanel.new()
+			troll_panel.name = "DevTrollPanel"
+			troll_panel.setup(view.state, local_id)
+			troll_panel.closed.connect(_resume_play)
+			pause_layer.add_child(troll_panel)
+		troll_panel.open()
 		return
 	if dev_panel == null:
 		dev_panel = DevMatchPanel.new()

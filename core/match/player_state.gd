@@ -15,6 +15,9 @@ var bean_color: int = 0
 ## `Cosmetics.sanitize_outfit`).
 var outfit: PackedStringArray = Cosmetics.sanitize_outfit([])
 var connected: bool = true
+## The developer joined as "the dev" (`MatchServer.gods`, Patrick 2026-11-16): unlimited money shown
+## as -1, not in the standings, the minigames or the lobby's ready check.
+var dev: bool = false
 var ready: bool = false
 var inventory: Array[StringName] = []
 ## The item out in the player's right hand for everyone to see (&"" = empty hands; one of
@@ -40,7 +43,7 @@ var jail_fine: int = 0
 func to_wire() -> Dictionary:
 	return {
 		"id": id, "uid": uid, "name": display_name, "color": color_index, "bean_color": bean_color, "outfit": outfit.duplicate(),
-		"connected": connected, "ready": ready, "inventory": inventory.duplicate(), "held": String(held),
+		"connected": connected, "dev": dev, "ready": ready, "inventory": inventory.duplicate(), "held": String(held),
 		"quiz_points": quiz_points, "quiz_time": quiz_correct_time, "biggest_win": biggest_win, "station": station, "seat": seat,
 		"pos": Serializer.vec3(position),
 		"catch_count": catch_count, "jail_time": snappedf(jail_time_remaining, 0.01), "jail_fine": jail_fine,
@@ -57,6 +60,7 @@ static func from_wire(d: Dictionary) -> PlayerState:
 	p.bean_color = int(d.get("bean_color", p.color_index))
 	p.outfit = Cosmetics.sanitize_outfit(d.get("outfit", []))
 	p.connected = bool(d.get("connected", true))
+	p.dev = bool(d.get("dev", false))
 	p.ready = bool(d.get("ready", false))
 	for item: Variant in d.get("inventory", []):
 		p.inventory.append(StringName(item))

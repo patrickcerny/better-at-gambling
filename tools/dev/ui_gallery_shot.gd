@@ -1,6 +1,6 @@
 extends Control
 ## Dev: one 2D screen with made-up state for the theme screenshots (M7). Pick it with
-## `--panel lobby|players|players_lobby|shop|rewards|settings|audio|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining|dev|dev_corner|dev_match|confirm`
+## `--panel lobby|players|players_lobby|shop|rewards|settings|audio|controls|pause|pause_tutorial|tutorial|online|browser|practice|joining|dev|dev_corner|dev_troll|dev_match|confirm`
 ## (tutorial: `--page N` picks the page, -1 the overview, `--minigame <id>` opens that game's page)
 ## over the blurred casino panorama:
 ## `-s tools/screenshot.gd -- --scene res://tools/dev/ui_gallery_shot.tscn --frames 60 --panel shop`
@@ -85,6 +85,21 @@ func _ready() -> void:
 		"dev_corner":
 			DevMode.forced = 1
 			add_child((load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate())
+		"dev_troll":
+			var tst := ClientMatchState.new()
+			var tplayers: Dictionary = {}
+			for i: int in 4:
+				var tps := PlayerState.new()
+				tps.id = i + 1
+				tps.display_name = ["Patrick", "Lena", "Max", "Sophie"][i]
+				tps.dev = i == 0
+				tplayers[tps.id] = tps.to_wire()
+			tst.apply_snapshot({"players": tplayers, "balances": {1: 5, 2: 1200, 3: 800, 4: 950}})
+			var tp := DevTrollPanel.new()
+			tp.send_to_server = false
+			tp.setup(tst, 1)
+			add_child(tp)
+			tp.open()
 		"dev_match":
 			var p := DevMatchPanel.new()
 			add_child(p)
