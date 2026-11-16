@@ -669,7 +669,7 @@ func get_snapshot() -> Dictionary:
 	_sync_state()
 	var snap: Dictionary = state.to_wire()
 	snap["match_time"] = snappedf(match_time, 0.001)
-	snap["time_left"] = snappedf(phases.time_left(), 0.001)
+	snap["time_left"] = snappedf(phases.time_left(), 0.001) if phases.time_left() != INF else -1.0  # -1 = no end (Practice)
 	snap["next_minigame_in"] = snappedf(phases.next_minigame_in(), 0.001) if phases.next_minigame_in() != INF else -1.0
 	snap["last_call"] = phases.last_call_announced
 	snap["piles"] = _piles_wire()
@@ -916,7 +916,7 @@ func _enter_segment(restock: bool) -> void:
 		_emit(GameEvents.make(&"shop_restocked", items.shop.wire()))
 
 
-## Practice without minigames: where a minigame would start the round turns over in the casino.
+## Practice (endless, no minigames): every gambling stretch the round turns over in the casino.
 ## The next segment's limits and shop stock, and the Out of Order signs come down (they last
 ## "until the next minigame" elsewhere). Nobody is stood up and item effects run on.
 func _turn_round() -> void:

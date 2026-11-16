@@ -36,18 +36,62 @@ func test_coin_pile_creation() -> void:
 	pile.amount = 100
 	add_child_autofree(pile)
 	assert_eq(pile.amount, 100)
-	assert_eq(pile._coins.size(), 0, "coins created by create_coins, not _ready")
+	assert_eq(pile._chips.size(), 0, "chips made by spawn_chips, not _ready")
 
 
-func test_coin_pile_creates_coins() -> void:
+func test_coin_pile_spawns_big_hovering_chips() -> void:
 	var pile := CoinPile.new()
 	pile.amount = 100
-	pile.position = Vector3(0, 0, 0)
 	add_child_autofree(pile)
-	pile.create_coins(Vector3(0, 1, 0))
+	pile.spawn_chips(pile.global_position)
 	await wait_frames(2)
-	var coin_count: int = clampi(100 / 25, 1, 6)
-	assert_eq(pile._coins.size(), coin_count, "correct number of coins created")
+	assert_eq(pile._chips.size(), CoinPile.chip_count(100), "one chip per $50")
+	assert_gt(pile._carousel.position.y, 0.3, "the chips hover above the carpet")
+	var mi: MeshInstance3D = pile._chips[0].get_node("Mesh") as MeshInstance3D
+	assert_gt(mi.scale.x, 0.1, "big enough to spot across the room")
+	assert_not_null(mi.material_overlay, "with a warm rim glow")
+
+
+func test_chip_count_is_capped() -> void:
+	assert_eq(CoinPile.chip_count(10), 1, "always at least one chip")
+	assert_eq(CoinPile.chip_count(100000), CoinPile.MAX_CHIPS)
+
+
+func test_hovering_chips_turn_and_bob() -> void:
+	var pile := CoinPile.new()
+	pile.amount = 200
+	add_child_autofree(pile)
+	pile.spawn_chips(pile.global_position)
+	var yaw: float = pile._chips[0].rotation.y
+	var spin: float = pile._carousel.rotation.y
+	await wait_frames(10)
+	assert_ne(pile._chips[0].rotation.y, yaw, "each chip turns")
+	assert_ne(pile._carousel.rotation.y, spin, "the chips circle the pile")
+
+
+func test_shaken_chips_arc_out_then_hover() -> void:
+	Vfx.force_enabled = true
+	var pile := CoinPile.new()
+	pile.amount = 150
+	add_child_autofree(pile)
+	pile.spawn_chips(pile.global_position + Vector3(1.0, 1.0, 0.0))
+	assert_false(pile._hovering, "still flying out of the victim")
+	await wait_seconds(CoinPile.SETTLE_SECONDS + 0.1)
+	Vfx.force_enabled = false
+	assert_true(pile._hovering, "landed: hovering over the carpet")
+	assert_almost_eq(pile._carousel.position.y, CoinPile.HOVER_HEIGHT, CoinPile.BOB_HEIGHT + 0.01)
+
+
+func test_restore_brings_a_predicted_pile_back() -> void:
+	var pile := CoinPile.new()
+	pile.amount = 60
+	add_child_autofree(pile)
+	pile.spawn_chips(pile.global_position)
+	pile.fly_to(null, true)
+	assert_true(pile.is_leaving())
+	pile.restore()
+	assert_false(pile.is_leaving())
+	assert_true(pile.visible)
 
 
 func test_coin_pile_has_label() -> void:
