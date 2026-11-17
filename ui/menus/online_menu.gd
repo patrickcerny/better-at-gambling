@@ -3,8 +3,9 @@ extends Control
 ## PLAY ONLINE (Patrick 2026-11-16: "der play online button sollte uns jetzt in ein menu bringen mit
 ## bildern als buttons und die bild beschreiben was abgeht"): a full screen like the lobby lists,
 ## with four big picture cards (`PictureCard`): CREATE PUBLIC LOBBY, CREATE PRIVATE LOBBY, BROWSE
-## LOBBIES and FRIENDS' LOBBIES, each with a picture (assets/ui/online/, generated splash
-## arts, Patrick 2026-11-16: "es sollen eher so splasharts sein ... generiere sie") and a line on what happens, PUBLIC / PRIVATE big on top, BROWSE / FRIENDS smaller below. Under them the status line and BACK. There is no name field: your
+## LOBBIES and FRIENDS' LOBBIES, each with a picture (assets/ui/online/: staged scenes with the
+## real beans rendered by tools/online_pictures.sh; Patrick 2026-11-17: no AI images, "Use self
+## rendered comps") and a line on what happens, PUBLIC / PRIVATE big on top, BROWSE / FRIENDS smaller below. Under them the status line and BACK. There is no name field: your
 ## name in a lobby is your Steam name (Patrick: "Der Name in der Lobby ist auch nicht setzbar
 ## sondern einfach der Name aus Steam"). The main menu wires the cards up.
 

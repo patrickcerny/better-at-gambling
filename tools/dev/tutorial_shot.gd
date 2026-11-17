@@ -7,10 +7,10 @@ extends Node
 ## gift shop open, items in the HUD slots), jail (two beans behind the bars, a guard outside),
 ## lobby (ready pedestals glowing in the start room), rough (a shove knockdown, from the brawl clip),
 ## items (four beans in a row, each holding an item out), leaderboard (the standings over the casino), oddjobs (broke at the Odd Jobs cabinet, aiming at the
-## glowing red button, the shared bar part full). Dev checks of PLAY ONLINE-style views (the cards now use generated splash arts):
-## online_public (an empty table with an OPEN sign), online_private (the same behind a velvet rope,
-## RESERVED), online_browse (players at tables across the floor), online_friends (three friends
-## waving you over). Dev checks only: race, racehall, and floor (the
+## glowing red button, the shared bar part full). PLAY ONLINE's splash arts
+## (tools/online_pictures.sh): splash_public (a dressed-up crowd cheering in front of the lobby),
+## splash_private (a guard at a velvet rope, friends at the table behind), splash_browse (tables
+## full of beans from up high), splash_friends (three friends waving you over). Dev checks only: race, racehall, and floor (the
 ## casino floor from just inside the lobby doors; `--floor <layout id>` picks the floor, e.g.
 ## `--floor floor_1234` (a drawn floor by its seed), `--floor random` or `--floor grand_hall`,
 ## docs/FLOOR_PLAN.md; `--from x,y,z --to x,y,z` moves the camera).
@@ -30,6 +30,10 @@ var _items_at: Vector3 = Vector3(0.0, 0.0, 2.0)
 var _items_yaw: float = PI
 ## Lobby view: whose pedestal glows.
 var _ready_ids: Array[int] = []
+## Splash views: outfits kept on (pid -> kind -> id) and who loops which emote.
+var _outfits: Dictionary = {}
+var _moves: Dictionary = {}
+var _move_t: float = 0.0
 ## Friends view: who waves (again and again, until the shot).
 var _waves: Array[int] = []
 var _wave_t: float = 0.0
@@ -50,7 +54,7 @@ func _ready() -> void:
 		add_child(clip)  # run with `--seconds 60` so the clip does not quit before the shot
 		_scene = clip.get(&"_scene")
 		return
-	MatchScene.test_dummies = {"online_public": 0, "online_private": 0, "online_browse": 7, "online_friends": 3}.get(_view, 4 if _view in ["lobby", "leaderboard", "hall", "items"] else 2)
+	MatchScene.test_dummies = {"splash_public": 7, "splash_private": 3, "splash_browse": 7, "splash_friends": 3}.get(_view, 4 if _view in ["lobby", "leaderboard", "hall", "items"] else 2)
 	_scene = (load("res://match/match_scene.tscn") as PackedScene).instantiate()
 	add_child(_scene)
 
@@ -68,6 +72,17 @@ func _process(delta: float) -> void:
 		for i: int in 6:  # a bar part full (late: it drains when left alone)
 			_scene.server.odd_jobs.press(_scene.local_id, _scene.server.match_time)
 	_wave_t -= delta
+	_move_t -= delta
+	for pid: int in _outfits:  # the snapshots put the joined look back: keep the staged one
+		(_scene.avatars[pid] as PlayerAvatar).set_outfit(_outfits[pid])
+		for l: Node in (_scene.avatars[pid] as Node).find_children("*", "Label3D", true, false):
+			(l as Label3D).visible = false  # no name tags in a splash art
+	if not _moves.is_empty() and _move_t <= 0.0:
+		_move_t = 2.2
+		var k: int = 0
+		for pid: int in _moves:
+			(_scene.avatars[pid] as PlayerAvatar).play_emote(_moves[pid], 0.05 + 0.3 * k)
+			k += 1
 	if not _waves.is_empty() and _wave_t <= 0.0:
 		_wave_t = 2.4
 		var k: int = 0
@@ -87,7 +102,7 @@ func _process(delta: float) -> void:
 
 func _stage() -> void:
 	var srv: MatchServer = _scene.server
-	if _view.begins_with("online_"):
+	if _view.begins_with("splash_"):
 		for g: Guard in _scene.guards:  # no security guard walking into PLAY ONLINE's pictures
 			g.visible = false
 			g.process_mode = Node.PROCESS_MODE_DISABLED
@@ -166,47 +181,98 @@ func _stage() -> void:
 				_scene.local.cam.toggle_mode()  # your own bean shows on its pedestal too
 			_scene.hud.visible = false
 			_free_cam(Vector3(0, 3.0, 9.4), Vector3(0, 1.6, 15.1), 80.0)
-		"online_public", "online_private":  # PLAY ONLINE's create cards: an empty table waiting
+		"splash_public":  # PUBLIC LOBBY: a crowd of beans in their best outfits, cheering in front of the lobby
 			_scene.hud.visible = false
-			_place(_scene.local_id, Vector3(0, 0, 60), 0.0)
+			_hide_local()
+			var looks: Array = [["hat_top_gold", "shirt_tux", "eyes_shades"], ["hat_cowboy", "shirt_flannel", "beard_handlebar"], ["hat_crown", "cape_royal", "shirt_royal"], ["hat_party", "shirt_hawaiian", "mouth_party_horn"], ["hat_wizard", "cape_wizard", "beard_wizard"], ["hat_propeller", "shirt_varsity", "eyes_star"], ["hat_viking", "beard_viking"]]
+			var spots: Array[Vector3] = [Vector3(-0.15, 0, 12.0), Vector3(-1.5, 0, 12.5), Vector3(1.3, 0, 12.4), Vector3(-2.7, 0, 13.3), Vector3(2.6, 0, 13.2), Vector3(-0.8, 0, 13.9), Vector3(0.9, 0, 14.0)]
+			var moves: Array[StringName] = [&"default_dance", &"wave", &"thumbs_up", &"dance", &"laugh", &"six_seven", &"wave"]
+			var i: int = 0
+			for pid: int in _others():
+				_place(pid, spots[i % spots.size()], _yaw_to(spots[i % spots.size()], Vector3(0.2, 0, 8.6)))
+				_dress(pid, looks[i % looks.size()])
+				_moves[pid] = moves[i % moves.size()]
+				i += 1
+			_key_light(Vector3(0, 4.5, 8.5), Vector3(0, 1.0, 13.0), 3.2, 28.0)
+			_free_cam(Vector3(0.2, 1.05, 8.6), Vector3(0, 1.45, 14.5), 50.0)
+		"splash_private":  # PRIVATE LOBBY: friends at their table behind a velvet rope, a guard at its end
+			_scene.hud.visible = false
+			_hide_local()
 			var st: StationBase = _table(0)
 			var fwd: Vector3 = (st.seat_position(0) - st.global_position)
 			fwd.y = 0.0
 			fwd = fwd.normalized()
 			var side: Vector3 = fwd.cross(Vector3.UP)
-			var at: Vector3 = st.global_position
-			if _view == "online_public":
-				_sign(at - side * 1.7 + fwd * 1.3, "OPEN", Palette.VIP_GOLD, fwd)
-			else:
-				_velvet_rope(at + fwd * 1.9, side, fwd)
-				_sign(at + fwd * 2.05 + Vector3(0, 0.25, 0), "RESERVED", Palette.CREAM, fwd)
-			_free_cam(at + fwd * 4.3 + side * 1.6 + Vector3(0, 2.2, 0), at + Vector3(0, 0.6, 0), 52.0)
-		"online_browse":  # BROWSE LOBBIES: busy tables across the floor
-			_scene.hud.visible = false
-			_place(_scene.local_id, Vector3(0, 0, 60), 0.0)
+			var at: Vector3 = Vector3(st.global_position.x, 0.0, st.global_position.z)
+			var cam: Vector3 = at + fwd * 5.4 + side * 0.6 + Vector3(0, 2.0, 0)
+			_velvet_rope(at + fwd * 2.4, side, fwd)
+			var looks: Array = [["hat_fedora", "shirt_business", "mouth_cigarette"], ["hat_top", "shirt_tux", "eyes_monocle"], ["hat_bowler", "shirt_gold_chain", "eyes_shades"]]
 			var i: int = 0
-			for pid: int in _others():
-				var st: StationBase = _table(i / 2)
-				_sit_dummy(pid, st, i % 2)
+			for pid: int in _others():  # behind the table, facing you: the party you are not in
+				var p: Vector3 = at - fwd * 1.55 + side * (-1.05 + 1.05 * i) - fwd * (0.2 if i == 1 else 0.0)
+				_place(pid, p, _yaw_to(p, Vector3(cam.x, 0.0, cam.z)))
+				_dress(pid, looks[i % looks.size()])
+				_moves[pid] = [&"laugh", &"thumbs_up", &"laugh"][i % 3]
 				i += 1
-			var first: StationBase = _table(0)
-			_free_cam(first.global_position + Vector3(6.5, 5.0, 7.5), first.global_position + Vector3(-3.0, 0.0, -4.0), 70.0)
-		"online_friends":  # FRIENDS' LOBBIES: your friends at a table, waving you over
+			if not _scene.guards.is_empty():  # the bouncer at the rope's end, arms crossed at you
+				var g: Guard = _scene.guards[0]
+				g.visible = true
+				var gp: Vector3 = at + fwd * 2.3 - side * 1.6
+				g.global_position = gp
+				g.rotation.y = _yaw_to(gp, Vector3(cam.x, 0.0, cam.z))
+			_key_light(at + fwd * 2.5 + Vector3(0, 4.5, 0), at + Vector3(0, 0.9, 0), 6.0, 40.0)
+			_key_light(at + fwd * 4.5 - side * 2.5 + Vector3(0, 3.2, 0), at + fwd * 2.3 - side * 1.6 + Vector3(0, 1.2, 0), 4.0, 25.0)
+			_free_cam(cam, at + fwd * 0.4 - side * 0.3 + Vector3(0, 1.0, 0), 50.0)
+		"splash_browse":  # BROWSE LOBBIES: a little party at every table across the floor, from up high
 			_scene.hud.visible = false
+			_hide_local()
+			var looks: Array = [["hat_cowboy", "shirt_flannel"], ["hat_crown", "cape_royal"], ["hat_party", "shirt_hawaiian"], ["hat_wizard", "cape_wizard"], ["hat_top", "shirt_tux"], ["hat_chef"], ["hat_pirate", "eyes_patch"]]
+			var fp: Vector3 = _table(0).global_position
+			fp.y = 0.0
+			var cam: Vector3 = fp + Vector3(4.2, 4.0, 5.4)
+			var near: Array = _scene.map.stations.values().filter(func(t: StationBase) -> bool:
+				var d: Vector3 = t.global_position - fp
+				d.y = 0.0
+				return d.length() < 14.0 and (cam - t.global_position).dot(cam - fp) > 0.0)
+			near.sort_custom(func(x: StationBase, y: StationBase) -> bool: return x.global_position.distance_to(fp) < y.global_position.distance_to(fp))
+			var counts: Array[int] = [3, 2, 2]
+			var i: int = 0
+			var g: int = 0
+			var k: int = 0
+			for pid: int in _others():
+				var c: Vector3 = (near[mini(g, near.size() - 1)] as StationBase).global_position
+				c.y = 0.0
+				var to_cam: Vector3 = Vector3(cam.x - c.x, 0.0, cam.z - c.z).normalized()
+				var p: Vector3 = c + to_cam * 1.7 + to_cam.cross(Vector3.UP) * (0.95 * k - 0.475 * (counts[g] - 1))
+				_place(pid, p, _yaw_to(p, Vector3(cam.x, 0.0, cam.z)))
+				_dress(pid, looks[i % looks.size()])
+				_moves[pid] = [&"wave", &"dance", &"laugh", &"thumbs_up"][i % 4]
+				if k == 0:
+					_key_light(c + to_cam * 3.5 + Vector3(0, 4.0, 0), c + to_cam * 1.7 + Vector3(0, 0.8, 0), 4.5, 32.0)
+				i += 1
+				k += 1
+				if k >= counts[g]:
+					k = 0
+					g = mini(g + 1, counts.size() - 1)
+			_free_cam(cam, fp + Vector3(-1.2, 0.3, -1.6), 62.0)
+		"splash_friends":  # FRIENDS' LOBBIES: your friends at their table, waving you over
+			_scene.hud.visible = false
+			_hide_local()
 			var st: StationBase = _table(0)
 			var fwd: Vector3 = (st.seat_position(0) - st.global_position)
 			fwd.y = 0.0
 			fwd = fwd.normalized()
 			var side: Vector3 = fwd.cross(Vector3.UP)
-			var spot: Vector3 = st.global_position + fwd * 1.8
-			spot.y = 0.0
+			var spot: Vector3 = Vector3(st.global_position.x, 0.0, st.global_position.z) + fwd * 1.6
+			var looks: Array = [["hat_party", "shirt_hawaiian"], ["hat_cowboy", "shirt_flannel", "beard_mustache"], ["hat_propeller", "shirt_varsity", "eyes_star"]]
 			var i: int = 0
 			for pid: int in _others():
-				_place(pid, spot + side * (-1.15 + 1.15 * i), atan2(-fwd.x, -fwd.z))
+				_place(pid, spot + side * (-1.05 + 1.05 * i) + fwd * (0.2 if i == 1 else 0.0), atan2(-fwd.x, -fwd.z))
+				_dress(pid, looks[i % looks.size()])
 				i += 1
-			_place(_scene.local_id, spot + fwd * 30.0, 0.0)
 			_waves = _others()
-			_free_cam(spot + fwd * 5.4 + Vector3(0, 1.6, 0), spot + Vector3(0, 0.8, 0), 55.0)
+			_key_light(spot + fwd * 3.0 + Vector3(0, 3.5, 0), spot + Vector3(0, 0.9, 0), 2.6, 32.0)
+			_free_cam(spot + fwd * 3.9 + Vector3(0, 1.2, 0), spot + Vector3(0, 1.0, 0), 50.0)
 		"leaderboard":
 			var cash: Array[int] = [640, -310, 1210, -520]
 			var i: int = 0
@@ -218,6 +284,40 @@ func _stage() -> void:
 			_scene.local.cam.yaw = 0.0
 			_scene.local.cam.pitch = -0.15
 			_scene.hud.show_leaderboard.call_deferred(true)
+
+
+## Our own bean out of the picture (the free camera shows only the staged ones).
+func _hide_local() -> void:
+	_place(_scene.local_id, Vector3(0, 0, -60), 0.0)
+	_scene.avatars[_scene.local_id].visible = false
+
+
+## Puts the outfit pieces `ids` on a bean (each piece in its own slot).
+func _dress(pid: int, ids: Array) -> void:
+	var o: Dictionary = {}
+	for id: Variant in ids:
+		var d: CosmeticDef = CosmeticShop.default().find(StringName(id))
+		if d != null:
+			o[d.kind] = d.id
+	(_scene.avatars[pid] as PlayerAvatar).set_outfit(o)
+	_outfits[pid] = o
+
+
+static func _yaw_to(from: Vector3, to: Vector3) -> float:
+	return atan2(-(to.x - from.x), -(to.z - from.z))
+
+
+## A warm spot on the staged beans (a splash art's key light).
+func _key_light(from: Vector3, to: Vector3, energy: float, angle: float) -> void:
+	var l := SpotLight3D.new()
+	l.light_color = Color(1.0, 0.86, 0.66)
+	l.light_energy = energy
+	l.spot_range = 14.0
+	l.spot_angle = angle
+	l.shadow_enabled = true
+	_scene.pixel_view.world.add_child(l)
+	l.global_position = from
+	l.look_at(to, Vector3.UP)
 
 
 ## The `n`-th blackjack table of the floor (by id), else any table.
@@ -243,51 +343,6 @@ func _station_id(st: StationBase) -> StringName:
 		if _scene.map.stations[k] == st:
 			return k
 	return &""
-
-
-## A brass-framed sign with `text` on a stand at `pos`, facing along `facing`.
-func _sign(pos: Vector3, text: String, color: Color, facing: Vector3) -> void:
-	var root := Node3D.new()
-	_scene.pixel_view.world.add_child(root)
-	root.global_position = Vector3(pos.x, 0.0, pos.z)
-	root.look_at(root.global_position - facing, Vector3.UP)
-	var brass := StandardMaterial3D.new()
-	brass.albedo_color = Palette.WARM_GOLD
-	brass.metallic = 0.8
-	brass.roughness = 0.35
-	var pole := MeshInstance3D.new()
-	var pm := CylinderMesh.new()
-	pm.top_radius = 0.035
-	pm.bottom_radius = 0.035
-	pm.height = 1.25
-	pole.mesh = pm
-	pole.material_override = brass
-	pole.position = Vector3(0, 0.62, 0)
-	root.add_child(pole)
-	var board := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.95 if text.length() > 5 else 0.7, 0.36, 0.04)
-	board.mesh = bm
-	var wood := StandardMaterial3D.new()
-	wood.albedo_color = Palette.VIP_BURGUNDY
-	board.material_override = wood
-	board.position = Vector3(0, 1.38 + pos.y, 0)
-	root.add_child(board)
-	var frame := MeshInstance3D.new()
-	var fm := BoxMesh.new()
-	fm.size = bm.size + Vector3(0.06, 0.06, -0.01)
-	frame.mesh = fm
-	frame.material_override = brass
-	frame.position = board.position
-	root.add_child(frame)
-	var label := Label3D.new()
-	label.text = text
-	label.font_size = 96
-	label.pixel_size = 0.0022
-	label.modulate = color
-	label.outline_size = 0
-	label.position = board.position + Vector3(0, 0, 0.03)
-	root.add_child(label)
 
 
 ## Two brass posts with a red velvet rope between them, across the way to the table.

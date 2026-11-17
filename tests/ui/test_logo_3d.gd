@@ -60,3 +60,19 @@ func test_entrance_has_one_logo_and_no_revolving_door() -> void:
 		assert_gt(p.z, LuckyLounge.ENTRANCE_POS.z - 1.0, "on the entrance wall")
 	for l: Node in map.find_children("*", "Label3D", true, false):
 		assert_ne((l as Label3D).text, "LUCKY LOUNGE", "old name sign removed")
+
+
+## Patrick 2026-11-17: "auf der rückseite des logos sollte ein counter stehen an spins".
+func test_spin_counter_on_the_back() -> void:
+	assert_eq(Logo3D._grouped(0), "0")
+	assert_eq(Logo3D._grouped(999), "999")
+	assert_eq(Logo3D._grouped(1234), "1,234")
+	assert_eq(Logo3D._grouped(1234567), "1,234,567")
+	var logo := Logo3D.new()
+	add_child_autofree(logo)
+	assert_false(logo.spins_label.visible, "only the main menu's logo shows it")
+	logo.set_spins(1234)
+	assert_true(logo.spins_label.visible)
+	assert_eq(logo.spins_label.text, "1,234")
+	assert_lt(logo.spins_label.position.z, -1.7, "behind the chip")
+	assert_false(logo.spins_label.double_sided, "not seen through the front")

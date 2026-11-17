@@ -3,7 +3,8 @@ extends CanvasLayer
 ## screen while an online connection is made. The live casino panorama (`CasinoPanorama`, blurred
 ## and gently tilting) with the 3D logo (`Logo3DView`, the same one the main menu shows: Patrick,
 ## "Use the Better at gambling logo"), a tip and "LOADING…" (or "JOINING ABCDE…").
-## The main menu calls `begin("JOINING …")` when it starts connecting and `cancel` if that fails;
+## A Gold Coin spins under the logo the whole time.
+## The main menu calls `begin("CREATING LOBBY")` / `begin("JOINING")` the moment you pick a lobby and `cancel` if that fails;
 ## `SceneRouter.goto` calls `begin` before it swaps to the match (switching an open joining screen
 ## to "LOADING") and the match scene calls `finish` once its world is built. Nothing shows when
 ## headless.
@@ -30,6 +31,9 @@ const TIPS: Array[String] = [
 
 ## Logo size on this screen (the main menu's is 640 × 516; the coin sign is about 1.24:1).
 const LOGO_SIZE: Vector2 = Vector2(680, 548)
+## The spinning coin under the logo, and how fast it turns (turns per second).
+const COIN_PX: float = 76.0
+const COIN_TURNS: float = 0.8
 
 var _root: Control
 var _shown_at: float = 0.0
@@ -90,6 +94,13 @@ func begin(status_text: String = "LOADING") -> void:
 	rule.custom_minimum_size = Vector2(360, 3)
 	rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(rule)
+	# A spinning Gold Coin over the status (Patrick 2026-11-17: "coin loader spinning in the
+	# center"), so the wait reads as a wait.
+	var coin: CoinIcon = CoinIcon.make(COIN_PX, true)
+	coin.name = "Spinner"
+	coin.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	coin.pivot_offset = Vector2(COIN_PX, COIN_PX) * 0.5
+	box.add_child(coin)
 	var loading := Label.new()
 	loading.name = "Loading"
 	loading.text = _status
@@ -164,6 +175,9 @@ func _process(_delta: float) -> void:
 		return
 	var dots: int = int(Time.get_ticks_msec() / 400.0) % 4
 	(_root.find_child("Loading", true, false) as Label).text = _status + ".".repeat(dots)
+	var coin := _root.find_child("Spinner", true, false) as Control
+	if coin != null:  # a coin turning on its edge: squash it to nothing and back
+		coin.scale.x = cos(Time.get_ticks_msec() / 1000.0 * TAU * COIN_TURNS)
 
 
 ## Takes the screen down at once (joining failed: back to the menu, which shows why).

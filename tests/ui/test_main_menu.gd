@@ -154,6 +154,39 @@ func test_play_online_is_four_picture_cards_without_a_name_field() -> void:
 	assert_true(menu.profile_badge.visible)
 
 
+## Patrick 2026-11-17: "theres alwys one selected on pc ... on pc not only on hover bigger" and
+## "allgemein aufm pc ist alles immer selected, in jedem menu änder das": with the mouse in hand
+## nothing keeps the focus (only hover lights up); the first key press brings it back.
+func test_with_the_mouse_nothing_is_selected() -> void:
+	menu.call(&"_show_online")
+	await wait_process_frames(2)
+	var card: PictureCard = menu.online.public_card
+	card.disabled = false  # no Steam here
+	card.grab_focus()
+	await wait_process_frames(1)
+	assert_true(card.is_lit(), "keys / pad: the focused card lights up")
+	var moved := InputEventMouseMotion.new()
+	moved.relative = Vector2(20, 0)
+	FocusGate._input(moved)
+	await wait_process_frames(1)
+	assert_true(FocusGate.mouse)
+	assert_false(card.has_focus(), "the mouse in hand: the focus is let go")
+	assert_false(card.is_lit(), "no card picked out")
+	menu.online.private_card.grab_focus()  # a menu opening grabs the focus: let go again
+	await wait_process_frames(2)
+	assert_null(menu.get_viewport().gui_get_focus_owner(), "nothing selected with the mouse")
+	var key := InputEventKey.new()
+	key.keycode = KEY_DOWN
+	key.physical_keycode = KEY_DOWN
+	key.pressed = true
+	FocusGate._input(key)
+	assert_false(FocusGate.mouse, "keys again")
+	assert_true(menu.online.private_card.has_focus(), "the first key press brings the focus back")
+	await wait_process_frames(1)
+	assert_true(menu.online.private_card.is_lit() or menu.online.private_card.disabled, "and it shows")
+	FocusGate.mouse = false
+
+
 func test_online_name_is_the_steam_name() -> void:
 	# No Steam here: the saved name; with Steam `SceneRouter.profile_name` is the persona name.
 	assert_false(menu.has_method(&"_save_name"), "nothing to type a name into")

@@ -3,7 +3,9 @@ extends Button
 ## A big menu button that is a picture with a caption (Patrick 2026-11-16: "ein menu mit bildern
 ## als buttons und die bild beschreiben was abgeht"): the picture fills the card, a dark band at the
 ## bottom carries the title and one line on what happens. Hover or focus (mouse, keyboard, pad)
-## lifts the card a little, rings it in gold and zooms the picture slightly. Disabled cards are
+## lifts the card a little, rings it in gold and zooms the picture slightly. With the mouse only
+## the hovered card lights up (Patrick 2026-11-17: "theres alwys one selected on pc"): `FocusGate`
+## lets the focus go while you use the mouse. Disabled cards are
 ## dimmed and stay still. Used by PLAY ONLINE (`OnlineMenu`) and the tutorial's overview
 ## (`HowToPlayPanel`). The card's size comes from its container (`custom_minimum_size`).
 
