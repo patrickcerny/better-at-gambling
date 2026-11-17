@@ -565,7 +565,7 @@ static func cape(k: OutfitMeshKit, id: StringName) -> void:
 					return OutfitMeshes.GOLD.darkened(0.2)
 				if d > 0.88:
 					return OutfitMeshes.GOLD.darkened(0.1)  # where four tiles meet
-				return OutfitMeshes.BURGUNDY, OutfitMeshes.BURGUNDY.darkened(0.4), 60, 42)
+				return OutfitMeshes.BURGUNDY, OutfitMeshes.BURGUNDY.darkened(0.4), 42, 30)
 			OutfitMeshes._clasps(k, OutfitMeshes.GOLD)
 		&"cape_suited_trips":
 			# The cape ends in three identical seven of hearts fanned out (the cloth itself is cut
