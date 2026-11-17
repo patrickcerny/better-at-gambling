@@ -298,9 +298,66 @@ static func _ice_point(a: float, v: float, lift: float) -> Vector3:
 	return Vector3(sin(a) * r, (t - 0.5) * AvatarVisuals.BODY_HEIGHT + 0.012, AvatarVisuals.bend_at(t) - cos(a) * r * AvatarVisuals.BODY_DEPTH)
 
 
+## Where the party horn's mouthpiece sits (body space).
+static func _horn_mouth() -> Vector3:
+	var my: float = OutfitMeshes._mouth_y()
+	return Vector3(0.0, my, AvatarVisuals.face_z(my, 0.0) + 0.01)
+
+
+## The party horn's tube: segment `i` of `n` when it is rolled up by `curl` (0 straight out, 1 a
+## full roll), from the mouthpiece forward, curling downward and back under (body space).
+static func _horn_point(i: int, n: int, curl: float) -> Vector3:
+	const LENGTH: float = 0.42
+	var ds: float = LENGTH / float(n)
+	var p: Vector3 = _horn_mouth() + Vector3(0, 0, -0.07)
+	var theta: float = 0.0
+	for j: int in i:
+		var s: float = (float(j) + 0.5) / float(n)
+		theta += curl * lerpf(2.0, 34.0, s * s) * ds
+		p += Vector3(0, -sin(theta), -cos(theta)) * ds
+	return p
+
+
+## A tear's way down the cheek under eye `side` at `s` (0 under the eye .. 1 the jaw), `lift` off
+## the skin (body space).
+static func _tear_point(side: float, s: float, lift: float) -> Vector3:
+	var r: float = AvatarVisuals.EYE_RADIUS
+	var e: Vector3 = OutfitMeshes._eye_center(side)
+	var x: float = e.x + side * (r * 0.5 + s * 0.03)
+	var y: float = e.y - r * 0.85 - s * 0.22
+	return Vector3(x, y, AvatarVisuals.face_z(y, x) - lift)
+
+
 static func spinners(id: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	match id:
+		&"mouth_party_horn":
+			# Every 10 s the tube rolls out straight, holds, and rolls back in (keys every 0.5 s).
+			const N: int = 22
+			var curls: PackedFloat32Array = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.55, 0.12, 0, 0, 0, 0.3, 0.7, 1, 1]
+			for i: int in N:
+				var k := OutfitMeshKit.new()
+				k.sphere(Vector3.ZERO, Vector3.ONE * 0.03, [OutfitMeshes.RED, OutfitMeshes.GOLD, OutfitMeshes.CREAM][(i / 2) % 3], 8, 4)
+				if i == N - 1:
+					k.sphere(Vector3.ZERO, Vector3.ONE * 0.034, OutfitMeshes.GOLD, 8, 4)
+				var origin: Vector3 = _horn_point(i + 1, N, 1.0)
+				var path := PackedVector3Array()
+				for c: float in curls:
+					path.append(_horn_point(i + 1, N, c) - origin)
+				out.append({"mesh": k.commit(), "origin": origin, "axis": Vector3.UP, "speed": 0.0, "path": path, "period": 10.0})
+		&"eyes_tears":
+			# Tears well up under each eye, roll down the cheek and drop off at the jaw.
+			for side: float in [-1.0, 1.0]:
+				for i: int in 3:
+					var k := OutfitMeshKit.new()
+					k.sphere(Vector3.ZERO, Vector3(0.02, 0.027, 0.014), OutfitMeshes._glow(TEAR, 0.3), 8, 5)
+					var origin: Vector3 = _tear_point(side, 0.0, 0.01)
+					var path := PackedVector3Array()
+					for j: int in 9:
+						path.append(_tear_point(side, float(j) / 8.0, 0.01) - origin)
+					path.append(path[path.size() - 1] + Vector3(0, -0.08, -0.02))  # falls off
+					out.append({"mesh": k.commit(), "origin": origin, "axis": Vector3.UP, "speed": 0.0, "path": path,
+							"period": 2.4, "scales": PackedFloat32Array([0.2, 0.9, 1, 1, 1, 1, 1, 1, 1, 0.0]), "phase": float(i) / 3.0 + (0.15 if side > 0.0 else 0.0)})
 		&"hat_ice_pack":
 			# Cold mist rolls off the ice bag's rim, sinks along the head and fades (body space).
 			for i: int in 5:
@@ -696,17 +753,8 @@ static func boots(k: OutfitMeshKit, id: StringName) -> void:
 
 
 ## The right foot's extra parts (the ball and chain trail behind one foot only).
-static func right_boot_extra(k: OutfitMeshKit, id: StringName) -> void:
-	if id == &"boots_ball_chain":
-		var ball := Vector3(0.02, 0.04, 0.5)
-		var path := PackedVector3Array()
-		for i: int in 9:
-			var s: float = float(i) / 8.0
-			path.append(Vector3(0.01 * s, lerpf(0.07, ball.y + 0.02, s) - 0.04 * sin(PI * s), lerpf(0.13, ball.z - 0.1, s)))
-		for i: int in path.size():
-			k.torus(path[i], 0.012, 0.03, OutfitMeshes.STEEL, 8, Basis(Vector3.FORWARD, PI * 0.5 * float(i % 2)) * Basis(Vector3.RIGHT, PI * 0.5))
-		k.sphere(ball, Vector3.ONE * 0.105, Color("#4A4744"), 16, 10)
-		k.sphere(ball + Vector3(-0.035, 0.05, -0.04), Vector3.ONE * 0.022, OutfitMeshes._glow(OutfitMeshes.WHITE, 0.15), 6, 3)
+static func right_boot_extra(_k: OutfitMeshKit, _id: StringName) -> void:
+	pass  # the ball and chain swings loose: `BallChain`, added by `AvatarVisuals`
 
 
 static func _shoe_plain(k: OutfitMeshKit, upper: Color, sole: Color) -> void:
@@ -768,25 +816,30 @@ static func eyes(k: OutfitMeshKit, id: StringName) -> void:
 				var c := Vector3(e.x * 1.12, e.y + 0.01, e.z - r * 0.55)
 				k.sphere(c, Vector3.ONE * r * 1.25, OutfitMeshes.WHITE, 16, 10)  # the pupils move: `spinners`
 		&"eyes_loupe":
-			# A jeweller's loupe screwed into the right eye.
+			# A jeweller's loupe screwed into the right eye: a black rubber cup pressed onto the skin
+			# round the eye, the barrel standing straight out of it, the gold-rimmed lens in front.
 			var e: Vector3 = OutfitMeshes._eye_center(-1.0)
-			var p := Vector3(e.x * 1.05, e.y, e.z - r - 0.04)
-			k.cylinder(p, r * 0.95, r * 1.15, 0.09, OutfitMeshes.BLACK, 18, face)
-			k.torus(p + Vector3(0, 0, -0.045), r * 0.85, r * 1.0, OutfitMeshes.GOLD, 18, face)
-			k.cylinder(p + Vector3(0, 0, -0.047), r * 0.85, r * 0.85, 0.004, Color("#2E3A44"), 18, face)
-			k.sphere(p + Vector3(r * 0.35, r * 0.35, -0.052), Vector3(r * 0.22, r * 0.12, 0.004), OutfitMeshes.WHITE, 8, 3, Basis(Vector3.BACK, 0.7))
+			var cup := func(u: float, v: float) -> Vector3:
+				var a: float = u * TAU
+				var rad: float = lerpf(r * 1.0, r * 1.38, v)
+				var x: float = e.x + cos(a) * rad
+				var y: float = e.y + sin(a) * rad
+				return Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.004 - 0.01 * (1.0 - v))
+			k.surface(cup, 32, 3, func(_u: float, _v: float) -> Color: return Color("#24211F"),
+				func(_p: Vector3) -> Vector3: return Vector3(0, 0, -1), true)
+			var skin_z: float = AvatarVisuals.face_z(e.y, e.x)
+			const L: float = 0.11
+			var p := Vector3(e.x, e.y, skin_z - L * 0.5)  # the barrel's middle: its back end on the skin
+			k.cylinder(p, r * 1.0, r * 1.12, L, OutfitMeshes.BLACK, 20, face)
+			k.torus(p + Vector3(0, 0, -L * 0.5), r * 0.86, r * 1.02, OutfitMeshes.GOLD, 20, face)
+			k.cylinder(p + Vector3(0, 0, -L * 0.5 - 0.002), r * 0.86, r * 0.86, 0.004, Color("#2E3A44"), 20, face)
+			k.sphere(p + Vector3(r * 0.35, r * 0.35, -L * 0.5 - 0.006), Vector3(r * 0.22, r * 0.12, 0.004), OutfitMeshes.WHITE, 8, 3, Basis(Vector3.BACK, 0.7))
 		&"eyes_tears":
-			# Streams of tears and a drop about to fall from each eye.
+			# Wet trails down the cheeks; the tears themselves roll down them (`spinners`).
 			for side: float in [-1.0, 1.0]:
-				var e: Vector3 = OutfitMeshes._eye_center(side)
-				for i: int in 7:
-					var s: float = float(i) / 6.0
-					var x: float = e.x + side * (r * 0.5 + s * 0.02)
-					var y: float = e.y - r * 0.85 - s * 0.16
-					k.sphere(Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.006), Vector3(0.016, 0.022, 0.01), OutfitMeshes._glow(TEAR, 0.25), 8, 4)
-				var dy: float = e.y - r * 0.85 - 0.2
-				var dx: float = e.x + side * (r * 0.5 + 0.025)
-				k.sphere(Vector3(dx, dy, AvatarVisuals.face_z(dy, dx) - 0.02), Vector3(0.022, 0.03, 0.022), OutfitMeshes._glow(TEAR, 0.25), 8, 5)
+				for i: int in 8:
+					var p: Vector3 = _tear_point(side, float(i) / 7.0, 0.003)
+					k.sphere(p, Vector3(0.012, 0.016, 0.004), OutfitMeshes._glow(TEAR.lightened(0.2), 0.15), 6, 3)
 
 
 ## Pupils of eye pieces in `PUPILS` (the pupil's own space, like `OutfitMeshes.pupil_mesh`).
@@ -817,19 +870,10 @@ static func mouth(k: OutfitMeshKit, id: StringName) -> void:
 	var mouth_at := Vector3(0.04, my, AvatarVisuals.face_z(my, 0.04) + 0.01)
 	match id:
 		&"mouth_party_horn":
-			# A party blower: the mouthpiece, then the paper tube rolled up into a curl, striped.
-			k.cylinder(mouth_at + Vector3(0, 0, -0.04), 0.028, 0.034, 0.08, OutfitMeshes.GOLD, 10, Basis(Vector3.RIGHT, PI * 0.5))
-			const R0: float = 0.1
-			var centre: Vector3 = mouth_at + Vector3(R0, 0.0, -0.1)
-			var prev: Vector3 = centre
-			for i: int in 40:
-				var s: float = float(i) / 39.0
-				var phi: float = PI - s * TAU * 1.2
-				var rad: float = lerpf(R0, 0.03, s)
-				var p: Vector3 = centre + Vector3(cos(phi) * rad, sin(phi) * rad, -0.01 * s)
-				k.sphere(p, Vector3.ONE * 0.032, [OutfitMeshes.RED, OutfitMeshes.GOLD, OutfitMeshes.CREAM][(i / 3) % 3], 8, 4)
-				prev = p
-			k.sphere(prev, Vector3.ONE * 0.036, OutfitMeshes.GOLD, 8, 4)
+			# A party blower straight out of the mouth: the gold mouthpiece here, the striped paper
+			# tube rolls out and back in (`spinners`).
+			var at: Vector3 = _horn_mouth()
+			k.cylinder(at + Vector3(0, 0, -0.035), 0.028, 0.034, 0.07, OutfitMeshes.GOLD, 10, Basis(Vector3.RIGHT, PI * 0.5))
 
 		&"mouth_straw":
 			# A striped straw in the corner of the mouth, a paper umbrella tied to it.
