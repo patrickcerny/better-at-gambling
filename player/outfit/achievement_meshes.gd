@@ -24,6 +24,7 @@ const MONEY := Color("#4E7A4A")
 const VARSITY := Color("#6A1F2A")
 
 ## Shirts' sleeve colours (the arms wear them), like `OutfitMeshes.SLEEVES`.
+const FROST := Color("#F2F9FC")
 const SLEEVES: Dictionary = {
 	&"shirt_varsity": Color("#E9DCBC"), &"shirt_harlequin": Color("#681F2C"), &"shirt_gold_chain": Color("#1C1A19"),
 }
@@ -135,7 +136,7 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 			var keep: Transform3D = k.xf
 			k.xf = Transform3D.IDENTITY
 			var rim := func(a: float) -> float:  # how far down the head the rim reaches (body t)
-				return lerpf(0.9, 0.8, smoothstep(-0.2, 1.0, sin(a))) + 0.012 * sin(a * 3.0 + 1.0)
+				return _ice_rim(a)
 			for side: int in 2:
 				var at := func(u: float, v: float) -> Vector3:
 					var a: float = u * TAU
@@ -145,7 +146,9 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 					var r: float = AvatarVisuals.radius_at(t) + (0.014 + fold + (full if side == 0 else 0.0) - (0.0 if side == 0 else 0.008)) * smoothstep(0.0, 0.08, v)
 					return Vector3(sin(a) * r, (t - 0.5) * AvatarVisuals.BODY_HEIGHT + 0.012, AvatarVisuals.bend_at(t) - cos(a) * r * AvatarVisuals.BODY_DEPTH)
 				var col: Color = ICE if side == 0 else ICE.darkened(0.35)
-				k.surface(at, 48, 14, func(_u: float, v: float) -> Color:
+				k.surface(at, 48, 14, func(u: float, v: float) -> Color:
+					if side == 0 and v > 0.15 and OutfitMeshes._hash(int(u * 24.0), int(v * 7.0), 7) > 0.9:
+						return ICE.lightened(0.45)  # a few frosted patches
 					return col.darkened(0.08) if side == 0 and v > 0.1 and fposmod(v * 6.0, 1.0) < 0.12 else col,
 					func(p: Vector3) -> Vector3: return (p - Vector3(0, 0.45, 0)) * (1.0 if side == 0 else -1.0), true)
 			# The screw cap where the bag bulges with ice, standing off the bag's surface.
@@ -160,6 +163,20 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 			k.cylinder(cap + cb * Vector3(0, 0.04, 0), 0.06, 0.06, 0.035, OutfitMeshes.SILVER.darkened(0.18), 16, cb)
 			for i: int in 3:  # ice cubes showing through the neck
 				k.box(cap + cb * Vector3(-0.02 + 0.02 * float(i), 0.065, 0.0), Vector3.ONE * 0.025, OutfitMeshes._glow(Color("#E4F0F7"), 0.2), cb * Basis(Vector3.UP, float(i)))
+			# Ice effects: twinkling frost crystals on the bag, meltwater drops along the rim (cold
+			# mist sinks from it: `spinners`).
+			for i: int in 11:
+				var a: float = TAU * float(i) / 11.0 + 0.3 * OutfitMeshes._hash(i, 2, 9)
+				var v: float = lerpf(0.25, 0.8, OutfitMeshes._hash(i, 3, 9))
+				var p: Vector3 = _ice_point(a, v, 0.004)
+				var n: Vector3 = (p - Vector3(0, 0.45, 0)).normalized()
+				var b := Basis(Quaternion(Vector3.BACK, n)) * Basis(Vector3.BACK, float(i))
+				var sz: float = lerpf(0.02, 0.034, OutfitMeshes._hash(i, 4, 9))
+				k.prism(OutfitMeshKit.star_poly(6, sz, sz * 0.32), 0.004, Transform3D(b, p), OutfitMeshes._glow(FROST, 0.7))
+			for i: int in 7:
+				var a: float = TAU * float(i) / 7.0 + 0.5
+				var p: Vector3 = _ice_point(a, 1.0, 0.004) + Vector3(0, -0.012, 0)
+				k.sphere(p, Vector3(0.011, 0.016, 0.011), OutfitMeshes._glow(TEAR, 0.35), 6, 4)
 			k.xf = keep
 		&"hat_star":
 			# A gold star floating over the head (it turns: `spinners`), sparkles round it.
@@ -267,9 +284,35 @@ const GREEDY_LOOKS: Array[Vector2] = [Vector2(0, 0), Vector2(0, 0), Vector2(0.32
 	Vector2(-0.22, 0.22), Vector2(-0.22, 0.22), Vector2(0, 0)]
 
 
+## The ice pack's rim, as body height t, and a point on its outer side (body space): `v` 0 at
+## the top of the head to 1 at the rim, `lift` off the bag.
+static func _ice_rim(a: float) -> float:
+	return lerpf(0.9, 0.8, smoothstep(-0.2, 1.0, sin(a))) + 0.012 * sin(a * 3.0 + 1.0)
+
+
+static func _ice_point(a: float, v: float, lift: float) -> Vector3:
+	var t: float = lerpf(1.0, _ice_rim(a), v)
+	var fold: float = 0.01 * sin(a * 9.0) * v * v
+	var full: float = 0.05 * sin(clampf(v * 1.6, 0.0, 1.0) * PI) * (0.6 + 0.4 * cos(a - 2.4))
+	var r: float = AvatarVisuals.radius_at(t) + (0.014 + fold + full) * smoothstep(0.0, 0.08, v) + lift
+	return Vector3(sin(a) * r, (t - 0.5) * AvatarVisuals.BODY_HEIGHT + 0.012, AvatarVisuals.bend_at(t) - cos(a) * r * AvatarVisuals.BODY_DEPTH)
+
+
 static func spinners(id: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	match id:
+		&"hat_ice_pack":
+			# Cold mist rolls off the ice bag's rim, sinks along the head and fades (body space).
+			for i: int in 5:
+				var a: float = TAU * float(i) / 5.0 + 0.9
+				var k := OutfitMeshKit.new()
+				k.sphere(Vector3.ZERO, Vector3(0.034, 0.02, 0.034), OutfitMeshes._glow(ICE.lightened(0.55), 0.3), 8, 4)
+				k.sphere(Vector3(0.022, 0.004, 0.008), Vector3(0.022, 0.014, 0.022), OutfitMeshes._glow(ICE.lightened(0.7), 0.3), 6, 3)
+				var start: Vector3 = _ice_point(a, 1.0, 0.012)
+				var outward := Vector3(sin(a), 0, -cos(a)) * 0.02
+				var path := PackedVector3Array([Vector3.ZERO, outward * 0.5 + Vector3(0, -0.05, 0), outward + Vector3(0, -0.11, 0), outward * 1.3 + Vector3(0, -0.16, 0)])
+				out.append({"mesh": k.commit(), "origin": start, "axis": Vector3.UP, "speed": 0.4, "path": path, "period": 3.2,
+						"scales": PackedFloat32Array([0.2, 0.9, 1.0, 0.0]), "phase": float(i) / 5.0})
 		&"eyes_bulging":
 			# The pupils dart round the bulging eyeballs (body space, like `eyes`).
 			var r: float = AvatarVisuals.EYE_RADIUS
