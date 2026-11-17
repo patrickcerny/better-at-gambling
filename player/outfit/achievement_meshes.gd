@@ -131,26 +131,36 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 		&"hat_ice_pack":
 			# A rubber ice bag slumped over the head: full of ice on top, flopping down the left side
 			# in soft folds, the screw cap sticking up.
-			var sag := func(a: float) -> float:  # how far down the rim reaches (elevation, radians)
-				return lerpf(0.95, -0.05, smoothstep(-0.2, 1.0, sin(a))) + 0.08 * sin(a * 3.0 + 1.0)
+			# Built on the head itself (body space), so it lies on the skin with no gap anywhere.
+			var keep: Transform3D = k.xf
+			k.xf = Transform3D.IDENTITY
+			var rim := func(a: float) -> float:  # how far down the head the rim reaches (body t)
+				return lerpf(0.9, 0.8, smoothstep(-0.2, 1.0, sin(a))) + 0.012 * sin(a * 3.0 + 1.0)
 			for side: int in 2:
 				var at := func(u: float, v: float) -> Vector3:
 					var a: float = u * TAU
-					var el: float = lerpf(PI * 0.5, sag.call(a), v)
-					var fold: float = 0.018 * sin(a * 9.0) * v * v
-					var full: float = 0.06 * pow(cos(clampf(el, 0.0, PI * 0.5) - PI * 0.5), 3.0) * (1.0 - v)  # the lump of ice on top
-					var r: float = 0.37 + fold + (full if side == 0 else 0.0) - (0.0 if side == 0 else 0.012)
-					return Vector3(sin(a) * cos(el) * r, 0.0 + sin(el) * (0.27 + full * 2.0), cos(a) * cos(el) * r * D)
+					var t: float = lerpf(1.0, rim.call(a), v)
+					var fold: float = 0.01 * sin(a * 9.0) * v * v
+					var full: float = 0.05 * sin(clampf(v * 1.6, 0.0, 1.0) * PI) * (0.6 + 0.4 * cos(a - 2.4))  # the lump of ice
+					var r: float = AvatarVisuals.radius_at(t) + (0.014 + fold + (full if side == 0 else 0.0) - (0.0 if side == 0 else 0.008)) * smoothstep(0.0, 0.08, v)
+					return Vector3(sin(a) * r, (t - 0.5) * AvatarVisuals.BODY_HEIGHT + 0.012, AvatarVisuals.bend_at(t) - cos(a) * r * AvatarVisuals.BODY_DEPTH)
 				var col: Color = ICE if side == 0 else ICE.darkened(0.35)
 				k.surface(at, 48, 14, func(_u: float, v: float) -> Color:
-					return col.darkened(0.08) if side == 0 and fposmod(v * 6.0, 1.0) < 0.12 else col,
-					func(p: Vector3) -> Vector3: return (p - Vector3(0, -0.05, 0)) * (1.0 if side == 0 else -1.0), true)
-			var cap := Vector3(-0.09, 0.33, 0.05)
-			var cb := Basis(Vector3.BACK, 0.35)
-			k.cylinder(cap, 0.075, 0.08, 0.05, OutfitMeshes.SILVER, 16, cb)
-			k.cylinder(cap + cb * Vector3(0, 0.04, 0), 0.065, 0.065, 0.035, OutfitMeshes.SILVER.darkened(0.18), 16, cb)
+					return col.darkened(0.08) if side == 0 and v > 0.1 and fposmod(v * 6.0, 1.0) < 0.12 else col,
+					func(p: Vector3) -> Vector3: return (p - Vector3(0, 0.45, 0)) * (1.0 if side == 0 else -1.0), true)
+			# The screw cap where the bag bulges with ice, standing off the bag's surface.
+			var ca: float = 2.4
+			var ct: float = 0.955
+			var cr: float = AvatarVisuals.radius_at(ct) + 0.014 + 0.05 * sin(clampf((1.0 - ct) / (1.0 - rim.call(ca)) * 1.6, 0.0, 1.0) * PI)
+			var cp := Vector3(sin(ca) * cr, (ct - 0.5) * AvatarVisuals.BODY_HEIGHT + 0.012, AvatarVisuals.bend_at(ct) - cos(ca) * cr * AvatarVisuals.BODY_DEPTH)
+			var cn: Vector3 = (cp - Vector3(0, 0.45, 0)).normalized()
+			var cb := Basis(Quaternion(Vector3.UP, cn))
+			var cap: Vector3 = cp + cn * 0.01
+			k.cylinder(cap, 0.07, 0.075, 0.05, OutfitMeshes.SILVER, 16, cb)
+			k.cylinder(cap + cb * Vector3(0, 0.04, 0), 0.06, 0.06, 0.035, OutfitMeshes.SILVER.darkened(0.18), 16, cb)
 			for i: int in 3:  # ice cubes showing through the neck
 				k.box(cap + cb * Vector3(-0.02 + 0.02 * float(i), 0.065, 0.0), Vector3.ONE * 0.025, OutfitMeshes._glow(Color("#E4F0F7"), 0.2), cb * Basis(Vector3.UP, float(i)))
+			k.xf = keep
 		&"hat_star":
 			# A gold star floating over the head (it turns: `spinners`), sparkles round it.
 			for i: int in 3:
@@ -168,22 +178,26 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 				k.torus(Vector3(side * 0.18, 0.47, 0), 0.05, 0.08, gold, 12, Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(Vector3(0.8, 0.3, 1.2)))
 			k.prism(OutfitMeshKit.star_poly(5, 0.05, 0.022), 0.012, Transform3D(Basis(Vector3.RIGHT, -0.2).rotated(Vector3.UP, PI), Vector3(0, 0.45, -0.15)), OutfitMeshes._glow(OutfitMeshes.CREAM, 0.4))
 		&"hat_card_house":
-			# A house of cards, solid from every side: two tents of cards leaning on each other (front
-			# and back card), a card laid across them, a third tent on top. The card backs face out.
+			# A house of cards stacked like a real one: pairs of cards leaning on each other in
+			# A-frames, a flat card across them, a third A-frame on top. Turned an eighth round so
+			# the A-frames and the card backs both show from the front.
+			var turn := Basis(Vector3.UP, PI * 0.25)
 			var place := func(at: Vector3, lean: float) -> void:
-				var b := Basis(Vector3.RIGHT, lean)
-				var out: Vector3 = b * Vector3(0, 0, -signf(lean) * 0.007)
-				k.box(at, Vector3(0.14, 0.2, 0.01), OutfitMeshes.CREAM, b)
-				k.box(at + out, Vector3(0.118, 0.176, 0.004), OutfitMeshes.BURGUNDY, b)
-				k.box(at + out * 1.25, Vector3(0.036, 0.036, 0.004), OutfitMeshes.GOLD, b * Basis(Vector3.BACK, PI * 0.25))
-			var tent := func(at: Vector3) -> void:
-				place.call(at + Vector3(0, 0, -0.038), 0.36)  # front card, top leaning back
-				place.call(at + Vector3(0, 0, 0.038), -0.36)
-			for x: float in [-0.076, 0.076]:
-				tent.call(Vector3(x, 0.29, 0))
-			k.box(Vector3(0, 0.395, 0), Vector3(0.3, 0.01, 0.17), OutfitMeshes.CREAM)
-			k.box(Vector3(0, 0.4, 0), Vector3(0.27, 0.004, 0.145), OutfitMeshes.BURGUNDY)
-			tent.call(Vector3(0, 0.495, 0))
+				var b: Basis = turn * Basis(Vector3.BACK, lean)
+				var p: Vector3 = turn * at
+				k.box(p, Vector3(0.01, 0.2, 0.14), OutfitMeshes.CREAM, b)
+				for side: float in [-1.0, 1.0]:  # the card's back pattern shows on both faces
+					var out: Vector3 = b * Vector3(side * 0.006, 0, 0)
+					k.box(p + out, Vector3(0.004, 0.176, 0.118), OutfitMeshes.BURGUNDY, b)
+					k.box(p + out * 1.3, Vector3(0.004, 0.036, 0.036), OutfitMeshes.GOLD, b * Basis(Vector3.RIGHT, PI * 0.25))
+			var frame := func(at: Vector3) -> void:  # two cards whose tops meet
+				place.call(at + Vector3(-0.038, 0, 0), -0.36)
+				place.call(at + Vector3(0.038, 0, 0), 0.36)
+			for x: float in [-0.085, 0.085]:
+				frame.call(Vector3(x, 0.29, 0))
+			k.box(Vector3(0, 0.395, 0), Vector3(0.33, 0.01, 0.15), OutfitMeshes.CREAM, turn)
+			k.box(Vector3(0, 0.4005, 0), Vector3(0.3, 0.004, 0.125), OutfitMeshes.BURGUNDY, turn)
+			frame.call(Vector3(0, 0.495, 0))
 		&"hat_cherries":
 			# The slot machine's cherries: two on stalks that meet in a leaf.
 			for side: float in [-1.0, 1.0]:
