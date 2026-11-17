@@ -1,39 +1,27 @@
 class_name CosmeticThumbnails
-extends Node
+extends ThumbnailRenderer
 ## Little 3D pictures of the cosmetics for the shop's tiles and tab icons: a bean wearing the piece,
 ## framed on it (a hat on the head, boots at the feet, a cape from behind), rendered once each in an
 ## offscreen SubViewport and kept for the rest of the run. `texture_for` hands out the texture at
-## once and fills it in when its turn comes (one render per frame, so opening the shop never
-## stalls). Headless: nothing renders, the textures stay blank.
+## once and fills it in when its turn comes (`ThumbnailRenderer`: cached on disk per build, rendered
+## a few frames apart, read back without stalling). Headless: nothing renders, the textures stay blank.
 
 const SIZE: int = 256
 ## The bean colour the outfit pictures use (warm cream, every piece reads on it).
 const BEAN_COLOR: Color = Color("#E9DCBC")
 
-## id -> ImageTexture, shared by every shop that ever opens.
-static var _cache: Dictionary = {}
-## Ids still waiting for their render.
-static var _queue: Array[StringName] = []
+const KIND: String = "cosmetics"
 
-var _viewport: SubViewport
 var _bean: AvatarVisuals
 var _cam: Camera3D
-var _busy: StringName = &""
-var _wait: int = 0
 
 
 func _ready() -> void:
 	name = "CosmeticThumbnails"
-	if DisplayServer.get_name() == "headless":
-		set_process(false)
+	kind = KIND
+	image_size = Vector2i(SIZE, SIZE)
+	if setup_viewport() == null:
 		return
-	_viewport = SubViewport.new()
-	_viewport.size = Vector2i(SIZE, SIZE)
-	_viewport.transparent_bg = true
-	_viewport.own_world_3d = true
-	_viewport.msaa_3d = Viewport.MSAA_4X
-	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	add_child(_viewport)
 	var root := Node3D.new()
 	_viewport.add_child(root)
 	_bean = AvatarVisuals.new()
@@ -65,46 +53,20 @@ func _ready() -> void:
 
 ## The picture of item `id` (blank until rendered). `urgent` ones (the tab icons) jump the queue.
 static func texture_for(id: StringName, urgent: bool = false) -> ImageTexture:
-	if _cache.has(id):
-		if urgent and id in _queue:  # still waiting (asked for by a tile first): jump the queue now
-			_queue.erase(id)
-			_queue.push_front(id)
-		return _cache[id]
-	var img := Image.create_empty(SIZE, SIZE, false, Image.FORMAT_RGBA8)
-	var tex := ImageTexture.create_from_image(img)
-	_cache[id] = tex
-	if urgent:
-		_queue.push_front(id)
-	else:
-		_queue.append(id)
-	return tex
+	return request(KIND, String(id), Vector2i(SIZE, SIZE), urgent)
 
 
 ## Whether every requested picture is done.
 static func idle() -> bool:
-	return _queue.is_empty()
+	return queue_empty(KIND)
 
 
-func _process(_delta: float) -> void:
-	if _busy != &"":
-		_wait -= 1
-		if _wait > 0:
-			return
-		var img: Image = _viewport.get_texture().get_image()
-		if img != null and not img.is_empty():
-			img.convert(Image.FORMAT_RGBA8)
-			(_cache[_busy] as ImageTexture).update(img)
-		_busy = &""
-	if _queue.is_empty():
-		return
-	_busy = _queue.pop_front()
-	_stage(_busy)
-	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-	_wait = 2  # rendered at the end of this frame; read it back next frame (plus one for safety)
+func _stage(key: String) -> void:
+	_dress(StringName(key))
 
 
 ## Dresses the bean for item `id` and frames the camera on it.
-func _stage(id: StringName) -> void:
+func _dress(id: StringName) -> void:
 	var d: CosmeticDef = CosmeticShop.default().find(id)
 	var kind: StringName = d.kind if d != null else &""
 	var pack: CosmeticPack = CosmeticShop.default().find_pack(id)

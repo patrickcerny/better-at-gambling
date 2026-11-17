@@ -84,6 +84,12 @@ var load_match: bool = true
 
 
 func _ready() -> void:
+	if SceneRouter.cmdline != null and SceneRouter.cmdline.has_flag("server"):
+		# A room server (also the one a host's game starts for its party) goes straight to the
+		# match: building the whole menu first only cost the host's PC a second of CPU on join.
+		set_process(false)
+		set_process_unhandled_input(false)
+		return
 	# Live casino behind the menu (art direction: the menu is the casino, slightly blurred).
 	var pano := CasinoPanorama.new()
 	pano.name = "Panorama"
