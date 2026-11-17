@@ -21,6 +21,8 @@ const LOOK: Dictionary = {
 const SIZE: Vector2 = Vector2(13.9, 11.2)
 const FRAME: float = 1.08
 const CAMERA_DIST: float = 24.0
+## Just behind the chip's back face, where the spin counter sits.
+const BACK_Z: float = -1.78
 
 @export var sway: bool = true
 ## Yaw/pitch in degrees applied on top of the sway (used for the preview angles).
@@ -30,6 +32,11 @@ const CAMERA_DIST: float = 24.0
 var spin_deg: float = 0.0
 
 var camera: Camera3D
+## The spin counter on the chip's back (Patrick 2026-11-17: "auf der rückseite des logos sollte ein
+## counter stehen an spins"): "SPINS" over the number of full turns, in the logo's lettering.
+## Hidden until `set_spins` is called (only the main menu's spinnable logo shows it).
+var spins_label: Label3D
+var spins_head: Label3D
 var _pivot: Node3D
 var _t: float = 0.0
 
@@ -39,6 +46,7 @@ func _ready() -> void:
 	_pivot.name = "Pivot"
 	add_child(_pivot)
 	_pivot.add_child(build_model())
+	_add_counter()
 	camera = Camera3D.new()
 	camera.position = Vector3(0, 0, CAMERA_DIST)
 	camera.current = true
@@ -47,6 +55,52 @@ func _ready() -> void:
 	_apply_pose()
 	get_viewport().size_changed.connect(_frame)
 	_frame()
+
+
+## Shows `n` full turns on the chip's back.
+func set_spins(n: int) -> void:
+	if spins_label == null:
+		return
+	spins_label.text = _grouped(n)
+	spins_label.visible = true
+	spins_head.visible = true
+
+
+## 12345 -> "12,345".
+static func _grouped(n: int) -> String:
+	var digits: String = str(absi(n))
+	var out: String = ""
+	while digits.length() > 3:
+		out = "," + digits.right(3) + out
+		digits = digits.left(digits.length() - 3)
+	return ("-" if n < 0 else "") + digits + out
+
+
+func _add_counter() -> void:
+	var font: Font = load("res://assets/fonts/LuckiestGuy-Regular.ttf") as Font
+	spins_head = _back_label("SpinsHead", "SPINS", font, 120, Palette.CREAM, 1.35)
+	spins_label = _back_label("Spins", "0", font, 300, Palette.VIP_GOLD, -0.95)
+
+
+## A label on the chip's back, facing out of it (-Z), centred at height `y`.
+func _back_label(label_name: String, text: String, font: Font, font_size: int, color: Color, y: float) -> Label3D:
+	var l := Label3D.new()
+	l.name = label_name
+	l.text = text
+	l.font = font
+	l.font_size = font_size
+	l.pixel_size = 0.01
+	l.modulate = color
+	l.outline_modulate = Color("#3A0E0B")
+	l.outline_size = 36
+	l.double_sided = false
+	l.shaded = false
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.position = Vector3(0, y, BACK_Z)
+	l.rotation.y = PI
+	l.visible = false
+	_pivot.add_child(l)
+	return l
 
 
 ## Fits the whole sign: by width in narrow views, by height in wide ones.

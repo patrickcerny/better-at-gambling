@@ -894,7 +894,7 @@ func _refresh_pedestals() -> void:
 	for i: int in LuckyLounge.PEDESTALS.size():
 		var pid: Variant = by_color.get(i, null)
 		var p: Dictionary = view.state.players.get(pid, {}) if pid != null else {}
-		map.set_pedestal(i, str(p.get("name", "")), bool(p.get("ready", false)), marks.get(pid, Color(0, 0, 0, 0)))
+		map.set_pedestal(i, str(p.get("name", "")), bool(p.get("ready", false)), marks.get(pid, Color(0, 0, 0, 0)), Cosmetics.skin_of(p))
 	# Arrow over the local player's own pedestal until they are ready.
 	var mine: Dictionary = view.state.players.get(local_id, {})
 	map.set_pedestal_marker(int(mine.get("color", -1)), not mine.is_empty() and not bool(mine.get("ready", false)), marks.get(local_id, Color(0, 0, 0, 0)))

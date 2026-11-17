@@ -3,7 +3,8 @@ extends CanvasLayer
 ## screen while an online connection is made. The live casino panorama (`CasinoPanorama`, blurred
 ## and gently tilting) with the 3D logo (`Logo3DView`, the same one the main menu shows: Patrick,
 ## "Use the Better at gambling logo"), a tip and "LOADING…" (or "JOINING ABCDE…").
-## The main menu calls `begin("JOINING …")` when it starts connecting and `cancel` if that fails;
+## A Gold Coin spins under the logo the whole time.
+## The main menu calls `begin("CREATING LOBBY")` / `begin("JOINING")` the moment you pick a lobby and `cancel` if that fails;
 ## `SceneRouter.goto` calls `begin` before it swaps to the match (switching an open joining screen
 ## to "LOADING") and the match scene calls `finish` once its world is built. Nothing shows when
 ## headless.
@@ -11,6 +12,8 @@ extends CanvasLayer
 ## Shortest time the screen stays up, so it never just flashes.
 const MIN_SECONDS: float = 1.6
 const FADE_SECONDS: float = 0.6
+## Frames the match world renders behind the screen before it fades.
+const WARM_FRAMES: int = 20
 const TIPS: Array[String] = [
 	"Luck is visible: every reroll it gives you shows up on the table.",
 	"Knock someone over and shake them. Their chips are yours if you grab them first.",
@@ -28,12 +31,22 @@ const TIPS: Array[String] = [
 
 ## Logo size on this screen (the main menu's is 640 × 516; the coin sign is about 1.24:1).
 const LOGO_SIZE: Vector2 = Vector2(680, 548)
+## The spinning coin under the logo, and how fast it turns (turns per second).
+const COIN_PX: float = 76.0
+const COIN_TURNS: float = 0.8
 
 var _root: Control
 var _shown_at: float = 0.0
 var _finishing: bool = false
 ## Status word the dots animate after ("LOADING", "JOINING ABCDE").
 var _status: String = "LOADING"
+## The main menu's panorama while this screen borrows it, and where it came from.
+var _borrowed: CasinoPanorama
+var _lender: Node
+var _lender_index: int = 0
+## Engine frame `finish` was called on: the screen stays a few frames longer so the match world's
+## first frames (its shaders and pipelines) are drawn behind it, not on screen.
+var _finish_frame: int = 0
 
 
 func _ready() -> void:
@@ -69,11 +82,7 @@ func begin(status_text: String = "LOADING") -> void:
 	bg.color = Palette.CASINO_BLACK
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(bg)
-	var pano := CasinoPanorama.new()
-	pano.blur_px = 3.0
-	pano.darken = 0.5
-	pano.start_leg = randf() * CasinoPanorama.PATH.size()
-	_root.add_child(pano)
+	_root.add_child(_panorama())
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -85,6 +94,13 @@ func begin(status_text: String = "LOADING") -> void:
 	rule.custom_minimum_size = Vector2(360, 3)
 	rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(rule)
+	# A spinning Gold Coin over the status (Patrick 2026-11-17: "coin loader spinning in the
+	# center"), so the wait reads as a wait.
+	var coin: CoinIcon = CoinIcon.make(COIN_PX, true)
+	coin.name = "Spinner"
+	coin.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	coin.pivot_offset = Vector2(COIN_PX, COIN_PX) * 0.5
+	box.add_child(coin)
 	var loading := Label.new()
 	loading.name = "Loading"
 	loading.text = _status
@@ -125,16 +141,49 @@ func begin(status_text: String = "LOADING") -> void:
 	tip_box.add_child(tip)
 
 
+## The backdrop: the menu's live panorama when there is one (moved over, still flying), else a new one.
+func _panorama() -> CasinoPanorama:
+	var scene: Node = get_tree().current_scene
+	var menu_pano: CasinoPanorama = scene.get_node_or_null(^"Panorama") as CasinoPanorama if scene != null else null
+	if menu_pano != null and menu_pano.camera != null:
+		_borrowed = menu_pano
+		_lender = scene
+		_lender_index = menu_pano.get_index()
+		menu_pano.get_parent().remove_child(menu_pano)
+		menu_pano.set_look(3.0, 0.5)
+		return menu_pano
+	var pano := CasinoPanorama.new()
+	pano.blur_px = 3.0
+	pano.darken = 0.5
+	pano.start_leg = randf() * CasinoPanorama.PATH.size()
+	return pano
+
+
+## Hands a borrowed panorama back to the menu that is still there (a failed join).
+func _return_panorama() -> void:
+	if _borrowed != null and is_instance_valid(_borrowed) and _lender != null and is_instance_valid(_lender) and _lender.is_inside_tree():
+		_borrowed.get_parent().remove_child(_borrowed)
+		_lender.add_child(_borrowed)
+		_lender.move_child(_borrowed, mini(_lender_index, _lender.get_child_count() - 1))
+		_borrowed.set_look(_borrowed.menu_blur, _borrowed.menu_darken)
+	_borrowed = null
+	_lender = null
+
+
 func _process(_delta: float) -> void:
 	if _root == null or _finishing:
 		return
 	var dots: int = int(Time.get_ticks_msec() / 400.0) % 4
 	(_root.find_child("Loading", true, false) as Label).text = _status + ".".repeat(dots)
+	var coin := _root.find_child("Spinner", true, false) as Control
+	if coin != null:  # a coin turning on its edge: squash it to nothing and back
+		coin.scale.x = cos(Time.get_ticks_msec() / 1000.0 * TAU * COIN_TURNS)
 
 
 ## Takes the screen down at once (joining failed: back to the menu, which shows why).
 func cancel() -> void:
 	if _root != null:
+		_return_panorama()
 		_root.queue_free()
 		_root = null
 	_finishing = false
@@ -146,9 +195,14 @@ func finish() -> void:
 	if _root == null or _finishing:
 		return
 	_finishing = true
+	_borrowed = null  # the menu is gone: the panorama goes with this screen
+	_lender = null
+	_finish_frame = Engine.get_frames_drawn()
 	var wait: float = MIN_SECONDS - (Time.get_ticks_msec() / 1000.0 - _shown_at)
 	if wait > 0.0:
 		await get_tree().create_timer(wait, true, false, true).timeout
+	while _root != null and Engine.get_frames_drawn() - _finish_frame < WARM_FRAMES:
+		await get_tree().process_frame
 	if _root == null:
 		return
 	var tw: Tween = create_tween()

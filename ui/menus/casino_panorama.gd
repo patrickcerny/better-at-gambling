@@ -27,6 +27,9 @@ const LOOK_PERIOD: float = 23.0
 @export var start_leg: float = 0.0
 
 var camera: Camera3D
+## The look it was built with (the loading screen borrows the menu's panorama, then gives it back).
+var menu_blur: float = 0.0
+var menu_darken: float = 0.0
 var _viewport: SubViewport
 var _view: TextureRect
 var _t: float = 0.0
@@ -35,6 +38,8 @@ var _t: float = 0.0
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	menu_blur = blur_px
+	menu_darken = darken
 	if DisplayServer.get_name() == "headless":
 		return
 	_t = start_leg * LEG_SECONDS
@@ -66,6 +71,17 @@ func _ready() -> void:
 	resized.connect(_fit)
 	_fit()
 	_place_camera()
+
+
+## Changes the blur and darkening on the fly.
+func set_look(blur: float, dark: float) -> void:
+	blur_px = blur
+	darken = dark
+	if _view != null:
+		var mat: ShaderMaterial = _view.material as ShaderMaterial
+		mat.set_shader_parameter(&"blur_px", blur)
+		mat.set_shader_parameter(&"darken", dark)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 ## Half resolution, bilinear, softened further by the blur (the backdrop is meant to be soft).

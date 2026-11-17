@@ -7,7 +7,8 @@ extends TextureRect
 ## joining screen (`Loading`) all use this view; build one in code with `make`.
 ## With `spinnable` (the main menu) the sign can be dragged round with the mouse (or a finger) and
 ## spun with the right stick (`LogoSpin`); every full turn adds to the profile's `logo_spins`, and
-## 1000 of them unlock the hidden achievement (`Achievements.LOGO_SPINS`).
+## 1000 of them unlock the hidden achievement (`Achievements.LOGO_SPINS`). The count stands on the
+## sign's back (`Logo3D.set_spins`).
 
 ## Drag / right stick spins the sign (main menu only; the loading screens just show it).
 @export var spinnable: bool = false
@@ -44,6 +45,8 @@ func _ready() -> void:
 	logo = Logo3D.new()
 	_viewport.add_child(logo)
 	texture = _viewport.get_texture()
+	if spinnable:  # the spin counter on the back
+		logo.set_spins(ProfileManager.profile.logo_spins if ProfileManager.profile != null else 0)
 	resized.connect(_fit)
 	get_viewport().size_changed.connect(_fit)
 	_fit()
@@ -94,6 +97,8 @@ func _credit(turns: int) -> void:
 	if turns <= 0:
 		return
 	var total: int = ProfileManager.add_logo_spins(turns)
+	if logo != null:
+		logo.set_spins(total)
 	var earned: Array[StringName] = Achievements.from_logo_spins(total)
 	if not earned.is_empty():
 		unlock.call(earned)

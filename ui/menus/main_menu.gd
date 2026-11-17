@@ -84,6 +84,12 @@ var load_match: bool = true
 
 
 func _ready() -> void:
+	if SceneRouter.cmdline != null and SceneRouter.cmdline.has_flag("server"):
+		# A room server (also the one a host's game starts for its party) goes straight to the
+		# match: building the whole menu first only cost the host's PC a second of CPU on join.
+		set_process(false)
+		set_process_unhandled_input(false)
+		return
 	# Live casino behind the menu (art direction: the menu is the casino, slightly blurred).
 	var pano := CasinoPanorama.new()
 	pano.name = "Panorama"
@@ -777,9 +783,11 @@ func _host_steam(public: bool) -> void:
 	_busy = true
 	_set_status("Starting your lobby…")
 	online.status.remove_theme_color_override(&"font_color")
+	Loading.begin("CREATING LOBBY")  # the whole screen, a coin spinning (Patrick 2026-11-17)
 	var name_: String = _display_name()
 	var port: int = await Net.steam_party.start_hosting(name_, public)
 	if port == 0:
+		Loading.cancel()
 		_busy = false
 		_set_status(Net.steam_party.last_error, true)
 		return
@@ -803,8 +811,10 @@ func _join_steam_lobby(lobby_id: int) -> void:
 	_busy = true
 	_set_status("Joining the lobby…")
 	online.status.remove_theme_color_override(&"font_color")
+	Loading.begin("JOINING")
 	var host_id: int = await Net.steam_party.enter_lobby(lobby_id)
 	if host_id == 0:
+		Loading.cancel()
 		_busy = false
 		_set_status(Net.steam_party.last_error, true)
 		return

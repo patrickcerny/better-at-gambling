@@ -241,6 +241,7 @@ func wear(kind: StringName, id: StringName) -> void:
 				var mmi: MeshInstance3D = _outfit_mesh(mm, "OutfitMouth")
 				body.add_child(mmi)
 				_outfit_nodes[kind] = mmi
+				_track_spinners(mmi, id)  # the party horn rolls out and in
 		CosmeticDef.KIND_EYES:
 			_wear_eyes(id)
 		CosmeticDef.KIND_BOOTS:
@@ -257,6 +258,8 @@ func wear(kind: StringName, id: StringName) -> void:
 				foot.mesh = null  # the boot is the foot now
 				if i == 0:
 					_outfit_nodes[kind] = holder
+					if id == &"boots_ball_chain":
+						BallChain.make(holder)  # hangs loose and swings from the right ankle
 				else:
 					_boot_l = holder
 		CosmeticDef.KIND_CAPE:
@@ -277,7 +280,7 @@ func wear(kind: StringName, id: StringName) -> void:
 			_cape_spread_node = spread_node
 			_update_cape_spread()
 			_outfit_nodes[kind] = _cape_pivot
-			var cloth_mat: ShaderMaterial = ToonMaterial.make_cloth(0.3)
+			var cloth_mat: ShaderMaterial = ToonMaterial.make_cloth(0.3, id)
 			if cloth_mat != null:
 				mi.material_override = cloth_mat
 				mi.extra_cull_margin = 1.0  # the cloth moves the vertices outside the mesh's box

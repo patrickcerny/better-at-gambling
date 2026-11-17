@@ -8,7 +8,7 @@ extends PanelContainer
 ## thing", "show current skin in leaderboard", "Steam link"): a walnut-and-brass table panel
 ## (`TableSkin`), the boards and GLOBAL / FRIENDS / MY RANK as tabs on top, a podium for the top
 ## three (each bean in the look its player last uploaded, `LeaderboardRules.skin_from_details`, on a
-## lacquer step with its medal), the rest as rows with a small bean portrait, and your own place
+## lacquer step with its medal), the rest as rows with a small live bean, and your own place
 ## pinned at the bottom. Any player opens their Steam profile in the overlay. FRIENDS counts 1, 2, 3
 ## among your friends ("warum ist hier 2 und 3 und keine 1"), the global rank stays beside it.
 ## MY STATS: the lifetime numbers from the local profile in four cards.
@@ -65,6 +65,14 @@ var _mine_total: int = 0
 var _mine_known: bool = false
 var _dim: ColorRect
 var _scroll: ScrollContainer
+## The live beans: on the podium (place -> view) and in the rows (only the ones on screen render).
+var _podium_beans: Dictionary[int, BeanPreviewView] = {}
+var _row_beans: Array[BeanPreviewView] = []
+var _emote_wait: float = 1.2
+var _live_wait: float = 0.0
+## What the beans do now and then: the winner celebrates, the rest wave and cheer.
+const WINNER_EMOTES: Array[StringName] = [&"dance", &"default_dance", &"thumbs_up"]
+const OTHER_EMOTES: Array[StringName] = [&"wave", &"thumbs_up", &"laugh", &"gg", &"taunt"]
 
 
 func _ready() -> void:
@@ -77,7 +85,6 @@ func _ready() -> void:
 	visible = false
 	add_theme_stylebox_override(&"panel", TableSkin.panel_box())
 	draw.connect(TableSkin.draw_frame.bind(self))
-	add_child(BeanPortraits.new())
 	_dim = ColorRect.new()
 	_dim.name = "LeaderboardsDim"
 	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -394,6 +401,9 @@ func _draw_rows() -> void:
 		c.queue_free()
 	for c: Node in rows_box.get_children():
 		c.queue_free()
+	_podium_beans.clear()
+	_row_beans.clear()
+	_live_wait = 0.0
 	# The podium: the first three places (not on MY RANK, which starts somewhere in the middle).
 	var top: Dictionary = {}
 	var rest: Array[Dictionary] = []
@@ -436,13 +446,10 @@ func _podium_spot(place: int, r: Dictionary) -> Control:
 		btn.custom_minimum_size = Vector2(pic_h * 0.8, pic_h)
 		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		col.add_child(btn)
-		var pic := TextureRect.new()
-		pic.texture = _portrait(r, BeanPortraits.Framing.FULL)
-		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pic.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		btn.add_child(pic)
+		var bean: BeanPreviewView = _bean(r, false)
+		bean.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		btn.add_child(bean)
+		_podium_beans[place] = bean
 		var who: Label = TableSkin.label(_name_of(r), 24 if place == 1 else 21, Palette.VIP_GOLD if me else Palette.CREAM, true)
 		who.clip_text = true
 		who.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -491,13 +498,10 @@ func _row(r: Dictionary) -> Control:
 		num.custom_minimum_size.x = 46
 		h.add_child(num)
 	h.add_child(badge)
-	var pic := TextureRect.new()
-	pic.texture = _portrait(r, BeanPortraits.Framing.HEAD)
-	pic.custom_minimum_size = Vector2(46, 56)
-	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	h.add_child(pic)
+	var bean: BeanPreviewView = _bean(r, true)
+	bean.custom_minimum_size = Vector2(48, 58)
+	h.add_child(bean)
+	_row_beans.append(bean)
 	var names := VBoxContainer.new()
 	names.alignment = BoxContainer.ALIGNMENT_CENTER
 	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -531,12 +535,9 @@ func _draw_mine() -> void:
 	h.add_theme_constant_override(&"separation", 14)
 	mine_bar.add_child(h)
 	var me_row: Dictionary = {"me": true, "steam_id": SteamSvc.get_steam_id(), "skin": {}}
-	var pic := TextureRect.new()
-	pic.texture = _portrait(me_row, BeanPortraits.Framing.HEAD)
-	pic.custom_minimum_size = Vector2(44, 52)
-	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	h.add_child(pic)
+	var bean: BeanPreviewView = _bean(me_row, true)
+	bean.custom_minimum_size = Vector2(46, 54)
+	h.add_child(bean)
 	var you: Label = TableSkin.label("YOU", 22, Palette.VIP_GOLD, true)
 	h.add_child(you)
 	var text: Label = TableSkin.label("", 22, Palette.CREAM, true)
@@ -583,16 +584,28 @@ func _focus_ring() -> StyleBoxFlat:
 	return ring
 
 
-## The bean of a row: your own current look, else the look the player uploaded; a plain bean in a
-## colour from their Steam ID when they never uploaded one.
-func _portrait(r: Dictionary, framing: BeanPortraits.Framing) -> Texture2D:
+## The look of a row ({color, outfit wire}): your own current look, else the look the player
+## uploaded; a plain bean in a colour from their Steam ID when they never uploaded one.
+func _look(r: Dictionary) -> Dictionary:
 	if bool(r.get("me", false)):
 		var p: PlayerProfile = ProfileManager.profile
-		return BeanPortraits.texture_for(p.preferred_color if p.preferred_color >= 0 else 0, p.outfit_wire(), framing)
+		return {"color": p.preferred_color if p.preferred_color >= 0 else 0, "outfit": p.outfit_wire()}
 	var skin: Dictionary = r.get("skin", {})
 	if skin.is_empty():
-		return BeanPortraits.texture_for(absi(int(r.get("steam_id", 0))) % Cosmetics.SLOT_COLORS, [], framing)
-	return BeanPortraits.texture_for(int(skin["color"]), skin["outfit"], framing)
+		return {"color": absi(int(r.get("steam_id", 0))) % Cosmetics.SLOT_COLORS, "outfit": PackedStringArray()}
+	return skin
+
+
+## A live bean in the row's look (Patrick 2026-11-17: "Animated beans on the leaderboard ... Use
+## self rendered"): the real `AvatarVisuals` in its own little viewport, swaying and blinking,
+## now and then waving or dancing (`_tick_emotes`). `portrait`: head and shoulders.
+func _bean(r: Dictionary, portrait: bool) -> BeanPreviewView:
+	var look: Dictionary = _look(r)
+	var v: BeanPreviewView = BeanPreviewView.make(Palette.player_color(int(look["color"])))
+	v.portrait = portrait
+	v.outfit = Cosmetics.outfit_dict(look["outfit"])
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return v
 
 
 func _name_of(r: Dictionary) -> String:
@@ -607,6 +620,49 @@ func _steam_on() -> bool:
 
 func _score_color() -> Color:
 	return Palette.MONEY_GREEN if bool(LeaderboardRules.board(board).get("money", false)) else Palette.CREAM
+
+
+func _process(delta: float) -> void:
+	if not visible or not boards_page.visible:
+		return
+	_live_wait -= delta
+	if _live_wait <= 0.0:
+		_live_wait = 0.25
+		_update_live_rows()
+	_emote_wait -= delta
+	if _emote_wait <= 0.0:
+		_emote_wait = randf_range(1.6, 3.2)
+		_tick_emotes()
+
+
+## Only the row beans inside the scroll area render (a board has up to 50 rows).
+func _update_live_rows() -> void:
+	var view: Rect2 = _scroll.get_global_rect()
+	for b: BeanPreviewView in _row_beans:
+		if is_instance_valid(b) and b.is_inside_tree():
+			b.set_live(view.intersects(b.get_global_rect()))
+
+
+## Now and then one bean emotes: the winner dances most of the time, the others wave or cheer.
+func _tick_emotes() -> void:
+	var first: BeanPreviewView = _podium_beans.get(1, null)
+	if first != null and is_instance_valid(first) and first.visuals != null and not first.visuals.is_emoting() and randf() < 0.55:
+		first.visuals.emote(WINNER_EMOTES[randi() % WINNER_EMOTES.size()])
+		return
+	var pool: Array[BeanPreviewView] = []
+	for place: int in [2, 3]:
+		var b: BeanPreviewView = _podium_beans.get(place, null)
+		if b != null:
+			pool.append(b)
+	var view: Rect2 = _scroll.get_global_rect()
+	for b: BeanPreviewView in _row_beans:
+		if is_instance_valid(b) and view.intersects(b.get_global_rect()):
+			pool.append(b)
+	pool.shuffle()
+	for b: BeanPreviewView in pool:
+		if is_instance_valid(b) and b.visuals != null and not b.visuals.is_emoting():
+			b.visuals.emote(OTHER_EMOTES[randi() % OTHER_EMOTES.size()])
+			return
 
 
 func _exit_tree() -> void:

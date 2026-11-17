@@ -125,7 +125,9 @@ func test_no_ready_control_only_the_pedestal_sets_ready() -> void:
 	await wait_process_frames(1)
 	for intent: Dictionary in fake.sent:
 		assert_ne(intent["type"], &"set_ready")
-	assert_true(panel._close_button.has_focus(), "focus lands on CLOSE")
+	# Clicking puts the mouse in hand: then nothing stays selected (FocusGate); keys keep CLOSE.
+	assert_true(panel._close_button.has_focus() or (FocusGate.mouse and panel.get_viewport().gui_get_focus_owner() == null), "focus lands on CLOSE")
+	FocusGate.mouse = false
 
 
 func test_tab_closes_the_open_panel() -> void:

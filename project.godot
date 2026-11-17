@@ -35,6 +35,7 @@ Net="*res://net/net_session.gd"
 SteamSvc="*res://services/steam_service.gd"
 Audio="*res://audio/audio_director.gd"
 Loading="*res://services/loading_screen.gd"
+FocusGate="*res://services/focus_gate.gd"
 
 [debug]
 

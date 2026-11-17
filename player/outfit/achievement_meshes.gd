@@ -24,6 +24,7 @@ const MONEY := Color("#4E7A4A")
 const VARSITY := Color("#6A1F2A")
 
 ## Shirts' sleeve colours (the arms wear them), like `OutfitMeshes.SLEEVES`.
+const FROST := Color("#F2F9FC")
 const SLEEVES: Dictionary = {
 	&"shirt_varsity": Color("#E9DCBC"), &"shirt_harlequin": Color("#681F2C"), &"shirt_gold_chain": Color("#1C1A19"),
 }
@@ -131,26 +132,52 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 		&"hat_ice_pack":
 			# A rubber ice bag slumped over the head: full of ice on top, flopping down the left side
 			# in soft folds, the screw cap sticking up.
-			var sag := func(a: float) -> float:  # how far down the rim reaches (elevation, radians)
-				return lerpf(0.95, -0.05, smoothstep(-0.2, 1.0, sin(a))) + 0.08 * sin(a * 3.0 + 1.0)
+			# Built on the head itself (body space), so it lies on the skin with no gap anywhere.
+			var keep: Transform3D = k.xf
+			k.xf = Transform3D.IDENTITY
+			var rim := func(a: float) -> float:  # how far down the head the rim reaches (body t)
+				return _ice_rim(a)
 			for side: int in 2:
 				var at := func(u: float, v: float) -> Vector3:
 					var a: float = u * TAU
-					var el: float = lerpf(PI * 0.5, sag.call(a), v)
-					var fold: float = 0.018 * sin(a * 9.0) * v * v
-					var full: float = 0.06 * pow(cos(clampf(el, 0.0, PI * 0.5) - PI * 0.5), 3.0) * (1.0 - v)  # the lump of ice on top
-					var r: float = 0.37 + fold + (full if side == 0 else 0.0) - (0.0 if side == 0 else 0.012)
-					return Vector3(sin(a) * cos(el) * r, 0.0 + sin(el) * (0.27 + full * 2.0), cos(a) * cos(el) * r * D)
+					var t: float = lerpf(1.0, rim.call(a), v)
+					var fold: float = 0.01 * sin(a * 9.0) * v * v
+					var full: float = 0.05 * sin(clampf(v * 1.6, 0.0, 1.0) * PI) * (0.6 + 0.4 * cos(a - 2.4))  # the lump of ice
+					var r: float = AvatarVisuals.radius_at(t) + (0.014 + fold + (full if side == 0 else 0.0) - (0.0 if side == 0 else 0.008)) * smoothstep(0.0, 0.08, v)
+					return Vector3(sin(a) * r, (t - 0.5) * AvatarVisuals.BODY_HEIGHT + 0.012, AvatarVisuals.bend_at(t) - cos(a) * r * AvatarVisuals.BODY_DEPTH)
 				var col: Color = ICE if side == 0 else ICE.darkened(0.35)
-				k.surface(at, 48, 14, func(_u: float, v: float) -> Color:
-					return col.darkened(0.08) if side == 0 and fposmod(v * 6.0, 1.0) < 0.12 else col,
-					func(p: Vector3) -> Vector3: return (p - Vector3(0, -0.05, 0)) * (1.0 if side == 0 else -1.0), true)
-			var cap := Vector3(-0.09, 0.33, 0.05)
-			var cb := Basis(Vector3.BACK, 0.35)
-			k.cylinder(cap, 0.075, 0.08, 0.05, OutfitMeshes.SILVER, 16, cb)
-			k.cylinder(cap + cb * Vector3(0, 0.04, 0), 0.065, 0.065, 0.035, OutfitMeshes.SILVER.darkened(0.18), 16, cb)
+				k.surface(at, 48, 14, func(u: float, v: float) -> Color:
+					if side == 0 and v > 0.15 and OutfitMeshes._hash(int(u * 24.0), int(v * 7.0), 7) > 0.9:
+						return ICE.lightened(0.45)  # a few frosted patches
+					return col.darkened(0.08) if side == 0 and v > 0.1 and fposmod(v * 6.0, 1.0) < 0.12 else col,
+					func(p: Vector3) -> Vector3: return (p - Vector3(0, 0.45, 0)) * (1.0 if side == 0 else -1.0), true)
+			# The screw cap where the bag bulges with ice, standing off the bag's surface.
+			var ca: float = 2.4
+			var ct: float = 0.955
+			var cr: float = AvatarVisuals.radius_at(ct) + 0.014 + 0.05 * sin(clampf((1.0 - ct) / (1.0 - rim.call(ca)) * 1.6, 0.0, 1.0) * PI)
+			var cp := Vector3(sin(ca) * cr, (ct - 0.5) * AvatarVisuals.BODY_HEIGHT + 0.012, AvatarVisuals.bend_at(ct) - cos(ca) * cr * AvatarVisuals.BODY_DEPTH)
+			var cn: Vector3 = (cp - Vector3(0, 0.45, 0)).normalized()
+			var cb := Basis(Quaternion(Vector3.UP, cn))
+			var cap: Vector3 = cp + cn * 0.01
+			k.cylinder(cap, 0.07, 0.075, 0.05, OutfitMeshes.SILVER, 16, cb)
+			k.cylinder(cap + cb * Vector3(0, 0.04, 0), 0.06, 0.06, 0.035, OutfitMeshes.SILVER.darkened(0.18), 16, cb)
 			for i: int in 3:  # ice cubes showing through the neck
 				k.box(cap + cb * Vector3(-0.02 + 0.02 * float(i), 0.065, 0.0), Vector3.ONE * 0.025, OutfitMeshes._glow(Color("#E4F0F7"), 0.2), cb * Basis(Vector3.UP, float(i)))
+			# Ice effects: twinkling frost crystals on the bag, meltwater drops along the rim (cold
+			# mist sinks from it: `spinners`).
+			for i: int in 11:
+				var a: float = TAU * float(i) / 11.0 + 0.3 * OutfitMeshes._hash(i, 2, 9)
+				var v: float = lerpf(0.25, 0.8, OutfitMeshes._hash(i, 3, 9))
+				var p: Vector3 = _ice_point(a, v, 0.004)
+				var n: Vector3 = (p - Vector3(0, 0.45, 0)).normalized()
+				var b := Basis(Quaternion(Vector3.BACK, n)) * Basis(Vector3.BACK, float(i))
+				var sz: float = lerpf(0.02, 0.034, OutfitMeshes._hash(i, 4, 9))
+				k.prism(OutfitMeshKit.star_poly(6, sz, sz * 0.32), 0.004, Transform3D(b, p), OutfitMeshes._glow(FROST, 0.7))
+			for i: int in 7:
+				var a: float = TAU * float(i) / 7.0 + 0.5
+				var p: Vector3 = _ice_point(a, 1.0, 0.004) + Vector3(0, -0.012, 0)
+				k.sphere(p, Vector3(0.011, 0.016, 0.011), OutfitMeshes._glow(TEAR, 0.35), 6, 4)
+			k.xf = keep
 		&"hat_star":
 			# A gold star floating over the head (it turns: `spinners`), sparkles round it.
 			for i: int in 3:
@@ -168,22 +195,26 @@ static func hat(k: OutfitMeshKit, id: StringName) -> void:
 				k.torus(Vector3(side * 0.18, 0.47, 0), 0.05, 0.08, gold, 12, Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(Vector3(0.8, 0.3, 1.2)))
 			k.prism(OutfitMeshKit.star_poly(5, 0.05, 0.022), 0.012, Transform3D(Basis(Vector3.RIGHT, -0.2).rotated(Vector3.UP, PI), Vector3(0, 0.45, -0.15)), OutfitMeshes._glow(OutfitMeshes.CREAM, 0.4))
 		&"hat_card_house":
-			# A house of cards, solid from every side: two tents of cards leaning on each other (front
-			# and back card), a card laid across them, a third tent on top. The card backs face out.
+			# A house of cards stacked like a real one: pairs of cards leaning on each other in
+			# A-frames, a flat card across them, a third A-frame on top. Turned an eighth round so
+			# the A-frames and the card backs both show from the front.
+			var turn := Basis(Vector3.UP, PI * 0.25)
 			var place := func(at: Vector3, lean: float) -> void:
-				var b := Basis(Vector3.RIGHT, lean)
-				var out: Vector3 = b * Vector3(0, 0, -signf(lean) * 0.007)
-				k.box(at, Vector3(0.14, 0.2, 0.01), OutfitMeshes.CREAM, b)
-				k.box(at + out, Vector3(0.118, 0.176, 0.004), OutfitMeshes.BURGUNDY, b)
-				k.box(at + out * 1.25, Vector3(0.036, 0.036, 0.004), OutfitMeshes.GOLD, b * Basis(Vector3.BACK, PI * 0.25))
-			var tent := func(at: Vector3) -> void:
-				place.call(at + Vector3(0, 0, -0.038), 0.36)  # front card, top leaning back
-				place.call(at + Vector3(0, 0, 0.038), -0.36)
-			for x: float in [-0.076, 0.076]:
-				tent.call(Vector3(x, 0.29, 0))
-			k.box(Vector3(0, 0.395, 0), Vector3(0.3, 0.01, 0.17), OutfitMeshes.CREAM)
-			k.box(Vector3(0, 0.4, 0), Vector3(0.27, 0.004, 0.145), OutfitMeshes.BURGUNDY)
-			tent.call(Vector3(0, 0.495, 0))
+				var b: Basis = turn * Basis(Vector3.BACK, lean)
+				var p: Vector3 = turn * at
+				k.box(p, Vector3(0.01, 0.2, 0.14), OutfitMeshes.CREAM, b)
+				for side: float in [-1.0, 1.0]:  # the card's back pattern shows on both faces
+					var out: Vector3 = b * Vector3(side * 0.006, 0, 0)
+					k.box(p + out, Vector3(0.004, 0.176, 0.118), OutfitMeshes.BURGUNDY, b)
+					k.box(p + out * 1.3, Vector3(0.004, 0.036, 0.036), OutfitMeshes.GOLD, b * Basis(Vector3.RIGHT, PI * 0.25))
+			var frame := func(at: Vector3) -> void:  # two cards whose tops meet
+				place.call(at + Vector3(-0.038, 0, 0), -0.36)
+				place.call(at + Vector3(0.038, 0, 0), 0.36)
+			for x: float in [-0.085, 0.085]:
+				frame.call(Vector3(x, 0.29, 0))
+			k.box(Vector3(0, 0.395, 0), Vector3(0.33, 0.01, 0.15), OutfitMeshes.CREAM, turn)
+			k.box(Vector3(0, 0.4005, 0), Vector3(0.3, 0.004, 0.125), OutfitMeshes.BURGUNDY, turn)
+			frame.call(Vector3(0, 0.495, 0))
 		&"hat_cherries":
 			# The slot machine's cherries: two on stalks that meet in a leaf.
 			for side: float in [-1.0, 1.0]:
@@ -253,9 +284,92 @@ const GREEDY_LOOKS: Array[Vector2] = [Vector2(0, 0), Vector2(0, 0), Vector2(0.32
 	Vector2(-0.22, 0.22), Vector2(-0.22, 0.22), Vector2(0, 0)]
 
 
+## The ice pack's rim, as body height t, and a point on its outer side (body space): `v` 0 at
+## the top of the head to 1 at the rim, `lift` off the bag.
+static func _ice_rim(a: float) -> float:
+	return lerpf(0.9, 0.8, smoothstep(-0.2, 1.0, sin(a))) + 0.012 * sin(a * 3.0 + 1.0)
+
+
+static func _ice_point(a: float, v: float, lift: float) -> Vector3:
+	var t: float = lerpf(1.0, _ice_rim(a), v)
+	var fold: float = 0.01 * sin(a * 9.0) * v * v
+	var full: float = 0.05 * sin(clampf(v * 1.6, 0.0, 1.0) * PI) * (0.6 + 0.4 * cos(a - 2.4))
+	var r: float = AvatarVisuals.radius_at(t) + (0.014 + fold + full) * smoothstep(0.0, 0.08, v) + lift
+	return Vector3(sin(a) * r, (t - 0.5) * AvatarVisuals.BODY_HEIGHT + 0.012, AvatarVisuals.bend_at(t) - cos(a) * r * AvatarVisuals.BODY_DEPTH)
+
+
+## Where the party horn's mouthpiece sits (body space).
+static func _horn_mouth() -> Vector3:
+	var my: float = OutfitMeshes._mouth_y()
+	return Vector3(0.0, my, AvatarVisuals.face_z(my, 0.0) + 0.01)
+
+
+## The party horn's tube: segment `i` of `n` when it is rolled up by `curl` (0 straight out, 1 a
+## full roll), from the mouthpiece forward, curling downward and back under (body space).
+static func _horn_point(i: int, n: int, curl: float) -> Vector3:
+	const LENGTH: float = 0.42
+	var ds: float = LENGTH / float(n)
+	var p: Vector3 = _horn_mouth() + Vector3(0, 0, -0.07)
+	var theta: float = 0.0
+	for j: int in i:
+		var s: float = (float(j) + 0.5) / float(n)
+		theta += curl * lerpf(2.0, 34.0, s * s) * ds
+		p += Vector3(0, -sin(theta), -cos(theta)) * ds
+	return p
+
+
+## A tear's way down the cheek under eye `side` at `s` (0 under the eye .. 1 the jaw), `lift` off
+## the skin (body space).
+static func _tear_point(side: float, s: float, lift: float) -> Vector3:
+	var r: float = AvatarVisuals.EYE_RADIUS
+	var e: Vector3 = OutfitMeshes._eye_center(side)
+	var x: float = e.x + side * (r * 0.5 + s * 0.03)
+	var y: float = e.y - r * 0.85 - s * 0.22
+	return Vector3(x, y, AvatarVisuals.face_z(y, x) - lift)
+
+
 static func spinners(id: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	match id:
+		&"mouth_party_horn":
+			# Every 10 s the tube rolls out straight, holds, and rolls back in (keys every 0.5 s).
+			const N: int = 22
+			var curls: PackedFloat32Array = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.55, 0.12, 0, 0, 0, 0.3, 0.7, 1, 1]
+			for i: int in N:
+				var k := OutfitMeshKit.new()
+				k.sphere(Vector3.ZERO, Vector3.ONE * 0.03, [OutfitMeshes.RED, OutfitMeshes.GOLD, OutfitMeshes.CREAM][(i / 2) % 3], 8, 4)
+				if i == N - 1:
+					k.sphere(Vector3.ZERO, Vector3.ONE * 0.034, OutfitMeshes.GOLD, 8, 4)
+				var origin: Vector3 = _horn_point(i + 1, N, 1.0)
+				var path := PackedVector3Array()
+				for c: float in curls:
+					path.append(_horn_point(i + 1, N, c) - origin)
+				out.append({"mesh": k.commit(), "origin": origin, "axis": Vector3.UP, "speed": 0.0, "path": path, "period": 10.0})
+		&"eyes_tears":
+			# Tears well up under each eye, roll down the cheek and drop off at the jaw.
+			for side: float in [-1.0, 1.0]:
+				for i: int in 3:
+					var k := OutfitMeshKit.new()
+					k.sphere(Vector3.ZERO, Vector3(0.02, 0.027, 0.014), OutfitMeshes._glow(TEAR, 0.3), 8, 5)
+					var origin: Vector3 = _tear_point(side, 0.0, 0.01)
+					var path := PackedVector3Array()
+					for j: int in 9:
+						path.append(_tear_point(side, float(j) / 8.0, 0.01) - origin)
+					path.append(path[path.size() - 1] + Vector3(0, -0.08, -0.02))  # falls off
+					out.append({"mesh": k.commit(), "origin": origin, "axis": Vector3.UP, "speed": 0.0, "path": path,
+							"period": 2.4, "scales": PackedFloat32Array([0.2, 0.9, 1, 1, 1, 1, 1, 1, 1, 0.0]), "phase": float(i) / 3.0 + (0.15 if side > 0.0 else 0.0)})
+		&"hat_ice_pack":
+			# Cold mist rolls off the ice bag's rim, sinks along the head and fades (body space).
+			for i: int in 5:
+				var a: float = TAU * float(i) / 5.0 + 0.9
+				var k := OutfitMeshKit.new()
+				k.sphere(Vector3.ZERO, Vector3(0.034, 0.02, 0.034), OutfitMeshes._glow(ICE.lightened(0.55), 0.3), 8, 4)
+				k.sphere(Vector3(0.022, 0.004, 0.008), Vector3(0.022, 0.014, 0.022), OutfitMeshes._glow(ICE.lightened(0.7), 0.3), 6, 3)
+				var start: Vector3 = _ice_point(a, 1.0, 0.012)
+				var outward := Vector3(sin(a), 0, -cos(a)) * 0.02
+				var path := PackedVector3Array([Vector3.ZERO, outward * 0.5 + Vector3(0, -0.05, 0), outward + Vector3(0, -0.11, 0), outward * 1.3 + Vector3(0, -0.16, 0)])
+				out.append({"mesh": k.commit(), "origin": start, "axis": Vector3.UP, "speed": 0.4, "path": path, "period": 3.2,
+						"scales": PackedFloat32Array([0.2, 0.9, 1.0, 0.0]), "phase": float(i) / 5.0})
 		&"eyes_bulging":
 			# The pupils dart round the bulging eyeballs (body space, like `eyes`).
 			var r: float = AvatarVisuals.EYE_RADIUS
@@ -484,23 +598,31 @@ static func pants(k: OutfitMeshKit, id: StringName) -> void:
 static func cape(k: OutfitMeshKit, id: StringName) -> void:
 	match id:
 		&"cape_carpet":
-			# Fifty matches on the floor: the casino's own carpet, burgundy with gold and teal ornament.
+			# Fifty matches on the floor: the casino's own carpet. An even field of gold diamonds with
+			# teal hearts, small gold diamonds where their corners meet, inside a clean gold-and-dark
+			# border; symmetric left to right, whole motifs only.
 			OutfitMeshes._cape_sheet(k, -0.78, func(u: float, v: float) -> Color:
-				if v > 0.93 or u < 0.03 or u > 0.97:
+				var e: float = minf(minf(u, 1.0 - u), 1.0 - v)  # distance to the sides and the hem
+				if e < 0.03:
 					return OutfitMeshes.GOLD.darkened(0.1)
-				var x: float = fposmod(u * 6.0, 1.0) - 0.5
-				var y: float = fposmod(v * 7.0, 1.0) - 0.5
-				var d: float = absf(x) + absf(y)
-				var r: float = Vector2(x, y).length()
-				if absf(d - 0.36) < 0.035:
-					return OutfitMeshes.GOLD
-				if r < 0.1:
-					return OutfitMeshes.TEAL.darkened(0.15)
-				if absf(r - 0.18) < 0.025:
+				if e < 0.065:
+					return OutfitMeshes.BURGUNDY.darkened(0.35)
+				if e < 0.08:
 					return OutfitMeshes.GOLD.darkened(0.2)
-				if absf(x) < 0.02 or absf(y) < 0.02:
-					return OutfitMeshes.BURGUNDY.darkened(0.25)
-				return OutfitMeshes.BURGUNDY, OutfitMeshes.BURGUNDY.darkened(0.4))
+				var fu: float = (u - 0.08) / 0.84 * 5.0
+				var fv: float = (v - 0.02) / 0.9 * 6.0
+				var x: float = fposmod(fu, 1.0) - 0.5
+				var y: float = fposmod(fv, 1.0) - 0.5
+				var d: float = absf(x) + absf(y)
+				if absf(d - 0.36) < 0.045:
+					return OutfitMeshes.GOLD
+				if d < 0.13:
+					return OutfitMeshes.TEAL.darkened(0.15)
+				if d < 0.19:
+					return OutfitMeshes.GOLD.darkened(0.2)
+				if d > 0.88:
+					return OutfitMeshes.GOLD.darkened(0.1)  # where four tiles meet
+				return OutfitMeshes.BURGUNDY, OutfitMeshes.BURGUNDY.darkened(0.4), 42, 30)
 			OutfitMeshes._clasps(k, OutfitMeshes.GOLD)
 		&"cape_suited_trips":
 			# The cape ends in three identical seven of hearts fanned out (the cloth itself is cut
@@ -533,9 +655,9 @@ static func _card_fan_cape(k: OutfitMeshKit, ranks: Array, hearts: bool, top: Co
 	var pip := func(q: Vector2, s: float) -> bool:  # a heart or spade, `s` across, at q
 		var p := q / s
 		if not hearts:
-			p.y = -p.y + 0.15
-			if absf(p.x) < 0.09 + (p.y + 0.95) * 0.25 and p.y < -0.45 and p.y > -0.95:
-				return true  # the spade's stem
+			p.y = -p.y + 0.35  # a little higher: the stem hangs below
+			if p.y < -0.55 and p.y > -1.3 and absf(p.x) < 0.07 + (-0.55 - p.y) * 0.45:
+				return true  # the spade's stem, flaring at its foot
 		var x: float = p.x * 1.15
 		var y: float = -p.y * 1.15 + 0.2
 		return pow(x * x + y * y - 1.0, 3.0) - x * x * y * y * y <= 0.0
@@ -631,17 +753,8 @@ static func boots(k: OutfitMeshKit, id: StringName) -> void:
 
 
 ## The right foot's extra parts (the ball and chain trail behind one foot only).
-static func right_boot_extra(k: OutfitMeshKit, id: StringName) -> void:
-	if id == &"boots_ball_chain":
-		var ball := Vector3(0.02, 0.04, 0.5)
-		var path := PackedVector3Array()
-		for i: int in 9:
-			var s: float = float(i) / 8.0
-			path.append(Vector3(0.01 * s, lerpf(0.07, ball.y + 0.02, s) - 0.04 * sin(PI * s), lerpf(0.13, ball.z - 0.1, s)))
-		for i: int in path.size():
-			k.torus(path[i], 0.012, 0.03, OutfitMeshes.STEEL, 8, Basis(Vector3.FORWARD, PI * 0.5 * float(i % 2)) * Basis(Vector3.RIGHT, PI * 0.5))
-		k.sphere(ball, Vector3.ONE * 0.105, Color("#4A4744"), 16, 10)
-		k.sphere(ball + Vector3(-0.035, 0.05, -0.04), Vector3.ONE * 0.022, OutfitMeshes._glow(OutfitMeshes.WHITE, 0.15), 6, 3)
+static func right_boot_extra(_k: OutfitMeshKit, _id: StringName) -> void:
+	pass  # the ball and chain swings loose: `BallChain`, added by `AvatarVisuals`
 
 
 static func _shoe_plain(k: OutfitMeshKit, upper: Color, sole: Color) -> void:
@@ -703,25 +816,30 @@ static func eyes(k: OutfitMeshKit, id: StringName) -> void:
 				var c := Vector3(e.x * 1.12, e.y + 0.01, e.z - r * 0.55)
 				k.sphere(c, Vector3.ONE * r * 1.25, OutfitMeshes.WHITE, 16, 10)  # the pupils move: `spinners`
 		&"eyes_loupe":
-			# A jeweller's loupe screwed into the right eye.
+			# A jeweller's loupe screwed into the right eye: a black rubber cup pressed onto the skin
+			# round the eye, the barrel standing straight out of it, the gold-rimmed lens in front.
 			var e: Vector3 = OutfitMeshes._eye_center(-1.0)
-			var p := Vector3(e.x * 1.05, e.y, e.z - r - 0.04)
-			k.cylinder(p, r * 0.95, r * 1.15, 0.09, OutfitMeshes.BLACK, 18, face)
-			k.torus(p + Vector3(0, 0, -0.045), r * 0.85, r * 1.0, OutfitMeshes.GOLD, 18, face)
-			k.cylinder(p + Vector3(0, 0, -0.047), r * 0.85, r * 0.85, 0.004, Color("#2E3A44"), 18, face)
-			k.sphere(p + Vector3(r * 0.35, r * 0.35, -0.052), Vector3(r * 0.22, r * 0.12, 0.004), OutfitMeshes.WHITE, 8, 3, Basis(Vector3.BACK, 0.7))
+			var cup := func(u: float, v: float) -> Vector3:
+				var a: float = u * TAU
+				var rad: float = lerpf(r * 1.0, r * 1.38, v)
+				var x: float = e.x + cos(a) * rad
+				var y: float = e.y + sin(a) * rad
+				return Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.004 - 0.01 * (1.0 - v))
+			k.surface(cup, 32, 3, func(_u: float, _v: float) -> Color: return Color("#24211F"),
+				func(_p: Vector3) -> Vector3: return Vector3(0, 0, -1), true)
+			var skin_z: float = AvatarVisuals.face_z(e.y, e.x)
+			const L: float = 0.11
+			var p := Vector3(e.x, e.y, skin_z - L * 0.5)  # the barrel's middle: its back end on the skin
+			k.cylinder(p, r * 1.0, r * 1.12, L, OutfitMeshes.BLACK, 20, face)
+			k.torus(p + Vector3(0, 0, -L * 0.5), r * 0.86, r * 1.02, OutfitMeshes.GOLD, 20, face)
+			k.cylinder(p + Vector3(0, 0, -L * 0.5 - 0.002), r * 0.86, r * 0.86, 0.004, Color("#2E3A44"), 20, face)
+			k.sphere(p + Vector3(r * 0.35, r * 0.35, -L * 0.5 - 0.006), Vector3(r * 0.22, r * 0.12, 0.004), OutfitMeshes.WHITE, 8, 3, Basis(Vector3.BACK, 0.7))
 		&"eyes_tears":
-			# Streams of tears and a drop about to fall from each eye.
+			# Wet trails down the cheeks; the tears themselves roll down them (`spinners`).
 			for side: float in [-1.0, 1.0]:
-				var e: Vector3 = OutfitMeshes._eye_center(side)
-				for i: int in 7:
-					var s: float = float(i) / 6.0
-					var x: float = e.x + side * (r * 0.5 + s * 0.02)
-					var y: float = e.y - r * 0.85 - s * 0.16
-					k.sphere(Vector3(x, y, AvatarVisuals.face_z(y, x) - 0.006), Vector3(0.016, 0.022, 0.01), OutfitMeshes._glow(TEAR, 0.25), 8, 4)
-				var dy: float = e.y - r * 0.85 - 0.2
-				var dx: float = e.x + side * (r * 0.5 + 0.025)
-				k.sphere(Vector3(dx, dy, AvatarVisuals.face_z(dy, dx) - 0.02), Vector3(0.022, 0.03, 0.022), OutfitMeshes._glow(TEAR, 0.25), 8, 5)
+				for i: int in 8:
+					var p: Vector3 = _tear_point(side, float(i) / 7.0, 0.003)
+					k.sphere(p, Vector3(0.012, 0.016, 0.004), OutfitMeshes._glow(TEAR.lightened(0.2), 0.15), 6, 3)
 
 
 ## Pupils of eye pieces in `PUPILS` (the pupil's own space, like `OutfitMeshes.pupil_mesh`).
@@ -752,19 +870,10 @@ static func mouth(k: OutfitMeshKit, id: StringName) -> void:
 	var mouth_at := Vector3(0.04, my, AvatarVisuals.face_z(my, 0.04) + 0.01)
 	match id:
 		&"mouth_party_horn":
-			# A party blower: the mouthpiece, then the paper tube rolled up into a curl, striped.
-			k.cylinder(mouth_at + Vector3(0, 0, -0.04), 0.028, 0.034, 0.08, OutfitMeshes.GOLD, 10, Basis(Vector3.RIGHT, PI * 0.5))
-			const R0: float = 0.1
-			var centre: Vector3 = mouth_at + Vector3(R0, 0.0, -0.1)
-			var prev: Vector3 = centre
-			for i: int in 40:
-				var s: float = float(i) / 39.0
-				var phi: float = PI - s * TAU * 1.2
-				var rad: float = lerpf(R0, 0.03, s)
-				var p: Vector3 = centre + Vector3(cos(phi) * rad, sin(phi) * rad, -0.01 * s)
-				k.sphere(p, Vector3.ONE * 0.032, [OutfitMeshes.RED, OutfitMeshes.GOLD, OutfitMeshes.CREAM][(i / 3) % 3], 8, 4)
-				prev = p
-			k.sphere(prev, Vector3.ONE * 0.036, OutfitMeshes.GOLD, 8, 4)
+			# A party blower straight out of the mouth: the gold mouthpiece here, the striped paper
+			# tube rolls out and back in (`spinners`).
+			var at: Vector3 = _horn_mouth()
+			k.cylinder(at + Vector3(0, 0, -0.035), 0.028, 0.034, 0.07, OutfitMeshes.GOLD, 10, Basis(Vector3.RIGHT, PI * 0.5))
 
 		&"mouth_straw":
 			# A striped straw in the corner of the mouth, a paper umbrella tied to it.

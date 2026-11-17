@@ -1,10 +1,11 @@
 class_name ItemThumbnails
-extends Node
+extends ThumbnailRenderer
 ## Little 3D pictures of the items for the tutorial's item list (`HowToPlayPanel`): the item's own
 ## model (`ItemModels.make`, the one players hold), turned a little and rendered once each in an
 ## offscreen SubViewport, kept for the rest of the run. Works like `CosmeticThumbnails`:
-## `texture_for` hands out the texture at once and fills it in when its turn comes (one render per
-## frame). Headless: nothing renders, the textures stay blank.
+## `texture_for` hands out the texture at once and fills it in when its turn comes
+## (`ThumbnailRenderer`: cached on disk per build, rendered a few frames apart). Headless: nothing
+## renders, the textures stay blank.
 
 const SIZE: int = 128
 ## The items are built facing forward (-z), the way the bean holds them out to the others, so the
@@ -19,27 +20,18 @@ const UPSIDE_DOWN: Array[StringName] = [&"baseball_bat"]
 ## Dev: extra turn for every item (tools/dev/item_thumbs_shot.gd --turn).
 static var extra_turn: float = 0.0
 
-## id -> ImageTexture, shared by every list that ever opens.
-static var _cache: Dictionary = {}
-## Ids still waiting for their render.
-static var _queue: Array[StringName] = []
+const KIND: String = "items"
 
-var _viewport: SubViewport
 var _stand: Node3D
 var _model: Node3D
-var _busy: StringName = &""
-var _wait: int = 0
 
 
 func _ready() -> void:
 	name = "ItemThumbnails"
-	if DisplayServer.get_name() == "headless":
-		set_process(false)
+	kind = KIND
+	image_size = Vector2i(SIZE, SIZE)
+	if setup_viewport() == null:
 		return
-	_viewport = SubViewport.new()
-	_viewport.size = Vector2i(SIZE, SIZE)
-	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	add_child(_viewport)
 	_stand = build_stage(_viewport)
 
 
@@ -82,14 +74,8 @@ static func build_stage(vp: SubViewport) -> Node3D:
 
 
 ## The picture of item `id` (blank until rendered).
-static func texture_for(id: StringName) -> ImageTexture:
-	if _cache.has(id):
-		return _cache[id]
-	var img := Image.create_empty(SIZE, SIZE, false, Image.FORMAT_RGBA8)
-	var tex := ImageTexture.create_from_image(img)
-	_cache[id] = tex
-	_queue.append(id)
-	return tex
+static func texture_for(id: StringName, urgent: bool = false) -> ImageTexture:
+	return request(KIND, String(id), Vector2i(SIZE, SIZE), urgent)
 
 
 ## The y turn of `id`'s preview, degrees (also the item bar's live model turns from there).
@@ -104,26 +90,12 @@ static func preview_rotation(id: StringName) -> Vector3:
 
 ## Whether every requested picture is done.
 static func idle() -> bool:
-	return _queue.is_empty()
+	return queue_empty(KIND)
 
 
-func _process(_delta: float) -> void:
-	if _busy != &"":
-		_wait -= 1
-		if _wait > 0:
-			return
-		var img: Image = _viewport.get_texture().get_image()
-		if img != null and not img.is_empty():
-			img.convert(Image.FORMAT_RGBA8)
-			(_cache[_busy] as ImageTexture).update(img)
-		_busy = &""
-	if _queue.is_empty():
-		return
-	_busy = _queue.pop_front()
+func _stage(key: String) -> void:
 	if _model != null:
 		_model.queue_free()
-	_model = ItemModels.make(_busy, 1.0)
-	_model.rotation_degrees = preview_rotation(_busy)
+	_model = ItemModels.make(StringName(key), 1.0)
+	_model.rotation_degrees = preview_rotation(StringName(key))
 	_stand.add_child(_model)
-	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-	_wait = 2  # rendered at the end of this frame; read it back next frame (plus one for safety)

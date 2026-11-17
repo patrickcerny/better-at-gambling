@@ -63,6 +63,9 @@ var pending_lobby: int = 0
 var last_error: String = ""
 
 var _available: bool = false
+## Seconds until a changed look goes up (0 = nothing waiting), and the wait after a change.
+var _look_wait: float = 0.0
+const LOOK_DELAY: float = 4.0
 ## The look `submit_profile_bests` last uploaded this run.
 var _bests_look: PackedInt32Array = PackedInt32Array()
 ## The global leaderboards (`SteamLeaderboards`; a no-op without Steam).
@@ -138,9 +141,13 @@ func _ready() -> void:
 	submit_profile_bests()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _available:
 		steam.call("run_callbacks")
+		if _look_wait > 0.0:
+			_look_wait -= delta
+			if _look_wait <= 0.0:
+				submit_profile_bests()
 
 
 func _exit_tree() -> void:
@@ -252,6 +259,10 @@ func _on_user_stats_received(_game_id: int = 0, result: int = 0, user_id: int = 
 
 func _on_profile_changed() -> void:
 	unlock_achievements(Achievements.from_profile(ProfileManager.profile))
+	# A new outfit or colour (or the Steam inventory arriving) goes to the leaderboards a few
+	# seconds later, so the boards show what this player wears now (Patrick 2026-11-17: "save that
+	# data of the player and display correctly"); `submit_profile_bests` skips an unchanged look.
+	_look_wait = LOOK_DELAY
 
 
 # --- Gold Coins and premium pieces (Steam Inventory Service) -------------------------------------
