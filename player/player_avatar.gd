@@ -50,6 +50,8 @@ var router: InputRouter
 var visuals: AvatarVisuals
 var cam: PlayerCamera
 var nametag: Label3D
+## Invisible dev (`set_hidden`).
+var hidden: bool = false
 var bubble: Label3D
 ## Facing yaw in radians (the direction the bean looks).
 var yaw: float = 0.0
@@ -451,6 +453,15 @@ func set_connection_away(away: bool) -> void:
 		visuals.set_ghost(false)
 
 
+## The dev before his entrance (`PlayerState.hidden`): not drawn, no name tag, nothing to bump into.
+## Only the look: the state machine (and the dev's own walking) carries on.
+func set_hidden(on: bool) -> void:
+	hidden = on
+	visuals.visible = not on
+	nametag.visible = not on and not is_local
+	_collision.disabled = on or state == State.RAGDOLL or state == State.HELD or state == State.AWAY
+
+
 ## Hides the player while they're outside (thrown out).
 func set_away(away: bool) -> void:
 	if carrier != null:
@@ -572,7 +583,7 @@ func _local_move(delta: float) -> void:
 		velocity.y -= GRAVITY * delta
 	else:
 		velocity.y = minf(velocity.y, 0.0)
-		if router != null and state == State.STANDING and Input.is_action_just_pressed(&"jump") and router.mode == InputRouter.Mode.WALK:
+		if router != null and state == State.STANDING and Input.is_action_just_pressed(&"jump") and router.mode == InputRouter.Mode.WALK and not router.cutscene:
 			velocity.y = sqrt(2.0 * GRAVITY * cfg.jump_height)
 			Audio.play(&"jump", &"SFX", -12.0, randf_range(0.95, 1.05))
 	push_velocity = push_velocity.move_toward(Vector3.ZERO, 8.0 * delta)

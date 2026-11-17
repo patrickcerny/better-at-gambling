@@ -30,6 +30,12 @@ extends Resource
 ## while an online room waits in LOBBY, the server sends anyone found below it back to their
 ## start-room spot (filled by the map scene; INF = no doors, no check).
 @export var lobby_door_z: float = INF
+## Where the dev makes his entrance (`MatchServer.dev_troll` "entrance", Patrick 2026-11-16: "ein
+## spotlight mittem am eingang vorm casino"): just inside the casino doors while the casino is
+## open, and on the start room's side of them while the room waits in LOBBY (INF = the first
+## lobby spawn).
+@export var entrance_stage: Vector3 = Vector3.INF
+@export var entrance_stage_lobby: Vector3 = Vector3.INF
 ## The jail cell's inner volume (filled by the map scene; empty = no physical jail: jail is only
 ## a timer and a fine, nobody is moved).
 @export var jail_area: AABB = AABB()

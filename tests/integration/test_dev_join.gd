@@ -12,6 +12,7 @@ func before_each() -> void:
 	server = MatchServer.new()
 	server.configure({"minigames": 2, "gamble_seconds": 30.0, "seed": 5, "minigame_pool": "quiz", "minigame_briefing": 0.0}, Registry.balance, Registry.presets, Registry.game_logic_scripts(), Registry.maps[&"lucky_lounge"])
 	server.event_emitted.connect(func(ev: Dictionary) -> void: events.append(ev))
+	LuckyLounge.describe_rooms(server.map_def)
 	server.open_lobby()
 
 
@@ -150,3 +151,71 @@ func test_troll_panel_sends_intents() -> void:
 	panel.buttons[&"say"].pressed.emit()
 	assert_eq(str(panel.sent[-1]["text"]), "hi")
 	assert_true(Intents.validate(panel.sent[-1]).is_empty())
+
+
+## Patrick 2026-11-17: invisible at join, the entrance button stands everyone up and shows him.
+func test_the_dev_is_invisible_until_his_entrance() -> void:
+	var bob: int = server.add_player("dev:bob", "Bob")
+	server.add_player("dev:cat", "Cat")
+	var dev: int = server.add_player("steam:%d" % DevMode.THE_DEV, "Patrick", -1, [], true)
+	assert_true(server.state.players[dev].hidden)
+	assert_true(server.rules.status(dev).away, "untouchable while invisible")
+	assert_false(_troll(bob, {"action": "entrance"})["ok"], "the dev's alone")
+	events.clear()
+	assert_true(_troll(dev, {"action": "entrance"})["ok"])
+	assert_false(server.state.players[dev].hidden)
+	assert_false(server.rules.status(dev).away)
+	var ev: Array[Dictionary] = _of(&"dev_entrance")
+	assert_eq(ev.size(), 1)
+	assert_eq(Serializer.to_vec3(ev[0]["pos"]), server.map_def.entrance_stage_lobby, "in the start room while the room waits")
+	assert_eq(server.world.get_position(dev), server.map_def.entrance_stage_lobby)
+
+
+func test_the_entrance_stands_everyone_up() -> void:
+	var bob: int = server.add_player("dev:bob", "Bob")
+	server.add_player("dev:cat", "Cat")
+	var dev: int = server.add_player("steam:%d" % DevMode.THE_DEV, "Patrick", -1, [], true)
+	server.start_match()
+	for i: int in 50:
+		server.advance(0.1)
+		if server.phases.phase == Phase.Id.CASINO:
+			break
+	var sid: StringName = &""
+	for id: StringName in server.stations.logics:
+		if not server.stations.vip.get(id, false):
+			sid = id
+			break
+	var spos: Variant = server.map_def.station_positions.get(sid, null)
+	if spos != null:
+		server.world.set_transform(bob, Vector3(spos), 0.0)
+	var sat: Dictionary = server.submit_intent(bob, Intents.make(&"sit", {"station": sid}))
+	assert_true(sat["ok"], str(sat))
+	assert_true(_troll(dev, {"action": "entrance"})["ok"])
+	assert_false(server.is_seated_anywhere(bob), "up from the table")
+	assert_eq(server.world.get_position(dev), server.map_def.entrance_stage, "just inside the casino doors")
+
+
+func test_the_entrance_show_holds_and_gives_back_the_controls() -> void:
+	var map := Node3D.new()
+	add_child_autofree(map)
+	var lamp := OmniLight3D.new()
+	lamp.light_energy = 2.0
+	map.add_child(lamp)
+	var router := InputRouter.new()
+	add_child_autofree(router)
+	var show := DevEntrance.new()
+	add_child_autofree(show)
+	show.play(map, null, null, router, null, Vector3(0, 0, 5), 9.0)
+	assert_true(router.cutscene, "controls held")
+	assert_eq(router.move_vector(), Vector2.ZERO)
+	for i: int in 30:
+		show._process(0.1)
+	assert_lt(lamp.light_energy, 0.5, "the lights are down")
+	assert_not_null(show.spot)
+	assert_gt(show.spot.light_energy, 0.0, "spotlight on after the drumroll")
+	for i: int in 65:
+		show._process(0.1)
+	assert_false(router.cutscene, "controls back after the show")
+	for i: int in 40:
+		show._process(0.1)
+	assert_almost_eq(lamp.light_energy, 2.0, 0.01, "the lights are back")

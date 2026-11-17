@@ -67,6 +67,8 @@ var pause_menu: PauseMenu = null
 var dev_panel: DevMatchPanel = null
 ## The dev's in-match tools online (`joined_as_dev`).
 var troll_panel: DevTrollPanel = null
+## The dev's entrance show while it runs.
+var entrance: DevEntrance = null
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
 ## The rules screen over the stage until everyone is ready (or 30 s pass).
@@ -616,6 +618,8 @@ func _spawn_avatar(pid: int, p: Dictionary) -> PlayerAvatar:
 	avatars[pid] = a
 	if not bool(p.get("connected", true)):
 		a.set_connection_away(true)
+	if bool(p.get("hidden", false)):
+		a.set_hidden(true)  # the dev before his entrance
 	if not a.is_local:
 		a.set_held_item(StringName(str(p.get("held", ""))))
 	# Already at a table when we learn about them (joining late, reconnecting): put them in their
@@ -1096,6 +1100,8 @@ func _on_event(ev: Dictionary) -> void:
 				net_world.reset_player(pid)
 		&"dev_joined":
 			_on_dev_joined(int(ev["player"]))
+		&"dev_entrance":
+			_on_dev_entrance(int(ev["player"]), Serializer.to_vec3(ev["pos"]), float(ev.get("seconds", MatchServer.ENTRANCE_SECONDS)))
 		&"dev_message":
 			hud.banner("DEV: %s" % str(ev.get("text", "")), Palette.MONEY_GREEN, 4.0)
 			Audio.play(&"announcer_opening", &"SFX", -4.0)
@@ -2470,12 +2476,28 @@ func joined_as_dev() -> bool:
 	return role == Role.CLIENT and view != null and view.state.is_dev(local_id)
 
 
-## The dev walked in (Patrick 2026-11-16: "When i join (ill give you a song later)"): a banner for
-## everyone and the dev's entrance song: audio/sfx/dev_join.wav is a placeholder fanfare (the big
-## win sting); Patrick's song goes in as audio/sfx/dev_join-v1.ogg, which wins over it.
-func _on_dev_joined(_player: int) -> void:
-	hud.banner("THE DEV HAS ENTERED THE CASINO", Palette.MONEY_GREEN, 5.0)
-	Audio.play(&"dev_join", &"SFX", -2.0)
+## The dev joined: invisible until he presses GRAND ENTRANCE (Patrick 2026-11-17: "nicht bei lobby
+## join, da bleib ich unsichtbar"), so only he hears about it.
+func _on_dev_joined(player: int) -> void:
+	if player == local_id:
+		hud.toast("You're invisible. Pause menu → DEV TOOLS → GRAND ENTRANCE", 6.0)
+
+
+## The dev's entrance (`DevEntrance`): lights down, drumroll, "Be prepared for a special guest....",
+## everyone's camera turns to the entrance, a spotlight, the dev floats down into it and his song
+## starts. Everyone's controls are held for `seconds`.
+func _on_dev_entrance(player: int, pos: Vector3, seconds: float) -> void:
+	var dev: PlayerAvatar = avatars.get(player, null)
+	if dev == null:
+		return
+	dev.teleport(pos)
+	dev.set_hidden(false)
+	if entrance != null and is_instance_valid(entrance):
+		entrance.finish_now()
+	entrance = DevEntrance.new()
+	entrance.name = "DevEntrance"
+	add_child(entrance)
+	entrance.play(map, dev, local, router, hud, pos, seconds)
 
 
 ## DEV TOOLS in the pause menu: the dev panel over the game (the cursor stays free while it is open).

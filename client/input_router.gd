@@ -31,6 +31,8 @@ enum Mode { WALK, SEATED, MENU, EMOTE, STAGE }
 const STICK_LOOK_SPEED: float = 3.2
 
 var mode: Mode = Mode.WALK
+## A show holds the controls (the dev's entrance, `DevEntrance`): no walking, no looking.
+var cutscene: bool = false
 ## True while the process has focus and should capture the mouse in WALK mode.
 var capture_mouse: bool = true
 ## Mouse look sensitivity (radians per pixel).
@@ -127,7 +129,7 @@ static func _dead_zone(v: float) -> float:
 
 ## WASD / left stick, as a 2D vector (x right, y forward) in [-1, 1].
 func move_vector() -> Vector2:
-	if mode != Mode.WALK:
+	if mode != Mode.WALK or cutscene:
 		return Vector2.ZERO
 	var v: Vector2 = Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
 	var out := Vector2(v.x, -v.y)
@@ -139,14 +141,14 @@ func move_vector() -> Vector2:
 
 ## Right stick look, radians per second.
 func stick_look() -> Vector2:
-	if mode == Mode.MENU or mode == Mode.STAGE:
+	if mode == Mode.MENU or mode == Mode.STAGE or cutscene:
 		return Vector2.ZERO
 	var v: Vector2 = Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
 	return v * STICK_LOOK_SPEED * stick_sensitivity * (-1.0 if drunk else 1.0)
 
 
 func sprint_held() -> bool:
-	return mode == Mode.WALK and Input.is_action_pressed(&"sprint")
+	return mode == Mode.WALK and not cutscene and Input.is_action_pressed(&"sprint")
 
 
 ## Sees every event first (even ones a UI consumes) so key hints follow the device in use.
@@ -157,7 +159,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion and (mode == Mode.WALK or mode == Mode.SEATED) and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if event is InputEventMouseMotion and (mode == Mode.WALK or mode == Mode.SEATED) and not cutscene and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var rel: Vector2 = (event as InputEventMouseMotion).relative * mouse_sensitivity
 		if invert_y:
 			rel.y = -rel.y

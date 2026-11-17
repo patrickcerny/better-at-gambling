@@ -50,10 +50,22 @@ func _ready() -> void:
 	title.add_theme_color_override(&"font_color", Palette.MONEY_GREEN)
 	v.add_child(title)
 	var sub := Label.new()
-	sub.text = "You joined as the dev: endless money, no rank, no minigames. Pick a victim."
+	sub.text = "You joined as the dev: invisible until your entrance, endless money, no rank, no minigames."
 	sub.theme_type_variation = &"SmallLabel"
 	sub.add_theme_color_override(&"font_color", Color(Palette.CREAM, 0.55))
 	v.add_child(sub)
+	# The entrance (Patrick 2026-11-17): lights down, drumroll, spotlight, the dev floats in.
+	var entrance := Button.new()
+	entrance.name = "Entrance"
+	entrance.text = "GRAND ENTRANCE"
+	entrance.theme_type_variation = &"ActionButton"
+	entrance.custom_minimum_size = Vector2(0, 60)
+	entrance.tooltip_text = "Lights down, drumroll, \"Be prepared for a special guest....\", everyone looks at the entrance and you float down into the spotlight with your song. Ends your invisibility."
+	entrance.pressed.connect(func() -> void:
+		do(&"entrance")
+		close())
+	v.add_child(entrance)
+	buttons[&"entrance"] = entrance
 	# Target.
 	var trow := _row(v, "WHO")
 	target_pick = OptionButton.new()
@@ -194,7 +206,7 @@ func do(action: StringName) -> void:
 	if send_to_server:
 		Net.send_intent(full)
 	var who: String = "everyone" if selected_target() == EVERYONE else target_pick.get_item_text(target_pick.selected)
-	status.text = "%s: %s" % [buttons[action].text if buttons.has(action) else String(action), "the casino" if action in [&"minigame", &"say"] else who]
+	status.text = "%s: %s" % [buttons[action].text if buttons.has(action) else String(action), "the casino" if action in [&"minigame", &"say", &"entrance"] else who]
 
 
 func _action(parent: Control, action: StringName, text: String) -> Button:

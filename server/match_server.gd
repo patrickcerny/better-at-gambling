@@ -250,7 +250,7 @@ func _build_match_systems(seed_value: int) -> void:
 	money_history = MoneyHistory.new()
 	for id: int in state.players:
 		_reset_stats(id)
-		rules.status(id).away = not state.players[id].connected
+		rules.status(id).away = not state.players[id].connected or state.players[id].hidden
 	if draws_floor():
 		_new_floor()
 	elif map_def.has_floor_plan() and floor_changed.is_valid():
@@ -469,6 +469,7 @@ func add_player(uid: String, display_name: String, bean_color: int = -1, outfit:
 	p.uid = uid
 	p.display_name = display_name
 	p.dev = god
+	p.hidden = god  # invisible until his entrance (Patrick: "nicht bei lobby join, da bleib ich unsichtbar")
 	if god:
 		gods[p.id] = true
 	# Slot colours are not picked (Patrick, 2026-10-05): everyone gets the first free one. The bean
@@ -495,6 +496,7 @@ func add_player(uid: String, display_name: String, bean_color: int = -1, outfit:
 		Log.info(&"server", "%s joined the running match (phase %s)" % [display_name, Phase.name_of(phases.phase)])
 	_emit(GameEvents.make(&"player_joined", {"player": p.to_wire(), "late": late}))
 	if god:
+		rules.status(p.id).away = true  # untouchable while invisible
 		Log.info(&"server", "%s joined as the dev" % display_name)
 		_emit(GameEvents.make(&"dev_joined", {"player": p.id}))
 	_check_leader()
@@ -580,7 +582,7 @@ func player_reconnected(player: int) -> void:
 	if ps.bean_color in worn:
 		ps.bean_color = Cosmetics.bean_color_for(-1, ps.color_index, worn)
 		_emit(GameEvents.make(&"player_color", {"player": player, "bean_color": ps.bean_color}))
-	rules.status(player).away = false
+	rules.status(player).away = state.players[player].hidden
 	lobby.set_connected(player, true, _uptime)
 	_emit(GameEvents.make(&"player_rejoined", {"player": player}))
 	_check_leader()
@@ -804,7 +806,7 @@ func dev_troll(player: int, intent: Dictionary) -> Dictionary:
 				targets.append(id)
 	elif state.players.has(target) and not gods.has(target):
 		targets.append(target)
-	var needs_target: bool = not action in [&"minigame", &"say"]
+	var needs_target: bool = not action in [&"minigame", &"say", &"entrance"]
 	if needs_target and targets.is_empty():
 		return StationLogicBase.fail(&"no_target")
 	match action:
@@ -842,6 +844,8 @@ func dev_troll(player: int, intent: Dictionary) -> Dictionary:
 		&"minigame":
 			if not dev_minigame_now(item):
 				return StationLogicBase.fail(&"not_now")
+		&"entrance":
+			return _dev_entrance(player)
 		&"say":
 			var text: String = str(intent.get("text", "")).strip_edges().left(120)
 			if text == "":
@@ -850,6 +854,40 @@ func dev_troll(player: int, intent: Dictionary) -> Dictionary:
 		_:
 			return StationLogicBase.fail(&"unknown_action")
 	_emit(GameEvents.make(&"dev_trolled", {"player": player, "action": action, "targets": targets}))
+	return StationLogicBase.OK_RESULT
+
+
+## Seconds the entrance holds everyone's controls (the clients play it: `DevEntrance`).
+const ENTRANCE_SECONDS: float = 9.0
+
+
+## The dev's entrance (Patrick 2026-11-17: "es soll auch alles dunkel werden ... Wenn ich den button
+## drücke ... Dann werden alle spieler vom tisch aufgestanden"): everyone at a table stands up, the
+## dev stands on the entrance stage (`MapDefinition.entrance_stage`, the start room's in LOBBY),
+## visible and touchable again, and `dev_entrance {player, pos, seconds}` lets every client play
+## the show. Not while a minigame runs.
+func _dev_entrance(player: int) -> Dictionary:
+	if minigame != null or phases.phase in [Phase.Id.MINIGAME, Phase.Id.REWARDS, Phase.Id.RESULTS]:
+		return StationLogicBase.fail(&"not_now")
+	for id: int in state.players:
+		if id != player and is_seated_anywhere(id):
+			stand_up(id)
+	var lobby_room: bool = phases.phase == Phase.Id.LOBBY
+	var pos: Vector3 = Vector3.INF
+	if map_def != null:
+		pos = map_def.entrance_stage_lobby if lobby_room else map_def.entrance_stage
+		if pos == Vector3.INF:
+			pos = map_def.lobby_spawn(player)
+	if pos == Vector3.INF:
+		pos = world.get_position(player)
+	if is_seated_anywhere(player):
+		stand_up(player)
+	_server_owned.erase(player)
+	set_server_position(player, pos)
+	state.players[player].hidden = false
+	rules.status(player).away = false
+	_emit(GameEvents.make(&"dev_entrance", {"player": player, "pos": Serializer.vec3(pos), "seconds": ENTRANCE_SECONDS}))
+	_flush()
 	return StationLogicBase.OK_RESULT
 
 
@@ -2149,8 +2187,8 @@ func _keep_out_of_casino() -> void:
 	if map_def == null:
 		return
 	for id: int in state.players:
-		if not world.positions.has(id):
-			continue  # no body in the world yet
+		if not world.positions.has(id) or gods.has(id):
+			continue  # no body in the world yet; the dev goes where he likes
 		var pos: Vector3 = world.get_position(id)
 		var spot: Vector3 = map_def.lobby_spawn(id)
 		if spot == Vector3.INF or not map_def.past_lobby_doors(pos):

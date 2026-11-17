@@ -357,6 +357,8 @@ func lobby_spawn(player_id: int) -> Vector3:
 ## spots inside it and where jailed players come out.
 static func describe_rooms(def: MapDefinition) -> void:
 	def.lobby_door_z = LOBBY_DOORS_Z - LOBBY_WALL_T * 0.5
+	def.entrance_stage = Vector3(0, 0, LOBBY_DOORS_Z - 3.4)
+	def.entrance_stage_lobby = Vector3(0, 0, LOBBY_DOORS_Z + 2.2)
 	def.jail_area = JAIL_AREA
 	def.jail_spots = JAIL_SPOTS.duplicate()
 	def.jail_exits = JAIL_EXITS.duplicate()

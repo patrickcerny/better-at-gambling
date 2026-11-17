@@ -199,6 +199,9 @@ func apply_event(ev: Dictionary) -> bool:
 func _apply(ev: Dictionary) -> void:
 	var type: StringName = ev["type"]
 	match type:
+		&"dev_entrance":
+			if players.has(int(ev["player"])):
+				players[int(ev["player"])]["hidden"] = false
 		&"player_joined":
 			var p: Dictionary = ev["player"]
 			players[int(p["id"])] = p

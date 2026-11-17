@@ -182,6 +182,12 @@ func set_bus_volume(bus_name: StringName, linear: float) -> void:
 	AudioServer.set_bus_volume_db(idx, linear_to_db(clampf(linear, 0.0001, 1.0)))
 
 
+## The clip `play` would use for `name` (null when there is none): for callers that need their own
+## player (the dev's entrance song fades in and runs long).
+func clip(name: StringName) -> AudioStream:
+	return _clip(name)
+
+
 func _clip(name: StringName) -> AudioStream:
 	if not _clips.has(name) and not _missing.has(name):
 		_load(name)
