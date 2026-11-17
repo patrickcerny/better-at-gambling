@@ -3,7 +3,7 @@ extends SceneTree
 ##   xvfb-run godot --path . --rendering-driver opengl3 --rendering-method gl_compatibility \
 ##     -s tools/logo/render_preview.gd -- --out DIR [--size 1600x800]
 
-const ANGLES: Array = [["front", 0.0, 0.0], ["left", -28.0, 4.0], ["right", 26.0, -6.0], ["above", 8.0, 22.0]]
+const ANGLES: Array = [["front", 0.0, 0.0], ["left", -28.0, 4.0], ["right", 26.0, -6.0], ["above", 8.0, 22.0], ["back", 180.0, 0.0], ["back_left", 150.0, 4.0]]
 
 var _out: String
 var _vp: SubViewport
@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_logo = Logo3D.new()
 	_logo.sway = false
 	_vp.add_child(_logo)
+	_logo.set_spins.call_deferred(1234)
 	_set_angle()
 
 
