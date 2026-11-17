@@ -168,3 +168,13 @@ func test_friends_count_from_one() -> void:
 	assert_eq(int(friends[0]["rank"]), 2, "the global rank stays")
 	var global: Array[Dictionary] = LeaderboardRules.with_places(rows, LeaderboardRules.SCOPE_GLOBAL)
 	assert_eq(int(global[0]["place"]), 2)
+
+
+## Patrick's own outfit (2026-11-17, every slot worn) goes up and comes back piece for piece.
+func test_a_full_real_outfit_round_trips() -> void:
+	var outfit := PackedStringArray(["hat_laurel", "shirt_tux", "pants_tux", "cape_royal_flush", "boots_pirate",
+		"skin_the_house", "eyes_bulging", "mouth_cigarette", "beard_pencil"])
+	assert_eq(Cosmetics.sanitize_outfit(outfit), outfit, "all real pieces in slot order")
+	var back: Dictionary = LeaderboardRules.skin_from_details(LeaderboardRules.skin_details(5, outfit))
+	assert_eq(back["outfit"], outfit)
+	assert_eq(int(back["color"]), 5)

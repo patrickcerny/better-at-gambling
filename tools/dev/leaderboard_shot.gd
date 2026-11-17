@@ -22,6 +22,13 @@ func _ready() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var args: Cmdline = Cmdline.parse(OS.get_cmdline_user_args())
+	# Your own bean: Patrick's outfit of 2026-11-17 (every piece owned for the shot).
+	DevMode.forced_cosmetics = 1
+	var p: PlayerProfile = ProfileManager.profile
+	p.preferred_color = 5
+	for kv: Array in [["hat", "hat_laurel"], ["shirt", "shirt_tux"], ["pants", "pants_tux"], ["cape", "cape_royal_flush"],
+			["boots", "boots_pirate"], ["skin", "skin_the_house"], ["eyes", "eyes_bulging"], ["mouth", "mouth_cigarette"], ["beard", "beard_pencil"]]:
+		p.outfit[StringName(kv[0])] = StringName(kv[1])
 	var panel := ShotPanel.new()
 	add_child(panel)
 	panel.open(LeaderboardPanel.PAGE_STATS if args.has_flag("stats") else LeaderboardPanel.PAGE_BOARDS)
