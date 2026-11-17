@@ -277,7 +277,7 @@ func wear(kind: StringName, id: StringName) -> void:
 			_cape_spread_node = spread_node
 			_update_cape_spread()
 			_outfit_nodes[kind] = _cape_pivot
-			var cloth_mat: ShaderMaterial = ToonMaterial.make_cloth(0.3)
+			var cloth_mat: ShaderMaterial = ToonMaterial.make_cloth(0.3, id)
 			if cloth_mat != null:
 				mi.material_override = cloth_mat
 				mi.extra_cull_margin = 1.0  # the cloth moves the vertices outside the mesh's box
