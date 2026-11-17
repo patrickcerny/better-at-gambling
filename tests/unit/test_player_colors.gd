@@ -79,3 +79,18 @@ func test_pedestal_inlays_follow_the_players_colour() -> void:
 	assert_ne(map.pedestal_inlays[1].albedo_color, pink, "other pedestals keep theirs")
 	map.set_pedestal(0, "", false)
 	assert_eq(map.pedestal_inlays[0].albedo_color, LuckyLounge.PEDESTAL_EMPTY)
+
+
+## Patrick 2026-11-17: "It should use the animated colors if there is one".
+func test_pedestal_inlays_wear_the_animated_skin() -> void:
+	var map: LuckyLounge = (load("res://maps/lucky_lounge/lucky_lounge.tscn") as PackedScene).instantiate()
+	map.bake_navmesh = false
+	add_child_autofree(map)
+	await wait_physics_frames(1)
+	map.set_pedestal(0, "Patrick", false, Palette.player_color(6), &"skin_lava")
+	assert_eq(map.pedestal_inlay_meshes[0].size(), 4)
+	for mi: MeshInstance3D in map.pedestal_inlay_meshes[0]:
+		assert_ne(mi.material_override, map.pedestal_inlays[0], "the inlay shows the skin")
+	assert_eq((map.pedestal_inlay_meshes[1][0] as MeshInstance3D).material_override, map.pedestal_inlays[1], "other pedestals don't")
+	map.set_pedestal(0, "Patrick", false, Palette.player_color(6))
+	assert_eq((map.pedestal_inlay_meshes[0][0] as MeshInstance3D).material_override, map.pedestal_inlays[0], "skin off: the plain colour again")

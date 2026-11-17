@@ -247,6 +247,10 @@ var pedestal_glows: Array[Node3D] = []
 ## Per pedestal: the material of its colour inlays, in its player's colour (`PlayerColors`, their
 ## bean or skin colour) or `PEDESTAL_EMPTY` while nobody has it.
 var pedestal_inlays: Array[StandardMaterial3D] = []
+## Per pedestal: its inlay meshes; while its player wears an animated skin they wear the skin's
+## moving pattern instead (Patrick 2026-11-17: "It should use the animated colors if there is one").
+var pedestal_inlay_meshes: Array[Array] = []
+static var _skin_inlays: Dictionary = {}
 var _pedestal_state: Array = []
 ## 0..1 per pedestal: how far its glow has faded in, and the fade under way.
 var _glow_level: Array[float] = []
@@ -372,15 +376,23 @@ func ready_pad(color_index: int) -> Vector3:
 ## reads FREE), colours its inlays and name in the player's `color` (their bean or skin colour,
 ## `PlayerColors`; transparent = the slot colour) and fades the glow from above in while they are
 ## ready, out when they are not.
-func set_pedestal(color_index: int, player_name: String, ready: bool, color: Color = Color(0, 0, 0, 0)) -> void:
+func set_pedestal(color_index: int, player_name: String, ready: bool, color: Color = Color(0, 0, 0, 0), skin: StringName = &"") -> void:
 	if color_index < 0 or color_index >= pedestal_labels.size():
 		return
 	var mark: Color = PEDESTAL_EMPTY if player_name == "" else (color if color.a > 0.0 else Palette.player_color(color_index))
-	var state: Array = [player_name, ready, mark]
+	if player_name == "":
+		skin = &""
+	var skin_mat: Material = _skin_inlay(skin)
+	if skin_mat != null:
+		mark = ToonMaterial.skin_flat(skin)  # the name plate in the skin's colour too
+	var state: Array = [player_name, ready, mark, skin]
 	if _pedestal_state[color_index] == state:
 		return
 	_pedestal_state[color_index] = state
 	pedestal_inlays[color_index].albedo_color = mark
+	if color_index < pedestal_inlay_meshes.size():
+		for mi: MeshInstance3D in pedestal_inlay_meshes[color_index]:
+			mi.material_override = skin_mat if skin_mat != null else pedestal_inlays[color_index]
 	var label: Label3D = pedestal_labels[color_index]
 	label.text = player_name.to_upper() if player_name != "" else PEDESTAL_FREE
 	label.font_size = PEDESTAL_NAME_SIZE if label.text.length() <= 8 else maxi(20, PEDESTAL_NAME_SIZE * 8 / label.text.length())  # long names fit the plate
@@ -395,6 +407,18 @@ func set_pedestal(color_index: int, player_name: String, ready: bool, color: Col
 	tw = create_tween()
 	tw.tween_method(_set_glow.bind(color_index), _glow_level[color_index], to, PEDESTAL_GLOW_FADE * absf(to - _glow_level[color_index]))
 	_glow_tweens[color_index] = tw
+
+
+## The inlay material for animated skin `skin` (shared per skin; null for none or unknown ids).
+static func _skin_inlay(skin: StringName) -> Material:
+	if skin == &"":
+		return null
+	if not _skin_inlays.has(skin):
+		var m: Material = ToonMaterial.make_skin(skin)
+		if m is ShaderMaterial:
+			(m as ShaderMaterial).set_shader_parameter(&"rim_strength", 0.15)
+		_skin_inlays[skin] = m
+	return _skin_inlays[skin]
 
 
 ## The glow over pedestal `i` at `level` (0 = off: the light is hidden, so it costs nothing).
@@ -761,6 +785,8 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	colour.metallic = 0.1
 	colour.roughness = 0.45
 	pedestal_inlays.append(colour)
+	var inlay_meshes: Array = []
+	pedestal_inlay_meshes.append(inlay_meshes)
 	var deep: StandardMaterial3D = GreyboxKit.material(MARBLE_DEEP, 0.0, 0.35)
 	var hw: float = DAIS_SIZE.x * 0.5  # body half width
 	var hd: float = DAIS_SIZE.y * 0.5  # body half depth
@@ -800,11 +826,15 @@ func _build_pedestal(i: int, pos: Vector3) -> void:
 	var inlay_h: float = (body_y1 - body_y0) - 0.16
 	for sx: float in [-1.0, 1.0]:
 		_mesh_box(root, Vector3(0.012, inlay_h + 0.04, DAIS_SIZE.y - 0.2), Vector3(sx * (hw + 0.006), mid_y, 0), gold).name = "InlayFrame"
-		_mesh_box(root, Vector3(0.012, inlay_h, DAIS_SIZE.y - 0.24), Vector3(sx * (hw + 0.012), mid_y, 0), colour).name = "Inlay"
+		var side_inlay: MeshInstance3D = _mesh_box(root, Vector3(0.012, inlay_h, DAIS_SIZE.y - 0.24), Vector3(sx * (hw + 0.012), mid_y, 0), colour)
+		side_inlay.name = "Inlay"
+		inlay_meshes.append(side_inlay)
 		var cx: float = sx * (STAIR_W * 0.5 + (hw - STAIR_W * 0.5) * 0.5)
 		var iw: float = hw - STAIR_W * 0.5 - 0.06
 		_mesh_box(root, Vector3(iw + 0.04, inlay_h + 0.04, 0.012), Vector3(cx, mid_y, front - 0.006), gold).name = "InlayFrame"
-		_mesh_box(root, Vector3(iw, inlay_h, 0.012), Vector3(cx, mid_y, front - 0.012), colour).name = "Inlay"
+		var front_inlay: MeshInstance3D = _mesh_box(root, Vector3(iw, inlay_h, 0.012), Vector3(cx, mid_y, front - 0.012), colour)
+		front_inlay.name = "Inlay"
+		inlay_meshes.append(front_inlay)
 	# The stair: solid risers from the footing up, polished treads with a gold nosing.
 	var rise: float = PEDESTAL_TOP / (STAIR_STEPS + 1)
 	var run: float = STAIR_LEN / STAIR_STEPS
