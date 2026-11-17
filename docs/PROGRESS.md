@@ -93,6 +93,41 @@
 - None for M5. Needed from Patrick later: a domain for TLS (optional), Steamworks App ID + Web API key (M8).
 
 ## Session log
+### 2026-11-16 / 0.10.47 no more cash piles on the floor
+- Patrick: "remove this random cash from everywhere" (screenshot: banknotes + coins on the carpet).
+  It was the Plinko jackpot decor: two `money_pile` props beside the board that appeared once the
+  jackpot reached 3x / 6x its seed. Removed `PlinkoStation.set_jackpot` + its call in `MatchScene`
+  and the test. Jackpot money logic untouched (purely visual).
+
+### 2026-11-16 / 0.10.46 no false "ALL IN" after a bet goes down
+- Patrick: "sometimes it tells me I go all in but I have more money (mainly on blackjack)". Blackjack
+  takes the stake off the balance as soon as the bet is placed; that balance update re-clamped the
+  bet still held in the `BetPanel` to what was left and toasted "ALL IN: betting everything you have"
+  although only part of the money was bet (e.g. $200 of $300 -> "ALL IN $100"). It also shrank the
+  next round's bet to the leftover. Same for Hi-Lo and Hold'em (Hold'em feeds a third of the balance).
+- `BetPanel` now keeps the picked bet (`wanted`): a balance update only re-clamps it and moves the
+  ALL IN tag, it never toasts, and the bet grows back once the money is there. The toast comes only
+  when an all-in bet is actually placed (`confirm`, `chip_stake`, instant pulls). Tests in
+  `tests/ui/test_bet_panel.gd`.
+### 2026-11-16 / 0.10.45 roulette: no more sitting in each other's lap
+- Patrick: "on roulette you can sit on eachother". The server already hands every player their own
+  stool (`MatchServer._free_seat`, `tests/integration/test_station_seats.gd`), but all six roulette
+  seats shared one camera anchor 0.4 m behind stool 1, at head height: whoever sat anywhere at the
+  table looked out of stool 1's bean. Each stool now has its own view (`RouletteStation.SEAT_EYE_*`,
+  `SEAT_AIM_X`): over and behind its own stool, high enough to clear the neighbours, the far row
+  turned towards the wheel so it stays left of the docked panel.
+- Checked every other table: `tests/physics/test_seat_cameras_clear.gd` fails if any seat's view
+  starts inside another seat's bean (only roulette did). Dev shot: `tools/dev/roulette_shot.tscn`.
+### 2026-11-16 / 0.10.44 thrown-around beans no longer stuck in someone's hands
+- Patrick: "The throw around and the ragdoll not updating bug is still there". When the bean holding
+  someone went flying (knocked out, caught by a guard, knocked down), `InteractionResolver` ended
+  the hold silently: the held bean kept dangling in front of the flying holder on every screen, the
+  host kept it server-owned (frozen for everyone else) and the holder could never grab again. Every
+  hold end now emits `player_released` (`_drop_holds`), and `tick` drops a hold whose holder (or a
+  target that was standing when grabbed) gets knocked down. `player_released` leaves a bean a guard
+  carries alone. Puppet ragdolls on clients applied the streamed (world) torso rotation as local
+  rotation under the bean's yaw: lying beans showed turned the wrong way; now world space.
+  Tests: tests/physics/test_holder_knocked_out.gd, test_ragdoll_puppet_pose.gd.
 ### 2026-11-16 / 0.10.22 Click the wheel to spin
 - Patrick: "be able to click the wheel to spin it". A click on the Daily Spin wheel (rim included) spins
   it like SPIN while a spin is free; the hand cursor shows when it can.

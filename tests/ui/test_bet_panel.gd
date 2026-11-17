@@ -100,10 +100,12 @@ func test_over_the_balance_clamps_to_all_in() -> void:
 	assert_true(panel.all_in)
 	assert_true(tag.visible, "the ALL IN tag shows")
 	assert_string_contains(tag.text, "ALL IN")
-	assert_signal_emit_count(panel, "went_all_in", 1)
+	assert_signal_emit_count(panel, "went_all_in", 0, "no toast while you are still picking")
 	panel._adjust(panel.amount + 25)
 	assert_eq(panel.amount, 37, "adding chips stays all-in")
-	assert_signal_emit_count(panel, "went_all_in", 1, "the toast fires once per bet")
+	panel.confirm()
+	assert_signal_emit_count(panel, "went_all_in", 1, "the toast fires when the all-in bet goes down")
+	assert_signal_emitted_with_parameters(panel, "went_all_in", [37])
 	assert_eq(panel._chip_buttons[3].text, "$100", "a chip keeps its own value")
 	assert_true(panel._chip_buttons[3].disabled, "and is greyed out when you can't pay it")
 	assert_true(panel._chip_buttons[2].disabled)
@@ -140,6 +142,38 @@ func test_balance_drop_reclamps_the_bet() -> void:
 	panel.set_balance(60)
 	assert_eq(panel.amount, 60)
 	assert_true(panel.all_in)
+	panel.set_balance(500)
+	assert_eq(panel.amount, 100, "the picked bet grows back once the money is there again")
+	assert_false(panel.all_in)
+
+
+## Patrick: "sometimes it tells me I go all in but I have more money (mainly on blackjack)".
+## Blackjack takes the stake off the balance when the bet goes down; that update re-clamped the
+## bet still in the panel to what was left and toasted ALL IN, although only part was bet.
+func test_stake_taken_off_after_a_bet_is_no_all_in_toast() -> void:
+	panel.set_balance(300)
+	panel.set_amount(200)
+	watch_signals(panel)
+	panel.confirm()
+	assert_signal_emitted_with_parameters(panel, "confirmed", [200])
+	panel.set_balance(100)  # the server took the $200 stake
+	assert_signal_emit_count(panel, "went_all_in", 0, "a bet of 200 out of 300 is not all-in")
+	panel.set_balance(500)  # the hand won
+	assert_eq(panel.amount, 200, "the next bet is the 200 picked, not the 100 that was left")
+	assert_false(panel.all_in)
+	panel.confirm()
+	assert_signal_emitted_with_parameters(panel, "confirmed", [200], 1)
+	assert_signal_emit_count(panel, "went_all_in", 0)
+
+
+func test_layout_chip_over_the_balance_toasts_once_placed() -> void:
+	panel.set_balance(1000)
+	panel.select_chip(3)
+	watch_signals(panel)
+	assert_eq(panel.chip_stake(), 100)
+	assert_signal_emit_count(panel, "went_all_in", 0)
+	panel.set_balance(60)  # the chips on the layout were taken off: no toast for that
+	assert_signal_emit_count(panel, "went_all_in", 0)
 
 
 func test_chip_stake_for_layout_tables() -> void:

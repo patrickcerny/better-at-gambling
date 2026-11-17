@@ -231,3 +231,23 @@ func test_buttons_are_locked_for_the_first_seconds() -> void:
 	assert_false(stage.leave_button.disabled)
 	assert_eq(stage.leave_button.text, "LEAVE LOBBY")
 	assert_eq(stage.get_viewport().gui_get_focus_owner(), stage.play_button, "the leader lands on Play again")
+
+
+func test_name_plate_stripe_stays_above_the_name() -> void:
+	# Patrick 2026-11-16: the colour stripe on the end screen ran through the names.
+	_open(3)
+	var tag: Label3D = stage._name_tag({"name": "Patrick", "money": 4031}, 1, 1)
+	var plate: MeshInstance3D = tag.get_node("Plate")
+	var plate_top: float = plate.position.y + (plate.mesh as QuadMesh).size.y * 0.5
+	var text_px: Vector2 = tag.font.get_multiline_string_size(tag.text, HORIZONTAL_ALIGNMENT_CENTER, -1, tag.font_size)
+	var text_top: float = (text_px.y + tag.line_spacing) * tag.pixel_size * 0.5
+	var m: ShaderMaterial = plate.material_override
+	var stripe_bottom: float = plate_top - _param(m, &"border_w", 0.022) * 1.6 - _param(m, &"accent_h", 0.05)
+	assert_gt(stripe_bottom, text_top + 0.02, "a clear gap between the stripe and the name")
+	assert_eq(m.get_shader_parameter(&"accent"), PlayerColors.of_player(stage.state.players, 1), "the stripe in the player's colour")
+
+
+## A shader parameter, or `fallback` (nameplate.gdshader's default) when the material leaves it unset.
+func _param(m: ShaderMaterial, name: StringName, fallback: float) -> float:
+	var v: Variant = m.get_shader_parameter(name)
+	return float(v) if v != null else fallback

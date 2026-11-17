@@ -63,6 +63,11 @@ var pending_lobby: int = 0
 var last_error: String = ""
 
 var _available: bool = false
+## Seconds until a changed look goes up (0 = nothing waiting), and the wait after a change.
+var _look_wait: float = 0.0
+const LOOK_DELAY: float = 4.0
+## The look `submit_profile_bests` last uploaded this run.
+var _bests_look: PackedInt32Array = PackedInt32Array()
 ## The global leaderboards (`SteamLeaderboards`; a no-op without Steam).
 var boards: SteamLeaderboards = SteamLeaderboards.new()
 var _steam_id: int = 0
@@ -133,11 +138,16 @@ func _ready() -> void:
 	# The developers own every achievement (`DevMode.granted_achievements`), set once per start.
 	unlock_achievements(DevMode.granted_achievements(_steam_id))
 	sync_achievements()
+	submit_profile_bests()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _available:
 		steam.call("run_callbacks")
+		if _look_wait > 0.0:
+			_look_wait -= delta
+			if _look_wait <= 0.0:
+				submit_profile_bests()
 
 
 func _exit_tree() -> void:
@@ -205,12 +215,34 @@ func check_beat_the_dev(beaten: Array[int]) -> void:
 
 
 ## After a match: the local player's ranked row (`MatchServer.progress_rows`, already added to the
-## profile) goes on the global leaderboards (`LeaderboardRules.scores_for`). Nothing when developer
-## mode was used this run or the host didn't rank the match.
+## profile) goes on the global leaderboards (`LeaderboardRules.scores_for`). Nothing when the host
+## didn't rank the match. The developer mode doesn't block it any more (Patrick 2026-11-16: "why
+## am i not on the leaderboard"): its menu tools (Coins, levels, cosmetics) can't touch an online
+## match's money, and its in-match tools only work in Practice, which the host never ranks.
 func submit_match(row: Dictionary) -> void:
-	if not _available or DevMode.used:
+	if not _available:
 		return
-	boards.submit(LeaderboardRules.scores_for(row, ProfileManager.profile))
+	boards.submit(LeaderboardRules.scores_for(row, ProfileManager.profile), my_look())
+
+
+## The local player's bean colour and outfit as leaderboard details (`LeaderboardRules.skin_details`).
+func my_look() -> PackedInt32Array:
+	var p: PlayerProfile = ProfileManager.profile
+	return LeaderboardRules.skin_details(p.preferred_color if p.preferred_color >= 0 else 0, p.outfit_wire())
+
+
+## On start: the profile's ranked bests (`LeaderboardRules.profile_scores`) go up again. Steam
+## keeps the higher score, so this only fills in matches whose upload never happened (an earlier
+## run with the developer mode on, Steam offline when the match ended).
+## Also when the leaderboards open, so a new outfit shows there at once (once per look and run).
+func submit_profile_bests() -> void:
+	if not _available:
+		return
+	var look: PackedInt32Array = my_look()
+	if look == _bests_look:
+		return
+	_bests_look = look
+	boards.submit(LeaderboardRules.profile_scores(ProfileManager.profile), look)
 
 
 func _on_user_stats_received(_game_id: int = 0, result: int = 0, user_id: int = 0) -> void:
@@ -227,6 +259,10 @@ func _on_user_stats_received(_game_id: int = 0, result: int = 0, user_id: int = 
 
 func _on_profile_changed() -> void:
 	unlock_achievements(Achievements.from_profile(ProfileManager.profile))
+	# A new outfit or colour (or the Steam inventory arriving) goes to the leaderboards a few
+	# seconds later, so the boards show what this player wears now (Patrick 2026-11-17: "save that
+	# data of the player and display correctly"); `submit_profile_bests` skips an unchanged look.
+	_look_wait = LOOK_DELAY
 
 
 # --- Gold Coins and premium pieces (Steam Inventory Service) -------------------------------------

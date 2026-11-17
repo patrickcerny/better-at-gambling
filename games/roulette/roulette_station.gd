@@ -21,12 +21,25 @@ func _build_visuals() -> void:
 	for i: int in spots.size():
 		_stool(spots[i], "Stool%d" % i)
 		_add_seat(spots[i] + Vector3(0, 0.5, 0), 0.0 if spots[i].z > 0 else PI)
+		var side: float = signf(spots[i].z)
+		_add_seat_camera(Vector3(spots[i].x, SEAT_EYE_Y, side * SEAT_EYE_Z), Vector3(SEAT_AIM_X[i], FELT_Y, side * SEAT_AIM_Z))
 	camera_anchor = Node3D.new()
 	camera_anchor.name = "CameraAnchor"
-	camera_anchor.position = Vector3(0.9, 1.7, 1.9)  # wheel and felt both clear of the panel docked right
-	camera_anchor.rotation.x = deg_to_rad(-35.0)
+	camera_anchor.position = Vector3(0.9, SEAT_EYE_Y, SEAT_EYE_Z)  # watching from the floor: the south side's middle view
+	camera_anchor.rotation = look_rotation(camera_anchor.position, Vector3(SEAT_AIM_X[1], FELT_Y, SEAT_AIM_Z))
 	add_child(camera_anchor)
 
+
+## Each stool's own view (Patrick: "on roulette you can sit on each other"): every seat used to
+## share one camera hanging 0.4 m behind stool 1, so everyone at the table looked out of stool 1's
+## bean, as if sitting in its lap. Now each eye is over and behind its own stool, high enough to
+## clear the neighbours' heads, looking at the felt between the wheel and the layout. The far row
+## (z < 0) sees the wheel on the right, so its views turn towards the wheel to keep it left of the
+## panel docked right.
+const SEAT_EYE_Y: float = 2.55
+const SEAT_EYE_Z: float = 1.5
+const SEAT_AIM_Z: float = -0.25
+const SEAT_AIM_X: Array[float] = [0.1, 0.5, 1.0, -1.0, -0.7, -0.2]
 
 const WHEEL_MODEL: String = "res://assets/models/own/roulette_wheel.glb"
 ## Centre of the wheel along the table (the body ends at x −2.5, so the 0.8 m radius stays on it).

@@ -22,9 +22,28 @@ func test_scores_after_a_ranked_win() -> void:
 	p.apply_match("m1", row)
 	var s: Dictionary = LeaderboardRules.scores_for(row, p)
 	assert_eq(int(s[LeaderboardRules.BEST_MATCH_MONEY]), 4200, "Patrick's board: money at the end of the match")
-	assert_eq(int(s[LeaderboardRules.BIGGEST_WIN]), 600)
+	assert_false(s.has(&"BIGGEST_WIN"), "Patrick 2026-11-16: no biggest single win board")
 	assert_eq(int(s[LeaderboardRules.MATCHES_WON]), 1)
 	assert_eq(int(s[LeaderboardRules.ONLINE_WINNINGS]), 3200)
+
+
+## Patrick 2026-11-16 "why am i not on the leaderboard": his ranked match was in the profile but
+## never uploaded (developer mode on that run). The profile's bests go up again on every start.
+func test_profile_bests_upload_what_the_profile_holds() -> void:
+	var p := PlayerProfile.new()
+	assert_true(LeaderboardRules.profile_scores(p).is_empty(), "nothing ranked yet")
+	var practice: Dictionary = _row(2500, 1, false, 1500)
+	practice["practice"] = true
+	p.apply_match("a", practice)
+	assert_true(LeaderboardRules.profile_scores(p).is_empty(), "Practice never counts")
+	var row: Dictionary = _row(8224, 1, true, 7224)
+	row["practice"] = false
+	p.apply_match("b", row)
+	var s: Dictionary = LeaderboardRules.profile_scores(p)
+	assert_eq(int(s[LeaderboardRules.BEST_MATCH_MONEY]), 8224)
+	assert_eq(int(s[LeaderboardRules.ONLINE_WINNINGS]), 7224)
+	assert_eq(int(s[LeaderboardRules.MATCHES_WON]), 1)
+	assert_eq(LeaderboardRules.BOARDS.size(), 3)
 
 
 func test_unranked_or_absurd_rows_upload_nothing() -> void:
@@ -117,3 +136,45 @@ func test_stat_lines_cover_the_profile() -> void:
 	assert_eq(texts["Total winnings"], "$2,000")
 	assert_eq(texts["Best online match"], "$3,000")
 	assert_eq(texts["Win rate"], "100%")
+
+
+## Patrick 2026-11-16 "show current skin in leaderboard": the look rides in Steam's details.
+func test_skin_survives_the_details_round_trip() -> void:
+	var outfit := PackedStringArray()
+	for kind: StringName in CosmeticDef.OUTFIT_KINDS:
+		var pick: String = ""
+		for d: CosmeticDef in CosmeticShop.default().items:
+			if d.kind == kind:
+				pick = String(d.id)
+				break
+		outfit.append(pick)
+	var details: PackedInt32Array = LeaderboardRules.skin_details(5, outfit)
+	assert_lte(details.size(), LeaderboardRules.DETAILS_MAX)
+	var back: Dictionary = LeaderboardRules.skin_from_details(details)
+	assert_eq(int(back["color"]), 5)
+	assert_eq(back["outfit"], Cosmetics.sanitize_outfit(outfit))
+	assert_true(LeaderboardRules.skin_from_details(PackedInt32Array()).is_empty(), "an old entry without a look")
+	assert_true(LeaderboardRules.skin_from_details([99, 1, 2]).is_empty(), "unknown version")
+	var rows: Array[Dictionary] = LeaderboardRules.entry_rows([{"steam_id": 3, "score": 10, "global_rank": 4, "details": details}], 0)
+	assert_eq(int((rows[0]["skin"] as Dictionary)["color"]), 5)
+
+
+## Patrick 2026-11-16: "warum ist hier 2 und 3 und keine 1": FRIENDS counts among the friends.
+func test_friends_count_from_one() -> void:
+	var rows: Array[Dictionary] = [{"rank": 2, "steam_id": 1, "score": 9, "me": false}, {"rank": 3, "steam_id": 2, "score": 5, "me": true}]
+	var friends: Array[Dictionary] = LeaderboardRules.with_places(rows, LeaderboardRules.SCOPE_FRIENDS)
+	assert_eq(int(friends[0]["place"]), 1)
+	assert_eq(int(friends[1]["place"]), 2)
+	assert_eq(int(friends[0]["rank"]), 2, "the global rank stays")
+	var global: Array[Dictionary] = LeaderboardRules.with_places(rows, LeaderboardRules.SCOPE_GLOBAL)
+	assert_eq(int(global[0]["place"]), 2)
+
+
+## Patrick's own outfit (2026-11-17, every slot worn) goes up and comes back piece for piece.
+func test_a_full_real_outfit_round_trips() -> void:
+	var outfit := PackedStringArray(["hat_laurel", "shirt_tux", "pants_tux", "cape_royal_flush", "boots_pirate",
+		"skin_the_house", "eyes_bulging", "mouth_cigarette", "beard_pencil"])
+	assert_eq(Cosmetics.sanitize_outfit(outfit), outfit, "all real pieces in slot order")
+	var back: Dictionary = LeaderboardRules.skin_from_details(LeaderboardRules.skin_details(5, outfit))
+	assert_eq(back["outfit"], outfit)
+	assert_eq(int(back["color"]), 5)

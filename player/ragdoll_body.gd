@@ -83,7 +83,10 @@ func _snap_to_pose(w: float) -> void:
 	if _pose_pos == Vector3.INF:
 		return
 	torso.global_position = torso.global_position.lerp(_pose_pos, w)
-	torso.quaternion = torso.quaternion.slerp(_pose_rot, w)
+	# The streamed rotation is the torso's world rotation (`pose`); this node is turned by the
+	# bean's yaw, so setting it as the local rotation laid the bean the wrong way round on clients.
+	var cur: Quaternion = torso.global_basis.get_rotation_quaternion()
+	torso.global_basis = Basis(cur.slerp(_pose_rot, w))
 	var bodies: Array[RigidBody3D] = [head, hand_l, hand_r, hips]
 	for i: int in mini(bodies.size(), _pose_parts.size()):
 		bodies[i].global_position = bodies[i].global_position.lerp(_pose_parts[i], w)

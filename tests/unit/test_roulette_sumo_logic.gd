@@ -431,3 +431,39 @@ func test_start_grace_and_safe_spawns() -> void:
 		assert_gt(g.clock, 0.0)
 		assert_eq(_of(evs, &"minigame_eliminated").size(), 1, "and the rules apply again")
 		assert_gt(g.ball_vel.length(), 1.0, "the ball sets off")
+
+
+## Patrick 2026-11-16: "on roulette sumo you still spawn at the edge sometimes". Through the grace
+## the server puts anyone off their spot back, pushes wait for the spin, and the ball only circles
+## the rim for its first seconds, for every table size from 2 to 8.
+func test_safe_start_for_two_to_eight_players() -> void:
+	for n: int in range(2, 9):
+		var ids: Array[int] = []
+		for i: int in n:
+			ids.append(i + 1)
+		var g := RouletteSumoLogic.new()
+		g.setup(ids, SeededRng.new(n * 13), cfg, {}, {})
+		g.world = WorldQuery.new()
+		for p: int in ids:
+			g.world.set_transform(p, g.spawn_for(p), 0.0)
+			assert_almost_eq(RouletteSumoLogic.flat_radius(g.spawn_for(p)), WheelRoom.SPAWN_RADIUS, 0.01, "%d players: spawn on the inner ring" % n)
+		_run(g, 0.5)
+		assert_false(_push(g, 1).get("ok", true), "%d players: no pushing before the spin" % n)
+		# Someone lands at the rim during the grace: the server sends them back to their spot.
+		g.world.set_transform(n, _deck(6.6, 1.0), 0.0)
+		_run(g, 0.1)
+		assert_true(g.pending_moves.has(n), "%d players: back to the spot" % n)
+		assert_eq(g.pending_moves[n], g.spawn_for(n))
+		g.world.set_transform(n, g.pending_moves[n], 0.0)
+		g.pending_moves.clear()
+		_run(g, RouletteSumoLogic.START_GRACE)
+		assert_gt(g.clock, 0.0, "%d players: the wheel runs" % n)
+		for p: int in ids:
+			assert_true(g.is_alive(p), "%d players: %d still in" % [n, p])
+		# The calm start: the ball rolls round the rim track and can't reach the spawn ring.
+		while g.clock < RouletteSumoLogic.BALL_CALM - 0.1:
+			for p: int in ids:
+				g.world.set_transform(p, g.spawn_for(p), 0.0)  # everyone holds their spot
+			var evs: Array[Dictionary] = _run(g, STEP)
+			assert_eq(_of(evs, &"roulette_sumo_ball_hit").size(), 0, "%d players: the ball hits nobody yet" % n)
+			assert_gt(g.ball_pos.length(), WheelRoom.SPAWN_RADIUS + RouletteSumoLogic.BALL_HIT + 0.3, "%d players: the ball stays out by the rim (r %.2f)" % [n, g.ball_pos.length()])

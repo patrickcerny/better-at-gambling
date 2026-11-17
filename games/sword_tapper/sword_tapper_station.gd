@@ -16,6 +16,8 @@ extends StationBase
 
 ## The plinth: radius, height of its top, and the velvet disc on it.
 const PLINTH_R: float = 0.7
+## How far behind its centre a pedestal keeps the floor: the foot, the wainscot and a hand's breadth.
+const FLOOR_BACK: float = 0.92
 const TOP_Y: float = 0.82
 const DISC_R: float = 0.66
 ## The gem ring: lamp radius on the disc and the prize labels' radius just outside it.
@@ -99,6 +101,11 @@ func _build_visuals() -> void:
 	seat_count = 1
 	interact_radius = 1.8
 	hot_center = Vector3(0, 0, 0.3)
+	# The plinth's foot flares past its collider (to PLINTH_R + 0.075) and a wall's wainscot stands
+	# 0.06 m proud of its face: the layouts keep this much floor so a pedestal with its back to a
+	# wall stands clear of it (0.10.54, Patrick: "stuck in the wall ... the 3d model").
+	# Only backwards: side by side the two pedestals keep the layouts' gap from their colliders.
+	floor_extent = Rect2(-PLINTH_R, -FLOOR_BACK, PLINTH_R * 2.0, FLOOR_BACK + PLINTH_R)
 	GreyboxKit.cylinder(self, PLINTH_R, TOP_Y, Vector3(0, TOP_Y * 0.5, 0), MARBLE, "Plinth")
 	var spot: Node3D = _add_seat(Vector3(0, 0, STAND_Z), 0.0)  # faces the sword (−z)
 	spot.set_meta(&"stand", true)  # stands at the pedestal, no stool

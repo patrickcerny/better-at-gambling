@@ -50,6 +50,16 @@ func test_entries_in_order_without_a_settings_entry() -> void:
 	assert_eq(names, PackedStringArray(["PLAY ONLINE", "PRACTICE", "TUTORIAL", "SHOP", "QUIT"]))
 
 
+func test_every_entry_has_its_logo() -> void:
+	# Patrick 2026-11-16: "its only text right now make it better with logos to distinguish".
+	var seen: Array[Texture2D] = []
+	for b: Node in menu.get_node("Center/Column/VBox").get_children():
+		var t: Texture2D = (b as Button).icon
+		assert_not_null(t, "%s has a logo" % (b as Button).text)
+		assert_false(t in seen, "%s has its own logo" % (b as Button).text)
+		seen.append(t)
+
+
 func test_logo_and_entries_are_centred() -> void:
 	var w: float = menu.get_viewport_rect().size.x
 	var h: float = menu.get_viewport_rect().size.y
@@ -129,7 +139,11 @@ func test_play_online_is_four_picture_cards_without_a_name_field() -> void:
 		assert_not_null(c.picture.texture, "%s has its picture" % c.name)
 		assert_ne(c.caption_label.text, "", "%s says what happens" % c.name)
 		assert_gt(c.size.x, 250.0, "%s is big" % c.name)
-	assert_eq(online.grid.columns, 4, "four in a row")
+	assert_eq(online.public_card.get_parent(), online.top_row, "PUBLIC big on top")
+	assert_eq(online.private_card.get_parent(), online.top_row, "PRIVATE big on top")
+	assert_eq(online.browse_card.get_parent(), online.bottom_row, "BROWSE below")
+	assert_eq(online.friends_card.get_parent(), online.bottom_row, "FRIENDS' below")
+	assert_gt(online.public_card.size.x, online.browse_card.size.x * 1.2, "the top two are bigger")
 	assert_eq(menu.find_children("*", "LineEdit", true, false).filter(func(e: Node) -> bool: return (e as Control).is_visible_in_tree()).size(), 0, "no name field")
 	assert_false(menu.profile_badge.visible, "corner things step aside")
 	online.set_friend_lobbies(2)
@@ -300,7 +314,8 @@ func test_trophy_opens_leaderboards_and_stats() -> void:
 	await wait_process_frames(2)
 	assert_true(panel.stats_page.visible)
 	assert_false(panel.boards_page.visible)
-	assert_gt(panel.stats_grid.get_child_count(), 20)
+	assert_eq(panel.stats_grid.get_child_count(), LeaderboardPanel.STAT_GROUPS.size(), "the stats in cards")
+	assert_eq(panel.stat_values.size(), LeaderboardPanel.stat_lines(ProfileManager.profile).size(), "every line in a card")
 	panel.close()
 	assert_false(panel.visible)
 

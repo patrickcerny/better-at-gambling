@@ -151,13 +151,13 @@ func test_fails_and_brawls() -> void:
 
 func test_backstabber() -> void:
 	var t := AchievementTracker.new()
-	var ev: Dictionary = {"type": &"split_or_steal_reveal", "a": OTHER, "b": ME, "house": -1, "choice_a": "SPLIT", "choice_b": "STEAL"}
-	assert_true(&"ACH_BACKSTABBER" in t.on_event(ev, ME))
-	ev["choice_a"] = "STEAL"
+	var mine: Dictionary = {"a": OTHER, "b": ME, "choice_a": "SPLIT", "choice_b": "STEAL"}
+	var ev: Dictionary = {"type": &"split_or_steal_reveal", "results": [{"a": 3, "b": 4, "choice_a": "SPLIT", "choice_b": "SPLIT"}, mine]}
+	assert_true(&"ACH_BACKSTABBER" in t.on_event(ev, ME), "our duel among the round's duels")
+	mine["choice_a"] = "STEAL"
 	assert_false(&"ACH_BACKSTABBER" in t.on_event(ev, ME), "both stole")
-	ev["choice_a"] = "SPLIT"
-	ev["house"] = ME
-	assert_false(&"ACH_BACKSTABBER" in t.on_event(ev, ME), "the house seat scores nothing")
+	mine["choice_a"] = "SPLIT"
+	assert_false(&"ACH_BACKSTABBER" in t.on_event(ev, 3), "someone else's duel")
 
 
 func test_participation_trophy() -> void:

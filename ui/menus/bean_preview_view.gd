@@ -43,6 +43,17 @@ func set_outfit(o: Dictionary) -> void:
 		visuals.set_outfit(outfit)
 
 
+## Renders and animates (on) or freezes on its last frame (off): long lists keep only the beans
+## on screen live (the leaderboard rows).
+func set_live(on: bool) -> void:
+	if _viewport == null:
+		return
+	_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if on else SubViewport.UPDATE_DISABLED
+	set_process(on)
+	if visuals != null:
+		visuals.set_process(on)
+
+
 ## Recolours the bean without rebuilding the viewport.
 func set_bean_color(p_color: Color) -> void:
 	color = p_color

@@ -7,7 +7,7 @@ extends Node
 ## gift shop open, items in the HUD slots), jail (two beans behind the bars, a guard outside),
 ## lobby (ready pedestals glowing in the start room), rough (a shove knockdown, from the brawl clip),
 ## items (four beans in a row, each holding an item out), leaderboard (the standings over the casino), oddjobs (broke at the Odd Jobs cabinet, aiming at the
-## glowing red button, the shared bar part full). PLAY ONLINE's cards (tools/online_pictures.sh):
+## glowing red button, the shared bar part full). Dev checks of PLAY ONLINE-style views (the cards now use generated splash arts):
 ## online_public (an empty table with an OPEN sign), online_private (the same behind a velvet rope,
 ## RESERVED), online_browse (players at tables across the floor), online_friends (three friends
 ## waving you over). Dev checks only: race, racehall, and floor (the

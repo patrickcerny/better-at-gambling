@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<!-- PLAY ONLINE: three beans together (our own drawing) -->
+<g fill="#ffffff" stroke="#151414" stroke-width="3" stroke-linejoin="round">
+<ellipse cx="17" cy="36" rx="11" ry="15"/>
+<ellipse cx="47" cy="36" rx="11" ry="15"/>
+<ellipse cx="32" cy="32" rx="12.5" ry="17"/>
+</g>
+<g fill="#151414">
+<circle cx="27.5" cy="27" r="2.6"/><circle cx="36.5" cy="27" r="2.6"/>
+</g>
+<path d="M26.5 36 Q32 41 37.5 36" fill="none" stroke="#151414" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

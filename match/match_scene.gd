@@ -65,7 +65,6 @@ var results_panel: ResultsStage = null
 var pause_menu: PauseMenu = null
 ## Developer mode's in-match tools (Practice, Patrick only), built on first use.
 var dev_panel: DevMatchPanel = null
-var _shown_jackpot: int = -1
 ## The running minigame's stage and the reward screen after it.
 var stage: MinigameStage = null
 ## The rules screen over the stage until everyone is ready (or 30 s pass).
@@ -745,11 +744,6 @@ func _process(delta: float) -> void:
 	_point_at_hot_table()
 	if crown != null:
 		crown.track(view.state.balances, avatars)
-	if view.state.jackpot != _shown_jackpot:
-		_shown_jackpot = view.state.jackpot
-		for node: StationBase in map.stations.values():
-			if node is PlinkoStation:
-				(node as PlinkoStation).set_jackpot(_shown_jackpot, cfg.jackpot_seed)
 	if stage != null:
 		stage.on_private(Net.request_private_snapshot())
 	_update_look_lock()
@@ -894,7 +888,7 @@ func _refresh_pedestals() -> void:
 	for i: int in LuckyLounge.PEDESTALS.size():
 		var pid: Variant = by_color.get(i, null)
 		var p: Dictionary = view.state.players.get(pid, {}) if pid != null else {}
-		map.set_pedestal(i, str(p.get("name", "")), bool(p.get("ready", false)), marks.get(pid, Color(0, 0, 0, 0)))
+		map.set_pedestal(i, str(p.get("name", "")), bool(p.get("ready", false)), marks.get(pid, Color(0, 0, 0, 0)), Cosmetics.skin_of(p))
 	# Arrow over the local player's own pedestal until they are ready.
 	var mine: Dictionary = view.state.players.get(local_id, {})
 	map.set_pedestal_marker(int(mine.get("color", -1)), not mine.is_empty() and not bool(mine.get("ready", false)), marks.get(local_id, Color(0, 0, 0, 0)))
@@ -1148,7 +1142,7 @@ func _on_event(ev: Dictionary) -> void:
 		&"player_released", &"player_broke_free":
 			var t: PlayerAvatar = avatars.get(int(ev["target"]), null)
 			var h: PlayerAvatar = avatars.get(int(ev["attacker"]), null)
-			if t != null:
+			if t != null and t.carrier == null:  # a bean a guard carries stays on the guard
 				t.release_held()
 				_report_position(int(ev["target"]))
 			if h != null:
