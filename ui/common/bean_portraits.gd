@@ -2,7 +2,7 @@ class_name BeanPortraits
 extends ThumbnailRenderer
 ## Little still pictures of a player's bean in its colour and outfit, for lists with many beans
 ## (the lobby panel's rows, BROWSE LOBBIES' bean line-ups). One offscreen SubViewport renders them
-## a few frames apart and keeps them (on disk too, `ThumbnailRenderer`) (same pattern as `CosmeticThumbnails`), so eight
+## a few frames apart and keeps them, on disk too (`ThumbnailRenderer`, like `CosmeticThumbnails`), so eight
 ## lobbies × eight beans never mean 64 live 3D views. `texture_for` hands the texture out at once
 ## and fills it in when its turn comes. Headless: nothing renders, the textures stay blank.
 ## Any panel that shows portraits adds one `BeanPortraits` node; they share the cache and queue.

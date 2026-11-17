@@ -4,7 +4,8 @@ extends ThumbnailRenderer
 ## model (`ItemModels.make`, the one players hold), turned a little and rendered once each in an
 ## offscreen SubViewport, kept for the rest of the run. Works like `CosmeticThumbnails`:
 ## `texture_for` hands out the texture at once and fills it in when its turn comes
-## (`ThumbnailRenderer`: cached on disk per build, rendered a few frames apart). Headless: nothing renders, the textures stay blank.
+## (`ThumbnailRenderer`: cached on disk per build, rendered a few frames apart). Headless: nothing
+## renders, the textures stay blank.
 
 const SIZE: int = 128
 ## The items are built facing forward (-z), the way the bean holds them out to the others, so the
