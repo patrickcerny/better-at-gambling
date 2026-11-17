@@ -125,6 +125,13 @@ func _queue_download(job: Dictionary) -> void:
 func _next_download() -> void:
 	if not _downloading.is_empty() and Time.get_ticks_msec() - _download_started < DOWNLOAD_TIMEOUT_MS:
 		return
+	if not _downloading.is_empty() and bool(_downloading["upload"]):
+		# Steam never answered the own-entry read: upload anyway, keeping the better score.
+		var lost: StringName = StringName(_downloading["board"])
+		var score: int = int(_pending_scores.get(lost, 0))
+		_pending_scores.erase(lost)
+		if score > 0 and int(handles.get(lost, 0)) != 0:
+			steam.call("uploadLeaderboardScore", score, true, _details, int(handles[lost]))
 	_downloading = {}
 	for i: int in _downloads.size():
 		var job: Dictionary = _downloads[i]
