@@ -106,14 +106,34 @@ static func skin_flat(id: StringName) -> Color:
 
 ## A cape's own material: `make_vertex_colored` plus the cloth deformation (`CapeCloth`). Null
 ## when the toon shaders are off (the cape then just swings).
-static func make_cloth(rim: float = 0.3) -> ShaderMaterial:
+static func make_cloth(rim: float = 0.3, cape: StringName = &"") -> ShaderMaterial:
 	if not enabled or not Vfx.enabled():
 		return null
 	var s := ShaderMaterial.new()
 	s.shader = CLOTH_SHADER
 	s.set_shader_parameter(&"albedo", Color.WHITE)
 	s.set_shader_parameter(&"rim_strength", rim)
+	var fx: Array = CAPE_FX.get(cape, [])
+	if not fx.is_empty():
+		s.set_shader_parameter(&"sheen_color", fx[0])
+		s.set_shader_parameter(&"sheen", fx[1])
+		s.set_shader_parameter(&"sparkle_color", fx[2])
+		s.set_shader_parameter(&"sparkle", fx[3])
+		s.set_shader_parameter(&"sheen_speed", fx[4])
 	return s
+
+
+## The expensive capes come alive (Patrick 2026-11-17: "Animiere paar teure capes ... vorallen die
+## teuren für echtgeld"): [sheen colour, sheen strength, sparkle colour, sparkle strength, sheen
+## sweeps per second]. Warm gold light, no neon (ART_DIRECTION.md).
+const CAPE_FX: Dictionary = {
+	&"cape_high_roller": [Color(1.0, 0.86, 0.52), 0.55, Color(1.0, 0.95, 0.75), 1.6, 0.24],  # Gold: a glint over the gold, sparkles
+	&"cape_royal": [Color(0.95, 0.75, 0.95), 0.35, Color(1.0, 0.85, 0.5), 1.2, 0.16],  # Gold: velvet sheen, gold dust
+	&"cape_money": [Color(0.8, 1.0, 0.75), 0.3, Color(1.0, 0.92, 0.6), 0.9, 0.2],  # crisp bills glinting
+	&"cape_card_shark": [Color(1.0, 0.55, 0.45), 0.3, Color(1.0, 0.88, 0.6), 0.7, 0.18],
+	&"cape_legend": [Color(1.0, 0.85, 0.55), 0.35, Color(1.0, 0.9, 0.65), 1.0, 0.2],
+	&"cape_jackpot": [Color(1.0, 0.85, 0.5), 0.3, Color(1.0, 0.9, 0.6), 1.0, 0.22],
+}
 
 
 ## Recolours a material made by `make`.
