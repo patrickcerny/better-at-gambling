@@ -541,23 +541,31 @@ static func pants(k: OutfitMeshKit, id: StringName) -> void:
 static func cape(k: OutfitMeshKit, id: StringName) -> void:
 	match id:
 		&"cape_carpet":
-			# Fifty matches on the floor: the casino's own carpet, burgundy with gold and teal ornament.
+			# Fifty matches on the floor: the casino's own carpet. An even field of gold diamonds with
+			# teal hearts, small gold diamonds where their corners meet, inside a clean gold-and-dark
+			# border; symmetric left to right, whole motifs only.
 			OutfitMeshes._cape_sheet(k, -0.78, func(u: float, v: float) -> Color:
-				if v > 0.93 or u < 0.03 or u > 0.97:
+				var e: float = minf(minf(u, 1.0 - u), 1.0 - v)  # distance to the sides and the hem
+				if e < 0.03:
 					return OutfitMeshes.GOLD.darkened(0.1)
-				var x: float = fposmod(u * 6.0, 1.0) - 0.5
-				var y: float = fposmod(v * 7.0, 1.0) - 0.5
-				var d: float = absf(x) + absf(y)
-				var r: float = Vector2(x, y).length()
-				if absf(d - 0.36) < 0.035:
-					return OutfitMeshes.GOLD
-				if r < 0.1:
-					return OutfitMeshes.TEAL.darkened(0.15)
-				if absf(r - 0.18) < 0.025:
+				if e < 0.065:
+					return OutfitMeshes.BURGUNDY.darkened(0.35)
+				if e < 0.08:
 					return OutfitMeshes.GOLD.darkened(0.2)
-				if absf(x) < 0.02 or absf(y) < 0.02:
-					return OutfitMeshes.BURGUNDY.darkened(0.25)
-				return OutfitMeshes.BURGUNDY, OutfitMeshes.BURGUNDY.darkened(0.4))
+				var fu: float = (u - 0.08) / 0.84 * 5.0
+				var fv: float = (v - 0.02) / 0.9 * 6.0
+				var x: float = fposmod(fu, 1.0) - 0.5
+				var y: float = fposmod(fv, 1.0) - 0.5
+				var d: float = absf(x) + absf(y)
+				if absf(d - 0.36) < 0.045:
+					return OutfitMeshes.GOLD
+				if d < 0.13:
+					return OutfitMeshes.TEAL.darkened(0.15)
+				if d < 0.19:
+					return OutfitMeshes.GOLD.darkened(0.2)
+				if d > 0.88:
+					return OutfitMeshes.GOLD.darkened(0.1)  # where four tiles meet
+				return OutfitMeshes.BURGUNDY, OutfitMeshes.BURGUNDY.darkened(0.4), 60, 42)
 			OutfitMeshes._clasps(k, OutfitMeshes.GOLD)
 		&"cape_suited_trips":
 			# The cape ends in three identical seven of hearts fanned out (the cloth itself is cut
@@ -590,9 +598,9 @@ static func _card_fan_cape(k: OutfitMeshKit, ranks: Array, hearts: bool, top: Co
 	var pip := func(q: Vector2, s: float) -> bool:  # a heart or spade, `s` across, at q
 		var p := q / s
 		if not hearts:
-			p.y = -p.y + 0.15
-			if absf(p.x) < 0.09 + (p.y + 0.95) * 0.25 and p.y < -0.45 and p.y > -0.95:
-				return true  # the spade's stem
+			p.y = -p.y + 0.35  # a little higher: the stem hangs below
+			if p.y < -0.55 and p.y > -1.3 and absf(p.x) < 0.07 + (-0.55 - p.y) * 0.45:
+				return true  # the spade's stem, flaring at its foot
 		var x: float = p.x * 1.15
 		var y: float = -p.y * 1.15 + 0.2
 		return pow(x * x + y * y - 1.0, 3.0) - x * x * y * y * y <= 0.0
