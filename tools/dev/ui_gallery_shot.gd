@@ -112,8 +112,7 @@ func _ready() -> void:
 			# BROWSE LOBBIES: lobby cards with the host's settings and the beans inside (LobbyInfo).
 			var menu: Control = (load("res://ui/menus/main_menu.tscn") as PackedScene).instantiate()
 			add_child(menu)
-			menu.call(&"_hide_boxes")
-			(menu.get(&"_browse_box") as Control).visible = true
+			menu.call(&"_open_list", menu.get(&"browse_screen"))
 			var info_a: Dictionary = LobbyInfo.from_state(st)
 			var st_b := _state()
 			st_b.lobby_settings = {"minigames": 8, "items_enabled": false, "mode": &"minigames", "minigame_pool": "quiz,spy,hot_potato"}
