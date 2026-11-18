@@ -36,3 +36,17 @@ uses ~180 MB, which is why rooms are capped at 8. The client default in
   processes, recent warnings.
 - Logs: `docker compose logs -f orchestrator` in `deploy/`; per-room logs in the `room-logs` volume.
 - Change settings: edit `orchestrator.env`, then re-run `deploy/install.sh`.
+
+## Leaderboards (server-checked, since 0.10.67)
+
+Every player still in a ranked online match sends the result to `POST /v1/matches/report` with a
+Steam Web API ticket. A match counts when 2+ different Steam accounts sent the same result within
+`SCORE_WINDOW` seconds (default 120) and nobody sent another one; any contradiction voids it for
+everyone (`match_contradiction` in the logs names who sent which version). Only the orchestrator
+writes the Steam boards (`SetLeaderboardScore`, ForceUpdate with its own totals), so the boards
+should be set to **trusted** in Steamworks. Totals live in sqlite at `SCORES_DB`
+(`/var/lib/bag-scores/scores.db`, the `scores` volume).
+
+Needs `STEAM_WEB_API_KEY` (a **publisher** Web API key) and `STEAM_APP_ID=5623410` in
+`orchestrator.env`; without them `/v1/matches/report` answers 503 and nothing reaches the boards.
+Rooms can stay on `AUTH_MODE=dev`: score reports always check real Steam tickets.

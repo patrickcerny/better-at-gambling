@@ -15,7 +15,7 @@ RUN apt-get update \
 	&& mv /tmp/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot \
 	&& chmod +x /usr/local/bin/godot && rm -f /tmp/godot.zip \
 	&& useradd --create-home --uid 10001 bag \
-	&& mkdir -p /var/log/bag-rooms && chown bag:bag /var/log/bag-rooms
+	&& mkdir -p /var/log/bag-rooms /var/lib/bag-scores && chown bag:bag /var/log/bag-rooms /var/lib/bag-scores
 
 COPY services/orchestrator/requirements.txt /opt/bag/orchestrator/requirements.txt
 RUN python -m venv /opt/bag/venv && /opt/bag/venv/bin/pip install --no-cache-dir -r /opt/bag/orchestrator/requirements.txt

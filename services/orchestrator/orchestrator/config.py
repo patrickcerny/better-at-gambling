@@ -75,6 +75,9 @@ class Config:
     steam_app_id: str = ""
     steam_timeout: float = 5.0
     rate_limit_per_min: int = 30
+    # Server-checked leaderboards (scores.py): sqlite file and how long a match waits for reports.
+    scores_db: str = ":memory:"
+    score_window: float = 120.0
     log_dir: str = "/tmp/bag-rooms"
     loopback_hosts: frozenset[str] = frozenset({"127.0.0.1", "::1"})
     trusted_proxies: frozenset[str] = frozenset({"127.0.0.1", "::1"})
@@ -109,6 +112,8 @@ class Config:
             steam_app_id=e.get("STEAM_APP_ID", "").strip(),
             steam_timeout=_float(e, "STEAM_TIMEOUT", 5.0),
             rate_limit_per_min=_int(e, "RATE_LIMIT_PER_MIN", 30),
+            scores_db=e.get("SCORES_DB", "/var/lib/bag-scores/scores.db").strip() or ":memory:",
+            score_window=_float(e, "SCORE_WINDOW", 120.0),
             log_dir=e.get("LOG_DIR", "/tmp/bag-rooms"),
             loopback_hosts=_csv(e, "LOOPBACK_HOSTS", "127.0.0.1,::1"),
             trusted_proxies=_csv(e, "TRUSTED_PROXIES", "127.0.0.1,::1"),
@@ -126,8 +131,15 @@ class Config:
             raise ConfigError("AUTH_MODE=steam requires STEAM_WEB_API_KEY and STEAM_APP_ID")
         if self.max_rooms < 1 or self.max_players < 1:
             raise ConfigError("MAX_ROOMS and MAX_PLAYERS must be >= 1")
+        if self.score_window < 0:
+            raise ConfigError("SCORE_WINDOW must be >= 0")
         if self.rate_limit_per_min < 1:
             raise ConfigError("RATE_LIMIT_PER_MIN must be >= 1")
+
+    @property
+    def scores_enabled(self) -> bool:
+        """Leaderboards need the publisher key: tickets are checked and boards written with it."""
+        return bool(self.steam_web_api_key and self.steam_app_id)
 
     @property
     def orchestrator_url(self) -> str:

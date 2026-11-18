@@ -81,14 +81,15 @@ def make_harness() -> Callable[..., Harness]:
     """Factory: ``make_harness(max_rooms=2, steam_verifier=..., spawner=...)``."""
     created: list[io.StringIO] = []
 
-    def factory(*, steam_verifier: Any = None, spawner: FakeSpawner | None = None, **overrides: Any) -> Harness:
+    def factory(*, steam_verifier: Any = None, spawner: FakeSpawner | None = None, score_writer: Any = None,
+                **overrides: Any) -> Harness:
         logs = io.StringIO()
         created.append(logs)
         logjson.set_stream(logs)
         cfg = make_config(**overrides)
         clock = FakeClock()
         sp = spawner or FakeSpawner()
-        app = create_app(cfg, spawner=sp, clock=clock, steam_verifier=steam_verifier)
+        app = create_app(cfg, spawner=sp, clock=clock, steam_verifier=steam_verifier, score_writer=score_writer)
         return Harness(TestClient(app), app.state.manager, sp, clock, cfg, logs)
 
     yield factory

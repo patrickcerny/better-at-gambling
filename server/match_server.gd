@@ -1200,6 +1200,8 @@ func progress_rows(standings: Array[Dictionary]) -> Dictionary:
 		out[id]["minigames_won"] = int(st.get("minigames_won", 0))
 		out[id]["money"] = economy.balance(id)
 		out[id]["players"] = standings.size()
+		# Who this row belongs to: the leaderboard server (`ScoreReporter`) matches rows to Steam IDs.
+		out[id]["uid"] = state.players[id].uid if state.players.has(id) else ""
 		# Lifetime statistics (`PlayerProfile.lifetime`) and the global leaderboards
 		# (`LeaderboardRules`): this server decides whether the row may go on a leaderboard.
 		out[id]["stats"] = {"profit": economy.balance(id) - balance.start_money, "hands": int(st.get("hands", 0)),

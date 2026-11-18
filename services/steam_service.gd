@@ -66,10 +66,13 @@ var _available: bool = false
 ## Seconds until a changed look goes up (0 = nothing waiting), and the wait after a change.
 var _look_wait: float = 0.0
 const LOOK_DELAY: float = 4.0
-## The look `submit_profile_bests` last uploaded this run.
+## The look `submit_profile_bests` last sent this run.
 var _bests_look: PackedInt32Array = PackedInt32Array()
-## The global leaderboards (`SteamLeaderboards`; a no-op without Steam).
+## The global leaderboards (`SteamLeaderboards`; a no-op without Steam). Only read here: scores
+## reach them through our server (`scores`).
 var boards: SteamLeaderboards = SteamLeaderboards.new()
+## Sends match results and the look to the leaderboard server (`ScoreReporter`).
+var scores: ScoreReporter = null
 var _steam_id: int = 0
 var _persona: String = ""
 ## Achievements already handed to Steam this run (asked once each).
@@ -135,6 +138,9 @@ func _ready() -> void:
 		InputGlyphs.set_deck(true)
 	Log.info(&"steam", "Steam on: %s (app %d)" % [_persona, APP_ID])
 	boards = SteamLeaderboards.new(steam)
+	scores = ScoreReporter.new(steam)
+	scores.name = "Scores"
+	add_child(scores)
 	_start_store()
 	# Lifetime achievements follow the profile (level-ups, matches, the shop) and catch up on start.
 	ProfileManager.changed.connect(_on_profile_changed)
@@ -218,15 +224,14 @@ func check_beat_the_dev(beaten: Array[int]) -> void:
 			steam.call("requestUserStats", sid)
 
 
-## After a match: the local player's ranked row (`MatchServer.progress_rows`, already added to the
-## profile) goes on the global leaderboards (`LeaderboardRules.scores_for`). Nothing when the host
-## didn't rank the match. The developer mode doesn't block it any more (Patrick 2026-11-16: "why
-## am i not on the leaderboard"): its menu tools (Coins, levels, cosmetics) can't touch an online
-## match's money, and its in-match tools only work in Practice, which the host never ranks.
-func submit_match(row: Dictionary) -> void:
-	if not _available:
+## After a match: the whole result goes to our leaderboard server (`ScoreReporter`), which counts
+## it once two players' games sent the same one and writes the Steam leaderboards itself (Patrick
+## 2026-11-18). The game never uploads a score on its own any more. Nothing for practice or a
+## match the host didn't rank.
+func submit_match(ev: Dictionary) -> void:
+	if not _available or scores == null:
 		return
-	boards.submit(LeaderboardRules.scores_for(row, ProfileManager.profile), my_look())
+	scores.report(ev, my_look())
 
 
 ## The local player's bean colour and outfit as leaderboard details (`LeaderboardRules.skin_details`).
@@ -235,18 +240,17 @@ func my_look() -> PackedInt32Array:
 	return LeaderboardRules.skin_details(p.preferred_color if p.preferred_color >= 0 else 0, p.outfit_wire())
 
 
-## On start: the profile's ranked bests (`LeaderboardRules.profile_scores`) go up again. Steam
-## keeps the higher score, so this only fills in matches whose upload never happened (an earlier
-## run with the developer mode on, Steam offline when the match ended).
-## Also when the leaderboards open, so a new outfit shows there at once (once per look and run).
+## On start, a few seconds after an outfit change and when the leaderboards open: the current look
+## goes to the leaderboard server, which shows it with this player's scores (Patrick 2026-11-17:
+## "save that data of the player and display correctly"). Once per look and run.
 func submit_profile_bests() -> void:
-	if not _available:
+	if not _available or scores == null:
 		return
 	var look: PackedInt32Array = my_look()
 	if look == _bests_look:
 		return
 	_bests_look = look
-	boards.submit(LeaderboardRules.profile_scores(ProfileManager.profile), look)
+	scores.send_look(look)
 
 
 func _on_user_stats_received(_game_id: int = 0, result: int = 0, user_id: int = 0) -> void:

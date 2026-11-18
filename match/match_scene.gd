@@ -1290,7 +1290,7 @@ func _on_event(ev: Dictionary) -> void:
 					SteamSvc.unlock_achievements(Achievements.from_match(my_row as Dictionary))
 					SteamSvc.check_beat_the_dev(Achievements.steam_ids_beaten(ev["standings"], local_id, my_row as Dictionary))
 					if not _progress_summary.is_empty():  # once per match id, like the profile
-						SteamSvc.submit_match(my_row as Dictionary)
+						SteamSvc.submit_match(ev)
 			_show_results(ev["standings"])
 			_log_digest()
 		&"match_reset":

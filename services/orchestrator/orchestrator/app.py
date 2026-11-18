@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import contextlib
+import dataclasses
 from typing import AsyncIterator, Callable, Literal
 
 from fastapi import FastAPI, Query, Request
@@ -18,6 +20,7 @@ from .errors import ApiError
 from .logjson import log
 from .ratelimit import RateLimiter
 from .rooms import Room, RoomManager
+from .scores import MAX_LOOK, MAX_PLAYERS, ReportError, ScoreKeeper, ScoreWriter, make_steam_writer
 from .spawner import PopenSpawner, Spawner
 
 # ---------------------------------------------------------------------- request models
@@ -53,6 +56,30 @@ class HeartbeatBody(InternalBody):
     mode: Literal["casino", "minigames"] | None = None
 
 
+class ScoreRow(BaseModel):
+    steam_id: str = Field(max_length=20)
+    rank: int = Field(ge=0, le=64)
+    money: int = Field(ge=-(2**40), le=2**40)
+    profit: int = Field(ge=-(2**40), le=2**40)
+    players: int = Field(ge=0, le=64)
+    ranked: bool = False
+
+
+class MatchReportBody(BaseModel):
+    """One player's copy of an online match's result (scores.py)."""
+
+    ticket: str = Field(max_length=8192)
+    build: str = Field(default="", max_length=128)
+    match: str = Field(min_length=1, max_length=64)
+    rows: list[ScoreRow] = Field(max_length=MAX_PLAYERS)
+    look: list[int] | None = Field(default=None, max_length=MAX_LOOK)
+
+
+class LookBody(BaseModel):
+    ticket: str = Field(max_length=8192)
+    look: list[int] = Field(max_length=MAX_LOOK)
+
+
 class ClosingBody(InternalBody):
     reason: str = Field(default="", max_length=500)
 
@@ -66,6 +93,7 @@ def create_app(
     spawner: Spawner | None = None,
     clock: Callable[[], float] | None = None,
     steam_verifier: SteamVerifier | None = None,
+    score_writer: ScoreWriter | None = None,
 ) -> FastAPI:
     """Build the orchestrator app. Raises ConfigError for unsafe configs (e.g. prod + dev auth)."""
     cfg = config or Config.from_env()
@@ -73,12 +101,18 @@ def create_app(
     manager = RoomManager(cfg, spawner or PopenSpawner(), clock)
     authenticator = Authenticator(cfg, steam_verifier)
     limiter = RateLimiter(cfg.rate_limit_per_min, 60.0, clock)
+    # Leaderboards always check real Steam tickets, whatever AUTH_MODE the rooms use.
+    keeper: ScoreKeeper | None = None
+    score_auth: Authenticator | None = None
+    if cfg.scores_enabled:
+        keeper = ScoreKeeper(cfg, score_writer or make_steam_writer(cfg), clock or time.time)
+        score_auth = Authenticator(dataclasses.replace(cfg, auth_mode="steam"), steam_verifier)
 
     @contextlib.asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         task: asyncio.Task[None] | None = None
         if cfg.reap_interval > 0:
-            task = asyncio.create_task(_reaper(manager, cfg.reap_interval))
+            task = asyncio.create_task(_reaper(manager, keeper, cfg.reap_interval))
         log("orchestrator_started", build=cfg.build_id, env=cfg.env, auth_mode=cfg.auth_mode,
             bind=f"{cfg.bind_host}:{cfg.bind_port}", ports=f"{cfg.port_min}-{cfg.port_max}",
             max_rooms=cfg.max_rooms)
@@ -96,6 +130,7 @@ def create_app(
     app.state.config = cfg
     app.state.manager = manager
     app.state.limiter = limiter
+    app.state.scores = keeper
 
     # ------------------------------------------------------------------ errors
     @app.exception_handler(ApiError)
@@ -186,6 +221,36 @@ def create_app(
         room, token = manager.join_room(ident, body.room_code, body.room_id)
         return room_reply(room, token)
 
+    # ------------------------------------------------------------------ leaderboards
+    async def score_player(request: Request, ticket: str) -> str:
+        """Rate-limit by IP, check the Steam ticket, rate-limit by Steam ID."""
+        limit(f"ip:{client_ip(request)}")
+        if keeper is None or score_auth is None:
+            raise ApiError(503, "scores_unavailable", "Leaderboards are not set up on this server.")
+        ident = await score_auth.authenticate(ticket)
+        limit(f"uid:{ident.player_uid}")
+        return ident.player_uid
+
+    @app.post("/v1/matches/report")
+    async def report_match(body: MatchReportBody, request: Request) -> dict[str, object]:
+        steam_id = await score_player(request, body.ticket)
+        assert keeper is not None
+        try:
+            state = keeper.report(steam_id, body.match, [r.model_dump() for r in body.rows], body.look)
+        except ReportError as exc:
+            log("match_report_refused", level="warning", reporter=steam_id, code=exc.code)
+            raise ApiError(422, exc.code, exc.message) from None
+        if state == "decided":
+            await keeper.flush()
+        return {"ok": True, "state": state}
+
+    @app.post("/v1/leaderboards/look")
+    async def update_look(body: LookBody, request: Request) -> dict[str, object]:
+        steam_id = await score_player(request, body.ticket)
+        assert keeper is not None
+        changed = keeper.set_look(steam_id, body.look)
+        return {"ok": True, "changed": changed}
+
     # ------------------------------------------------------------------ internal routes
     @app.post("/v1/internal/verify")
     async def verify(body: VerifyBody, request: Request) -> dict[str, str]:
@@ -209,11 +274,19 @@ def create_app(
     return app
 
 
-async def _reaper(manager: RoomManager, interval: float) -> None:
-    """Background loop calling :meth:`RoomManager.reap_once` every ``interval`` seconds."""
+async def _reaper(manager: RoomManager, keeper: ScoreKeeper | None, interval: float) -> None:
+    """Background loop: reaps rooms, decides matches whose report window ran out, writes scores."""
+    ticks = 0
     while True:
         try:
             manager.reap_once()
+            if keeper is not None:
+                keeper.decide_due()
+                if ticks % 15 == 0:  # Steam writes (and their retries) every ~30 s
+                    await keeper.flush()
+                if ticks % 1800 == 0:
+                    keeper.prune()
         except Exception as exc:  # keep reaping no matter what
             log("reaper_error", level="error", error=repr(exc))
+        ticks += 1
         await asyncio.sleep(interval)
