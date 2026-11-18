@@ -95,7 +95,10 @@ func test_the_profile_wears_owned_pieces_and_remembers_them() -> void:
 	cfg.load(path)
 	cfg.set_value(PlayerProfile.SECTION, "owned", PackedStringArray())
 	cfg.set_value("outfit", "boots", "boots_party_hat")
+	assert_eq(PlayerProfile.is_signed_ok(cfg, true), false, "the signature catches the edit")
+	cfg.erase_section(PlayerProfile.SIGN_SECTION)  # sanitizing still guards an unsigned (pre-0.10.67) file
 	cfg.save(path)
+	DirAccess.remove_absolute(PlayerProfile.seal_path(path))
 	assert_eq(back.load_from(path), OK)
 	assert_eq(back.outfit_wire(), PackedStringArray(["", "", "", "cape_towel", "", "", "", "", ""]), "only owned pieces stay on")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

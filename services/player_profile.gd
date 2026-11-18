@@ -11,6 +11,11 @@ const SECTION: String = "profile"
 const MAX_COINS: int = 9_999_999
 ## How many applied match ids are remembered (`apply_match` adds a match's row once).
 const MAX_APPLIED: int = 32
+## Profile signature (security audit 2026-11-18): an HMAC over the whole file in section
+## `[integrity]`, so editing profile.cfg by hand (Coins, levels, unlocks, stats) is noticed and the
+## edited file is not used. Deterrence, not a vault: the key ships with the game.
+const SIGN_SECTION: String = "integrity"
+const SIGN_KEY: String = "bag-profile-v1:914ff0462febd220654920963d738f5a4d4e2c194f5c78dd"
 ## The lifetime statistics `lifetime` keeps (saved under [lifetime]).
 const LIFETIME_KEYS: Array[StringName] = [&"podiums", &"online_matches", &"best_money", &"online_winnings",
 	&"winnings", &"losses", &"hands", &"minigames_won", &"jackpot_won", &"knockouts_dealt",
@@ -438,18 +443,55 @@ func sanitize() -> void:
 func save(path: String) -> Error:
 	var cfg := ConfigFile.new()
 	to_config(cfg)
-	return cfg.save(path)
+	cfg.set_value(SIGN_SECTION, "sig", signature(cfg))
+	var err: Error = cfg.save(path)
+	if err == OK and not FileAccess.file_exists(seal_path(path)):
+		# From now on this profile must carry a signature: one stripped by hand counts as edited.
+		var f: FileAccess = FileAccess.open(seal_path(path), FileAccess.WRITE)
+		if f != null:
+			f.store_string("1")
+			f.close()
+	return err
 
 
-## Loads `path` (a missing or unreadable file leaves a fresh profile). Returns the load error.
+## Loads `path` (a missing or unreadable file leaves a fresh profile). Returns the load error;
+## ERR_FILE_CORRUPT when the file was edited by hand (its signature doesn't match): the profile
+## stays fresh and the edited file is kept next to it as "<name>.tampered".
 func load_from(path: String) -> Error:
 	var cfg := ConfigFile.new()
 	if not FileAccess.file_exists(path):
 		return ERR_FILE_NOT_FOUND
 	var err: Error = cfg.load(path)
-	if err == OK:
-		from_config(cfg)
-	return err
+	if err != OK:
+		return err
+	if not is_signed_ok(cfg, FileAccess.file_exists(seal_path(path))):
+		DirAccess.copy_absolute(path, path + ".tampered")
+		return ERR_FILE_CORRUPT
+	from_config(cfg)
+	return OK
+
+
+## The signature of `cfg` without its own `[integrity]` section (hex HMAC-SHA256).
+static func signature(cfg: ConfigFile) -> String:
+	var copy := ConfigFile.new()
+	copy.parse(cfg.encode_to_text())
+	if copy.has_section(SIGN_SECTION):
+		copy.erase_section(SIGN_SECTION)
+	return Crypto.new().hmac_digest(HashingContext.HASH_SHA256, SIGN_KEY.to_utf8_buffer(), copy.encode_to_text().to_utf8_buffer()).hex_encode()
+
+
+## Whether a loaded profile may be used: its signature matches, or it has none and comes from a
+## version before signatures (`sealed` false: this profile was never saved signed here).
+static func is_signed_ok(cfg: ConfigFile, sealed: bool) -> bool:
+	var sig: Variant = cfg.get_value(SIGN_SECTION, "sig", "")
+	if typeof(sig) != TYPE_STRING or str(sig) == "":
+		return not sealed
+	return str(sig) == signature(cfg)
+
+
+## Marker next to the profile once it has been saved with a signature.
+static func seal_path(path: String) -> String:
+	return path + ".seal"
 
 
 static func _strings(ids: Array[StringName]) -> PackedStringArray:

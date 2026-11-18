@@ -116,6 +116,7 @@ func test_loading_clamps_a_tampered_file() -> void:
 	cfg.set_value("stats", "biggest_win", -4)
 	cfg.set_value("stats", "applied", "not a list")
 	cfg.save(PATH)
+	DirAccess.remove_absolute(PlayerProfile.seal_path(PATH))  # an unsigned profile from before 0.10.67
 	var p: PlayerProfile = _fresh()
 	assert_eq(p.load_from(PATH), OK)
 	assert_eq(p.xp, 0)

@@ -106,6 +106,9 @@ func host_present() -> bool:
 func on_server_attached(p_server: MatchServer) -> void:
 	server = p_server
 	server.kick_handler = kick_player
+	# Host mode: identities and Steam inventories are vouched for, so premium and developer pieces
+	# are checked against them (`MatchServer.may_wear`).
+	server.verify_cosmetics = host_mode
 	var queued: Array[Dictionary] = _pending.duplicate()
 	_pending.clear()
 	for h: Dictionary in queued:
@@ -114,9 +117,16 @@ func on_server_attached(p_server: MatchServer) -> void:
 
 ## First message of every connection.
 func on_hello(peer: int, hello: Variant) -> void:
-	if not WireGuard.is_clean_dictionary(hello) or _players.has(peer) or _verifying.has(peer):
+	if typeof(hello) != TYPE_DICTIONARY or _players.has(peer) or _verifying.has(peer):
 		return
-	var h: Dictionary = hello
+	var h: Dictionary = (hello as Dictionary).duplicate()
+	# The Steam-granted pieces can outgrow the wire guard's list size: checked on their own.
+	var owned: Variant = h.get("steam_owned", [])
+	h.erase("steam_owned")
+	if not WireGuard.is_clean_dictionary(h) or not valid_owned_list(owned):
+		return
+	if host_mode:
+		h["steam_owned"] = owned  # stamped by the host's bridge (friends) or the host's own game
 	if Serializer.to_int(h.get("protocol", -1), -1) != Protocol.PROTOCOL_VERSION or str(h.get("build", "")) != Protocol.BUILD_ID:
 		Log.info(&"room", "peer %d rejected: version %s/%s, server %d/%s" % [peer, h.get("protocol"), h.get("build"), Protocol.PROTOCOL_VERSION, Protocol.BUILD_ID])
 		_reject(peer, &"version_mismatch")
@@ -152,6 +162,7 @@ func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> 
 			_players.erase(old_peer)
 			Net.transport.kick(old_peer)
 		_players[peer] = pid
+		server.set_steam_owned(pid, owned_of(hello))
 		server.player_reconnected(pid)
 		Log.info(&"room", "%s rejoined as player %d (peer %d)" % [display_name, pid, peer])
 	else:
@@ -165,7 +176,7 @@ func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> 
 		if server.occupied_slots() >= Protocol.MAX_PLAYERS and not god:
 			_reject(peer, &"room_full")
 			return
-		pid = server.add_player(uid, display_name, Serializer.to_int(hello.get("color", -1), -1), hello.get("outfit", []), god)
+		pid = server.add_player(uid, display_name, Serializer.to_int(hello.get("color", -1), -1), hello.get("outfit", []), god, owned_of(hello))
 		_players[peer] = pid
 		Log.info(&"room", "%s joined as player %d (peer %d)" % [display_name, pid, peer])
 	Net.forget_private(pid)
@@ -294,6 +305,28 @@ func _quit(code: int) -> void:
 	if Net.transport != null:
 		Net.transport.close()
 	get_tree().quit(code)
+
+
+## Most Steam-granted pieces a hello may list (far above the shop's premium pieces).
+const MAX_OWNED: int = 512
+
+
+## True if `v` is a list of at most `MAX_OWNED` short shop ids.
+static func valid_owned_list(v: Variant) -> bool:
+	if typeof(v) != TYPE_ARRAY or (v as Array).size() > MAX_OWNED:
+		return false
+	for id: Variant in v:
+		if not typeof(id) in [TYPE_STRING, TYPE_STRING_NAME] or str(id).length() > Intents.NAME_MAX:
+			return false
+	return true
+
+
+## The Steam-granted pieces of an admitted hello (only host mode keeps them, see `on_hello`).
+static func owned_of(hello: Dictionary) -> PackedStringArray:
+	var out := PackedStringArray()
+	for id: Variant in hello.get("steam_owned", []):
+		out.append(str(id))
+	return out
 
 
 static func _clean_name(raw: String) -> String:

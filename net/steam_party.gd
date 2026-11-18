@@ -80,6 +80,7 @@ func start_hosting(display_name: String, public: bool = false) -> int:
 	bridge = HostBridge.new(outside,
 		func() -> NetTransport: return TransportFactory.client("127.0.0.1", port),
 		func(peer: int) -> String: return "steam:%d" % outside.steam_id_of(peer))
+	bridge.inventory_check = InventoryProof.new()
 	return server_port
 
 
@@ -109,11 +110,20 @@ func start_dev_bridge(listen_port: int, room_port: int) -> Error:
 
 ## Step 4: this game joins its own room server (call through the menu's `_connect`).
 func join_own_party(display_name: String, cosmetics: Dictionary) -> Error:
-	var hello: Dictionary = {"name": display_name, "uid": "steam:%d" % SteamSvc.get_steam_id(), "color": int(cosmetics.get("color", -1)), "outfit": cosmetics.get("outfit", PackedStringArray())}
+	# The host's own game is on loopback and trusted with its Steam pieces (its own Steam read them).
+	var hello: Dictionary = {"name": display_name, "uid": "steam:%d" % SteamSvc.get_steam_id(), "color": int(cosmetics.get("color", -1)), "outfit": cosmetics.get("outfit", PackedStringArray()), "steam_owned": owned_ids()}
 	var err: Error = Net.join_server("127.0.0.1", server_port, hello)
 	if err == OK:
 		Net.room = {"host": "127.0.0.1", "port": server_port, "steam_lobby": SteamSvc.lobby_id, "host_mode": true}
 	return err
+
+
+## The Steam-granted pieces this game owns, as plain strings for the hello.
+static func owned_ids() -> Array:
+	var out: Array = []
+	for id: StringName in ProfileManager.steam_owned:
+		out.append(String(id))
+	return out
 
 
 ## Joining a friend: enters their Steam lobby and checks it. Returns the host's Steam ID, or 0
@@ -121,6 +131,7 @@ func join_own_party(display_name: String, cosmetics: Dictionary) -> Error:
 func enter_lobby(lobby_id: int) -> int:
 	last_error = ""
 	stop_hosting()
+	SteamSvc.refresh_inventory()  # a fresh signed inventory for the host's check (`InventoryProof`)
 	if not SteamSvc.join_lobby(lobby_id):
 		last_error = SteamSvc.last_error
 		return 0
@@ -139,7 +150,7 @@ func enter_lobby(lobby_id: int) -> int:
 
 ## Connects to the lobby owner's game over Steam (call through the menu's `_connect`).
 func join_host(host_steam_id: int, display_name: String, cosmetics: Dictionary) -> Error:
-	var hello: Dictionary = {"name": display_name, "color": int(cosmetics.get("color", -1)), "outfit": cosmetics.get("outfit", PackedStringArray())}
+	var hello: Dictionary = {"name": display_name, "color": int(cosmetics.get("color", -1)), "outfit": cosmetics.get("outfit", PackedStringArray()), "inventory": SteamSvc.inventory_proof}
 	var err: Error = Net.join_server("steam:%d" % host_steam_id, 0, hello, {"transport": "steam", "steam_id": host_steam_id})
 	if err == OK:
 		Net.room = {"host": "steam:%d" % host_steam_id, "port": 0, "steam_lobby": SteamSvc.lobby_id}
@@ -159,7 +170,7 @@ func join_as_dev(lobby_id: int, display_name: String, cosmetics: Dictionary) -> 
 		last_error = "That lobby's host is unknown (an older version). Join normally."
 		return ERR_UNAVAILABLE
 	stop_hosting()
-	var hello: Dictionary = {"name": display_name, "god": true, "color": int(cosmetics.get("color", -1)), "outfit": cosmetics.get("outfit", PackedStringArray())}
+	var hello: Dictionary = {"name": display_name, "god": true, "color": int(cosmetics.get("color", -1)), "outfit": cosmetics.get("outfit", PackedStringArray()), "inventory": SteamSvc.inventory_proof}
 	var err: Error = Net.join_server("steam:%d" % host, 0, hello, {"transport": "steam", "steam_id": host})
 	if err == OK:
 		Net.room = {"host": "steam:%d" % host, "port": 0, "steam_lobby": 0}

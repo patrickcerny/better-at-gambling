@@ -20,7 +20,18 @@ var local_factory: Callable
 ## outside peer → "steam:<id>" (the uid the room server sees).
 var uid_of: Callable
 
+## Checks friends' Steam inventory proofs (`InventoryProof`); null = none checked (the dev bridge
+## and tests without Steam): every friend then owns no premium piece.
+var inventory_check: InventoryProof = null
+## Milliseconds a friend's packets wait for Steam to check their proof before it counts as none.
+var proof_timeout_ms: int = 5000
+var clock: Callable = Time.get_ticks_msec
+
 var _links: Dictionary[int, NetTransport] = {}
+## Friends whose inventory proof Steam is checking: {handle, deadline}.
+var _proofs: Dictionary[int, Dictionary] = {}
+## Their packets meanwhile, in order: [channel, data, hello Dictionary or null].
+var _held: Dictionary[int, Array] = {}
 var _link_up: Dictionary[int, bool] = {}
 var _queued: Dictionary[int, Array] = {}
 ## Friends whose room connection dropped this poll (dropped on Steam after forwarding).
@@ -50,6 +61,7 @@ func poll() -> void:
 		return
 	for p: Dictionary in outside.poll():
 		_from_outside(int(p["peer"]), int(p["channel"]), p["data"])
+	_check_proofs()
 	for peer: int in _links.keys():
 		var link: NetTransport = _links.get(peer)
 		if link == null:
@@ -119,6 +131,10 @@ func _on_link_lost(peer: int) -> void:
 
 func _drop_link(peer: int, say_bye: bool) -> void:
 	var link: NetTransport = _links.get(peer)
+	if _proofs.has(peer) and inventory_check != null:
+		inventory_check.release(int(_proofs[peer]["handle"]))
+	_proofs.erase(peer)
+	_held.erase(peer)
 	_links.erase(peer)
 	_link_up.erase(peer)
 	_queued.erase(peer)
@@ -141,11 +157,26 @@ func _from_outside(peer: int, channel: int, data: PackedByteArray) -> void:
 		var msg: Array = Wire.decode(data)
 		if not msg.is_empty() and int(msg[0]) == Protocol.Msg.LOADED:
 			outside.set_peer_timeout(peer, ENetTransport.TIMEOUT_MS)
+	var hello: Variant = null
 	if channel != Protocol.CHANNEL_VOICE:
 		# Every channel, not only the events one: a HELLO sent on another channel must not reach the
 		# room with the uid the friend made up (the dev's or the host's Steam ID). The room server
 		# also takes HELLO on the events channel only (`Net._server_packet`).
-		data = _stamp_hello(peer, data)
+		hello = _stamp_hello(peer, data)
+		if hello != null:
+			data = Wire.encode(Protocol.Msg.HELLO, hello)
+	if _held.has(peer):
+		var held: Array = _held[peer]
+		if held.size() < MAX_QUEUED or Protocol.is_reliable_channel(channel):
+			held.append([channel, data, hello])
+		return
+	_forward(peer, channel, data)
+
+
+## Sends a friend's packet on to the room, or queues it while their room connection opens.
+func _forward(peer: int, channel: int, data: PackedByteArray) -> void:
+	if not _links.has(peer):
+		return
 	if not _link_up.get(peer, false):
 		var q: Array = _queued[peer]
 		if q.size() < MAX_QUEUED or Protocol.is_reliable_channel(channel):
@@ -166,13 +197,57 @@ func _log_voice(way: String, peer: int, bytes: int) -> void:
 		Log.info(&"host", "voice: first packet from the room to friend peer %d over Steam (%d bytes)" % [peer, bytes])
 
 
-func _stamp_hello(peer: int, data: PackedByteArray) -> PackedByteArray:
+## A friend's HELLO with the identity and the inventory the bridge vouches for, or null when
+## `data` is not a HELLO. Whatever the friend claimed under `uid` or `steam_owned` is replaced:
+## `steam_owned` starts empty and is filled once Steam has checked their inventory proof (the
+## packets wait in `_held` until then).
+func _stamp_hello(peer: int, data: PackedByteArray) -> Variant:
 	var msg: Array = Wire.decode(data)
 	if msg.is_empty() or int(msg[0]) != Protocol.Msg.HELLO or typeof(msg[1]) != TYPE_DICTIONARY:
-		return data
+		return null
 	var hello: Dictionary = (msg[1] as Dictionary).duplicate()
 	if uid_of.is_valid():
 		hello["uid"] = str(uid_of.call(peer))
 	else:
 		hello.erase("uid")
-	return Wire.encode(Protocol.Msg.HELLO, hello)
+	var proof: Variant = hello.get("inventory", null)
+	hello.erase("inventory")  # bytes the room server never needs (and its wire guard refuses)
+	hello["steam_owned"] = []
+	if inventory_check != null and not _proofs.has(peer) and not _held.has(peer):
+		var handle: int = inventory_check.start(proof)
+		if handle > 0:
+			_proofs[peer] = {"handle": handle, "deadline": int(clock.call()) + proof_timeout_ms}
+			_held[peer] = []
+	return hello
+
+
+## Proofs Steam has answered (or that took too long): their held packets go on, the HELLO with
+## the pieces Steam vouched for.
+func _check_proofs() -> void:
+	for peer: int in _proofs.keys():
+		var job: Dictionary = _proofs[peer]
+		var owned: Variant = inventory_check.poll(_steam_id(peer), int(job["handle"]))
+		if owned == null:
+			if int(clock.call()) < int(job["deadline"]):
+				continue
+			inventory_check.release(int(job["handle"]))
+			Log.warn(&"host", "peer %d: Steam did not check the inventory in time (no premium pieces)" % peer)
+			owned = []
+		_proofs.erase(peer)
+		var held: Array = _held.get(peer, [])
+		_held.erase(peer)
+		var ids: Array = []
+		for id: Variant in owned:
+			ids.append(str(id))
+		for q: Array in held:
+			var data: PackedByteArray = q[1]
+			if q[2] != null:
+				var hello: Dictionary = q[2]
+				hello["steam_owned"] = ids
+				data = Wire.encode(Protocol.Msg.HELLO, hello)
+			_forward(peer, int(q[0]), data)
+
+
+## The friend's Steam ID, from the stamped uid ("steam:<id>"; 0 when unknown).
+func _steam_id(peer: int) -> int:
+	return MatchServer.steam_id_of_uid(str(uid_of.call(peer))) if uid_of.is_valid() else 0

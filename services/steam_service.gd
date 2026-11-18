@@ -86,6 +86,10 @@ var buying: bool = false
 var gold: int = 0
 ## The Gold Coin stacks: [{item_id, quantity}] (what an exchange spends from).
 var _gold_stacks: Array[Dictionary] = []
+## Steam-signed serialized inventory from the last read (empty = none yet): sent in the hello when
+## joining a party, checked by the host's `HostBridge` (`InventoryProof`).
+var inventory_proof: PackedByteArray = PackedByteArray()
+var inventory_proof_ms: int = 0
 ## Exchanges on their way: result handle -> the item definition bought.
 var _exchanging: Dictionary[int, int] = {}
 ## The Daily Spin's item drop on its way (its result handle, 0 = none).
@@ -425,6 +429,13 @@ func _read_inventory(result: int, handle: int) -> void:
 		Log.warn(&"steam", "inventory read failed (result %d)" % result)
 		return
 	var items: Variant = steam.call("getResultItems", handle)
+	if items is Array:
+		# Steam-signed copy of this listing: the proof a host checks when we join their party
+		# (`InventoryProof`), so nobody wears premium pieces they don't own.
+		var proof: Variant = steam.call("serializeResult", handle)
+		if proof is PackedByteArray and not (proof as PackedByteArray).is_empty():
+			inventory_proof = proof
+			inventory_proof_ms = Time.get_ticks_msec()
 	steam.call("destroyResult", handle)
 	if not items is Array:
 		return

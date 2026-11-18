@@ -462,7 +462,7 @@ func open_lobby() -> void:
 ## Adds a participant and returns its player id. The slot colour is fixed and unique; `bean_color`
 ## is the player's preferred bean colour from their profile (`Cosmetics.bean_color_for`), `outfit`
 ## the pieces they wear (anything a client sent: `Cosmetics.sanitize_outfit` cleans it).
-func add_player(uid: String, display_name: String, bean_color: int = -1, outfit: Variant = [], god: bool = false) -> int:
+func add_player(uid: String, display_name: String, bean_color: int = -1, outfit: Variant = [], god: bool = false, steam_owned: PackedStringArray = PackedStringArray()) -> int:
 	var p := PlayerState.new()
 	p.id = _next_player_id
 	_next_player_id += 1
@@ -476,7 +476,11 @@ func add_player(uid: String, display_name: String, bean_color: int = -1, outfit:
 	# wears the preferred colour when no other bean does (0.9.16, the pedestal colour panel).
 	p.color_index = lobby.free_color(_taken_colors(), -1)
 	p.bean_color = Cosmetics.bean_color_for(bean_color, p.color_index, _worn_bean_colors(-1))
+	_steam_owned[p.id] = steam_owned
 	p.outfit = Cosmetics.sanitize_outfit(outfit)
+	for i: int in p.outfit.size():
+		if p.outfit[i] != "" and not may_wear(p.id, StringName(p.outfit[i]), uid):
+			p.outfit[i] = ""  # a premium piece they don't own (or a developer piece): taken off
 	state.add_player(p)
 	economy.add_player(p.id, GOD_MONEY if god else balance.start_money)
 	_reset_stats(p.id)
@@ -778,6 +782,41 @@ func is_god(player: int) -> bool:
 
 
 ## Whether a hello from `uid` may join as the dev.
+## Host mode (set by `RoomHost`): Steam IDs and Steam inventories are vouched for, so `may_wear`
+## checks premium and developer pieces. Off in Practice, on dev servers and in tests.
+var verify_cosmetics: bool = false
+## Player -> the Steam-granted shop ids they own (from the host's `InventoryProof` check).
+var _steam_owned: Dictionary[int, PackedStringArray] = {}
+
+
+## Whether `player` may wear shop piece `id` (security audit 2026-11-18): a piece only the Steam
+## inventory grants (premium Gold Coin pieces, the Daily Spin skin) only if Steam vouched they own it, a
+## developer piece only for the developer accounts; everything else (Coin and level pieces) yes.
+## `uid` is for a player being added (not in `state` yet).
+func may_wear(player: int, id: StringName, uid: String = "") -> bool:
+	if not verify_cosmetics:
+		return true
+	var d: CosmeticDef = CosmeticShop.default().find(id)
+	if d == null:
+		return false
+	# Only premium (Gold Coin) and Daily Spin pieces come from Steam alone; Coin, level and
+	# achievement pieces (many also in Steam sets) live in the player's profile.
+	if not (d.gold > 0 or d.wheel_only or d.dev_only):
+		return true
+	if uid == "" and state.players.has(player):
+		uid = state.players[player].uid
+	if DevMode.owns_everything(steam_id_of_uid(uid)):
+		return true
+	if d.dev_only:
+		return false
+	return String(id) in _steam_owned.get(player, PackedStringArray())
+
+
+## A rejoining player's Steam-granted pieces (their proof was checked again).
+func set_steam_owned(player: int, owned: PackedStringArray) -> void:
+	_steam_owned[player] = owned
+
+
 static func may_be_god(uid: String) -> bool:
 	return DevMode.is_the_dev(steam_id_of_uid(uid))
 
@@ -1654,14 +1693,17 @@ func _apply_intent(player: int, intent: Dictionary) -> Dictionary:
 			_emit(GameEvents.make(&"player_color", {"player": player, "bean_color": ps.bean_color}))
 			return StationLogicBase.OK_RESULT
 		&"set_outfit":
-			# One slot at a time: {kind, item} with item "" to take it off. Ownership lives in the
-			# player's local profile (no accounts), like colours: the server checks the id only.
+			# One slot at a time: {kind, item} with item "" to take it off. Coin and level pieces live
+			# in the player's local profile (no accounts): the server checks the id. Premium (Steam)
+			# and developer pieces are checked against the vouched Steam inventory (`may_wear`).
 			var kind: StringName = StringName(str(intent["kind"]))
 			var item: String = str(intent["item"])
 			var slot: int = CosmeticDef.OUTFIT_KINDS.find(kind)
 			if slot < 0 or (item != "" and not Cosmetics.is_outfit_item(kind, StringName(item))):
 				return StationLogicBase.fail(&"bad_value")
 			var ps: PlayerState = state.players[player]
+			if item != "" and not may_wear(player, StringName(item)):
+				return StationLogicBase.fail(&"not_owned")
 			if ps.outfit[slot] == item:
 				return StationLogicBase.OK_RESULT
 			ps.outfit[slot] = item

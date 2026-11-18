@@ -118,8 +118,11 @@ func test_lifetime_survives_save_and_clamps_a_damaged_file() -> void:
 	cfg.load(PATH)
 	cfg.set_value("lifetime", "hands", -40)
 	cfg.set_value("lifetime", "winnings", "lots")
+	cfg.erase_section(PlayerProfile.SIGN_SECTION)  # sanitizing still guards an unsigned (pre-0.10.67) file
 	cfg.save(PATH)
-	q.load_from(PATH)
+	DirAccess.remove_absolute(PlayerProfile.seal_path(PATH))
+	q = PlayerProfile.new()
+	assert_eq(q.load_from(PATH), OK)
 	assert_eq(q.stat(&"hands"), 0)
 	assert_eq(q.stat(&"winnings"), 0)
 
