@@ -330,7 +330,18 @@ static func owned_of(hello: Dictionary) -> PackedStringArray:
 
 
 static func _clean_name(raw: String) -> String:
-	var s: String = raw.strip_edges().replace("\n", " ")
+	# Control and invisible format characters out (security audit 2026-11-18): right-to-left
+	# overrides and zero-width marks could make a name look like someone else's.
+	var kept: String = ""
+	for ch: String in raw:
+		var c: int = ch.unicode_at(0)
+		if c < 0x20 or (c >= 0x7F and c <= 0x9F) or (c >= 0x200B and c <= 0x200F) or (c >= 0x202A and c <= 0x202E) or (c >= 0x2060 and c <= 0x206F) or c == 0xFEFF or c == 0xAD:
+			kept += " " if c == 0x0A or c == 0x09 else ""
+			continue
+		kept += ch
+	var s: String = kept.strip_edges()
+	while s.contains("  "):
+		s = s.replace("  ", " ")
 	if s.length() > 24:
 		s = s.substr(0, 24)
 	return s if s != "" else "Player"

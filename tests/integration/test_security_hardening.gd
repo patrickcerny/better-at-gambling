@@ -164,3 +164,11 @@ func test_steam_party_admits_the_dev_and_lobby_members_only() -> void:
 	assert_true(SteamParty.may_connect(DevMode.THE_DEV), "DEV JOIN skips the Steam lobby")
 	assert_false(SteamParty.may_connect(ALICE_STEAM), "not in our lobby (no Steam in tests: no lobby at all)")
 	assert_false(SteamParty.may_connect(0))
+
+
+func test_names_lose_control_and_invisible_characters() -> void:
+	assert_eq(RoomHost._clean_name("Pat" + char(0x202E) + "rick"), "Patrick", "no right-to-left override")
+	assert_eq(RoomHost._clean_name("Pa" + char(0x200B) + "tr" + char(0xFEFF) + "ick"), "Patrick", "no zero-width marks")
+	assert_eq(RoomHost._clean_name("Bob\nSmith\t "), "Bob Smith")
+	assert_eq(RoomHost._clean_name(char(0x200B) + char(0x200B)), "Player", "nothing visible left")
+	assert_eq(RoomHost._clean_name("J" + char(0xFC) + "rgen " + char(0x1F3B2)), "J" + char(0xFC) + "rgen " + char(0x1F3B2), "ordinary characters stay")
