@@ -169,3 +169,25 @@ def test_sanitize_display_name() -> None:
     assert sanitize_display_name(None) == "Player"
     assert sanitize_display_name("‮\x07") == "Player"
     assert sanitize_display_name("a" * 40) == "a" * 24
+
+
+def test_real_verifier_network_error_is_unavailable_without_the_key(monkeypatch) -> None:
+    """A connection error is a clean 503 path (SteamUnavailable), never a NameError/500, and the
+    reason carries no URL (it would contain the publisher key)."""
+    import asyncio
+
+    import httpx
+
+    from orchestrator.auth import make_steam_verifier
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom " + str(request.url), request=request)
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient",
+                        lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw))
+    verify = make_steam_verifier(make_config(auth_mode="steam", steam_web_api_key="SECRETKEY", steam_app_id="480"))
+    with pytest.raises(SteamUnavailable) as info:
+        asyncio.run(verify("ABCD"))
+    assert str(info.value) == "ConnectError"
+    assert "SECRETKEY" not in str(info.value)

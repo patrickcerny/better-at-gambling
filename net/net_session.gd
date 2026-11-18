@@ -59,6 +59,10 @@ var room_host: RoomHost = null
 var voice_relay: VoiceRelay = null
 ## SERVER: peers whose voice was dropped because they are not players (logged once each).
 var _voice_unknown_peers: Dictionary[int, bool] = {}
+## SERVER: per-peer caps on the messages that are not intents (`PeerLimits`).
+var _peer_limits: PeerLimits = PeerLimits.new()
+## SERVER: peers whose snapshot request waits for the limit.
+var _snapshot_owed: Dictionary[int, bool] = {}
 ## SERVER: returns the world dictionary to stream (set by the match scene).
 var world_provider: Callable
 ## Last refusal/disconnect (code + player-facing text), for the menu's error panel.
@@ -142,6 +146,8 @@ func stop() -> void:
 	local_server = null
 	voice_relay = null
 	_voice_unknown_peers.clear()
+	_peer_limits = PeerLimits.new()
+	_snapshot_owed.clear()
 	local_player_id = -1
 	_welcomed = false
 	_snapshot = {}
@@ -384,6 +390,7 @@ func start_server(port: int, opts: Dictionary = {}) -> Error:
 	add_child(room_host)
 	transport.peer_connected.connect(func(id: int) -> void: Log.info(&"net", "peer %d connected" % id))
 	transport.peer_disconnected.connect(room_host.on_peer_disconnected)
+	transport.peer_disconnected.connect(_forget_peer_limits)
 	Log.info(&"net", "server listening on UDP %d (room %s)" % [port, opts.get("room_code", "-")])
 	return OK
 
@@ -419,15 +426,22 @@ func _on_server_event(ev: Dictionary) -> void:
 		transport.send(peer, Protocol.CHANNEL_EVENTS, true, bytes)
 
 
-func _server_packet(peer: int, type: int, payload: Variant) -> void:
+func _server_packet(peer: int, type: int, payload: Variant, channel: int = Protocol.CHANNEL_EVENTS) -> void:
 	if type == Protocol.Msg.HELLO:
-		room_host.on_hello(peer, payload)
+		# Events channel only: the host's Steam bridge stamps the Steam-vouched uid into hellos, and
+		# a hello that slipped past it on another channel would carry a made-up identity.
+		if channel == Protocol.CHANNEL_EVENTS:
+			room_host.on_hello(peer, payload)
 		return
 	var pid: int = room_host.player_of(peer)
 	if pid < 0 or local_server == null:
 		return
 	if type in [Protocol.Msg.INTENT, Protocol.Msg.MOVE, Protocol.Msg.PING] and not WireGuard.is_clean_dictionary(payload):
 		return  # not a dictionary of plain, finite, bounded data: nothing a real client sends
+	if not _peer_limits.allow(peer, type, _now()):
+		if type == Protocol.Msg.SNAPSHOT_REQ:
+			_snapshot_owed[peer] = true  # served once the limit allows (never lost: a desynced client needs it)
+		return
 	match type:
 		Protocol.Msg.INTENT:
 			var intent: Dictionary = payload
@@ -467,6 +481,32 @@ func _server_packet(peer: int, type: int, payload: Variant) -> void:
 
 
 func _server_tick(delta: float) -> void:
+	if local_server == null:
+		return
+	_pay_owed_snapshots()
+	_server_tick_body(delta)
+
+
+## SERVER: a peer left: its limits and any owed snapshot go with it (ENet reuses peer ids).
+func _forget_peer_limits(peer: int) -> void:
+	_peer_limits.forget(peer)
+	_snapshot_owed.erase(peer)
+
+
+## SERVER: snapshot requests the per-peer limit held back get one snapshot as soon as it allows.
+func _pay_owed_snapshots() -> void:
+	if _snapshot_owed.is_empty() or room_host == null:
+		return
+	var now: float = _now()
+	for peer: int in _snapshot_owed.keys():
+		if room_host.player_of(peer) < 0:
+			_snapshot_owed.erase(peer)
+		elif _peer_limits.allow(peer, Protocol.Msg.SNAPSHOT_REQ, now):
+			_snapshot_owed.erase(peer)
+			_send(peer, Protocol.CHANNEL_EVENTS, true, Protocol.Msg.SNAPSHOT, local_server.get_snapshot())
+
+
+func _server_tick_body(delta: float) -> void:
 	if local_server == null:
 		return
 	var peers: Array[int] = room_host.welcomed_peers()
@@ -531,7 +571,7 @@ func _process(delta: float) -> void:
 			_last_packet_at = _now()
 			_client_packet(int(msg[0]), msg[1])
 		elif mode == Mode.SERVER:
-			_server_packet(int(p["peer"]), int(msg[0]), msg[1])
+			_server_packet(int(p["peer"]), int(msg[0]), msg[1], int(p["channel"]))
 		if transport == null:
 			return  # a packet ended the session
 	match mode:

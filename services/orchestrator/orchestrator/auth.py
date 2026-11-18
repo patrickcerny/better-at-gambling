@@ -67,7 +67,7 @@ def make_steam_verifier(config: Config) -> SteamVerifier:
                 resp = await client.get(STEAM_AUTH_URL, params=params)
         except httpx.TimeoutException:
             raise SteamUnavailable("timeout") from None
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
             # Never include str(exc): it may contain the URL with the key.
             raise SteamUnavailable(type(exc).__name__) from None
         if resp.status_code in (401, 403):

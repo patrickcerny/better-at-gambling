@@ -35,6 +35,11 @@ const CLOSE_DELAY_MS: int = 1500
 
 var steam: Object
 var max_clients: int = 12
+## Host: (steam_id: int) -> bool, who may connect (unset = anyone). `SteamParty` lets in the
+## members of the party's Steam lobby (and the dev): a stranger who only knows the host's Steam
+## ID can't walk into a private party. A refused HI gets no answer; the client repeats it once a
+## second, so a friend whose lobby join the host hasn't seen yet gets in a moment later.
+var admit: Callable
 
 var _server: bool = false
 var _active: bool = false
@@ -266,6 +271,8 @@ func _on_control(m: Dictionary, now: int) -> void:
 		match kind:
 			CTRL_HI:
 				if peer == 0:
+					if admit.is_valid() and not bool(admit.call(sid)):
+						return
 					if _sid_by_peer.size() >= max_clients:
 						_control(sid, CTRL_BYE, 0, true)
 						return

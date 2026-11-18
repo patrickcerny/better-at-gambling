@@ -6,7 +6,7 @@ extends RefCounted
 ## own loopback connection (`local_factory`), so the room server sees ordinary peers and
 ## everything (admission, kicks, late join, voice relay) works exactly as on a dedicated server.
 ##
-## The bridge only looks inside two kinds of packets: a friend's HELLO, whose `uid` it overwrites
+## The bridge only looks inside two kinds of packets: a friend's HELLO (on any channel), whose `uid` it overwrites
 ## with the Steam ID Steam vouched for ("steam:<id>": identities can't be faked, the 60 s kick block
 ## holds), and LOADED, which tightens the Steam-side timeout like `RoomHost.on_loaded` does for
 ## the loopback side. Everything else is forwarded byte for byte on the same channel.
@@ -137,12 +137,15 @@ func _from_outside(peer: int, channel: int, data: PackedByteArray) -> void:
 		return
 	if channel == Protocol.CHANNEL_VOICE:
 		_log_voice("in", peer, data.size())
-	if channel == Protocol.CHANNEL_EVENTS:
-		data = _stamp_hello(peer, data)
 	elif channel == Protocol.CHANNEL_STATE:
 		var msg: Array = Wire.decode(data)
 		if not msg.is_empty() and int(msg[0]) == Protocol.Msg.LOADED:
 			outside.set_peer_timeout(peer, ENetTransport.TIMEOUT_MS)
+	if channel != Protocol.CHANNEL_VOICE:
+		# Every channel, not only the events one: a HELLO sent on another channel must not reach the
+		# room with the uid the friend made up (the dev's or the host's Steam ID). The room server
+		# also takes HELLO on the events channel only (`Net._server_packet`).
+		data = _stamp_hello(peer, data)
 	if not _link_up.get(peer, false):
 		var q: Array = _queued[peer]
 		if q.size() < MAX_QUEUED or Protocol.is_reliable_channel(channel):

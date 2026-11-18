@@ -185,3 +185,20 @@ func test_without_steam_nothing_starts() -> void:
 	assert_eq(t.listen(4), ERR_UNAVAILABLE)
 	assert_eq(t.connect_to_user(HOST_ID), ERR_UNAVAILABLE)
 	assert_eq(t.poll().size(), 0)
+
+
+func test_the_host_answers_only_who_it_admits() -> void:
+	# Security audit 2026-11-18: a private party let in anyone who knew the host's Steam ID.
+	# `SteamParty` admits its Steam lobby's members (and the dev); here only Alice is "in the lobby".
+	var members: Array[int] = [ALICE_ID]
+	host.admit = func(sid: int) -> bool: return sid in members
+	_join_both()
+	assert_eq(connected["host"], [2], "only Alice got a peer")
+	assert_true(alice.is_active())
+	assert_false(bob.is_active(), "Bob, not in the lobby, gets no WELCOME")
+	assert_eq(host.peer_of_steam_id(BOB_ID), 0)
+	members.append(BOB_ID)  # his lobby join reaches the host a moment later
+	for i: int in 3:
+		_pump(SteamTransport.HELLO_INTERVAL_MS + 10)
+	assert_true(bob.is_active(), "his repeated HI gets in once he is a member")
+	assert_eq(connected["host"], [2, 3])

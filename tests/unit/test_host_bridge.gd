@@ -136,3 +136,19 @@ func test_close_drops_everyone() -> void:
 	bridge.close()
 	assert_false(outside.is_active())
 	assert_false(links[0].is_active())
+
+
+func test_a_hello_on_any_channel_carries_the_steam_uid() -> void:
+	# Security audit 2026-11-18: only the events channel used to be stamped, so a HELLO on the state
+	# or physics channel reached the room with whatever uid the friend wrote (the dev's Steam ID).
+	friend.send(NetTransport.SERVER_PEER, Protocol.CHANNEL_EVENTS, true, _hello(""))
+	_step(3)
+	var dev_uid: String = "steam:%d" % DevMode.THE_DEV
+	for ch: int in [Protocol.CHANNEL_STATE, Protocol.CHANNEL_PHYSICS]:
+		friend.send(NetTransport.SERVER_PEER, ch, Protocol.is_reliable_channel(ch), _hello(dev_uid))
+	var got: Array[Dictionary] = _step(2)
+	assert_eq(got.size(), 2)
+	for p: Dictionary in got:
+		var msg: Array = Wire.decode(p["data"])
+		assert_eq(int(msg[0]), Protocol.Msg.HELLO)
+		assert_eq(str((msg[1] as Dictionary)["uid"]), "steam:76561192", "channel %d: the Steam identity, not the claim" % int(p["channel"]))

@@ -779,6 +779,16 @@ func member_count() -> int:
 	return int(steam.call("getNumLobbyMembers", lobby_id)) if _available and lobby_id != 0 else 0
 
 
+## True if `steam_id` is in our current Steam lobby (host mode: who may connect to the party).
+func is_lobby_member(steam_id: int) -> bool:
+	if not _available or lobby_id == 0 or steam_id == 0:
+		return false
+	for i: int in member_count():
+		if int(steam.call("getLobbyMemberByIndex", lobby_id, i)) == steam_id:
+			return true
+	return false
+
+
 ## Lobbies of friends playing this game, ONE entry per lobby however many friends are in it
 ## (Patrick: "If i have 4 friends in the lobby, it shows 4 times the same lobby"):
 ## [{lobby, party, build, friends: [names], members, max}]. Our own lobby is left out, and so

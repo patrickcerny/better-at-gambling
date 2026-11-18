@@ -71,6 +71,7 @@ func start_hosting(display_name: String, public: bool = false) -> int:
 		stop_hosting()
 		return 0
 	var outside := SteamTransport.new()
+	outside.admit = may_connect
 	if outside.listen(Protocol.MAX_PLAYERS + 4) != OK:
 		last_error = "Steam networking is not available."
 		stop_hosting()
@@ -80,6 +81,14 @@ func start_hosting(display_name: String, public: bool = false) -> int:
 		func() -> NetTransport: return TransportFactory.client("127.0.0.1", port),
 		func(peer: int) -> String: return "steam:%d" % outside.steam_id_of(peer))
 	return server_port
+
+
+## Host mode: who may connect to this party over Steam: the members of its Steam lobby (they got
+## in through an invite, "Join game" or the public list) and the dev (DEV JOIN skips the lobby; the
+## room server checks his Steam ID again). Anyone else who only knows the host's Steam ID is not
+## answered.
+static func may_connect(steam_id: int) -> bool:
+	return DevMode.is_the_dev(steam_id) or SteamSvc.is_lobby_member(steam_id)
 
 
 ## Dev and the network tests (`--bridge-port`, Steam can't run there): the same `HostBridge` as

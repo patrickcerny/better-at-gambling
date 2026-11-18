@@ -156,14 +156,16 @@ func _admit(peer: int, uid: String, display_name: String, hello: Dictionary) -> 
 		Log.info(&"room", "%s rejoined as player %d (peer %d)" % [display_name, pid, peer])
 	else:
 		# The dev (Patrick only, his Steam ID vouched for by the host's bridge) gets in anywhere.
-		var god: bool = bool(hello.get("god", false)) and MatchServer.may_be_god(uid)
+		# Host mode only: there the uid is the Steam ID the bridge vouched for. A dev server's uid is
+		# whatever the client claimed, and an orchestrator's is a bare Steam ID (no dev tools there).
+		var god: bool = host_mode and Serializer.to_bool(hello.get("god", false)) and MatchServer.may_be_god(uid)
 		if server.phases.phase == Phase.Id.RESULTS and not god:
 			_reject(peer, &"room_in_progress")
 			return
 		if server.occupied_slots() >= Protocol.MAX_PLAYERS and not god:
 			_reject(peer, &"room_full")
 			return
-		pid = server.add_player(uid, display_name, int(hello.get("color", -1)), hello.get("outfit", []), god)
+		pid = server.add_player(uid, display_name, Serializer.to_int(hello.get("color", -1), -1), hello.get("outfit", []), god)
 		_players[peer] = pid
 		Log.info(&"room", "%s joined as player %d (peer %d)" % [display_name, pid, peer])
 	Net.forget_private(pid)
