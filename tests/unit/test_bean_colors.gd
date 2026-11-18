@@ -23,6 +23,8 @@ func test_palette_and_shop_cover_every_colour() -> void:
 		assert_eq(d.display_name, Palette.PLAYER_COLOR_NAMES[c])
 		if c < Cosmetics.SLOT_COLORS:
 			assert_true(d.is_free(), "%s is free" % d.display_name)
+		elif d.price == 0:
+			assert_ne(d.achievement, &"", "%s without a price is an achievement reward" % d.display_name)
 		else:
 			assert_between(d.price, 100, 1000, "%s costs Coins" % d.display_name)
 	var colours: Array[Color] = []
@@ -54,8 +56,8 @@ func test_slot_colours_stay_in_the_free_eight() -> void:
 	assert_eq(lobby.free_color([0, 1], 12), 2, "a bought colour is never a slot colour")
 	assert_true(Cosmetics.is_slot_color(7))
 	assert_false(Cosmetics.is_slot_color(8))
-	assert_true(Cosmetics.is_valid_color(23))
-	assert_false(Cosmetics.is_valid_color(24))
+	assert_true(Cosmetics.is_valid_color(Cosmetics.COLOR_COUNT - 1))
+	assert_false(Cosmetics.is_valid_color(Cosmetics.COLOR_COUNT))
 
 
 func test_palette_bean_color_reads_the_wire() -> void:
