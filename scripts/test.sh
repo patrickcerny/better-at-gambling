@@ -23,8 +23,8 @@ run_gut() { # suite-name dir
 	grep -E 'Scripts|Tests|Passing|Failing|Pending|Asserts|Time' "$log" | sed 's/^/   /'
 	if [[ $code -ne 0 ]]; then
 		echo "   FAILED (exit $code), log: $log"; grep -E 'FAILED|\[Failed\]' -A3 "$log" | head -40; FAILED=1
-	elif grep -qE "$ERROR_PATTERN" "$log"; then
-		echo "   FAILED: errors in output, log: $log"; grep -E "$ERROR_PATTERN" -A2 "$log" | head -40; FAILED=1
+	elif real_errors "$log" >/dev/null; then
+		echo "   FAILED: errors in output, log: $log"; real_errors "$log"; FAILED=1
 	fi
 }
 
@@ -33,8 +33,8 @@ run_boot_smoke() {
 	echo "== boot (main scene, 60 frames)"
 	"$GODOT" --headless --path . -- --smoke-test --frames 60 >"$log" 2>&1
 	local code=$?
-	if [[ $code -ne 0 ]] || grep -qE "$ERROR_PATTERN" "$log"; then
-		echo "   FAILED (exit $code), log: $log"; grep -E "$ERROR_PATTERN" -A2 "$log" | head -40; FAILED=1
+	if [[ $code -ne 0 ]] || real_errors "$log" >/dev/null; then
+		echo "   FAILED (exit $code), log: $log"; real_errors "$log"; FAILED=1
 	else
 		echo "   ok"
 	fi
@@ -45,8 +45,8 @@ run_session() { # scripted 3-minute Practice session must log no errors (M2 acce
 	echo "== session (autoplay, 185 s game time)"
 	"$GODOT" --headless --path . --audio-driver Dummy -- --autoplay --smoke-test --seconds 185 --dummies 3 --seed 7 --give-items lucky_clover,banana_peel,black_cat >"$log" 2>&1
 	local code=$?
-	if [[ $code -ne 0 ]] || grep -qE "$ERROR_PATTERN" "$log"; then
-		echo "   FAILED (exit $code), log: $log"; grep -E "$ERROR_PATTERN" -A2 "$log" | head -40; FAILED=1
+	if [[ $code -ne 0 ]] || real_errors "$log" >/dev/null; then
+		echo "   FAILED (exit $code), log: $log"; real_errors "$log"; FAILED=1
 	else
 		echo "   ok ($(grep -c 'autoplay\]' "$log") scripted steps, $(grep -c WARN "$log") warnings)"
 	fi

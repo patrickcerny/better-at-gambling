@@ -20,8 +20,8 @@ fi
 LOG="$ROOT/build/test-logs/lint-parse.log"; mkdir -p "$(dirname "$LOG")"
 "$GODOT" --headless --path . -s tools/check_scripts.gd >"$LOG" 2>&1
 CODE=$?
-if [[ $CODE -ne 0 ]] || grep -qE "$ERROR_PATTERN" "$LOG"; then
-	echo "   script parse errors (log: $LOG):"; grep -E "$ERROR_PATTERN" -A2 "$LOG" | head -40; FAILED=1
+if [[ $CODE -ne 0 ]] || real_errors "$LOG" >/dev/null; then
+	echo "   script parse errors (log: $LOG):"; real_errors "$LOG"; FAILED=1
 fi
 [[ $FAILED -eq 0 ]] && echo "   ok"
 exit $FAILED

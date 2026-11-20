@@ -92,7 +92,9 @@ static func on_steam_deck() -> bool:
 	var f: FileAccess = FileAccess.open("/sys/devices/virtual/dmi/id/product_name", FileAccess.READ)
 	if f == null:
 		return false
-	var product: String = f.get_as_text().strip_edges()
+	# get_line, not get_as_text: sysfs files claim 4096 bytes but hold a few, and get_as_text then
+	# logs the engine error "r != len", which turned every Linux test run red.
+	var product: String = f.get_line().strip_edges()
 	return product in ["Jupiter", "Galileo"]
 
 
